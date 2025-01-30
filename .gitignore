@@ -1,0 +1,101 @@
+# anything secret or local
+*secret*
+.secrets.*
+*.local*
+
+# source
+*.ai
+.obsidian/
+
+# media
+resources/media/
+
+# api, schema extras
+extras/api
+extras/schemas
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*_cache
+*.pkl
+*.db
+tmp*
+
+# C extensions
+*.so
+
+# Python distro
+*.egg*
+build/
+develop-eggs/
+dist/
+lib/
+lib64/
+sdist/
+wheels/
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Sphinx
+docs/_build/
+
+# Unit test / coverage reports
+.coverage*/
+!.coveragerc
+htmlcov/
+html_cov/
+.tox/
+.nox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Node/Yarn
+node_modules
+.yarn
+*_dist.md
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# OSX
+.DS_Store
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json

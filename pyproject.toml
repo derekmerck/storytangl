@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "tangl"
+version = "0.1.0"
+description = ""
+authors = ["derek <derek.merck@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.10.6"
+shortuuid = "^1.0.13"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
