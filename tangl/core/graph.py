@@ -1,22 +1,20 @@
 from __future__ import annotations
+from typing import Any, Optional, Generic, Iterator, Callable, TypeVar
 from uuid import UUID
-from typing import Any, Self, Optional
 import functools
+from collections import deque
 import logging
 
-from pydantic import Field, BaseModel, GetCoreSchemaHandler
-from pydantic_core import core_schema
+from pydantic import Field, BaseModel
 
 from tangl.type_hints import UniqueLabel
-from .entity import Entity, Registry
+from .entity import Entity
+from .registry import Registry
 
 PATH_SEPARATOR = "/"
 logger = logging.getLogger(__name__)
 
-from typing import Iterator, Callable, TypeVar
-from collections import deque
-
-T = TypeVar('T', bound='Node')
+NodeT = TypeVar('NodeT', bound='Node')
 
 class Node(Entity):
     """
@@ -73,6 +71,7 @@ class Node(Entity):
             if child.detect_cycle():
                 raise ValueError("Adding this node would create a cycle")
             self.children_ids.append(child.uid)
+            return
         logger.warning("Tried to re-add a child node")
 
     def remove_child(self, child: Node, unlink: bool = False):
@@ -98,13 +97,13 @@ class Node(Entity):
             visited.add(current.uid)
         return False
 
-    def traverse_dfs(self) -> Iterator[T]:
+    def traverse_dfs(self) -> Iterator[NodeT]:
         """Depth-first traversal of node tree"""
         yield self
         for child in self.children:
             yield from child.traverse_dfs()
 
-    def traverse_bfs(self) -> Iterator[T]:
+    def traverse_bfs(self) -> Iterator[NodeT]:
         """Breadth-first traversal of node tree"""
         queue = deque([self])
         while queue:
@@ -112,13 +111,13 @@ class Node(Entity):
             yield node
             queue.extend(node.children)
 
-    def visit(self, visitor: Callable[[T], None]) -> None:
+    def visit(self, visitor: Callable[[NodeT], None]) -> None:
         """Apply visitor function to this node and all children"""
         visitor(self)
         for child in self.children:
             child.visit(visitor)
 
-    def move_to(self, new_parent: T, index: int = None) -> None:
+    def move_to(self, new_parent: NodeT, index: int = None) -> None:
         """
         Move this node and its subtree to a new parent.
         Optionally specify insertion index.
@@ -138,14 +137,14 @@ class Node(Entity):
             self.graph = new_parent.graph
 
     @property
-    def siblings(self) -> list[T]:
+    def siblings(self) -> list[NodeT]:
         """Get all siblings of this node"""
         if not self.parent:
             return []
         return [child for child in self.parent.children if child != self]
 
     @property
-    def leaf_nodes(self) -> list[T]:
+    def leaf_nodes(self) -> list[NodeT]:
         """Get all leaf nodes in subtree"""
         leaves = []
         for node in self.traverse_dfs():
@@ -173,17 +172,16 @@ class Edge(Node):
     def successor(self) -> Optional[Node]:
         return self.graph.get(self.successor_id, None)
 
+class Graph(Registry[NodeT], Generic[NodeT]):
 
-class Graph(Registry[Node]):
-
-    def add(self, node: Node, **kwargs):
+    def add(self, node: NodeT, **kwargs):
         if node.graph is self:
             return
         node.graph = self
         super().add(node, **kwargs)
         # this will throw if trying to re-add but node.graph is not already set to self
 
-    def remove(self, value: Node):
+    def remove(self, value: NodeT):
         for child in value.children:
             value.remove_child(child, unlink=True)
         super().remove(value)
@@ -193,10 +191,3 @@ class Graph(Registry[Node]):
             if x := self.find_one(path=key):
                 return x
         return super().__getitem__(key)
-
-    def __get_pydantic_core_schema__(self, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
-        # this allows pydantic to create a complete schema for Node
-        return core_schema.dict_schema(
-            keys_schema=core_schema.uuid_schema(),
-            values_schema=handler.generate_schema(Node)
-        )

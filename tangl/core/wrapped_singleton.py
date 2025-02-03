@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
 import sys
 import logging
@@ -6,8 +7,8 @@ import pydantic
 from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
-from .entity import Singleton
-from .graph import Node, Graph  # importing graph is req for schema
+from .singleton import Singleton
+from .graph import Node, Graph  # apparently unnecessary Graph import required for schema
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +27,14 @@ class WrappedSingleton(Node, Generic[WrappedType]):
     @classmethod
     def _valid_label_for_wrapped_cls(cls, value: str) -> str:
         if not cls.wrapped_cls.get_instance(value):
-            raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref_id `{value}`.")
+            raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref label `{value}`.")
         return value
 
     @property
     def reference_singleton(self) -> WrappedType:
         res = self.wrapped_cls.get_instance(self.label)
         if not res:
-            raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref_id `{self.label}`.")
+            raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.label}`.")
         return self.wrapped_cls.get_instance(self.label)
 
     def __getattr__(self, name: str) -> Any:

@@ -1,40 +1,27 @@
-import logging
+from __future__ import annotations
+from typing import Self, Optional, Any, Iterable, Type
 from uuid import UUID, uuid4
-from typing import TypeVar, Generic, ClassVar, Self, Optional, Any, Iterable, Type
 import functools
+from fnmatch import fnmatch
+import logging
 
 import shortuuid
-from pydantic import BaseModel, Field, model_validator, field_serializer, field_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator, field_serializer
 
-from tangl.type_hints import UniqueLabel, UnstructuredData, Tag, Identifier, Hash
+from tangl.type_hints import UnstructuredData, Tag, Identifier, Hash
+from tangl.utils.dereference_obj_cls import dereference_obj_cls
 
 logger = logging.getLogger(__name__)
 
-ObjCls = TypeVar("ObjCls", bound=Type)
-
-def subclass_by_name(base_cls: ObjCls, cls_name: UniqueLabel) -> Optional[ObjCls]:
-    if base_cls.__name__ == cls_name:
-        return base_cls
-    for cls_ in base_cls.__subclasses__():
-        if cls_.__name__ == cls_name:
-            return cls_
-        if cls_ := subclass_by_name(cls_, cls_name):
-            return cls_
-    return None  # can't raise here b/c it is a recursive call
-
-def dereference_obj_cls(cls: ObjCls, cls_name: str) -> ObjCls:
-    obj_cls = subclass_by_name(cls, cls_name)
-    if obj_cls is None:
-        raise ValueError(f"Cannot dereference subclass {cls_name} in {cls.__name__}")
-    return obj_cls
-
 class Entity(BaseModel):
 
-    obj_cls: str = Field(init_var=True, default=None)  # Consumed by metaclass if necessary
+    #: Consumed by metaclass for dereference, if necessary
+    obj_cls: str | Type[Self] = Field(init_var=True, default=None)  
     uid: UUID = Field(default_factory=uuid4)
     label: str = None
     tags: set[Tag] = Field(default_factory=set)
     data_hash: Hash = None
+    domain: str = None  # holder for user-defined domain of entity
 
     @property
     def short_uid(self):
@@ -54,6 +41,9 @@ class Entity(BaseModel):
         return values
 
     def has_tags(self, *tags: str) -> bool:
+        """Check all tags are in self.tags"""
+        if len(tags) == 1 and isinstance(tags[0], (list, set)):
+            tags = tags[0]
         return set(tags).issubset(self.tags)
 
     def get_identifiers(self) -> set[Identifier]:
@@ -61,33 +51,48 @@ class Entity(BaseModel):
         return { self.uid, self.label, self.data_hash }
 
     def has_alias(self, *aliases: Identifier) -> bool:
+        """Test if any alias is in self.identifiers"""
+        if len(aliases) == 1 and isinstance(aliases[0], (list, set)):
+            aliases = aliases[0]
         identifiers = self.get_identifiers()
         identifiers = { x for x in identifiers if x }  # discard empty/falsy identifiers
         return bool( set(aliases).intersection(identifiers) )
 
+    def has_cls(self, obj_cls: str | type[Self]) -> bool:
+        """Test if entity is instance of the given class"""
+        cls_ = dereference_obj_cls(self.__class__, obj_cls)
+        return isinstance(self, cls_)
+
+    @classmethod
+    def class_distance(cls, obj_cls: str | type[Self]) -> Optional[int]:
+        """
+        Get distance to class in MRO. Returns None if not in MRO.
+        Distance of 0 means exact class, 1 means immediate parent, etc.
+        """
+        cls_ = dereference_obj_cls(cls, obj_cls)
+        return cls.__mro__.index(cls_)
+
+    def has_domain(self, domain: str) -> bool:
+        if not isinstance(self.domain, str) or not isinstance(domain, str):
+            return False
+        if '*' in domain:
+            # compare strings with * in test with fnmatch
+            return fnmatch(self.domain, domain)
+        return self.domain == domain
+
     def matches_criteria(self, **criteria) -> bool:
         # Must match all
-
-        def compare_values(test_value, self_value) -> bool:
-            if isinstance(self_value, set):
-                if isinstance(test_value, (list, set)):
-                    if set(test_value).issubset(self_value):
-                        return True
-                else:
-                    raise ValueError(f"Undefined comparison between set and {type(test_value)}")
-            elif test_value == self_value:
-                return True
 
         if not criteria:
             raise ValueError("No criteria specified, return value is undefined.")
 
         for criterion, value in criteria.items():
-            if hasattr(self, criterion):
-                if not compare_values(value, getattr(self, criterion)):
-                    return False
-            elif hasattr(self, f"has_{criterion}"):
-                if not compare_values(value, getattr(self, f"has_{criterion}")):
-                    return False
+            # try any explicitly defined tests first
+            if hasattr(self, f"has_{criterion}"):
+                return getattr(self, f"has_{criterion}")(value)
+            # if the attribute is directly available, try comparing it
+            elif hasattr(self, criterion):
+                return getattr(self, criterion) == value
             else:
                 raise ValueError(f"Untestable comparitor for {criterion} on {self.__class__}")
 
@@ -137,97 +142,3 @@ class Entity(BaseModel):
                 return False
         return True
 
-
-VT = TypeVar("VT", bound=Entity)
-
-class Registry(dict[UUID, VT], Generic[VT]):
-
-    def __setitem__(self, *args, **kwargs):
-        raise NotImplementedError(f"{self.__class__.__name__} is not setable by key, use `add(entity)`.")
-
-    def __getitem__(self, key: UUID | UniqueLabel) -> VT:
-        if isinstance(key, UniqueLabel):
-            if x := self.find_one(label=key):
-                return x
-        return super().__getitem__(key)
-
-    def add(self, value: VT, allow_overwrite: bool = False):
-        if not allow_overwrite and value.uid in self:
-            raise ValueError(f"Cannot overwrite {value.uid} in registry. Pass `allow_overwrite=True` to force overwrite.")
-        super().__setitem__(value.uid, value)
-
-    def remove(self, value: VT):
-        # this is actually more like discard since it doesn't fail if the key is missing
-        self.pop(value.uid, None)
-
-    def find(self, **criteria) -> list[VT]:
-        return Entity.filter_by_criteria(self.values(), **criteria)
-
-    def find_one(self, **criteria) -> Optional[VT]:
-        return Entity.filter_by_criteria(self.values(), return_first=True, **criteria)
-
-    def unstructure(self, *args, **kwargs) -> UnstructuredData:
-        data = []
-        for v in self.values():
-            data.append(v.unstructure())
-        return { 'obj_cls': self.__class__.__name__, 'data': data }
-
-    @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
-        obj_cls = data.pop("obj_cls")
-        obj_cls = dereference_obj_cls(cls, obj_cls)
-        this = obj_cls()
-        data = data.pop('data', [])
-        for v in data:
-            item = Entity.structure(v)
-            this.add(item)
-        return this
-
-class Singleton(Entity):
-
-    model_config = ConfigDict(frozen=True)
-
-    _instances: ClassVar[Registry[Self]] = Registry[Self]()
-
-    def __hash__(self):
-        return hash((self.__class__, self.label),)
-
-    @classmethod
-    def __init_subclass__(cls, isolate_registry: bool = True, **kwargs) -> None:
-        if isolate_registry:
-            # create a new registry for this subclass, otherwise `get_instance` refers to the super class
-            cls._instances = Registry[Self]()
-        super().__init_subclass__(**kwargs)
-
-    label: UniqueLabel = Field(...)   # required now, must be unique w/in class
-
-    @field_validator("label")
-    @classmethod
-    def check_unique(cls, label_value: str):
-        if cls.get_instance(label_value):
-            raise ValueError(f"Instance {label_value} already registered.")
-        return label_value
-
-    @model_validator(mode="after")
-    def register_instance(self):
-        # This will raise value error if it already exists, but we check that explicitly as well
-        self._instances.add(self)
-
-    @classmethod
-    def get_instance(cls, label: str) -> VT:
-        # We don't want to get by uid, want to get by label
-        # todo: add a 'search_everywhere' flag to look in superclass and subclass registries
-        return cls._instances.find_one(label=label)
-
-    @functools.wraps(BaseModel.model_dump)
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
-        # singletons can structure from class and label alone
-        return { 'obj_cls': self.__class__.__name__, 'label': self.label }
-
-    @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
-        obj_cls = data.pop("obj_cls")
-        obj_cls = dereference_obj_cls(cls, obj_cls)
-        label = data.pop("label")  # this will throw a key error if it's not set properly
-        this = obj_cls.get_instance(label)
-        return this

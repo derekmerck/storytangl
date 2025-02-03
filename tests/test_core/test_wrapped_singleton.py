@@ -15,6 +15,8 @@ class TestSingleton(Singleton):
 def reset_test_singleton():
     TestSingleton._instances.clear()
     TestSingleton(label="unique_singleton")
+    yield
+    TestSingleton._instances.clear()
 
 @pytest.fixture
 def ws():

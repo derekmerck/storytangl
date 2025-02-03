@@ -1,7 +1,7 @@
 import pytest
 from uuid import UUID
 
-from tangl.core.entity import Entity, Registry, Singleton
+from tangl.core.entity import Entity
 
 
 class TestEntity:
@@ -61,68 +61,4 @@ class TestEntity:
         e = Entity()
         with pytest.raises(TypeError):
             { e }
-
-
-class TestRegistry:
-
-    def test_registry_add_find(self):
-        r = Registry()
-        e = Entity(label="hero")
-        r.add(e)
-        assert r.find_one(label="hero") == e
-        assert r.find(label="hero") == [e]
-        assert r['hero'] == e
-
-        with pytest.raises(KeyError):
-            r['dog']
-
-    def test_registry_prevent_duplicate(self):
-        r = Registry()
-        e = Entity(label="hero")
-        r.add(e)
-        with pytest.raises(ValueError):
-            r.add(e)  # Should raise because allow_overwrite=False by default
-
-    def test_registry_unstructure_structure(self):
-        r = Registry()
-        e = Entity(label="hero")
-        r.add(e)
-        structured = r.unstructure()
-        restored = Registry.structure(structured)
-        assert restored.find_one(label="hero") == e
-
-
-class TestSingleton:
-
-    def test_singleton_creation(self):
-        class TestSingleton(Singleton):
-            pass
-
-        s1 = TestSingleton(label="unique")
-        s2 = TestSingleton.get_instance("unique")
-        assert s1 == s2
-
-    def test_singleton_duplicate_prevention(self):
-        class TestSingleton(Singleton):
-            pass
-
-        TestSingleton(label="unique")
-        with pytest.raises(ValueError):
-            TestSingleton(label="unique")  # Should fail due to duplicate label
-
-    def test_singleton_hashes(self):
-
-        class TestSingleton(Singleton):
-            pass
-
-        u = TestSingleton(label="unique")
-        { u }
-
-    def test_singleton_unstructure_structure(self):
-        class TestSingleton(Singleton):
-            pass
-        s1 = TestSingleton(label="unique")
-        structured = s1.unstructure()
-        restored = TestSingleton.structure(structured)
-        assert restored == s1
 
