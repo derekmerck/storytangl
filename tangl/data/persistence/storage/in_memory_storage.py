@@ -1,0 +1,2 @@
+class InMemoryStorage(dict):
+    pass
