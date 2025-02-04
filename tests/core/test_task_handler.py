@@ -1,13 +1,13 @@
 import pytest
 
 from tangl.core import Entity
-from tangl.core.handler import TaskHandler, TaskPipeline, PipelineStrategy, HandlerPriority
+from tangl.core.handlers import PipelineStrategy, TaskPipeline, HandlerPriority
 
 @pytest.fixture(autouse=True)
 def renderable_pipeline_and_classes():
     on_render = TaskPipeline[Entity, dict](label="on_render", pipeline_strategy=PipelineStrategy.GATHER)
 
-    class RenderableEntity(Entity):
+    class RenderableTestEntity(Entity):
 
         @on_render.register(HandlerPriority.NORMAL)
         def my_rendering_handler(self, **context) -> dict:
@@ -16,26 +16,26 @@ def renderable_pipeline_and_classes():
         def render(self):
             return on_render.execute(self)
 
-    class MyRenderableEntity(RenderableEntity):
+    class MyRenderableTestEntity(RenderableTestEntity):
 
         @on_render.register(HandlerPriority.FIRST)
         def my_rendering_handler(self, **context) -> dict:
             return {'hello': 'world2'}
 
-    yield on_render, RenderableEntity, MyRenderableEntity
+    yield on_render, RenderableTestEntity, MyRenderableTestEntity
 
     TaskPipeline.clear_instances()
 
 
 def test_renderable_pipeline(renderable_pipeline_and_classes):
 
-    on_render, RenderableEntity, MyRenderableEntity = renderable_pipeline_and_classes
-    result = on_render.execute(RenderableEntity())
+    on_render, RenderableTestEntity, MyRenderableTestEntity = renderable_pipeline_and_classes
+    result = on_render.execute(RenderableTestEntity())
     assert result == {'hello': 'world', 'foo': 'bar'}
-    result = on_render.execute(MyRenderableEntity())
+    result = on_render.execute(MyRenderableTestEntity())
     assert result == {'hello': 'world2', 'foo': 'bar'}
 
-    result = RenderableEntity().render()
+    result = RenderableTestEntity().render()
     assert result == {'hello': 'world', 'foo': 'bar'}
-    result = MyRenderableEntity().render()
+    result = MyRenderableTestEntity().render()
     assert result == {'hello': 'world2', 'foo': 'bar'}

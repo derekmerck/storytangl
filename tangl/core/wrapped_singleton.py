@@ -8,6 +8,7 @@ from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
 from .singleton import Singleton
+# noinspection PyUnresolvedReferences
 from .graph import Node, Graph  # apparently unnecessary Graph import required for schema
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class WrappedSingleton(Node, Generic[WrappedType]):
 
     label: UniqueLabel = Field(...)  # required
 
+    # noinspection PyNestedDecorators
     @field_validator("label")
     @classmethod
     def _valid_label_for_wrapped_cls(cls, value: str) -> str:

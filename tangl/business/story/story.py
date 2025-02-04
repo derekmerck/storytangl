@@ -1,33 +1,35 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from tangl.core import Graph, Node
+from tangl.core.handlers import HasContext
 
-def setup_story_pipelines():
-    """
-    Story pipelines include:
-    - on_create (get class, update args/kwargs) -> type[Entity], args, kwargs
-    - on_init (post init bookkeeping and registrations) -> in place
-    - on_gather_context (collect scoped local and global variables and callables) -> mapping
-    - on associate/disassociate dynamically linked nodes -> in place
-    - on_enter/exit traversable nodes (invokes processing) -> new cursor update loc or None
-    - on_render_content (invokes services to assemble a journal entry) -> list[JournalFragment]
-    """
+if TYPE_CHECKING:
+    from tangl.business.world.world import World
+else:
+    from tangl.core import Singleton as World
 
+class StoryNode(HasContext, Node):
 
-class StoryNode(Node):
     @property
-    def story(self):
+    def story(self) -> Story:
         return self.graph
 
+    @property
+    def world(self):
+        return self.story.world
 
-class Story(Graph[StoryNode]):
 
+class Story(HasContext, Graph[StoryNode]):
+
+    world: World = None
     cursor_id: UUID = None
 
     @property
-    def cursor(self) -> StoryNode:  # a traversable story node, no less
+    def cursor(self) -> StoryNode:  # todo: should be a traversable story node, no less
         return self[self.cursor_id]
 
     # def get_scenes(self):
     #     from .scene import Scene
-    #     self.find(obj_cls=Scene)
+    #     self.find(has_cls=Scene)
