@@ -28,6 +28,6 @@ FlatData = str | bytes
 UnstructuredData = StringMap
 
 # UI style hints
-StyleId = str                       # ui element id, #id or id=name
-StyleClasses = str | list[str]      # ui element class list, npc, npc.win
-StyleDict = dict[str, str]          # ui element style dictionary, {'color': 'orange', ...}
+StyleId = str            # ui element id, #id or id=name
+StyleClass = str         # ui element class list, npc, npc.win
+StyleDict = StringMap    # ui element style dictionary, {'color': 'orange', ...}

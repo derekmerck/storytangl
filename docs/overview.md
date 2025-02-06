@@ -1,8 +1,8 @@
-# Abstract Narrative Graph Lib (tANGL)
+# The Abstract Narrative Graph Lib (Tangl)
 
 ## Overview
 
-**tANGL** is a framework for designing, storing, and executing **interactive narratives** as **abstract story graphs**. It separates concerns into four main layers—**data**, **business**, **service**, and **presentation**—to handle everything from persistent storage and user management to story logic and multi-format rendering. This modular design supports scenarios ranging from **classic CYOA** branching to **open-world RPG** structures with concurrency, dynamic node creation, skill checks, and more.
+**Tangl** is a framework for designing, storing, and executing **interactive narratives** as **abstract story graphs**. It separates concerns into four main layers—**data**, **business**, **service**, and **presentation**—to handle everything from persistent storage and user management to story logic and multi-format rendering. This modular design supports scenarios ranging from **classic CYOA** branching to **open-world RPG** structures with concurrency, dynamic node creation, skill checks, and more.
 
 ---
 

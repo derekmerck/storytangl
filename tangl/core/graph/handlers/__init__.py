@@ -1,2 +1,2 @@
-from .traversable import Traversable
+# from .traversable import Traversable
 from .associating import Associating

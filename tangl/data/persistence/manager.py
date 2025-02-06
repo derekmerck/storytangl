@@ -4,7 +4,7 @@ from uuid import UUID
 from typing import Type, ClassVar
 
 from tangl.type_hints import HasUid, ClassName, FlatData, UnstructuredData
-from tangl.utils.is_valid_uuid import is_valid_uuid
+# from tangl.utils.is_valid_uuid import is_valid_uuid
 from .storage import StorageProtocol
 from .serializers import SerializationHandlerProtocol
 from .structuring import StructuringHandlerProtocol

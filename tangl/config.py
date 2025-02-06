@@ -7,7 +7,7 @@ from dynaconf import Dynaconf
 from dynaconf.utils import parse_conf
 
 settings = Dynaconf(
-    envvar_prefix="AFC",  # set "foo=bar" with `export AFC_FOO=bar`.
+    envvar_prefix="TANGL",  # set "foo=bar" with `export TANGL_FOO=bar`.
     settings_files=['defaults.toml', 'settings.toml', 'settings.local.toml', '.secrets.toml'],
     root_path = Path(__file__).parent,
 )
