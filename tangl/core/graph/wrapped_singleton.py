@@ -9,11 +9,12 @@ from pydantic import Field, field_validator
 from tangl.type_hints import UniqueLabel
 from tangl.core.entity import Singleton
 # noinspection PyUnresolvedReferences
-from .graph import Node, Graph  # apparently unnecessary Graph import required for schema
+# apparently unnecessary Graph import required for schema
+from .graph import Node, Graph
 
 logger = logging.getLogger(__name__)
 
-WrappedType = TypeVar("WrappedType", bound=Singleton)  # Singleton inherits from Entity and pydantic.BaseModel
+WrappedType = TypeVar("WrappedType", bound=Singleton)
 
 class WrappedSingleton(Node, Generic[WrappedType]):
     # Allows embedding a singleton into a graph and referring to its properties indirectly.

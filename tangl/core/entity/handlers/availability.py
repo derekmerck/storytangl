@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 import logging
 
 from tangl.core.task_handler import TaskPipeline, PipelineStrategy
@@ -7,16 +8,11 @@ from .runtime import on_check_conditions, HasConditions
 
 logger = logging.getLogger(__name__)
 
-def setup_on_avail_pipeline() -> TaskPipeline[Available, bool]:
-    if pipeline := TaskPipeline.get_instance(label="on_avail"):
-        pass
-    else:
-        pipeline = TaskPipeline(label="on_avail", pipeline_strategy=PipelineStrategy.ALL)
-
-    return pipeline
-
-# todo: can't invoke this directly b/c it requires context
-on_avail = setup_on_avail_pipeline()
+on_avail = TaskPipeline[HasContext, bool](label="on_avail", pipeline_strategy=PipelineStrategy.ALL)
+"""
+The global pipeline for testing availability. Handlers for availability tests
+should decorate methods with ``@on_avail.register(...)``.
+"""
 
 class Available(HasContext):
 

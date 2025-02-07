@@ -5,9 +5,9 @@ from tangl.core.graph import Node, Edge
 from tangl.core.entity.handlers import HasContext, Renderable, on_render, HasEffects, on_apply_effects
 from tangl.core.task_handler import TaskHandler, TaskPipeline, HandlerPriority, PipelineStrategy
 
-on_enter = TaskPipeline[Traversable, Optional[Edge]](label="on_enter", pipeline_strategy=PipelineStrategy.FIRST)
+on_enter = TaskPipeline[Node, Optional[Edge]](label="on_enter", pipeline_strategy=PipelineStrategy.FIRST)
 
-on_exit = TaskPipeline[Traversable, Any](label="on_exit", pipeline_strategy=PipelineStrategy.GATHER)
+on_exit = TaskPipeline[Edge, Any](label="on_exit", pipeline_strategy=PipelineStrategy.GATHER)
 
 
 class Traversable(HasContext, Node):

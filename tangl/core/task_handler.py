@@ -20,7 +20,7 @@ for specific tasks and execute them in a controlled order on Entities.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, Type, Optional
+from typing import TypeVar, Generic, Callable, Any, Type, Optional, Union
 from enum import Enum, auto, IntEnum
 import inspect
 from itertools import chain
@@ -137,7 +137,7 @@ class TaskHandler(Entity):
     priority: HandlerPriority = HandlerPriority.NORMAL
     caller_cls_: Optional[Type[Entity]] = Field(None, alias="caller_cls")
     domain: str = "*"  # global ns
-    registration_order: Optional[int] = None
+    registration_order: Optional[int] = -1
 
     def __call__(self, *args: Any, **kwargs: Any) -> ResultT:
         """
@@ -169,7 +169,11 @@ class TaskHandler(Entity):
                     raise ValueError("Cannot get outer scope name for module-level func")
                 possible_class_name = parts[-2]  # the thing before .method_name
                 logger.debug(f'Parsing {possible_class_name}')
-                self.caller_cls_ = dereference_obj_cls(Entity, possible_class_name)
+                try:
+                    self.caller_cls_ = dereference_obj_cls(Entity, possible_class_name)
+                except ValueError:
+                    # return None if we can't evaluate it
+                    pass
         return self.caller_cls_
 
     def has_signature(self, *args, **kwargs) -> bool:
@@ -189,6 +193,9 @@ class TaskHandler(Entity):
         except TypeError:
             return False
 
+    def has_func_name(self, name: str) -> bool:
+        return self.func.__name__ == name
+
     def has_caller_cls(self, caller_cls: Type[EntityT]) -> bool:
         """
         Determine if this handler can apply to the given ``caller_cls``
@@ -196,7 +203,7 @@ class TaskHandler(Entity):
 
         - If ``self.func`` is a classmethod, staticmethod, or lambda,
           it's considered globally applicable.
-        - Otherwise, we check that the pipeline's ``caller_cls`` is a
+        - Otherwise, we check that the given ``caller_cls`` is a
           subclass of the declared or inferred ``self.caller_cls``.
 
         :param caller_cls: The class of the entity being processed.
@@ -206,10 +213,13 @@ class TaskHandler(Entity):
         :raises ValueError: If we cannot evaluate or infer the
                             handler's ``caller_cls``.
         """
-        if isinstance(self.func, (classmethod, staticmethod)) or self.func.__name__ == "<lambda>":
+        if self.caller_cls is None:  # accepts unbounded
             return True
-        if self.caller_cls:
+        elif self.caller_cls:
+            logger.debug(f"subclass check child {caller_cls.__name__} is sub of parent {self.caller_cls.__name__}: {issubclass(caller_cls, self.caller_cls)}")
             return issubclass(caller_cls, self.caller_cls)
+        elif isinstance(self.func, (classmethod, staticmethod)) or self.func.__name__ == "<lambda>":
+            return True
         raise ValueError(f"Cannot evaluate {self.func.__qualname__} caller_cls {self.caller_cls} of type {type(self.caller_cls)}")
 
 
@@ -312,7 +322,7 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
         Internal helper to place a handler in the registry, increment
         the registration count, and invalidate caches.
         """
-        handler.registration_order = self.handler_registry
+        handler.registration_order = self.handler_registrations
         self.handler_registrations += 1
         self.handler_registry.add(handler)
         self._invalidate_resolution_cache()
@@ -326,7 +336,10 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
         # but don't decrement the registration counter
         self._invalidate_resolution_cache()
 
-    def gather_handlers(self, caller_cls: Type[EntityT], domain: str = "*"):
+    def gather_handlers(self,
+                        caller_cls: Type[EntityT],
+                        domain: str = "*",
+                        extra_handlers: list[Callable] = None):
         """
         Retrieve handlers applicable to a given ``caller_cls`` and
         ``domain``, in final sorted order.
@@ -344,24 +357,46 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
         :return: A list of all matching handlers in sorted order.
         :rtype: list[TaskHandler]
         """
-        if cached := self._resolution_cache.get((caller_cls, domain)):
-            return cached
+        if not extra_handlers and (caller_cls, domain) in self._resolution_cache:
+            # Only use cache if no extra handlers are provided
+            return self._resolution_cache.get((caller_cls, domain))
 
         handlers = self.handler_registry.find(caller_cls=caller_cls, domain=domain)
+
+        if extra_handlers:
+            for h in extra_handlers:
+                if isinstance(h, TaskHandler):
+                    if h.has_caller_cls(caller_cls):
+                        logger.debug(f"Allowing {h.func.__name__} for {caller_cls.__name__}")
+                        handlers.append(h)
+                elif isinstance(h, Callable):
+                    # Cast to TaskHandler if they are bare Callables,
+                    # priority defaults to Normal and registration order to -1
+                    # Pass in explicit TaskHandlers for more control
+                    h = TaskHandler(func=h)
+                    handlers.append(h)
+                else:
+                    raise TypeError('Extra handlers must be a callable or TaskHandler')
+
+        # logger.debug(f"{self.label} pipeline handlers to invoke: {[h.func.__name__ for h in handlers]}")
 
         # Sort by priority maintaining relative ordering within each level
         handlers = sorted(handlers, key=lambda h: (
             h.priority,
             -caller_cls.class_distance(h.caller_cls),
+            # calling entity should be a subclass of h.caller_class
             # -h.domain_specificity(domain),
             # todo: we are just using * fnmatch for now, how are domains represented and dist measured?
             h.registration_order
         ))
 
-        self._resolution_cache[(caller_cls, domain)] = handlers
+        if not extra_handlers:
+            # Only cache the result if no extra handlers are in the sorted result
+            self._resolution_cache[(caller_cls, domain)] = handlers
+
         return handlers
 
-    def execute(self, entity: EntityT, **context) -> ResultT:
+    def execute(self, entity: EntityT, extra_handlers: list[Callable] = None, **context) -> ResultT:
         """
         Execute all applicable handlers for a given entity, combining
         results according to :attr:`pipeline_strategy`.
@@ -374,7 +409,10 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
         :rtype: ResultT
         :raises ValueError: If no handlers are found for the entity.
         """
-        handlers = self.gather_handlers(caller_cls=entity.__class__, domain=entity.domain)
+        handlers = self.gather_handlers(
+            caller_cls=entity.__class__,
+            domain=entity.domain,
+            extra_handlers=extra_handlers)
 
         logger.debug(f"{self.label} pipeline handlers to invoke: {(h.func.__name__ for h in handlers)}")
 

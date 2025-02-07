@@ -8,7 +8,7 @@ objects that other handler pipelines may depend on.
 """
 
 from __future__ import annotations
-from typing import Mapping, Optional
+from typing import Optional, Any
 from pydantic import Field
 
 from tangl.type_hints import StringMap
@@ -16,30 +16,12 @@ from tangl.core.entity import Entity
 from tangl.core.graph import Node
 from tangl.core.task_handler import TaskPipeline, HandlerPriority, PipelineStrategy
 
-def setup_on_context_pipeline() -> TaskPipeline[HasContext, StringMap]:
-    """
-    Retrieve (or create) a singleton TaskPipeline for the 'on_gather_context'
-    label. By default, it uses the ``GATHER`` strategy, meaning all non-None
-    dict results from handlers will be merged (if they share the same type).
-
-    :return: The singleton pipeline for context gathering.
-    :rtype: TaskPipeline[HasContext, Mapping[str, Any]]
-    """
-    # Attempt to look up an existing pipeline by label
-    pipeline = TaskPipeline.get_instance(label="on_gather_context")
-    if pipeline is None:
-        # Create a new pipeline with the desired label + strategy
-        pipeline = TaskPipeline(
-            label="on_gather_context",
-            pipeline_strategy=PipelineStrategy.GATHER
-        )
-    return pipeline
-
-# Expose this pipeline for decorating methods that supply context
-on_gather_context = setup_on_context_pipeline()
+on_gather_context = TaskPipeline[Entity, dict](
+    label="on_gather_context",
+    pipeline_strategy=PipelineStrategy.GATHER)
 """
 The global pipeline for supplying context. Handlers for context gathering
-should decorate methods with ``@on_gather_conext.register(...)``.
+should decorate methods with ``@on_gather_context.register(...)``.
 """
 
 class HasContext(Entity):

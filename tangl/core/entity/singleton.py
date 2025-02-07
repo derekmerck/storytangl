@@ -12,7 +12,7 @@ from typing import ClassVar, Self, Any
 import functools
 import logging
 
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict, PrivateAttr
 
 from tangl.type_hints import UniqueLabel, UnstructuredData
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
@@ -55,6 +55,20 @@ class Singleton(Entity):
     Each subclass gets its own registry instance.
     """
 
+    def __new__(cls, label, **kwargs):
+        if x := cls.get_instance(label):
+            return x
+        return super().__new__(cls)
+
+    _initialized: bool = PrivateAttr(False)
+
+    def __init__(self, label, **kwargs) -> None:
+        # prevent init code from running again
+        if hasattr(self, "__pydantic_private__") and self._initialized:
+            return
+        super().__init__(label=label, **kwargs)
+        self._initialized = True
+
     def __hash__(self):
         """
         Define a custom hash function so Singleton instances can be
@@ -88,24 +102,25 @@ class Singleton(Entity):
     within a given subclass registry.
     """
 
-    # noinspection PyNestedDecorators
-    @field_validator("label")
-    @classmethod
-    def _check_unique(cls, label_value: UniqueLabel):
-        """
-        Field validator that ensures no existing Singleton in this class
-        has the same label. Raises :exc:`ValueError` if another instance
-        is already registered under that label.
-
-        :param label_value: The proposed label for the new instance.
-        :type label_value: str
-        :raises ValueError: If the label is already registered for this class.
-        :return: The validated label.
-        :rtype: str
-        """
-        if cls.get_instance(label_value):
-            raise ValueError(f"Instance {label_value} already registered.")
-        return label_value
+    # No longer relevant, since __new__ is idempotent
+    # # noinspection PyNestedDecorators
+    # @field_validator("label")
+    # @classmethod
+    # def _check_unique(cls, label_value: UniqueLabel):
+    #     """
+    #     Field validator that ensures no existing Singleton in this class
+    #     has the same label. Raises :exc:`ValueError` if another instance
+    #     is already registered under that label.
+    #
+    #     :param label_value: The proposed label for the new instance.
+    #     :type label_value: str
+    #     :raises ValueError: If the label is already registered for this class.
+    #     :return: The validated label.
+    #     :rtype: str
+    #     """
+    #     if cls.get_instance(label_value):
+    #         raise ValueError(f"Instance {label_value} already registered.")
+    #     return label_value
 
     @model_validator(mode="after")
     def _register_instance(self):

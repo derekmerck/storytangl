@@ -115,6 +115,11 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
         """
         return len(self._data)
 
+    def __contains__(self, item: Entity | UUID) -> bool:
+        if isinstance(item, Entity):
+            item = item.uid
+        return super().__contains__(item)
+
     def add(self, value: VT, allow_overwrite: bool = False) -> None:
         """
         Add a new entity to the Registry. The entity's UUID is used as

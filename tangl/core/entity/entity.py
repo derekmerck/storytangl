@@ -71,7 +71,7 @@ class Entity(BaseModel):
     uid: UUID = Field(init=False, default_factory=uuid4)
     label: Label = None
     tags: set[Tag] = Field(default_factory=set)
-    data_hash: Hash = None
+    content_hash: Hash = None
     domain: str = None  # holder for user-defined domain of entity
     dirty: bool = None  # indicator that entity has been tampered with, invalidates certain debugging
 
@@ -140,7 +140,7 @@ class Entity(BaseModel):
         :return: A set of identifiers usable for matching or searching.
         :rtype: set[Identifier]
         """
-        return { self.uid, self.label, self.data_hash }
+        return { self.uid, self.label, self.content_hash }
 
     def has_alias(self, *aliases: Identifier) -> bool:
         """
@@ -177,8 +177,10 @@ class Entity(BaseModel):
     def class_distance(cls, obj_cls: Typelike) -> Optional[int]:
         """
         Compute the distance in the MRO (method resolution order) between
-        this class and a target class or class name. A distance of 0
-        means exactly the same class, 1 means immediate parent, etc.
+        this child class and a target superclass or class name. A distance
+        of 0 means exactly the same class, 1 means immediate parent, etc.
+
+        i.e., child_class.class_distance(parent_class) = 1
 
         :param obj_cls: The class name or type to measure distance from.
         :type obj_cls: str | type[Self]
@@ -186,7 +188,12 @@ class Entity(BaseModel):
         :rtype: int | None
         """
         cls_ = dereference_obj_cls(cls, obj_cls)
-        return cls.__mro__.index(cls_)
+        if cls is cls_:
+            return 0
+        # logger.debug(f"Resolved {cls_}")
+        if not issubclass(cls, cls_):
+            raise ValueError(f"{cls.__name__} is not a subclass of {cls_.__name__}, cannot compute class dist")
+        return cls.__mro__.index(cls_) + 1
 
     def has_domain(self, domain: str) -> bool:
         """
@@ -334,6 +341,8 @@ class Entity(BaseModel):
         :return: True if the fields returned by :meth:`cmp_fields` are equal.
         :rtype: bool
         """
+        if self.__class__ is not other.__class__:
+            return False
         for field in self.cmp_fields():
             if getattr(self, field) != getattr(other, field):
                 return False

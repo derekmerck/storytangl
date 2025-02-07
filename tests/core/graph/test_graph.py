@@ -47,20 +47,22 @@ class TestNode:
         child.add_child(grandchild2)
 
         assert child in parent.children
+        assert child in g
         assert child.uid in g
         assert grandchild1 in child.children
+        assert grandchild1 in g
         assert grandchild1.uid in g
         assert grandchild2 in child.children
-        assert grandchild2.uid in g
+        assert grandchild2 in g
 
         parent.remove_child(child, unlink=True) # removes tree
         assert child not in parent.children
         assert grandchild1 not in child.children
         assert grandchild2 not in child.children
 
-        assert child.uid not in g
-        assert grandchild1.uid not in g
-        assert grandchild2.uid not in g
+        assert child not in g
+        assert grandchild1 not in g
+        assert grandchild2 not in g
 
     def test_path(self):
         g = Graph()

@@ -22,6 +22,8 @@ collections = {
     "full": ([PKG_NAME], []),
     # core ONLY
     "core": ([f"{PKG_NAME}/core"], []),
+    # media ONLY
+    "media": ([f"{PKG_NAME}/business/content/media"], []),
     # tests ONLY
     "tests": ([f"tests"], [])
 }

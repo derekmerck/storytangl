@@ -94,7 +94,7 @@ def test_expensive_computation(patch_shelved):
     # Tests can use pytest's `xfail` in combination with this approach
     # @pytest.xfail("Expected cache miss on fresh install")
 
-
+@pytest.mark.skip(reason="only for benchmarking")
 @pytest.mark.parametrize("keep_open", [True, False])
 def test_shelve_performance(patch_shelved, keep_open):
 

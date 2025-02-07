@@ -19,24 +19,10 @@ from .has_context import HasContext
 
 logger = logging.getLogger(__name__)
 
-def setup_on_render_pipeline() -> TaskPipeline[Renderable, StringMap]:
-    """
-    Retrieve or create a TaskPipeline labeled 'on_render', using the
-    :attr:`PipelineStrategy.GATHER` strategy to accumulate or merge
-    rendering-related data from multiple handlers.
-
-    :return: The singleton pipeline for rendering content.
-    :rtype: TaskPipeline[Renderable, Mapping[str, Any]]
-    """
-    pipeline = TaskPipeline.get_instance(label="on_render")
-    if pipeline is None:
-        pipeline = TaskPipeline(
+on_render = TaskPipeline[HasContext, dict](
             label="on_render",
             pipeline_strategy=PipelineStrategy.GATHER
         )
-    return pipeline
-
-on_render = setup_on_render_pipeline()
 """
 The global pipeline for rendering. Handlers for rendering
 should decorate methods with ``@on_render.register(...)``.

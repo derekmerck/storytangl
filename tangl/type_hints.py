@@ -1,10 +1,10 @@
-from typing import Protocol, Any, Type, Union
+from typing import Protocol, Any, Type, Union, Dict
 from uuid import UUID
 from enum import Enum
 from pathlib import Path
 
 # General types
-StringMap = dict[str, Any]
+StringMap = Dict[str, Any]
 Primitive = str | int | float | Enum | bool
 Pathlike = Path | str
 Typelike = Type | str
