@@ -171,6 +171,7 @@ class Edge(Node):
     def successor(self) -> Optional[Node]:
         return self.graph.get(self.successor_id, None)
 
+
 class Graph(Registry[NodeT], Generic[NodeT]):
 
     def add(self, node: NodeT, **kwargs):

@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 
 WrappedType = TypeVar("WrappedType", bound=Singleton)
 
-class WrappedSingleton(Node, Generic[WrappedType]):
-    # Allows embedding a singleton into a graph and referring to its properties indirectly.
+class SingletonNode(Node, Generic[WrappedType]):
+    # Allows embedding a singleton into a mutable node so its properties can be
+    # referenced indirectly via a graph
     # Note that singletons are frozen, so you shouldn't mess with its referred attributes.
 
     #: The singleton entity class that this wrapper is associated with.

@@ -150,10 +150,13 @@ def test_pipeline_strategy_with_extra_handlers():
     assert result == 1  # Just base handler
 
     result = on_process.execute(entity, extra_handlers=[plus_two])
-    assert result == 3  # 1 + 2
+    assert result == 3, "Processes extra handler 1 + 2 = 3"
 
     result = on_process.execute(entity, extra_handlers=[plus_two, times_two])
-    assert result == 6  # (1 + 2) * 2
+    assert result == 6, "Multiple extra handlers (1 + 2) * 2 = 6"
+
+    result = on_process.execute(entity, extra_handlers=[times_two, plus_two])
+    assert result == 4, "Order should be respected (1 * 2) + 2 = 4"
 
 
 def test_temporary_handler_caching():

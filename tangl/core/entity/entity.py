@@ -23,7 +23,7 @@ from fnmatch import fnmatch
 import logging
 
 import shortuuid
-from pydantic import BaseModel, Field, model_validator, field_serializer
+from pydantic import BaseModel, Field, model_validator, field_serializer, field_validator
 
 from tangl.type_hints import UnstructuredData, Identifier, Hash, Label, Tag, Typelike
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
@@ -94,8 +94,21 @@ class Entity(BaseModel):
         """
         # this is considered 'unset' and won't be serialized
         if self.label is None:
-            self.label = self.short_uid[0:6]
+            if self.content_hash:
+                # content hash is going to be fairly unique and stable, if it's present
+                content_uid = UUID(bytes=self.content_hash[0:16])
+                content_short_uid = shortuuid.encode(content_uid)
+                self.label = content_short_uid[0:6]
+            else:
+                self.label = self.short_uid[0:6]
         return self
+
+    @field_validator("tags", "aka", mode="before", check_fields=False)
+    @classmethod
+    def _convert_strings_to_sets(cls, values: Any) -> set:
+        if isinstance(values, str):
+            values = { x.strip() for x in values.split(',') }
+        return values
 
     @field_serializer("tags")
     def _convert_set_to_list(self, values: set):
@@ -140,7 +153,16 @@ class Entity(BaseModel):
         :return: A set of identifiers usable for matching or searching.
         :rtype: set[Identifier]
         """
-        return { self.uid, self.label, self.content_hash }
+        result = { self.uid, self.label, self.content_hash }
+        # Look for some other common alias fields
+        common_alias_attribs = ['name', 'aka']
+        for attrib in common_alias_attribs:
+            if x := getattr(self, attrib, None):
+                if isinstance(x, set | list ):
+                    result.update(x)
+                elif isinstance(x, Identifier):
+                    result.add(x)
+        return result
 
     def has_alias(self, *aliases: Identifier) -> bool:
         """
@@ -205,6 +227,8 @@ class Entity(BaseModel):
         :return: True if the entity's domain matches the pattern.
         :rtype: bool
         """
+        if domain is None:
+            return True  # accept unbounded
         if not isinstance(self.domain, str) or not isinstance(domain, str):
             return False
         if '*' in domain:

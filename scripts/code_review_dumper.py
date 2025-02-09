@@ -20,11 +20,13 @@ PKG_NAME = "tangl"
 
 collections = {
     "full": ([PKG_NAME], []),
-    # core ONLY
+    # core only
     "core": ([f"{PKG_NAME}/core"], []),
-    # media ONLY
+    # story only
+    "story": ([f"{PKG_NAME}/business/story"], []),
+    # media only
     "media": ([f"{PKG_NAME}/business/content/media"], []),
-    # tests ONLY
+    # tests only
     "tests": ([f"tests"], [])
 }
 

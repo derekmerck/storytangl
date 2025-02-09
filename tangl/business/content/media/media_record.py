@@ -1,17 +1,20 @@
 from __future__ import annotations
+from typing import Self
 import hashlib
 from typing import Optional, Any
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import Field, model_validator, field_validator
+from pydantic import Field, model_validator
 
+from tangl.utils.shelved2 import shelved
 from tangl.core.entity import Entity
 from .media_data_type import MediaDataType
 
 class MediaRecord(Entity):
     """
-    MediaRecords can be dereferenced by the response handler to generate a client-relative path.
+    MediaRecords can be dereferenced by the response handler at the service layer
+    to generate a client-relative media path.
     """
     path: Optional[Path] = None
     data: Optional[Any] = None
@@ -32,14 +35,18 @@ class MediaRecord(Entity):
         if isinstance(data, bytes):
             return hashlib.sha224(data).digest()
 
-    @model_validator(mode="after")
-    def _set_content_hash(self):
-        if self.data:
-            self.content_hash = self.compute_data_hash(self.data)
-        elif self.path:
-            self.content_hash = self.compute_file_hash(self.path)
-        else:
-            raise ValueError("Must include either data or path in constructor.")
+    @model_validator(mode="before")
+    @classmethod
+    def _set_content_hash(cls, data: Any) -> bytes:
+        if 'content_hash' not in data:
+            if 'data' in data:
+                content_hash = cls.compute_data_hash(data['data'])
+            elif 'path' in data:
+                content_hash = cls.compute_file_hash(data['path'])
+            else:
+                raise ValueError("Must include a content hash, data, or a path in constructor.")
+            data['content_hash'] = content_hash
+        return data
 
     data_type: MediaDataType = None
 
@@ -49,9 +56,11 @@ class MediaRecord(Entity):
             if self.path:
                 if data_type := MediaDataType.from_path(self.path):
                     self.data_type = data_type
-                raise ValueError(f"Unknown media data type for fp {self.path}")
+                else:
+                    raise ValueError(f"Unknown media data type for fp {self.path}")
             else:
                 raise ValueError("Must include a media data type when passing raw data")
+        return self
 
     inventory_time: datetime = Field(init=False, default_factory=datetime.now)
     expiry: Optional[datetime | timedelta] = None
@@ -65,3 +74,16 @@ class MediaRecord(Entity):
     def has_expired(self, *args, **kwargs) -> bool:
         # for matching `find(expired=True)`
         return self.expiry < datetime.now()
+
+    @shelved(fn="media_records")
+    @staticmethod
+    def _from_path(cls, path: Path) -> MediaRecord:
+        return cls(path=path)
+
+    @classmethod
+    def from_source(cls, item: Path | MediaDataType) -> Self:
+        if isinstance(item, (Path, str)):
+            mtime = item.stat().st_mtime
+            return cls._from_path(cls, item, check_value=mtime)
+        raise NotImplementedError("Can only handle paths right now.")
+

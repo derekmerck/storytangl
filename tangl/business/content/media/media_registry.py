@@ -1,29 +1,32 @@
 from __future__ import annotations
-from typing import Iterable, Type, Optional, Any, Callable
+from typing import Iterable, Type, Optional, Any, Callable, ByteString
 from pathlib import Path
 from uuid import UUID
+
+from pydantic import Field, model_validator
+from PIL import Image
 
 from tangl.core.entity import Registry
 from tangl.core.task_handler import TaskPipeline, PipelineStrategy
 from .media_record import MediaRecord
 
-from PIL import Image
-
-DataType = Path | bytes | Image
+DataType = Path | ByteString | Image
 
 class MediaRegistry(Registry[MediaRecord]):
     """
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
     """
+    on_index: TaskPipeline[MediaRecord, Any] = None
 
-    def __init__(self, *, label: str):
-        super().__init__(label=label)
-        # Set up a default indexing pipeline
-        self.on_index = TaskPipeline[MediaRecord, Any](
-            label=f"{label}_indexer",
-            pipeline_strategy=PipelineStrategy.PIPELINE
+    @model_validator(mode="after")
+    def _default_on_index(self):
+        if not self.on_index:
+            self.on_index = TaskPipeline(
+            label=f"{self.label}_indexer",
+            pipeline_strategy=PipelineStrategy.GATHER
         )
+        return self
 
     def index(self,
               items: Iterable[DataType],
@@ -45,7 +48,7 @@ class MediaRegistry(Registry[MediaRecord]):
                 continue
 
             # Run through indexing pipeline
-            record = self.on_index.execute(record, extra_handlers=extra_handlers, **context)
+            self.on_index.execute(record, extra_handlers=extra_handlers, **context)
 
             # Add to registry
             self.add(record)

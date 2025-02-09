@@ -29,6 +29,7 @@ from typing import TypeVar, Generic, Self, Optional, Any, MutableMapping, Iterat
 from uuid import UUID
 import functools
 import logging
+from collections import Counter
 
 from pydantic import BaseModel, PrivateAttr
 
@@ -168,6 +169,13 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
          :rtype: Optional[VT]
          """
         return self.filter_by_criteria(self._data.values(), return_first=True, **criteria)
+
+    def all_tags(self) -> Counter:
+        res = Counter()
+        for c in self._data.values():
+            for t in c.tags:
+                res[t] += 1
+        return res
 
     @functools.wraps(BaseModel.model_dump)
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:

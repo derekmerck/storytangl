@@ -149,6 +149,18 @@ class Singleton(Entity):
         return cls._instances.find_one(label=label)
 
     @classmethod
+    def find_instance(cls, **criteria) -> Self:
+        return cls._instances.find_one(**criteria)
+
+    @classmethod
+    def find_instances(cls, **criteria) -> list[Self]:
+        return cls._instances.find(**criteria)
+
+    @classmethod
+    def all_tags(cls):
+        return cls._instances.all_tags()
+
+    @classmethod
     def clear_instances(cls):
         """
         Clear all instances from this class-level registry. Useful in
