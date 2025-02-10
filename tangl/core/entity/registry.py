@@ -119,7 +119,10 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
     def __contains__(self, item: Entity | UUID) -> bool:
         if isinstance(item, Entity):
             item = item.uid
-        return super().__contains__(item)
+        return item in self._data
+
+    def __bool__(self) -> bool:
+        return bool(self._data)
 
     def add(self, value: VT, allow_overwrite: bool = False) -> None:
         """

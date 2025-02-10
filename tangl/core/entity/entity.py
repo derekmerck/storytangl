@@ -192,6 +192,7 @@ class Entity(BaseModel):
         :return: True if ``self`` is an instance of that class.
         :rtype: bool
         """
+        logger.debug(f"Trying to dereference {obj_cls}")
         cls_ = dereference_obj_cls(self.__class__, obj_cls)
         return isinstance(self, cls_)
 
@@ -242,6 +243,8 @@ class Entity(BaseModel):
         criterion is tested using a dedicated ``has_<criterion>`` method,
         if available, or by direct attribute comparison.
 
+        Note, use 'has_cls' (not obj_cls) to test for object class membership.
+
         :param criteria: Key-value pairs for the match check. E.g.
                          ``matches_criteria(domain="mydomain", label="foo")``.
         :type criteria: Any
@@ -255,8 +258,9 @@ class Entity(BaseModel):
 
         for criterion, value in criteria.items():
             # try any explicitly defined tests first
-            if hasattr(self, f"has_{criterion}"):
-                return getattr(self, f"has_{criterion}")(value)
+            criterion_method = criterion if criterion.startswith('has') else f"has_{criterion}"
+            if hasattr(self, criterion_method):
+                return getattr(self, criterion_method)(value)
             # if the attribute is directly available, try comparing it
             elif hasattr(self, criterion):
                 return getattr(self, criterion) == value

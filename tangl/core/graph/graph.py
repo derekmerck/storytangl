@@ -5,7 +5,7 @@ import functools
 from collections import deque
 import logging
 
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, model_validator
 
 from tangl.type_hints import UniqueLabel
 from tangl.core.entity import Entity, Registry
@@ -26,6 +26,16 @@ class Node(Entity):
     Nodes may be used as sub-graph containers for other nodes.
     """
     graph: Graph = Field(None, json_schema_extra={'cmp': False})
+
+    @model_validator(mode="after")
+    def _register_self(self):
+        """If graph is passed in as an argument."""
+        logger.debug(f"Checking {self.label} in graph {self.graph}")
+        if self.graph is not None:
+            logger.debug(f"Adding {self.label} to graph")
+            self.graph.add(self)
+        return self
+
     parent_id: UUID = None
 
     @property
@@ -57,15 +67,18 @@ class Node(Entity):
     children_ids: list[UUID] = Field(default_factory=list)
 
     @property
-    def children(self):
+    def children(self) -> list[Node]:
         return [ self.graph[v] for v in self.children_ids ]
 
-    def add_child(self, child: NodeT):
+    def add_child(self, child: NodeT, as_parent: bool = True):
         if child.graph and child.graph is not self.graph:
             raise ValueError("Cannot add a node from a different graph.")
-        if child.uid not in self.children_ids:
+        elif not child.graph:
             self.graph.add(child)
-            child.parent_id = self.uid
+        if child.uid not in self.children_ids:
+            if as_parent:
+                # Allow adding links as peers
+                child.parent_id = self.uid
             # check for cycles
             if child.detect_cycle():
                 raise ValueError("Adding this node would create a cycle")
@@ -75,7 +88,10 @@ class Node(Entity):
 
     def remove_child(self, child: NodeT, unlink: bool = False):
         if child.uid in self.children_ids:
-            child.parent_id = None
+            if child.parent_id is self.uid:
+                # Child was associated hierarchically, remove self as parent.
+                # If it still had its own parent, leave it alone.
+                child.parent_id = None
             self.children_ids.remove(child.uid)
             if unlink:
                 # Use this cautiously -- there is no link counting, so if the child is
@@ -84,6 +100,13 @@ class Node(Entity):
                 child.graph.remove(child)
         else:
             logger.warning("Tried to remove a non-child node")
+
+    def find_children(self, **criteria) -> list[Node]:
+        logger.debug(f"Finding children in {self.children} matching {criteria}")
+        return self.filter_by_criteria(self.children, **criteria)
+
+    def find_child(self, **criteria) -> list[Node]:
+        return self.filter_by_criteria(self.children, return_first=True, **criteria)
 
     def detect_cycle(self) -> bool:
         """Detect if adding this node would create a cycle"""
@@ -175,8 +198,6 @@ class Edge(Node):
 class Graph(Registry[NodeT], Generic[NodeT]):
 
     def add(self, node: NodeT, **kwargs):
-        if node.graph is self:
-            return
         node.graph = self
         super().add(node, **kwargs)
         # this will throw if trying to re-add but node.graph is not already set to self

@@ -9,7 +9,6 @@ from pydantic import Field, field_validator
 from tangl.type_hints import UniqueLabel
 from tangl.core.entity import Singleton
 # noinspection PyUnresolvedReferences
-# apparently unnecessary Graph import required for schema
 from .graph import Node, Graph
 
 logger = logging.getLogger(__name__)
