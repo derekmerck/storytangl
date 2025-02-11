@@ -180,6 +180,9 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
                 res[t] += 1
         return res
 
+    def all_labels(self) -> list[str]:
+        return [ v.label for v in self._data.values() ]
+
     @functools.wraps(BaseModel.model_dump)
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
         """

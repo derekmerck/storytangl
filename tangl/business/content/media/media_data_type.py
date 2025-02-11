@@ -30,13 +30,14 @@ class MediaDataType(Enum):
     @classmethod
     def from_path(cls, path: str | Path) -> Self:
         path = Path(path)
-        if path.suffix in ['.png', '.jpg', '.jpeg', '.webp']:
+        suffix = path.suffix.lower()
+        if suffix in ['.png', '.jpg', '.jpeg', '.webp']:
             return MediaDataType.IMAGE
-        elif path.suffix == '.svg':
+        elif suffix == '.svg':
             return MediaDataType.VECTOR
-        elif path.suffix in ['.mp4', '.mkv', '.webm']:
+        elif suffix in ['.mp4', '.mkv', '.webm']:
             return MediaDataType.VIDEO
-        elif path.suffix == '.mp3':
+        elif suffix == '.mp3':
             return MediaDataType.AUDIO
 
     @property

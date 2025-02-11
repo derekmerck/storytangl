@@ -1,0 +1,76 @@
+outfit:
+    # wearable components fill combinations of region(s) and layer slots
+    regions:
+    - head
+    - upper
+    - lower
+
+    layers:
+    - inner
+    - outer
+    - over
+
+    mods:
+    - warm
+    - cool
+    - swim
+    - uniform
+
+vehicles:
+    # vehicle components discretely fill one of five slots, each providing a corresponding stat
+    components:
+    - chassis         # limits engine and suspension quality, provides durability
+    - power_plant     # provides speed
+    - suspension      # provides handling
+    - nav             # provides range
+    - weapons         # provides strength, near or far
+
+    mods:
+    - armored         # bonus durability
+    - over_powered    # bonus speed, limited by durability (gas-engine)
+    - quiet           # bonus handling, limited by durability (sneak?)
+    - targeting nav   # bonus range, lights, radar
+    - siege anchors   # bonus strength
+
+robots:
+    # robots are basically vehicles an abstraction between the chassis and the other four component systems
+    components:
+    - chassis         # limits power-plant qnd controller quality, provides _durability_
+
+    - power_plant     # provides 'power' (speed, strength)
+    - controller      # provides 'control' (range, handling)
+
+    - sensors         # consumes control, provides _range_
+    - locomotion      # consumes power, provides _speed_
+
+    # manipulators
+    - fine_motor      # consumes control, provides _handling_
+    - coarse_motor    # consumes power, provides _strength_
+
+    # combat
+    - ranged          # convert range, handling to damage (if far, penalty for close, req ranged weapon)
+    - close           # convert strength, handling to damage (if close, improved by close weapon)
+
+    mods:
+    # specialty mods (req permit)
+    - fast            # consumes power, control, limited by durability, provides bonus speed
+    - combat          # consumes power, control, allows use of non-integrated weapons, improves wc, provides bonus dur
+    - passing         # consumes control, limited by durability, provides passing
+    - engineer        # consumes control, provides bonus handling & unlock/fix mechanical
+
+    # illegal mods (never legal)
+    - hacking         # consumes control, provides bonus range & unlock/fix electronic, unlock mechanical
+    - cloaking        # consumes power, control, limited by durability, provides bonus init & sneak
+    - smuggling       # convert durability to hidden compartments or hidden integrated weapons
+
+combat:
+    - attack          # convert near or far weapon to outgoing damage
+    - defense         # convert durability, handling to incoming damage malus
+    - initiative      # convert speed, handling to resolution priority
+
+rps:
+    - paper    - speed      - air     - white   - plains   - rush         - drones     - scouts
+    - lizard   - durability - water   - blue    - water    - control      - hackers    - siege
+    - rock     - strength   - stone   - black   - swamp    - tank         - mecs       - armor
+    - spock    - range      - fire    - red     - mountain - glass cannon - artillery  - archers  # can def beat str tho!
+    - scissors - handling   - iron    - green   - forest   - damage       - inf        - inf

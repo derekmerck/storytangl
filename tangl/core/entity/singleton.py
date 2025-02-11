@@ -157,8 +157,12 @@ class Singleton(Entity):
         return cls._instances.find(**criteria)
 
     @classmethod
-    def all_tags(cls):
+    def all_instance_tags(cls):
         return cls._instances.all_tags()
+
+    @classmethod
+    def all_instance_labels(cls):
+        return cls._instances.all_labels()
 
     @classmethod
     def clear_instances(cls):
