@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.core.entity.handlers import on_render, Renderable, on_gather_context
+from tangl.business.core.handlers import on_render, Renderable, on_gather_context
 
 @pytest.fixture
 def renderable_entity():

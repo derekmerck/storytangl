@@ -29,8 +29,8 @@ vehicles:
     - armored         # bonus durability
     - over_powered    # bonus speed, limited by durability (gas-engine)
     - quiet           # bonus handling, limited by durability (sneak?)
-    - targeting nav   # bonus range, lights, radar
-    - siege anchors   # bonus strength
+    - targeting_nav   # bonus range, lights, radar
+    - siege_anchors   # bonus strength
 
 robots:
     # robots are basically vehicles an abstraction between the chassis and the other four component systems

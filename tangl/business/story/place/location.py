@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from tangl.type_hints import UniqueLabel, StringMap
-from tangl.core.graph import DynamicEdge
+from tangl.business.core import DynamicEdge
 from tangl.business.story.story_node import StoryNode
 from .place import Place
 

@@ -1,4 +1,4 @@
-from tangl.core.entity import Entity, Registry
+from tangl.business.core import Entity, Registry
 
 import pytest
 

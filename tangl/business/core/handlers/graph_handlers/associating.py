@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Self, Any, Literal
 
 # noinspection PyUnresolvedReferences
-from tangl.core.graph import Node, Graph
-from tangl.core.task_handler import TaskPipeline, PipelineStrategy
+from tangl.business.core.graph import Node, Graph
+from tangl.business.core.handlers import TaskPipeline, PipelineStrategy
 
 on_can_associate = TaskPipeline[Node, bool]("on_can_associate", strategy=PipelineStrategy.ALL)
 on_can_disassociate = TaskPipeline[Node, bool]("on_can_disassociate", strategy=PipelineStrategy.ALL)

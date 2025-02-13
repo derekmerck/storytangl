@@ -7,7 +7,7 @@ import pydantic
 from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
-from tangl.core.entity import Singleton
+from tangl.business.core import Singleton
 # noinspection PyUnresolvedReferences
 from .graph import Node, Graph
 

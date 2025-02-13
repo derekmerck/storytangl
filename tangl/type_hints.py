@@ -21,7 +21,7 @@ TemplateName = str   # Unique name of a default attributes template
 TemplateMap = dict[TemplateName, dict[str, Any]]
 Turn = int
 
-# Used by Storage and Serializers
+# Used by storage and serializers
 class HasUid(Protocol):
     uid: UUID
 FlatData = str | bytes

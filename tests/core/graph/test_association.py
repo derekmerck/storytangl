@@ -1,7 +1,7 @@
 import pytest
 
-from tangl.core.graph import Graph
-from tangl.core.graph.handlers import Associating
+from tangl.business.core import Graph
+from tangl.business.core.handlers import Associating
 
 @pytest.fixture
 def graph():

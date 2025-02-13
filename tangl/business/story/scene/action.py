@@ -3,9 +3,9 @@ from typing import Optional, Any
 from pydantic import Field
 
 from tangl.type_hints import UniqueLabel
-from tangl.core.graph import DynamicEdge
-from tangl.core.entity.handlers import HasConditions, HasEffects, Renderable, on_render
-from tangl.core.graph.handlers import Traversable
+from tangl.business.core import DynamicEdge
+from tangl.business.core import HasConditions, HasEffects, Renderable, on_render
+from tangl.business.core import Traversable
 from tangl.business.story.story_node import StoryNode
 from .block import Block
 

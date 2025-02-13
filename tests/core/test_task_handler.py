@@ -1,7 +1,6 @@
 import pytest
 
-from tangl.core.entity import Entity
-from tangl.core.task_handler import PipelineStrategy, TaskPipeline, HandlerPriority, TaskHandler
+from tangl.business.core import Entity, PipelineStrategy, TaskPipeline, HandlerPriority, TaskHandler
 
 @pytest.fixture(autouse=True)
 def renderable_pipeline_and_classes():

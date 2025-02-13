@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Any
 import logging
 
-from tangl.core.task_handler import TaskPipeline, PipelineStrategy
-from tangl.core.graph import Edge
+from tangl.business.core.graph import Edge
+from tangl.business.core.handlers import TaskPipeline, PipelineStrategy
 from .has_context import HasContext
 from .runtime import on_check_conditions, HasConditions
 

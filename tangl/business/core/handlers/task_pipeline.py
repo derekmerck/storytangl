@@ -29,7 +29,7 @@ import logging
 
 from pydantic import Field, ConfigDict
 
-from tangl.core.entity import Entity, Registry, Singleton
+from tangl.business.core import Entity, Registry, Singleton
 from .task_handler import TaskHandler, HandlerPriority
 
 # Type variables

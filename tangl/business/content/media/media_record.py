@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import Field, model_validator
 
 from tangl.utils.shelved2 import shelved
-from tangl.core.entity import Entity
+from tangl.business.core import Entity
 from .media_data_type import MediaDataType
 
 class MediaRecord(Entity):

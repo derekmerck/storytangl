@@ -6,8 +6,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 from PIL import Image
 
-from tangl.core.entity import Registry
-from tangl.core.task_handler import TaskPipeline, PipelineStrategy
+from tangl.business.core import Registry, TaskPipeline, PipelineStrategy
 from .media_record import MediaRecord
 
 DataType = Path | ByteString | Image

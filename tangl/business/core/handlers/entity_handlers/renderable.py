@@ -14,7 +14,7 @@ import logging
 import jinja2
 
 from tangl.type_hints import StringMap
-from tangl.core.task_handler import TaskPipeline, PipelineStrategy
+from tangl.business.core.handlers import TaskPipeline, PipelineStrategy
 from .has_context import HasContext
 
 logger = logging.getLogger(__name__)

@@ -4,8 +4,8 @@ import logging
 
 from tangl.type_hints import Expr
 from tangl.utils.safe_builtins import safe_builtins
-from tangl.core.graph import Node
-from tangl.core.task_handler import TaskPipeline, PipelineStrategy
+from tangl.business.core.graph import Node
+from tangl.business.core.handlers import TaskPipeline, PipelineStrategy
 from .has_context import HasContext
 
 logger = logging.getLogger(__name__)

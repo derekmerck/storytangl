@@ -1,6 +1,7 @@
 
-from tangl.core.entity.handlers import HasEffects, HasConditions
-from tangl.core.graph.handlers import Traversable
+from tangl.business.core.handlers import HasEffects, HasConditions
+# from tangl.business.core import Traversable
+Traversable = object
 
 from tangl.business.story.story_node import StoryNode
 from tangl.business.story.actor import Actor, Role

@@ -8,7 +8,7 @@ import logging
 from pydantic import Field, BaseModel, model_validator
 
 from tangl.type_hints import UniqueLabel
-from tangl.core.entity import Entity, Registry
+from tangl.business.core import Entity, Registry
 
 PATH_SEPARATOR = "/"
 logger = logging.getLogger(__name__)
@@ -212,3 +212,6 @@ class Graph(Registry[NodeT], Generic[NodeT]):
             if x := self.find_one(path=key):
                 return x
         return super().__getitem__(key)
+
+    def by_path(self) -> dict[str, NodeT]:
+        return { v.path: v for v in self.values() }

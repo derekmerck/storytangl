@@ -4,13 +4,13 @@ from uuid import UUID
 
 from pydantic import Field
 
-from tangl.core.graph import Graph, Node
-from tangl.core.entity.handlers import HasContext
+from tangl.business.core import Graph, Node
+from tangl.business.core.handlers import HasContext
 
 if TYPE_CHECKING:
     from tangl.business.world.world import World
 else:
-    from tangl.core import Singleton as World
+    from tangl.business.core import Singleton as World
 
 class StoryNode(HasContext, Node):
 

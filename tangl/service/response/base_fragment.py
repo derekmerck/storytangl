@@ -1,14 +1,14 @@
 from typing import Literal, Optional, Any
 from uuid import UUID, uuid4
 
-from pydantic import Field
+from pydantic import Field, BaseModel
 import yaml
 
+import tangl.utils.setup_yaml
 from tangl.type_hints import UniqueLabel, Identifier
-from tangl.core.entity import Entity
 from .presentation_hints import PresentationHints
 
-class ResponseFragment(Entity, extra='allow'):
+class ResponseFragment(BaseModel, extra='allow'):
     """
     Represents a basic content element in any response and the core
     schema for communicating story-content and info-content to the front-end.
@@ -30,12 +30,13 @@ class ResponseFragment(Entity, extra='allow'):
     content_format: str = Field(None, alias='format')
     presentation_hints: Optional[PresentationHints] = None
 
-    # If not wrapped in a response, can be used for async batches to assemble a response on client end
+    # If not wrapped in a response, can be used with batches to assemble a response on client end
     response_id: Optional[UUID] = None
     sequence: Optional[int] = 0
 
+    # Indicate if fragment can be "activated", for choices, allow the choice to be selected, etc.
+    activatable: bool = False
     # Params to be included with the cb if the fragment is "activated", ie, a choice, link, button, input
-    active: bool = False
     activation_payload: Optional[Any] = None
 
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:

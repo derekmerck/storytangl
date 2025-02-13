@@ -1,8 +1,7 @@
 import pytest
-from pydantic import Field, BaseModel
-from uuid import UUID
+from pydantic import Field
 
-from tangl.core.entity import InheritingSingleton
+from tangl.business.core import InheritingSingleton
 
 class TestInheritingSingleton:
     """Test suite for InheritingSingleton behavior"""

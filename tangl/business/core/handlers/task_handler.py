@@ -7,7 +7,7 @@ import logging
 from pydantic import Field
 
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
-from tangl.core.entity import Entity, Registry, Singleton
+from tangl.business.core import Entity, Registry, Singleton
 
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.DEBUG)

@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.core.entity.handlers import on_check_conditions, HasConditions, on_gather_context
+from tangl.business.core.handlers import on_check_conditions, HasConditions, on_gather_context
 
 @pytest.fixture
 def conditional_entity():

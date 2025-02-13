@@ -2,8 +2,7 @@ import pytest
 
 from pydantic import Field
 
-from tangl.core.entity import Singleton
-from tangl.core.graph import Node, Graph, SingletonNode
+from tangl.business.core import Singleton, Node, Graph, SingletonNode
 
 
 class TestSingleton(Singleton):

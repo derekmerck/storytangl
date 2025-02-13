@@ -1,8 +1,8 @@
 from typing import Any
 
 from tangl.type_hints import StringMap
-from tangl.core.task_handler import TaskPipeline
-from tangl.core.entity import Entity
+from tangl.business.core.entity import Entity
+from tangl.business.core.handlers import TaskPipeline
 
 on_gather_templates = TaskPipeline[Entity, dict]("on_gather_templates")
 on_set_defaults = TaskPipeline[Entity, Any]("on_set_defaults")

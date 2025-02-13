@@ -12,9 +12,9 @@ from typing import Optional, Any
 from pydantic import Field
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Entity
-from tangl.core.graph import Node
-from tangl.core.task_handler import TaskPipeline, HandlerPriority, PipelineStrategy
+from tangl.business.core.entity import Entity
+from tangl.business.core.graph import Node, Graph
+from tangl.business.core.handlers import TaskPipeline, HandlerPriority, PipelineStrategy
 
 on_gather_context = TaskPipeline[Entity, dict](
     label="on_gather_context",
@@ -72,6 +72,10 @@ class HasContext(Entity):
             return self.parent.gather_context()
         elif self.parent is None and isinstance(self.graph, HasContext):
             return self.graph.gather_context()
+
+    # @on_gather_context.register(caller_cls=Graph)
+    # def _provide_items_by_path(self: Graph) -> Optional[StringMap]:
+    #     return self.by_path()
 
     def gather_context(self) -> StringMap:
         """

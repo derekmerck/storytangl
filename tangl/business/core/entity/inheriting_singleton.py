@@ -1,6 +1,4 @@
-from copy import copy
-
-from pydantic import model_validator, Field, BaseModel
+from pydantic import model_validator, BaseModel
 
 from tangl.type_hints import UniqueLabel
 from .singleton import Singleton

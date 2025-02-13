@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from tangl.type_hints import UniqueLabel, StringMap
 from tangl.utils.hash_secret import hash_for_secret
-from tangl.core.entity.handlers import on_gather_context, HasContext
+from tangl.business.core.handlers import on_gather_context, HasContext
 from .achievement import UserAchievementRecord
 
 StoryId = UUID

@@ -1,8 +1,7 @@
 from tangl.info import __version__
-import tangl.utils.setup_yaml
 
 # schema version can be tied to library minor version
-minor_version = ".".join(__version__.split(".")[0:1])
+minor_version = ".".join(__version__.split(".")[0:1])  # i.e "3.2"
 RESPONSE_SCHEMA_VERSION = minor_version
 
 from .response_models import ContentResponse, InfoResponse

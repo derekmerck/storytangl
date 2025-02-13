@@ -11,8 +11,8 @@ Moving assets is handled through a Transaction handler pipeline.
 
 Assets of a given class have instance inheritance from already registered peers via a "from" field.
 """
-from tangl.core.entity import InheritingSingleton
-from tangl.core.entity.handlers import Renderable
+from tangl.business.core import InheritingSingleton
+from tangl.business.core import Renderable
 
 class Asset(Renderable, InheritingSingleton):
     ...
