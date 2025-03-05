@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from tangl.info import __version__
 from tangl.type_hints import Identifier
-from .base_fragment import BaseFragment, ContentUpdateFragment, RuntimeInfoFragment
+from .base_fragment import BaseFragment, ContentUpdateFragment
 from .media_fragment import MediaFragment, MediaUpdateFragment
 from .text_fragment import TextFragment
 from .kv_fragment import KvFragment
@@ -36,5 +36,5 @@ class ContentResponse(BaseResponse):
     data: list[ContentFragment]  # This will automatically cast to proper model
 
 
-class RuntimeResponse(BaseResponse):
-    data: list[RuntimeInfoFragment]
+# class RuntimeResponse(BaseResponse):
+#     data: list[RuntimeInfoFragment]

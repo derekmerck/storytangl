@@ -9,8 +9,10 @@ from pydantic import Field, model_validator
 
 from tangl.utils.shelved2 import shelved
 from tangl.business.core import Entity
-from tangl.service.response.media_fragment import MediaResponseFragment
+# from tangl.service.response.media_fragment import MediaResponseFragment
 from .media_data_type import MediaDataType
+
+MediaResponseFragment = Entity
 
 class MediaRecord(Entity):
     """

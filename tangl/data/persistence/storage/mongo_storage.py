@@ -68,5 +68,8 @@ class MongoStorage:
     def __len__(self) -> int:
         return self.mongo.estimated_document_count()
 
+    def __iter__(self):
+        return iter(self.mongo.find())
+
     def __bool__(self) -> bool:
         return len(self) != 0

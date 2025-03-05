@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Type, TYPE_CHECKING
 from contextlib import contextmanager
 import functools
@@ -8,7 +9,6 @@ from .api_endpoint import HasApiEndpoints, ApiEndpoint, MethodType, AccessLevel
 
 if TYPE_CHECKING:
     from tangl.business.story.story_graph import Story
-    from tangl.business.world import World
     from tangl.service.user import User
 
 class ServiceManager:

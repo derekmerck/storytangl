@@ -1,8 +1,16 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from tangl.type_hints import Identifier
 from tangl.service.api_endpoints import ApiEndpoint, AccessLevel, HasApiEndpoints
 from tangl.business.content.media.media_record import MediaRecord, MediaDataType
-from tangl.business.story.story_graph import Story
 from .user import User, UserSecret, UserInfo
+
+if TYPE_CHECKING:
+    from tangl.business.story.story_graph import Story
+else:
+    # Fallbacks for endpoint type hinting
+    class Story: pass
 
 class UserController(HasApiEndpoints):
     """

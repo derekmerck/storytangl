@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum, IntEnum
 from typing import Callable, Any, Type, get_type_hints
 import functools
@@ -159,7 +160,7 @@ class ApiEndpoint(BaseModel):
 
         # Optionally run preprocessors:
         for pre in self.preprocessors:
-            pre(*args, **kwargs)
+            args, kwargs = pre(args, kwargs)
 
         result = self.func(*args, **kwargs)
 

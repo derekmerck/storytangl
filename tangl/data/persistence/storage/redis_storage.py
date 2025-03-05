@@ -86,5 +86,8 @@ class RedisStorage:
     def __len__(self):
         return self.redis.dbsize()
 
+    def __iter__(self):
+        return iter(self.redis.keys("*"))
+
     def __bool__(self) -> bool:
         return len(self) != 0

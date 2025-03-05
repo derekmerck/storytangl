@@ -1,17 +1,25 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 from tangl.type_hints import Identifier
-from tangl.service.api_endpoints import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints
+from tangl.service.api_endpoints import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
 from tangl.business.content.media.media_record import MediaDataType, MediaRecord
 from .world import World, WorldInfo
 
 if TYPE_CHECKING:
-    from tangl.service.account import User
+    from tangl.service.user import User
     from tangl.business.story.story_graph import Story
+else:
+    # Fallbacks for endpoint type hinting
+    class User: pass
+    class Story: pass
 
-def _dereference_world_id(*args, world_id: Identifier = None, **kwargs):
-    # todo: I'm not sure if this will work, is kwargs a copy or a reference?
-    if world_id is not None:
-        kwargs["world"] = World.get_instance(world_id)  # type: World
+def _dereference_world_id(args, kwargs):
+    if world_id := kwargs.pop("world_id", None):
+        world = World.get_instance(world_id)
+        if not world:
+            raise ValueError(f"World {world_id} does not exist")
+        kwargs["world"] = world  # type: World
+    return args, kwargs
 
 class WorldController(HasApiEndpoints):
     """
@@ -63,7 +71,7 @@ class WorldController(HasApiEndpoints):
         preprocessors=[_dereference_world_id],
         access_level=AccessLevel.USER,
         group="user")
-    def create_story(self, world: World, user: 'User' = None, **kwargs) -> Story:
+    def create_story(self, world: World, user: User = None, **kwargs) -> Story:
         # explicitly including the user kwarg is redundant, but it signals the
         # service manager logic to dereference a calling user for this method.
         return world.create_story(user=user, **kwargs)
@@ -71,6 +79,7 @@ class WorldController(HasApiEndpoints):
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
+        response_type=ResponseType.CONTENT,
         group="system")
     def list_worlds(self):
         return { v.label: v.name for v in World.all_instances() }

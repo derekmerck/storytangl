@@ -4,19 +4,6 @@ import pytest
 
 from tangl.service.api_endpoints import HasApiEndpoints, ApiEndpoint, MethodType, ResponseType, AccessLevel
 
-# def test_api_endpoints_decorator():
-#
-#     c = MyController()
-#     print(c.get_api_endpoints())
-#     assert 'get_world_info' in c.get_api_endpoints()
-#     print(c.get_world_info())
-#     assert c.get_world_info() == {'hello': 'world', 'foo': 'bar'}
-#     assert c.get_world_info._api_endpoint.group == "my"
-#
-#     assert len(c.get_world_info._api_endpoint.type_hints()) == 0
-#     assert "data" in c.custom_create_something._api_endpoint.type_hints()
-
-
 # -------------------------------------------------------------------
 # 1. Fixtures & Sample Controller / Classes to Decorate
 # -------------------------------------------------------------------
@@ -203,8 +190,9 @@ def test_pre_postprocessors():
     """
     logs = []
 
-    def my_preprocessor(*args, **kwargs):
+    def my_preprocessor(args, kwargs):
         logs.append(("pre", args, kwargs))
+        return args, kwargs
 
     def my_postprocessor(result):
         logs.append(("post", result))
@@ -221,7 +209,7 @@ def test_pre_postprocessors():
 
     # Check the logs
     assert logs[0][0] == "pre"
-    assert logs[0][1][1] == 99
+    assert 99 in logs[0][1]
     # no "x" in kwargs because user didn't pass as named kwarg
     assert logs[1][0] == "post"
     assert logs[1][1] == {"value": 99}

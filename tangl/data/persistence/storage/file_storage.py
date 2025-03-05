@@ -46,6 +46,9 @@ class FileStorage:
     def __len__(self) -> int:
         return sum(1 for item in self.base_path.iterdir() if item.is_file())
 
+    def __iter__(self):
+        return iter(self.base_path.iterdir())
+
     def __bool__(self) -> bool:
         return len(self) != 0
 

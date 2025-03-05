@@ -2,13 +2,15 @@ from typing import Any, Optional
 
 from tangl.type_hints import Identifier, Expr, UnstructuredData
 from tangl.service.response import ContentResponse, InfoResponse
-from tangl.service.api_endpoints import ApiEndpoint, MethodType, ResponseType, AccessLevel
+from tangl.service.api_endpoints import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
 from tangl.business.content.media.media_record import MediaRecord, MediaDataType
 from tangl.business.core.handlers import TraversableEdge, AnonymousEdge, HasEffects, HasConditions
 from .story_graph import Story, StoryInfo
 from .story_node import StoryNode
 
-class StoryController:
+class ContentResponse(list): pass
+
+class StoryController(HasApiEndpoints):
     """
     This is the library API for the Story logic implemented as a
     collection of methods.
@@ -31,12 +33,12 @@ class StoryController:
     with context.
     """
 
-    @ApiEndpoint.annotate(access_level=AccessLevel.USER)
+    @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
     def get_journal_entry(self, story: Story, item = -1) -> ContentResponse:
         journal = story.journal
         return journal[item]
 
-    @ApiEndpoint.annotate(access_level=AccessLevel.USER)
+    @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
     def get_story_info(self, story: Story, **kwargs) -> ContentResponse:
         return story.get_info(**kwargs)
 
@@ -69,7 +71,7 @@ class StoryController:
             node = story.find_one(alias=node)
         node.dirty = True  # Jumping logic arbitrarily
         anonymous_edge = AnonymousEdge(predecessor=story.cursor, successor=node)
-        story.do_step(anonymous_edge)
+        story.resolve_step(anonymous_edge)
 
     # Read func, but make this an update, so it writes back the story marked as dirty
     @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)

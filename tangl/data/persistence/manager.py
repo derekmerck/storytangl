@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from logging import getLogger
 from uuid import UUID
-from typing import Type, ClassVar
+from typing import Type, ClassVar, Mapping
 
 from tangl.type_hints import HasUid, ClassName, FlatData, UnstructuredData
 from tangl.utils.is_valid_uuid import is_valid_uuid
@@ -11,7 +11,7 @@ from .structuring import StructuringHandlerProtocol
 
 logger = getLogger(__name__)
 
-class PersistenceManager:
+class PersistenceManager(Mapping[UUID, HasUid]):
     """
     This is a relatively generic data persistence framework.
 
@@ -108,3 +108,23 @@ class PersistenceManager:
         elif hasattr(item, 'uid'):
             item = item.uid
         return self.storage.__contains__(item)
+
+    # Mapping-like accessors
+
+    def __getitem__(self, key: UUID) -> HasUid:
+        return self.load(key)
+
+    def __setitem__(self, _, value):
+        self.save(value)
+
+    def __delitem__(self, key: UUID):
+        self.remove(key)
+
+    def __len__(self) -> int:
+        return len(self.storage)
+
+    def __iter__(self):
+        return iter(self.storage)
+
+    def __bool__(self):
+        return bool(self.storage)

@@ -1,33 +1,13 @@
 import pytest
 from uuid import uuid4, UUID
-from typing import Dict, Any
 
-from tangl.service.api_endpoints import ServiceManager, AccessLevel, MethodType, ApiEndpoint, HasApiEndpoints
+from tangl.service.api_endpoints import ServiceManager, AccessLevel, ApiEndpoint, HasApiEndpoints
 
-
-# -------------------------------------------------------------------
-# 1) Fake Classes for Testing
-# -------------------------------------------------------------------
-
-class FakeUser:
-    def __init__(self, uid, access_level=AccessLevel.USER, current_story_id=None):
-        self.uid = uid
-        self.access_level = access_level
-        self.current_story_id = current_story_id
-        self.story_ids = []
-
-    def add_story(self, story_id):
-        self.story_ids.append(story_id)
-        self.current_story_id = story_id
-
-class FakeStory:
-    def __init__(self, uid, user=None):
-        self.uid = uid
-        self.user = user  # might be a FakeUser or just user_id
+from tests.fake_types import FakeStory, FakeUser
 
 
 # -------------------------------------------------------------------
-# 2) Sample Controller to Register with ServiceManager
+# 1) Sample Controller to Register with ServiceManager
 # -------------------------------------------------------------------
 
 class MyController(HasApiEndpoints):
@@ -69,7 +49,7 @@ class MyController(HasApiEndpoints):
 
 
 # -------------------------------------------------------------------
-# 3) Pytest Tests for ServiceManager
+# 2) Pytest Tests for ServiceManager
 # -------------------------------------------------------------------
 
 @pytest.fixture
