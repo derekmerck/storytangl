@@ -10,9 +10,14 @@ Both are based on singleton reference classes.
 Moving assets is handled through a Transaction handler pipeline.
 
 Assets of a given class have instance inheritance from already registered peers via a "from" field.
+
+Note, Entities can have countable assets stored in a wallet component, however, discrete assets
+are associated, so they require a node/graph structure.
 """
 from tangl.business.core import InheritingSingleton
-from tangl.business.core import Renderable
+from tangl.business.core.handlers import Renderable
 
 class Asset(Renderable, InheritingSingleton):
-    ...
+
+    name: str = None
+    value: float = None

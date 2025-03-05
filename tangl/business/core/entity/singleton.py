@@ -8,7 +8,7 @@ central :class:`~tangl.registry.Registry` of singletons keyed by label.
 """
 
 from __future__ import annotations
-from typing import ClassVar, Self, Any
+from typing import ClassVar, Self, Any, Iterable
 import functools
 import logging
 
@@ -27,7 +27,7 @@ class Singleton(Entity):
     A base class for Tangl entities that must be unique within a given
     subclass, identified by a required ``label``. Each subclass has its
     own registry of instances, so that any attempt to create a second
-    instance of the same label triggers an error.
+    instance of the same label returns the already initialized instance.
 
     **Key Features**:
       - The :attr:`label` is required, ensuring each instance has a
@@ -102,7 +102,7 @@ class Singleton(Entity):
     within a given subclass registry.
     """
 
-    # No longer relevant, since __new__ is idempotent
+    # No longer relevant, since __new__ is now idempotent
     # # noinspection PyNestedDecorators
     # @field_validator("label")
     # @classmethod
@@ -157,12 +157,21 @@ class Singleton(Entity):
         return cls._instances.find(**criteria)
 
     @classmethod
+    def all_instances(cls) -> Iterable[Self]:
+        return cls._instances.values()
+
+    @classmethod
     def all_instance_tags(cls):
         return cls._instances.all_tags()
 
     @classmethod
     def all_instance_labels(cls):
         return cls._instances.all_labels()
+
+    @classmethod
+    def clear_instance(cls, label):
+        world = cls._instances.find_one(label=label)
+        cls._instances.remove(world)
 
     @classmethod
     def clear_instances(cls):

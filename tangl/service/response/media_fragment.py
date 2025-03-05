@@ -1,10 +1,11 @@
 from typing import Literal, Optional
+from base64 import b64encode
 
-from pydantic import Field
+from pydantic import Field, field_serializer
 
-from tangl.type_hints import StringMap, UniqueLabel, Label, Identifier, Tag
+from tangl.type_hints import StringMap, UniqueLabel, Label, Identifier, Tag, Pathlike
 
-from .base_fragment import ResponseFragment, ResponseFragmentUpdate
+from .base_fragment import BaseFragment, ContentUpdateFragment
 from .presentation_hints import PresentationHints
 
 # Media Presentation Hints
@@ -27,13 +28,19 @@ class MediaPresentationHints(PresentationHints, extra="allow"):
     timing: Optional[TimingName] = None
 
 MediaFragmentType = Literal['media', 'image', 'vo', 'music', 'sfx', 'anim', 'mov']
-DataContentFormatType = Literal['url', 'data', 'svg', 'json']
+DataContentFormatType = Literal['url', 'data', 'xml', 'json']
 
-class MediaResponseFragment(ResponseFragment, extra='allow'):
+class MediaFragment(BaseFragment, extra='allow'):
     fragment_type: MediaFragmentType = Field("media", alias='type')
-    content: str
+    content: Pathlike | bytes
     content_format: DataContentFormatType = Field(..., alias='format')
     presentation_hints: Optional[MediaPresentationHints] = None
 
-class MediaResponseFragmentUpdate(ResponseFragmentUpdate, extra='allow'):
+    @field_serializer("content")
+    def _encode_data_content(self, content):
+        if self.content_format is "data":
+            return b64encode(content)
+        return str(content)
+
+class MediaUpdateFragment(ContentUpdateFragment, extra='allow'):
     presentation_hints: Optional[MediaPresentationHints] = None  # Only req if updating pres

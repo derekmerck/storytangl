@@ -11,3 +11,6 @@ class Role(StoryNode, DynamicEdge[Actor]):
     successor_template: StringMap = Field(None, alias="actor_template")
     successor_criteria: StringMap = Field(None, alias="actor_criteria")
 
+    @property
+    def actor(self) -> Actor:
+        return self.successor

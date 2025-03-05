@@ -25,7 +25,7 @@ Usage:
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Self, Optional, Any, MutableMapping, Iterator
+from typing import TypeVar, Generic, Self, Optional, Any, MutableMapping, Iterator, Iterable
 from uuid import UUID
 import functools
 import logging
@@ -173,15 +173,18 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
          """
         return self.filter_by_criteria(self._data.values(), return_first=True, **criteria)
 
+    def values(self) -> Iterable[VT]:
+        return self._data.values()
+
     def all_tags(self) -> Counter:
         res = Counter()
-        for c in self._data.values():
+        for c in self.values():
             for t in c.tags:
                 res[t] += 1
         return res
 
     def all_labels(self) -> list[str]:
-        return [ v.label for v in self._data.values() ]
+        return [ v.label for v in self.values() ]
 
     @functools.wraps(BaseModel.model_dump)
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
@@ -198,7 +201,7 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
         """
         data = super().model_dump(**kwargs)
         data['data'] = []
-        for v in self._data.values():
+        for v in self.values():
             data['data'].append(v.unstructure())
         return data
 

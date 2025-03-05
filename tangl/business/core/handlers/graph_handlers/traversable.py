@@ -88,6 +88,9 @@ class TraversableNode(Node):
             context = context or self.gather_context()
         return on_enter.execute(self, **context)
 
+    # todo: consider nodes with traversable children, that is, nodes that represent
+    #       subgraphs -- how do we enter and exit them or jump between subgraphs?
+
 
 class AnonymousEdge(Entity):
     # Temporary traversable edge that is not registered in a graph and can be garbage collected.
@@ -96,12 +99,12 @@ class AnonymousEdge(Entity):
     successor: Optional[TraversableNode] = None
 
 
-class TraversableGraph(Graph[Node]):
+class TraversableGraph(Graph):
 
     cursor_id: UUID = None
 
     @property
-    def cursor(self):
+    def cursor(self) -> TraversableNode:
         return self.graph[self.cursor_id]
 
     @cursor.setter
@@ -122,30 +125,19 @@ class TraversableGraph(Graph[Node]):
             context = context or self.gather_context()
         on_follow_edge.execute(self, edge=edge, **context)
 
+    # todo: deal with entering graphs and setting the initial cursor
+    def enter(self, **context):
+        entry_point = self.entry_point  # type: TraversableNode
+        entry_edge = AnonymousEdge(successor=entry_point)
+        self.follow_edge(edge=entry_edge)
 
-    # add traversal history, traversal journal, entry for graph and node
-    # traversal_history: list[TraversalRecord] = Field(default_factory=list)
+    def find_entry_point(self) -> Optional[TraversableEdge]:
+        # Nodes and graphs with traversable children provide a context and need a default entry point
+        return self.find_child(
+            has_cls=TraversableNode,
+            is_entry_point=True)  # type: TraversableNode
 
-    # def enter(self, **context):
-    #     entry_point = self.find_one(is_entry_point=True)  # type: TraversableNode
-    #     entry_edge = AnonymousEdge(successor=entry_point)
-    #     self.follow_edge(entry_edge)
-
-ContentJournal = list
-
-class HasJournal(Entity):
-
-    journal: ContentJournal = None
-
-
-TraversalHistory = list
-
-class HasHistory(Entity):
-
-    history: TraversalHistory = None
-
-    @on_follow_edge.register(priority=HandlerPriority.FIRST, caller_cls=Graph)
-    def _start_history_record(self, *, edge: TraversableEdge, **context):
-        self.history.finalize_record(edge.predecessor)
-        self.history.start_record(edge.successor)
-
+    @property
+    def is_entry_point(self) -> bool:
+        return "is_entry" in self.tags or \
+               self.label in ["entry", "start"]

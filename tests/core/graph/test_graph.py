@@ -22,6 +22,11 @@ class TestNode:
         assert child in parent.children
         assert child.parent == parent
 
+        assert parent.child is child
+
+        with pytest.raises(AttributeError):
+            parent.does_not_exist
+
     def test_remove_child(self):
         g = Graph()
         parent = Node(label="parent")
@@ -94,6 +99,8 @@ class TestNode:
         g.add(root)
         root.add_child(child)
         child.add_child(grandchild)
+
+        assert child.grandchild is grandchild
 
         with pytest.raises(ValueError, match="create a cycle"):
             grandchild.add_child(root)
@@ -196,11 +203,30 @@ class TestEdge:
         g.add(n1)
         g.add(n2)
 
-        e = Edge(predecessor_id=n1.uid, successor_id=n2.uid)
+        e = Edge(label="edge", predecessor_id=n1.uid, successor_id=n2.uid)
         g.add(e)
 
         assert e.predecessor == n1
         assert e.successor == n2
+
+        n1.add_child(e)
+        assert e.label == "edge"
+        assert n1.edge is n2
+
+    def test_edge_creation2(self):
+        # alternate, simpler argument format for node creation
+        g = Graph()
+        n1 = Node(label="A", graph=g)
+        n2 = Node(label="B", graph=g)
+
+        e = Edge(label="edge", predecessor_id=n1.uid, successor_id=n2.uid, graph=g)
+
+        assert e.predecessor == n1
+        assert e.successor == n2
+
+        assert e.label == "edge"
+        assert n1.edge is n2
+
 
 class TestGraph:
 

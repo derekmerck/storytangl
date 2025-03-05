@@ -13,6 +13,10 @@ higher-level Tangl classes build upon. The ``Entity`` encapsulates:
 
 Derived classes can specialize behavior (like node vs. edge definitions),
 while still inheriting the robust core features here.
+
+There are 3 types of story landmarks -- immutable, represented as entity
+singletons, mutable, represented as entity instances, and partially mutable,
+represented as entity singletons wrapped by a mutable instance.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from uuid import UUID, uuid4
 import functools
 from fnmatch import fnmatch
 import logging
+import unicodedata
 
 import shortuuid
 from pydantic import BaseModel, Field, model_validator, field_serializer, field_validator
@@ -57,8 +62,8 @@ class Entity(BaseModel):
     :type label: str
     :param tags: A set of string tags for categorization or searching.
     :type tags: set[Tag]
-    :param data_hash: An optional cryptographic hash for the entity data.
-    :type data_hash: Hash
+    :param content_hash: An optional cryptographic hash for the entity data.
+    :type content_hash: Hash
     :param domain: A string used to categorize or namespace the entity. Allows
                    advanced domain-based filtering.
     :type domain: str
@@ -85,6 +90,13 @@ class Entity(BaseModel):
          """
         return shortuuid.encode(self.uid)
 
+    @field_validator('label', mode="after")
+    @classmethod
+    def _normalize_unicode(cls, value):
+        if isinstance(value, str):
+            value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('utf8')
+        return value
+
     @model_validator(mode="after")
     def _set_default_label(self):
         """
@@ -92,7 +104,7 @@ class Entity(BaseModel):
         if no label was provided. Helps ensure every entity has at least a
         minimal readable label.
         """
-        # this is considered 'unset' and won't be serialized
+        # This is considered 'unset' and won't be serialized by the default model dumper
         if self.label is None:
             if self.content_hash:
                 # content hash is going to be fairly unique and stable, if it's present
@@ -110,7 +122,7 @@ class Entity(BaseModel):
             values = { x.strip() for x in values.split(',') }
         return values
 
-    @field_serializer("tags")
+    @field_serializer("tags", "aka", check_fields=False)
     def _convert_set_to_list(self, values: set):
         """
         Field-level serializer that converts sets to lists, to ensure
@@ -243,6 +255,13 @@ class Entity(BaseModel):
         criterion is tested using a dedicated ``has_<criterion>`` method,
         if available, or by direct attribute comparison.
 
+        mong the ``has_<criteron>`` methods, there are 4 common filters
+        implemented at the Entity base-class level:
+          - has a superset of the given tags (has_tags={a, b, c})
+          - is a subtype of a given superclass (has_cls=supercls)
+          - answers to a particular in a set of names (has_alias=[value, ...])
+          - belongs to a domain (has_domain=abc.*)
+
         Note, use 'has_cls' (not obj_cls) to test for object class membership.
 
         :param criteria: Key-value pairs for the match check. E.g.
@@ -253,6 +272,7 @@ class Entity(BaseModel):
         :return: True if the entity passes *all* specified criteria.
         :rtype: bool
         """
+
         if not criteria:
             raise ValueError("No criteria specified, return value is undefined.")
 
@@ -260,10 +280,12 @@ class Entity(BaseModel):
             # try any explicitly defined tests first
             criterion_method = criterion if criterion.startswith('has') else f"has_{criterion}"
             if hasattr(self, criterion_method):
-                return getattr(self, criterion_method)(value)
+                if not getattr(self, criterion_method)(value):
+                    return False
             # if the attribute is directly available, try comparing it
             elif hasattr(self, criterion):
-                return getattr(self, criterion) == value
+                if getattr(self, criterion) != value:
+                    return False
             else:
                 raise ValueError(f"Untestable comparator for {criterion} on {self.__class__}")
 

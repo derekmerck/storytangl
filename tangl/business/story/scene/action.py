@@ -4,12 +4,11 @@ from pydantic import Field
 
 from tangl.type_hints import UniqueLabel
 from tangl.business.core import DynamicEdge
-from tangl.business.core import HasConditions, HasEffects, Renderable, on_render
-from tangl.business.core import Traversable
+from tangl.business.core.handlers import HasConditions, HasEffects, Renderable, on_render, TraversableEdge
 from tangl.business.story.story_node import StoryNode
 from .block import Block
 
-class Action(HasConditions, HasEffects, Traversable, Renderable, DynamicEdge[Block], StoryNode):
+class Action(HasConditions, HasEffects, TraversableEdge, Renderable, DynamicEdge[Block], StoryNode):
 
     successor_ref: UniqueLabel = Field(None, alias="next")
     # Using successor_template or criteria will _probably_ work, but is currently undefined.
@@ -21,6 +20,5 @@ class Action(HasConditions, HasEffects, Traversable, Renderable, DynamicEdge[Blo
         # This is useful if you want to re-use the same action with different parameters,
         # or set a parameter on the client end and return it via an action cb
         payload = payload or self.default_payload
-        return {'payload': payload}
-
-
+        if payload is not None:
+            return {'payload': payload}

@@ -5,13 +5,24 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from tangl.type_hints import UniqueLabel, StringMap
+from tangl.type_hints import UniqueLabel, StringMap, Hash
 from tangl.utils.hash_secret import hash_for_secret
+from tangl.business.core import Entity
 from tangl.business.core.handlers import on_gather_context, HasContext
 from .achievement import UserAchievementRecord
 
 StoryId = UUID
 WorldId = UniqueLabel
+
+class UserSecret(BaseModel):
+    user_id: UUID
+    secret: str
+    api_key: Hash
+
+class UserInfo(BaseModel):
+    user_id: UUID
+    created_at: datetime
+    # ... etc.
 
 class UserWorldMetadata(HasContext):
 
@@ -88,3 +99,12 @@ class User(HasContext):
         for s in self.worlds_metadata():
             res[s.world_id] = s.gather_context()
         return res
+
+
+class HasUser(Entity):
+    user: User = None
+
+    @on_gather_context.register()
+    def _provide_user_context(self, **context):
+        if self.user is not None:
+            return self.user.gather_context()

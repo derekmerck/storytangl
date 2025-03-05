@@ -20,16 +20,18 @@ PKG_NAME = "tangl"
 
 collections = {
     "full": ([PKG_NAME], []),
-    # core only
-    "core": ([f"{PKG_NAME}/core"], []),
-    # story only
-    "story": ([f"{PKG_NAME}/business/story"], []),
-    # media only
-    "media": ([f"{PKG_NAME}/business/content/media"], []),
-    # service only
-    "service": ([f"{PKG_NAME}/service"], []),
+    # # core only
+    # "core": ([f"{PKG_NAME}/core"], []),
+    # # story only
+    # "story": ([f"{PKG_NAME}/business/story"], []),
+    # # media only
+    # "media": ([f"{PKG_NAME}/business/content/media"], []),
+    # # service only
+    # "service": ([f"{PKG_NAME}/service"], []),
     # tests only
-    "tests": ([f"tests"], [])
+    "tests": ([f"tests"], []),
+    # overview only
+    "overview": ([f"scratch/overview"], [])
 }
 
 file_exts = [".py", ".toml", ".md", ".rst"]
@@ -62,6 +64,7 @@ def get_file_strings(root_dir):
                 relative_fp = Path( filepath ).relative_to( root_dir )
 
                 with open(filepath) as f:
+                    print(f"trying to read {filepath}")
                     data = f.read()
 
                 data = re.sub(r"<!--.*-->", "", data, flags=re.DOTALL)

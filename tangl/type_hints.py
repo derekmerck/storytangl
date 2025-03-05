@@ -11,7 +11,7 @@ Typelike = Type | str
 
 # Used by business logic
 Label = str          # Not unique, will not be used for hashing
-Expr = str           # evaluable/executable string expression
+Expr = str           # Evaluable/executable string expression
 UniqueLabel = str    # Must be unique within namespace, may be used for hashing
 Hash = int | bytes
 Identifier = Union[UUID, UniqueLabel, Hash]
@@ -19,7 +19,7 @@ Tag = Enum | str | int  # Tags may be enums, strs, or ints
 ClassName = str      # Unique name of an entity subclass
 TemplateName = str   # Unique name of a default attributes template
 TemplateMap = dict[TemplateName, dict[str, Any]]
-Turn = int
+Step = int           # Counter for traversal steps
 
 # Used by storage and serializers
 class HasUid(Protocol):

@@ -1,3 +1,5 @@
+---
+# Components
 outfit:
     # wearable components fill combinations of region(s) and layer slots
     regions:
@@ -68,9 +70,11 @@ combat:
     - defense         # convert durability, handling to incoming damage malus
     - initiative      # convert speed, handling to resolution priority
 
+---
+# RPS cycles
 rps:
-    - paper    - speed      - air     - white   - plains   - rush         - drones     - scouts
-    - lizard   - durability - water   - blue    - water    - control      - hackers    - siege
-    - rock     - strength   - stone   - black   - swamp    - tank         - mecs       - armor
-    - spock    - range      - fire    - red     - mountain - glass cannon - artillery  - archers  # can def beat str tho!
-    - scissors - handling   - iron    - green   - forest   - damage       - inf        - inf
+  fast:   light,        speed,     lt inf,    scout (+smart),     drone cav,    light,  rush,     air,   paper
+  range:  glass cannon, influence, archers,   artillery (+tough), line inf,     blue,   indirect, water, lizard
+  strong: heavy,        power,     hv inf,    lt cav (+fast),     power marine, red,    direct,   fire,  rock
+  smart:  sharp,        handling,  engineers, ?? (+range),        hacker,       black,  control,  iron,  scissors
+  tough:  fortified,    defense,   fortified, hv cav (+strong),   mech cav,     green,  exhaust,  stone, spock

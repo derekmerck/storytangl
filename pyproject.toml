@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "tangl"
+name = "StoryTangl"
 version = "3.2.0"
 description = "The abstract narrative graph lib for interactive stories"
 authors = ["derek <derek.merck@gmail.com>"]

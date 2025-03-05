@@ -96,3 +96,15 @@ def test_clear_successor(graph):
     # Clear and verify
     edge.clear_successor()
     assert edge.successor_id is None
+
+def test_no_successor(graph):
+    """Test clearing resolved successor"""
+    # Setup
+    parent_id = graph.find_one(label="parent").uid
+    edge = DynamicEdge(
+        predecessor_id=parent_id,
+        successor_ref="target",
+        graph=graph
+    )
+
+    assert edge.successor is None

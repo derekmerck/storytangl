@@ -11,3 +11,6 @@ class Location(StoryNode, DynamicEdge[Place]):
     successor_template: StringMap = Field(None, alias="place_template")
     successor_criteria: StringMap = Field(None, alias="place_criteria")
 
+    @property
+    def place(self) -> Place:
+        return self.successor

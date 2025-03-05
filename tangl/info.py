@@ -1,6 +1,6 @@
 __name__ = "tangl"
 __desc__ = "The abstract narrative graph lib for interactive stories"
-__title__ = "Tangl"
+__title__ = "StoryTangl"
 __author__ = "Derek Merck"
 __author_email__ = "derek.merck@gmail.com"
 __url__ = "https://github.com/derekmerck/tangl"

@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from tangl.utils.shelved2 import shelved
 from tangl.business.core import Entity
+from tangl.service.response.media_fragment import MediaResponseFragment
 from .media_data_type import MediaDataType
 
 class MediaRecord(Entity):
@@ -86,4 +87,15 @@ class MediaRecord(Entity):
             mtime = item.stat().st_mtime
             return cls._from_path(cls, item, check_value=mtime)
         raise NotImplementedError("Can only handle paths right now.")
+
+    def to_response_fragment(self) -> MediaResponseFragment:
+        # todo: if this is a file path, it needs to be converted by a response handler to a url path
+        #       note that the path provides an identifier for a media record lookup (or just
+        #       save the record here?)
+        fragment = MediaResponseFragment(
+            type=self.data_type.value or "media",
+            content=self.path or self.data,
+            format="url" if self.path else "data",
+        )
+        return fragment
 

@@ -10,7 +10,7 @@ from tangl.utils.dereference_obj_cls import dereference_obj_cls
 from tangl.business.core import Entity, Registry, Singleton
 
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 class HandlerPriority(IntEnum):

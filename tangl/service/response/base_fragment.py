@@ -8,7 +8,7 @@ import tangl.utils.setup_yaml
 from tangl.type_hints import UniqueLabel, Identifier
 from .presentation_hints import PresentationHints
 
-class ResponseFragment(BaseModel, extra='allow'):
+class BaseFragment(BaseModel, extra='allow'):
     """
     Represents a basic content element in any response and the core
     schema for communicating story-content and info-content to the front-end.
@@ -16,7 +16,7 @@ class ResponseFragment(BaseModel, extra='allow'):
     Presentation hints need not be respected by the client.
 
     Attributes:
-    - fragment_type: General type of fragment, i.e., text, media, kv
+    - fragment_type: General type of fragment, i.e., text, media, kv, runtime
     - label (str): Optional name/key for the fragment
     - content (str): Optional value/text/media for the fragment
     - content_format: Instruction for how to parse content field, ie, markdown or encoded data
@@ -48,9 +48,11 @@ class ResponseFragment(BaseModel, extra='allow'):
         s = yaml.dump(data, default_flow_style=False)
         return s
 
-UpdateFragmentType = Literal['update', 'discard']
+RuntimeFragmentType = Literal['create', 'read', 'update', 'delete']
 
-class ResponseFragmentUpdate(ResponseFragment, extra='allow'):
-    fragment_type: UpdateFragmentType = Field("update", alias='type')
+class ContentUpdateFragment(BaseFragment, extra='allow'):
+    fragment_type: RuntimeFragmentType = Field("update", alias='type')
+    reference_type: Literal['content'] = "content"
     reference_id: Identifier = Field(..., alias='ref_id')
-    # identifier (uid or label) for the fragment we want to update content or presentation of
+    # identifier (uid or label) for the content fragment we want to update content or presentation of
+

@@ -38,6 +38,15 @@ class Node(Entity):
 
     parent_id: UUID = None
 
+    @model_validator(mode="after")
+    def _add_self_to_parent(self):
+        """If parent is passed in as an argument."""
+        logger.debug(f"Checking {self.label} is parented by {self.parent_id} in graph {self.graph}")
+        if self.parent_id is not None and self.graph is not None:
+            logger.debug(f"Adding {self.label} to parent")
+            self.parent.add_child(self)
+        return self
+
     @property
     def parent(self) -> Optional[Node]:
         if self.parent_id:
@@ -107,6 +116,16 @@ class Node(Entity):
 
     def find_child(self, **criteria) -> list[Node]:
         return self.filter_by_criteria(self.children, return_first=True, **criteria)
+
+    def __getattr__(self, name):
+        # provide accessors for 'dot' addressing children by label
+        child_map = { k.label: k for k in self.children }
+        if name in child_map:
+            child = child_map[name]
+            if isinstance(child, Edge):
+                child = child.successor
+            return child
+        return super().__getattr__(name)
 
     def detect_cycle(self) -> bool:
         """Detect if adding this node would create a cycle"""
