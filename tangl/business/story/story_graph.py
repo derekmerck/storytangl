@@ -8,10 +8,9 @@ from tangl.service.user import HasUser
 from tangl.business.world.world import HasWorld
 from .story_node import StoryNode
 
+# todo: commented out for now, needs pydantic schema for journal
 class HasJournal: pass
 
-class StoryInfo(BaseModel):
-    ...
 
 class Story(HasJournal, HasWorld, HasUser, HasContext, TraversableGraph[StoryNode]):
 

@@ -1,16 +1,39 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
-from tangl.type_hints import Identifier
+import base64
+from typing import TYPE_CHECKING, Optional
+from uuid import UUID
+from datetime import datetime
+
+from pydantic import BaseModel, field_serializer, computed_field
+
+from tangl.type_hints import Identifier, Hash
 from tangl.service.api_endpoints import ApiEndpoint, AccessLevel, HasApiEndpoints
 from tangl.business.content.media.media_record import MediaRecord, MediaDataType
-from .user import User, UserSecret, UserInfo
+from .user import User
 
 if TYPE_CHECKING:
     from tangl.business.story.story_graph import Story
 else:
     # Fallbacks for endpoint type hinting
     class Story: pass
+
+class UserInfo(BaseModel):
+    user_id: UUID
+    created_at: datetime
+    # ... etc. could inherit from UserWorldMetadata
+
+    @classmethod
+    def from_user(cls, user: User, **kwargs) -> UserInfo:
+        ...
+
+class ApiKeyInfo(BaseModel):
+    secret: str
+
+    @computed_field()
+    @property
+    def api_key(self) -> str:
+        return base64.urlsafe_b64encode(self.secret.encode('utf-8')).decode('utf-8')
 
 class UserController(HasApiEndpoints):
     """
@@ -33,12 +56,13 @@ class UserController(HasApiEndpoints):
         return User(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
-    def update_user(self, user: User, **kwargs):
+    def update_user(self, user: User, **kwargs) -> ApiKeyInfo:
         user.update(**kwargs)
+        return ApiKeyInfo(secret=user.secret)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
     def get_user_info(self, user: User, **kwargs) -> UserInfo:
-        return user.get_info(**kwargs)
+        return UserInfo.from_user(user, **kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
     def get_user_media(self, user: User, media: MediaRecord | Identifier, **kwargs) -> MediaDataType:
@@ -61,5 +85,5 @@ class UserController(HasApiEndpoints):
         return (story.uid,)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, group="system")
-    def get_key_for_secret(self, secret: str, **kwargs):
-        ...
+    def get_key_for_secret(self, secret: str, **kwargs) -> ApiKeyInfo:
+        return ApiKeyInfo(secret=secret)

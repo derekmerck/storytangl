@@ -1,14 +1,17 @@
 from typing import Any, Optional
 
+from pydantic import BaseModel
+
 from tangl.type_hints import Identifier, Expr, UnstructuredData
-from tangl.service.response import ContentResponse, InfoResponse
+# from tangl.service.response import ContentResponse, InfoResponse
 from tangl.service.api_endpoints import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
 from tangl.business.content.media.media_record import MediaRecord, MediaDataType
 from tangl.business.core.handlers import TraversableEdge, AnonymousEdge, HasEffects, HasConditions
-from .story_graph import Story, StoryInfo
+from .story_graph import Story
 from .story_node import StoryNode
 
-class ContentResponse(list): pass
+class ContentFragment(BaseModel):
+    ...
 
 class StoryController(HasApiEndpoints):
     """
@@ -34,12 +37,16 @@ class StoryController(HasApiEndpoints):
     """
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
-    def get_journal_entry(self, story: Story, item = -1) -> ContentResponse:
+    def get_journal_entry(self, story: Story, item = -1) -> list[ContentFragment]:
+        # JournalEntries are formatted as content fragments and interpreted as an
+        # ordered list of styled narrative entries
         journal = story.journal
         return journal[item]
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
-    def get_story_info(self, story: Story, **kwargs) -> ContentResponse:
+    def get_story_info(self, story: Story, **kwargs) -> list[ContentFragment]:
+        # StoryInfo is formatted as content fragments and can be interpreted as
+        # an ordered, styled kv list
         return story.get_info(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)

@@ -50,8 +50,8 @@ def test_get_world_info_via_service_manager(world_service_manager):
 
     # No user_id required because it's public
     result = world_service_manager.endpoints[key](world_id="narnia")
-    assert result["label"] == "narnia"
-    assert result["name"] == "FakeWorld-narnia"
+    assert result.label == "narnia"
+    assert result.name == "FakeWorld-narnia"
 
 def test_unload_world_via_service_manager(world_service_manager):
     """

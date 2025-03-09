@@ -1,12 +1,11 @@
 from typing import Literal, Optional
 from base64 import b64encode
 
-from pydantic import Field, field_serializer
+from pydantic import Field, field_serializer, BaseModel
 
-from tangl.type_hints import StringMap, UniqueLabel, Label, Identifier, Tag, Pathlike
-
-from .base_fragment import BaseFragment, ContentUpdateFragment
-from .presentation_hints import PresentationHints
+from tangl.type_hints import Pathlike
+from tangl.business.content.media import MediaRecord
+from .content_fragment import ContentFragment, UpdateFragment
 
 # Media Presentation Hints
 ShapeName = Literal['landscape', 'portrait', 'square', 'avatar', 'banner', 'bg']
@@ -19,22 +18,22 @@ TransitionName = Literal['fade_in', 'fade_out', 'remove',
 DurationName = Literal['short', 'medium', 'long']
 TimingName = Literal['start', 'stop', 'pause', 'restart', 'loop']
 
-class MediaPresentationHints(PresentationHints, extra="allow"):
-    shape: Optional[ShapeName | float] = None  # aspect ratio
-    size: Optional[SizeName | tuple[int, int] | tuple[float, float] | float] = None  # dims or scale
-    position: Optional[PositionName | tuple[int, int] | tuple[float, float]] = None  # pixel or ndc coords
-    transition: Optional[TransitionName] = None
-    duration: Optional[DurationName | float] = None  # secs
-    timing: Optional[TimingName] = None
+class MediaPresentationHints(BaseModel, extra="allow"):
+    media_shape: Optional[ShapeName | float] = None  # aspect ratio
+    media_size: Optional[SizeName | tuple[int, int] | tuple[float, float] | float] = None  # dims or scale
+    media_position: Optional[PositionName | tuple[int, int] | tuple[float, float]] = None  # pixel or ndc coords
+    media_transition: Optional[TransitionName] = None
+    media_duration: Optional[DurationName | float] = None  # secs
+    media_timing: Optional[TimingName] = None
 
 MediaFragmentType = Literal['media', 'image', 'vo', 'music', 'sfx', 'anim', 'mov']
 DataContentFormatType = Literal['url', 'data', 'xml', 'json']
 
-class MediaFragment(BaseFragment, extra='allow'):
+class MediaFragment(ContentFragment, extra='allow'):
     fragment_type: MediaFragmentType = Field("media", alias='type')
     content: Pathlike | bytes
     content_format: DataContentFormatType = Field(..., alias='format')
-    presentation_hints: Optional[MediaPresentationHints] = None
+    media_hints: Optional[MediaPresentationHints] = None
 
     @field_serializer("content")
     def _encode_data_content(self, content):
@@ -42,5 +41,9 @@ class MediaFragment(BaseFragment, extra='allow'):
             return b64encode(content)
         return str(content)
 
-class MediaUpdateFragment(ContentUpdateFragment, extra='allow'):
-    presentation_hints: Optional[MediaPresentationHints] = None  # Only req if updating pres
+    @classmethod
+    def from_media_record(cls, media_record: MediaRecord, **kwargs) -> 'MediaFragment':
+        ...
+
+class MediaUpdateFragment(MediaPresentationHints, UpdateFragment, extra='allow'):
+    reference_type: Literal['media'] = "media"

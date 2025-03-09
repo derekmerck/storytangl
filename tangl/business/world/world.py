@@ -3,9 +3,6 @@ from pydantic import BaseModel
 from tangl.business.core import Singleton, Entity
 from tangl.business.core.handlers import on_gather_context, HasContext
 
-class WorldInfo(BaseModel):
-    world_id: str
-    # etc.
 
 class World(HasContext, Singleton):
     ...

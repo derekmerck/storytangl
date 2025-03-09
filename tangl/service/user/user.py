@@ -14,38 +14,38 @@ from .achievement import UserAchievementRecord
 StoryId = UUID
 WorldId = UniqueLabel
 
-class UserSecret(BaseModel):
-    user_id: UUID
-    secret: str
-    api_key: Hash
-
-class UserInfo(BaseModel):
-    user_id: UUID
-    created_at: datetime
-    # ... etc.
 
 class UserWorldMetadata(HasContext):
 
     world_id: WorldId = Field(..., alias='world')
-    total_times_completed: int = 0
+    num_stories: int = 0
+    num_stories_completed: int = 0
     total_turns: int = 0
+    first_start_time: datetime = None
     last_interaction_time: datetime = None
     achievements: list[UserAchievementRecord] = Field(default_factory=list)
 
     @classmethod
     def from_story_metadata(cls, *story_metadata: UserStoryMetadata) -> Self:
-        ...
+        return cls(
+            num_stories=len(story_metadata),
+            num_stories_completed=sum([1 for x in story_metadata if x.completed]),
+            total_turns = sum([x.current_turn for x in story_metadata]),
+            first_start_time = min([x.start_time for x in story_metadata]),
+            last_interaction_time = max([x.last_interaction_time for x in story_metadata]),
+            achievements = set([a for x in story_metadata for a in x.achievements])
+        )
 
     @on_gather_context.register()
     def _provide_achievements(self):
-        return self.achievements
+        return {'achievements': { self.world_id: self.achievements}}
 
 class UserStoryMetadata(HasContext):
     engine_version: str = None
     story_id: StoryId
     world_id: WorldId
     world_version: str = None
-    num_turns: int = 0
+    current_turn: int = 0
     achievements: list[UserAchievementRecord] = Field(default_factory=list)
     start_time: datetime = Field(default_factory=datetime.now)
     completion_time: datetime = None

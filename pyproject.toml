@@ -152,7 +152,7 @@ exclude_also = [
 
     # Don't complain about abstract methods, they aren't run:
     "@(abc\\.)?abstractmethod",
-    "@BaseHandler\\.task_signature"
+    "@ApiEndpoint\\.register"
     ]
 
 [tool.coverage.html]

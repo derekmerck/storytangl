@@ -16,19 +16,19 @@ class PresentationHints(BaseModel, extra="allow"):
 
     These are some basic suggestions.
 
-    - label (str): Optional suggested presentation-style label or html-entity #id
-    - tags (list[str]): Optional list of tags or html-classes
-    - icon (str): Optional suggested icon (arrow, emoji, etc.)
+    - style_name (str): Optional suggested presentation-style label or html-entity #id
+    - style_tags (list[str]): Optional list of tags or html-classes
     - style_dict (dict[str, Any]): Optional suggested html style params (color, etc.)
+    - icon (str): Optional suggested icon (arrow, emoji, etc.)
 
     The tags or hints fields can be abused for free-form, fragment-type-specific
     tags like ["portrait", "from_right", "2.0s"] for an image.  Or, use the
     dedicated MediaPresentationHints model for type checking.
     """
-    label: Optional[Label | StyleId] = None
-    tags: Optional[list[Tag | StyleClass]] = Field(default_factory=list)
-    icon: Optional[str] = None
+    style_name: Optional[StyleId] = None
+    style_tags: Optional[list[StyleClass]] = Field(default_factory=list)
     style_dict: Optional[StyleDict] = Field(default_factory=dict)
+    icon: Optional[str] = None
 
     @functools.wraps(BaseModel.model_dump)
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:

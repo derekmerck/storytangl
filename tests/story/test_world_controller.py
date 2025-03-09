@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.business.world import WorldController
+from tangl.business.world import world_controller, WorldController
 from tangl.service.api_endpoints import MethodType, AccessLevel
 
 from tests.fake_types import FakeWorld, FakeStory
@@ -19,19 +19,22 @@ def patch_world(monkeypatch):
     FakeWorld._instances.clear()
     return True
 
-def test_get_world_info_with_patch(patch_world):
+def test_get_world_info_with_patch():
     """
     Example test that calls 'get_world_info' with a monkey-patched FakeWorld.
     """
     c = WorldController()
+    print( world_controller.World )
+    print( world_controller._dereference_world_id((), kwargs={"world_id": "mars"}) )
+
     # We get the endpoint from reflection or directly from the class method
     ep = c.get_api_endpoints()["get_world_info"]
 
     # Now, calls to 'World.get_instance("mars")' inside the controller code
     # are actually 'FakeWorld.get_instance("mars")'
     result = ep(c, world_id="mars")
-    assert result["label"] == "mars"
-    assert result["name"] == "FakeWorld-mars"
+    assert result.label == "mars"
+    assert result.name == "FakeWorld-mars"
 
 def test_world_controller_inference():
     """
@@ -71,8 +74,8 @@ def test_world_controller_direct_calls(monkeypatch):
     # Now let's call 'get_world_info' with the 'world' param explicitly
     ep_info = endpoints["get_world_info"]
     result = ep_info(WorldController(), world=w)
-    assert result["label"] == "earth"
-    assert result["name"] == "FakeWorld-earth"
+    assert result.label == "earth"
+    assert result.name == "FakeWorld-earth"
 
     # 'unload_world'
     ep_unload = endpoints["unload_world"]
@@ -98,8 +101,8 @@ def test_preprocessor_dereference(monkeypatch):
 
     # The preprocessor expects 'world_id' and sets 'world' in kwargs
     result = ep_info(c, world_id="mars")
-    assert result["label"] == "mars"  # from 'mars' instance
-    assert result["name"] == "FakeWorld-mars"
+    assert result.label == "mars"  # from 'mars' instance
+    assert result.name == "FakeWorld-mars"
 
 
 def test_create_story_direct():
