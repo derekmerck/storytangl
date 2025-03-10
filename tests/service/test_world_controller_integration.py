@@ -23,7 +23,7 @@ def patch_world(monkeypatch):
 def world_context():
     """
     Provide a dictionary simulating the 'context' for the service manager.
-    Typically we would store users, stories, etc.
+    Typically, we would store users, stories, etc.
     For the world logic, we might not need user/story in the context,
     unless you test the 'create_story' with a user.
     """

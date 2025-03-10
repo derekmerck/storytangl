@@ -26,8 +26,8 @@ collections = {
     # "story": ([f"{PKG_NAME}/business/story"], []),
     # # media only
     # "media": ([f"{PKG_NAME}/business/content/media"], []),
-    # # service only
-    # "service": ([f"{PKG_NAME}/service"], []),
+    # service only
+    "content_frag": ([f"{PKG_NAME}/service/content_fragment"], []),
     # tests only
     "tests": ([f"tests"], []),
     # overview only

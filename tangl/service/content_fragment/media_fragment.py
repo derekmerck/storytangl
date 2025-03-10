@@ -45,5 +45,6 @@ class MediaFragment(ContentFragment, extra='allow'):
     def from_media_record(cls, media_record: MediaRecord, **kwargs) -> 'MediaFragment':
         ...
 
-class MediaUpdateFragment(MediaPresentationHints, UpdateFragment, extra='allow'):
-    reference_type: Literal['media'] = "media"
+class MediaUpdateFragment(MediaFragment, UpdateFragment, extra='allow'):
+    fragment_type: Literal['media_update'] = Field("media_update", alias='type')
+    reference_type: MediaFragmentType = "media"

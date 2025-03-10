@@ -1,32 +1,94 @@
 from __future__ import annotations
-from typing import Union, Annotated, Literal, Any, Self
+from typing import Union, Annotated, Any, Optional, Self
 from uuid import uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator, field_validator, field_serializer
 
 import tangl.info
 from tangl.type_hints import Identifier
-from tangl.service.content_fragment import ContentFragment, UpdateFragment, MediaFragment, MediaUpdateFragment, TextFragment, KvFragment
+from tangl.service.content_fragment import ContentFragment, UpdateFragment, MediaFragment, MediaUpdateFragment, TextFragment, KvFragment, GroupFragment, UserEventFragment
 
 # schema version can be tied to library minor version
 minor_version = ".".join(tangl.info.__version__.split(".")[0:1])  # i.e "3.2"
 CONTENT_SCHEMA_VERSION = minor_version
 
 AnyContentFragment = Annotated[
-    Union[TextFragment, MediaFragment, KvFragment, UpdateFragment, MediaUpdateFragment],
+    Union[TextFragment, MediaFragment, KvFragment, UpdateFragment, MediaUpdateFragment, GroupFragment, UserEventFragment],
     Field(discriminator='fragment_type')
 ]
 
 class ContentResponse(BaseModel):
-    # Any content response is an ordered list of content fragments (text, media, or update)
-    schema_version: str = CONTENT_SCHEMA_VERSION
-    response_id: Identifier = Field(default_factory=uuid4, init=False)
+    # Any content response is an ordered list of content fragments
+    schema_version: str = Field(CONTENT_SCHEMA_VERSION, init=False)
+    uid: Identifier = Field(default_factory=uuid4, init=False, alias="response_id")
     timestamp: datetime = Field(default_factory=datetime.now, init=False)
-    data: list[AnyContentFragment] = Field(default_factory=list)
+    error: Optional[str] = None
+    data: list[AnyContentFragment] = Field(...)
     # This _should_ automatically cast to proper model based on declared fragment type
 
+    @field_validator("data", mode="before")
     @classmethod
-    def from_ordered_dict(cls, data: dict) -> Self:
-        fragments = [ {'key': k, 'value': v, 'fragment_type': 'kv'} for k, v in data.items() ]
-        return ContentResponse(data=fragments)
+    def _cast_dict_to_kv_list(cls, data):
+        if isinstance(data, dict):
+            # Converter for simple, un-styled kv responses
+            data = [ {'key': k, 'value': v, 'fragment_type': 'kv'} for k, v in data.items() ]
+        return data
+
+    @field_validator("data", mode="before")
+    @classmethod
+    def _check_has_content(cls, data):
+        if not data:
+            raise ValueError("ContentResponse data is empty.")
+        return data
+
+    @field_serializer("timestamp")
+    def _ts_isoformat(self, value: datetime) -> str:
+        return value.isoformat()
+
+    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
+        kwargs.setdefault('by_alias', True)
+        return super().model_dump(*args, **kwargs)
+
+    def get_ordered_fragments(self) -> list[AnyContentFragment]:
+        """Return fragments in sequence order"""
+        return sorted(self.data, key=lambda f: getattr(f, "sequence", 0))
+
+
+class PagedContentResponse(ContentResponse):
+
+    # Support for paging
+    page: int
+    num_pages: int
+
+    @classmethod
+    def segment_pages(cls,
+                      response: ContentResponse,
+                      num_pages: int = -1,
+                      max_page_len: int = -1) -> list[Self]:
+        raise NotImplementedError
+
+    @classmethod
+    def gather_pages(cls, paged_response: Self) -> ContentResponse:
+        raise NotImplementedError
+
+class StreamingContentResponse(ContentResponse):
+    # Support streaming content
+
+    pending_fragments: list[int] = None
+
+    @model_validator(mode="after")
+    def _init_pending_fragments(self):
+        self.pending_fragments = list(range(0, len(self.data)))
+
+    def next_fragment(self) -> ContentFragment:
+        # fragments have been created, but may not be finalized for this client/session
+        for frag_num in self.pending_fragments:
+            fragment = self.data[frag_num]
+            if fragment.is_ready():
+                self.pending_fragments.remove(frag_num)
+                yield fragment
+
+    def gather_fragments(self, *fragments: ContentFragment):
+        self.data += fragments
+        self.data = self.get_ordered_fragments()

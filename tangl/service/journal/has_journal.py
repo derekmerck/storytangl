@@ -6,14 +6,19 @@ from tangl.service.content_fragment import ContentFragment
 
 
 class HasJournal(Entity, arbitrary_types_allowed=True):
+    # Functional wrapper for bookmarked list of ContentFragments
 
     journal: BookmarkedList[ContentFragment] = Field(default_factory=BookmarkedList)
 
-    def start_journal_section(self, which):
-        return self.journal.set_bookmark("section", which)
+    def start_journal_section(self, which, section_type="section"):
+        self.journal.set_bookmark(section_type, which)
+
+    def get_journal_section(self, which=-1, section_type="section") -> list[ContentFragment]:
+        return self.journal.get_slice(which, bookmark_type=section_type)
+
+    def add_journal_entry(self, items: list[ContentFragment]):
+        self.journal.add_items(items, bookmark_type="entry")
 
     def get_journal_entry(self, which=-1) -> list[ContentFragment]:
         return self.journal.get_slice(which, bookmark_type="entry")
 
-    def add_journal_entry(self, items: list[ContentFragment]):
-        return self.journal.add_items(items, bookmark_type="entry")

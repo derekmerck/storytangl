@@ -22,26 +22,31 @@ class ContentFragment(BaseModel, extra='allow'):
     - content_format: Instruction for how to parse content field, ie, markdown or encoded data
     """
     # base features
-    uid: UUID = Field(init=False, default_factory=uuid4, alias="fragment_id")
+    uid: Identifier = Field(init=False, default_factory=uuid4, alias="fragment_id")
     fragment_type: str = Field(..., alias='type')
     label: UniqueLabel = Field(None)
     content: Any = Field(...)
     content_format: str = Field(None, alias='format')
     presentation_hints: Optional[PresentationHints] = Field(None, alias='hints')
 
+    # If the fragment belongs to a group of fragments, declare the master's fragment_id
+    group_id: Optional[Identifier] = None
+    group_role: Optional[str] = None
+
     # If not wrapped in a response, can be used with batches to assemble a response on client end
-    response_id: Optional[UUID] = None
+    response_id: Optional[Identifier] = None
     sequence: Optional[int] = 0
 
     # Indicate if fragment can be "activated", for choices, allow the choice to be selected, etc.
     activatable: bool = False
     # For activatable fragments, is this fragment _currently_ active.
     active: bool = True
-    # Params to be included with the cb if the fragment is "activated", ie, a choice, link, button, input, custom ui trigger
+    # Params to be included with the cb if the fragment is "activated", ie, a choice, link, button, input, custom ui event trigger
     activation_payload: Optional[Any] = None
 
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
         kwargs.setdefault('exclude_none', True)
+        kwargs.setdefault('by_alias', True)
         return super().model_dump(*args, **kwargs)
 
     def __str__(self):
