@@ -3,7 +3,7 @@ from typing import Union, Annotated, Any, Optional, Self
 from uuid import uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_validator, field_validator, field_serializer
+from pydantic import BaseModel, Field, field_validator, field_serializer
 
 import tangl.info
 from tangl.type_hints import Identifier
@@ -54,41 +54,10 @@ class ContentResponse(BaseModel):
         """Return fragments in sequence order"""
         return sorted(self.data, key=lambda f: getattr(f, "sequence", 0))
 
-
-class PagedContentResponse(ContentResponse):
-
-    # Support for paging
-    page: int
-    num_pages: int
-
-    @classmethod
-    def segment_pages(cls,
-                      response: ContentResponse,
-                      num_pages: int = -1,
-                      max_page_len: int = -1) -> list[Self]:
-        raise NotImplementedError
-
-    @classmethod
-    def gather_pages(cls, paged_response: Self) -> ContentResponse:
-        raise NotImplementedError
-
-class StreamingContentResponse(ContentResponse):
-    # Support streaming content
-
-    pending_fragments: list[int] = None
-
-    @model_validator(mode="after")
-    def _init_pending_fragments(self):
-        self.pending_fragments = list(range(0, len(self.data)))
-
-    def next_fragment(self) -> ContentFragment:
-        # fragments have been created, but may not be finalized for this client/session
-        for frag_num in self.pending_fragments:
-            fragment = self.data[frag_num]
-            if fragment.is_ready():
-                self.pending_fragments.remove(frag_num)
-                yield fragment
-
-    def gather_fragments(self, *fragments: ContentFragment):
-        self.data += fragments
-        self.data = self.get_ordered_fragments()
+    def filter_for_client(self, capabilities: set[str]) -> Self:
+        """
+        Return a new ContentResponse with fragments filtered for client capabilities.
+        """
+        # Filter logic here (e.g., removing media fragments if 'media' not in capabilities)
+        filtered_fragments = [f for f in self.data if self._is_supported(f, capabilities)]
+        return self.model_copy(update={'data': filtered_fragments})

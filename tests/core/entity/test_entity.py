@@ -62,3 +62,32 @@ class TestEntity:
         with pytest.raises(TypeError):
             { e }
 
+    def test_entity_roundtrip(self):
+
+        e = Entity(tags=["a", "b", "c"])
+        assert isinstance(e.tags, set)
+        unstructured = e.unstructure()
+        print(unstructured)
+        assert isinstance(unstructured['tags'], list)
+        ee = Entity.structure(unstructured)
+        assert isinstance(ee.tags, set)
+
+    def test_entity_equality(self):
+
+        e = Entity(tags=["a", "b", "c"])
+        f = Entity(uid=e.uid, tags=["a", "b", "c"])
+        g = Entity(uid=e.uid, tags=["d", "e", "f"])
+
+        assert e == f,     "identical data should be equal"
+        assert not e == g, "different data should be unequal"
+
+        class EntitySubclass(Entity): pass
+
+        e1 = EntitySubclass(uid=e.uid, tags=["a", "b", "c"])
+        e2 = EntitySubclass(uid=e.uid, tags=["d", "e", "f"])
+
+        assert e != e1, "identical data but different classes should be unequal"
+        assert e != e2
+        assert g != e2
+
+

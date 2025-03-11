@@ -41,7 +41,7 @@ class HasConditions(HasContext):
         return self.all_conditions_true(self.conditions, context)
 
     @on_check_conditions.register(caller_cls=Node)
-    def _check_my_conditions(self, **context) -> bool:
+    def _check_my_parent_conditions(self, **context) -> bool:
         if self.parent and isinstance(self.parent, HasConditions):
             return on_check_conditions.execute(self.parent, **context)
 

@@ -37,7 +37,7 @@ class MediaFragment(ContentFragment, extra='allow'):
 
     @field_serializer("content")
     def _encode_data_content(self, content):
-        if self.content_format is "data":
+        if self.content_format == "data":
             return b64encode(content)
         return str(content)
 
