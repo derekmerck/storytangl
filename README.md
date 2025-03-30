@@ -2,9 +2,9 @@
 
 **Merck, Spring 2025**  
 
-**The Abstract Narrative Graph Library for Interactive Fiction**, inspired by morphological shape models, compiler theory, superposition, Kantian categoricals, and a weaving metaphor.
+**The Abstract Narrative Graph Library for Interactive Stories**, inspired by morphological shape models, compiler theory, superposition, Kantian categoricals, and a weaving metaphor.
 
-StoryTangl aims to **separate** the concerns of narrative structure, story content, stateful navigation, and final presentation. By **representing stories** as an abstract graph that “collapses” into a linear narrative under user or system choices, it supports traditional linear novels, branching CYOAs, sandbox RPGs, and beyond.
+StoryTangl aims to **separate** the concerns of narrative structure, story content, stateful navigation, and final presentation. By **representing stories** as an abstract graph that “collapses” into a linear narrative under user or system choices, it supports traditional linear novels, branching CYOAs, sandbox RPGs, and more.
 
 ---
 

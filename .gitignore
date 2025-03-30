@@ -3,6 +3,12 @@
 .secrets.*
 *.local*
 
+# temporary
+dump*
+tmp*
+# schemas
+#extras*
+
 # source
 *.ai
 .obsidian/
@@ -22,7 +28,6 @@ __pycache__/
 *_cache
 *.pkl
 *.db
-tmp*
 
 # C extensions
 *.so
@@ -72,6 +77,7 @@ node_modules
 *.iml
 *.iws
 *.ipr
+.junie/
 
 # OSX
 .DS_Store

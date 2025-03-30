@@ -15,23 +15,23 @@ Pathlike = str | Path
 # COLLECTION = [ "full", "test" ]
 
 # name: ([ include ], [ ignore ] )
-BASE_DIR = Path(__file__).parent.parent
+BASE_DIR = Path(__file__).parent.parent / "engine/src"
 PKG_NAME = "tangl"
 
 collections = {
     "full": ([PKG_NAME], []),
-    # # core only
-    # "core": ([f"{PKG_NAME}/core"], []),
+    # core only
+    "core": ([f"{PKG_NAME}/business/core"], []),
     # # story only
     # "story": ([f"{PKG_NAME}/business/story"], []),
     # # media only
     # "media": ([f"{PKG_NAME}/business/content/media"], []),
     # service only
-    "content_frag": ([f"{PKG_NAME}/service/content_fragment"], []),
+    # "content_frag": ([f"{PKG_NAME}/service/content_fragment"], []),
     # tests only
-    "tests": ([f"tests"], []),
+    # "tests": ([f"tests"], []),
     # overview only
-    "overview": ([f"scratch/overview"], [])
+    # "overview": ([f"scratch/overview"], [])
 }
 
 file_exts = [".py", ".toml", ".md", ".rst"]

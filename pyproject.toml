@@ -6,6 +6,7 @@ authors = ["derek <derek.merck@gmail.com>"]
 readme = "README.md"
 packages = [
     { include = "tangl" },
+#    { include = "sample_world", as = "tangle.worlds.sample_world" }
 ]
 
 [build-system]
@@ -92,14 +93,15 @@ pymongo = "^4.6.0"
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
-testpaths = [
-    "tests",               # base tests
-#    "worlds/*/tests"       # sample world tests
-
-]
-pythonpath = [
-    "tangl",
-]
+#testpaths = [
+#    "engine/tests",               # base tests
+#    "apps/*/tests"                # app tests
+##    "worlds/*/tests"       # sample world tests
+#
+#]
+#pythonpath = [
+#    "tangl",
+#]
 norecursedirs = [
     "tmp",
     "old",

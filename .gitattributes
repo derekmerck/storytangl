@@ -1,0 +1,15 @@
+# use lfs for binary files and ignore them in archive
+*.png filter=lfs diff=lfs merge=lfs -text export-ignore
+*.webp filter=lfs diff=lfs merge=lfs -text export-ignore
+
+# Track large "forge-svg" files for svg forge with LFS
+*.forge.svg filter=lfs diff=lfs merge=lfs -text export-ignore
+
+# Handle other SVG files as text
+#*.svg -filter -diff -merge text
+
+# but not for other text files unless explicitly told to
+*.py
+*.md
+*.yaml
+*.svg

@@ -1,0 +1,12 @@
+label = "sample_world"
+
+title = "My Story"
+author = "T. Angle"
+date = "Spring, 2025"
+version = "1.0"
+
+media = [{ role = "info", path = "my_story_cover.png" }]
+
+resources_dir = ["{pkg}/resources"]
+script_resources = ["script.yaml"]
+media_resource_dir = ["media"]

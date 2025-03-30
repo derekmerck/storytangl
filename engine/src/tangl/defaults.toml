@@ -1,0 +1,100 @@
+# Default settings config
+# =======================
+
+# If it can find them, Dynaconf will prefer config from highest to lowest priority:
+
+# - TANGL_{var} prefixed environment vars
+# - A '.secrets.toml' file
+# - A 'settings.locals.toml' file
+# - A 'settings.toml' file
+# - The package 'defaults.toml' file, this file
+
+# Using format key '@path' will cast to Path and resolve relative paths.
+
+# Following is a list of configuration parameter names with default values.
+
+# Config for running a client or single-story server
+# ---------------------
+[client]
+secret = "None"                         # default user
+
+# Config for running a game backend
+# ---------------------
+[service]
+default_world = "None"                  # for new users
+salt = "==$t0ryT4nG1-3=="               # for hashing secrets
+complexify_secret = false               # enable to expand the default code-name space
+persistence = "native_in_mem"           # native objects in memory, ephemeral
+#persistence = "pickle_file"             # pickled native objects in binary files
+#persistence = "pickle_redis"            # pickled native objects in db
+#persistence = "json_redis"              # json text in db
+#persistence = "json_file"               # json text files
+#persistence = "yaml_file"               # yaml text files
+#persistence = "bson_file"               # bson data in binary files
+#persistence = "bson_mongo"              # bson data in db
+
+# URLs for integrated REST service
+[service.rest]
+api_url =   "https://localhost:8000/api/v2"  # rest server root
+media_url = "https://localhost:8000/media"   # media server root
+
+# Data organization
+[service.paths]
+worlds      = [ "@path /app/worlds/" ]      # search paths for tangl world packages
+client_dist =   "@path /app/client/"        # file path for web client static dist
+docs =          "@path /app/docs/"          # package docs and user guide
+user_data =     "@path /app/data/user/"     # user/story data storage for file-based persistence
+story_media =   "@path /app/data/media/"    # user/story media files
+cache_data =    "@path /app/cache/"         # file loc shelve and pickle cache data
+
+# Backend persistence services
+[service.apis.redis]
+enabled = false                         # kv data storage backend, req for redis-persistence
+token = "<tok>"
+url = "redis://localhost:6379/0"
+
+[service.apis.mongo]
+enabled = false                         # bson doc storage backend, req for mongo-persistence
+url = "mongodb://localhost:27017/tangl"
+
+# Config for content creation services
+# ---------------------
+[content.svg]
+renderer = "playwright"                 # playwright is slower and heavy, but renders mix-blend-mode
+#renderer = "cairosvg"                   # cairosvg is faster and lighter, but does not render mix-blend-mode
+
+[content.apis.stableforge]
+enabled = false                         # AI art generator
+auto1111_workers = []                   # [ <host1>, <host2>, ... ]
+comfy_workers = []
+
+[content.apis.openai]
+enabled = false                         # AI narrative content
+token = "<tok>"
+org_token = "<tok>"
+
+[content.apis.ollama]
+enabled = false                         # AI narrative content
+url = "http://localhost:11434"
+
+[content.apis.elevenlabs]
+enabled = false                         # AI voice over generator
+token = "<tok>"
+
+# Config for structured language services
+# ---------------------
+[lang.apis.verbix]
+enabled = false                         # conjugation scraping
+token = "<tok>"
+
+[lang.apis.reverso]
+enabled = false                         # conjugation scraping
+
+[lang.apis.languagetool]
+enabled = false                         # grammar, spell checking
+url = "http://localhost:8081/v2/check"
+
+[lang.apis.meriamwebster]
+enabled = false                         # spelling and synonyms
+collegiate_token = "<tok>"
+thesaurus_token  = "<tok>"

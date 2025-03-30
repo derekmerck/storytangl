@@ -1,18 +1,16 @@
-.. Tangl documentation master file, created by
-   sphinx-quickstart on Wed Feb  5 21:51:49 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-Tangl documentation
+Tangl
 ===================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+Documentation is divided into 3 sections:
 
+1. End user docs
+2. Story developer docs
+3. Reference library api
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   api/modules
+   user_docs/index
+   developer_docs/index
+   api_docs/tangl
