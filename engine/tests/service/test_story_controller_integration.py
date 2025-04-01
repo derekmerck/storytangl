@@ -1,7 +1,8 @@
 import pytest
 from uuid import uuid4
-from tangl.service.api_endpoints import ServiceManager, AccessLevel
-from tangl.business.story.story_controller import StoryController
+from tangl.service.api_endpoint import AccessLevel
+from tangl.service.service_manager import ServiceManager
+from tangl.story.story_controller import StoryController
 from fake_types import FakeStory, FakeUser, FakeAnonymousEdge
 
 @pytest.fixture(autouse=True)
@@ -10,7 +11,7 @@ def patch_story(monkeypatch):
     Replace the 'AnonymousEdge' class in 'story_controller' with 'FakeAnonymousEdge'.
     This fixture can be used for tests that force logic jumps
     """
-    from tangl.business.story import story_controller
+    from tangl.story import story_controller
     monkeypatch.setattr(story_controller, "AnonymousEdge", FakeAnonymousEdge)
     return True
 

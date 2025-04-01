@@ -1,7 +1,7 @@
 import pytest
 
-from tangl.business.world import world_controller, WorldController
-from tangl.service.api_endpoints import MethodType, AccessLevel
+from tangl.world import world_controller, WorldController
+from tangl.service.api_endpoint import MethodType, AccessLevel
 
 from fake_types import FakeWorld, FakeStory
 
@@ -13,7 +13,7 @@ def patch_world(monkeypatch):
     This fixture can be used for tests that need to intercept calls
     to 'World.get_instance' etc.
     """
-    from tangl.business.world import world_controller
+    from tangl.world import world_controller
     monkeypatch.setattr(world_controller, "World", FakeWorld)
     # Optionally ensure no leftover state
     FakeWorld._instances.clear()

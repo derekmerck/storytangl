@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from tangl.service.api_endpoints import HasApiEndpoints, ApiEndpoint, MethodType, ResponseType, AccessLevel
+from tangl.service.api_endpoint import HasApiEndpoints, ApiEndpoint, MethodType, ResponseType, AccessLevel
 
 # -------------------------------------------------------------------
 # 1. Fixtures & Sample Controller / Classes to Decorate

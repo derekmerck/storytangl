@@ -1,4 +1,4 @@
-from tangl.business.core import Singleton
+from tangl.core import Singleton
 
 import pytest
 

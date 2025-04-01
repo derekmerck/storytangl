@@ -1,7 +1,8 @@
 import pytest
 from uuid import uuid4, UUID
 
-from tangl.service.api_endpoints import ServiceManager, AccessLevel, ApiEndpoint, HasApiEndpoints
+from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints
+from tangl.service.service_manager import ServiceManager
 
 from fake_types import FakeStory, FakeUser
 

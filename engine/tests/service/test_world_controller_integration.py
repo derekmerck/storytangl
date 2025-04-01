@@ -2,7 +2,8 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.service.api_endpoints import ServiceManager, AccessLevel
+from tangl.service.api_endpoint import AccessLevel
+from tangl.service.service_manager import ServiceManager
 from fake_types import FakeWorld
 
 
@@ -13,7 +14,7 @@ def patch_world(monkeypatch):
     This fixture can be used for tests that need to intercept calls
     to 'World.get_instance' etc.
     """
-    from tangl.business.world import world_controller
+    from tangl.world import world_controller
     monkeypatch.setattr(world_controller, "World", FakeWorld)
     # Optionally ensure no leftover state
     FakeWorld._instances.clear()
@@ -36,7 +37,7 @@ def world_service_manager(world_context):
     """
     Build a service manager that includes WorldController as a component.
     """
-    from tangl.business.world import WorldController  # Adjust import
+    from tangl.world import WorldController  # Adjust import
     mgr = ServiceManager(context=world_context, components=[WorldController])
     return mgr
 

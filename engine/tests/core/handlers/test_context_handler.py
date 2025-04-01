@@ -1,7 +1,7 @@
 import pytest
 
-from tangl.business.core.handlers import on_gather_context, HasContext
-from tangl.business.core import Node, Graph
+from tangl.core.handlers import on_gather_context, HasContext
+from tangl.core import Node, Graph
 
 @pytest.fixture
 def context_entity():

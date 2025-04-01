@@ -12,8 +12,6 @@ import re
 
 Pathlike = str | Path
 
-# COLLECTION = [ "full", "test" ]
-
 # name: ([ include ], [ ignore ] )
 BASE_DIR = Path(__file__).parent.parent / "engine/src"
 PKG_NAME = "tangl"
@@ -97,6 +95,7 @@ def get_file_strings(root_dir):
 import subprocess
 
 def run_tree_command(directory: str) -> str:
+    directory = Path("engine/src") / directory
     try:
         # Run the tree command and capture the output
         cmd = f"cd .. && git ls-tree -r --name-only HEAD:{directory} | tree --fromfile --charset=ascii --dirsfirst"

@@ -1,5 +1,5 @@
 import pytest
-from tangl.business.story.story_controller import StoryController
+from tangl.story.story_controller import StoryController
 
 from fake_types import FakeStory, FakeAnonymousEdge
 
@@ -9,7 +9,7 @@ def patch_world(monkeypatch):
     Replace the 'AnonymousEdge' class in 'story_controller' with 'FakeAnonymousEdge'.
     This fixture can be used for tests that force logic jumps
     """
-    from tangl.business.story import story_controller
+    from tangl.story import story_controller
     monkeypatch.setattr(story_controller, "AnonymousEdge", FakeAnonymousEdge)
     return True
 

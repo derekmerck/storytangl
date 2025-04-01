@@ -1,7 +1,7 @@
 import pytest
 from uuid import UUID
 
-from tangl.business.core import DynamicEdge, Node, Graph
+from tangl.core import DynamicEdge, Node, Graph
 
 
 def test_dynamic_edge_validation():

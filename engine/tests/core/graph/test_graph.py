@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4
 
-from tangl.business.core import Node, Edge, Graph
+from tangl.core import Node, Edge, Graph
 
 class TestNode:
 

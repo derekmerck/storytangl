@@ -4,7 +4,7 @@ from tangl.business.world.world_controller import WorldController
 from tangl.service.user.user_controller import UserController
 from tangl.service.system.system_controller import SystemController
 
-from tangl.rest.fastapi_adapter import FastApiAdapter
+from tangl.service.rest.fastapi_adapter import FastApiAdapter
 
 def main():
     # todo: context-type should be based on config

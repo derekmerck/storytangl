@@ -1,7 +1,7 @@
 import pytest
 from uuid import UUID
 
-from tangl.business.core import Entity
+from tangl.core import Entity
 
 
 class TestEntity:

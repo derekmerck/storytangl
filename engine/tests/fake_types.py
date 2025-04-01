@@ -1,5 +1,5 @@
 from uuid import uuid4
-from tangl.service.api_endpoints import AccessLevel
+from tangl.service.api_endpoint import AccessLevel
 
 class FakeWorld:
     """
