@@ -1,0 +1,78 @@
+# todo: this is _very_ out of date
+
+# Create a minimal service stack:
+#  - api on 5000 (backend)
+#  - nginx on 8000 (client, media, docs)
+#  - redis on 6379 (locking, data storage)
+
+# req .env:
+#  - TANGL_BASE_URL (path from _browser_, default to http:127.0.0.1:5000)
+#  - TANGL_REDIS_URL (if using other redis service, defaults to this)
+#  - TANGL_DOMAIN_NAME  (if using a fqdn and traefik rev-proxy)
+
+# Includes Docker labels and shared network for traefik reverse proxy:
+#  $ docker network create frontend
+#  $ docker-compose up
+#  $ docker-compose -f deployment/docker-compose.yaml -s traefik up
+
+version: "3.3"
+
+services:
+
+  api:
+    image: story-tangl:3.2
+    build:
+      context: .
+      args:
+        API_BASE_URL: http://api.${TANGL_DOMAIN_NAME}
+
+    volumes:
+      - data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 5000:5000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tangl_api.rule=Host(`api.${TANGL_DOMAIN_NAME}`)
+      - traefik.http.routers.tangl_api.entrypoints=websecure
+      - traefik.docker.network=frontend
+      # change to prodresolver for signed cert
+      - traefik.http.routers.tangl_api.tls.certresolver=stagingresolver
+      - traefik.http.services.tangl_api.loadbalancer.server.port=5000
+    networks:
+      - frontend
+      - backend
+
+  app:
+    image: nginx
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+#    ports:
+#      - 9000:80
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tangl_app.rule=Host(`app.${TANGL_BASE_URL}`)
+      - traefik.http.routers.tangl_app.entrypoints=websecure
+      # change to prodresolver for signed cert
+      - traefik.http.routers.tangl_app.tls.certresolver=stagingresolver
+      - traefik.http.services.tangl_app.loadbalancer.server.port=80
+    networks:
+      - frontend
+
+  redis:
+    image: redis:latest
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - backend
+
+volumes:
+  data: {}
+
+networks:
+  frontend:
+    external: True
+  backend:
