@@ -92,7 +92,7 @@ enabled = false                         # conjugation scraping
 
 [lang.apis.languagetool]
 enabled = false                         # grammar, spell checking
-url = "http://localhost:8081/v2/check"
+url = "http://localhost:8081/v2"
 
 [lang.apis.meriamwebster]
 enabled = false                         # spelling and synonyms

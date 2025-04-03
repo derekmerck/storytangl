@@ -132,7 +132,8 @@ class Singleton(Entity):
         :return: This Singleton instance, for chaining.
         :rtype: Self
         """
-        self._instances.add(self)
+        if self not in self._instances:
+            self._instances.add(self)
         return self
 
     @classmethod
