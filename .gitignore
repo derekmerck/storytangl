@@ -6,6 +6,8 @@
 # temporary
 dump*
 tmp*
+**/old
+**/old_*
 # schemas
 #extras*
 

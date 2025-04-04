@@ -18,6 +18,7 @@ TransitionName = Literal['fade_in', 'fade_out', 'remove',
 DurationName = Literal['short', 'medium', 'long']
 TimingName = Literal['start', 'stop', 'pause', 'restart', 'loop']
 
+# originally "MediaStagingHints"
 class MediaPresentationHints(BaseModel, extra="allow"):
     media_shape: Optional[ShapeName | float] = None  # aspect ratio
     media_size: Optional[SizeName | tuple[int, int] | tuple[float, float] | float] = None  # dims or scale

@@ -54,7 +54,7 @@ gendered_nominals_ = """
 - [ mister, miss ]
 - [ monk, nun ]
 - [ moor, moura ]
-- [ 'mr.', 'ms.' ]
+- [ mr., ms. ]
 - [ negro, negress ]
 - [ nephew, niece ]
 - [ pants, skirt ]
@@ -64,7 +64,7 @@ gendered_nominals_ = """
 - [ prince, princess ]
 - [ samurai, onna-musha ]
 - [ signor, signora ]
-- [ sir, miss ]
+- [ sir, miss ]            # wanted to use ma'am, but the apostrophe confuses the system
 - [ son, daughter ]
 - [ stag, hind ]
 - [ steward, maid ]
