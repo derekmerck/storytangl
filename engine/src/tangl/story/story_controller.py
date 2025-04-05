@@ -90,14 +90,18 @@ class StoryController(HasApiEndpoints):
         return data
 
     # Read func, but make this an update, so it writes back the story marked as dirty
-    @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)
+    @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED,
+                          method_type=MethodType.UPDATE,
+                          response_type=ResponseType.RUNTIME)
     def check_condition(self, story: Story, expr: Expr) -> Any:
         story.dirty = True  # Testing internal values
         context = story.gather_context()
         result = HasConditions.eval_str(expr, **context)
         return result
 
-    @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)
+    @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED,
+                          method_type=MethodType.UPDATE,
+                          response_type=ResponseType.RUNTIME)
     def apply_effect(self, story: Story, effect: Expr):
         story.dirty = True  # Updating internal values arbitrarily
         context = story.gather_context()

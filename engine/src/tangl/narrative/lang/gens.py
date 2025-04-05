@@ -13,7 +13,7 @@ class Gens(EnumPlusMixin, Enum):
 
     XX  = F  = "XX"    # bio female
     XY  = M  = "XY"    # bio male
-    X_  = N  = "X_"    # ambiguous/null
+    X_  = N  = "X_"    # androgynous
 
     @property
     def is_xx(self) -> bool:
@@ -29,10 +29,10 @@ class ExtGens(EnumPlusMixin, Enum):
 
     XX = F = Gens.XX.value  # female
     XY = M = Gens.XY.value  # male
-    X_ = N = Gens.X_.value  # ambiguous
+    X_ = N = Gens.X_.value  # androgynous/null
 
-    Xx  = SF = "Xx"    # surgical/trans female
-    Xy  = SM = "Xy"    # surgical/trans male
+    Xx  = SF = AMAB = "Xx"    # surgical/trans female
+    Xy  = SM = AFAB = "Xy"    # surgical/trans male
 
     XXY = H  = "XXY"   # herm
     # XXy = FH = "XXy"   # female surgical herm

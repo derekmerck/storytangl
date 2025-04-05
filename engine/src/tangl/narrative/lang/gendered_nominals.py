@@ -54,7 +54,7 @@ gendered_nominals_ = """
 - [ mister, miss ]
 - [ monk, nun ]
 - [ moor, moura ]
-- [ mr., ms. ]
+- [ mr, ms ]               # period confuses the system
 - [ negro, negress ]
 - [ nephew, niece ]
 - [ pants, skirt ]

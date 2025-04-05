@@ -1,18 +1,18 @@
 from pydantic import field_validator
 
-from tangl.business.core import Entity
-from tangl.business.core.handlers import on_render
+from tangl.core.entity import Entity
+from tangl.core.handlers import on_render
 
-from .enums import HairColor, HairStyle, BodyPhenotype, SkinColor, EyeColor
+from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
 
 class Look(Entity):
     hair_color: HairColor = None
     eye_color: EyeColor = None
     phenotype: BodyPhenotype = None
-    skin_color: SkinColor = None
+    skin_tone: SkinTone = None
     hair_style: HairStyle = None
 
-    @field_validator("skin_color", "hair_color", mode="before")
+    @field_validator("skin_tone", "hair_color", mode="before")
     @classmethod
     def _replace_spaces(cls, value):
         if isinstance(value, str) and " " in value:

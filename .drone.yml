@@ -1,0 +1,30 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+
+- name: test
+  image: python
+  commands:
+    - pip install poetry
+    - poetry install
+    - poetry run python -c "import tangl.config; tangl.config.show_settings()"
+    - poetry run pytest -W ignore::DeprecationWarning
+    # confirm the setup alias works
+    - poetry run tangl-cli get_status quit
+    # should confirm the alias works, but won't exit without wrapper
+    # - poetry run tangl-serve
+
+    # build takes advantage of existing environment
+    - poetry build
+    - cp dist/*.whl /drone/src/
+
+- name: test-install
+  image: python:3.10
+  commands:
+    - pip install /drone/src/*.whl
+    - python -c "import tangl; print(tangl.__version__)"
+
+# todo: update the docker image if it passes test stage
+#- name: docker

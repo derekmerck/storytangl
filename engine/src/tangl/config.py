@@ -6,10 +6,14 @@ import re
 from dynaconf import Dynaconf
 from dynaconf.utils import parse_conf
 
+package_root = Path(__file__).parent
+default_settings = package_root / 'defaults.toml'
+
 settings = Dynaconf(
-    envvar_prefix="TANGL",  # set "foo=bar" with `export TANGL_FOO=bar`.
-    settings_files=['defaults.toml', 'settings.toml', 'settings.local.toml', '.secrets.toml'],
-    root_path = Path(__file__).parent,
+    envvar_prefix="TANGL",   # set "foo=bar" with `export TANGL_FOO=bar`.
+    preload=[default_settings],
+    settings_files=['settings.toml', 'settings.local.toml', '.secrets.toml'],
+    root_path = os.getcwd(),  # set a base path in env with ROOT_PATH_FOR_DYNACONF
 )
 
 def cast_path( value: str | Path ):

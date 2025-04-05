@@ -35,7 +35,7 @@ vehicles:
     - siege_anchors   # bonus strength
 
 robots:
-    # robots are basically vehicles an abstraction between the chassis and the other four component systems
+    # robots are basically vehicles with an abstraction between the chassis and the other four component systems
     components:
     - chassis         # limits power-plant qnd controller quality, provides _durability_
 

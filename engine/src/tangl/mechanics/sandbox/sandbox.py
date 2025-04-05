@@ -1,7 +1,7 @@
-from tangl.business.core.handlers import HasConditions
-from tangl.business.core.graph import DynamicEdge
-from tangl.business.story.place import Location, Place
-from tangl.business.story.actor import Role, Actor
+from tangl.core.handlers import HasConditions
+from tangl.core.graph import DynamicEdge
+from tangl.story.concept.place import Location, Place
+from tangl.story.concept.actor import Role, Actor
 
 
 class SandboxConnection(HasConditions, DynamicEdge):

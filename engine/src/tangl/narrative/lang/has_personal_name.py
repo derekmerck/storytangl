@@ -1,7 +1,10 @@
+import logging
+
 from pydantic import BaseModel, model_validator, Field
 
-from .gens import IsGendered
-from .gendered_nominals import gn
+from .gendered_nominals import gn, normalize_gn
+
+logger = logging.getLogger(__name__)
 
 class HasPersonalName(BaseModel):
     """
@@ -60,8 +63,9 @@ class HasPersonalName(BaseModel):
             return self.titled_name  # Mr. Smith
 
     @property
-    def title(self: IsGendered):
-        return gn( self.title_, self.is_xx ).capitalize()
+    def title(self):
+        # logger.debug(f"title: {self.title_}, gens: {self.gender}" )
+        return normalize_gn( self.title_, self.is_xx ).capitalize()
 
     @property
     def titled_name(self):

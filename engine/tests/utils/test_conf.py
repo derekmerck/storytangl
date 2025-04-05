@@ -10,6 +10,9 @@ def test_conf():
 
     # reads config files
     import tangl.config
+
+    tangl.config.show_settings()
+
     from tangl.config import settings
     assert str(settings.service.paths.docs).endswith("docs/_build")
 
