@@ -4,6 +4,8 @@ from tangl.core.entity import Entity
 from tangl.core.handlers import on_render
 
 from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
+from .ornaments.ornaments import Ornamentation
+
 
 class Look(Entity):
     hair_color: HairColor = None
@@ -24,4 +26,14 @@ class Look(Entity):
         # Provide description, including current outfit if the caller provides it
         # with the request.
         # todo: or we want to invoke a narrative creation service here...
+        ...
+
+class HasLook(Entity):
+
+    look: Look
+    outfit: Outfit
+    ornamentation: Ornamentation
+
+    def describe(self):
+        # person, outfit/state, visible ornamentation, attitude
         ...

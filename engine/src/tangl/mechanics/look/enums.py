@@ -118,7 +118,7 @@ class AgeRange(EnumPlusMixin, IntEnum):
     OLD = 4                 # 80
     VERY_OLD = 5            # 100
 
-    OTHER = "other"                                 # use tags to inspect
+    OTHER = -1                                      # use tags to inspect
 
 class PresentingGender(EnumPlusMixin, Enum):
     XY = MASCULINE = "masculine"

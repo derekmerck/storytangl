@@ -41,13 +41,13 @@ Story
 
 Entity specialization for the 3-layer abstract narrative graph and associated handlers.
 
-- **`concept`** -> general links within and from structure, narrative concepts like `actor`, `place`, `prop`, `landmark`, `achievement`, `relationship` and linking structures
-- **`journal`** and **`journal.content_fragment`** -> list links within, general links to originating structure nodes and thence transitively to concepts, realized linear output of story to current state
-- **`structure`** -> deps on `concept`, `journal`, traversable links within, general links from concept, to journal, navigable plot points like `scene`, `block`, `action` that mediate between concepts and realized story content
+- **`concept`** -> general links within and from structure nodes; narrative concepts like `actor`, `place`, `prop`, `landmark`, `achievement`, `relationship` and linking structures
+- **`journal`** and **`journal.content_fragment`** -> list links within; general links to originating structure nodes and thence transitively to concepts, realized linear output of story to current state
+- **`structure`** -> deps on `concept`, `journal`; traversable links within; general links from concept, to journal, navigable plot points like `scene`, `block`, `action` that mediate between concepts and realized story content
 
 - **`story node`** -> base class for concept, structure, and journal nodes
 - **`story graph`** -> a graph with concept, structure, and journal layers
-- **`player`** -> specialized story node for reader proxy that can attach managers like an actor (inventory, relationships, outfit, etc.)
+- **`player`** -> specialized concept node for reader proxy that can attach managers like an actor (inventory, relationships, outfit, etc.)
 
 - **`story api`** -> deps: `service.api_endpoint`, api for story endpoints: `get journal`, `follow edge`, `get story info`, and story dev endpoints: `check_condition`, `apply effect`, `get node info`, `goto node`
 
@@ -84,7 +84,7 @@ Mechanics
 
 Namespace subpackage for complex concepts with structure nodes that wrap them as components, such as `stat` and `stat challenge block`, `interactive game` and `game block`, actor `look` and `outfit` add-ons.
 
-Worlds can share mechanics with other worlds by installing them in the `mechanics` namespace.
+Worlds or plugins can share mechanics globally by installing them in the `tangl.mechanics` namespace.
 
 **deps**: `story`
 
@@ -122,7 +122,6 @@ Service layer entity that manages collections of stories for tracking stats and 
 - **`user api`**:  api for user endpoints: `new user`, `update user`, `get user info`
 
 **deps**: `core`
-
 
 System
 --------------

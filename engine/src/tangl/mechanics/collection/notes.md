@@ -1,6 +1,8 @@
 collections
 ===========
 
+is this an abstract core feature?  that works with association and maybe includes wallets for countable assets?
+
 - component systems have slots and objects that can fill those slots
 - each object or the collection can provide attributes, stats, tags, descriptions
 

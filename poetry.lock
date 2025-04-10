@@ -2261,7 +2261,22 @@ files = [
     {file = "wcwidth-0.2.13.tar.gz", hash = "sha256:72ea0c06399eb286d978fdedb6923a9eb47e1c486ce63e9b4e64fc18303972b5"},
 ]
 
+[[package]]
+name = "webuiapi"
+version = "0.9.17"
+description = "Python API client for AUTOMATIC1111/stable-diffusion-webui"
+optional = false
+python-versions = "<4,>=3.7"
+files = [
+    {file = "webuiapi-0.9.17-py3-none-any.whl", hash = "sha256:5ee61943405b6a9b889e36114a6c1e386d83597c1e369796ab871080489443e9"},
+    {file = "webuiapi-0.9.17.tar.gz", hash = "sha256:b37effbbd27dea550152391285dc26a9b15e2a7395b0d1af320e637e20b425a7"},
+]
+
+[package.dependencies]
+Pillow = "*"
+requests = "*"
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "1698c164a894ac2031c9203ce25aa1495d27ba4b2eaf963f413a3972c3ee3084"
+content-hash = "84d495ab628de8e67dad150cdb5a9f4420c5ed1cd31de6aac72335e640345589"

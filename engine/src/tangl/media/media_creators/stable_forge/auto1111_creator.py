@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PIL import Image
+
 from tangl.media.media_record import MediaRecord
 
 class StableStage:
@@ -29,5 +31,5 @@ class Auto1111Adapter:
 # Implements MediaCreator
 class Auto1111Creator:
 
-    def create_media(self, spec: Auto1111Adapter) -> tuple[Auto111Spec, Image]:
+    def create_media(self, spec: Auto1111Adapter) -> tuple[Auto1111Spec, Image]:
         ...

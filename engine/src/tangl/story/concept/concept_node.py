@@ -1,9 +1,9 @@
 # concepts are non-traversable nodes that can be linked through dynamic edges
 
-from tangl.business.core.handlers import Associating
-from tangl.business.core.graph import DynamicEdge
-from tangl.business.story.story_graph import Story
-from tangl.business.story.story_node import StoryNode
+from tangl.core.handlers import Associating
+from tangl.core.graph import DynamicEdge
+from tangl.story.story_graph import Story
+from tangl.story.story_node import StoryNode
 
 class ConceptNode(Associating, StoryNode):
     ...

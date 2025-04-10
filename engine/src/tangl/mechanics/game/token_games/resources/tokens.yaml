@@ -1,0 +1,28 @@
+---
+# Example token types
+
+red_pawn:
+  affiliation: red
+  value: 1
+
+red_rook:
+  affiliation: red
+  value: 2
+
+red_knight:
+  affiliation: red
+  value: 3
+
+# ----
+
+blue_pawn:
+  affiliation: blue
+  value: 1
+
+blue_rook:
+  affiliation: blue
+  value: 2
+
+blue_knight:
+  affiliation: blue
+  value: 3

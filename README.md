@@ -1,6 +1,6 @@
 # StoryTangl
 
-**Merck, Spring 2025**  
+**TanglDev, Spring 2025**  
 
 **The Abstract Narrative Graph Library for Interactive Stories**, inspired by morphological shape models, compiler theory, superposition, Kantian categoricals, and a weaving metaphor.
 
