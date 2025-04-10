@@ -24,24 +24,54 @@ logger = logging.getLogger(__name__)
 
 class Singleton(Entity):
     """
-    A base class for Tangl entities that must be unique within a given
-    subclass, identified by a required ``label``. Each subclass has its
-    own registry of instances, so that any attempt to create a second
-    instance of the same label returns the already initialized instance.
+    Singleton is a base mixin class for creating unique, reference-based entities in StoryTangl.
+    It ensures that only one instance exists per unique label within each subclass hierarchy.
 
-    **Key Features**:
-      - The :attr:`label` is required, ensuring each instance has a
-        unique key.
-      - A dedicated registry per subclass (see :meth:`__init_subclass__`)
-        is used to store and retrieve singletons.
-      - Instances are automatically registered during validation, enforcing
-        uniqueness at construction time.
+    Key Features
+    ------------
+    * **Unique Instances**: Only one instance exists for each label within a class.
+    * **Hierarchical Registry**: Each subclass maintains its own registry of instances.
+    * **Reference-based Access**: Instances are retrieved by label rather than constructed.
+    * **Instance Management**: Methods to add, remove, or clear instances.
 
-    **Behavior**:
-      - ``model_config = ConfigDict(frozen=True)`` ensures immutability:
-        fields cannot be changed after creation.
-      - If an entity with the same label already exists, the constructor
-        raises a :exc:`ValueError`.
+    Usage
+    -----
+    .. code-block:: python
+
+        from tangl.core import Singleton
+
+        class MyConstant(Singleton):
+            value: int = 0
+
+        # Create an instance
+        const1 = MyConstant(label="CONST_1", value=42)
+
+        # Later, retrieve the same instance
+        const1_again = MyConstant.get_instance("CONST_1")
+
+        # Or automatically retrieve when trying to create with the same label
+        same_const = MyConstant(label="CONST_1", value=100)  # Returns existing instance
+        print(const1 is same_const)  # True
+        print(same_const.value)      # 42 (original value preserved)
+
+    Advanced Features
+    ----------------
+    * **Subclass Searching**: Find instances across the hierarchy with `search_subclasses=True`.
+    * **Instance Creation**: Create instances on-demand with `create=True`.
+    * **Instance Management**: Remove instances with `discard_instance` or clear all with `clear_instances`.
+    * **Bulk Loading**: Initialize multiple instances from data structures or YAML files.
+
+    Implementation Notes
+    -------------------
+    * Each subclass maintains its own instance registry to avoid cross-contamination.
+    * Singleton instances are pickle-able and can be safely serialized.
+    * Labels must be unique within a class; attempting to create a duplicate returns the existing instance.
+
+    Related Components
+    -----------------
+    * :class:`~tangl.core.entity.SingletonEntity`: Combines Singleton with Entity for immutable reference concepts.
+    * :class:`~tangl.core.entity.InheritingSingleton`: Singleton with inheritance from other instances.
+    * :class:`~tangl.core.graph.SingletonNode`: Wrapper for using Singletons in a graph structure.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -137,25 +167,36 @@ class Singleton(Entity):
         return self
 
     @classmethod
-    def get_instance(cls, label: UniqueLabel) -> Self:
+    def get_instance(cls, label: UniqueLabel, search_subclasses: bool = False) -> Self:
         """
         Retrieve an existing Singleton instance (if any) by label.
 
         :param label: The label to look up.
         :type label: str
+        :param search_subclasses: Whether subclasses should be searched for a match.
+        :type search_subclasses: bool
         :return: The existing instance if found, otherwise None.
         :rtype: Self | None
         """
-        # todo: add a 'search_everywhere' flag to look in superclass and subclass registries
-        return cls._instances.find_one(label=label)
+        return cls.find_instance(label=label, search_subclasses=search_subclasses)
 
     @classmethod
-    def find_instance(cls, **criteria) -> Self:
-        return cls._instances.find_one(**criteria)
+    def find_instance(cls, search_subclasses: bool = False, **criteria, ) -> Self:
+        if x :=  cls._instances.find_one(**criteria):
+            return x
+        elif search_subclasses:
+            for subcls in cls.__subclasses__():
+                if x := subcls.find_instance(**criteria, search_subclasses=True):
+                    return x
 
     @classmethod
-    def find_instances(cls, **criteria) -> list[Self]:
-        return cls._instances.find(**criteria)
+    def find_instances(cls, search_subclasses: bool = False, **criteria) -> list[Self]:
+        res = []
+        res.extend( cls._instances.find(**criteria) )
+        if search_subclasses:
+            for subcls in cls.__subclasses__():
+                res.extend( subcls.find_instances(**criteria, search_subclasses=True) )
+        return res
 
     @classmethod
     def all_instances(cls) -> Iterable[Self]:
@@ -170,9 +211,9 @@ class Singleton(Entity):
         return cls._instances.all_labels()
 
     @classmethod
-    def clear_instance(cls, label):
-        world = cls._instances.find_one(label=label)
-        cls._instances.remove(world)
+    def discard_instance(cls, label):
+        if x := cls._instances.find_one(label=label):
+            cls._instances.remove(x)
 
     @classmethod
     def clear_instances(cls):
@@ -181,6 +222,16 @@ class Singleton(Entity):
         testing contexts or to reset state.
         """
         cls._instances.clear()
+
+    def __reduce__(self) -> tuple:
+        """
+        Singletons can be pickled by reference since they are immutable with respect to
+        their public interface.
+
+        :returns: tuple: The class and label of the entity, used for reconstructing the
+           instance when unpickling.
+        """
+        return self.__class__.get_instance, (self.label, )
 
     @functools.wraps(BaseModel.model_dump)
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
@@ -226,3 +277,18 @@ class Singleton(Entity):
         label = data.pop("label")  # this will throw a key error if it's not set properly
         this = obj_cls.get_instance(label)
         return this
+
+    # Loaders
+
+    @classmethod
+    def load_instances(cls, data: dict):
+        for label, kwargs in data.items():
+            cls(label=label, **kwargs)
+
+    @classmethod
+    def load_instances_from_yaml(cls, resources_module: str, fn: str):
+        import yaml
+        from importlib import resources
+        with resources.open_text(resources_module, fn) as f:
+            data = yaml.safe_load(f)
+        cls.load_instances(data)

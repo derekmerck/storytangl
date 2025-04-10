@@ -25,11 +25,12 @@ Usage:
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Self, Optional, Any, MutableMapping, Iterator, Iterable
+from typing import TypeVar, Generic, Self, Optional, Any, MutableMapping, Iterator, Iterable, Mapping
 from uuid import UUID
 import functools
 import logging
 from collections import Counter
+from copy import deepcopy
 
 from pydantic import BaseModel, PrivateAttr
 
@@ -173,8 +174,25 @@ class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
          """
         return self.filter_by_criteria(self._data.values(), return_first=True, **criteria)
 
-    def values(self) -> Iterable[VT]:
-        return self._data.values()
+    # ? these get implemented automatically by mapping given iter? like _clear_ does?
+    # def keys(self) -> Iterable[UUID]:
+    #     return self.data_.keys()
+    #
+    # def values(self) -> Iterable[VT]:
+    #     return self._data.values()
+
+    def update(self, other: Mapping[UUID, VT] | Iterable[VT] | VT) -> None:
+        if isinstance(other, Mapping):
+            for v in other.values():
+                self.add(v)
+        elif isinstance(other, Iterable):
+            for v in other:
+                self.add(v)
+        elif hasattr(other, 'uid'):
+            self.add(other)
+
+    # def __repr__(self) -> str:
+    #     return f"<{self.__class__.__name__}:{self.label} {dict(self.data_)}>"
 
     def all_tags(self) -> Counter:
         res = Counter()

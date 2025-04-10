@@ -30,27 +30,69 @@ import unicodedata
 import shortuuid
 from pydantic import BaseModel, Field, model_validator, field_serializer, field_validator
 
-from tangl.type_hints import UnstructuredData, Identifier, Hash, Label, Tag, Typelike
+from tangl.type_hints import UnstructuredData, Identifier, Hash, Label, Tag, Typelike, ClassName
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 
 logger = logging.getLogger(__name__)
 
+TaglikeFields = ("tags", 'with_tags', 'inv', "aka")
+
 class Entity(BaseModel):
     """
-    The base class for all Tangl managed objects.
+    Entities are the fundamental building blocks in StoryTangl. They represent any object
+    or concept within the story world that needs to be tracked, manipulated, or interacted with.
 
-    This class extends Pydantic's ``BaseModel`` to integrate fundamental
-    identity, labeling, domain scoping, and hashing features. Derived
-    classes can build on these capabilities for more specialized behaviors,
-    keeping data consistency and filtering logic centralized.
+    Key Features
+    ------------
+    * **Unique Identification**: Each entity has a `uid` for system-wide identification.
+      The `uid` is automatically generated if not provided, ensuring uniqueness.
+    * **Labeling**: Entities can be given human-readable labels for easier reference.
+      The `label` defaults to a shortened version of the `uid` if not specified.
+    * **Tagging**: Flexible tagging system for categorization and filtering.
+    * **Identification**: Multiple methods to identify and reference entities via aliases, ids, and more.
+    * **Filtering**: Rich criteria-based searching and filtering capabilities.
+    * **Serialization**: Built-in methods for converting to and from dictionary representations.
+    * **Comparison**: Subclass fields may be excluded from comparison by flagging :code:`json_schema_extras['cmp'] = False` in the pydantic field declaration.
 
-    **Separation of Concerns**:
-      - **Data Integrity**: Pydantic ensures type checking and validation.
-      - **Identification**: Managed by ``uid``, ``label``, ``tags``, and ``data_hash``.
-      - **Filtering & Matching**: Provided by methods like :meth:`matches_criteria`
-        and :meth:`filter_by_criteria`.
-      - **Serialization & Deserialization**: Provided by :meth:`model_dump`,
-        :meth:`unstructure`, and :meth:`structure`.
+    Usage
+    -----
+    .. code-block:: python
+
+        from tangl.core.entity import Entity
+
+        # Creating a basic entity
+        entity = Entity(label="example_entity", tags={"important", "active"})
+
+        # Accessing properties
+        print(entity.uid)    # Unique identifier
+        print(entity.label)  # "example_entity"
+        print(entity.tags)   # {"important", "active"}
+
+        # Checking tags
+        print(entity.has_tags("important"))  # True
+        print(entity.has_tags("important", "inactive"))  # False
+
+        # Filtering entities
+        matches = Entity.filter_by_criteria([entity1, entity2], has_tags={"active"})
+
+        # Serialization
+        entity_dict = entity.model_dump()
+
+    Mixin Classes
+    -------------
+    Entities are designed to be extendable through mixins, allowing for flexible behavior composition.
+
+    * HasContext: Adds a context and local variables.
+    * Available: Adds conditional availability checking.
+    * HasConditions: Adds runtime condition evaluation.
+    * HasEffects: Adds runtime effect execution.
+    * Renderable: Provides a framework for generating content.
+
+    Related Concepts
+    ----------------
+    * Connected Entities are Nodes
+    * Singleton Entities are immutable reference entities
+    * Registry provides collections of Entity instances with search capabilities
 
     :param obj_cls: Consumed by a metaclass or external builder to ensure the correct
                    final model class (subclass) is used during reconstruction.
@@ -73,9 +115,13 @@ class Entity(BaseModel):
     """
 
     obj_cls: Typelike = Field(init_var=True, default=None)
+    """The ability to self-cast on instantiation is actually granted by a metaclass or factory, but the common trigger field is included in the base class schema because, in practice, all Entities are self-casting."""
     uid: UUID = Field(init=False, default_factory=uuid4)
+    """Unique identifier for each instance for registries and serialization."""
     label: Label = None
+    """A short public identifier, usually based on a template name or a truncated uid hash if unspecified, may require uniqueness in some contexts."""
     tags: set[Tag] = Field(default_factory=set)
+    """Mechanism to classify and filter entities based on assigned characteristics or roles."""
     content_hash: Hash = None
     domain: str = None  # holder for user-defined domain of entity
     dirty: bool = None  # indicator that entity has been tampered with, invalidates certain debugging
@@ -115,14 +161,21 @@ class Entity(BaseModel):
                 self.label = self.short_uid[0:6]
         return self
 
-    @field_validator("tags", "aka", mode="before", check_fields=False)
+    @field_validator(*TaglikeFields, mode="before", check_fields=False)
     @classmethod
     def _convert_strings_to_sets(cls, values: Any) -> set:
         if isinstance(values, str):
             values = { x.strip() for x in values.split(',') }
         return values
 
-    @field_serializer("tags", "aka", check_fields=False)
+    @field_validator(*TaglikeFields, mode='before', check_fields=False)
+    @classmethod
+    def _handle_none_tags(cls, data):
+        if data is None:
+            data = set()
+        return data
+
+    @field_serializer(*TaglikeFields, check_fields=False)
     def _convert_set_to_list(self, values: set):
         """
         Field-level serializer that converts sets to lists, to ensure
@@ -364,6 +417,30 @@ class Entity(BaseModel):
         return this
 
     @classmethod
+    def public_fields(cls) -> list[str]:
+        """Returns a list of constructor parameter names or aliases, if an alias is defined."""
+        field_names = [ f.alias if f.alias else k for k, f in cls.model_fields.items() ]
+        return field_names
+
+    def reset_fields(self):
+        """
+        Reset flagged entity fields to their default state.
+
+        To flag a field for reset, set `json_schema_extra={reset_field: True}` .
+        """
+        for field_name, field_info in self.model_fields.items():
+            extra = field_info.json_schema_extra or {}
+            if extra.get('reset_field', False):
+                default_value = field_info.get_default(call_default_factory=True)
+                logger.debug(f"updating: {field_name} = {default_value}")
+                setattr(self, field_name, default_value)
+
+    # There is no built-in method for excluding fields from comparison with pydantic.
+    # For this approach, set json_schema_extra = {'cmp', false} on fields to ignore.
+    # Other approaches include unlinking fields during comparison then relinking them, or
+    # comparing model_dumps with excluded fields.
+
+    @classmethod
     def cmp_fields(cls):
         """
         Identify which fields should be used for equality checks. By default,
@@ -373,12 +450,16 @@ class Entity(BaseModel):
         :return: A list of field names used in :meth:`__eq__`.
         :rtype: list[str]
         """
-        res = []
-        for field_name, field_info in cls.__pydantic_fields__.items():
-            extra = field_info.json_schema_extra or {}
-            if extra.get('cmp', True):
-                res.append(field_info.alias or field_name)
-        return res
+
+        return [f.alias if f.alias else k for k, f in cls.model_fields.items()
+                if not f.json_schema_extra or f.json_schema_extra.get("cmp", True)]
+
+        # res = []
+        # for field_name, field_info in cls.__pydantic_fields__.items():
+        #     extra = field_info.json_schema_extra or {}
+        #     if extra.get('cmp', True):
+        #         res.append(field_info.alias or field_name)
+        # return res
 
     def __eq__(self, other: Self) -> bool:
         """
@@ -397,3 +478,17 @@ class Entity(BaseModel):
             if getattr(self, field) != getattr(other, field):
                 return False
         return True
+
+    def __repr__(self):
+        s = f"<{type(self).__name__}:{self.label}>"
+        return s
+
+    def __del__(self):
+        # should use logger but can't b/c it closes the stream while
+        # tearing down and raises a bunch of errors on exit()
+        if logger.level <= logging.DEBUG:
+            print(f"DEBUG:{__name__}:Deleting {self!r}")
+
+    # probably should only go into a set if they are frozen or singletons
+    # def __hash__(self) -> int:
+    #     return self.uid.__hash__()
