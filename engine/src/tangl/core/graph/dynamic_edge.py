@@ -4,7 +4,8 @@ from typing import Generic, TypeVar, Optional
 from pydantic import model_validator
 
 from tangl.type_hints import StringMap, UniqueLabel
-from .graph import Node, Edge, Graph
+from .node import Node
+from .edge import Edge
 
 NodeT = TypeVar("NodeT", bound=Node)
 

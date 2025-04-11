@@ -1,3 +1,5 @@
-from .graph import Node, Graph, Edge
+from .node import Node
+from .edge import Edge
+from .graph import Graph
 from .dynamic_edge import  DynamicEdge
 from .singleton_node import SingletonNode

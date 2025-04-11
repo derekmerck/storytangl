@@ -10,7 +10,12 @@ on_enter = TaskPipeline[Node, Optional[Edge]](label="on_enter", pipeline_strateg
 on_follow_edge = TaskPipeline[Graph, Any](label="on_follow_edge", pipeline_strategy=PipelineStrategy.GATHER)
 
 class TraversableEdge(Available, HasConditions, Edge):
-    trigger: Literal["before", "after", "block"] = "block"
+    """
+    * **Availability Inheritance**: Edge availability depends on the successor's availability.
+    * **Activation Modes**: Supports 'first' (redirect), 'last' (continue), or None (manual) activation.  The activation mode determines when the TraversalHandler interacts with the edge.
+    * **Traversal Role**:  Edges may define "on_enter" and "on_exit" tasks, but cannot redirect or continue themselves.
+    """
+    activation_mode: Literal["before", "after", "block"] = "block"
 
 
 class TraversableNode(Node):
@@ -141,3 +146,4 @@ class TraversableGraph(Graph):
     def is_entry_point(self) -> bool:
         return "is_entry" in self.tags or \
                self.label in ["entry", "start"]
+
