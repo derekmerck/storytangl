@@ -1,0 +1,148 @@
+name: Cosmic Wizards
+
+phase_names:
+- launch
+- navigate
+- encounter
+
+strategy_types:
+- explore:  # scissors equivalent
+    adj:
+      - pioneering
+      - bold
+    nominal:
+      - expedition
+      - probe
+- negotiate:  # paper equivalent
+    adj:
+      - diplomatic
+      - cunning
+    nominal:
+      - alliance
+      - treaty
+- fortify:  # rock equivalent
+    adj:
+      - defensive
+      - resilient
+    nominal:
+      - shield
+      - outpost
+
+affiliations:
+- red:
+    name: nova
+    modifiers: explore+1
+    adj:
+      - blazing
+      - volatile
+      - energetic
+    nominal:
+      - star
+      - flare
+      - plasma
+      - fusion
+      - supernova
+    special_nominal:
+      - quasar
+- blue:
+    name: quantum
+    modifiers: fortify+1
+    adj:
+      - entangled
+      - probabilistic
+      - wave-like
+    nominal:
+      - particle
+      - wormhole
+      - singularity
+      - dimension
+      - paradox
+    special_nominal:
+      - tesseract
+- green:
+    name: biome
+    modifiers: negotiate+1
+    adj:
+      - symbiotic
+      - adaptive
+      - evolving
+    nominal:
+      - ecosystem
+      - spore
+      - terraform
+      - xenoflora
+      - mutation
+    special_nominal:
+      - panspermia
+
+play_card_verbs:
+- deploy
+- activate
+- jettison
+- dock
+- launch
+
+card_interacts_with_verbs:
+- outmaneuvers
+- intercepts
+- assimilates
+- repels
+- neutralizes
+
+card_adj:
+- interstellar
+- cybernetic
+- gravitational
+- quantum
+- nebulous
+- psionic
+- cryogenic
+- antimatter
+- subspace
+- hyperdrive
+
+card_nominal:
+- starship
+- android
+- nebula
+- asteroid
+- alien
+- cyborg
+- satellite
+- planet
+- wormhole
+- space station
+- black hole
+- laser
+- comet
+
+special_card_adj:
+- galactic
+- cosmic
+- quantum
+- hyper
+
+special_card_nominal:
+- mothership
+- space-time rift
+- dark matter
+- dyson sphere
+- nanite swarm
+- tachyon beam
+- gravity well
+- warp drive
+- AI core
+
+special_prefix:
+- prototype
+- experimental
+- enhanced
+- nano-infused
+- quantum-
+
+unique_prefix:
+- one-of-a-kind
+- classified
+- lost relic
+- forbidden tech
+- anomalous

@@ -1,0 +1,172 @@
+name: Caste Sapphire
+
+phase_names:
+# e.g., in the _build_ phase
+- build
+- declare
+- resolve
+
+strategy_types:
+# rps rules
+- aggro:       # attack, scissors
+    adj:
+      - explosive
+      - swarming
+    nominal:
+      - rush
+      - edge
+- midrange:    # balanced, paper
+    adj:
+      - ranged
+      - counter
+    nominal:
+      - combo
+      - feint
+- control:     # defend, rock
+    adj:
+      - entrenched
+      - defensive
+    nominal:
+      - fortification
+      - bulwark
+
+affiliations:
+- red:
+    name: fire
+    modifiers: aggro+1
+    adj:
+      - blazing
+      - hot
+      - cruel
+    nominal:
+      - fire
+      - forge
+      - mountain
+      - lantern
+      - mercenary
+    special_nominal:
+      - ruby
+- blue:
+    name: water
+    modifiers: control+1
+    adj:
+      - soothing
+      - sunken
+      - tidal
+    nominal:
+      - water
+      - sea
+      - maelstrom
+      - ship
+      - pirate
+    special_nominal:
+      - sapphire
+- green:
+    name: forest
+    modifiers: midrange+1
+    adj:
+      - verdant
+      - horned
+      - fecund
+    nominal:
+      - forest
+      - tree
+      - eagle
+      - branch
+      - druid
+    special_nominal:
+      - emerald
+
+play_card_verbs:
+# e.g., you _cast_ card x
+- cast
+- show
+- sacrifice
+- tap
+
+card_interacts_with_verbs:
+# e.g., your x card _interacts with_ their y card
+- attacks
+- loses against
+- defeats
+- defends against
+- uncasts
+
+card_adj:
+- brash
+- arcane
+- fierce
+- sneaky
+- black
+- bright
+- clockwork
+- organic
+- glorious
+- hidden
+- eternal
+- temporary
+- monstrous
+- friendly
+
+card_nominal:
+- soldier
+- ninja
+- robot
+- zombie
+- general
+- spy
+- mage
+- demon
+- artifact
+- scavenger
+- ranger
+- veteran
+- novice
+
+- garden
+- workshop
+- battlefield
+
+- plain
+- swamp
+
+- blessing
+- book
+- sword
+
+special_card_adj:
+- mox
+- spectral
+- rookie
+- ancient
+
+special_card_nominal:
+- lotus
+- dragon
+- paladin
+- hero
+- angel
+- devil
+- charizard
+
+- monolith
+- song
+- diamond
+
+special_prefix:
+- shiny
+- alt art
+- foil
+- holofoil
+- inverse
+
+unique_prefix:
+- signed
+- artist proof
+- alpha
+- unreleased
+- misprint
+
+# adj, nominals, and prefixes are selected from the union of generic, affiliation specific, and strategy specific terms
+
+# common and uncommon cards are "{adj} {nominal}", like "Sneaky Garden", rares have either a special prefix or special nominal, like "Holofoil Unholy Battlefield" or "Black Dragon".  Legendaries are rares with a unique prefix

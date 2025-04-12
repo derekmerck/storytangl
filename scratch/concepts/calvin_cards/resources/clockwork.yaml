@@ -1,0 +1,145 @@
+name: Clockwork Consortium
+
+phase_names:
+- wind
+- engage
+- resolve
+
+strategy_types:
+- innovate:  # scissors equivalent
+    adj:
+      - revolutionary
+      - avant-garde
+    nominal:
+      - invention
+      - discovery
+- refine:  # paper equivalent
+    adj:
+      - precise
+      - elegant
+    nominal:
+      - calibration
+      - optimization
+- reinforce:  # rock equivalent
+    adj:
+      - robust
+      - steadfast
+    nominal:
+      - fortification
+      - bulwark
+
+affiliations:
+- red:
+    name: steam
+    modifiers: innovate+1
+    adj:
+      - pressurized
+      - scalding
+      - volatile
+    nominal:
+      - boiler
+      - piston
+      - turbine
+      - furnace
+      - locomotive
+    special_nominal:
+      - perpetual engine
+- blue:
+    name: aether
+    modifiers: reinforce+1
+    adj:
+      - ethereal
+      - arcane
+      - fluctuating
+    nominal:
+      - crystal
+      - resonator
+      - conduit
+      - leyline
+      - vortex
+    special_nominal:
+      - philosopher's stone
+- green:
+    name: nature
+    modifiers: refine+1
+    adj:
+      - organic
+      - wild
+      - adaptive
+    nominal:
+      - clockwork fauna
+      - mechanical flora
+      - hybrid
+      - automaton
+      - symbiosis
+    special_nominal:
+      - world tree
+
+play_card_verbs:
+- wind up
+- engage
+- dismantle
+- calibrate
+- retrofit
+
+card_interacts_with_verbs:
+- outmaneuvers
+- overclocks
+- short-circuits
+- recalibrates
+- augments
+
+card_adj:
+- brass
+- clockwork
+- steam-powered
+- mechanized
+- gilded
+- pneumatic
+- cogwheel
+- alchemical
+- galvanic
+- spring-loaded
+
+card_nominal:
+- automaton
+- airship
+- goggles
+- gear
+- contraption
+- dirigible
+- zeppelin
+- dynamo
+- Tesla coil
+- difference engine
+- analytical engine
+- chronometer
+
+special_card_adj:
+- ethereal
+- arcane
+- quantum
+- transcendent
+
+special_card_nominal:
+- time machine
+- aether manipulator
+- perpetual motion machine
+- reality engine
+- dimensional scissors
+- aetheric resonator
+- clockwork hivemind
+- steam-powered colossus
+
+special_prefix:
+- brass-bound
+- steam-infused
+- aether-touched
+- clockwork-
+
+unique_prefix:
+- one-of-a-kind
+- lost blueprint
+- da Vinci's
+- Tesla's secret
+- interdimensional
