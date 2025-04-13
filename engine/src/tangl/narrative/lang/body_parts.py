@@ -1,8 +1,8 @@
 from enum import Enum, auto, Flag
 
-from tangl.utils.enum_utils import EnumUtils
+from tangl.utils.enum_plus import EnumPlusMixin
 
-class BodyRegion(EnumUtils, Enum):
+class BodyRegion(EnumPlusMixin, Enum):
     """A coarse body region enum"""
     # Basic divisions
     HEAD = auto()
@@ -16,7 +16,7 @@ class BodyRegion(EnumUtils, Enum):
     FEET = auto()
 
 
-class BodyPart(EnumUtils, Flag):
+class BodyPart(EnumPlusMixin, Flag):
     """A more detailed hierarchical body region enum"""
 
     FACE = auto()

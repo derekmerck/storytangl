@@ -74,7 +74,7 @@ class HasContext(Entity):
             return self.graph.gather_context()
 
     # @on_gather_context.register(caller_cls=Graph)
-    # def _provide_items_by_path(self: Graph) -> Optional[StringMap]:
+    # def _provide_items_by_path(self: Graph) -> StringMap:
     #     return self.by_path()
 
     def gather_context(self) -> StringMap:

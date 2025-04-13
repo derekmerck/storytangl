@@ -120,7 +120,7 @@ def test_trivial_game_handler_force_draw():
     assert game.score["player"] == 3
     assert game.score["opponent"] == 3
 
-@pytest.mark.skip(reason="not sure")
+@pytest.mark.xfail(reason="not sure")
 def test_player_advantage():
     game = TrivialGame(difficulty=3)
     assert game.player_advantage == 0.2
@@ -128,7 +128,7 @@ def test_player_advantage():
     game.difficulty = 10
     assert game.player_advantage == 0
 
-@pytest.mark.skip(reason="not sure")
+@pytest.mark.xfail(reason="not sure")
 def test_story_context_interaction(monkeypatch):
     game = TrivialGame()
 

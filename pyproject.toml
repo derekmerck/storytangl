@@ -97,12 +97,11 @@ webuiapi = "^0.9.17"
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "DEBUG"
-#testpaths = [
-#    "engine/tests",               # base tests
-#    "apps/*/tests"                # app tests
-##    "worlds/*/tests"       # sample world tests
-#
-#]
+testpaths = [
+    "engine/tests",               # base tests
+    "apps/*/tests"                # app tests
+#    "worlds/*/tests"       # sample world tests
+]
 #pythonpath = [
 #    "tangl",
 #]

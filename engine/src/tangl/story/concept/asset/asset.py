@@ -14,8 +14,8 @@ Assets of a given class have instance inheritance from already registered peers 
 Note, Entities can have countable assets stored in a wallet component, however, discrete assets
 are associated, so they require a node/graph structure.
 """
-from tangl.business.core import InheritingSingleton
-from tangl.business.core.handlers import Renderable
+from tangl.core.entity import InheritingSingleton
+from tangl.core.handlers import Renderable
 
 class Asset(Renderable, InheritingSingleton):
 

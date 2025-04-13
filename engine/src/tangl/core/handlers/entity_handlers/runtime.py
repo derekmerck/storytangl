@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any, Optional
 import logging
 
 from tangl.type_hints import Expr
@@ -10,7 +10,7 @@ from .has_context import HasContext
 
 logger = logging.getLogger(__name__)
 
-# todo: separate on_gather_conditions, on_check_conditions?  Is the gathering the pluggable part?
+# todo: separate on_gather_exprs, on_runtime_exprs?  Is the gathering the pluggable part?
 
 on_check_conditions = TaskPipeline[HasContext, bool](
     label="on_check_conditions",
@@ -25,7 +25,7 @@ class HasConditions(HasContext):
     conditions: list[Expr] = None
 
     @classmethod
-    def eval_str(cls, s: str, **context) -> Any:
+    def eval_expr(cls, s: Expr, **context) -> Any:
         if not s:
             return
         result = eval(s, safe_builtins, context)
@@ -34,14 +34,14 @@ class HasConditions(HasContext):
 
     @classmethod
     def all_conditions_true(cls, conditions: list[Expr], context: dict = None) -> bool:
-        return all([ cls.eval_str( c, **context ) for c in conditions ])
+        return all([ cls.eval_expr( c, **context ) for c in conditions ])
 
     @on_check_conditions.register()
     def _check_my_conditions(self, **context) -> bool:
         return self.all_conditions_true(self.conditions, context)
 
     @on_check_conditions.register(caller_cls=Node)
-    def _check_my_parent_conditions(self, **context) -> bool:
+    def _check_my_parent_conditions(self, **context) -> Optional[bool]:
         if self.parent and isinstance(self.parent, HasConditions):
             return on_check_conditions.execute(self.parent, **context)
 
@@ -62,7 +62,7 @@ class HasEffects(HasContext):
     effects: list[Expr] = None
 
     @classmethod
-    def exec_str(cls, s: str, **context):
+    def exec_expr(cls, s: Expr, **context):
         if not s:
             return
         logger.debug(f"exec {s} with {context}")
@@ -72,7 +72,7 @@ class HasEffects(HasContext):
     @classmethod
     def apply_all_effects(cls, effects: list[Expr], context: dict = None):
         for e in effects:
-            cls.exec_str(e, **context)
+            cls.exec_expr(e, **context)
         # todo: write direct context updates back to state?
 
     @on_apply_effects.register()
