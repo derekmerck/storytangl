@@ -30,7 +30,7 @@ Examples:
 - state-dependent games: most token/card/board games, clickers
 
 - simple games: require no equipment, often-state independent, rps
-- token games: requires fungible markers
-- picking games: require target and distractor markers
-- card game: requires an ordered set of markers
-- board game: requires a map of positions for markers
+- token games: requires fungible markers, nim
+- picking games: require target and distractor markers, memory, waldo
+- card game: requires an ordered set of markers, blackjack, poker
+- board game: requires a map of positions for markers, checkers, life

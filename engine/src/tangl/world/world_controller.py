@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from tangl.type_hints import Identifier
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
-from tangl.media.media_record import MediaDataType, MediaRecord
+# from tangl.media.media_record import MediaDataType, MediaRecord
 from .world import World
 
 if TYPE_CHECKING:

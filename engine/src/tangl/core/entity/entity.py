@@ -340,7 +340,7 @@ class Entity(BaseModel):
                 if getattr(self, criterion) != value:
                     return False
             else:
-                raise ValueError(f"Untestable comparator for {criterion} on {self.__class__}")
+                raise ValueError(f"Untestable criteria comparator for '{criterion}' on {self.__class__}")
 
         return True  # all checks passed
 
@@ -487,7 +487,7 @@ class Entity(BaseModel):
         # should use logger but can't b/c it closes the stream while
         # tearing down and raises a bunch of errors on exit()
         if logger.level <= logging.DEBUG:
-            print(f"DEBUG:{__name__}:Deleting {self!r}")
+            print(f"DEBUG:{__name__}:Deleting {self}")
 
     # probably should only go into a set if they are frozen or singletons
     # def __hash__(self) -> int:

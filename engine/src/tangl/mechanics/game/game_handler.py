@@ -17,35 +17,35 @@ Examples:
 
 from __future__ import annotations
 import random
-from typing import Callable, TypeVar, ClassVar, Optional, Type
+from typing import Callable, TypeVar, ClassVar, Optional, Type, Generic
 from abc import ABC, abstractmethod
-from enum import Enum
 
 from pydantic import Field, field_validator, model_validator
 
-from tangl.core.handlers import PipelineStrategy
+from tangl.core.handlers import HandlerRegistry
+from tangl.core.entity import Entity
 from tangl.core.graph import Node
-from tangl.core.handlers import on_gather_context
+from tangl.core.handlers import on_gather_context, HasContext
 from .enums import GameResult
+from ...core import TaskPipeline
 
 # Move-type for any GameHandler may be a simple Enum or a more complex
 # parameterized dataclass
 Move = TypeVar("Move")
 
-# Annotated strategies should follow these sigs:
-OpponentStrategyFunc = Callable[[Type['GameHandler'], 'Game', Optional[Move]], Move]
-# Requires player move param for opponent strategy, but not for opponent next move
-# strategy, which is called _before_ player move is determined
-ScoringStrategyFunc = Callable[[Type['GameHandler'], 'Game'], GameResult]
+# # Annotated strategies should follow these sigs:
+# OpponentStrategyFunc = Callable[[Type['GameHandler'], 'Game', Optional[Move]], Move]
+# # Requires player move param for opponent strategy, but not for opponent next move
+# # strategy, which is called _before_ player move is determined
+# ScoringStrategyFunc = Callable[[Type['GameHandler'], 'Game'], GameResult]
 
-GameType = TypeVar("GameType", bound='Game')
+GameT = TypeVar("GameT", bound='Game')
 
-# todo: definitely need each game handler to have it's OWN strategy registry
-opponent_strategies = StrategyRegistry(label='game_opponent_strategies')
-scoring_strategies = StrategyRegistry(label='game_scoring_strategies')
+opponent_strategies = HandlerRegistry(label='opponent_strategies')
+scoring_strategies = HandlerRegistry(label='scoring_strategies')
 
 
-class GameHandler(ABC):
+class GameHandler(ABC, Generic[GameT]):
     """
     Provides a base class for game handler logic that can be wrapped in a challenge block.
 
@@ -60,10 +60,10 @@ class GameHandler(ABC):
     `_resolve_round`, must be implemented for each different game-type.
 
     When adding named opponent strategies, they should be decorated in the handler with
-    `@opponent_strategy`.
+    `@GameHandler.opponent_strategy.register`.
 
     If adding additional scoring strategies, they should be decorated in the handler with
-    `@scoring_strategy`.
+    `@GameHandler.scoring_strategy.register`.
 
     This provides maps for function names to be dereferenced from simple string fields in
     the Game dataclass.
@@ -72,7 +72,7 @@ class GameHandler(ABC):
     such as for assigning namespace variables to evaluate win conditions at higher levels.
     """
 
-    # These methods _must_ be implemented for each subclass game-type
+    # These two methods _must_ be implemented for each subclass game-type
     @classmethod
     @abstractmethod
     def get_possible_moves(cls, game: Game) -> list[Move]:
@@ -122,54 +122,44 @@ class GameHandler(ABC):
                              round_result: GameResult):
         game.history.append((player_move, opponent_move, round_result))
 
+    # @classmethod
+    # def get_opponent_strategy(cls, name: str) -> Callable:
+    #     res = cls.opponent_strategies.get_strategies(name)
+    #     if res:
+    #         return res[0]
+
+    # Opponent move selection strategies are registered with `@GameHandler.opponent_move_strategy`
+    @opponent_strategies.register()
     @staticmethod
-    def opponent_strategy(func: OpponentStrategyFunc):
-        """
-        Decorator to mark a method an opponent move-selection strategy.
-        """
-        opponent_strategies.register_strategy(func, func.__name__)
-        return func
-
-    @classmethod
-    def get_opponent_strategy(cls, name: str) -> Callable:
-        res = opponent_strategies.get_strategies(name)
-        if res:
-            return res[0]
-
-    # Opponent move selection strategies are registered with `@opponent_move_strategy`
-    @classmethod
-    @opponent_strategy
-    def make_random_move(cls, game: Game, player_move: Move = None) -> Move:
+    def make_random_move(game: Game, **context) -> Move:
         # Override this for more complex move types
-        return random.choice(cls.get_possible_moves(game))
+        return random.choice(game.get_possible_moves())
 
     @classmethod
     def _get_opponent_move(cls, game: Game):
         if not game.opponent_move_strategy:
             return None
-        strategy_func = cls.get_opponent_strategy( game.opponent_move_strategy )
-        if strategy_func:
-            return strategy_func(cls, game, None)
+        move = opponent_strategies.execute(game, game.opponent_move_strategy)
+        return move
 
     @classmethod
     def _revise_opponent_move(cls, game: Game, player_move: Move) -> Move:
         if not game.opponent_revise_move_strategy:
             return game.opponent_next_move
-        strategy_func = cls.get_opponent_strategy( game.opponent_revise_move_strategy )
-        if strategy_func:
-            return strategy_func(cls, game, player_move)
+        move = opponent_strategies.execute(game, game.opponent_revise_move_strategy, player_move=player_move)
+        return move
 
+    # @classmethod
+    # def scoring_strategy(cls, func: ScoringStrategyFunc):
+    #     """
+    #     Decorator to mark a method as a scoring strategy.
+    #     """
+    #     cls.scoring_strategies.register_strategy(func, func.__name__)
+
+    # Scoring strategies are registered with `@GameHandler.scoring_strategy`
+    @scoring_strategies.register()
     @staticmethod
-    def scoring_strategy(func: ScoringStrategyFunc):
-        """
-        Decorator to mark a method as a scoring strategy.
-        """
-        scoring_strategies.register_strategy(func, func.__name__)
-
-    # Scoring strategies are registered with `@scoring_strategy`
-    @classmethod
-    @scoring_strategy
-    def best_of_n(cls, game: Game) -> GameResult:
+    def best_of_n(game: Game, **context) -> GameResult:
         """Check if the game has ended using best-of-n."""
         total_rounds = game.scoring_n
         player_wins = sum([1 if r[2] is GameResult.WIN else 0 for r in game.history])
@@ -182,9 +172,9 @@ class GameHandler(ABC):
             return GameResult.DRAW
         return GameResult.IN_PROCESS
 
-    @classmethod
-    @scoring_strategy
-    def highest_at_n(cls, game: Game) -> GameResult:
+    @scoring_strategies.register()
+    @staticmethod
+    def highest_at_n(game: Game, **context) -> GameResult:
         """Check if the game has ended using highest-score"""
         total_rounds = game.scoring_n
         if game.round > total_rounds:
@@ -195,9 +185,9 @@ class GameHandler(ABC):
             return GameResult.WIN
         return GameResult.IN_PROCESS
 
-    @classmethod
-    @scoring_strategy
-    def first_to_n(cls, game: Game) -> GameResult:
+    @scoring_strategies.register()
+    @staticmethod
+    def first_to_n(game: Game, **context) -> GameResult:
         """Check if the game has ended using first-to-n"""
         total_score = game.scoring_n
         if game.score["player"] >= total_score:
@@ -208,14 +198,15 @@ class GameHandler(ABC):
 
     @classmethod
     def check_game_result(cls, game: Game) -> GameResult:
-        strategy_func = scoring_strategies.get_strategies( game.scoring_strategy )
-        if strategy_func:
-            strategy_func = strategy_func[0]
-            return strategy_func(cls, game)
-        raise ValueError(f"Invalid scoring strategy: {game.scoring_strategy}")
+        return scoring_strategies.execute(game, func_name=game.scoring_strategy)
 
+    @classmethod
+    def valid_strategy_name(cls, name: str) -> bool:
+        if name in set(scoring_strategies.func_names() + opponent_strategies.func_names() ):
+            return True
+        return False
 
-class Game(HasNamespace, Node):
+class Game(HasContext, Entity):
     # Games are `Nodes`, so they have access to the parent block's namespace
     # to get situational effects or global bonuses for identifying possible moves,
     # resolving rounds, or computing opponent strategies.
@@ -248,7 +239,7 @@ class Game(HasNamespace, Node):
                      "opponent_revise_move_strategy")
     @classmethod
     def _is_valid_strategy(cls, value):
-        if value not in set(scoring_strategies.keys() + opponent_strategies.keys()):
+        if not cls.game_handler_cls.valid_strategy_name(value):
             raise ValueError(f"No such strategy: {value}")
         return value
 
@@ -270,7 +261,7 @@ class Game(HasNamespace, Node):
     def result(self):
         return self.game_handler_cls.check_game_result(self)
 
-    @on_gather_context.register
+    @on_gather_context.register()
     def _include_game_status(self):
         R = GameResult
         res = {
@@ -298,7 +289,7 @@ class Game(HasNamespace, Node):
         }
         return res
 
-    @on_gather_context.register
+    @on_gather_context.register()
     def _add_game_result_enum_to_ns(self):
         # for evaluating enums like `R.WIN`
         return {'R': GameResult}

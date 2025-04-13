@@ -13,7 +13,7 @@ Affiliation = str | Enum
 class Token(Fungible):
     """
     Tokens are fungible assets that can be grouped and aggregated
-    by type, specifically to be used in games.
+    by type, specifically to be used in game.
 
     Extends fungible, which only has name and value, with an enumerated
     affiliation, e.g., "Red" or "Blue".

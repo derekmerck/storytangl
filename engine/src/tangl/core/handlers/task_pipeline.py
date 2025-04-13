@@ -20,17 +20,18 @@ for specific tasks and execute them in a controlled order on Entities.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, Type, Optional, Union
+from typing import TypeVar, Generic, Callable, Type
 from enum import Enum, auto
 from itertools import chain
 from collections import ChainMap
 import functools
 import logging
 
-from pydantic import Field, ConfigDict
+from pydantic import ConfigDict
 
 from tangl.core import Entity, Registry, Singleton
-from .task_handler import TaskHandler, HandlerPriority
+from .task_handler import TaskHandler
+from .handler_registry import HandlerRegistry
 
 # Type variables
 T = TypeVar('T')
@@ -73,7 +74,7 @@ class PipelineStrategy(Enum):
     ANY = auto()        # Any success is enough (with early return)
 
 
-class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
+class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
     """
     A specialized pipeline that processes :class:`~tangl.core.Entity`
     objects through a collection of :class:`TaskHandler` callbacks,
@@ -114,51 +115,51 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
     model_config = ConfigDict(frozen=False)
 
     pipeline_strategy: PipelineStrategy = PipelineStrategy.GATHER
-    entity_type: Type[EntityT] = Entity
-    result_type: Type[ResultT] = Any
-
-    handler_registry: Registry[TaskHandler] = Field(default_factory=Registry[TaskHandler])
-    handler_registrations: int = 0  # can't just use len, b/c we allow unregistering handlers
+    # entity_type: Type[EntityT] = Entity
+    # result_type: Type[ResultT] = Any
+    #
+    # handler_registry: Registry[TaskHandler] = Field(default_factory=Registry[TaskHandler])
+    # handler_registrations: int = 0  # can't just use len, b/c we allow unregistering handlers
 
     _resolution_cache: dict[tuple[type, str], list[TaskHandler]] = {}
 
-    def register(self,
-                 priority: HandlerPriority = HandlerPriority.NORMAL,
-                 domain: str = "*",
-                 caller_cls: type[EntityT] = None):
-        """
-        Decorator to register a new handler with this pipeline.
-
-        :param priority: The execution priority, defaults to NORMAL.
-        :type priority: HandlerPriority
-        :param domain: A domain pattern restricting which entities are
-                       handled (default ``"*"``).
-        :type domain: str
-        :param caller_cls: Class restriction for instance methods; if
-                           None, it may be inferred later.
-        :type caller_cls: type[EntityT]
-        :return: A function decorator that registers the wrapped function
-                 as a :class:`TaskHandler`.
-        :rtype: Callable[[Callable[..., ResultT]], Callable[..., ResultT]]
-
-        Example::
-          >>> pipeline = TaskPipeline()
-          >>> @pipeline.register(priority=HandlerPriority.FIRST)
-          >>> def my_handler(entity, **context):
-          >>>    ...
-          >>>    return some_value
-        """
-        def decorator(func: Callable[..., ResultT]):
-            handler = TaskHandler(
-                func=func,
-                priority=priority,
-                domain=domain,
-                caller_cls=caller_cls,
-            )
-            self._register_handler(handler)
-            return func
-
-        return decorator
+    # def register(self,
+    #              priority: HandlerPriority = HandlerPriority.NORMAL,
+    #              domain: str = "*",
+    #              caller_cls: type[EntityT] = None):
+    #     """
+    #     Decorator to register a new handler with this pipeline.
+    #
+    #     :param priority: The execution priority, defaults to NORMAL.
+    #     :type priority: HandlerPriority
+    #     :param domain: A domain pattern restricting which entities are
+    #                    handled (default ``"*"``).
+    #     :type domain: str
+    #     :param caller_cls: Class restriction for instance methods; if
+    #                        None, it may be inferred later.
+    #     :type caller_cls: type[EntityT]
+    #     :return: A function decorator that registers the wrapped function
+    #              as a :class:`TaskHandler`.
+    #     :rtype: Callable[[Callable[..., ResultT]], Callable[..., ResultT]]
+    #
+    #     Example::
+    #       >>> pipeline = TaskPipeline()
+    #       >>> @pipeline.register(priority=HandlerPriority.FIRST)
+    #       >>> def my_handler(entity, **context):
+    #       >>>    ...
+    #       >>>    return some_value
+    #     """
+    #     def decorator(func: Callable[..., ResultT]):
+    #         handler = TaskHandler(
+    #             func=func,
+    #             priority=priority,
+    #             domain=domain,
+    #             caller_cls=caller_cls,
+    #         )
+    #         self._register_handler(handler)
+    #         return func
+    #
+    #     return decorator
 
     def _invalidate_resolution_cache(self):
         """
@@ -172,9 +173,7 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
         Internal helper to place a handler in the registry, increment
         the registration count, and invalidate caches.
         """
-        handler.registration_order = self.handler_registrations
-        self.handler_registrations += 1
-        self.handler_registry.add(handler)
+        super()._register_handler(handler)
         self._invalidate_resolution_cache()
 
     def _unregister_handler(self, handler: TaskHandler):
@@ -182,8 +181,7 @@ class TaskPipeline(Singleton, Generic[EntityT, ResultT]):
         Remove a handler from the registry and invalidate caches. The
         monotonic registration counter is not decremented.
         """
-        self.handler_registry.remove(handler)
-        # but don't decrement the registration counter
+        super()._unregister_handler(handler)
         self._invalidate_resolution_cache()
 
     def gather_handlers(self,

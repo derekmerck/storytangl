@@ -4,7 +4,7 @@ from base64 import b64encode
 from pydantic import Field, field_serializer, BaseModel
 
 from tangl.type_hints import Pathlike
-from tangl.media import MediaRecord
+# from tangl.media import MediaRecord
 from .content_fragment import ContentFragment, UpdateFragment
 
 # Media Presentation Hints
@@ -43,7 +43,7 @@ class MediaFragment(ContentFragment, extra='allow'):
         return str(content)
 
     @classmethod
-    def from_media_record(cls, media_record: MediaRecord, **kwargs) -> 'MediaFragment':
+    def from_media_record(cls, media_record: 'MediaRecord', **kwargs) -> 'MediaFragment':
         ...
 
 class MediaUpdateFragment(MediaFragment, UpdateFragment, extra='allow'):

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from tangl.type_hints import Identifier, Expr, UnstructuredData
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
-from tangl.media.media_record import MediaRecord, MediaDataType
+# from tangl.media.media_record import MediaRecord, MediaDataType
 from tangl.core.handlers import TraversableEdge, AnonymousEdge, HasEffects, HasConditions
 from .story_graph import Story
 from .story_node import StoryNode
@@ -50,7 +50,7 @@ class StoryController(HasApiEndpoints):
         return story.get_info(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
-    def get_story_media(self, story: Story, media: MediaRecord | Identifier, **kwargs) -> MediaDataType:
+    def get_story_media(self, story: Story, media: 'MediaRecord' | Identifier, **kwargs) -> 'MediaDataType':
         if isinstance(media, Identifier):
             media = story.find_one(alias=media)  # type: MediaRecord
         return media.get_content(**kwargs)

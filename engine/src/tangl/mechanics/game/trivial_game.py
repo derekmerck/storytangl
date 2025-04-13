@@ -5,8 +5,14 @@ import random
 
 from pydantic import ConfigDict, Field
 
+from tangl.core.handlers import HandlerRegistry
 from .game_handler import GameHandler, Game
 from .enums import GameResult
+
+# opponent_strategies = HandlerRegistry(label='opponent_strategies')
+# scoring_strategies = HandlerRegistry(label='scoring_strategies')
+
+from .game_handler import opponent_strategies, scoring_strategies
 
 
 class TrivialGameHandler(GameHandler):
@@ -48,37 +54,43 @@ class TrivialGameHandler(GameHandler):
             game.score["opponent"] += 2
             return GameResult.LOSE
 
-    @GameHandler.opponent_strategy
-    def always_win(cls, game: Game, player_move: WinLoseMove = None) -> WinLoseMove:
-        return cls.WinLoseMove.WIN
+    @opponent_strategies.register()
+    @staticmethod
+    def always_win(game: TrivialGame, player_move: WinLoseMove = None) -> WinLoseMove:
+        return TrivialGameHandler.WinLoseMove.WIN
 
-    @GameHandler.opponent_strategy
-    def always_lose(cls, game: Game, player_move: WinLoseMove = None) -> WinLoseMove:
-        return cls.WinLoseMove.LOSE
+    @opponent_strategies.register()
+    @staticmethod
+    def always_lose(game: Game, player_move: WinLoseMove = None) -> WinLoseMove:
+        return TrivialGameHandler.WinLoseMove.LOSE
 
-    @GameHandler.opponent_strategy
-    def always_draw(cls, game: Game, player_move: WinLoseMove = None) -> WinLoseMove:
-        return cls.WinLoseMove.DRAW
+    @opponent_strategies.register()
+    @staticmethod
+    def always_draw(game: Game, player_move: WinLoseMove = None, **context) -> WinLoseMove:
+        return TrivialGameHandler.WinLoseMove.DRAW
 
     # todo: these are revision _only_ strategies b/c they required a player move
-    @GameHandler.opponent_strategy
-    def always_oppose(cls, game: Game, player_move: WinLoseMove) -> WinLoseMove:
-        if player_move == cls.WinLoseMove.WIN:
-            return cls.WinLoseMove.LOSE
-        elif player_move == cls.WinLoseMove.LOSE:
-            return cls.WinLoseMove.WIN
-        return cls.WinLoseMove.DRAW
+    @opponent_strategies.register()
+    @staticmethod
+    def always_oppose(game: Game, player_move: WinLoseMove, **context) -> WinLoseMove:
+        if player_move == TrivialGameHandler.WinLoseMove.WIN:
+            return TrivialGameHandler.WinLoseMove.LOSE
+        elif player_move == TrivialGameHandler.WinLoseMove.LOSE:
+            return TrivialGameHandler.WinLoseMove.WIN
+        return TrivialGameHandler.WinLoseMove.DRAW
 
-    @GameHandler.opponent_strategy
-    def always_agree(cls, game: Game, player_move: WinLoseMove) -> WinLoseMove:
+    @opponent_strategies.register()
+    @staticmethod
+    def always_agree(game: Game, player_move: WinLoseMove, **context) -> WinLoseMove:
         return player_move
 
-    @GameHandler.scoring_strategy
-    def most_wins_played(cls, game: Game) -> GameResult:
+    @scoring_strategies.register()
+    @staticmethod
+    def most_wins_played(game: Game, **context) -> GameResult:
         """Determine the winner based on who played the most wins after n rounds."""
         if game.round > game.scoring_n:
-            player_wins = sum(1 for result in game.history if result[0] == cls.WinLoseMove.WIN)
-            opponent_wins = sum(1 for result in game.history if result[1] == cls.WinLoseMove.WIN)
+            player_wins = sum(1 for result in game.history if result[0] == TrivialGameHandler.WinLoseMove.WIN)
+            opponent_wins = sum(1 for result in game.history if result[1] == TrivialGameHandler.WinLoseMove.WIN)
             if player_wins > opponent_wins:
                 return GameResult.WIN
             elif opponent_wins > player_wins:
@@ -88,11 +100,12 @@ class TrivialGameHandler(GameHandler):
         else:
             return GameResult.IN_PROCESS
 
-    @GameHandler.scoring_strategy
-    def points_after_n(cls, game: TrivialGame) -> GameResult:
+    @scoring_strategies.register()
+    @staticmethod
+    def points_after_n(game: TrivialGame, **context) -> GameResult:
         """End the game after n rounds, win if player has at least m points else lose."""
         if game.round > game.scoring_n:
-            if game.score["player"] >= game.point_threshold:
+            if game.score["player"] >= game.scoring_n:
                 return GameResult.WIN
             return GameResult.LOSE
         else:
@@ -117,8 +130,6 @@ class TrivialGame(Game):
     """
     game_handler_cls: ClassVar[Type[GameHandler]] = TrivialGameHandler
     scoring_strategy: str = "most_wins_played"
-
-    point_threshold: int = Field(5, description="Points needed to win when using 'point_threshold' scoring")
 
     def handle_player_move(self, player_move: TrivialGameHandler.WinLoseMove) -> GameResult:
 

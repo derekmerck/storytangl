@@ -6,7 +6,7 @@ from enum import Enum
 
 from pydantic import Field
 
-from tangl.mechanics.games.game_handler import GameHandler, Game, GameResult
+from tangl.mechanics.game.game_handler import GameHandler, Game, GameResult
 from .card_game import CardGame
 
 class MndCard:

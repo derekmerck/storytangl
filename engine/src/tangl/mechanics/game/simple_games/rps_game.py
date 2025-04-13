@@ -1,18 +1,28 @@
+from __future__ import annotations
 import random
 from enum import Enum
 
-from tangl.mechanics.games.game_handler import Game, GameHandler, GameResult
+from bson.regex import str_flags_to_int
+
+from tangl.core.handlers import HandlerRegistry
+from tangl.mechanics.game.game_handler import Game, GameHandler, GameResult
+
+from ..game_handler import opponent_strategies, scoring_strategies
+# opponent_strategies = HandlerRegistry(label='opponent_strategies')
+# scoring_strategies = HandlerRegistry(label='scoring_strategies')
+
+
+class RpsMove(Enum):
+    ROCK = "rock"
+    PAPER = "paper"
+    SCISSORS = "scissors"
+
 
 class RpsGameHandler(GameHandler):
 
-    class RpsMove( Enum ):
-        ROCK = "rock"
-        PAPER = "paper"
-        SCISSORS = "scissors"
-
     @classmethod
     def get_possible_moves(cls, game: Game) -> list[RpsMove]:
-        return list(cls.RpsMove)
+        return list(RpsMove)
 
     @classmethod
     def _resolve_round(cls, game: Game, player_move: RpsMove, opponent_move: RpsMove):
@@ -20,38 +30,43 @@ class RpsGameHandler(GameHandler):
         # Update the score
         if player_move is opponent_move:
             return GameResult.DRAW
-        elif (player_move is cls.RpsMove.ROCK and opponent_move is cls.RpsMove.SCISSORS) or \
-           (player_move is cls.RpsMove.PAPER and opponent_move is cls.RpsMove.ROCK) or \
-           (player_move is cls.RpsMove.SCISSORS and opponent_move is cls.RpsMove.PAPER):
+        elif (player_move is RpsMove.ROCK and opponent_move is RpsMove.SCISSORS) or \
+           (player_move is RpsMove.PAPER and opponent_move is RpsMove.ROCK) or \
+           (player_move is RpsMove.SCISSORS and opponent_move is RpsMove.PAPER):
             game.score["player"] += 1
             return GameResult.WIN
         else:
             game.score["opponent"] += 1
             return GameResult.LOSE
 
-    @GameHandler.opponent_strategy
-    def always_rock(cls, game: Game, player_move: RpsMove = None) -> RpsMove:
-        return cls.RpsMove.ROCK
+    @opponent_strategies.register()
+    @staticmethod
+    def always_rock(game: Game, player_move: RpsMove = None) -> RpsMove:
+        return RpsMove.ROCK
 
-    @GameHandler.opponent_strategy
-    def always_paper(cls, game: Game, player_move: RpsMove = None) -> RpsMove:
-        return cls.RpsMove.PAPER
+    @opponent_strategies.register()
+    @staticmethod
+    def always_paper(game: Game, player_move: RpsMove = None) -> RpsMove:
+        return RpsMove.PAPER
 
-    @GameHandler.opponent_strategy
-    def always_scissors(cls, game: Game, player_move: RpsMove = None) -> RpsMove:
-        return cls.RpsMove.SCISSORS
+    @opponent_strategies.register()
+    @staticmethod
+    def always_scissors(game: Game, player_move: RpsMove = None) -> RpsMove:
+        return RpsMove.SCISSORS
 
-    @GameHandler.opponent_strategy
-    def force_win(cls, game: Game, player_move: RpsMove) -> RpsMove:
-        if player_move is cls.RpsMove.ROCK:
-            return cls.RpsMove.PAPER
-        elif player_move is cls.RpsMove.PAPER:
-            return cls.RpsMove.SCISSORS
+    @opponent_strategies.register()
+    @staticmethod
+    def force_win(game: Game, player_move: RpsMove) -> RpsMove:
+        if player_move is RpsMove.ROCK:
+            return RpsMove.PAPER
+        elif player_move is RpsMove.PAPER:
+            return RpsMove.SCISSORS
         else:  # player_move == RpsGameHandler.Choice.SCISSORS
-            return cls.RpsMove.ROCK
+            return RpsMove.ROCK
 
-    @GameHandler.opponent_strategy
-    def force_lose(cls, game: Game, player_move: RpsMove) -> RpsMove:
+    @opponent_strategies.register
+    @staticmethod
+    def force_lose(game: RpsGame, player_move: RpsMove) -> RpsMove:
         if player_move is RpsGameHandler.RpsMove.ROCK:
             return RpsGameHandler.RpsMove.SCISSORS
         elif player_move is RpsGameHandler.RpsMove.PAPER:
@@ -62,6 +77,13 @@ class RpsGameHandler(GameHandler):
 class RpsGame(Game):
     game_handler_cls = RpsGameHandler
 
+class RpslsMove( Enum ):
+    ROCK = "rock"
+    PAPER = "paper"
+    SCISSORS = "scissors"
+    LIZARD = "lizard"
+    SPOCK = "spock"
+
 class RpslsGameHandler(GameHandler):
     """
     Extends the existing rules of Rock-Paper-Scissors with Lizard and Spock moves.
@@ -70,12 +92,6 @@ class RpslsGameHandler(GameHandler):
 
     RPS can be further extended to any odd number, n*2+1, of moves as long as each move beats n of the other moves.
     """
-    class RpslsMove( Enum ):
-        ROCK = "rock"
-        PAPER = "paper"
-        SCISSORS = "scissors"
-        LIZARD = "lizard"
-        SPOCK = "spock"
 
     WINNING_RPSLMOVES = {
         RpslsMove.ROCK: [RpslsMove.SCISSORS, RpslsMove.LIZARD],
@@ -99,7 +115,7 @@ class RpslsGameHandler(GameHandler):
 
     @classmethod
     def get_possible_moves(cls, game: Game) -> list[RpslsMove]:
-        return list(cls.RpslsMove)
+        return list(RpslsMove)
 
     @classmethod
     def _resolve_round(cls, game: Game, player_move: RpslsMove, opponent_move: RpslsMove):
@@ -113,16 +129,18 @@ class RpslsGameHandler(GameHandler):
             return GameResult.LOSE
         return GameResult.DRAW
 
-    @GameHandler.opponent_strategy
-    def force_win(cls, game: Game, player_move: RpslsMove) -> RpslsMove:
+    @opponent_strategies.register()
+    @staticmethod
+    def force_win(game: Game, player_move: RpslsMove) -> RpslsMove:
         for move, beats in cls.WINNING_RPSLMOVES.items():
             if player_move in beats:
                 return move
         # fallback
         return cls.make_random_move()
 
-    @GameHandler.opponent_strategy
-    def force_lose(cls, game: Game, player_move: RpslsMove) -> RpslsMove:
+    @opponent_strategies.register()
+    @staticmethod
+    def force_lose(game: Game, player_move: RpslsMove) -> RpslsMove:
         return random.choice( cls.WINNING_RPSLMOVES[player_move] )
 
 class RpslsGame(Game):

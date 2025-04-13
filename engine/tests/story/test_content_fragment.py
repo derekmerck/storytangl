@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Optional, Literal
 from pydantic import BaseModel, Field
 
-from tangl.story.journal.content_fragment import ContentFragment, UpdateFragment, TextFragment, KvFragment, GroupFragment, MediaFragment, MediaPresentationHints, PresentationHints
+from tangl.story.journal.content_fragment_models import ContentFragment, UpdateFragment, TextFragment, KvFragment, GroupFragment, MediaFragment, MediaPresentationHints, PresentationHints
 
 
 class TestContentFragment:

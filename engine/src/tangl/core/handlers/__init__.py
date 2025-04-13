@@ -20,6 +20,7 @@ for specific tasks and execute them in a controlled order on Entities.
 """
 
 from .task_handler import TaskHandler, HandlerPriority
+from .handler_registry import HandlerRegistry
 from .task_pipeline import PipelineStrategy, TaskPipeline
 
 from .entity_handlers import HasContext, on_gather_context, HasConditions, on_check_conditions, HasEffects, on_apply_effects, Renderable, on_render, Available, on_avail

@@ -7,7 +7,7 @@ from pydantic import Field
 
 from tangl.core.graph import SingletonNode
 from tangl.mechanics.game.game_handler import GameHandler, Game
-from tangl.mechanics.game.strategy_games.rps_game import RpsGame, RpsGameHandler
+from tangl.mechanics.game.strategy_game.rps_game import RpsGame, RpsGameHandler
 from .game_token import GameToken
 
 class TokenGameHandler(GameHandler):

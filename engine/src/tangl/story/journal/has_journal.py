@@ -3,7 +3,7 @@ from pydantic import Field
 from tangl.utils.bookmarked_list import BookmarkedList
 from tangl.core import Entity
 from tangl.story.story_node import StoryNode
-from .content_fragment.content_fragment import ContentFragment
+from .content_fragment_models.content_fragment import ContentFragment
 
 class JournalNode(StoryNode):
 
