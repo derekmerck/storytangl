@@ -14,7 +14,7 @@ from tangl.utils.deep_merge import deep_merge
 from .protocols import MediaForgeProtocol
 
 if TYPE_CHECKING:
-    from tangl.graph import Node
+    from tangl.core.graph import Node
 
 class MediaSpecification(BaseModel):
     # This is pydantic, so it can be read directly from scripts as part of a reference.

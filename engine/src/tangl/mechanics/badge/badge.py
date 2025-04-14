@@ -7,12 +7,12 @@ import re
 
 from pydantic import Field
 
-from tangl.type_hints import UniqueLabel
+from tangl.type_hints import UniqueLabel, Expr
 from tangl.utils.topological_sort import topological_sort
 from tangl.core.handlers import TaskHandler
 from tangl.core.entity import Singleton
-from tangl.core.handlers import HasEffects, Conditional, ConditionHandler, NamespaceHandler, RenderHandler, HasNamespace, Renderable
-from tangl.core.handlers import Associating, AssociationHandler
+from tangl.core.handlers import HasEffects, HasConditions, HasContext, Renderable, on_render, on_gather_context, on_check_conditions
+from tangl.core.handlers import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 
 
 class BadgeHandler:
@@ -61,7 +61,7 @@ class BadgeHandler:
         raise RuntimeError(f"Unable to normalize arg badge: {badge} as a Badge ({type(badge)}, {badge_cls}")
 
 
-class Badge(HasEffects, Conditional, Renderable, Associating, Singleton):
+class Badge(HasEffects, HasConditions, Renderable, Associating, Singleton):
     """
     A Badge is an intangible asset-like SingletonEntity that can be associated
     conditionally with StoryNodes.
@@ -99,9 +99,9 @@ class Badge(HasEffects, Conditional, Renderable, Associating, Singleton):
     """
 
     dynamic_attach: bool = False
-    conditions: Strings = Field(default_factory=list, alias="attach_conditions")
+    conditions: list[Expr] = Field(default_factory=list, alias="attach_conditions")
     dynamic_detach: bool = False
-    detach_conditions: Strings = Field(default_factory=list)
+    detach_conditions: list[Expr] = Field(default_factory=list)
 
     # Badges superseded by this one should be hidden for render
     hides: set[Badge] = Field( default_factory=set )
@@ -164,7 +164,7 @@ class Badge(HasEffects, Conditional, Renderable, Associating, Singleton):
         # Irrelevant
         pass
 
-    @AssociationHandler.can_disassociate_from_strategy()
+    @on_can_disassociate.register()
     def _check_detach_conditions(self, other: HasBadges, **kwargs):
         if self.dynamic_detach and not self.detach_conditions:
             return not ConditionHandler.check_conditions_satisfied_by(self.conditions, other)
@@ -208,7 +208,7 @@ class HasBadges(Associating):
     def compute_dynamic_badges(self):
         BadgeHandler.compute_dynamic_badges(self)
 
-    @NamespaceHandler.strategy()
+    @on_gather_context.register()
     def _include_badges_in_ns(self) -> Mapping:
         return {
             'badges': self.badges,
@@ -217,8 +217,8 @@ class HasBadges(Associating):
             'has_badges': self.has_badges  # method to check if badge is present by name
         }
 
-    @RenderHandler.strategy()
+    @on_render.register()
     def _include_badges_in_render(self, **kwargs):
-        return {'badges': [ RenderHandler.render(b) for b in self.badges ] }
+        return {'badges': [ self.render(b) for b in self.badges ] }
 
 BadgeLike = Badge | UniqueLabel

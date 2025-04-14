@@ -10,6 +10,7 @@ from pydantic import Field, BaseModel, model_validator, field_validator
 from tangl.utils.is_valid_uuid import is_valid_uuid
 from tangl.type_hints import UniqueLabel
 from tangl.core import Entity, Registry
+from .graph import Graph
 
 if TYPE_CHECKING:
     from .edge import Edge
@@ -69,24 +70,23 @@ class Node(Entity):
     * :class:`SingletonNode<~tangl.core.graph.SingletonNode>` wraps a singleton with unique local vars and parent/children relationships.
     * :class:`~tangl.story.StoryNode` provides a common basis for all Story-related object.
     """
-    graph: Registry = Field(None,  # Circular import to include Graph here as a default factory
-                            repr=False,
-                            exclude=True,
-                            json_schema_extra={'cmp': False})
+    graph: Graph = Field(None,
+                         repr=False,
+                         exclude=True,
+                         json_schema_extra={'cmp': False})
     """The Graph object collection that contains this node.  Omitted from serialization and comparison to prevent recursion issues."""
 
     anon: bool = False  # do not register with the graph
 
     @model_validator(mode="after")
-    def _register_self(self):
-        """If graph is passed in as an argument."""
-        logger.debug(f"Checking {self!r} in graph {self.graph!r}")
-        if self.graph is not None:
-            if self.anon:
-                logger.debug(f'Declining to register self {self!r}')
-            else:
-                self.graph.add(self)
-                logger.debug(f'Registering self {self!r}')
+    def _setup_graph_and_register(self):
+        # Create default graph for non-anonymous nodes if needed
+        if self.graph is None and not self.anon:
+            self.graph = Graph()
+
+        # Only register non-anonymous nodes with the graph
+        if self.graph is not None and not self.anon:
+            self.graph.add(self)
         return self
 
     # @model_validator(mode="after")
@@ -102,17 +102,17 @@ class Node(Entity):
     def _add_self_to_parent(self):
         """If parent is passed in as an argument."""
         logger.debug(f"Checking {self.label} is parented by {self.parent_id} in graph {self.graph}")
-        if self.parent_id is not None and self.graph is not None:
+        if self.graph is not None and self.parent_id is not None and self.parent_id in self.graph:
             logger.debug(f"Adding {self.label} to parent")
             self.parent.add_child(self)
         return self
 
     @property
     def parent(self) -> Optional[Node]:
-        """Link to this node's parent."""
-        if self.parent_id:
-            return self.graph[self.parent_id]
-        return None
+        """Link to this node's parent or None if the parent is None or not in the graph yet."""
+        # This guardrail is primarily to catch attempting to recurse ancestors to get
+        # path before a graph is completely reassembled during deserialization
+        return self.graph.get(self.parent_id)
 
     # @parent.setter
     # def parent(self, node: Node | UUID):
@@ -136,7 +136,7 @@ class Node(Entity):
     def ancestors(self) -> list[Node]:
         root = self
         res = [ root ]
-        while root.parent:
+        while root.parent_id:
             root = root.parent
             res.append(root)
         return [ *reversed(res) ]  # Reverse list so it starts from root
@@ -158,21 +158,88 @@ class Node(Entity):
     def children(self) -> list[Node]:
         return [ self.graph[v] for v in self.children_ids ]
 
-    def add_child(self, child: Self, as_parent: bool = True):
-        if child.graph and child.graph is not self.graph:
-            raise ValueError("Cannot add a node from a different graph.")
-        elif not child.graph:
+    def add_child(self, child: Node, as_parent: bool = True):
+        """
+        Cases:
+        1. Error cases (fast fail):
+           - child has a different non-empty graph than parent
+           - adding child would create a cycle
+
+        2. Graph assignment:
+           - if child has no graph, assign parent's graph
+           - if child has same graph as parent, ensure it's registered
+
+        3. Parent-child relationship:
+           - if as_parent=True, set child.parent_id = self.uid
+           - add child.uid to self.children_ids if not already there
+        """
+        # Error case: different non-trivial graphs
+        has_trivial_graph = child.graph and child.graph is not self.graph and len(child.graph) <= 1
+        logger.debug(f"Child trivial graph: {has_trivial_graph}")
+
+        if child.graph and child.graph is not self.graph and not has_trivial_graph:
+            raise ValueError("Cannot add a node from a different non-trivial graph.")
+
+        # Graph assignment - respect anonymity
+        if child.graph is None or has_trivial_graph:
+            # Set graph reference, but only register if not anonymous
+            child.graph = self.graph
+            if not child.anon:
+                self.graph.add(child)
+        elif not child.anon and child not in self.graph:
+            # Ensure non-anonymous child is registered
             self.graph.add(child)
-        if child.uid not in self.children_ids:
-            if as_parent:
-                # Allow adding links as peers
-                child.parent_id = self.uid
-            # check for cycles
-            if child.detect_cycle():
-                raise ValueError("Adding this node would create a cycle")
-            self.children_ids.append(child.uid)
+
+        # Skip if already a child
+        if child.uid in self.children_ids:
+            logger.warning("Tried to re-add a child node")
             return
-        logger.warning("Tried to re-add a child node")
+
+        # Set parent reference if requested
+        orig_child_parent_id = child.parent_id
+        if as_parent:
+            child.parent_id = self.uid
+
+        # Check for cycles before finalizing
+        if child.detect_cycle():
+            # Undo parent assignment if we made it
+            if as_parent:
+                child.parent_id = orig_child_parent_id
+            raise ValueError("Adding this node would create a cycle")
+
+        # Add to children list
+        self.children_ids.append(child.uid)
+
+    # def add_child(self, child: Self, as_parent: bool = True):
+    #     """
+    #     cases:
+    #     1. skip:
+    #        - child has graph, it's the same as parent and child is already in it
+    #     2. add to parent graph if:
+    #        - child has no graph
+    #        - child has same graph as parent but NOT in parent.graph already
+    #     2. raise if:
+    #        - child has a graph that is not the same as the parent graph and not empty
+    #     """
+    #
+    #     if not child.graph or child not in self.graph:
+    #
+    #         if child.graph is self.graph and child not in self.graph:
+    #             self.graph.add(child)
+    #         elif child.graph is not self.graph and len(child.graph) > 1:
+    #             raise ValueError("Cannot add a node from a different working graph.")
+    #     else:
+    #         self.graph.add(child)  # this will replace an empty child graph
+    #     if child.uid not in self.children_ids:
+    #         if as_parent:
+    #             # Allow adding links as peers
+    #             child.parent_id = self.uid
+    #         # check for cycles
+    #         if child.detect_cycle():
+    #             raise ValueError("Adding this node would create a cycle")
+    #         self.children_ids.append(child.uid)
+    #         return
+    #     logger.warning("Tried to re-add a child node")
 
     def remove_child(self, child: Self, unlink: bool = False):
         if self.anon:

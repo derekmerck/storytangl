@@ -35,7 +35,8 @@ from tangl.utils.dereference_obj_cls import dereference_obj_cls
 
 logger = logging.getLogger(__name__)
 
-TaglikeFields = ("tags", 'with_tags', 'inv', "aka")
+SetlikeFields = ("tags", 'with_tags', 'inv', "aka")
+AliaslikeFields = ('name', 'aka', 'alias', 'aliases')
 
 class Entity(BaseModel):
     """
@@ -161,21 +162,21 @@ class Entity(BaseModel):
                 self.label = self.short_uid[0:6]
         return self
 
-    @field_validator(*TaglikeFields, mode="before", check_fields=False)
+    @field_validator(*SetlikeFields, mode="before", check_fields=False)
     @classmethod
-    def _convert_strings_to_sets(cls, values: Any) -> set:
+    def _convert_str_to_set(cls, values: Any) -> set:
         if isinstance(values, str):
             values = { x.strip() for x in values.split(',') }
         return values
 
-    @field_validator(*TaglikeFields, mode='before', check_fields=False)
+    @field_validator(*SetlikeFields, mode='before', check_fields=False)
     @classmethod
-    def _handle_none_tags(cls, data):
+    def _convert_none_to_set(cls, data):
         if data is None:
             data = set()
         return data
 
-    @field_serializer(*TaglikeFields, check_fields=False)
+    @field_serializer(*SetlikeFields, check_fields=False)
     def _convert_set_to_list(self, values: set):
         """
         Field-level serializer that converts sets to lists, to ensure
@@ -204,6 +205,9 @@ class Entity(BaseModel):
             if my_entity.has_tags("villain", "undead"):
                 ...
         """
+        logger.debug(f"Comparing query tags {tags} against {self!r} with tags={self.tags}")
+        if len(tags) == 1 and tags[0] is None:
+            return len(self.tags) == 0  # check for empty
         if len(tags) == 1 and isinstance(tags[0], (list, set)):
             tags = tags[0]
         return set(tags).issubset(self.tags)
@@ -218,15 +222,15 @@ class Entity(BaseModel):
         :return: A set of identifiers usable for matching or searching.
         :rtype: set[Identifier]
         """
-        result = { self.uid, self.label, self.content_hash }
+        result = { self.uid, self.label, self.content_hash, self.short_uid, self.short_uid[0:6] }
         # Look for some other common alias fields
-        common_alias_attribs = ['name', 'aka']
-        for attrib in common_alias_attribs:
+        for attrib in AliaslikeFields:
             if x := getattr(self, attrib, None):
                 if isinstance(x, set | list ):
                     result.update(x)
                 elif isinstance(x, Identifier):
                     result.add(x)
+        result.discard(None)
         return result
 
     def has_alias(self, *aliases: Identifier) -> bool:

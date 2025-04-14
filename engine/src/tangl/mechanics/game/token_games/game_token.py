@@ -5,7 +5,10 @@ from collections import Counter
 
 from pydantic import Field
 
-from tangl.story.concept.asset import Fungible, Wallet, WalletHandler, HasWallet
+from tangl.story.concept.asset import CountableAsset as Fungible, AssetWallet as Wallet
+
+WalletHandler = object
+HasWallet = object
 
 Affiliation = str | Enum
 # todo: affiliation should be like "move" in game handler?
@@ -20,7 +23,7 @@ class Token(Fungible):
     """
     affiliation: Affiliation
 
-Token.load_instances_from_yaml('tangl.mechanics.game.resources', 'tokens.yaml')
+Token.load_instances_from_yaml('tangl.mechanics.game.token_games.resources', 'tokens.yaml')
 
 
 class TokenHandler(WalletHandler):

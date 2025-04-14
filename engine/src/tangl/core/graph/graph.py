@@ -7,11 +7,11 @@ import logging
 from tangl.utils.is_valid_uuid import is_valid_uuid
 from tangl.type_hints import UniqueLabel
 from tangl.core import Entity, Registry
-from .node import Node
+# from .node import Node
 
 logger = logging.getLogger(__name__)
 
-NodeT = TypeVar('NodeT', bound=Node)
+NodeT = TypeVar('NodeT', bound='Node')
 
 # Side note, the 'Graph' class was originally called 'Context' and was derived from
 # the context manager directly.  This functionality was factored out into the service
@@ -62,9 +62,11 @@ class Graph(Registry[NodeT], Generic[NodeT]):
     """
 
     def add(self, node: NodeT, **kwargs):
-        if getattr(node, "anon", False):
-            # anonymous nodes don't get added to the graph
+        if node.anon:
+            # Skip registration for anonymous nodes
+            logger.debug(f'Declining to register anonymous node {node!r}')
             return
+
         node.graph = self
         super().add(node, **kwargs)
         self.invalidate_by_path_cache()

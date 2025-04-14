@@ -3,11 +3,11 @@ import pytest
 
 pytest.skip(allow_module_level=True)
 
-from tangl.mechanics.game.simple_games.rps_game import RpsGameHandler
+from tangl.mechanics.game.simple_games.rps_game import RpsGameHandler, RpsMove
 from tangl.mechanics.game.token_games.game_token import TokenHandler
 from tangl.mechanics.game.token_games.token_game import RpsGameToken
 
-Mv = RpsGameHandler.RpsMove
+Mv = RpsMove
 
 paper_ = {
     'label': 'paper',

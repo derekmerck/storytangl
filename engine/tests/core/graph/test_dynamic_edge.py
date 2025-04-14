@@ -8,10 +8,10 @@ def test_dynamic_edge_validation():
     """Test edge requires at least one linking method"""
 
     parent = Node()
-    edge = DynamicEdge(predecessor_id=parent.uid, successor_ref="abc")
+    edge = DynamicEdge(predecessor_id=parent.uid, successor_ref="abc", graph=parent.graph)
 
     with pytest.raises(ValueError):
-        DynamicEdge(predecessor_id=parent.uid)
+        DynamicEdge(predecessor_id=parent.uid, graph=parent.graph)
 
 @pytest.fixture
 def graph() -> Graph:

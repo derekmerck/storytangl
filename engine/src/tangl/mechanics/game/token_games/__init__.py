@@ -1,2 +1,2 @@
-from .token import Token
+from .game_token import Token
 from .token_game import TokenGame

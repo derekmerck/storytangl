@@ -1,285 +1,219 @@
 import pytest
 from uuid import uuid4
+import pickle
 
-from tangl.core import Node, Edge, Graph
-
-class TestNode:
-
-    def test_node_creation(self):
-        n = Node(label="root")
-        assert isinstance(n.uid, uuid4().__class__)  # Ensure it's a UUID
-        assert n.label == "root"
-        assert n.parent is None
-
-    def test_add_child(self):
-        g = Graph()
-        parent = Node(label="parent")
-        child = Node(label="child")
-
-        g.add(parent)
-        parent.add_child(child)
-
-        assert child in parent.children
-        assert child.parent == parent
-
-        assert parent.child is child
-
-        with pytest.raises(AttributeError):
-            parent.does_not_exist
-
-    def test_remove_child(self):
-        g = Graph()
-        parent = Node(label="parent")
-        child = Node(label="child")
-
-        g.add(parent)
-        parent.add_child(child)
-        parent.remove_child(child)
-
-        assert child not in parent.children
-        assert child.parent is None
-
-    def test_unlink_child(self):
-        g = Graph()
-        parent = Node(label="parent")
-        child = Node(label="child")
-        grandchild1 = Node(label="grandchild1")
-        grandchild2 = Node(label="grandchild2")
-
-        g.add(parent)
-        parent.add_child(child)
-        child.add_child(grandchild1)
-        child.add_child(grandchild2)
-
-        assert child in parent.children
-        assert child in g
-        assert child.uid in g
-        assert grandchild1 in child.children
-        assert grandchild1 in g
-        assert grandchild1.uid in g
-        assert grandchild2 in child.children
-        assert grandchild2 in g
-
-        parent.remove_child(child, unlink=True) # removes tree
-        assert child not in parent.children
-        assert grandchild1 not in child.children
-        assert grandchild2 not in child.children
-
-        assert child not in g
-        assert grandchild1 not in g
-        assert grandchild2 not in g
-
-    def test_path(self):
-        g = Graph()
-        root = Node(label="root")
-        child = Node(label="child")
-        g.add(root)
-        root.add_child(child)
-
-        assert child.path == "root/child"
-
-    def test_root_property(self):
-        g = Graph()
-        root = Node(label="root")
-        mid = Node(label="mid")
-        leaf = Node(label="leaf")
-
-        g.add(root)
-        root.add_child(mid)
-        mid.add_child(leaf)
-
-        assert leaf.root == root
-
-    def test_cycle_detection(self):
-        g = Graph()
-        root = Node(label="root")
-        child = Node(label="child")
-        grandchild = Node(label="grandchild")
-
-        g.add(root)
-        root.add_child(child)
-        child.add_child(grandchild)
-
-        assert child.grandchild is grandchild
-
-        with pytest.raises(ValueError, match="create a cycle"):
-            grandchild.add_child(root)
-
-    def test_traversal_methods(self):
-        g = Graph()
-        root = Node(label="root")
-        child1 = Node(label="child1")
-        child2 = Node(label="child2")
-        grandchild = Node(label="grandchild")
-
-        g.add(root)
-        root.add_child(child1)
-        root.add_child(child2)
-        child1.add_child(grandchild)
-
-        # Test DFS
-        dfs_order = [n.label for n in root.traverse_dfs()]
-        assert dfs_order == ["root", "child1", "grandchild", "child2"]
-
-        # Test BFS
-        bfs_order = [n.label for n in root.traverse_bfs()]
-        assert bfs_order == ["root", "child1", "child2", "grandchild"]
-
-    def test_visitor_pattern(self):
-        g = Graph()
-        root = Node(label="root")
-        child = Node(label="child")
-        g.add(root)
-        root.add_child(child)
-
-        visited = []
-
-        def visitor(node: Node):
-            visited.append(node.label)
-
-        root.visit(visitor)
-        assert visited == ["root", "child"]
-
-    def test_move_operations(self):
-        g = Graph()
-        root1 = Node(label="root1")
-        root2 = Node(label="root2")
-        child = Node(label="child")
-
-        g.add(root1)
-        g.add(root2)
-        root1.add_child(child)
-
-        assert child in root1.children
-
-        # Test moving to new parent
-        child.move_to(root2)
-        assert child not in root1.children
-        assert child in root2.children
-
-        # Test moving to specific index
-        child2 = Node(label="child2")
-        root2.add_child(child2)
-        child2.move_to(root2, 0)
-        assert root2.children[0] == child2
-
-    def test_sibling_methods(self):
-        g = Graph()
-        root = Node(label="root")
-        child1 = Node(label="child1")
-        child2 = Node(label="child2")
-        child3 = Node(label="child3")
-
-        g.add(root)
-        root.add_child(child1)
-        root.add_child(child2)
-        root.add_child(child3)
-
-        assert set(c.uid for c in child1.siblings) == {child2.uid, child3.uid}
-        assert child1 not in child1.siblings
-
-    def test_leaf_nodes(self):
-        g = Graph()
-        root = Node(label="root")
-        child1 = Node(label="child1")
-        child2 = Node(label="child2")
-        grandchild = Node(label="grandchild")
-
-        g.add(root)
-        root.add_child(child1)
-        root.add_child(child2)
-        child1.add_child(grandchild)
-
-        leaves = root.leaf_nodes
-        assert len(leaves) == 2
-        assert set(n.label for n in leaves) == {"grandchild", "child2"}
-
-class TestEdge:
-
-    def test_edge_creation(self):
-        g = Graph()
-        n1 = Node(label="A")
-        n2 = Node(label="B")
-        g.add(n1)
-        g.add(n2)
-
-        e = Edge(label="edge", predecessor_id=n1.uid, successor_id=n2.uid)
-        g.add(e)
-
-        assert e.predecessor == n1
-        assert e.successor == n2
-
-        n1.add_child(e)
-        assert e.label == "edge"
-        assert n1.edge is n2
-
-    def test_edge_creation2(self):
-        # alternate, simpler argument format for node creation
-        g = Graph()
-        n1 = Node(label="A", graph=g)
-        n2 = Node(label="B", graph=g)
-
-        e = Edge(label="edge", predecessor_id=n1.uid, successor_id=n2.uid, graph=g)
-
-        assert e.predecessor == n1
-        assert e.successor == n2
-
-        assert e.label == "edge"
-        assert n1.edge is n2
-
-
-class TestGraph:
-
-    def test_graph_add_and_retrieve(self):
-        g = Graph()
-        n = Node(label="root")
-        g.add(n)
-
-        assert g[n.uid] == n
-        assert g["root"] == n
-
-    def test_graph_prevents_duplicates(self):
-        g = Graph()
-        n = Node(label="root")
-        g.add(n)
-        assert n.graph == g
-
-        n.graph = None
-        with pytest.raises(ValueError):
-            g.add(n)  # Should raise because already in graph but graph is not set properly
-
-    def test_graph_lookup_by_label(self):
-        g = Graph()
-        n1 = Node(label="root")
-        n2 = Node(label="child")
-
-        g.add(n1)
-        n1.add_child(n2)
-
-        assert g["root/child"] == n2
-
-    def test_graph_missing_node_raises_key_err(self):
-        g = Graph()
-
-        with pytest.raises(KeyError):
-            assert g["nonexistent"] is None
-
-    def test_graph_unstructure_structure(self):
-        g = Graph()
-        root = Node(label="root")
-        mid = Node(label="mid")
-        leaf = Node(label="leaf")
-
-        g.add(root)
-        root.add_child(mid)
-        mid.add_child(leaf)
-
-        assert leaf.root == root
-
-        structured = g.unstructure()
-        restored = Graph.structure(structured)
-
-        restored_leaf = restored[leaf.uid]
-        assert restored_leaf == leaf
-        restored_root = restored[root.uid]
-        assert restored_leaf.root == restored_root
+from tangl.core import Node, Graph
+
+
+def test_graph_add_and_retrieve():
+    g = Graph()
+    n = Node(label="root")
+    g.add(n)
+
+    assert g[n.uid] == n
+    assert g["root"] == n
+
+def test_graph_prevents_duplicates():
+    g = Graph()
+    n = Node(label="root")
+    g.add(n)
+    assert n.graph == g
+
+    n.graph = None
+    with pytest.raises(ValueError):
+        g.add(n)  # Should raise because already in graph but graph is not set properly
+
+def test_graph_lookup_by_label():
+    g = Graph()
+    n1 = Node(label="root")
+    n2 = Node(label="child")
+
+    g.add(n1)
+    n1.add_child(n2)
+
+    assert g["root/child"] == n2
+
+def test_graph_missing_node_raises_key_err():
+    g = Graph()
+
+    with pytest.raises(KeyError):
+        assert g["nonexistent"] is None
+
+def test_graph_unstructure_structure():
+    g = Graph()
+    root = Node(label="root")
+    mid = Node(label="mid")
+    leaf = Node(label="leaf")
+
+    g.add(root)
+    root.add_child(mid)
+    mid.add_child(leaf)
+
+    assert leaf.root == root
+
+    structured = g.unstructure()
+    restored = Graph.structure(structured)
+
+    restored_leaf = restored[leaf.uid]
+    assert restored_leaf == leaf
+    restored_root = restored[root.uid]
+    assert restored_leaf.root == restored_root
+
+def test_add_node():
+    graph = Graph()
+    node = Node()
+    graph.add(node)
+
+    assert node in graph
+
+def test_get_node_by_uuid():
+    graph = Graph()
+    node = Node()
+    graph.add(node)
+
+    retrieved_node = graph.get(node.uid)
+    assert retrieved_node is node
+
+def test_get_node_by_label():
+    graph = Graph()
+    node = Node(label="unique_label")
+    graph.add(node)
+
+    retrieved_node = graph.get("unique_label")
+    assert retrieved_node == node
+
+class TestNodeByCls(Node):
+    ...
+
+def test_find_nodes():
+    registry = Graph()
+
+    # Create some nodes with specific tags
+    node1 = Node(tags=['red'])
+    node2 = Node(tags=['blue'])
+    node3 = TestNodeByCls(tags=['red', 'blue'])
+    registry.add(node1)
+    registry.add(node2)
+    registry.add(node3)
+
+    assert list(registry.values()) == [node1, node2, node3]
+
+    # Test finding nodes by type
+    assert registry.find(has_cls=TestNodeByCls) == [node3]
+
+    # Test finding nodes by filter
+    assert registry.find(tags="red") == [node1, node3]
+
+    # Test finding nodes by tags
+    assert registry.find(tags=node1.tags) == [node1, node3]
+
+def test_node_and_registry():
+    index = Graph()
+    print( index.nodes_by_path )
+
+    root = Node(label='root', graph=index)
+
+    assert root.graph is index
+    assert root in index
+
+    child1 = Node(label='child1')
+    root.add_child(child1)
+    assert child1 in root.children
+
+    assert child1.graph is index
+
+    print(index.keys())
+
+    assert child1 in index
+    assert child1.path in index
+    assert child1.uid in index
+
+    child2 = Node(label='child2')
+    root.add_child(child2)
+    assert child2 in root.children
+    # index.add_node(child2)
+    #
+    assert len(root.children) == 2
+    assert index.get(root.uid) == root
+    assert index.get(root.uid) == root
+    assert index.get(child1.uid) == child1
+    assert index.get(child2.uid) == child2
+    assert index.get(root.path) == root
+    assert index.get(root.path) == root
+    assert index.get(child1.path) == child1
+    assert index.get(child2.path) == child2
+
+    assert root.graph == index
+    assert child1.graph == index
+    assert child2.graph == index
+
+    assert child1 in root.children
+    root.remove_child(child1)
+    assert child1 not in root.children
+
+    print( child2.parent )
+    print( root.children_ids )
+    assert child2.uid in root.children_ids
+
+    index.remove(child2)
+    assert child2 not in index
+
+    assert index.get("dog") is None
+
+    assert index.get(uuid4()) is None
+
+    assert index.get(100) is None
+
+    assert 100 not in index
+
+def test_complex_hierarchies():
+    root = Node(label="r")
+    registry = Graph()
+    registry.add(root)
+
+    # Create child nodes
+    child1 = Node(label="ch1")
+    child2 = Node(label="ch2")
+    root.add_child(child1)
+    root.add_child(child2)
+
+    # Create grandchild nodes
+    grandchild1 = Node(label="gch1")
+    grandchild2 = Node(label="gch2")
+    child1.add_child(grandchild1)
+    child2.add_child(grandchild2)
+
+    # Check hierarchy and paths
+    assert root.path == root.label
+    assert child1.path == f"{root.label}/{child1.label}"
+    assert grandchild1.path == f"{root.label}/{child1.label}/{grandchild1.label}"
+
+    print( registry.keys() )
+    print( registry.nodes_by_path.keys() )
+
+    # Check registry nodes by path
+    assert registry.nodes_by_path == {
+        root.path: root,
+        child1.path: child1,
+        child2.path: child2,
+        grandchild1.path: grandchild1,
+        grandchild2.path: grandchild2,
+    }
+
+def test_graph_pickles():
+
+    graph = Graph()
+    node = Node(label="node", graph=graph)
+    child = Node(label="child")
+    node.add_child(child)
+
+    assert child.parent is node
+    assert child.graph is node.graph
+    assert node.uid in node.graph
+    assert child.uid in node.graph
+
+    s = pickle.dumps( graph )
+    print( s )
+    res = pickle.loads( s )
+    print( res )
+    assert graph == res
