@@ -252,6 +252,8 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
         Execute all applicable handlers for a given entity, combining
         results according to :attr:`pipeline_strategy`.
 
+        Handlers that return a "None" value are ignored.
+
         :param entity: The entity to be processed by the pipeline.
         :type entity: EntityT
         :param context: Additional keyword arguments to pass to each handler.
@@ -297,11 +299,18 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
             case PipelineStrategy.PIPELINE:
                 result = None
                 for h in handlers:
-                    result = h.func(entity, result, **context)
+                    # Only update result if handler returns non-None
+                    if (new_result := h.func(entity, result, **context)) is not None:
+                        result = new_result
                 return result
 
             case PipelineStrategy.ITER:
-                return (functools.partial(h.func, entity, **context) for h in handlers)
+                # Return an iterator that will filter None results when consumed
+                def generate_results():
+                    for h in handlers:
+                        if (r := h.func(entity, **context)) is not None:
+                            yield r
+                return generate_results()
 
             case PipelineStrategy.FIRST:
                 return next((r for h in handlers
@@ -309,10 +318,29 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
                             None)
 
             case PipelineStrategy.ALL:
-                return all(h.func(entity, **context) for h in handlers)
+                # return all(h.func(entity, **context) for h in handlers)
+                # Proper short-circuit with None skipping
+                for h in handlers:
+                    result = h.func(entity, **context)
+                    if result is None:
+                        continue  # Skip None values
+                    if not result:  # Short circuit on first falsy value
+                        return False
+                # If we get here, no falsy non-None results were found
+                # If they were all None it is "vacuous truth"
+                return True
 
             case PipelineStrategy.ANY:
-                return any(h.func(entity, **context) for h in handlers)
+                # return any(h.func(entity, **context) for h in handlers)
+                # Proper short-circuit with None skipping
+                for h in handlers:
+                    result = h.func(entity, **context)
+                    if result is None:
+                        continue  # Skip None values
+                    if result:  # Short circuit on first truthy value
+                        return True
+                # If we get here, no truthy non-None results were found
+                return False
 
         raise ValueError(f"Unknown strategy: {self.pipeline_strategy}")
 

@@ -4,8 +4,6 @@ import logging
 
 import pytest
 
-pytest.skip(allow_module_level=True)
-
 from tangl.core.graph import Edge
 from tangl.core.handlers import TaskPipeline, PipelineStrategy
 from .has_context import HasContext

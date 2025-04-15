@@ -39,10 +39,12 @@ class HasConditions(HasContext):
 
     @on_check_conditions.register()
     def _check_my_conditions(self, **context) -> bool:
+        logger.debug(f"check_my_conditions {context}")
         return self.all_conditions_true(self.conditions, **context)
 
     @on_check_conditions.register(caller_cls=Node)
     def _check_my_parent_conditions(self, **context) -> Optional[bool]:
+        # todo: it's unclear whether we want to inherit conditions by default...
         if self.parent and isinstance(self.parent, HasConditions):
             return on_check_conditions.execute(self.parent, **context)
 

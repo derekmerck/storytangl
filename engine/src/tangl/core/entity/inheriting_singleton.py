@@ -11,12 +11,18 @@ class InheritingSingleton(Singleton):
     A Singleton mixin that supports attribute inheritance from existing instances.
 
     Attributes are inherited from a reference instance and can be selectively overridden.
-    This creates an inheritance chain without requiring class inheritance.
+    This creates an inheritance chain without requiring class inheritance.  The inheritance
+    is controlled by the 'from_ref' keyword argument.
+
+    Be careful to load them in order, the code does not provide any dependency resolution.
 
     Example:
         base = MySingleton(label="base", value=1, other=2)
         child = MySingleton(label="child", from_ref="base", value=3)
         # child.value == 3, child.other == 2
+
+    Parameters:
+        from_ref (UniqueLabel): The label of the reference entity to inherit attributes from.
     """
     from_ref: Optional[UniqueLabel] = Field(None, init_var=True)
     """The label of the reference entity to inherit attributes from.
@@ -34,8 +40,9 @@ class InheritingSingleton(Singleton):
                     f"Cannot inherit from non-existent instance: {from_ref} "
                     f"while creating {data.get('label', '<unknown>')}"
                 )
-            defaults = BaseModel.model_dump(
-                ref_instance, exclude_unset=True, exclude_defaults=True, exclude_none=True, exclude={"from_ref", "label"})
+            defaults = BaseModel.model_dump(ref_instance,
+                exclude_unset=True, exclude_defaults=True, exclude_none=True,
+                exclude={"uid", "label", "from_ref"})
             for k, v in defaults.items():
                 if k in data:
                     # include items from reference class in collections
