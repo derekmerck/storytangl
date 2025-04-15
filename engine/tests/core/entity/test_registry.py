@@ -1,6 +1,6 @@
-from tangl.core import Entity, Registry
-
 import pytest
+
+from tangl.core import Entity, Registry
 
 
 def test_registry_add_find():

@@ -289,7 +289,8 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
                     if first_type is set:
                         return set(chain(*result))
                     if first_type is dict:
-                        return dict(ChainMap(*result))  # reverse result to put early at the end
+                        return dict(ChainMap(*reversed(result)))
+                        # reverse result to put early at the end
 
                 return result
 

@@ -4,7 +4,6 @@ from tangl.core.entity import InheritingSingleton
 
 class TestInheritingSingleton(InheritingSingleton):
     extra_field: str = None
-    __hash__ = InheritingSingleton.__hash__
 
 class TestMultivalueInheritingSingleton(InheritingSingleton):
     attribute1: str
@@ -21,6 +20,8 @@ def cleanup():
 def setup_singletons():
     # Create a base instance to be referenced later
     TestInheritingSingleton(label="base_entity", extra_field="base_value")
+    yield
+    TestInheritingSingleton.clear_instances()
 
 @pytest.fixture
 def setup_mv_singletons():

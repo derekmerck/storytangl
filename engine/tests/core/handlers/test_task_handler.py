@@ -18,7 +18,7 @@ def renderable_pipeline_and_classes():
 
     class MyRenderableTestEntity(RenderableTestEntity):
 
-        @on_render.register(HandlerPriority.FIRST)
+        @on_render.register(HandlerPriority.LAST)
         def _my_rendering_handler(self, **context) -> dict:
             return {'hello': 'world2'}
 

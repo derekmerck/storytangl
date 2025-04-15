@@ -114,7 +114,6 @@ def test_entity_equality2():
     assert entity1 != entity4  # They should have different classes
 
 
-
 def test_entity_instantiation1():
 
     kwargs = {'uid': uuid4(),
@@ -131,7 +130,6 @@ def test_entity_instantiation1():
     # does not hash
     with pytest.raises(TypeError):
         { e }
-
 
 def test_entity_instantiation2():
     import shortuuid
@@ -183,7 +181,6 @@ def test_entity_tags():
 
     assert a.model_dump()['tags'] in [ ["a", "b"], ["b", "a"] ]
 
-
 def test_entity_pickles():
 
     a = Entity(label="test_entity")
@@ -193,7 +190,6 @@ def test_entity_pickles():
     res = pickle.loads( s )
     print( res )
     assert a == res
-
 
 def test_has_aliases():
     class MyEntity(Entity):

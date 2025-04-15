@@ -1,7 +1,9 @@
 import pytest
 
-from tangl.core import Graph
+from tangl.core import Graph, Node
 from tangl.core.handlers import Associating
+
+MyAssociatingNode = type('MyAssociatingNode', (Associating, Node), {} )
 
 @pytest.fixture
 def graph():
@@ -9,11 +11,11 @@ def graph():
 
 @pytest.fixture
 def node1(graph):
-    return Associating(graph=graph)
+    return MyAssociatingNode(graph=graph)
 
 @pytest.fixture
 def node2(graph):
-    return Associating(graph=graph)
+    return MyAssociatingNode(graph=graph)
 
 def test_basic_parent_child_association(node1, node2):
     """Test basic parent-child association"""

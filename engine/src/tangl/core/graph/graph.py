@@ -62,7 +62,7 @@ class Graph(Registry[NodeT], Generic[NodeT]):
     """
 
     def add(self, node: NodeT, **kwargs):
-        if node.anon:
+        if getattr(node, 'anon', False):
             # Skip registration for anonymous nodes
             logger.debug(f'Declining to register anonymous node {node!r}')
             return
