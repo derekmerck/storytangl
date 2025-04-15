@@ -3,9 +3,10 @@ from pydantic import field_validator
 from tangl.core.entity import Entity
 from tangl.core.handlers import on_render
 from tangl.narrative.lang.gens import Gens
+from tangl.narrative.lang.age_range import AgeRange
 
-from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor, AgeRange
-from .ornaments.ornaments import Ornamentation
+from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
+from .ornaments import Ornamentation
 
 Outfit = object
 

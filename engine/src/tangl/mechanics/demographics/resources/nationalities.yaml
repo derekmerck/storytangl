@@ -1,0 +1,1227 @@
+# ~2021 stats
+#
+# eth_mix types:
+#   european: white
+#   semitic:  north african, middle eastern
+#   asian:    pacific asian
+#   eurasian: central and south asian
+#   amerind:  native new world, pacific islander
+#   black:    sub-saharan african
+#   mixed:    mixed
+
+africa:
+  countries:
+    ago:
+      demonym: Angolan
+      id: ago
+      name: Angola
+      population: 31825295
+    bdi:
+      demonym: Burundian
+      id: bdi
+      name: Burundi
+      population: 11530580
+    ben:
+      demonym: Beninois
+      id: ben
+      name: Benin
+      population: 11801151
+    bfa:
+      demonym: Burkinabe
+      id: bfa
+      name: Burkina Faso
+      population: 20321378
+    bwa:
+      demonym: a Motswana
+      id: bwa
+      name: Botswana
+      population: 2303697
+    caf:
+      demonym: Central African
+      id: caf
+      name: Central African Republic
+      population: 4745185
+    civ:
+      demonym: Ivorian
+      id: civ
+      name: Cote d'Ivoire
+      population: 25716544
+    cmr:
+      demonym: Cameroonian
+      id: cmr
+      name: Cameroon
+      population: 25876380
+    cod:
+      demonym: Congolese
+      id: cod
+      name: The Democratic Republic of the Congo
+      population: 86790567
+    cog:
+      demonym: Congolese
+      id: cog
+      name: The Republic of the Congo
+      population: 5380508
+    com:
+      demonym: Comoran
+      id: com
+      name: Comoros
+      population: 850886
+    cpv:
+      demonym: Cape Verdian
+      id: cpv
+      name: Cape Verde
+      population: 549935
+    eri:
+      demonym: Eritrean
+      id: eri
+      name: Eritrea
+      population: 6081196
+    eth:
+      demonym: Ethiopian
+      id: eth
+      name: Ethiopia
+      population: 112078730
+    gab:
+      demonym: Gabonese
+      id: gab
+      name: Gabon
+      population: 2172579
+    gha:
+      demonym: Ghanaian
+      id: gha
+      name: Ghana
+      population: 30417856
+    gin:
+      demonym: Guinean
+      id: gin
+      name: Guinea
+      population: 12771246
+    gmb:
+      demonym: Gambian
+      id: gmb
+      name: The Gambia
+      population: 2347706
+    gnb:
+      demonym: Bissau-Guinean
+      id: gnb
+      name: Guinea-Bissau
+      population: 1920922
+    gnq:
+      demonym: Equatoguinean
+      id: gnq
+      name: Equatorial Guinea
+      population: 1355986
+    ken:
+      demonym: Kenyan
+      id: ken
+      name: Kenya
+      population: 52573973
+    lbr:
+      demonym: Liberian
+      id: lbr
+      name: Liberia
+      population: 4937374
+    lso:
+      demonym: a Mosotho
+      id: lso
+      name: Lesotho
+      population: 2125268
+    mdg:
+      demonym: Malagasy
+      id: mdg
+      name: Madagascar
+      population: 26969307
+    mli:
+      demonym: Malian
+      id: mli
+      name: Mali
+      population: 19658031
+    moz:
+      demonym: Mozambican
+      id: moz
+      name: Mozambique
+      population: 30366036
+    mrt:
+      demonym: Mauritanian
+      id: mrt
+      name: Mauritania
+      population: 4525696
+    mus:
+      demonym: Mauritian
+      id: mus
+      name: Mauritius
+      population: 1265711
+    mwi:
+      demonym: Malawian
+      id: mwi
+      name: Malawi
+      population: 18628747
+    nam:
+      demonym: Namibian
+      id: nam
+      name: Namibia
+      population: 2494530
+    ner:
+      demonym: Nigerien
+      id: ner
+      name: Niger
+      population: 23310715
+    nga:
+      demonym: Nigerian
+      id: nga
+      name: Nigeria
+      population: 200963599
+    rwa:
+      demonym: Rwandan
+      id: rwa
+      name: Rwanda
+      population: 12626950
+    sdn:
+      demonym: Sudanese
+      id: sdn
+      name: Sudan
+      population: 42813238
+    sen:
+      demonym: Senegalese
+      id: sen
+      name: Senegal
+      population: 16296364
+    sle:
+      demonym: Sierra Leonean
+      id: sle
+      name: Sierra Leone
+      population: 7813215
+    som:
+      demonym: Somalian
+      id: som
+      name: Somalia
+      population: 15442905
+    ssd:
+      demonym: South Sudanese
+      id: ssd
+      name: South Sudan
+      population: 11062113
+    stp:
+      demonym: Sao Tomean
+      id: stp
+      name: Sao Tome and Principe
+      population: 215056
+    swz:
+      demonym: Swazi
+      id: swz
+      name: Swaziland
+      population: 1148130
+    syc:
+      demonym: Seychellois
+      id: syc
+      name: Seychelles
+      population: 97625
+    tcd:
+      demonym: Chadian
+      id: tcd
+      name: Chad
+      population: 15946876
+    tgo:
+      demonym: Togolese
+      id: tgo
+      name: Togo
+      population: 8082366
+    tza:
+      demonym: Tanzanian
+      id: tza
+      name: Tanzania
+      population: 58005463
+    uga:
+      demonym: Ugandan
+      id: uga
+      name: Uganda
+      population: 44269594
+    zaf:
+      demonym: South African
+      id: zaf
+      name: South Africa
+      population: 58558270
+      eth_mix:
+        black: 50
+        european: 40
+        mixed: 10
+    zmb:
+      demonym: Zambian
+      id: zmb
+      name: Zambia
+      population: 17861030
+    zwe:
+      demonym: Zimbabwean
+      id: zwe
+      name: Zimbabwe
+      population: 14645468
+  demonym: African
+  eth_mix:
+    black: 85
+    european: 5
+    mixed: 5
+    semitic: 5
+  id: africa
+  name: Sub-Saharan Africa
+  population: 1109541977
+asia:
+  countries:
+    brn:
+      demonym: Bruneian
+      id: brn
+      name: Brunei
+      population: 433285
+    chn:
+      demonym: Chinese
+      id: chn
+      name: China
+      population: 1397715000
+    eti:
+      demonym: East Timorese
+      id: eti
+      name: East Timor
+      population: 1200000
+    hkg:
+      demonym: a Hong Konger
+      id: hkg
+      name: Hong Kong
+      population: 7507400
+    idn:
+      demonym: Indonesian
+      id: idn
+      name: Indonesia
+      population: 270625568
+    jpn:
+      demonym: Japanese
+      id: jpn
+      name: Japan
+      population: 126264931
+    khm:
+      demonym: Cambodian
+      id: khm
+      name: Cambodia
+      population: 16486542
+    kir:
+      demonym: I-Kiribati
+      id: kir
+      name: Kiribati
+      population: 117606
+    kor:
+      demonym: South Korean
+      id: kor
+      name: South Korea
+      population: 51709098
+    lao:
+      demonym: Laotian
+      id: lao
+      name: Laos
+      population: 7169455
+    mhl:
+      demonym: Marshallese
+      id: mhl
+      name: Marshall Islands
+      population: 58791
+    mmr:
+      demonym: Myanmarese
+      id: mmr
+      name: Myanmar
+      population: 54045420
+    mng:
+      demonym: Mongolian
+      id: mng
+      name: Mongolia
+      population: 3225167
+    mys:
+      demonym: Malaysian
+      id: mys
+      name: Malaysia
+      population: 31949777
+    nru:
+      demonym: Nauruan
+      id: nru
+      name: Nauru
+      population: 12581
+    phl:
+      demonym: Filipino
+      id: phl
+      name: Philippines
+      population: 108116615
+    plw:
+      demonym: Palauan
+      id: plw
+      name: Palau
+      population: 18008
+    png:
+      demonym: Papua New Guinean
+      id: png
+      name: Papua New Guinea
+      population: 8776109
+    prk:
+      demonym: North Korean
+      id: prk
+      name: North Korea
+      population: 25666161
+    sgp:
+      demonym: Singaporean
+      id: sgp
+      name: Singapore
+      population: 5703569
+    slb:
+      demonym: a Solomon Islander
+      id: slb
+      name: Solomon Islands
+      population: 669823
+    tbt:
+      demonym: Tibetan
+      id: tbt
+      name: Tibet
+      population: 3000000
+    tha:
+      demonym: Thai
+      id: tha
+      name: Thailand
+      population: 69625582
+    tls:
+      demonym: Timorese
+      id: tls
+      name: Timor-Leste
+      population: 1293119
+    twn:
+      demonym: Taiwanese
+      id: twn
+      name: Taiwan
+      population: 23780000
+    vnm:
+      demonym: Vietnamese
+      id: vnm
+      name: Vietnam
+      population: 96462106
+  demonym: Asian
+  eth_mix:
+    asian: 80
+    eurasian: 10
+    european: 5
+    mixed: 5
+  id: asia
+  name: East Asia
+  population: 2311631713
+east_europe:
+  countries:
+    alb:
+      demonym: Albanian
+      id: alb
+      name: Albania
+      population: 2854191
+    arm:
+      demonym: Armenian
+      id: arm
+      name: Armenia
+      population: 2957731
+    aze:
+      demonym: Azerbaijani
+      id: aze
+      name: Azerbaijan
+      population: 10023318
+    bgr:
+      demonym: Bulgarian
+      id: bgr
+      name: Bulgaria
+      population: 6975761
+    bih:
+      demonym: Bosnian
+      id: bih
+      name: Bosnia and Herzegovina
+      population: 3301000
+    blr:
+      demonym: Belarusian
+      id: blr
+      name: Belarus
+      population: 9466856
+    cze:
+      demonym: Czech
+      id: cze
+      name: Czech Republic
+      population: 10669709
+    est:
+      demonym: Estonian
+      id: est
+      name: Estonia
+      population: 1326590
+    fin:
+      demonym: Finnish
+      id: fin
+      name: Finland
+      population: 5520314
+      eth_mix:
+        european: 100
+    geo:
+      demonym: Georgian
+      id: geo
+      name: Georgia
+      population: 3720382
+    hrv:
+      demonym: Croatian
+      id: hrv
+      name: Croatia
+      population: 4067500
+    hun:
+      demonym: Hungarian
+      id: hun
+      name: Hungary
+      population: 9769949
+    kos:
+      demonym: Kosovan
+      id: kos
+      name: Kosovo
+      population: 1800000
+    ltu:
+      demonym: Lithuanian
+      id: ltu
+      name: Lithuania
+      population: 2786844
+    lva:
+      demonym: Latvian
+      id: lva
+      name: Latvia
+      population: 1912789
+    mda:
+      demonym: Moldovan
+      id: mda
+      name: Moldova
+      population: 2657637
+    mkd:
+      demonym: Macedonian
+      id: mkd
+      name: Macedonia
+      population: 2083459
+    mne:
+      demonym: Montenegrin
+      id: mne
+      name: Montenegro
+      population: 622137
+    rou:
+      demonym: Romanian
+      id: rou
+      name: Romania
+      population: 19356544
+    rus:
+      demonym: Russian
+      id: rus
+      name: Russia
+      population: 144373535
+    srb:
+      demonym: Serbian
+      id: srb
+      name: Serbia
+      population: 6944975
+    svk:
+      demonym: Slovakian
+      id: svk
+      name: Slovakia
+      population: 5454073
+    svn:
+      demonym: Slovenian
+      id: svn
+      name: Slovenia
+      population: 2087946
+    ukr:
+      demonym: Ukrainian
+      id: ukr
+      name: Ukraine
+      population: 44385155
+  demonym: East European
+  eth_mix:
+    eurasian: 5
+    european: 85
+    mixed: 5
+    semitic: 5
+  id: east_europe
+  name: East Europe
+  population: 305118395
+eurasia:
+  countries:
+    afg:
+      demonym: Afghan
+      id: afg
+      name: Afghanistan
+      population: 38041754
+    bgd:
+      demonym: Bangladeshi
+      id: bgd
+      name: Bangladesh
+      population: 163046161
+    btn:
+      demonym: Bhutanese
+      id: btn
+      name: Bhutan
+      population: 763092
+    ind:
+      demonym: Indian
+      id: ind
+      name: India
+      population: 1366417754
+    irn:
+      demonym: Iranian
+      id: irn
+      name: Iran
+      population: 82913906
+    irq:
+      demonym: Iraqi
+      id: irq
+      name: Iraq
+      population: 39309783
+    kaz:
+      demonym: Kazakhstani
+      id: kaz
+      name: Kazakhstan
+      population: 18513930
+    kgz:
+      demonym: Kirghiz
+      id: kgz
+      name: Kyrgyz Republic
+      population: 6456900
+    krd:
+      demonym: Kurdish
+      id: krd
+      name: Kurdistan
+      population: 30000000
+    lbn:
+      demonym: Lebanese
+      id: lbn
+      name: Lebanon
+      population: 6855713
+    lka:
+      demonym: Sri Lankan
+      id: lka
+      name: Sri Lanka
+      population: 21803000
+    mdv:
+      demonym: Maldivian
+      id: mdv
+      name: Maldives
+      population: 530953
+    npl:
+      demonym: a Gurkha
+      id: npl
+      name: Nepal
+      population: 28608710
+    pak:
+      demonym: Pakistani
+      id: pak
+      name: Pakistan
+      population: 216565318
+    syr:
+      demonym: Syrian
+      id: syr
+      name: Syria
+      population: 17070135
+    tjk:
+      demonym: Tajikistani
+      id: tjk
+      name: Tajikistan
+      population: 9321018
+    tkm:
+      demonym: Turkmenistani
+      id: tkm
+      name: Turkmenistan
+      population: 5942089
+    tur:
+      demonym: Turkish
+      id: tur
+      name: Turkey
+      population: 83429615
+    uzb:
+      demonym: Uzbekistani
+      id: uzb
+      name: Uzbekistan
+      population: 33580650
+    yem:
+      demonym: Yemeni
+      id: yem
+      name: Yemen
+      population: 29161922
+  demonym: Central Asian
+  eth_mix:
+    asian: 5
+    eurasian: 80
+    european: 5
+    mixed: 5
+    semitic: 5
+  id: eurasia
+  name: Central Asia
+  population: 2198332403
+m_east:
+  countries:
+    are:
+      demonym: Emirian
+      id: are
+      name: United Arab Emirates
+      population: 9770529
+    bhr:
+      demonym: Bahraini
+      id: bhr
+      name: Bahrain
+      population: 1641172
+    dji:
+      demonym: Djiboutian
+      id: dji
+      name: Djibouti
+      population: 973560
+    dza:
+      demonym: Algerian
+      id: dza
+      name: Algeria
+      population: 43053054
+    egy:
+      demonym: Egyptian
+      id: egy
+      name: Egypt
+      population: 100388073
+    isr:
+      demonym: Israeli
+      id: isr
+      name: Israel
+      population: 9053300
+    jor:
+      demonym: Jordanian
+      id: jor
+      name: Jordan
+      population: 10101694
+    kwt:
+      demonym: Kuwaiti
+      id: kwt
+      name: Kuwait
+      population: 4207083
+    lby:
+      demonym: Libyan
+      id: lby
+      name: Libya
+      population: 6777452
+    mar:
+      demonym: Moroccan
+      id: mar
+      name: Morocco
+      population: 36471769
+    omn:
+      demonym: Omani
+      id: omn
+      name: Oman
+      population: 4974986
+    pse:
+      demonym: Palestinian
+      id: pse
+      name: Palestine
+      population: 4685306
+    qat:
+      demonym: Qatari
+      id: qat
+      name: Qatar
+      population: 2832067
+    sau:
+      demonym: Saudi Arabian
+      id: sau
+      name: Saudi Arabia
+      population: 34268528
+    tun:
+      demonym: Tunisian
+      id: tun
+      name: Tunisia
+      population: 11694719
+    wsh:
+      demonym: Sahrawian
+      id: wsh
+      name: Western Sahara
+      population: 200000
+  demonym: Middle Eastern
+  eth_mix:
+    black: 5
+    european: 5
+    mixed: 5
+    semitic: 85
+  id: m_east
+  name: Middle East
+  population: 281093292
+n_amer:
+  countries:
+    arb:
+      demonym: Aruban
+      id: arb
+      name: Aruba
+      population: 100000
+    atg:
+      demonym: Antiguan
+      id: atg
+      name: Antigua and Barbuda
+      population: 97118
+    bhs:
+      demonym: Bahamian
+      id: bhs
+      name: The Bahamas
+      population: 389482
+      eth_mix:
+        black: 85
+        mixed: 5
+        european: 10
+    blz:
+      demonym: Belizean
+      id: blz
+      name: Belize
+      population: 390353
+    brb:
+      demonym: Bajan
+      id: brb
+      name: Barbados
+      population: 287025
+    brm:
+      demonym: Bermudan
+      id: brm
+      name: Bermuda
+      population: 70000
+    can:
+      demonym: a Canuck
+      id: can
+      name: Canada
+      population: 37589262
+    cri:
+      demonym: Costa Rican
+      id: cri
+      name: Costa Rica
+      population: 5047561
+    cub:
+      demonym: Cuban
+      id: cub
+      name: Cuba
+      population: 11333483
+    dma:
+      demonym: Dominican
+      id: dma
+      name: Dominica
+      population: 71808
+    dom:
+      demonym: Dominican
+      id: dom
+      name: The Dominican Republic
+      population: 10738958
+      eth_mix:
+        amerind: 15
+        black: 15
+        european: 10
+        mixed: 60
+    grd:
+      demonym: Grenadian
+      id: grd
+      name: Grenada
+      population: 112003
+    grn:
+      demonym: Greenlandic
+      id: grn
+      name: Greenland
+      population: 56000
+    gtm:
+      demonym: Guatemalan
+      id: gtm
+      name: Guatemala
+      population: 16604026
+    hnd:
+      demonym: Honduran
+      id: hnd
+      name: Honduras
+      population: 9746117
+    hti:
+      demonym: Haitian
+      id: hti
+      name: Haiti
+      population: 11263077
+    jam:
+      demonym: Jamaican
+      id: jam
+      name: Jamaica
+      population: 2948279
+      eth_mix:
+        black: 90
+        mixed: 10
+    kna:
+      demonym: Kittian
+      id: kna
+      name: St. Kitts and Nevis
+      population: 52823
+    lca:
+      demonym: Saint Lucian
+      id: lca
+      name: St. Lucia
+      population: 182790
+    mex:
+      demonym: Mexican
+      id: mex
+      name: Mexico
+      population: 127575529
+      eth_mix:
+        amerind: 60
+        european: 30
+        mixed: 10
+    nic:
+      demonym: Nicaraguan
+      id: nic
+      name: Nicaragua
+      population: 6545502
+    pan:
+      demonym: Panamanian
+      id: pan
+      name: Panama
+      population: 4246439
+    pri:
+      demonym: Puerto Rican
+      id: pri
+      name: Puerto Rico
+      population: 3200000
+    slv:
+      demonym: Salvadoran
+      id: slv
+      name: El Salvador
+      population: 6453553
+    tto:
+      demonym: Trinidadian
+      id: tto
+      name: Trinidad and Tobago
+      population: 1394973
+    usa:
+      demonym: American
+      id: usa
+      name: United States
+      population: 328239523
+    vct:
+      demonym: Saint Vincentian
+      id: vct
+      name: St. Vincent and the Grenadines
+      population: 110589
+  demonym: North American
+  eth_mix:
+    amerind: 5
+    asian: 5
+    black: 10
+    eurasian: 5
+    european: 65
+    mixed: 5
+    semitic: 5
+  id: n_amer
+  name: North America
+  population: 584846273
+oceania:
+  countries:
+    aus:
+      demonym: Australian
+      id: aus
+      name: Australia
+      population: 25364307
+      eth_mix:
+        amerind: 5
+        asian: 10
+        european: 80
+        mixed: 5
+    cki:
+      demonym: a Cook Islander
+      id: cki
+      name: Cook Islands
+      population: 17000
+    fji:
+      demonym: Fijian
+      id: fji
+      name: Fiji
+      population: 889953
+    fsm:
+      demonym: Micronesian
+      id: fsm
+      name: Micronesia
+      population: 113815
+    gua:
+      demonym: Guamanian
+      id: gua
+      name: Guam
+      population: 170000
+    ncf:
+      demonym: New Caledonian
+      id: ncf
+      name: New Caledonia
+      population: 270000
+    niu:
+      demonym: Niuean
+      id: niu
+      name: Niue
+      population: 1600
+    nzl:
+      demonym: a Kiwi
+      id: nzl
+      name: New Zealand
+      population: 4917000
+      eth_mix:
+        amerind: 10
+        european: 80
+        mixed: 10
+    pof:
+      demonym: French Polynesian
+      id: pof
+      name: French Polynesia
+      population: 270000
+    ton:
+      demonym: Tongan
+      id: ton
+      name: Tonga
+      population: 104494
+    tuv:
+      demonym: Tuvaluan
+      id: tuv
+      name: Tuvalu
+      population: 11646
+    vut:
+      demonym: Vanuatuan
+      id: vut
+      name: Vanuatu
+      population: 299882
+    wsm:
+      demonym: Samoan
+      id: wsm
+      name: Samoa
+      population: 197097
+  demonym: Oceanic
+  eth_mix:
+    amerind: 50
+    asian: 20
+    black: 10
+    european: 10
+    mixed: 10
+  id: oceania
+  name: Oceania
+  population: 32626794
+s_amer:
+  countries:
+    arg:
+      demonym: Argentinean
+      id: arg
+      name: Argentina
+      population: 44938712
+    bol:
+      demonym: Bolivian
+      id: bol
+      name: Bolivia
+      population: 11513100
+    bra:
+      demonym: Brazilian
+      id: bra
+      name: Brazil
+      population: 211049527
+      eth_mix:
+        amerind: 15
+        black: 15
+        european: 10
+        mixed: 60
+    chl:
+      demonym: Chilean
+      id: chl
+      name: Chile
+      population: 18952038
+    col:
+      demonym: Colombian
+      id: col
+      name: Colombia
+      population: 50339443
+    crc:
+      demonym: Curaçaoan
+      id: crc
+      name: Curaçao
+      population: 200000
+    ecu:
+      demonym: Ecuadorian
+      id: ecu
+      name: Ecuador
+      population: 17373662
+    guf:
+      demonym: French Guianese
+      id: guf
+      name: French Guiana
+      population: 80000
+    guy:
+      demonym: Guyanese
+      id: guy
+      name: Guyana
+      population: 782766
+    per:
+      demonym: Peruvian
+      id: per
+      name: Peru
+      population: 32510453
+    pry:
+      demonym: Paraguayan
+      id: pry
+      name: Paraguay
+      population: 7044636
+    sur:
+      demonym: a Surinamer
+      id: sur
+      name: Suriname
+      population: 581372
+    ury:
+      demonym: Uruguayan
+      id: ury
+      name: Uruguay
+      population: 3461734
+    ven:
+      demonym: Venezuelan
+      id: ven
+      name: Venezuela
+      population: 28515829
+  demonym: South American
+  eth_mix:
+    amerind: 15
+    black: 15
+    european: 15
+    mixed: 55
+  id: s_amer
+  name: South America
+  population: 427343272
+west_europe:
+  countries:
+    and:
+      demonym: Andorran
+      id: and
+      name: Andorra
+      population: 77142
+    aut:
+      demonym: Austrian
+      id: aut
+      name: Austria
+      population: 8877067
+    bel:
+      demonym: Belgian
+      id: bel
+      name: Belgium
+      population: 11484055
+    cat:
+      demonym: Catalan
+      id: cat
+      name: Catalonia
+      population: 7500000
+    che:
+      demonym: Swiss
+      id: che
+      name: Switzerland
+      population: 8574832
+    cyp:
+      demonym: Cypriot
+      id: cyp
+      name: Cyprus
+      population: 1198575
+    deu:
+      demonym: German
+      id: deu
+      name: Germany
+      population: 83132799
+    dnk:
+      demonym: Danish
+      id: dnk
+      name: Denmark
+      population: 5818553
+    esp:
+      demonym: Spanish
+      id: esp
+      name: Spain
+      population: 47076781
+    fra:
+      demonym: French
+      id: fra
+      name: France
+      population: 67059887
+    gbr:
+      demonym: British
+      id: gbr
+      name: United Kingdom
+      population: 66834405
+    grc:
+      demonym: Greek
+      id: grc
+      name: Greece
+      population: 10716322
+    hos:
+      demonym: a Citizen of the Holy See
+      id: hos
+      name: Vatican City
+      population: 805
+    irl:
+      demonym: Irish
+      id: irl
+      name: Ireland
+      population: 4941444
+    isl:
+      demonym: Icelandic
+      id: isl
+      name: Iceland
+      population: 361313
+    ita:
+      demonym: Italian
+      id: ita
+      name: Italy
+      population: 60297396
+    lie:
+      demonym: a Liechtensteiner
+      id: lie
+      name: Liechtenstein
+      population: 38019
+    lux:
+      demonym: a Luxembourger
+      id: lux
+      name: Luxembourg
+      population: 619896
+    mco:
+      demonym: Monacan
+      id: mco
+      name: Monaco
+      population: 38964
+    mlt:
+      demonym: Maltese
+      id: mlt
+      name: Malta
+      population: 502653
+    nld:
+      demonym: Dutch
+      id: nld
+      name: Netherlands
+      population: 17332850
+    nor:
+      demonym: Norwegian
+      id: nor
+      name: Norway
+      population: 5347896
+    pol:
+      demonym: Polish
+      id: pol
+      name: Poland
+      population: 37970874
+    prt:
+      demonym: Portuguese
+      id: prt
+      name: Portugal
+      population: 10269417
+    sct:
+      demonym: Scottish
+      id: sct
+      name: Scotland
+      population: 5000000
+    smr:
+      demonym: Sammarinese
+      id: smr
+      name: San Marino
+      population: 33860
+    swe:
+      demonym: Swedish
+      id: swe
+      name: Sweden
+      population: 10285453
+  demonym: European
+  eth_mix:
+    asian: 5
+    black: 10
+    european: 70
+    mixed: 5
+    semitic: 10
+  id: west_europe
+  name: West Europe
+  population: 471391258

@@ -23,6 +23,7 @@ class Gens(EnumPlusMixin, Enum):
 
     @classmethod
     def pick(cls) -> Gens:
+        # todo: could take some arguments for what classes with what weights to pick from
         return random.choice([cls.XX, cls.XY])
 
 class ExtGens(EnumPlusMixin, Enum):

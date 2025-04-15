@@ -181,6 +181,10 @@ class Singleton(Entity):
         return cls.find_instance(label=label, search_subclasses=search_subclasses)
 
     @classmethod
+    def has_instance(cls, label: UniqueLabel, search_subclasses: bool = False) -> bool:
+        return cls.get_instance(label=label, search_subclasses=search_subclasses) is not None
+
+    @classmethod
     def find_instance(cls, search_subclasses: bool = False, **criteria, ) -> Self:
         if x :=  cls._instances.find_one(**criteria):
             return x
@@ -216,12 +220,16 @@ class Singleton(Entity):
             cls._instances.remove(x)
 
     @classmethod
-    def clear_instances(cls):
+    def clear_instances(cls, clear_subclasses: bool = False):
         """
         Clear all instances from this class-level registry. Useful in
         testing contexts or to reset state.
         """
         cls._instances.clear()
+
+        if clear_subclasses:
+            for cls_ in cls.__subclasses__():
+                cls_.clear_instances(clear_subclasses=True)
 
     def __reduce__(self) -> tuple:
         """
