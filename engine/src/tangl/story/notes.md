@@ -1,6 +1,7 @@
+Story Node Lifecycle
+====================
 
-
-Every story node "class" needs 2-3 things:
+Every story node "class" needs a few things:
 
 1. A data model, this is the keywords that could be in a script yaml document to create/deserialize it
 2. A set of flexible/plugable handlers for instances of the class that trigger on different events:

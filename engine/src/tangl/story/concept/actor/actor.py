@@ -1,4 +1,4 @@
-from tangl.business.story.story_node import StoryNode
+from tangl.story.story_node import StoryNode
 
 class Actor(StoryNode):
 

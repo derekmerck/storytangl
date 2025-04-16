@@ -29,6 +29,7 @@ import logging
 
 from pydantic import ConfigDict
 
+from tangl.utils.enum_plus import Enum, EnumPlusMixin
 from tangl.core import Entity, Registry, Singleton
 from .task_handler import TaskHandler
 from .handler_registry import HandlerRegistry
@@ -41,7 +42,7 @@ ResultT = TypeVar('ResultT')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class PipelineStrategy(Enum):
+class PipelineStrategy(EnumPlusMixin, Enum):
     """
     Describes how a pipeline combines or iterates over multiple handler
     results. In all strategies, any handler returning ``None`` is discarded.
@@ -247,7 +248,7 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
 
         return handlers
 
-    def execute(self, entity: EntityT, extra_handlers: list[Callable] = None, **context) -> ResultT:
+    def execute(self, entity: EntityT, extra_handlers: list[Callable] = None, pipeline_strategy: PipelineStrategy | str = None, **context) -> ResultT:
         """
         Execute all applicable handlers for a given entity, combining
         results according to :attr:`pipeline_strategy`.
@@ -262,6 +263,8 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
         :param extra_handlers: Additional handlers to inject into the
                  pipeline for this invocation only
         :type extra_handlers: list[TaskHandler|Callable]
+        :param pipeline_strategy: Override default strategy to use for handling results.
+        :type pipeline_strategy: PipelineStrategy
         :rtype: ResultT
         :raises ValueError: If no handlers are found for the entity.
         """
@@ -275,7 +278,10 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
         if not handlers:
             raise ValueError(f"No handlers found for {self.label} with cls {entity.__class__} and domain {entity.domain}")
 
-        match self.pipeline_strategy:
+        pipeline_strategy = pipeline_strategy or self.pipeline_strategy
+        pipeline_strategy = PipelineStrategy(pipeline_strategy)  # cast to ensure class
+
+        match pipeline_strategy:
 
             case PipelineStrategy.GATHER:
                 result = [r for h in handlers
@@ -342,7 +348,7 @@ class TaskPipeline(Singleton, HandlerRegistry, Generic[EntityT, ResultT]):
                 # If we get here, no truthy non-None results were found
                 return False
 
-        raise ValueError(f"Unknown strategy: {self.pipeline_strategy}")
+        raise ValueError(f"Unknown strategy: {pipeline_strategy}")
 
     def debug_handlers(self, entity):
         # Show ordered handlers that this pipeline will call when executed on a given entity
