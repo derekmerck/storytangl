@@ -1,5 +1,8 @@
 from __future__ import annotations
 from typing import Mapping, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 import pytest
 import jinja2
@@ -144,25 +147,29 @@ def test_accumulate_rendering_order():
 
 def test_multiple_renderable_mixins():
 
-    class Renderable1(BaseModel):
+    class Renderable1(Entity):
+        # This _has_ to inherit from entity, or else the task decorator
+        # won't properly restrict the task to a subclass of this one.
 
         @on_render.register(priority=HandlerPriority.LATE)
-        def _render1(self, **kwargs):
+        def _render1(self, **context):
             return {'icon': 'bar'}
 
-    class Renderable2(BaseModel):
+    class Renderable2(Entity):
 
         @on_render.register(priority=HandlerPriority.LATE)
-        def _render2(self, **kwargs):
-            return {'text': 'foo'}
+        def _render2(self, **context):
+            return {'text': 'foo1'}
 
-    DoubleRenderableNode = type('DoubleRenderableNode', (Renderable1, Renderable2, ContextRenderableEntity), {})
+    DoubleRenderableNode = type('DoubleRenderableNode',
+                                (Renderable1, Renderable2, ContextRenderableEntity),
+                                {})
 
     node = DoubleRenderableNode(title="cat")
     res = node.render()
-    print( res )
+    logger.debug( res )
 
     assert res == { 'title': 'cat',
                     'label': node.label,
                     'icon': 'bar',
-                    'text': 'foo' }
+                    'text': 'foo1' }

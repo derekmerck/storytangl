@@ -26,17 +26,17 @@ def context_node_child(context_node):
 def test_context_graph(context_node):
 
     result = on_gather_context.execute(context_node.graph)
-    assert result == {'graph': 'hello graph'}
+    assert {'graph': 'hello graph'}.items() <= result.items()
 
 def test_context_node(context_node):
 
     result = on_gather_context.execute(context_node)
-    assert result == {"node": "hello node", 'graph': 'hello graph'}
+    assert {"node": "hello node", 'graph': 'hello graph'}.items() <= result.items()
 
 def test_context_node_child(context_node_child):
 
     result = on_gather_context.execute(context_node_child)
-    assert result == {"node": "hello node", "child": "hello child", 'graph': 'hello graph'}
+    assert {"node": "hello node", "child": "hello child", 'graph': 'hello graph'}.items() <= result.items()
 
 def test_namespace_inheritance1():
     graph = Graph()
@@ -139,7 +139,7 @@ def test_grandparent_namespace_inherits():
 #     grandchild.local_namespace["x"] = 0
 #     assert not grandchild.available
 
-from tangl.core.handlers import HasEffects, HasConditions
+from tangl.core.handlers import HasEffects, HasConditions, Renderable
 
 MyApplyableNode = type('MyApplyableNode', (HasEffects, Node), {} )
 
@@ -152,21 +152,18 @@ def test_effect_with_inherited_namespace():
     child.apply_effects()
     assert parent.locals['parent_var']['foo'] == 'bar'
 
+MyRenderableNode = type('MyRenderableNode', (Renderable, HasContext, Node), {} )
 
-# TestRenderableNode  = type('TestRenderableNode',  (Renderable, HasScopedNamespace, Node), {} )
-#
-# def test_rendering_with_inherited_namespace():
-#     graph = Graph()
-#     parent = TestRenderableNode(locals={'parent_var': 'parent'})
-#     graph.add_node(parent)
-#     child = TestRenderableNode(parent_uid=parent.uid, text='{{parent_var}}')
-#     parent.add_child(child)
-#     output = child.render()
-#     assert output['text'] == 'parent'
+def test_rendering_with_inherited_namespace():
+    graph = Graph()
+    parent = MyRenderableNode(locals={'parent_var': 'parent'})
+    graph.add(parent)
+    child = MyRenderableNode(text='pv: {{parent_var}}')
+    parent.add_child(child)
+    output = child.render()
+    assert output['text'] == 'pv: parent'
 
 MyConditionsNode = type('MyConditionsNode', (HasConditions, Node), {} )
-
-# TestConditionalNode  = type('TestConditionalNode',  (Conditional, HasScopedNamespace, Node), {} )
 
 def test_conditional_with_inherited_namespace():
     graph = Graph()

@@ -73,9 +73,9 @@ class HasContext(Entity):
         elif self.parent is None and isinstance(self.graph, HasContext):
             return self.graph.gather_context()
 
-    # @on_gather_context.register(caller_cls=Graph)
-    # def _provide_items_by_path(self: Graph) -> StringMap:
-    #     return self.by_path()
+    @on_gather_context.register(caller_cls=Graph)
+    def _provide_items_by_path(self: Graph) -> StringMap:
+        return self.nodes_by_path
 
     def gather_context(self) -> StringMap:
         """
