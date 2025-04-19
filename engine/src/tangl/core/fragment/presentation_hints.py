@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import Optional, Any
 import functools
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
-from tangl.type_hints import Label, Tag, StyleId, StyleClass, StyleDict
+from tangl.type_hints import StyleId, StyleClass, StyleDict
 
 class PresentationHints(BaseModel, extra="allow"):
     """
@@ -25,6 +25,8 @@ class PresentationHints(BaseModel, extra="allow"):
     tags like ["portrait", "from_right", "2.0s"] for an image.  Or, use the
     dedicated MediaPresentationHints model for type checking.
     """
+    model_config = ConfigDict(frozen=True)
+
     style_name: Optional[StyleId] = None
     style_tags: Optional[list[StyleClass]] = Field(default_factory=list)
     style_dict: Optional[StyleDict] = Field(default_factory=dict)

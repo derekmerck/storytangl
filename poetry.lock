@@ -408,6 +408,24 @@ docs = ["ipython", "matplotlib", "numpydoc", "sphinx"]
 tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
+name = "deepdiff"
+version = "8.4.2"
+description = "Deep Difference and Search of any Python object/data. Recreate objects by adding adding deltas to each other."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "deepdiff-8.4.2-py3-none-any.whl", hash = "sha256:7e39e5b26f3747c54f9d0e8b9b29daab670c3100166b77cc0185d5793121b099"},
+    {file = "deepdiff-8.4.2.tar.gz", hash = "sha256:5c741c0867ebc7fcb83950ad5ed958369c17f424e14dee32a11c56073f4ee92a"},
+]
+
+[package.dependencies]
+orderly-set = ">=5.3.0,<6"
+
+[package.extras]
+cli = ["click (==8.1.8)", "pyyaml (==6.0.2)"]
+optimize = ["orjson"]
+
+[[package]]
 name = "dnspython"
 version = "2.7.0"
 description = "DNS toolkit"
@@ -1158,6 +1176,17 @@ files = [
     {file = "numpy-2.2.4-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d0f35b19894a9e08639fd60a1ec1978cb7f5f7f1eace62f38dd36be8aecdef4d"},
     {file = "numpy-2.2.4-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:b4adfbbc64014976d2f91084915ca4e626fbf2057fb81af209c1a6d776d23e3d"},
     {file = "numpy-2.2.4.tar.gz", hash = "sha256:9ba03692a45d3eef66559efe1d1096c4b9b75c0986b5dff5530c378fb8331d4f"},
+]
+
+[[package]]
+name = "orderly-set"
+version = "5.4.0"
+description = "Orderly set"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "orderly_set-5.4.0-py3-none-any.whl", hash = "sha256:f0192a7f9ae3385b587b71688353fae491d1ca45878496eb71ea118be1623639"},
+    {file = "orderly_set-5.4.0.tar.gz", hash = "sha256:c8ff5ba824abe4eebcbbdd3f646ff3648ad0dd52239319d90056d8d30b6cccdd"},
 ]
 
 [[package]]
@@ -2279,4 +2308,4 @@ requests = "*"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "84d495ab628de8e67dad150cdb5a9f4420c5ed1cd31de6aac72335e640345589"
+content-hash = "b4f8cfd786dd5f5f51bf0b1a20ccda7984702bff3287a5c2bd20c0d1a850a127"

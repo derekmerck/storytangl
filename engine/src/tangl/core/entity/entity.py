@@ -127,7 +127,7 @@ class Entity(BaseModel):
     domain: str = None  # holder for user-defined domain of entity
     dirty: bool = None  # indicator that entity has been tampered with, invalidates certain debugging
 
-    @property
+    @functools.cached_property
     def short_uid(self) -> str:
         """
          A short, URL-friendly alias for the ``uid``.

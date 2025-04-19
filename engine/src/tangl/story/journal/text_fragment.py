@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from .content_fragment import ContentFragment
+from tangl.core.fragment import ContentFragment
 
 TextFragmentType = Literal['text', 'title', 'narrative', 'paragraph', 'dialog', 'choice']
 TextContentFormatType = Literal['plain', 'html', 'markdown']

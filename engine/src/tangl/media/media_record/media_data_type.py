@@ -3,7 +3,9 @@ from typing import Self
 from enum import Enum
 from pathlib import Path
 
-class MediaDataType(Enum):
+from tangl.utils.enum_plus import EnumPlusMixin
+
+class MediaDataType(EnumPlusMixin, Enum):
     MEDIA  = "media"   # generic default
     IMAGE  = "image"   # a PIL image
     VECTOR = "vector"  # an lxml document

@@ -1,11 +1,5 @@
 from typing import Literal, Optional
-from base64 import b64encode
-
-from pydantic import Field, field_serializer, BaseModel
-
-from tangl.type_hints import Pathlike
-# from tangl.media import MediaRecord
-from .content_fragment import ContentFragment, UpdateFragment
+from pydantic import BaseModel
 
 # Media Presentation Hints
 ShapeName = Literal['landscape', 'portrait', 'square', 'avatar', 'banner', 'bg']
@@ -26,26 +20,3 @@ class MediaPresentationHints(BaseModel, extra="allow"):
     media_transition: Optional[TransitionName] = None
     media_duration: Optional[DurationName | float] = None  # secs
     media_timing: Optional[TimingName] = None
-
-MediaFragmentType = Literal['media', 'image', 'vo', 'music', 'sfx', 'anim', 'mov']
-DataContentFormatType = Literal['url', 'data', 'xml', 'json']
-
-class MediaFragment(ContentFragment, extra='allow'):
-    fragment_type: MediaFragmentType = Field("media", alias='type')
-    content: Pathlike | bytes
-    content_format: DataContentFormatType = Field(..., alias='format')
-    media_hints: Optional[MediaPresentationHints] = None
-
-    @field_serializer("content")
-    def _encode_data_content(self, content):
-        if self.content_format == "data":
-            return b64encode(content)
-        return str(content)
-
-    @classmethod
-    def from_media_record(cls, media_record: 'MediaRecord', **kwargs) -> 'MediaFragment':
-        ...
-
-class MediaUpdateFragment(MediaFragment, UpdateFragment, extra='allow'):
-    fragment_type: Literal['media_update'] = Field("media_update", alias='type')
-    reference_type: MediaFragmentType = "media"

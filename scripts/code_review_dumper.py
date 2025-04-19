@@ -29,7 +29,7 @@ collections = {
     # tests only
     # "tests": ([f"tests"], []),
     # overview only
-    # "overview": ([f"scratch/overview"], [])
+    "overview": ([f"../../scratch/docs/overview-ext"], [])
 }
 
 file_exts = [".py", ".toml", ".md", ".rst"]

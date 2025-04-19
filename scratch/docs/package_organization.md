@@ -4,7 +4,7 @@ StoryTangl Package Organization
 Uses a separated-concern, layered architecture:
 
 - General: `core`, `utilities`
-- Data Layer: `persistence`
+- Data Layer: `persistence`, `media/record`
 - Business Logic: `story`, `world`, `mechanics`, `media`, `narrative`
 - Service Layer: `persistence`, `service`, `system`, `user`
 - Presentation Layer: apps packages in separate source tree (`cli`, `rest`)
@@ -20,6 +20,7 @@ Basic managed data structures used throughout the code.
 
 - **`entity`** -> basic managed `entity`, `registry`, `singleton`
 - **`graph`** -> connectable entities `node`, `edge`, and `graph`, wrapped `singleton node`
+- **`fragment`** -> specialized leaf nodes for projected graph content
 - **`handlers`** -> general entity task pipeline and specific implementations for gathering context, and contextually scoped tasks like rendering, conditional evaluation, applying effects, handling dynamic associations, and edge traversal
 
 **deps**: None
@@ -42,7 +43,7 @@ Story
 Entity specialization for the 3-layer abstract narrative graph and associated handlers.
 
 - **`concept`** -> general links within and from structure nodes; narrative concepts like `actor`, `place`, `prop`, `landmark`, `achievement`, `relationship` and linking structures
-- **`journal`** and **`journal.content_fragment`** -> list links within; general links to originating structure nodes and thence transitively to concepts, realized linear output of story to current state
+- **`journal`** -> list links within; general links to originating structure nodes and thence transitively to concepts, realized linear output of story to current state
 - **`structure`** -> deps on `concept`, `journal`; traversable links within; general links from concept, to journal, navigable plot points like `scene`, `block`, `action` that mediate between concepts and realized story content
 
 - **`story node`** -> base class for concept, structure, and journal nodes
