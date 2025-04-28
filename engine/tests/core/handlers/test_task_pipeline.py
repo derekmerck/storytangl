@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core import PipelineStrategy, Entity
-from tangl.core.handlers import TaskPipeline, HandlerPriority
+from tangl.core import Entity, HandlerPriority, HandlerPipeline, PipelineStrategy
 
-MyPipeline = TaskPipeline(
+MyPipeline = HandlerPipeline(
     label="MyPipeline",
     pipeline_strategy=PipelineStrategy.GATHER)
 

@@ -3,7 +3,7 @@ import pytest
 pytest.skip(allow_module_level=True)
 
 from tangl.core.entity import Entity
-from tangl.core.handlers import Available, HasConditions, HasContext, on_check_conditions, on_gather_context
+from tangl.core.entity_handlers import Available, HasConditions, HasContext, on_check_conditions, on_gather_context
 
 MyAvailEntity = type('MyAvailEntity', (Available, Entity), {} )
 

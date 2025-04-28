@@ -3,7 +3,7 @@ from typing import Type, Protocol
 from pydantic import BaseModel
 
 from tangl.core import Entity
-from tangl.core.handlers import on_gather_context, on_enter, on_render
+from tangl.core import on_gather_context, on_enter, on_render
 from tangl.story.structure import Block
 from tangl.type_hints import StringMap
 

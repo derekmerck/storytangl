@@ -9,14 +9,14 @@ import jinja2
 from pydantic import BaseModel
 
 from tangl.core.entity import Entity
-from tangl.core.handlers import on_render, Renderable, on_gather_context, HasContext
-from tangl.core.handlers.task_handler import HandlerPriority
+from tangl.core.task_handler import HandlerPriority
+from tangl.core.entity_handlers import on_render, Renderable, on_gather_context, HasContext
 
 MyRenderableEntity = type('MyRenderableEntity', (Renderable, Entity), {} )
 
 @pytest.fixture
 def renderable_entity():
-    yield Renderable(locals={'msg': 'hello entity'}, text="msg: {{ msg }}")
+    yield Renderable(locals={'msg': 'hello entity'}, content="msg: {{ msg }}")
 
 
 def test_renderable_entity(renderable_entity):
@@ -28,10 +28,10 @@ def test_renderable_entity(renderable_entity):
     assert context == {'msg': 'hello entity'}
 
     result = on_render.execute(renderable_entity, **context)
-    assert result['text'] == "msg: hello entity"
+    assert result['content'] == "msg: hello entity"
 
     result = renderable_entity.render()
-    assert result['text'] == "msg: hello entity"
+    assert result['content'] == "msg: hello entity"
 
 class ContextRenderableEntity(Renderable, HasContext, Entity):
     title: str = None
@@ -46,44 +46,44 @@ class ContextRenderableEntity(Renderable, HasContext, Entity):
 def renderable():
     return ContextRenderableEntity(
         title="dog",
-        text = "Hello, {{ name }}!",
+        content = "Hello, {{ name }}!",
         locals = {"name": "World"}
     )
 
 def test_renderable1(renderable):
-    result = Renderable.render_str( renderable.text, **renderable.locals )
+    result = Renderable.render_str( renderable.content, **renderable.locals )
     assert result == "Hello, World!"
     result = renderable.render()
-    assert result.get('text') == "Hello, World!"
+    assert result.get('content') == "Hello, World!"
 
 
 def test_renderable2():
-    n = ContextRenderableEntity( locals={'abc': 'foo'}, text='this should say foo: {{abc}}' )
+    n = ContextRenderableEntity( locals={'abc': 'foo'}, content='this should say foo: {{abc}}' )
     output = n.render()
-    assert output['text'] == 'this should say foo: foo'
+    assert output['content'] == 'this should say foo: foo'
 
 
 def test_renderable_fields():
-    test_entity = ContextRenderableEntity(text="Hello {{ var1 }}", title="Title", icon="icon.png", locals={'var1': 'World'})
+    test_entity = ContextRenderableEntity(content="Hello {{ var1 }}", title="Title", icon="icon.png", locals={'var1': 'World'})
     rendered = test_entity.render()
-    assert rendered['text'] == "Hello World"
+    assert rendered['content'] == "Hello World"
     assert rendered['title'] == "Title"
     assert rendered['icon'] == "icon.png"
 
 def test_rendering_with_multiple_fields():
-    n = ContextRenderableEntity(locals={'abc': 'foo', 'dog': 'cat'}, text='{{abc}} {{dog}}')
+    n = ContextRenderableEntity(locals={'abc': 'foo', 'dog': 'cat'}, content='{{abc}} {{dog}}')
     output = n.render()
-    assert output['text'] == f'foo cat'
+    assert output['content'] == f'foo cat'
 
 
 def test_rendering_with_missing_variable():
-    n = ContextRenderableEntity(text='Missing variable: {{missing_var}}')
+    n = ContextRenderableEntity(content='Missing variable: {{missing_var}}')
     output = n.render()
-    assert 'missing_var' not in output['text']
+    assert 'missing_var' not in output['content']
 
 def test_template_error_handling():
     node = ContextRenderableEntity(
-        text="Hello, {{ name }!",  # Missing closing brace
+        content="Hello, {{ name }!",  # Missing closing brace
         locals={"name": "World"}
     )
 
@@ -93,12 +93,12 @@ def test_template_error_handling():
 
 def test_complex_template():
     node = ContextRenderableEntity(
-        text="{{ a + b }} {{ c * d }} {{ e.upper() }} {{ 'x' if f else 'y' }}",
+        content="{{ a + b }} {{ c * d }} {{ e.upper() }} {{ 'x' if f else 'y' }}",
         locals={"a": 1, "b": 2, "c": 3, "d": 4, "e": "test", "f": False}
     )
 
     result = node.render()
-    assert result.get('text') == "3 12 TEST y"
+    assert result.get('content') == "3 12 TEST y"
 
 
 def test_custom_render_handler():
@@ -159,7 +159,7 @@ def test_multiple_renderable_mixins():
 
         @on_render.register(priority=HandlerPriority.LATE)
         def _render2(self, **context):
-            return {'text': 'foo1'}
+            return {'content': 'foo1'}
 
     DoubleRenderableNode = type('DoubleRenderableNode',
                                 (Renderable1, Renderable2, ContextRenderableEntity),
@@ -172,4 +172,4 @@ def test_multiple_renderable_mixins():
     assert res == { 'title': 'cat',
                     'label': node.label,
                     'icon': 'bar',
-                    'text': 'foo1' }
+                    'content': 'foo1' }

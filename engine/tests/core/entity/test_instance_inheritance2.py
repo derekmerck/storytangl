@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.core.entity import InheritingSingleton
+from tangl.core import InheritingSingleton
 
 class TestInheritingSingleton(InheritingSingleton):
     extra_field: str = None

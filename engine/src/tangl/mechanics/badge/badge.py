@@ -9,10 +9,10 @@ from pydantic import Field
 
 from tangl.type_hints import UniqueLabel, Expr
 from tangl.utils.topological_sort import topological_sort
-from tangl.core.handlers import TaskHandler
-from tangl.core.entity import Singleton
-from tangl.core.handlers import HasEffects, HasConditions, HasContext, Renderable, on_render, on_gather_context, on_check_conditions
-from tangl.core.handlers import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
+from tangl.core import TaskHandler
+from tangl.core import Singleton
+from tangl.core import HasEffects, HasConditions, HasContext, Renderable, on_render, on_gather_context, on_check_conditions
+from tangl.core import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 
 
 class BadgeHandler:

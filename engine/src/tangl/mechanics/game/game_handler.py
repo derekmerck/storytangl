@@ -22,12 +22,11 @@ from abc import ABC, abstractmethod
 
 from pydantic import Field, field_validator, model_validator
 
-from tangl.core.handlers import HandlerRegistry
-from tangl.core.entity import Entity
+from tangl.core import HandlerRegistry
+from tangl.core import Entity
 from tangl.core.graph import Node
-from tangl.core.handlers import on_gather_context, HasContext
+from tangl.core import on_gather_context, HasContext, HandlerPipeline
 from .enums import GameResult
-from ...core import TaskPipeline
 
 # Move-type for any GameHandler may be a simple Enum or a more complex
 # parameterized dataclass

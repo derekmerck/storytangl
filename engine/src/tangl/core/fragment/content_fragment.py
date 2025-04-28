@@ -2,18 +2,18 @@
 
 from typing import Optional, Any
 
-from pydantic import Field
+from pydantic import Field, BaseModel, ConfigDict, model_validator
 import yaml
 
 import tangl.utils.setup_yaml
 from tangl.type_hints import Identifier
-from tangl.core.graph import Node
+from ..entity import Entity
 from .presentation_hints import PresentationHints
 
-class ContentFragment(Node, extra='allow'):
+class ContentFragment(Entity, extra='allow'):
     """
     Represents a basic content element and the core schema for communicating
-    story-content and info-content to the front-end.
+    story- and info-content to the front-end.
 
     Renderables generate lists of content fragments with themselves as the parent.
     The journal layer of the graph is made up of ordered content fragments generated
@@ -37,11 +37,11 @@ class ContentFragment(Node, extra='allow'):
     - content (str): Optional value/text/media for the fragment
     - content_format: Instruction for how to parse content field, ie, markdown or encoded data
     """
-    # fragments are immutable
-    # model_config = ConfigDict(frozen=True)
+    # fragments are immutable once created
+    model_config = ConfigDict(frozen=True)
 
     # base features
-    fragment_type: str = Field(..., alias='type')
+    fragment_type: str = Field(..., alias='type')  # content, group, update, kv
     content: Any = Field(...)
     content_format: str = Field(None, alias='format')
     presentation_hints: Optional[PresentationHints] = Field(None, alias='hints')
@@ -65,4 +65,3 @@ class ContentFragment(Node, extra='allow'):
         data = self.model_dump()
         s = yaml.dump(data, default_flow_style=False)
         return s
-

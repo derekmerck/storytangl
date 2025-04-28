@@ -4,10 +4,11 @@ logger = logging.getLogger(__name__)
 
 import pytest
 
-from tangl.core.handlers import on_gather_context, HasContext
+from tangl.core.entity_handlers import on_gather_context, HasContext
 from tangl.core.graph import Graph, Node
+from tangl.core.graph_handlers import HasScopedContext
 
-MyContextNode = type('MyContextNode', (HasContext, Node), {} )
+MyContextNode = type('MyContextNode', (HasScopedContext, Node), {} )
 MyContextGraph = type('MyContextGraph', (HasContext, Graph), {} )
 
 @pytest.fixture
@@ -139,9 +140,9 @@ def test_grandparent_namespace_inherits():
 #     grandchild.local_namespace["x"] = 0
 #     assert not grandchild.available
 
-from tangl.core.handlers import HasEffects, HasConditions, Renderable
+from tangl.core import HasEffects, HasConditions, Renderable
 
-MyApplyableNode = type('MyApplyableNode', (HasEffects, Node), {} )
+MyApplyableNode = type('MyApplyableNode', (HasEffects, HasScopedContext, Node), {} )
 
 def test_effect_with_inherited_namespace():
     graph = Graph()
@@ -152,18 +153,18 @@ def test_effect_with_inherited_namespace():
     child.apply_effects()
     assert parent.locals['parent_var']['foo'] == 'bar'
 
-MyRenderableNode = type('MyRenderableNode', (Renderable, HasContext, Node), {} )
+MyRenderableNode = type('MyRenderableNode', (Renderable, HasScopedContext, Node), {} )
 
 def test_rendering_with_inherited_namespace():
     graph = Graph()
     parent = MyRenderableNode(locals={'parent_var': 'parent'})
     graph.add(parent)
-    child = MyRenderableNode(text='pv: {{parent_var}}')
+    child = MyRenderableNode(content='pv: {{parent_var}}')
     parent.add_child(child)
     output = child.render()
-    assert output['text'] == 'pv: parent'
+    assert output['content'] == 'pv: parent'
 
-MyConditionsNode = type('MyConditionsNode', (HasConditions, Node), {} )
+MyConditionsNode = type('MyConditionsNode', (HasConditions, HasScopedContext, Node), {} )
 
 def test_conditional_with_inherited_namespace():
     graph = Graph()

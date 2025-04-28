@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handlers import HasConditions, on_check_conditions, on_gather_context
+from tangl.core.entity_handlers import HasConditions, on_check_conditions, on_gather_context
 
 MyConditionEntity = type('MyConditionEntity', (HasConditions, Entity), {} )
 

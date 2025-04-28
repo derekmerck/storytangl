@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 from tangl.core import Singleton, Entity
-from tangl.core.handlers import on_gather_context, HasContext
+from tangl.core import on_gather_context, HasContext
 
 
 class World(HasContext, Singleton):

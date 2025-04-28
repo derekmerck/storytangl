@@ -1,11 +1,11 @@
 import pytest
 
-from tangl.core import Entity, PipelineStrategy, TaskPipeline, HandlerPriority, TaskHandler
+from tangl.core import Entity, PipelineStrategy, HandlerPipeline, HandlerPriority, TaskHandler
 
 @pytest.fixture(autouse=True)
 def renderable_pipeline_and_classes():
 
-    on_render = TaskPipeline[Entity, dict](label="on_render", pipeline_strategy=PipelineStrategy.GATHER)
+    on_render = HandlerPipeline[Entity, dict](label="on_render", pipeline_strategy=PipelineStrategy.GATHER)
 
     class RenderableTestEntity(Entity):
 
@@ -24,7 +24,7 @@ def renderable_pipeline_and_classes():
 
     yield on_render, RenderableTestEntity, MyRenderableTestEntity
 
-    TaskPipeline.clear_instances()
+    HandlerPipeline.clear_instances()
 
 
 def test_renderable_pipeline(renderable_pipeline_and_classes):
@@ -49,7 +49,7 @@ def test_renderable_pipeline(renderable_pipeline_and_classes):
 
 def test_extra_handlers_with_priority():
     """Test that extra handlers respect priority ordering"""
-    on_process = TaskPipeline[Entity, list](
+    on_process = HandlerPipeline[Entity, list](
         label="test_pipeline",
         pipeline_strategy=PipelineStrategy.GATHER
     )
@@ -87,7 +87,7 @@ def test_extra_handlers_with_class_restrictions():
     class SpecialEntity(Entity):
         pass
 
-    on_render = TaskPipeline[Entity, dict](
+    on_render = HandlerPipeline[Entity, dict](
         label="test_pipeline",
         pipeline_strategy=PipelineStrategy.GATHER
     )
@@ -123,7 +123,7 @@ def test_extra_handlers_with_class_restrictions():
 def test_pipeline_strategy_with_extra_handlers():
     """Test that pipeline strategy works with injected handlers"""
 
-    on_process = TaskPipeline[Entity, int](
+    on_process = HandlerPipeline[Entity, int](
         label="test_pipeline",
         pipeline_strategy=PipelineStrategy.PIPELINE
     )
@@ -161,7 +161,7 @@ def test_pipeline_strategy_with_extra_handlers():
 def test_temporary_handler_caching():
     """Test that caching works correctly with temporary handlers"""
 
-    on_render = TaskPipeline[Entity, dict](
+    on_render = HandlerPipeline[Entity, dict](
         label="test_pipeline",
         pipeline_strategy=PipelineStrategy.GATHER
     )

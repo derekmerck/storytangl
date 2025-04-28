@@ -16,37 +16,38 @@ Managing such mutable associations and transactions requires additional flexibil
 """
 
 from __future__ import annotations
-from typing import Optional, Protocol, Literal
+from typing import Optional, Protocol, Generic, TypeVar
 from uuid import UUID
 
 import logging
 
 from pydantic import Field, model_validator
 
-from tangl.core.entity import Entity
+from tangl.core import Entity
 from .node import Node
 
 logger = logging.getLogger(__name__)
 
-class EdgeProtocol(Protocol):
+SuccessorT = TypeVar("SuccessorT", bound=Entity)
+
+class EdgeP(Protocol):
     predecessor: Entity
     successor: Entity
 
-
-class SimpleEdge(Entity):
+class SimpleEdge(Entity, Generic[SuccessorT]):
     """
     An SimpleEdge is an *anonymous* (unregistered) link between two entities. The entities
     themselves do not hold links to the edge, so the connector can be garbage collected.
     """
-    predecessor: Entity
-    successor: Entity
+    predecessor: Optional[Entity]
+    successor: SuccessorT
 
     def __repr__(self):
         s = f"<{type(self).__name__}:{self.predecessor.label}->{self.successor.label}>"
         return s
 
 
-class Edge(Node):
+class Edge(Node, Generic[SuccessorT]):
     """
     An Edge is a specialized :class:`~tangl.core.graph.Node` that connects a parent predecessor node
     with a linked successor node, facilitating traversal and story flow.
@@ -99,16 +100,18 @@ class Edge(Node):
         return data
 
     @property
-    def successor(self) -> Optional[Node]:
+    def successor(self) -> Optional[SuccessorT]:
         return self.graph.get(self.successor_id, None)
 
     @successor.setter
-    def successor(self, value: UUID | Node):
+    def successor(self, value: UUID | SuccessorT):
         if value:
             if isinstance(value, UUID):
                 self.successor_id = value
-            elif isinstance(value, Node):
-                self.successor_id = value.uid
+            elif x := getattr(value, "uid", None):
+                self.successor_id = x
+            else:
+                raise TypeError("successor must be a UUID or a Node-like object")
 
     # todo: add this to on avail handler for edges
     # @on_avail.strategy("on_available")

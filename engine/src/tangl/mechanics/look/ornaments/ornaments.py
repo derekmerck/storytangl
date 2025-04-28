@@ -16,9 +16,9 @@ from enum import auto, Flag
 
 from pydantic import Field
 
-from tangl.core.entity import Entity
+from tangl.core import Entity
 from tangl.core.graph import Node
-from tangl.core.handlers import Renderable, on_render
+from tangl.core import Renderable, on_render
 # from tangl.story.story_node import StoryNode
 from tangl.narrative.lang.helpers import oxford_join
 from tangl.narrative.lang.body_parts import BodyPart

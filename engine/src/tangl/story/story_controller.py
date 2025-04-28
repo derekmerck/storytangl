@@ -6,7 +6,8 @@ from tangl.type_hints import Identifier, Expr, UnstructuredData
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
 # from tangl.media.media_record import MediaRecord, MediaDataType
-from tangl.core.handlers import TraversableEdge, AnonymousEdge, HasEffects, HasConditions
+from tangl.core.graph import SimpleEdge
+from tangl.core import TraversableEdge, HasEffects, HasConditions
 from .story_graph import Story
 from .story_node import StoryNode
 
@@ -77,7 +78,7 @@ class StoryController(HasApiEndpoints):
         if isinstance(node, Identifier):
             node = story.find_one(alias=node)
         node.dirty = True  # Jumping logic arbitrarily
-        anonymous_edge = AnonymousEdge(predecessor=story.cursor, successor=node)
+        anonymous_edge = SimpleEdge(predecessor=story.cursor, successor=node)
         story.resolve_step(anonymous_edge)
 
     # Read func, but make this an update, so it writes back the story marked as dirty

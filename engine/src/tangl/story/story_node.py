@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pydantic import Field
 
 from tangl.core import Node
-from tangl.core.handlers import HasContext
+from tangl.core import HasContext
 from tangl.world.world import World
 
 if TYPE_CHECKING:

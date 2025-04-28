@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 NodeT = TypeVar('NodeT', bound='Node')
 
 # Side note, the 'Graph' class was originally called 'Context' and was derived from
-# the context manager directly.  This functionality was factored out into the service
+# Python's context manager directly.  This functionality was factored out into the service
 # layer after 2.3.
 
 class Graph(Registry[NodeT], Generic[NodeT]):

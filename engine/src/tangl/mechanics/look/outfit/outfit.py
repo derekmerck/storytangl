@@ -17,7 +17,7 @@ import logging
 from tangl.type_hints import UniqueLabel
 from tangl.narrative.lang.helpers import oxford_join
 # from tangl.entity import BaseEntityHandler
-from tangl.core.handlers import on_render, Renderable
+from tangl.core import on_render, Renderable
 from tangl.story.story_node import StoryNode
 from tangl.narrative.lang.body_parts import BodyPart
 from ..wearable.enums import WearableState, WearableLayer

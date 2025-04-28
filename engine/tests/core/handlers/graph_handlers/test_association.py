@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core import Graph, Node
-from tangl.core.handlers import Associating
+from tangl.core.graph_handlers import Associating
 
 MyAssociatingNode = type('MyAssociatingNode', (Associating, Node), {} )
 

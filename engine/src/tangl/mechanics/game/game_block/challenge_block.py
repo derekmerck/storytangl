@@ -1,5 +1,5 @@
 from tangl.type_hints import StringMap
-from tangl.core.entity.handlers import NamespaceHandler
+from tangl.core import NamespaceHandler
 from tangl.story.scene import Block, Action
 from tangl.mechanics.games import Game
 

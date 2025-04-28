@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from tangl.core.entity.handlers import Lockable, AvailabilityHandler, HasEffects, EffectHandler
+from tangl.core import Lockable, AvailabilityHandler, HasEffects, EffectHandler
 from tangl.core.graph import Graph, Node
 from tangl.core.graph.handlers import TraversableGraph, TraversalHandler
 from tangl.story.place import Location

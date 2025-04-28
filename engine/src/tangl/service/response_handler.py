@@ -8,7 +8,7 @@ from tangl.mechanics.demographics import DemographicSampler
 logging.getLogger('markdown_it').setLevel(logging.WARNING)
 
 from tangl.type_hints import StringMap
-from tangl.core.handlers import TaskPipeline, PipelineStrategy
+from tangl.core import TaskPipeline, PipelineStrategy
 # from tangl.utils.response_models import BaseResponse
 
 OutputMode = Literal["html", "ascii"]

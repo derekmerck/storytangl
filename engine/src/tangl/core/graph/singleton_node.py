@@ -34,7 +34,7 @@ class SingletonNode(Node, Generic[WrappedType]):
     -----
     .. code-block:: python
         from tangl.core.graph import SingletonNode, Graph
-        from tangl.core.entity import Singleton
+        from tangl.core import Singleton
 
         class MyConstant(Singleton):
             value: int

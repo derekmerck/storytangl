@@ -1,7 +1,7 @@
 from typing import TypeVar, Generic
 
 from tangl.core.graph import SingletonNode, Node
-from tangl.core.handlers import Associating
+from tangl.core import Associating
 from .asset import Asset
 
 AssetT = TypeVar('AssetT', bound=Asset)

@@ -4,12 +4,13 @@ from typing import Generic, TypeVar, Optional
 from pydantic import model_validator
 
 from tangl.type_hints import StringMap, UniqueLabel
+from tangl.core import Entity
 from .node import Node
 from .edge import Edge
 
-NodeT = TypeVar("NodeT", bound=Node)
+SuccessorT = TypeVar("SuccessorT", bound=Entity)
 
-class DynamicEdge(Edge, Generic[NodeT]):
+class DynamicEdge(Edge[SuccessorT], Generic[SuccessorT]):
     """
     An edge with a lazily-linked successor.  Successor may be referenced by name,
     found by criteria, or created from a template when needed.
@@ -26,22 +27,22 @@ class DynamicEdge(Edge, Generic[NodeT]):
             raise ValueError("Must specify either ref, template or criteria")
         return self
 
-    def _resolve_by_ref(self) -> Optional[NodeT]:
+    def _resolve_by_ref(self) -> Optional[SuccessorT]:
         """Find successor by reference"""
         return self.graph.find_one(alias=self.successor_ref)
 
-    def _resolve_by_template(self) -> Optional[NodeT]:
+    def _resolve_by_template(self) -> Optional[SuccessorT]:
         """Create successor from template"""
         # todo: set correct class!
         successor = Node.structure(self.successor_template)
         self.graph.add(successor)
         return successor
 
-    def _resolve_by_criteria(self) -> Optional[NodeT]:
+    def _resolve_by_criteria(self) -> Optional[SuccessorT]:
         """Find successor by search criteria"""
         return self.graph.find_one(**self.successor_criteria)
 
-    def _resolve_successor(self) -> Optional[NodeT]:
+    def _resolve_successor(self) -> Optional[SuccessorT]:
         """Attempt to resolve successor through available methods"""
         if self.successor_ref:
             return self._resolve_by_ref()
@@ -56,7 +57,7 @@ class DynamicEdge(Edge, Generic[NodeT]):
         self.successor_id = None
 
     @property
-    def successor(self) -> Optional[NodeT]:
+    def successor(self) -> Optional[SuccessorT]:
         """Get or resolve the successor node"""
         if self.successor_id is None:
             if successor := self._resolve_successor():

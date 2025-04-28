@@ -2,7 +2,7 @@ from collections import Counter
 
 from pydantic import Field
 
-from tangl.core.entity import Entity
+from tangl.core import Entity
 from .asset import Asset
 
 class CountableAsset(Asset):

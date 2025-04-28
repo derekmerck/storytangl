@@ -76,7 +76,7 @@ class Node(Entity):
                          json_schema_extra={'cmp': False})
     """The Graph object collection that contains this node.  Omitted from serialization and comparison to prevent recursion issues."""
 
-    anon: bool = False  # do not register with the graph
+    anon: bool = False  # do not register with the graph, transient node that can be garbage collected
 
     @model_validator(mode="after")
     def _setup_graph_and_register(self):
@@ -110,7 +110,7 @@ class Node(Entity):
     @property
     def parent(self) -> Optional[Node]:
         """Link to this node's parent or None if the parent is None or not in the graph yet."""
-        # This guardrail is primarily to catch attempting to recurse ancestors to get
+        # This guardrail `get` is primarily to catch attempting to recurse ancestors to get
         # path before a graph is completely reassembled during deserialization
         return self.graph.get(self.parent_id)
 

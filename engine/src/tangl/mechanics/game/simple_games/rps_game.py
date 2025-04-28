@@ -4,7 +4,7 @@ from enum import Enum
 
 from bson.regex import str_flags_to_int
 
-from tangl.core.handlers import HandlerRegistry
+from tangl.core import HandlerRegistry
 from tangl.mechanics.game.game_handler import Game, GameHandler, GameResult
 
 from ..game_handler import opponent_strategies, scoring_strategies

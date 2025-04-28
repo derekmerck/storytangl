@@ -2,8 +2,8 @@ from typing import Mapping
 
 import pytest
 
-from tangl.core.handlers import on_gather_context, HasContext
 from tangl.core.entity import Entity
+from tangl.core.entity_handlers import on_gather_context, HasContext
 
 MyContextEntity = type('MyContext', (HasContext, Entity), {} )
 

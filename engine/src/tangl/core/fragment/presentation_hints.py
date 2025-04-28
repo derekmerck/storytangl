@@ -21,9 +21,9 @@ class PresentationHints(BaseModel, extra="allow"):
     - style_dict (dict[str, Any]): Optional suggested html style params (color, etc.)
     - icon (str): Optional suggested icon (arrow, emoji, etc.)
 
-    The tags or hints fields can be abused for free-form, fragment-type-specific
-    tags like ["portrait", "from_right", "2.0s"] for an image.  Or, use the
-    dedicated MediaPresentationHints model for type checking.
+    The tags field can be abused for free-form, fragment-type-specific tags like
+    ["portrait", "from_right", "2.0s"] for an image.  Or, use the dedicated
+    MediaPresentationHints model for type checking.
     """
     model_config = ConfigDict(frozen=True)
 
@@ -37,3 +37,5 @@ class PresentationHints(BaseModel, extra="allow"):
         kwargs.setdefault('by_alias', True)
         kwargs.setdefault('exclude_none', True)
         return super().model_dump(*args, **kwargs)
+
+    # todo: should have an inference from tags like ["color=blue", ...] -> {'color': 'blue'}

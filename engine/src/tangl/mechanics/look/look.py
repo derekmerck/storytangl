@@ -1,7 +1,7 @@
 from pydantic import field_validator
 
-from tangl.core.entity import Entity
-from tangl.core.handlers import on_render
+from tangl.core import Entity
+from tangl.core import on_render
 from tangl.narrative.lang.gens import Gens
 from tangl.narrative.lang.age_range import AgeRange
 

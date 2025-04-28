@@ -7,12 +7,12 @@ from pydantic import Field, field_serializer, BaseModel, AnyUrl, model_validator
 
 from tangl.type_hints import Pathlike
 # from tangl.media import MediaRecord
-from tangl.core.fragment import ContentFragment, UpdateFragment
+from tangl.core.fragment import ContentFragment, ControlFragment
 # from tangl.media.enums import MediaRole
 from .media_presentation_hints import MediaPresentationHints
 
 if TYPE_CHECKING:
-    from tangl.media.media_record import MediaRecord
+    from tangl.core.data_resources import ResourceRegistry, ResourceInventoryTag as RIT
 
 MediaFragmentType = Literal['media', 'image', 'vo', 'music', 'sfx', 'anim', 'mov']
 DataContentFormatType = Literal['url', 'data', 'xml', 'json']
@@ -52,7 +52,7 @@ class MediaFragment(ContentFragment, extra='allow'):
     media_record_id: Optional[UUID] = Field(None, exclude=True)
 
     @property
-    def media_record(self) -> MediaRecord:
+    def media_record(self) -> RIT:
         on_get_media.execute(self.media_record_id)
 
     # @classmethod

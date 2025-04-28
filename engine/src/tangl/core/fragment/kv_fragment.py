@@ -1,14 +1,16 @@
 from typing import Literal, Any
+from collections import namedtuple
 
 from pydantic import Field
 
+from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 from .content_fragment import ContentFragment
-from .group_fragment import GroupFragment
 
-class KvFragment(ContentFragment, extra='allow'):
+# todo: OrderedTupleDict should be type OTDict[str, tuple[Primitive, PresentationHints]]
+# todo: implement __get_pydantic_core_schema__ on OTDict so it will get represented properly in dto schema
+
+class KvFragment(ContentFragment, extra='allow', arbitrary_types_allowed=True):
+    # Used for info-responses that require ordered, hinted kv data (story info, world info, etc.)
     fragment_type: Literal["kv"] = Field("kv", alias='type')
-    label: str = Field(None, alias='key')
-    content: Any = Field(..., alias='value')
+    content: list[OrderedTupleDict] = Field(...)
 
-class KvGroup(GroupFragment, extra='allow'):
-    content: list[KvFragment] = []

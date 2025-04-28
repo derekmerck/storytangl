@@ -10,7 +10,7 @@ def patch_world(monkeypatch):
     This fixture can be used for tests that force logic jumps
     """
     from tangl.story import story_controller
-    monkeypatch.setattr(story_controller, "AnonymousEdge", FakeAnonymousEdge)
+    monkeypatch.setattr(story_controller, "SimpleEdge", FakeAnonymousEdge)
     return True
 
 def test_direct_get_journal_entry():
