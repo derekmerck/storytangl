@@ -13,33 +13,13 @@ on_project = HandlerPipeline(
     pipeline_strategy=PipelineStrategy.GATHER,
 )
 
-class ProjectableNode(Renderable, Node):
-
-    def create_projection(self, **context):
-        context = context or self.gather_context(**context)
-        on_project.execute(self, **context)
-
-    @on_project.register()
-    def _create_fragment_node(self, **context):
-        fragments = self.render(**context)
-        fragment_node = FragmentNode(
-            graph=self.graph,
-            fragments=fragments
-        )
-        self.add_child(fragment_node, as_parent=True)
-
-    @property
-    def projections(self):
-        ...
-
-class FragmentNode(Node):
+class HasLeafFragments(Node):
     """
     An immutable leaf node representing the projection of a structural graph node.
 
     - Created during traversal of structure nodes
-    - Contains rendered content fragments
+    - Contains an ordered list of rendered content fragments
     - Links back to its parent structure node and associated concepts
-    - Only has fragment children
     """
     # Make immutable
     model_config = ConfigDict(frozen=True)
@@ -59,7 +39,25 @@ class FragmentNode(Node):
         # this doesn't account for the fact that a single structure node can generate many projection leafs
         content_fragments = parent.render(**context)
         return cls(
-            parent=parent,
-            fragments=content_fragments,
+            parent_id=parent.uid,
+            graph=parent.graph,
+            fragments=content_fragments
             # Other fields as needed
         )
+
+    # def create_projection(self, **context):
+    #     context = context or self.gather_context(**context)
+    #     on_project.execute(self, **context)
+    #
+    # @on_project.register()
+    # def _create_fragment_node(self, **context):
+    #     fragments = self.render(**context)
+    #     fragment_node = HasFragments(
+    #         graph=self.graph,
+    #         fragments=fragments
+    #     )
+    #     self.add_child(fragment_node, as_parent=True)
+    #
+    # @property
+    # def projections(self):
+    #     ...

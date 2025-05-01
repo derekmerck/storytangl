@@ -1,12 +1,11 @@
 from __future__ import annotations
 from typing import Optional, Any
 from pydantic import Field
+import re
 
 from tangl.type_hints import StringMap
-from ..entity import Entity
 from ..task_handler import HandlerPriority
-# from tangl.core.graph import Node, Graph
-from ..handler_pipeline import HandlerPipeline, PipelineStrategy
+from tangl.core.graph import Node, Graph
 from ..entity_handlers import HasContext, on_gather_context
 
 class HasScopedContext(HasContext):
@@ -40,7 +39,7 @@ class HasScopedContext(HasContext):
             return self.parent.gather_context()
         elif self.parent is None and isinstance(self.graph, HasContext):
             return self.graph.gather_context()
-    #
-    # @on_gather_context.register(caller_cls=Graph)
-    # def _provide_items_by_path(self: Graph) -> StringMap:
-    #     return self.nodes_by_path
+
+    @on_gather_context.register(caller_cls=Graph)
+    def _provide_items_by_path(self: Graph) -> StringMap:
+        return self.nodes_by_path

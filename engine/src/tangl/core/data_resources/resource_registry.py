@@ -33,7 +33,7 @@ class ResourceRegistry(Registry[RIT]):
               extra_handlers: Callable = None,
               **context) -> list[RIT]:
         """
-        Index a collection of media items, deduplicating by content hash
+        Index a collection of data resources, deduplicating by content hash
         and running through the indexing pipeline.
         """
         rit_cls = rit_cls or self.rit_cls

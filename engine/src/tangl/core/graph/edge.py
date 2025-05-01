@@ -1,7 +1,7 @@
 """
 Nodes can be associated in several ways:
 
-- Directly through parent/child relationships.  These relationships can be added programmatically with "add_child()" and "remove_child".  No edge is required.
+- Directly through parent/child relationships.  These relationships can be added programmatically with "add_child()" and "remove_child()".  No edge is required.
 - For direct parent/child relationships, the child node is added to the parent's children.
 - For direct peer relationships, neither node is the parent of the other, both nodes are added to the other's children.
 
@@ -21,7 +21,7 @@ from uuid import UUID
 
 import logging
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, field_validator
 
 from tangl.core import Entity
 from .node import Node
@@ -74,6 +74,7 @@ class Edge(Node, Generic[SuccessorT]):
     """
     parent_id: UUID = Field(..., alias="predecessor_id")  # required now
 
+    predecessor: Entity = Field(None, init_var=True)
     @model_validator(mode='before')
     @classmethod
     def _alias_predecessor_to_parent(cls, data):
@@ -83,12 +84,21 @@ class Edge(Node, Generic[SuccessorT]):
                 data.setdefault('graph', predecessor.graph)
         return data
 
+    successor: SuccessorT
+
     # todo: what is the pydantic attribute property markup so this shows up as an allowable input in the schema?
     @property
     def predecessor(self) -> Node:
         return self.parent
 
     successor_id: UUID = None
+
+    @field_validator("successor_id", mode="before")
+    @classmethod
+    def _reference_entities_as_ids(cls, data):
+        if isinstance(data, Entity):
+            return data.uid
+        return data
 
     @model_validator(mode='before')
     @classmethod

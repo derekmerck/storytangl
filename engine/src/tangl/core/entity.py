@@ -458,16 +458,8 @@ class Entity(BaseModel):
         :return: A list of field names used in :meth:`__eq__`.
         :rtype: list[str]
         """
-
-        return [f.alias if f.alias else k for k, f in cls.model_fields.items()
+        return [k for k, f in cls.model_fields.items()
                 if not f.json_schema_extra or f.json_schema_extra.get("cmp", True)]
-
-        # res = []
-        # for field_name, field_info in cls.__pydantic_fields__.items():
-        #     extra = field_info.json_schema_extra or {}
-        #     if extra.get('cmp', True):
-        #         res.append(field_info.alias or field_name)
-        # return res
 
     def __eq__(self, other: Self) -> bool:
         """

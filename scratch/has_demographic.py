@@ -6,8 +6,8 @@ from pydantic import BaseModel, model_validator, field_validator
 from nameparser import HumanName
 from nameparser.config import CONSTANTS as HN_CONSTANTS
 
-from tangl.mechanics.look.enums import AgeRange
 from tangl.narrative.lang.gens import Gens
+from tangl.narrative.lang.age_range import AgeRange
 from tangl.narrative.lang.gendered_nominals import gn
 
 HN_CONSTANTS.titles.add('boss')
@@ -66,4 +66,5 @@ if __name__ == "__main__":
     assert d.familiar_name == "Jack"
 
     d = Demographic(name="Mr. John Doe, PhD")
-    assert d.formal_name.startswith("Ms.") and d.formal_name.endswith("PhD")
+    print(d)
+    assert d.formal_name.startswith("Mr.") and d.formal_name.endswith("PhD")

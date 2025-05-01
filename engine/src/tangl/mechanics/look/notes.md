@@ -10,12 +10,12 @@ There are 3 inter-related parts to an Actor's "Look"
 There are also optional dynamic state-based factors:
 
 4. Attitude
-5. Action, state, or pose
+5. Action or pose
 
 The Look handler implements two main public interfaces:
 
 1. `describe(actor, *state)`: produce a _narrative description_ of the actor, optionally given state, pose, and/or attitude
-2. `media_spec(actor, *state)`: produce a media spec for the character, either as a paperdoll or a portrait, optionally given current state, pose, and/or attitude
+2. `media_spec(actor, *state)`: produce a media spec for the character, either as a paperdoll or a portrait, optionally given current action, pose, and/or attitude
 
 Look also provides access to the OutfitManager attribute, which allows changing wearables or wearable states (open, close, remove) and the OrnamentManager attribute, which allows updating those features or forcing an outfit to cover/show a particular feature.
 

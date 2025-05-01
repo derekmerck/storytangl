@@ -52,7 +52,7 @@ class ResponseType(Enum):
     :cvar RUNTIME: Acknowledgment or status model, e.g., for create/delete.
     :cvar MEDIA: Binary or MIME-typed data (e.g., images, audio).
     """
-    CONTENT = "content"          # List of journal or kv fragments
+    CONTENT = "content"          # List of content fragments
     INFO    = "info"             # User, world-, or sys-info model
     RUNTIME = "runtime"          # Acknowledgement model
     MEDIA   = "media"            # Raw or MIME-typed media data

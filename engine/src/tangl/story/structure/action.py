@@ -2,23 +2,22 @@ from typing import Optional, Any
 
 from pydantic import Field
 
-from tangl.type_hints import UniqueLabel
-from tangl.business.core import DynamicEdge
-from tangl.business.core.handlers import HasConditions, HasEffects, Renderable, on_render, TraversableEdge
-from tangl.business.story.story_node import StoryNode
+from tangl.type_hints import Identifier
+from tangl.core import DynamicEdge, HasEffects, Renderable, on_render, TraversableEdge
+from tangl.story.story_node import StoryNode
 from .block import Block
 
-class Action(HasConditions, HasEffects, TraversableEdge, Renderable, DynamicEdge[Block], StoryNode):
+class Action(HasEffects, TraversableEdge, Renderable, DynamicEdge[Block], StoryNode):
 
-    successor_ref: UniqueLabel = Field(None, alias="next")
+    successor_ref: Identifier = Field(..., alias="next")
     # Using successor_template or criteria will _probably_ work, but is currently undefined.
 
-    default_payload: Optional[Any] = None
+    payload: Optional[Any] = None
 
     @on_render.register()
     def _provide_callback_payload(self, payload: Any = None, **context):
         # This is useful if you want to re-use the same action with different parameters,
         # or set a parameter on the client end and return it via an action cb
-        payload = payload or self.default_payload
+        payload = payload or self.payload
         if payload is not None:
             return {'payload': payload}

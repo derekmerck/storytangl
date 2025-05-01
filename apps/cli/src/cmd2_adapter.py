@@ -4,7 +4,7 @@ from cmd2 import CommandSet, with_argparser
 from typing import Optional, get_type_hints
 from uuid import UUID
 
-from tangl.service.api_endpoints import HasApiEndpoints, ApiEndpoint, MethodType, AccessLevel, ServiceManager
+from tangl.service.api_endpoint import HasApiEndpoints, ApiEndpoint, MethodType, AccessLevel, ServiceManager
 
 
 class Cmd2Adapter:

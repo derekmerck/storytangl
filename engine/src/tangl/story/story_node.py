@@ -3,8 +3,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from tangl.core import Node
-from tangl.core import HasContext
+from tangl.core import Node, Graph, HasContext
 from tangl.world.world import World
 
 if TYPE_CHECKING:
@@ -12,8 +11,8 @@ if TYPE_CHECKING:
 
 class StoryNode(HasContext, Node):
 
-    graph: Story = Field(None, json_schema_extra={'cmp': False})
-    # Update required type
+    graph: Graph = Field(None, json_schema_extra={'cmp': False})
+    # todo: Update required type -> Story, but circular ref? Put all in one file?
 
     dirty: bool = False  # flag for when a story node has been tampered with
 

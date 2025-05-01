@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import Field, model_validator
 
 from tangl.utils.shelved2 import shelved
+from tangl.utils.compute_data_hash import compute_data_hash
 from tangl.core import Entity
 from .resource_data_type import ResourceDataType
 
@@ -21,31 +22,17 @@ class ResourceInventoryTag(Entity):
     # todo: handle data stored in other dbs?  Annotate data with cms info?
     path: Optional[Path] = None
     data: Optional[Any] = None
-    # Must have one or the other
-
-    @classmethod
-    def compute_file_hash(cls, path: Path) -> bytes:
-        """Quick file hash for change detection"""
-        hasher = hashlib.md5()
-        with open(path, 'rb') as f:
-            # Read in chunks to handle large files
-            for chunk in iter(lambda: f.read(64 * 1024), b''):
-                hasher.update(chunk)
-        return hasher.digest()
-
-    @classmethod
-    def compute_data_hash(cls, data: Any) -> Optional[bytes]:
-        if isinstance(data, bytes):
-            return hashlib.sha224(data).digest()
+    # Must have one or the other if no pre-computed content hash
 
     @model_validator(mode="before")
     @classmethod
     def _set_content_hash(cls, data: Any) -> bytes:
         if 'content_hash' not in data:
             if 'data' in data:
-                content_hash = cls.compute_data_hash(data['data'])
+                content_hash = compute_data_hash(data['data'])
             elif 'path' in data:
-                content_hash = cls.compute_file_hash(data['path'])
+                path = Path(data['path'])
+                content_hash = compute_data_hash(path)
             else:
                 raise ValueError("Must include a content hash, data, or a path in constructor.")
             data['content_hash'] = content_hash
@@ -78,7 +65,8 @@ class ResourceInventoryTag(Entity):
         # for matching `find(expired=True)`
         return self.expiry < datetime.now()
 
-    @shelved(fn="media_records")
+    # todo: see load_yaml_resource for ref on caching with hash as check key
+    @shelved(fn="rits")
     @staticmethod
     def _from_path(cls, path: Path) -> 'ResourceInventoryTag':
         return cls(path=path)

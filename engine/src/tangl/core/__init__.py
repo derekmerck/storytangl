@@ -18,4 +18,4 @@ from .data_resources import ResourceDataType, ResourceInventoryTag, ResourceRegi
 from .entity_handlers import HasContext, on_gather_context, HasConditions, on_check_conditions, HasEffects, on_apply_effects, Renderable, on_render, Available, on_avail  # deps task_handler
 
 # deps graph, entity_handlers, singleton, task_handler, registry
-from .graph_handlers import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate, TraversableGraph, TraversableEdge, TraversableNode, on_enter
+from .graph_handlers import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate, TraversableGraph, TraversableEdge, TraversableNode, on_enter, HasScopedContext

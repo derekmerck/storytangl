@@ -16,10 +16,10 @@ classes:
         - ExpandsTemplates:
         - HasContext:
             has: [locals, gather_context()]
-        - HasConditions:
+        - HasConditions:  # Runtime eval
             has: [exprs, eval_expr(), check_conditions()]
             friends: [HasContext]
-        - HasEffects:
+        - HasEffects:     # Runtime exec
             has: [exprs, exec_expr(), apply_effect()]
             friends: [HasContext]
         - Available:
@@ -38,17 +38,17 @@ classes:
               - content_format      # primitive, markdown/html, binary, path/url, FragmentT, collection[FragmentT], control code
               - presentation_hints  # style id, classes, and/or dict
 
-        - ResourceInventoryTag:  # 'RIT'
+        - ResourceInventoryTag:     # 'RIT', primarily for media
             has:
-              - resource_type       # FILE_PATH, SPEC, or inline DATA
+              - resource_type       # FILE_PATH or inline DATA
               - data_format         # xml, json, image, video, audio
               - data_hash           # immutable alias for content, these are cached
-              - get_resource()      # loads if it is a FP, creates if specification and creator avail, else returns data
+              - get_resource()      # loads if it is a FP and returns data
               - create_resource() 
 
               - creation_time
               - modified_time
-              - expiry_time         # dt to load and reindex/rehash content even if size and mtime are constant
+              - expiry_time         # dt to load and reindex/rehash content even if size and mtime appear to be consistent
 
               # if inline data type:
               - data
@@ -59,13 +59,13 @@ classes:
               - file_hash
 
         - Singleton:
-            has: [label (unique), get_instance()]
+            has: [_unique_ label, get_instance()]
             subclasses:
               - InheritingSingleton:  # instance inheritance
-                  has: [reference]
+                  has: [from_ref]
         
         - TaskHandler:
-            has: [func(), matches(features), execute(), priority]
+            has: [func(), match_features, execute(), priority]
 
         - Node:
             has:
@@ -123,7 +123,7 @@ classes:
               - Registry[ResourceInventoryTag] => ResourceManager:
 
             mixins:
-              - TraversableGraph[Node,TraversableNode]:    # Includes traverable nodes
+              - TraversableGraph[Node|TraversableNode]:    # Includes traversable nodes
                   has:
                     - traversal_cursor -> TraversableT
                     # todo: not sure about syntax here, like find/find_one?

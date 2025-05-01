@@ -9,6 +9,8 @@ objects that other handler pipelines may depend on.
 
 from __future__ import annotations
 from typing import Optional, Any
+import re
+
 from pydantic import Field
 
 from tangl.type_hints import StringMap
@@ -87,4 +89,10 @@ class HasContext(Entity):
                  by the handlers, or None if no handlers returned anything.
         :rtype: dict[str, Any] | None
         """
-        return on_gather_context.execute(self)
+
+        def var_safe_key(s: str) -> str:
+            return re.sub(r'[/-]', '_', s)
+
+        context = on_gather_context.execute(self)
+        context = {var_safe_key(k): v for k, v in context.items()}
+        return context

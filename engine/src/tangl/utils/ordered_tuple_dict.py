@@ -2,8 +2,8 @@ from typing import Any, Self, Union
 import json
 from collections import OrderedDict
 
-
 class OrderedTupleDict(OrderedDict[str, tuple]):
+    # This is used by kv fragments for {key: (value, *extras)} model and serialization
 
     def __setitem__(self, key: str, value: Union[Any, tuple]) -> None:
         """Set an item, ensuring the value is a tuple."""

@@ -38,7 +38,7 @@ class Available(HasContext):
 
     @on_avail.register(caller_cls=HasConditions)
     def _check_conditions(self, **context) -> bool:
-        return on_check_conditions.execute(**context)
+        return on_check_conditions.execute(self, **context)
 
     @on_avail.register(caller_cls=Edge)
     def _check_successor_avail(self, **context) -> bool:

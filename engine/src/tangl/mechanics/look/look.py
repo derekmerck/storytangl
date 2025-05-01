@@ -20,7 +20,7 @@ class Look(Entity):
     body_phenotype: BodyPhenotype = None
     skin_tone: SkinTone = None
     hair_style: HairStyle = None
-    apparent_age: AgeRange
+    apparent_age: AgeRange = None
 
     @field_validator("skin_tone", "hair_color", mode="before")
     @classmethod
@@ -86,7 +86,8 @@ class FantasticLook(Look):
     fur_color: str = None
 
     horn_type: str = None  # goat, oni, unicorn
-    horn_color: str = None
+    horn_color: str = None # bone
+    horn_count: int = None
 
     wing_type: str = None  # bug, dragonfly, butterfly, bird/feathered, bat/leather, robotic
     wing_palette: str = None

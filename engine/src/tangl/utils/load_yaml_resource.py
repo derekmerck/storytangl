@@ -4,7 +4,8 @@ from pathlib import Path
 
 import yaml
 
-from tangl.utils.file_check_values import compute_file_hash, get_file_mtime
+from tangl.utils.compute_data_hash import compute_data_hash
+from tangl.utils.get_file_mtime import get_file_mtime
 from tangl.utils.shelved2 import shelved, clear_shelf
 
 SHELF_FN = "yaml_loader"
@@ -20,15 +21,15 @@ def load_yaml_resource(resource_module, yaml_fn, clear_cache=False):
         clear_shelf(SHELF_FN)
     resources_dir = resources.files(resource_module)
     yaml_fp = resources_dir / yaml_fn
-    check_value = (compute_file_hash(yaml_fp), get_file_mtime(yaml_fp))
+    check_value = (compute_data_hash(yaml_fp), get_file_mtime(yaml_fp))
     return cached_yaml_loader(yaml_fp, check_value=check_value)
 
-@shelved(fn=SHELF_FN)
-def cached_yaml_text_loader(text: str):
-    # check_value is used to invalidate stale entries
-    return yaml.safe_load(text)
-
-def load_yaml_text(text: str, clear_cache=False):
-    if clear_cache:
-        clear_shelf(SHELF_FN)
-    return cached_yaml_text_loader(text)
+# @shelved(fn=SHELF_FN)
+# def cached_yaml_text_loader(text: str):
+#     # check_value is used to invalidate stale entries
+#     return yaml.safe_load(text)
+#
+# def load_yaml_text(text: str, clear_cache=False):
+#     if clear_cache:
+#         clear_shelf(SHELF_FN)
+#     return cached_yaml_text_loader(text)

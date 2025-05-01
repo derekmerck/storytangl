@@ -4,7 +4,7 @@ from pydantic import BaseModel, field_validator, Field, ConfigDict
 
 from tangl.type_hints import UniqueLabel
 # from tangl.media import MediaNode, JournalMediaItem
-from tangl.story.journal.content_fragment_models import KvFragment
+from tangl.core import KvFragment
 
 class UIConfig(BaseModel):
     model_config = ConfigDict(extras="allow")

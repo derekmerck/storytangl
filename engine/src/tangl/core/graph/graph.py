@@ -3,6 +3,7 @@ from typing import Generic, TypeVar
 from uuid import UUID
 import functools
 import logging
+import re
 
 from tangl.utils.is_valid_uuid import is_valid_uuid
 from tangl.type_hints import UniqueLabel

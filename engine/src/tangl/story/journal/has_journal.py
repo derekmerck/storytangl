@@ -1,13 +1,9 @@
 from pydantic import Field
 
 from tangl.utils.bookmarked_list import BookmarkedList
-from tangl.core import Entity
+from tangl.core import Entity, Node
 from tangl.core.fragment import ContentFragment
-from tangl.story.story_node import StoryNode
-
-class JournalNode(StoryNode):
-
-    content_fragments: list[ContentFragment]
+# from tangl.story.story_node import StoryNode
 
 
 class HasJournal(Entity, arbitrary_types_allowed=True):
