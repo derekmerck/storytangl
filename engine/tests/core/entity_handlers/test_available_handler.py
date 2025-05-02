@@ -1,27 +1,45 @@
+from __future__ import annotations
+import logging
+
 import pytest
 
-pytest.skip(allow_module_level=True)
-
-from tangl.core.entity import Entity
-from tangl.core.entity_handlers import Available, HasConditions, HasContext, on_check_conditions, on_gather_context
-
-MyAvailEntity = type('MyAvailEntity', (Available, Entity), {} )
+from tangl.core import Entity, Available, HasConditions
 
 
-# CONDITIONAL AVAILABILITY
+logging.basicConfig(level=logging.DEBUG)
+
+TestLockableEntity = type('TestLockableEntity', (Available, Entity), {} )
+TestConditionalLockableEntity = type('TestConditionalLockableEntity', (Available, HasConditions, Entity), {} )
+
+
+def test_lock():
+    n = TestLockableEntity(locked=True)
+    assert not n.available()
+    assert n.locked
+    assert not n.forced
+
+    n.unlock()
+    assert n.available()
+    assert not n.locked
+    assert not n.forced
+
+def test_locked_status():
+    entity = TestLockableEntity(locked=False)
+    assert entity.available(), "Entity should be available when not locked"
+
+    entity.locked = True
+    assert not entity.available(), "Entity should be unavailable when locked"
 
 def test_conditional_availability():
     entity = TestConditionalLockableEntity(
         conditions=["condition_met == True"],
         locals={"condition_met": False}
     )
-    assert AvailabilityHandler.available(entity) is False, "Entity should be unavailable when condition is False"
-    assert not entity.available()
+    assert not entity.available(), "Entity should be unavailable when condition is False"
 
     # Update namespace to meet the condition
     entity.locals['condition_met'] = True
-    assert AvailabilityHandler.available(entity) is True, "Entity should be available when condition is True"
-    assert entity.available()
+    assert entity.available(), "Entity should be available when condition is True"
 
 
 def test_conditional_availability2():
@@ -69,4 +87,18 @@ def test_conditional_fail():
     n.locked = True
     assert not n.available()
 
+def test_force_unlock():
+    node = TestLockableEntity(locked=True)
+    assert node.locked
+    assert not node.available()
+
+    node.force()
+    assert node.locked, "Should still be locked"
+    assert node.forced, "Should be forced open now"
+    assert node.available(), "Should be available now"
+
+    node.lock()
+    assert node.locked, "Should be able to relock"
+    assert node.forced, "Should still be forced"
+    assert node.available(), "Should remain available even if relocked"
 

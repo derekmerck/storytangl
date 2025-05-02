@@ -8,6 +8,11 @@ if TYPE_CHECKING:
     from .role import Role
 
 class Actor(Associating, Renderable, StoryNode):
+    """
+    The Actor class extends the StoryNode class and represents a character or entity within the narrative.
+
+    Complex features like "Look" and "Outfit" are delegated to child nodes with their own handlers or managers.
+    """
 
     name: Optional[str] = None
 

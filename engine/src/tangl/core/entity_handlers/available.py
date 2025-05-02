@@ -44,10 +44,10 @@ class Available(HasContext):
     def _check_successor_avail(self, **context) -> bool:
         if self.successor is None:
             return False
-        return self.successor.avail(**context)
+        return self.successor.available(**context)
         # todo: do we want to check this in the edge's context,
         #       or re-evaluate the successor's context?
 
-    def avail(self, **context) -> bool:
+    def available(self, **context) -> bool:
         context = context or self.gather_context()
         return on_avail.execute(self, **context)

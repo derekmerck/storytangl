@@ -34,6 +34,7 @@ from tangl.type_hints import UnstructuredData, Identifier, Hash, Label, Tag, Typ
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 SetlikeFields = ("tags", 'with_tags', 'inv', "aka")
 AliaslikeFields = ('name', 'aka', 'alias', 'aliases')

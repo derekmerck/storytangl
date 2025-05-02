@@ -53,11 +53,11 @@ class TraversableNode(Node):
     @on_enter.register(priority=HandlerPriority.FIRST)
     def _check_for_redirects(self, **context) -> Optional[Edge]:
         # want r to check availability in the successors context, so don't pass this one
-        return next(r for r in self.redirects if r.avail())
+        return next(r for r in self.redirects if r.available())
 
     @on_enter.register(priority=HandlerPriority.FIRST, caller_cls=Available)
     def _confirm_available(self, **context):
-        if not self.avail(**context):
+        if not self.available(**context):
             raise RuntimeError(f"Node {self.label} cannot be entered bc it is not available!")
 
     @on_enter.register(priority=HandlerPriority.NORMAL, caller_cls=HasEffects)
@@ -67,7 +67,7 @@ class TraversableNode(Node):
     @on_render.register()
     def _include_choices(self, **context):
         # want r to check availability in the successors context, so don't pass this one
-        return {'choices': [r.render(**context) for r in self.choices if r.avail()]}
+        return {'choices': [r.render(**context) for r in self.choices if r.available()]}
 
     @on_enter.register(priority=HandlerPriority.LATE, caller_cls=Renderable)
     def _create_content(self, journal = None, **context):
@@ -80,7 +80,7 @@ class TraversableNode(Node):
     @on_enter.register(priority=HandlerPriority.LAST)
     def _check_for_continues(self, **context) -> Optional[Edge]:
         # want r to check availability in the successors context, so don't pass this one
-        return next(r for r in self.continues if r.avail())
+        return next(r for r in self.continues if r.available())
 
     def enter(self, **context) -> Optional[TraversableEdge]:
         """

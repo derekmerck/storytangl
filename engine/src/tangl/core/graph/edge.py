@@ -74,7 +74,7 @@ class Edge(Node, Generic[SuccessorT]):
     """
     parent_id: UUID = Field(..., alias="predecessor_id")  # required now
 
-    predecessor: Entity = Field(None, init_var=True)
+    # predecessor: Entity = Field(None, init_var=True)
     @model_validator(mode='before')
     @classmethod
     def _alias_predecessor_to_parent(cls, data):
@@ -84,7 +84,7 @@ class Edge(Node, Generic[SuccessorT]):
                 data.setdefault('graph', predecessor.graph)
         return data
 
-    successor: SuccessorT
+    # successor: SuccessorT
 
     # todo: what is the pydantic attribute property markup so this shows up as an allowable input in the schema?
     @property
@@ -113,15 +113,15 @@ class Edge(Node, Generic[SuccessorT]):
     def successor(self) -> Optional[SuccessorT]:
         return self.graph.get(self.successor_id, None)
 
-    @successor.setter
-    def successor(self, value: UUID | SuccessorT):
-        if value:
-            if isinstance(value, UUID):
-                self.successor_id = value
-            elif x := getattr(value, "uid", None):
-                self.successor_id = x
-            else:
-                raise TypeError("successor must be a UUID or a Node-like object")
+    # @successor.setter
+    # def successor(self, value: UUID | SuccessorT):
+    #     if value:
+    #         if isinstance(value, UUID):
+    #             self.successor_id = value
+    #         elif x := getattr(value, "uid", None):
+    #             self.successor_id = x
+    #         else:
+    #             raise TypeError("successor must be a UUID or a Node-like object")
 
     # todo: add this to on avail handler for edges
     # @on_avail.strategy("on_available")

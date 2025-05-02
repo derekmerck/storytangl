@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 PATH_SEPARATOR = "/"
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class Node(Entity):
     """

@@ -48,7 +48,7 @@ class DynamicEdge(Edge[SuccessorT], Generic[SuccessorT]):
 
     def _resolve_by_template(self) -> Optional[SuccessorT]:
         """Create successor from template"""
-        # todo: set correct class!
+        # todo: set correct class from successor T!
         successor = Node.structure(self.successor_template)
         self.graph.add(successor)
         return successor
