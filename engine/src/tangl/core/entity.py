@@ -406,8 +406,9 @@ class Entity(BaseModel):
         """
         return self.model_dump(*args, **kwargs)
 
+    # Consume and ignore extra structuring info, like a class-map from the structure subpackage
     @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
+    def structure(cls, data: UnstructuredData, *args, **kwargs) -> Self:
         """
         Reconstruct an entity (including subclass resolution) from a
         previously dumped data structure. Uses ``obj_cls`` to find the

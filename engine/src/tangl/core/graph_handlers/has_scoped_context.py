@@ -24,7 +24,7 @@ class HasScopedContext(HasContext):
     typically a single combined context dictionary.
     """
 
-    @on_gather_context.register(priority=HandlerPriority.EARLY)
+    @on_gather_context.register(priority=HandlerPriority.EARLY, caller_cls=Node)
     def _provide_parent_context(self, **context) -> Optional[StringMap]:
         """
         If this entity is a Node, gather context from its parent if

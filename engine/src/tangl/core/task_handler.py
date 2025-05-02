@@ -11,7 +11,7 @@ from tangl.utils.dereference_obj_cls import dereference_obj_cls
 from tangl.core import Entity
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.WARNING)
 
 
 class HandlerPriority(IntEnum):

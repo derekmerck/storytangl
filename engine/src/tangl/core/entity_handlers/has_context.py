@@ -59,26 +59,6 @@ class HasContext(Entity):
         :rtype: dict[str, Any]
         """
         return self.locals
-    #
-    # @on_gather_context.register(priority=HandlerPriority.EARLY, caller_cls=Node)
-    # def _provide_parent_context(self: Node) -> Optional[StringMap]:
-    #     """
-    #     If this entity is a Node, gather context from its parent if
-    #     that parent also implements :class:`HasContext`. If there's
-    #     no parent, attempt to gather from the `graph` (if it's a
-    #     :class:`HasContext`). Returns None if no context is found.
-    #
-    #     :return: The parent's or graph's context, or None if not available.
-    #     :rtype: dict[str, Any] | None
-    #     """
-    #     if self.parent is not None and isinstance(self.parent, HasContext):
-    #         return self.parent.gather_context()
-    #     elif self.parent is None and isinstance(self.graph, HasContext):
-    #         return self.graph.gather_context()
-    #
-    # @on_gather_context.register(caller_cls=Graph)
-    # def _provide_items_by_path(self: Graph) -> StringMap:
-    #     return self.nodes_by_path
 
     def gather_context(self) -> StringMap:
         """
