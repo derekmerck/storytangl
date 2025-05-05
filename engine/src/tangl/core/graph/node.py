@@ -285,18 +285,25 @@ class Node(Entity):
 
     def __contains__(self, item):
         """
-        Support `<tag> in Node()` or `<child_id> in Node()`.
+        Support `<child_id> in Node()`.
 
         This can be extended by other classes that want to add their own attributes to `__contains__`.
         """
+        # If it's a node, uid, or string-like uid check the children array
+        if isinstance(item, Node):
+            if item in self.children:
+                return True
+            return False
         if isinstance(item, str) and is_valid_uuid(item):
             item = UUID(item)
-        if isinstance(item, str) and self.has_tags(item):
-            return True
-        if isinstance(item, UUID) and item in self.children_ids:
-            return True
+        if isinstance(item, UUID):
+            if item in self.children_ids:
+                return True
+            return False
+        # If it's a regular string, check if it's a label or pass it on
         if isinstance(item, str) and item in [ch.label for ch in self.children]:
             return True
+            # Pass string to super() and see if it matches
         return super().__contains__(item)
 
     def detect_cycle(self) -> bool:

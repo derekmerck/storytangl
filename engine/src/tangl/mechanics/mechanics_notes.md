@@ -7,12 +7,13 @@ Mechanics
 
 - **Progression**: a tiny-rpg stat progression system and a Block wrapper for stat-challenges
 
-- **Game**: a component and Block wrapper for interactive games, a generic framework for longer stateful interactions
+- **Game**: an interactive component and Block wrapper for interactive games, a generic framework for longer stateful interactions
 - **Credentials**: an asset-based game framework similar to Pope's "Papers, Please", includes Extras (generic Actors) generation by indication
 
 - **Demographic**: a parametric regional/ethnic name generator
 - **Look**: a manager for common references to a character's style and appearance, along with adapters to narrative description and media creation params
 - **Wearable**: assets and a state manager for removable clothes
+- **Ornaments**: tattoos and other permanent decorations
 
 - **Crafting**: recipes for combining assets to generate other assets
 

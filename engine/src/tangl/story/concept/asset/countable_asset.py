@@ -3,9 +3,9 @@ from collections import Counter
 from pydantic import Field
 
 from tangl.core import Entity
-from .asset import Asset
+from .asset_type import AssetType
 
-class CountableAsset(Asset):
+class CountableAsset(AssetType):
     ...
 
 
@@ -17,6 +17,4 @@ class AssetWallet(Counter[CountableAsset]):
 
 class HasAssetWallet(Entity):
 
-    wallet: Counter = Field(default=AssetWallet)
-
-    # wallet: AssetWallet = Field(default=AssetWallet)
+    wallet: Counter[CountableAsset] = Field(default_factory=AssetWallet)

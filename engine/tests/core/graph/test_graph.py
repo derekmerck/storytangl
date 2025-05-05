@@ -13,6 +13,14 @@ def test_graph_add_and_retrieve():
     assert g[n.uid] == n
     assert g["root"] == n
 
+
+def test_graph_contains():
+    g = Graph()
+    n = Node(label="root", graph=g)
+
+    assert n in g
+    assert n.uid in g
+
 def test_graph_prevents_duplicates():
     g = Graph()
     n = Node(label="root")

@@ -13,23 +13,23 @@ import re
 Pathlike = str | Path
 
 # name: ([ include ], [ ignore ] )
-BASE_DIR = Path(__file__).parent.parent / "engine/src"
-PKG_NAME = "tangl"
+BASE_DIR = Path(__file__).parent.parent
+PKG_DIR  = Path("engine/src/tangl")
 
 collections = {
-    "full": ([PKG_NAME], []),
+    "full": ([PKG_DIR], []),
     # core only
-    "core": ([f"{PKG_NAME}/core"], []),
-    # # story only
-    # "story": ([f"{PKG_NAME}/business/story"], []),
+    "core": ([PKG_DIR / "core"], []),
+    # story only
+    "story": ([PKG_DIR / "story"], []),
     # # media only
     # "media": ([f"{PKG_NAME}/business/content/media"], []),
     # service only
     # "content_frag": ([f"{PKG_NAME}/service/content_fragment"], []),
     # tests only
-    # "tests": ([f"tests"], []),
+    "tests": (["engine/tests"], []),
     # overview only
-    "overview": ([f"../../scratch/docs/overview-ext"], [])
+    # "overview": (["docs/overview-ext"], [])
 }
 
 file_exts = [".py", ".toml", ".md", ".rst"]
@@ -95,10 +95,11 @@ def get_file_strings(root_dir):
 import subprocess
 
 def run_tree_command(directory: str) -> str:
-    directory = Path("engine/src") / directory
+    print(f"Calling tree on {BASE_DIR}/{directory}")
+    # directory = Path("engine/src") / directory
     try:
         # Run the tree command and capture the output
-        cmd = f"cd .. && git ls-tree -r --name-only HEAD:{directory} | tree --fromfile --charset=ascii --dirsfirst"
+        cmd = f"cd {BASE_DIR} && git ls-tree -r --name-only HEAD:{directory} | tree --fromfile --charset=ascii --dirsfirst"
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
@@ -112,7 +113,7 @@ def convert_coverage_to_relative_paths(report):
     lines = report.split('\n')
     lines.pop()  # there's a blank line at the end
     processed_lines = []
-    path_pattern = re.compile(r'^\/.*?\/(afc\/.*)$')  # Pattern to capture everything after '/afc'
+    path_pattern = re.compile(r'^\/.*?\/(tangl\/.*)$')  # Pattern to capture everything after '/tangl'
 
     # Find the first line with a path to determine the prefix to remove
     for line in lines:
@@ -178,8 +179,8 @@ if __name__ == "__main__":
         file_strings = []
         for root_dir in root_dirs:
 
-            if root_dir.startswith("../"):
-                data = run_tree_command(root_dir[3:])
+            # if root_dir.startswith("../"):
+            #     data = run_tree_command(root_dir[3:])
             #
             # if root_dir.startswith("../docs"):
             #     data = run_tree_command("docs")
@@ -187,14 +188,14 @@ if __name__ == "__main__":
             #     data = run_tree_command("clients/cli/afc")
             # elif root_dir.startswith("../server/afc"):
             #     data = run_tree_command("server/afc")
-            else:
-                data = run_tree_command(root_dir)
+            # else:
+            data = run_tree_command(root_dir)
             header = f'# Tree: {root_dir}\n"""\n'
             footer = '\n"""\n# --- End of tree ---\n\n'
             data = header + data + footer
             file_strings.append( data )
 
-            if not run_once and c in ["test"]:
+            if not run_once and c in ["tests"]:
                 run_once = True
                 data = run_coverage_report()
                 header = f'# Coverage\n"""\n'

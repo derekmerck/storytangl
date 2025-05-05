@@ -1,0 +1,17 @@
+# Service Subpackage
+# ------------------
+deps: [core, story.*Controller, MediaController, utils]
+classes:
+
+  - API:
+    friends: [WorldController, StoryController, UserController, SystemController, PersistenceManager, SystemManager]
+
+  - User:  # Scoped context for owner of multiple stories, track turns, achievements, etc
+    friends: [UserController]
+
+  - PersistenceManager:
+    implements: Mapping[UUID, Entity]  # Not a registry, data is not resident, so no complex finds on backend
+
+  - SystemManager:
+    has:
+      get_system_info

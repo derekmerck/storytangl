@@ -1,21 +1,23 @@
 from __future__ import annotations
-from typing import Literal, Optional, TYPE_CHECKING, Self
+from typing import Literal, Optional, TYPE_CHECKING
 from base64 import b64encode
 from uuid import UUID
 
-from pydantic import Field, field_serializer, BaseModel, AnyUrl, model_validator, PrivateAttr
+from pydantic import Field, field_serializer, AnyUrl
 
 from tangl.type_hints import Pathlike
-# from tangl.media import MediaRecord
-from tangl.core.fragment import ContentFragment, ControlFragment
+from tangl.core import ContentFragment, HandlerPipeline, PipelineStrategy, ResourceInventoryTag as RIT
 # from tangl.media.enums import MediaRole
+from tangl.media.type_hints import Media
 from .media_presentation_hints import MediaPresentationHints
 
-if TYPE_CHECKING:
-    from tangl.core.data_resources import ResourceRegistry, ResourceInventoryTag as RIT
 
 MediaFragmentType = Literal['media', 'image', 'vo', 'music', 'sfx', 'anim', 'mov']
 DataContentFormatType = Literal['url', 'data', 'xml', 'json']
+
+on_handle_media_fragment = HandlerPipeline[RIT, Media](label="on_handle_media_fragment", pipeline_strategy=PipelineStrategy.PIPELINE)
+# Media fragments can have a RIT as content and need to be _dereferenced_ at the service
+# layer to an actual data object or file url
 
 class MediaFragment(ContentFragment, extra='allow'):
     """
@@ -23,10 +25,10 @@ class MediaFragment(ContentFragment, extra='allow'):
 
     Attributes:
       - uid (UUID): Unique identifier of the generating story entity.
+      - fragment_type: media, image, vo, music, sfx, anim, mov
       - media_role (MediaRole): Intended use, e.g., `narrative_im`
-      - url (url): Path to resource for client.
-      - data (str): xml or base64 encoded data.
-      - record (RIT): Resource inventory tag to be processed into data or url by the service layer
+      - content: Path, xml or base64 encoded data, or RIT
+      - format: path, str, bytes, rit
       - text (str): Rendered content text (caption, label, lyric, etc.)
 
     Only one of url or data may be provided.
@@ -50,10 +52,6 @@ class MediaFragment(ContentFragment, extra='allow'):
 
     #: Processed by service layer and discarded
     media_record_id: Optional[UUID] = Field(None, exclude=True)
-
-    @property
-    def media_record(self) -> RIT:
-        on_get_media.execute(self.media_record_id)
 
     # @classmethod
     # def from_media_record(cls, media_record: 'MediaRecord', **kwargs) -> 'MediaFragment':

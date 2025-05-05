@@ -215,6 +215,18 @@ class Entity(BaseModel):
             tags = tags[0]
         return set(tags).issubset(self.tags)
 
+    def __contains__(self, item):
+        """
+        Support `<tag> in Entity()`.
+
+        This can be extended by other classes that want to add their own attributes to `__contains__`.
+        """
+        if isinstance(item, str):
+            if self.has_tags(item):
+                return True
+            return False
+        raise TypeError(f"Unsupported type {type(item)} for contains")
+
     def get_identifiers(self) -> set[Identifier]:
         """
         Retrieve all known identifiers for this entity. By default,

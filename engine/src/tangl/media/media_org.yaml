@@ -1,0 +1,17 @@
+# Media Subpackage
+# ----------------
+deps: [core, story, utils]
+classes:
+  - MediaNode:
+      has: [Optional[MediaSpec]]
+      implements: [DynamicEdge[MediaRIT]]
+  - MediaFragment:
+  - MediaSpec:
+  - MediaCreator:          # give it a spec and params, it returns media object
+  - MediaResourceManager:  # manage data resource tags for media objects
+
+# structure or concept nodes can have a media node as a child
+# media nodes may have a path, data, a spec or a spec reference
+# media nodes should resolve to at least 1 media data resource (RIT)
+
+

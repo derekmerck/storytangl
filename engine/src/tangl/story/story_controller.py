@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -7,12 +7,9 @@ from tangl.type_hints import Identifier, Expr, UnstructuredData
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
 # from tangl.media.media_record import MediaRecord, MediaDataType
 from tangl.core.graph import SimpleEdge
-from tangl.core import TraversableEdge, HasEffects, HasConditions
+from tangl.core import TraversableEdge, HasEffects, HasConditions, ContentFragment
 from .story_graph import Story
 from .story_node import StoryNode
-
-class ContentFragment(BaseModel):
-    ...
 
 class StoryController(HasApiEndpoints):
     """

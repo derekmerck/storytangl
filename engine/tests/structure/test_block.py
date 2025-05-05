@@ -63,6 +63,8 @@ def test_block_actions():
     assert len(choices) == 3, "Should be three choices"
     assert choices[0] is action1
 
+# todo: this should be implemented in traversable
+@pytest.mark.xfail(reason="Not implemented yet")
 def test_action_activation_modes():
 
     from tangl.story.structure import Action

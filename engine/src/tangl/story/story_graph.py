@@ -1,7 +1,4 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
-
-from pydantic import BaseModel
 
 from tangl.core import HasContext, TraversableGraph, on_gather_context
 from tangl.user import HasUser

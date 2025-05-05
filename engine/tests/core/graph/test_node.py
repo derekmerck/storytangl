@@ -30,6 +30,33 @@ def test_add_child():
     with pytest.raises(AttributeError):
         parent.does_not_exist
 
+def test_node_contains():
+    g = Graph()
+    node = Node(label="root", tags={"dog"}, graph=g)
+    child = Node(label="child", graph=g, parent_id=node.uid)
+    not_child = Node(label="not_child", tags={'cat'}, graph=g)
+
+    assert child in node.children
+    assert not_child not in node.children
+
+    assert child in node
+    assert not_child not in node
+
+    assert child.uid in node
+    from tangl.utils.is_valid_uuid import is_valid_uuid
+    assert is_valid_uuid(str(child.uid))
+    assert str(child.uid) in node
+    assert not_child.uid not in node
+    assert is_valid_uuid(str(not_child.uid))
+    assert str(not_child.uid) not in node
+
+    assert "child" in node
+    assert "not_child" not in node
+
+    assert "dog" in node
+    assert "cat" not in node
+
+
 def test_remove_child():
     g = Graph()
     parent = Node(label="parent")
@@ -179,7 +206,9 @@ def test_sibling_methods():
     root.add_child(child3)
 
     assert set(c.uid for c in child1.siblings) == {child2.uid, child3.uid}
-    assert child1 not in child1.siblings
+    assert child1 not in child1.siblings, "should not be in own siblings"
+
+    assert root.siblings == [], "Root siblings should be empty"
 
 def test_leaf_nodes():
     g = Graph()

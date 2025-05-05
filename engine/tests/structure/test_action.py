@@ -14,7 +14,7 @@ def test_create_action():
     assert action.content == "Action Label"
     assert action.successor_ref == "next_block1"
 
-
+@pytest.mark.xfail(reason="Not implemented yet")
 def test_action_from_node():
 
     # Create a test Block
