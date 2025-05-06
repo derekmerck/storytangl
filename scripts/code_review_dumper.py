@@ -20,6 +20,8 @@ collections = {
     "full": ([PKG_DIR], []),
     # core only
     "core": ([PKG_DIR / "core"], []),
+    # core next only
+    "core_next": ([PKG_DIR / "core_next"], []),
     # story only
     "story": ([PKG_DIR / "story"], []),
     # # media only
