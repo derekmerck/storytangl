@@ -1,21 +1,22 @@
 import tangl.core_next
 from tangl.core_next import ProvisionKey as PK, Registry
+from tangl.core_next import Requirement as R
 
 def test_auto_resolve_and_continue(tmp_path):
     g = tangl.core_next.node.Graph()
     root = tangl.core_next.node.Node(label="root",
-        requires={tangl.core_next.base.ProvisionKey('scene','square')})
+        requires={R(PK('scene','square'))})
     g.add(root); g.cursor_id = root.uid
 
     # template providing scene:square + actor:shopkeeper
     def build_scene(ctx):
         scene = tangl.core_next.node.Node(label="square",
             provides={PK('scene','square')},
-            requires={PK('actor','shopkeeper')},
+            requires={R(PK('actor','shopkeeper'))},
             content_tmpl="The {{ actor.name }} greets you.")
         return scene
     t_scene = tangl.core_next.template.Template(label="tpl_scene",
-        provides={PK('scene','square')}, requires={PK('actor','shopkeeper')},
+        provides={PK('scene','square')}, requires={R(PK('actor','shopkeeper'))},
         build=build_scene)
 
     # template for shopkeeper

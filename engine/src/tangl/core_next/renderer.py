@@ -1,10 +1,10 @@
 from .fragment import ContentFragment
-from .context import ContextView
-from .task_handler import TaskRegistry as HandlerPipeline
+from .context_builder import ContextView
+from .task_handler import HandlerRegistry
 from .node import Node
 
 class Renderer:
-    pipeline = HandlerPipeline(label="on_render")
+    pipeline = HandlerRegistry(label="on_render")
 
     @pipeline.register(caller_cls=Node)
     @staticmethod

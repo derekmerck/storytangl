@@ -1,9 +1,12 @@
-from .node import Edge, Node, Graph
-from .context import ContextBuilder, ContextView
+from __future__ import annotations
+
+from .node import Graph
+from .edge import Edge
+from .context_builder import ContextBuilder, ContextView
 from .resolver import Resolver
 from .conditions import ConditionChecker
 from .renderer import Renderer
-from .task_handler import TaskRegistry as HandlerPipeline
+from .task_handler import HandlerRegistry
 from .registry import Registry
 from .template import Template
 
@@ -14,8 +17,8 @@ class CursorDriver:
         self.journal = journal or []
         self.return_stack = return_stack or []
 
-        self.effects_pipeline = HandlerPipeline(label="on_apply_effects")
-        self.follow_edge_pipeline = HandlerPipeline(label="on_follow_edge")
+        self.effects_pipeline = HandlerRegistry(label="on_apply_effects")
+        self.follow_edge_pipeline = HandlerRegistry(label="on_follow_edge")
 
     def step(self, edge: Edge | None = None, *, globals=None):
         e = edge or Edge(successor_id=self.g.cursor_id)

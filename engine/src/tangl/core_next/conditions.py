@@ -1,12 +1,12 @@
 from pydantic import Field
 
-from .task_handler import TaskRegistry as HandlerPipeline
-from .context import ContextView, ContextBuilder
+from .task_handler import HandlerRegistry
+from .context_builder import ContextView, ContextBuilder
 from .node import Node
-from .base import Entity
+from .entity import Entity
 
 class ConditionChecker:
-    gather_pipeline = HandlerPipeline(label="on_gather_conditions")
+    gather_pipeline = HandlerRegistry(label="on_gather_conditions")
 
     @classmethod
     def eval_expr(cls, expr, ctx):

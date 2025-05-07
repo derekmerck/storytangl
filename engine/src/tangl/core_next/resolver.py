@@ -1,25 +1,20 @@
-from .task_handler import TaskRegistry as HandlerPipeline
-from .registry import Registry
-from .template import Template
-from .node import Node, Graph
-from .context import ContextView
-from .fragment import ContentFragment
+from .task_handler import HandlerRegistry
 
 class Resolver:
-    on_find     = HandlerPipeline(label='on_find_provider')
-    on_find_template = HandlerPipeline(label='on_find_template')
-    on_create  = HandlerPipeline(label='on_create_provider')
-    on_link    = HandlerPipeline(label='on_link_provider')
+    link_pipeline = HandlerRegistry(label='on_link')
 
     @classmethod
-    def resolve(cls, node: Node, graph: Graph, templates: Registry[Template], ctx: ContextView):
-        missing = node.requires - set(graph.index)
-        for key in missing:
-            associate = cls.on_find.execute_all(entity=graph, key=key, ctx=ctx)  # may return a satisfying node
-            if associate is None:
-                template = cls.on_find_template.execute_all(entity=node, templates=templates, ctx=ctx)  # may return a satisfying template
-                if template is not None:
-                    associate = cls.on_create.execute_all(entity=template, ctx=ctx) or template.build(ctx=ctx)
-                    graph.add(associate)
-            if associate is not None:
-                cls.on_link.execute_all(entity=node, associate=associate, key=key, ctx=ctx)
+    def resolve(cls, node, graph, templates, ctx):
+        unresolved = []
+        for req in node.requires:
+            provider = next(req.select_candidates(node, graph, ctx), None)
+            if provider is None:
+                provider = req.maybe_create(node, graph, templates, ctx)
+                if provider:
+                    graph.add(provider)
+            if provider:
+                cls.link_pipeline.execute_all(entity=node, link=provider, key=req.key, ctx=ctx)
+                # call on_link pipeline once
+            else:
+                unresolved.append(req)
+        return not unresolved

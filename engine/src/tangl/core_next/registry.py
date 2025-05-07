@@ -1,37 +1,44 @@
 from uuid import UUID
 from typing import TypeVar, Generic, Iterable
 from collections import defaultdict
+import logging
 
 from pydantic import Field
 
-from .base import Entity, ProvisionKey, Providable
+from .requirement import ProvisionKey, Providable
+from .entity import Entity
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 EntityT = TypeVar("EntityT", bound=Entity)
 
 class Registry(Entity, Generic[EntityT]):
     registry: dict[UUID, EntityT] = Field(default_factory=dict, repr=False)
-    index: dict[ProvisionKey, set[UUID]] = Field(default_factory=defaultdict[set], repr=False)
+    index: dict[ProvisionKey, set[UUID]] = Field(default_factory=lambda: defaultdict(set), repr=False)
 
     # -------- public API ----------
     def add(self, obj: Entity):
         self.registry[obj.uid] = obj
         if isinstance(obj, Providable):
+            logger.debug(f"adding {obj!r} to {obj.provides}")
             for key in obj.provides:
-                self.index[key] = obj.uid
+                logger.debug(f"->adding {obj!r} to {key!r}")
+                self.index[key].add(obj.uid)
 
     def add_all(self, *objs: Entity):
         for obj in objs:
-            self.registry[obj.uid] = obj
-            if isinstance(obj, Providable):
-                for key in obj.provides:
-                    self.index[key] = obj.uid
+            self.add(obj)
 
     def find_one(self, **criteria):
         # robust search: UID, label, tags, or ProvisionKey
         if "uid" in criteria:
             return self.registry.get(criteria["uid"])
         if "provides" in criteria:
-            return self.registry.get(next(self.registry.get(criteria["provides"])))
+            logger.debug(f"searching for {criteria['provides']!r} provider")
+            providers = self.index.get(criteria["provides"])
+            if providers:
+                return self.registry[next(iter(providers))]
         return next((o for o in self.registry.values() if o.matches(**criteria)), None)
 
     def find_all(self, **criteria) -> Iterable[Entity]:

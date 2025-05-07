@@ -1,11 +1,11 @@
 from __future__ import annotations
 from typing import Callable, Any, Literal, Type, TYPE_CHECKING, Optional
 
-from .base import Entity
+from .entity import Entity
 from .registry import Registry
 
 if TYPE_CHECKING:
-    from .context import ContextView
+    from .context_builder import ContextView
 
 class TaskHandler(Callable, Entity):
     func: Callable
@@ -19,11 +19,11 @@ class TaskHandler(Callable, Entity):
             raise TypeError(f"{entity} is not a {self.caller_cls.__name__}")
         return self.func(*args, entity=entity, ctx=ctx, **kwargs)
 
-STRATEGIES = Literal['gather', 'pipeline', 'first', 'all', 'iter']
+Aggregator = Literal['gather', 'pipeline', 'first', 'all', 'iter']
 
-class TaskRegistry(Registry):
+class HandlerRegistry(Registry):
 
-    strategy: STRATEGIES = "gather"
+    aggregator: Aggregator = "gather"
 
     def register(self, caller_cls: Type[Entity] = None, priority: int = 0):
 
@@ -42,11 +42,14 @@ class TaskRegistry(Registry):
         handler = self.find_one(label=which)
         return handler(entity=entity, ctx=ctx, **kwargs)
 
-    def execute_all(self, *, entity: Entity, ctx: ContextView, **kwargs) -> Any:
-        handlers = self.find_all(caller_cls=type(entity))
-        list(handlers).sort(key=lambda h: h.priority, reverse=True)   # highest priority first
+    def execute_all(self, *, entity: Entity, ctx: ContextView, aggregator: Aggregator = None, **kwargs) -> Any:
 
-        match self.strategy:
+        aggregator = aggregator or self.aggregator
+
+        handlers = list(self.find_all(caller_cls=type(entity)))
+        handlers.sort(key=lambda h: h.priority, reverse=True)
+
+        match aggregator:
             # todo: ignore None or len(0) return values, but not False
             case "gather":
                 return [h.__call__(entity=entity, ctx=ctx, **kwargs) for h in handlers]
