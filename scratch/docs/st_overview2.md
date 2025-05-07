@@ -59,7 +59,7 @@ Story Lifecycle
 
 6. client submits an action/choice and optional payload
 
-7. selected choice edge is followed (state update triggers journal entry) and returrn to 4
+7. selected choice edge is followed (state update triggers journal entry) and return to 4
 
 8. at some point, the story content will be exhausted or otherwise terminate without providing a blocking interaction, at which point we can archive the story
 

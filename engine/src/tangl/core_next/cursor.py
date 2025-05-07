@@ -29,13 +29,23 @@ class CursorDriver:
             self._follow(e, ctx=None)
             node = self.g.cursor
             ctx = ContextBuilder.gather(node, self.g, globals=globals or {})
+            ctx['templates'] = self.templates
+
+            # ----------- before redirect ---------
+            hooks = sorted(self.g.step_hooks, key=lambda h: h.priority, reverse=True)
+            for h in hooks:
+                if h.phase == 'before_redirect' and h.predicate(ctx):
+                    new_edge = h.action(self, ctx)
+                    if new_edge:
+                        e = new_edge
+                        break
 
             # ------------- redirect -------------
             e = node._select(node.redirects, ctx)
             if e: continue
 
             # resolve → effects → render
-            Resolver.resolve(node=node, graph=self.g, templates=self.templates, ctx=ctx)
+            Resolver.resolve(node=node, graph=self.g, ctx=ctx)
             if not ConditionChecker.check(node, ctx): return
             self.effects_pipeline.execute_all(entity=node, ctx=ctx)
             frags = Renderer.render(node, ctx)

@@ -1,5 +1,6 @@
 from tangl.core_next.task_handler import HandlerRegistry
-from tangl.core_next.base import Entity
+from tangl.core_next import Entity
+
 class E(Entity): pass
 pipe = HandlerRegistry()
 @pipe.register(caller_cls=E, priority=10)

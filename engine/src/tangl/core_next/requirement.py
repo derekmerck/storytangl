@@ -1,7 +1,10 @@
 from typing import ClassVar, Callable
+import logging
 
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ProvisionKey:
@@ -10,7 +13,7 @@ class ProvisionKey:
     def __hash__(self): return hash((self.domain, self.name))
 
     def __repr__(self):
-        return f"{self.domain}:{self.name}"
+        return f"PK({self.domain}:{self.name})"
 
 @dataclass
 class Requirement:
@@ -36,15 +39,41 @@ class Requirement:
         if self.strategy not in self._strategies:
             raise ValueError(f"Strategy '{self.strategy}' not found, must be one of {list(self._strategies.keys())}")
         fn = self._strategies[self.strategy]
-        yield from fn("select", self, node, graph, ctx)
+        for ent in self._strategies[self.strategy]("select", self, node, graph, ctx):
+            yield ent
 
-    def maybe_create(self, node, graph, templates, ctx):
+    def maybe_create(self, node, graph, ctx):
         fn = self._strategies[self.strategy]
-        return fn("create", self, node, graph, ctx)
+        obj = fn("create", self, node, graph, ctx)
+        logger.debug(f"Maybe-created provider {obj}")
+        return obj
 
+# requirement.py  ------------------------------------------
 @Requirement.register_strategy("direct")
-def select_direct(op, self, node, graph, ctx):
-    return []
+def direct_strategy(phase, req, node, graph, ctx):
+    """
+    phase == "select"  → yield providers already in graph
+    phase == "create"  → if template exists, build it
+    """
+    from .registry import Registry         # avoid circular import
+    from .template import Template
+
+    if phase == "select":
+        # breadth: local subtree → graph index
+        uids = graph.index.get(req.key, set())
+        return [ graph.registry[uid] for uid in uids ]
+
+    elif phase == "create":
+        templates: Registry[Template] = ctx.get("templates")
+        if not templates:
+            return None
+        tpl = templates.find_one(provides=req.key)
+        logger.debug(f"found template {tpl}")
+        if tpl:
+            obj = tpl.build(ctx)
+            logger.debug(f"created inst {obj}")
+            return tpl.build(ctx)
+
 
 class Providable(BaseModel):
     requires: set[Requirement] = Field(default_factory=set)

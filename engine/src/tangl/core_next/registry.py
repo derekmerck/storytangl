@@ -8,7 +8,6 @@ from pydantic import Field
 from .requirement import ProvisionKey, Providable
 from .entity import Entity
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 EntityT = TypeVar("EntityT", bound=Entity)
@@ -19,6 +18,8 @@ class Registry(Entity, Generic[EntityT]):
 
     # -------- public API ----------
     def add(self, obj: Entity):
+        if not hasattr(obj, "uid"):
+            raise ValueError(f"Cannot register objects without a uid {type(obj)}")
         self.registry[obj.uid] = obj
         if isinstance(obj, Providable):
             logger.debug(f"adding {obj!r} to {obj.provides}")
@@ -32,11 +33,13 @@ class Registry(Entity, Generic[EntityT]):
 
     def find_one(self, **criteria):
         # robust search: UID, label, tags, or ProvisionKey
+        logger.debug(f"searching for {criteria}")
         if "uid" in criteria:
             return self.registry.get(criteria["uid"])
         if "provides" in criteria:
             logger.debug(f"searching for {criteria['provides']!r} provider")
             providers = self.index.get(criteria["provides"])
+            logger.debug(f"found {providers} id's")
             if providers:
                 return self.registry[next(iter(providers))]
         return next((o for o in self.registry.values() if o.matches(**criteria)), None)
