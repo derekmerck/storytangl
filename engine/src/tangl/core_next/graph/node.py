@@ -4,15 +4,11 @@ from typing import Callable, Optional
 
 from pydantic import Field
 
-from .requirement import Providable
-from .entity import Entity
+from ..entity import Entity
+from ..registry import Registry
 from .edge import Edge
-from .registry import Registry
-from .template import Template
-from .step_hook import StepHook
 
-
-class Node(Entity, Providable):
+class Node(Entity):
 
     children_ids: list[UUID] = Field(default_factory=list)
 
@@ -28,23 +24,29 @@ class Node(Entity, Providable):
             if pred(ctx):
                 return edge
 
+StepHook = object
+
 class StructureNode(Node):
     # structure nodes, graphs, and domains can contribute step hooks
     step_hooks: list[StepHook] = Field(default_factory=list)
+
+from typing import ClassVar
 
 
 class Graph(Registry[Node]):
 
     domain: Domain = None
     cursor_id: UUID | None = None
-    step_hooks: list[StepHook] = Field(default_factory=list)
+    # step_hooks: list[StepHook] = Field(default_factory=list)
 
     @property
     def cursor(self) -> Optional[Node]:
         if self.cursor_id:
             return self.registry[self.cursor_id]
 
+    context_providers: ClassVar = []
 
-class Domain(Entity, Providable):
-    step_hooks: list[StepHook] = Field(default_factory=list)
-    template_registry: Registry[Template] = Field(default_factory=Registry)
+
+class Domain(Entity): ...
+    # step_hooks: list[StepHook] = Field(default_factory=list)
+    # template_registry: Registry[Template] = Field(default_factory=Registry)

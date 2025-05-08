@@ -14,12 +14,12 @@ Pathlike = str | Path
 
 # name: ([ include ], [ ignore ] )
 BASE_DIR = Path(__file__).parent.parent
-PKG_DIR  = Path("engine/src/tangl")
+PKG_DIR  = Path("engine/src/tangl33")
 
 collections = {
     "full": ([PKG_DIR], []),
     # core only
-    "core": ([PKG_DIR / "core"], []),
+    "core33": ([PKG_DIR / "core"], []),
     # core next only
     "core_next": ([PKG_DIR / "core_next"], []),
     # story only
@@ -29,7 +29,7 @@ collections = {
     # service only
     # "content_frag": ([f"{PKG_NAME}/service/content_fragment"], []),
     # tests only
-    "tests": (["engine/tests"], []),
+    # "tests": (["engine/tests"], []),
     # overview only
     # "overview": (["docs/overview-ext"], [])
 }

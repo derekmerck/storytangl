@@ -3,7 +3,8 @@ import pytest
 
 import yaml
 
-from tangl.core_next import Graph, Node, ProvisionKey, CursorDriver, Registry, Template
+from tangl.core_next.provision.requirement import ProvisionKey as PK
+from tangl.core_next import Graph, Node, CursorDriver, Registry, Template
 
 # --- author YAML ---
 data = """
@@ -32,7 +33,7 @@ def test_create_from_templates():
 
     # --- build graph ---
     g = Graph()
-    root = Node(label="root", requires={ProvisionKey('scene','village_square')})
+    root = Node(label="root", requires={PK('scene','village_square')})
     g.add(root)
     cursor = CursorDriver(graph=g, templates=template_registry)
 

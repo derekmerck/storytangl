@@ -1,11 +1,9 @@
 from __future__ import annotations
 from typing import Callable, Any, Literal, Type, TYPE_CHECKING, Optional
 
-from .entity import Entity
-from .registry import Registry
-
-if TYPE_CHECKING:
-    from .context_builder import ContextView
+from ..entity import Entity
+from ..registry import Registry
+from ..type_hints import Context
 
 class TaskHandler(Callable, Entity):
     func: Callable
@@ -14,7 +12,7 @@ class TaskHandler(Callable, Entity):
 
     # todo: set defaults caller_cls and label from func fqn
 
-    def __call__(self, *args, entity: Entity, ctx: ContextView, **kwargs):
+    def __call__(self, *args, entity: Entity, ctx: Context, **kwargs):
         if not isinstance(entity, self.caller_cls):
             raise TypeError(f"{entity} is not a {self.caller_cls.__name__}")
         return self.func(*args, entity=entity, ctx=ctx, **kwargs)
@@ -38,11 +36,11 @@ class HandlerRegistry(Registry):
 
         return decorator
 
-    def execute_one(self, which: str, *, entity: Entity, ctx: ContextView, **kwargs):
+    def execute_one(self, which: str, *, entity: Entity, ctx: Context, **kwargs):
         handler = self.find_one(label=which)
         return handler(entity=entity, ctx=ctx, **kwargs)
 
-    def execute_all(self, *, entity: Entity, ctx: ContextView, aggregator: Aggregator = None, **kwargs) -> Any:
+    def execute_all(self, *, entity: Entity, ctx: Context, aggregator: Aggregator = None, **kwargs) -> Any:
 
         aggregator = aggregator or self.aggregator
 

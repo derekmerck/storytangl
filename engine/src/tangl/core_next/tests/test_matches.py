@@ -1,4 +1,4 @@
-from tangl.core_next import ProvisionKey, Entity
+from tangl.core_next import Entity
 def test_matches():
     e = Entity(label="hero", tags={"pc"}, locals={"hp": 10})
     assert e.matches(label="hero")

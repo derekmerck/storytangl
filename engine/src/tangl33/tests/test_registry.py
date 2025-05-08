@@ -1,7 +1,9 @@
-from tangl.core_next import Entity, Registry
+from dataclasses import dataclass
+from tangl33.core import Entity, Registry
 
+@dataclass
 class P(Entity):
-    data: str
+    data: str = None
 
 def test_find_by_feature():
     g = Registry()

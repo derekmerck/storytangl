@@ -1,14 +1,16 @@
-from tangl.core_next import requirement, node, registry, template, resolver
+from tangl.core_next import Registry, Template, Graph, Node
 from tangl.core_next import Requirement as R
+from tangl.core_next.provision.requirement import ProvisionKey as PK
+from tangl.core_next.handlers.resolver import Resolver
 
 def test_resolver_created():
-    k_actor = requirement.ProvisionKey("actor", "npc")
-    def build_npc(ctx): return node.Node(label="npc", provides={k_actor})
-    tpl = template.Template(label="tpl", provides={k_actor}, build=build_npc)
-    T = registry.Registry[template.Template]();
+    k_actor = PK("actor", "npc")
+    def build_npc(ctx): return Node(label="npc", provides={k_actor})
+    tpl = Template(label="tpl", provides={k_actor}, build=build_npc)
+    T = Registry[Template]();
     T.add(tpl)
-    G = node.Graph()
-    root = node.Node(label="root", requires={R(k_actor)});
+    G = Graph()
+    root = Node(label="root", requires={R(k_actor)});
     G.add(root)
-    resolver.Resolver.resolve(root, G, ctx={'templates': T})
+    Resolver.resolve(root, G, ctx={'templates': T})
     assert G.find_one(provides=k_actor).label == "npc"

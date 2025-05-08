@@ -1,4 +1,4 @@
-from tangl.core_next.task_handler import HandlerRegistry
+from tangl.core_next.handlers.task_handler import HandlerRegistry
 from tangl.core_next import Entity
 
 class E(Entity): pass

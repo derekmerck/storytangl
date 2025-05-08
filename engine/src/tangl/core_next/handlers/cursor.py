@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from .node import Graph
-from .edge import Edge
-from .context_builder import ContextBuilder, ContextView
+from ..registry import Registry
+from ..enums import StepPhase
+from ..provision.capability_cache import CapabilityCache
+from ..graph import Graph, Edge, Template
+# from .context_builder import ContextBuilder, ContextView
 from .resolver import Resolver
 from .conditions import ConditionChecker
 from .renderer import Renderer
 from .task_handler import HandlerRegistry
-from .registry import Registry
-from .template import Template
 
 class CursorDriver:
     def __init__(self, graph: Graph, templates: Registry[Template], journal = None, return_stack=None):
@@ -20,7 +20,15 @@ class CursorDriver:
         self.effects_pipeline = HandlerRegistry(label="on_apply_effects")
         self.follow_edge_pipeline = HandlerRegistry(label="on_follow_edge")
 
+    def new_step(self, edge: Edge | None = None, *, globals=None):
+        for phase in StepPhase:
+            for cap in cap_cache.iter_phase(phase, cursor_tier):
+                if cap.should_run(ctx):
+                    cap.apply(node, driver, graph, ctx)
+
     def step(self, edge: Edge | None = None, *, globals=None):
+        return
+
         e = edge or Edge(successor_id=self.g.cursor_id)
         while e:
             # todo: ctx here is complicated, do we use pred or successor?
