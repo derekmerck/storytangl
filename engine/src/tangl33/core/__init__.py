@@ -7,7 +7,7 @@ from .exceptions import ProvisionError
 
 from .provision import ResourceProvider
 from .runtime import HandlerCache, ProviderRegistry
-from .graph import Edge, Node, Graph
+from .graph import Edge, Node, Graph, EdgeKind
 
 from .render import Fragment, Journal, render_fragments, RenderHandler, render_handler
 from .context import gather, ContextHandler, context_handler

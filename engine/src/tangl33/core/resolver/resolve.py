@@ -31,7 +31,8 @@ def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cache: HandlerCache
     search_chain.extend([Tier.ANCESTORS] * len(list(node.iter_ancestors(graph=graph))))  # 2. each ancestor
     search_chain.extend([Tier.GRAPH, Tier.DOMAIN, Tier.GLOBAL])                   # 3‑5
 
-    for req in node.requires:
+    # Nodes may not have requirements, although structure nodes probably should
+    for req in getattr(node, "requires", []):
         # Walk the chain until a provider is found/created
         cap: ResourceProvider | None = None
         for tier in search_chain:

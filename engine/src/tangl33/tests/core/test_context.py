@@ -8,23 +8,6 @@ from tangl33.core.runtime.handler_cache import HandlerCache
 from tangl33.core.context.gather import gather
 from tangl33.core.type_hints import Context
 
-
-# -----------------------------------------------------------------------------
-# Fixture helpers
-# -----------------------------------------------------------------------------
-@pytest.fixture
-def graph():
-    g = Graph()
-    root = Node(label="root")
-    child = Node(label="child", parent_uid=root.uid)
-    g.add(root); g.add(child)
-    return g
-
-@pytest.fixture
-def cap_cache():
-    return HandlerCache()
-
-
 # -----------------------------------------------------------------------------
 # Context gather + iter_ancestors behaviour
 # -----------------------------------------------------------------------------

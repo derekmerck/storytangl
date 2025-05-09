@@ -3,7 +3,6 @@ import pytest
 from tangl33.core import ContextHandler, ResourceProvider, RedirectHandler
 from tangl33.core import Tier, Requirement
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -26,14 +25,14 @@ def _redirect(node, driver, graph, ctx):
 # ---------------------------------------------------------------------------
 # Capability— behaviour & ordering
 # ---------------------------------------------------------------------------
-def test_contextcap_apply_and_predicate():
+def test_context_h_apply_and_predicate():
     cap = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=0)
     assert cap.should_run(ctx_empty) is True
     result = cap.apply(dummy_node, dummy_driver, dummy_graph, ctx_empty)
     assert result == {"extra": 1}
 
 
-def test_provisioncap_apply_and_provides():
+def test_res_prov_apply_and_provides():
     cap = ResourceProvider(provides={"shop"}, tier=Tier.GRAPH, owner_uid=None)
     out = cap.apply(dummy_node, dummy_driver, dummy_graph, ctx_empty)
     assert out is dummy_node

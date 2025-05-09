@@ -19,16 +19,15 @@ flowchart RL
     end
 
     subgraph provision
-        ProvisionCap -- is --> Entity
-        ProvisionCap -- is --> Capability
-        Template  -- has --> ProvisionCap
+        ResourceProvider -- is --> Entity
+        ResourceProvider -- is --> Capability
+        Template  -- has --> ResourceProvider
         Template -- builds --> Node
     end
 
    subgraph runtime
-        CapCache  -- has --> Capability
-        ProvisionRegistry -- has --> ProvisionCap
-        ProvisionRegistry
+        HandlerCache  -- has --> Capability
+        ProviderRegistry -- has --> ResourceProvider
     end
     
     subgraph resolver
@@ -38,17 +37,17 @@ flowchart RL
     end
 
     subgraph context
-        ContextCap --> Capability
-        gather --> CapCache
+        ContextHandler --> Capability
+        gather --> HandlerCache
         gather --> graph_
     end
 
     subgraph render
-        RenderCap --> Capability
+        RenderHandler --> Capability
         Fragment --> Entity
         Journal --> Fragment
         render_fragments --> Node
-        render_fragments --> CapCache
+        render_fragments --> HandlerCache
         render_fragments --> Journal
     end
 

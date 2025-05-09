@@ -18,27 +18,6 @@ from tangl33.core.context.gather import gather
 from tangl33.core.resolver.resolve import resolve
 from tangl33.core.type_hints import Context
 
-
-# -----------------------------------------------------------------------------
-# Fixture helpers
-# -----------------------------------------------------------------------------
-@pytest.fixture
-def graph():
-    g = Graph()
-    root = Node(label="root")
-    child = Node(label="child", parent_uid=root.uid)
-    g.add(root); g.add(child)
-    return g
-
-@pytest.fixture
-def cap_cache():
-    return HandlerCache()
-
-@pytest.fixture
-def prov_reg():
-    return ProviderRegistry()
-
-
 # -----------------------------------------------------------------------------
 # ProvisionRegistry & resolver basics
 # -----------------------------------------------------------------------------
