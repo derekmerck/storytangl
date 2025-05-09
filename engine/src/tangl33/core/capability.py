@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
+from uuid import UUID
 
 from .enums import Phase, Tier
 from .type_hints import Predicate, Context
@@ -23,6 +24,7 @@ class Capability:
     tier: Tier
     priority: int = 0
     predicate: Predicate = lambda ctx: True
+    owner_uid: UUID = None  # points back to registering provider, but avoids import
 
     # -----------------------------------------------------------------
     # core API
@@ -44,7 +46,6 @@ class Capability:
     # -----------------------------------------------------------------
     # rich comparison for heap / sort() stability
     # -----------------------------------------------------------------
-    # __slots__ = ()
 
     def _sort_key(self):
         """(phase, tier, -priority)  → deterministic ascending"""

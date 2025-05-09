@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).parent.parent
 PKG_DIR  = Path("engine/src/tangl33")
 
 collections = {
-    "full": ([PKG_DIR], []),
+    "full33": ([PKG_DIR], []),
     # core only
     "core33": ([PKG_DIR / "core"], []),
     # core next only

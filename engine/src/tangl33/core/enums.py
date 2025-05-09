@@ -24,3 +24,33 @@ class Tier(IntEnum):
     DOMAIN = 50
     GLOBAL = 60
     DEFAULT = LAST = 70     # do _after_ the normal phase actions
+
+    @classmethod
+    def range_inwards(cls, start: "Tier | int | None" = None):
+        """
+        Return tiers from *inner* to *outer* (NODE → … → GLOBAL).
+        If *start* is given, begin at that tier (inclusive).
+        """
+        tiers = sorted(iter(cls), key=int)                 # ascending: PRIORITY(10)…DEFAULT(70)
+        if start is None:
+            return tiers
+        start = cls(start) if not isinstance(start, cls) else start
+        try:
+            return tiers[tiers.index(start):]
+        except ValueError:                                 # should not happen
+            return tiers
+
+    @classmethod
+    def range_outwards(cls, start: "Tier | int | None" = None):
+        """
+        Return tiers from *outer* to *inner* (GLOBAL → … → NODE).
+        If *start* is given, begin at that tier (inclusive).
+        """
+        tiers = sorted(iter(cls), key=int, reverse=True)
+        if start is None:
+            return tiers
+        start = cls(start) if not isinstance(start, cls) else start
+        try:
+            return tiers[tiers.index(start):]
+        except ValueError:
+            return tiers

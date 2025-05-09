@@ -1,4 +1,4 @@
-from tangl33.core import Capability, CapabilityCache, Phase, Tier
+from tangl33.core import Capability, HandlerCache, Phase, Tier
 
 # ---------------------------------------------------------------------------
 # Helpers: lightweight dummy Capability for testing
@@ -15,7 +15,7 @@ def make_cap(priority: int, phase: Phase = Phase.GATHER_CONTEXT,
 # Tests
 # ---------------------------------------------------------------------------
 def test_register_and_iter_basic():
-    cache = CapabilityCache()
+    cache = HandlerCache()
     cap = make_cap(priority=0)
     cache.register(cap)
 
@@ -24,7 +24,7 @@ def test_register_and_iter_basic():
 
 
 def test_priority_sort_descending():
-    cache = CapabilityCache()
+    cache = HandlerCache()
     low = make_cap(priority=0)
     mid = make_cap(priority=5)
     high = make_cap(priority=10)
@@ -37,7 +37,7 @@ def test_priority_sort_descending():
 
 
 def test_phase_tier_isolation():
-    cache = CapabilityCache()
+    cache = HandlerCache()
     a = make_cap(priority=1, phase=Phase.GATHER_CONTEXT, tier=Tier.NODE)
     b = make_cap(priority=1, phase=Phase.RENDER, tier=Tier.NODE)
     c = make_cap(priority=1, phase=Phase.GATHER_CONTEXT, tier=Tier.GRAPH)

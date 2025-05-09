@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import TypeVar, Generic, Iterable
+from typing import TypeVar, Generic, Iterable, Optional
 import logging
 from dataclasses import dataclass, field
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 EntityT = TypeVar("EntityT", bound=Entity)
 
-@dataclass
+@dataclass(kw_only=True)
 class Registry(dict, Generic[EntityT]):
 
     data: dict[UUID, EntityT] = field(default_factory=dict, repr=False)
@@ -28,11 +28,14 @@ class Registry(dict, Generic[EntityT]):
         # robust search: UID, label, tags, or ProvisionKey
         logger.debug(f"searching for {criteria}")
         if "uid" in criteria:
-            return self.data.get(criteria["uid"])
+            return self.get(criteria["uid"])
         return next((o for o in self.data.values() if o.matches(**criteria)), None)
 
     def find_all(self, **criteria) -> Iterable[EntityT]:
         # robust search: UID, label, tags
         if "uid" in criteria:
-            return [ self.data.get(criteria["uid"]) ]
+            return [ self.get(criteria["uid"]) ]
         return (o for o in self.data.values() if o.matches(**criteria))
+
+    def get(self, key: UUID) -> Optional[EntityT]:
+        return self.data.get(key)

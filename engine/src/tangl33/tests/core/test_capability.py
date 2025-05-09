@@ -1,16 +1,7 @@
-"""
-Unit‑tests for the new Capability and Requirement primitives.
-
-Run with:  pytest -q
-"""
 import pytest
 
-from tangl33.core import (
-    ContextCap,
-    ProvisionCap,
-    RedirectCap,
-)
-from tangl33.core import Phase, Tier, Requirement
+from tangl33.core import ContextHandler, ResourceProvider, RedirectHandler
+from tangl33.core import Tier, Requirement
 
 
 # ---------------------------------------------------------------------------
@@ -36,23 +27,23 @@ def _redirect(node, driver, graph, ctx):
 # Capability— behaviour & ordering
 # ---------------------------------------------------------------------------
 def test_contextcap_apply_and_predicate():
-    cap = ContextCap(_ctx_layer, tier=Tier.NODE, priority=0)
+    cap = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=0)
     assert cap.should_run(ctx_empty) is True
     result = cap.apply(dummy_node, dummy_driver, dummy_graph, ctx_empty)
     assert result == {"extra": 1}
 
 
 def test_provisioncap_apply_and_provides():
-    cap = ProvisionCap(provides={"shop"}, tier=Tier.GRAPH, owner_uid=None)
+    cap = ResourceProvider(provides={"shop"}, tier=Tier.GRAPH, owner_uid=None)
     out = cap.apply(dummy_node, dummy_driver, dummy_graph, ctx_empty)
     assert out is dummy_node
     assert "shop" in cap.provides
 
 
 def test_capability_deterministic_sorting():
-    a = ContextCap(_ctx_layer, tier=Tier.NODE, priority=0)               # GATHER_CONTEXT / NODE / prio 0
-    b = RedirectCap(_redirect, tier=Tier.NODE, priority=0)               # CHECK_REDIRECTS / NODE / prio 0
-    c = ContextCap(_ctx_layer, tier=Tier.NODE, priority=10)              # higher priority → before 'a'
+    a = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=0)               # GATHER_CONTEXT / NODE / prio 0
+    b = RedirectHandler(_redirect, tier=Tier.NODE, priority=0)               # CHECK_REDIRECTS / NODE / prio 0
+    c = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=10)              # higher priority → before 'a'
 
     # Expected order: phase, then tier, then -priority
     caps = [a, b, c]

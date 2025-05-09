@@ -3,7 +3,7 @@ from typing import Callable
 from ..capability import Capability
 from ..enums import Phase, Tier
 
-class RenderCap(Capability):
+class RenderHandler(Capability):
     def apply(self, node, driver, graph, ctx):  # returns list[Fragment]
         return self.func(node, driver, graph, ctx)
 
@@ -12,6 +12,6 @@ class RenderCap(Capability):
         self.func = func
 
 
-def render_cap(priority: int = 0, **kw):
-    def _wrap(fn): return RenderCap(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
+def render_handler(priority: int = 0, **kw):
+    def _wrap(fn): return RenderHandler(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
     return _wrap

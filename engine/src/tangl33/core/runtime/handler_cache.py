@@ -3,7 +3,8 @@ from collections import defaultdict
 from ..enums import Phase, Tier
 from ..capability import Capability
 
-class CapabilityCache:
+class HandlerCache:
+
     def __init__(self):
         self._store: dict[tuple[Phase, Tier], list[Capability]] = \
             defaultdict(list)

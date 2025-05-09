@@ -13,14 +13,13 @@ if TYPE_CHECKING:
    from ..graph import Node, Graph
 
 @dataclass(kw_only=True)
-class ProvisionCap(Capability, Entity):
+class ResourceProvider(Capability, Entity):
     """
     Registers a *provider* for some resource (shop, actor, sound, …).
 
     *provides* is a set of keys this provider can satisfy.
     """
     phase: Phase = Phase.PROVISION_NEXT
-    owner_uid: UUID  # points back to Node but avoids import
     provides: set[ProvisionKey] = field(default_factory=set)
 
     # In most cases apply() just returns the provider-node reference

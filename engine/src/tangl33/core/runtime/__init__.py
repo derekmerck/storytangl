@@ -1,2 +1,2 @@
-from .capability_cache import CapabilityCache
-from .provision_registry import ProvisionRegistry
+from .handler_cache import HandlerCache
+from .provider_registry import ProviderRegistry
