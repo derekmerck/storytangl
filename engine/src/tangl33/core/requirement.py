@@ -1,3 +1,32 @@
+"""
+tangl.core.requirement
+=====================
+
+Declarative dependency specifications with resolution strategies.
+
+Requirements are first-class declarations of what resources a node
+needs to function properly. Key features include:
+
+- String-based keys for provider matching
+- Strategy pattern for flexible resolution approaches
+- Parameter passing for contextual creation/selection
+- Tiered resolution for scope control
+- Built-in memoization support through hashing
+
+Requirements provide the "pull" side of StoryTangl's architecture,
+where story elements actively request the providers they need,
+triggering just-in-time creation of narrative elements.
+
+This enables dynamic, contextual story unfolding where characters,
+locations, and objects appear only when narratively appropriate,
+embodying the "quantum narrative" metaphor.
+
+See Also
+--------
+resolver: System for matching requirements to providers
+ResourceProvider: The capability that fulfills requirements
+"""
+
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Dict, Protocol, runtime_checkable
 

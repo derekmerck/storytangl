@@ -1,3 +1,35 @@
+"""
+tangl.core.capability
+=====================
+
+Executable behavior units with phased, tiered execution semantics.
+
+Capabilities are the primary extension mechanism in StoryTangl33,
+representing discrete behaviors that execute during specific phases
+of graph traversal. Key features include:
+
+- Phase-targeted execution (context gathering, rendering, etc.)
+- Tier-based scope control (node-local, graph-wide, etc.)
+- Priority-based ordering within phase/tier combinations
+- Conditional activation through predicates
+- Owner-based filtering for node-specific behaviors
+
+This design enables a clean separation between:
+- WHAT happens (the capability implementation)
+- WHEN it happens (phase, tier, priority)
+- WHERE it happens (owner node)
+- IF it happens (predicate)
+
+Unlike traditional event systems, capabilities form a structured
+protocol that ensures deterministic execution while maintaining
+flexibility for authors and developers.
+
+See Also
+--------
+context_handler, render_handler, redirect_handler, continue_handler:
+    Decorator factories for common capability types
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING

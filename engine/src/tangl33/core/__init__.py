@@ -5,7 +5,7 @@ from .requirement import Requirement
 from .capability import Capability
 from .exceptions import ProvisionError
 
-from .provision import ResourceProvider
+from .provision import ResourceProvider, Template
 from .runtime import HandlerCache, ProviderRegistry
 from .graph import Edge, Node, Graph, EdgeKind
 

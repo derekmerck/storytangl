@@ -1,3 +1,26 @@
+"""
+tangl.core.registry
+===================
+
+Collection management for entities with robust search capabilities.
+
+The Registry provides a generic dictionary-like container for Entity
+objects with enhanced retrieval options:
+
+- UUID-based direct access for performance-critical operations
+- Criteria-based flexible search for dynamic discovery
+- Type safety via generic parameters
+- Composition over inheritance for extensibility
+
+The Registry underpins the core StoryTangl graph management,
+supporting specialized variants like ProviderRegistry
+that index based on multiple dimensions.
+
+This component is foundational as it enables decoupling between
+storage patterns and retrieval logic, letting capabilities
+find requirements and vice versa without direct references.
+"""
+
 from uuid import UUID
 from typing import TypeVar, Generic, Iterable, Optional
 import logging

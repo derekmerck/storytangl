@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 from ..enums import Tier
 from ..requirement import Requirement
 from ..graph import Node, Graph, Edge, EdgeKind
@@ -42,4 +40,3 @@ def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cache: HandlerCache
         if cap is None:   # last safeguard – shouldn’t happen if strategy.create() never returns None
             raise RuntimeError(f"Unresolved requirement: {req.key!r}")
         graph.link(node.uid, cap.owner_uid, EdgeKind.PROVIDES)
-

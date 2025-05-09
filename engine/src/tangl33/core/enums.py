@@ -1,3 +1,29 @@
+"""
+tangl.core.enums
+================
+
+Core execution model enums defining the traversal protocol.
+
+StoryTangl organizes its execution model through two primary dimensions:
+
+- **Phase**: Determines what type of operation is being performed
+  (context gathering, redirection, content generation, etc.)
+
+- **Tier**: Defines the scope in which operations execute
+  (node-local, ancestor chain, graph-wide, domain-wide, etc.)
+
+These enums establish a consistent, deterministic ordering system
+that makes story traversal predictable while maintaining flexibility
+in how capabilities are inserted and executed.
+
+The traversal protocol ensures that the story space "collapses"
+in a principled way from outer tiers (global) to inner ones (node),
+and from earlier phases to later ones.
+
+This module also provides utility methods for iterating through
+tiers in different directions (inwards vs. outwards).
+"""
+
 from enum import IntEnum
 
 class Phase(IntEnum):
