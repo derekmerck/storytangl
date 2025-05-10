@@ -2,11 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl33.core import Node, ContinueHandler, Edge, EdgeKind, Tier, Journal, CursorDriver
-
-@pytest.fixture
-def domain():
-    return SimpleNamespace(get_globals=lambda: {})
+from tangl33.core import Node, ContinueHandler, Edge, EdgeKind, Tier, Journal, CursorDriver, Domain
 
 def test_cursor_step_advances(graph, cap_cache, prov_reg, domain):
     root  = graph.find_one(label="root")

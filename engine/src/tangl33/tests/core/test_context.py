@@ -1,11 +1,7 @@
 import pytest
 from collections import ChainMap
 
-from tangl33.core.enums import Tier
-from tangl33.core.graph.node import Node
-from tangl33.core.graph.graph import Graph
-from tangl33.core.runtime.handler_cache import HandlerCache
-from tangl33.core.context.gather import gather
+from tangl33.core import Tier, gather,TieredMap
 from tangl33.core.type_hints import Context
 
 # -----------------------------------------------------------------------------
@@ -31,7 +27,8 @@ def test_gather_merges_layers(graph, cap_cache):
     )
 
     ctx: Context = gather(child, graph, cap_cache, globals={})
-    assert isinstance(ctx, ChainMap)
+    assert isinstance(ctx, ChainMap)  # Actually a TieredContextMap subclass of chainmap
+    assert isinstance(ctx, TieredMap)
     assert ctx["root_var"] == 1 and ctx["child_var"] == 2
     # child values overshadow ancestor on key clash
     cap_cache.register(
@@ -42,3 +39,4 @@ def test_gather_merges_layers(graph, cap_cache):
     )
     ctx = gather(child, graph, cap_cache, globals={})
     assert ctx["dup"] == "child"
+

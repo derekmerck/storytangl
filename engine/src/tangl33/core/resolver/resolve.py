@@ -4,8 +4,9 @@ from ..graph import Node, Graph, Edge, EdgeKind
 from ..provision import ResourceProvider
 from ..runtime import ProviderRegistry, HandlerCache
 from ..type_hints import Context
+from ..context import make_role_injector
 
-def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cache: HandlerCache, ctx: Context):
+def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cap_cache: HandlerCache, ctx: Context):
 
     def _find_or_create(req: Requirement,
                         scope_tier: Tier,
@@ -40,3 +41,11 @@ def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cache: HandlerCache
         if cap is None:   # last safeguard – shouldn’t happen if strategy.create() never returns None
             raise RuntimeError(f"Unresolved requirement: {req.key!r}")
         graph.link(node.uid, cap.owner_uid, EdgeKind.PROVIDES)
+
+        # auto-register context injector so render sees the new provider
+        injector = make_role_injector(
+            node_uid=node.uid,
+            requirement=req,
+            provider_uid=cap.owner_uid,
+            slot_index=0)          # or map role→index
+        cap_cache.register(injector)

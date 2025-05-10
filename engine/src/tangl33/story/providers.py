@@ -1,4 +1,4 @@
-from tangl33.core import ProvisionError
+from tangl33.core import ProvisionError, ResourceProvider, Tier
 
 class CharacterStrategy:
     """Strategy for creating/selecting character nodes."""
@@ -9,14 +9,31 @@ class CharacterStrategy:
             return False
         # Match character attributes from criteria
         return all(getattr(prov, k, None) == v for k, v in req.criteria.items())
+    #
+    # def create(self, req, ctx):
+    #     """Create a new character from template if needed."""
+    #     registry = ctx["templates"]
+    #     tpl_name = req.params.get("template")
+    #     tpl = registry.get(tpl_name)
+    #     if not tpl:
+    #         raise ProvisionError(f"No template for character: {tpl_name}")
+    #     return tpl.build(ctx)
 
     def create(self, req, ctx):
-        """Create a new character from template if needed."""
-        templates = ctx.get('character_templates', {})
-        template_name = req.params.get('template')
-        if not template_name or template_name not in templates:
-            raise ProvisionError(f"No template for character: {template_name}")
+        registry = ctx["templates"]
+        tpl_name = req.params.get("template")
+        tpl = registry.get(tpl_name)
+        if not tpl:
+            raise ProvisionError(f"No template for character: {tpl_name}")
 
-        # Create from template
-        template = templates[template_name]
-        return template.build(req.params)
+        node = tpl.build(ctx)                      # returns StoryNode
+        graph = ctx["graph"]                       # pass graph in resolver context
+        graph.add(node)
+
+        # wrap the node in a provider-cap and register that
+        cap = ResourceProvider(
+            owner_uid=node.uid,
+            provides={"character"},
+            tier=Tier.GRAPH
+        )
+        return cap

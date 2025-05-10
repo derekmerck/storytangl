@@ -4,10 +4,11 @@ from .registry import Registry
 from .requirement import Requirement
 from .capability import Capability
 from .exceptions import ProvisionError
+from .tiered_map import TieredMap
 
 from .provision import ResourceProvider, Template
 from .runtime import HandlerCache, ProviderRegistry
-from .graph import Edge, Node, Graph, EdgeKind
+from .graph import Edge, Node, Graph, EdgeKind, Domain
 
 from .render import Fragment, Journal, render_fragments, RenderHandler, render_handler
 from .context import gather, ContextHandler, context_handler

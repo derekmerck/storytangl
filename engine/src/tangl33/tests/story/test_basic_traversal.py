@@ -1,6 +1,5 @@
-from legacy_src.journal.journal_handler import Journal
-from tangl33.core import Graph, EdgeKind, HandlerCache, ProviderRegistry, Journal, CursorDriver
-from tangl33.story import StoryNode, Domain
+from tangl33.core import Graph, EdgeKind, HandlerCache, ProviderRegistry, Journal, CursorDriver, Domain
+from tangl33.story import StoryNode, register_base_capabilities
 
 def test_basic_traversal():
     """Test basic story graph traversal."""

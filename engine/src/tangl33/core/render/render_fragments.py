@@ -9,14 +9,14 @@ def render_fragments(node, ctx: Context, cap_cache: HandlerCache) -> list[Fragme
 
     for tier in Tier.range_inwards(Tier.NODE):          # NODE → GLOBAL
         for cap in cap_cache.iter_phase(Phase.RENDER, tier):
-            if cap.owner_uid == node.uid or tier is not Tier.NODE:
-                part = cap.apply(node, None, None, ctx)
-                if part:
-                    # normalise to list
-                    if isinstance(part, Fragment):
-                        frags.append(part)
-                    else:
-                        frags.extend(part)
+            # ── run NODE-tier handlers bound to *this* node
+            #    and any handler whose owner_uid == None (global renderer)
+            if tier is Tier.NODE and cap.owner_uid not in (None, node.uid):
+                continue
+
+            part = cap.apply(node, None, None, ctx)
+            if part:
+                frags.extend(part if isinstance(part, (list, tuple)) else [part])
 
     # guarantee UID and ordering
     for f in frags:

@@ -1,13 +1,12 @@
 from typing import Mapping, Any
 from collections import ChainMap
-from unittest import case
 
 from ..type_hints import Context
 from ..enums import Tier, Phase
 from ..graph import Node, Graph
 from ..runtime import HandlerCache
+from ..tiered_map import TieredMap
 
-#
 # ---------------------------------------------------------------------------
 # tier_owner helper
 # ---------------------------------------------------------------------------
@@ -33,15 +32,17 @@ def tier_owner(node: Node, graph: Graph, tier: Tier) -> Any:
         case Tier.GLOBAL:
             # Could point at a real singleton registry; for tests an empty dict works
             return getattr(graph, "globals_layer", {})
-        case Tier.PRIORITY | Tier.DEFAULT:
+        case _ if tier in Tier:
             # Could grab something out of the args or point at a singleton registry; for tests an empty dict works
             return {}
 
     raise ValueError(f"Unsupported tier {tier}")
 
 def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) -> Context:
-    layers = [globals]
+    res = TieredMap()
+    res.inject(Tier.GLOBAL, globals)
     for tier in Tier:
+        layers = []
         if tier is Tier.ANCESTORS:
             owners = list(node.iter_ancestors(graph=graph))
             effective_tier = Tier.NODE  # ancestor providers live at NODE tier
@@ -53,4 +54,7 @@ def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) 
             for cap in cap_cache.iter_phase(Phase.GATHER_CONTEXT, effective_tier):
                 if cap.should_run(globals) and cap.owner_uid == owner.uid:
                     layers.append(cap.apply(owner, None, graph, globals))
-    return ChainMap(*layers)  # Apparently not reversed here
+
+        res.inject(tier, ChainMap(*layers))
+
+    return res  # Apparently not reversed here

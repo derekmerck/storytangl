@@ -1,10 +1,23 @@
+import logging
+
 from tangl33.core import EdgeKind, render_handler, Fragment
+
+logger = logging.getLogger(__name__)
+
+from jinja2 import Environment
+
+def render_str(s: str, **ctx):
+    j2tmpl = Environment().from_string(s)
+    logger.debug( list(ctx.keys()) )
+    return j2tmpl.render(ctx)
 
 @render_handler()
 def render_text(node, driver, graph, ctx):
     """Render a basic text fragment from node content."""
+    logger.debug(f'Rendering text fragment from node {node!r}')
     if 'text' in node.locals:
-        return Fragment(node_uid=node.uid, text=node.locals['text'])
+        s = render_str(node.locals['text'], **ctx)
+        return Fragment(node_uid=node.uid, text=s)
 
 @render_handler()
 def render_choices(node, driver, graph, ctx):

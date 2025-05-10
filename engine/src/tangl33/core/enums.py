@@ -38,18 +38,19 @@ class Phase(IntEnum):
 
 class Tier(IntEnum):
     """
-    There are 7 scope tiers in context evaluation.
+    There are multiple scope tiers in context evaluation.
     Adding a provider for a phase at the 'priority' tier will force first,
-    adding at the 'default' tier will run it last or possibly not at all if
-    a result has already been returned
+    adding at the 'default' tier will run it last or possibly not at all, if
+    a result can be returned earlier.
     """
     PRIORITY = FIRST = 10   # do _before_ the normal phase actions
     NODE = 20
-    ANCESTORS = 30
+    ANCESTORS = 30          # active subgraph
     GRAPH = 40
     DOMAIN = 50
-    GLOBAL = 60
-    DEFAULT = LAST = 70     # do _after_ the normal phase actions
+    USER = 60
+    GLOBAL = 70
+    DEFAULT = LAST = 80     # do _after_ the normal phase actions
 
     @classmethod
     def range_inwards(cls, start: "Tier | int | None" = None):
@@ -57,7 +58,7 @@ class Tier(IntEnum):
         Return tiers from *inner* to *outer* (NODE → … → GLOBAL).
         If *start* is given, begin at that tier (inclusive).
         """
-        tiers = sorted(iter(cls), key=int)                 # ascending: PRIORITY(10)…DEFAULT(70)
+        tiers = sorted(iter(cls), key=int)                 # ascending: PRIORITY(10)…DEFAULT(80)
         if start is None:
             return tiers
         start = cls(start) if not isinstance(start, cls) else start
