@@ -3,15 +3,15 @@ from ..requirement import Requirement
 from ..graph import Node, Graph, Edge, EdgeKind
 from ..provision import ResourceProvider
 from ..runtime import ProviderRegistry, HandlerCache
-from ..type_hints import Context
+from ..type_hints import StringMap
 from ..context import make_role_injector
 
-def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cap_cache: HandlerCache, ctx: Context):
+def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cap_cache: HandlerCache, ctx: StringMap):
 
     def _find_or_create(req: Requirement,
                         scope_tier: Tier,
                         reg: ProviderRegistry,
-                        ctx: Context) -> ResourceProvider | None:
+                        ctx: StringMap) -> ResourceProvider | None:
         """Return an existing provider that satisfies *req* or create one."""
         # 1. search outward
         for tier in Tier.range_inwards(scope_tier):  # NODE → … → GLOBAL

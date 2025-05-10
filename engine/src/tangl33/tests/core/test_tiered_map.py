@@ -1,4 +1,3 @@
-
 from tangl33.core import Tier, TieredMap
 from tangl33.core.tiered_map import _sanitise
 

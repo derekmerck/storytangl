@@ -7,7 +7,7 @@ from .. import Phase
 from ..type_hints import ProvisionKey
 from ..capability import Capability
 from ..entity import Entity
-from ..type_hints import Context
+from ..type_hints import StringMap
 
 if TYPE_CHECKING:
    from ..graph import Node, Graph
@@ -19,10 +19,10 @@ class ResourceProvider(Capability, Entity):
 
     *provides* is a set of keys this provider can satisfy.
     """
-    phase: Phase = Phase.PROVISION_NEXT
+    phase: Phase = Phase.RESOLVE
     provides: set[ProvisionKey] = field(default_factory=set)
 
     # In most cases apply() just returns the provider-node reference
-    def apply(self, node: 'Node', driver, graph: 'Graph', ctx: Context) -> 'Node':
+    def apply(self, node: 'Node', driver, graph: 'Graph', ctx: StringMap) -> 'Node':
         return node
 

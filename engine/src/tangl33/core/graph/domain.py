@@ -1,15 +1,13 @@
-from types import SimpleNamespace
+from dataclasses import dataclass, field
 
-class Domain(SimpleNamespace):
+from ..entity import Entity
+from .scope_mixin import ScopeMixin
+
+@dataclass(kw_only=True)
+class Domain(Entity, ScopeMixin):
     """Holds world-level singletons that must survive graph reloads."""
-    def __init__(self):
-        super().__init__(
-            globals_layer = {},          # context globals
-            templates = {},              # name → Template
-        )
+    templates: dict = field(default_factory=dict)
+    # todo: type hint self.templates properly?
 
     def get_templates(self) -> dict:
         return self.templates
-
-    def get_globals(self) -> dict:
-        return self.globals_layer

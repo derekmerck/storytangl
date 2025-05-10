@@ -8,7 +8,7 @@ class ContextHandler(Capability):
         return self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.GATHER_CONTEXT, **meta)
+        super().__init__(phase=Phase.CONTEXT, **meta)
         self.func = func
 
 def context_handler(priority: int = 0, **kw):

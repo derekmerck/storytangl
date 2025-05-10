@@ -36,7 +36,7 @@ from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
 from .enums import Phase, Tier
-from .type_hints import Predicate, Context
+from .type_hints import Predicate, StringMap
 
 if TYPE_CHECKING:
     from .graph import Node, Graph
@@ -61,13 +61,13 @@ class Capability:
     # -----------------------------------------------------------------
     # core API
     # -----------------------------------------------------------------
-    def should_run(self, ctx: Context) -> bool:
+    def should_run(self, ctx: StringMap) -> bool:
         return self.predicate(ctx)
 
-    def apply(self, node: Node, driver, graph: Graph, ctx: Context) -> Any:
+    def apply(self, node: Node, driver, graph: Graph, ctx: StringMap) -> Any:
         """
         Sub-classes override.  Return type depends on phase:
-        * GATHER_CONTEXT   →  Mapping layer
+        * CONTEXT   →  Mapping layer
         * CHECK_REDIRECTS  →  Optional[Edge]
         * APPLY_EFFECTS    →  None
         * RENDER           →  list[Fragment]

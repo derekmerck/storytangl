@@ -5,7 +5,7 @@ from tangl33.core.cursor.step_handlers    import (
     redirect_handler, continue_handler, effect_handler
 )
 from tangl33.core.render.fragment import Fragment
-from tangl33.core.graph.edge import EdgeKind, Edge, ChoiceTrigger
+from tangl33.core.graph.edge import EdgeKind, Edge, EdgeTrigger
 
 from .renderers import render_text, render_choices
 
@@ -18,7 +18,7 @@ from .renderers import render_text, render_choices
 def auto_continue(node, driver, graph, ctx):
     # auto-advance if exactly one CHOICE edge
     choices = [e for e in graph.edges_out.get(node.uid, [])
-               if e.kind is EdgeKind and e.trigger is ChoiceTrigger.AFTER]
+               if e.kind is EdgeKind and e.trigger is EdgeTrigger.AFTER]
     return choices[0] if len(choices) == 1 else None
 
 def register_base_capabilities(cap_cache):

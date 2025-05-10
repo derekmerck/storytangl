@@ -16,7 +16,7 @@ from tangl33.core.provision.resource_provider import ResourceProvider
 from tangl33.core.requirement import Requirement
 from tangl33.core.context.gather import gather
 from tangl33.core.resolver.resolve import resolve
-from tangl33.core.type_hints import Context
+from tangl33.core.type_hints import StringMap
 
 # -----------------------------------------------------------------------------
 # ProvisionRegistry & resolver basics

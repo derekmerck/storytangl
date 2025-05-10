@@ -15,7 +15,7 @@ This implementation uses ChainMap for efficient layered access,
 and provides a clear protocol for how information shadows across
 scope boundaries.
 
-Context gathering occurs at the beginning of traversal,
+StringMap gathering occurs at the beginning of traversal,
 establishing the environment in which all subsequent phase
 decisions (redirects, rendering, etc.) will operate.
 

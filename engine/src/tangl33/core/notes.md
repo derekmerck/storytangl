@@ -23,7 +23,7 @@ Package Organization
 * Capability:       Phase-based computational units with tiered execution rules  
 * Requirement:      Declarative expression of dependencies with resolution strategies
 * Provision:        Dynamic providers that satisfy requirements
-* Context:          Scoped information gathering across graph tiers
+* StringMap:          Scoped information gathering across graph tiers
 * Render:           Content projection to representation-agnostic fragments
 * Cursor:           The driver of phased graph traversal and journal updates
 * Resolver:         The system for matching requirements to providers

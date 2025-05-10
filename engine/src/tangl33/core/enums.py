@@ -24,17 +24,29 @@ This module also provides utility methods for iterating through
 tiers in different directions (inwards vs. outwards).
 """
 
-from enum import IntEnum
+from enum import IntEnum, Enum, auto
 
+class Service(Enum):
+    PROVIDER = auto()  # satisfies a requirement, provides a node-like to link
+    CONTEXT = auto()   # provides a map layer
+    GATE = auto()
+    EFFECT = auto()    # mutates graph
+    RENDER = auto()    # provides a list of fragments for the journal
+    CHOICE = auto()    # provides structural edges to further content
+    # todo: CHOICE may be before (redirect), after (continue), or manual selection
+    #       should we call each a different service?
+    # todo: provide a FINALIZE service for bookkeeping, then phase is redundant
+
+# todo: Don't need "phase" anymore?  Use service instead?
 class Phase(IntEnum):
-    """There are 5 phases in handling a step"""
-    GATHER_CONTEXT = 10   # provider should return a context layer
-    CHECK_REDIRECTS = 20  # provider should return an optional edge
-    PROVISION_NEXT = 30   # provider should work in-place on node/graph?
-    APPLY_EFFECTS = 40    # provider should work in-place on node/graph
-    RENDER = 50           # provider should return a list of content fragments?
-    FINALIZE = 60         # provider should work in-place on node/graph
-    CHECK_CONTINUES = 70  # provider should return an optional edge
+    """There are multiple phases in handling a step"""
+    CONTEXT = 10          # context services only
+    REDIRECTS = 15        # todo: remove, this is before choice
+    RESOLVE = 20          # 5 services can register here: provider, gate, before choice, effect, manual choice
+    EFFECTS = 25          # todo: remove, this is effects service at resolve
+    RENDER = 30           # render services only
+    FINALIZE = 40         # 2 services can register here: effect, after choice
+    CONTINUES = 45        # todo: remove, this is after choice
 
 class Tier(IntEnum):
     """
@@ -44,12 +56,12 @@ class Tier(IntEnum):
     a result can be returned earlier.
     """
     PRIORITY = FIRST = 10   # do _before_ the normal phase actions
-    NODE = 20
+    NODE = 20               # graph.node
     ANCESTORS = 30          # active subgraph
-    GRAPH = 40
-    DOMAIN = 50
+    GRAPH = 40              # graph.graph
+    DOMAIN = 50             # graph.domain
     USER = 60
-    GLOBAL = 70
+    GLOBAL = 70             # graph.global_scope
     DEFAULT = LAST = 80     # do _after_ the normal phase actions
 
     @classmethod

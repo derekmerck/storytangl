@@ -4,7 +4,7 @@ from typing import Optional
 
 from ..registry import Registry
 from .node import Node
-from .edge import Edge, EdgeKind, ChoiceTrigger
+from .edge import Edge, EdgeKind, EdgeTrigger
 
 
 class Graph(Registry[Node]):
@@ -18,13 +18,13 @@ class Graph(Registry[Node]):
              kind: EdgeKind,
              *,
              directed: bool | None = None,
-             trigger: ChoiceTrigger | str | None = None,
+             trigger: EdgeTrigger | str | None = None,
              **_locals) -> Edge:
         src_uid = src if isinstance(src, UUID) else src.uid
         dst_uid = dst if isinstance(dst, UUID) else dst.uid
         directed = directed if directed is not None else (kind is not EdgeKind.ASSOCIATION)
         if trigger and isinstance(trigger, str):
-            trigger = ChoiceTrigger[trigger.upper()]
+            trigger = EdgeTrigger[trigger.upper()]
 
         edge = Edge(src_uid=src_uid, dst_uid=dst_uid,
                     kind=kind, trigger=trigger, directed=directed, locals=_locals)

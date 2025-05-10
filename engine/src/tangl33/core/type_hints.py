@@ -11,7 +11,7 @@ This module provides centralized type definitions that enable:
 
 Key type hints include:
 - ProvisionKey: Identifier for resource providers
-- Context: Mapping for variable scopes
+- StringMap: Mapping for variable scopes
 - Predicate: Functions for conditional evaluation
 
 These type definitions bridge the gap between StoryTangl's conceptual
@@ -19,12 +19,21 @@ model and Python's type system, making the codebase more maintainable
 and self-documenting.
 """
 
-from typing import Mapping, Any, Callable
+from typing import Mapping, Any, Callable, Protocol
 
 ProvisionKey = str
 
 # ------------------------------------------------------------
 # Predicates & helper aliases
 # ------------------------------------------------------------
-Context = Mapping[str, Any]
-Predicate = Callable[[Context], bool]          # return True to run
+StringMap = Mapping[str, Any]
+Predicate = Callable[[StringMap], bool]          # return True to run
+
+
+class Scope(Protocol):
+    # service handlers
+    def handler_layer(self): ...   # Returns a callable registry?
+    # provisioning resources
+    def template_layer(self): ...  # Returns?
+    # context data, layer may be a map or a list[map] to be folded into the TierView
+    def local_layer(self, service) -> StringMap | list[StringMap]: ...

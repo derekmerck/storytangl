@@ -8,7 +8,7 @@ class RedirectHandler(Capability):
         return self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.CHECK_REDIRECTS, **meta)
+        super().__init__(phase=Phase.REDIRECTS, **meta)
         self.func = func
 
 def redirect_handler(priority: int = 0, **kw):
@@ -20,7 +20,7 @@ class EffectHandler(Capability):
         self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.APPLY_EFFECTS, **meta)
+        super().__init__(phase=Phase.EFFECTS, **meta)
         self.func = func
 
 # todo: I think we need an effect handler, this should probably be with that.
@@ -34,7 +34,7 @@ class ContinueHandler(Capability):
         return self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.CHECK_CONTINUES, **meta)
+        super().__init__(phase=Phase.CONTINUES, **meta)
         self.func = func
 
 def continue_handler(priority: int = 0, **kw):

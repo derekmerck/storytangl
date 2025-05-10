@@ -3,7 +3,7 @@ from tangl33.core import Capability, HandlerCache, Phase, Tier
 # ---------------------------------------------------------------------------
 # Helpers: lightweight dummy Capability for testing
 # ---------------------------------------------------------------------------
-def make_cap(priority: int, phase: Phase = Phase.GATHER_CONTEXT,
+def make_cap(priority: int, phase: Phase = Phase.CONTEXT,
              tier: Tier = Tier.NODE) -> Capability:
     class DummyCap(Capability):
         def apply(self, *a, **kw):  # pragma: no cover
@@ -38,14 +38,14 @@ def test_priority_sort_descending():
 
 def test_phase_tier_isolation():
     cache = HandlerCache()
-    a = make_cap(priority=1, phase=Phase.GATHER_CONTEXT, tier=Tier.NODE)
+    a = make_cap(priority=1, phase=Phase.CONTEXT, tier=Tier.NODE)
     b = make_cap(priority=1, phase=Phase.RENDER, tier=Tier.NODE)
-    c = make_cap(priority=1, phase=Phase.GATHER_CONTEXT, tier=Tier.GRAPH)
+    c = make_cap(priority=1, phase=Phase.CONTEXT, tier=Tier.GRAPH)
 
     for cap in (a, b, c):
         cache.register(cap)
 
     # Only 'a' matches its exact (phase, tier)
-    assert list(cache.iter_phase(Phase.GATHER_CONTEXT, Tier.NODE)) == [a]
+    assert list(cache.iter_phase(Phase.CONTEXT, Tier.NODE)) == [a]
     # Empty when nothing registered
-    assert list(cache.iter_phase(Phase.APPLY_EFFECTS, Tier.DOMAIN)) == []
+    assert list(cache.iter_phase(Phase.RESOLVE, Tier.DOMAIN)) == []

@@ -2,10 +2,10 @@ import pytest
 from collections import ChainMap
 
 from tangl33.core import Tier, gather,TieredMap
-from tangl33.core.type_hints import Context
+from tangl33.core.type_hints import StringMap
 
 # -----------------------------------------------------------------------------
-# Context gather + iter_ancestors behaviour
+# StringMap gather + iter_ancestors behaviour
 # -----------------------------------------------------------------------------
 def test_iter_ancestors_order(graph):
     child = graph.find_one(label="child")
@@ -26,7 +26,7 @@ def test_gather_merges_layers(graph, cap_cache):
         ContextHandler(lambda *_: {"child_var": 2}, tier=Tier.NODE, owner_uid=child.uid)
     )
 
-    ctx: Context = gather(child, graph, cap_cache, globals={})
+    ctx: StringMap = gather(child, graph, cap_cache, globals={})
     assert isinstance(ctx, ChainMap)  # Actually a TieredContextMap subclass of chainmap
     assert isinstance(ctx, TieredMap)
     assert ctx["root_var"] == 1 and ctx["child_var"] == 2

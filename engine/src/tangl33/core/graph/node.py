@@ -3,9 +3,10 @@ from typing import Any
 from dataclasses import dataclass, field
 
 from ..entity import Entity
+from .scope_mixin import ScopeMixin
 
 @dataclass(kw_only=True)
-class Node(Entity):
+class Node(ScopeMixin, Entity):
     parent_uid: UUID | None = None
 
     def iter_ancestors(self, *, graph):

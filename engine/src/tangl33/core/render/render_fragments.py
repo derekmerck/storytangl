@@ -1,9 +1,9 @@
 from ..enums import Phase, Tier
 from ..runtime.handler_cache import HandlerCache
 from ..render.fragment import Fragment
-from ..type_hints import Context
+from ..type_hints import StringMap
 
-def render_fragments(node, ctx: Context, cap_cache: HandlerCache) -> list[Fragment]:
+def render_fragments(node, ctx: StringMap, cap_cache: HandlerCache) -> list[Fragment]:
     """Run RenderHandlers tier-ordered and collect fragments."""
     frags: list[Fragment] = []
 

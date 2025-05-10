@@ -1,7 +1,7 @@
 from typing import Mapping, Any
 from collections import ChainMap
 
-from ..type_hints import Context
+from ..type_hints import StringMap
 from ..enums import Tier, Phase
 from ..graph import Node, Graph
 from ..runtime import HandlerCache
@@ -38,7 +38,7 @@ def tier_owner(node: Node, graph: Graph, tier: Tier) -> Any:
 
     raise ValueError(f"Unsupported tier {tier}")
 
-def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) -> Context:
+def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) -> StringMap:
     res = TieredMap()
     res.inject(Tier.GLOBAL, globals)
     for tier in Tier:
@@ -51,7 +51,7 @@ def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) 
             effective_tier = tier
 
         for owner in owners:
-            for cap in cap_cache.iter_phase(Phase.GATHER_CONTEXT, effective_tier):
+            for cap in cap_cache.iter_phase(Phase.CONTEXT, effective_tier):
                 if cap.should_run(globals) and cap.owner_uid == owner.uid:
                     layers.append(cap.apply(owner, None, graph, globals))
 

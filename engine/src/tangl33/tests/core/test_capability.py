@@ -40,7 +40,7 @@ def test_res_prov_apply_and_provides():
 
 
 def test_capability_deterministic_sorting():
-    a = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=0)               # GATHER_CONTEXT / NODE / prio 0
+    a = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=0)               # CONTEXT / NODE / prio 0
     b = RedirectHandler(_redirect, tier=Tier.NODE, priority=0)               # CHECK_REDIRECTS / NODE / prio 0
     c = ContextHandler(_ctx_layer, tier=Tier.NODE, priority=10)              # higher priority → before 'a'
 

@@ -56,10 +56,10 @@ class CursorDriver:
 
         # 2. phase loop
         next_edge = (
-            self._run_phase(node, Phase.CHECK_REDIRECTS, ctx)
-            or self._run_phase(node, Phase.APPLY_EFFECTS , ctx)
+            self._run_phase(node, Phase.REDIRECTS, ctx)
+            or self._run_phase(node, Phase.EFFECTS , ctx)
             or self._render_phase(node, ctx)
-            or self._run_phase(node, Phase.CHECK_CONTINUES, ctx)
+            or self._run_phase(node, Phase.CONTINUES, ctx)
         )
 
         # 3. cursor advance
