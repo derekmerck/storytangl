@@ -2,7 +2,7 @@ from uuid import UUID
 import logging
 from typing import Mapping
 
-from .. import TieredMap
+from .. import TierView
 from ..enums import Phase, Tier
 from ..context.gather import gather
 from ..resolver.resolve import resolve
@@ -47,14 +47,16 @@ class CursorDriver:
         if next_edge:
             # 1.5 cursor advance
             self.cursor_uid = next_edge.dst_uid
+            return
 
-        self._render_phase(node, ctx)
+        self._render_phase(node, self.graph, self.domain, ctx)
 
         # 2. phase loop
         next_edge = self._run_phase(node, Phase.FINALIZE, ctx)
         if next_edge:
             # 2.5. cursor advance
             self.cursor_uid = next_edge.dst_uid
+            return
 
         # 3. block on player input or end-state
         pass
@@ -79,8 +81,8 @@ class CursorDriver:
                 if edge:
                     return edge
 
-    def _render_phase(self, node, ctx):
+    def _render_phase(self, node, graph, domain, ctx):
         logger.debug(f"Rendering node {node!r}")
-        frags = render_fragments(node, ctx, self.cap_cache)
+        frags = render_fragments(node, graph, domain, ctx)
         logger.debug(f"Got frags: {frags!r}")
         self.journal.append_fragments(frags)

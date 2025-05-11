@@ -1,7 +1,7 @@
 import pytest
 from collections import ChainMap
 
-from tangl33.core import Tier, gather,TieredMap
+from tangl33.core import Tier, gather,TierView
 from tangl33.core.type_hints import StringMap
 
 # -----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ def test_gather_merges_layers(graph, cap_cache):
 
     ctx: StringMap = gather(child, graph, cap_cache, globals={})
     assert isinstance(ctx, ChainMap)  # Actually a TieredContextMap subclass of chainmap
-    assert isinstance(ctx, TieredMap)
+    assert isinstance(ctx, TierView)
     assert ctx["root_var"] == 1 and ctx["child_var"] == 2
     # child values overshadow ancestor on key clash
     cap_cache.register(

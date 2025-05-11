@@ -5,7 +5,7 @@ from ..type_hints import StringMap
 from ..enums import Tier, Phase
 from ..graph import Node, Graph
 from ..runtime import HandlerCache
-from ..tiered_map import TieredMap
+from ..tier_view import TierView
 
 # ---------------------------------------------------------------------------
 # tier_owner helper
@@ -39,7 +39,7 @@ def tier_owner(node: Node, graph: Graph, tier: Tier) -> Any:
     raise ValueError(f"Unsupported tier {tier}")
 
 def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) -> StringMap:
-    res = TieredMap()
+    res = TierView()
     res.inject(Tier.GLOBAL, globals)
     for tier in Tier:
         layers = []

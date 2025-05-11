@@ -26,7 +26,9 @@ tiers in different directions (inwards vs. outwards).
 
 from enum import IntEnum, Enum, auto
 
-class Service(Enum):
+from tangl33.utils.smart_missing import SmartMissing
+
+class Service(SmartMissing, Enum):
     PROVIDER = auto()  # satisfies a requirement, provides a node-like to link
     CONTEXT = auto()   # provides a map layer
     GATE = auto()
@@ -38,7 +40,7 @@ class Service(Enum):
     # todo: provide a FINALIZE service for bookkeeping, then phase is redundant
 
 # todo: Don't need "phase" anymore?  Use service instead?
-class Phase(IntEnum):
+class Phase(SmartMissing, IntEnum):
     """There are multiple phases in handling a step"""
     GATHER = 10          # context services only
     # REDIRECTS = 15        # todo: remove, this is before choice
@@ -48,7 +50,7 @@ class Phase(IntEnum):
     FINALIZE = 40         # 2 services can register here: effect, after choice
     # CONTINUES = 45        # todo: remove, this is after choice
 
-class Tier(IntEnum):
+class Tier(SmartMissing, IntEnum):
     """
     There are multiple scope tiers in context evaluation.
     Adding a provider for a phase at the 'priority' tier will force first,

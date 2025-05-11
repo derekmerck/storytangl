@@ -1,5 +1,5 @@
 from tangl33.core import Graph, HandlerCache, ProviderRegistry, Journal, CursorDriver, EdgeKind, Domain
-from tangl33.core.graph.edge import ChoiceTrigger
+from tangl33.core.graph.edge import EdgeTrigger
 from tangl33.story import register_base_capabilities
 
 import logging
@@ -28,7 +28,7 @@ def get_player_choice(choices):
 def _collect_choices(graph, node_uid):
     """Return CHOICE edges currently live for *node_uid*."""
     return [e for e in graph.edges_out.get(node_uid, [])
-            if getattr(e, "kind", None) is EdgeKind.CHOICE and e.trigger is ChoiceTrigger.MANUAL]
+            if getattr(e, "kind", None) is EdgeKind.CHOICE and e.trigger is EdgeTrigger.MANUAL]
 
 def run_story(entry_node, graph=None, domain=None):
     """Run a minimal story from the given entry node."""

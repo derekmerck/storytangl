@@ -1,16 +1,19 @@
 from collections import defaultdict
 from uuid import UUID
 from typing import Optional
+from dataclasses import dataclass, field
 
 from ..registry import Registry
+from .scope_mixin import ScopeMixin
+from .domain import Domain
 from .node import Node
 from .edge import Edge, EdgeKind, EdgeTrigger
 
+@dataclass(kw_only=True)
+class Graph(ScopeMixin, Registry[Node]):
 
-class Graph(Registry[Node]):
-
-    edges_out: dict[UUID, list[Edge]] = defaultdict(list)
-    edges_in: dict[UUID, list[Edge]] = defaultdict(list)
+    edges_out: dict[UUID, list[Edge]] = field(default_factory=lambda: defaultdict(list))
+    edges_in: dict[UUID, list[Edge]] = field(default_factory=lambda: defaultdict(list))
 
     def link(self,
              src: Node | UUID,
@@ -41,4 +44,4 @@ class Graph(Registry[Node]):
     def unlink(self, edge: Edge) -> None:
         ...
 
-    domain: Optional['Domain'] = None
+    domain: Optional[Domain] = None

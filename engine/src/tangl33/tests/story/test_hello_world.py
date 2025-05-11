@@ -37,7 +37,7 @@ def test_hello_world():
     assert driver.cursor_uid == entry_uid
 
     print([f.text for f in jour])       # ['Hello, traveller.']
-    assert len(jour) == 1, "journal should have 1 entry"
+    assert len(jour) == 1, f"journal should have 1 entry (jour={[f.text for f in jour]}"
 
     # manually choose the only outgoing edge
     edge = graph.edges_out[entry_uid][0]

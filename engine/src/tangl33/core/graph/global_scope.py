@@ -1,5 +1,30 @@
+from typing import ClassVar, Self
+from dataclasses import dataclass
+
+from .. import Service
+from ..type_hints import StringMap
 from ..entity import Entity
 from .scope_mixin import ScopeMixin
 
-class GlobalScope(Entity, ScopeMixin):
-    ...
+@dataclass(kw_only=True)
+class GlobalScope(ScopeMixin, Entity):
+
+    # Singleton
+    instance: ClassVar = None
+
+    @classmethod
+    def get_instance(cls) -> Self:
+        if not cls.instance:
+            cls.instance = cls()
+        return cls.instance
+
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        if cls.instance is not None:
+            raise RuntimeError()
+        return super().__new__(cls)
+
+    # For domains / global scope, expose .globals as a read-only view
+    @property
+    def globals(self) -> StringMap:
+        return self.locals    # alias, purely semantic

@@ -4,7 +4,7 @@ from .registry import Registry
 from .requirement import Requirement
 from .capability import Capability
 from .exceptions import ProvisionError
-from .tiered_map import TieredMap
+from .tier_view import TierView
 
 from .provision import ProviderCap, Template
 from .runtime import HandlerCache, ProviderRegistry
