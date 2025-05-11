@@ -18,12 +18,12 @@ def test_gather_merges_layers(graph, cap_cache):
     child = graph.find_one(label="child")
 
     # register two dummy context providers, one at each tier
-    from tangl33.core.context.context_handler import ContextHandler
+    from tangl33.core.context.context_cap import ContextCap
     cap_cache.register(
-        ContextHandler(lambda *_: {"root_var": 1}, tier=Tier.NODE, owner_uid=root.uid)
+        ContextCap(lambda *_: {"root_var": 1}, tier=Tier.NODE, owner_uid=root.uid)
     )
     cap_cache.register(
-        ContextHandler(lambda *_: {"child_var": 2}, tier=Tier.NODE, owner_uid=child.uid)
+        ContextCap(lambda *_: {"child_var": 2}, tier=Tier.NODE, owner_uid=child.uid)
     )
 
     ctx: StringMap = gather(child, graph, cap_cache, globals={})
@@ -32,10 +32,10 @@ def test_gather_merges_layers(graph, cap_cache):
     assert ctx["root_var"] == 1 and ctx["child_var"] == 2
     # child values overshadow ancestor on key clash
     cap_cache.register(
-        ContextHandler(lambda *_: {"dup": "root"}, tier=Tier.NODE, owner_uid=root.uid)
+        ContextCap(lambda *_: {"dup": "root"}, tier=Tier.NODE, owner_uid=root.uid)
     )
     cap_cache.register(
-        ContextHandler(lambda *_: {"dup": "child"}, tier=Tier.NODE, owner_uid=child.uid)
+        ContextCap(lambda *_: {"dup": "child"}, tier=Tier.NODE, owner_uid=child.uid)
     )
     ctx = gather(child, graph, cap_cache, globals={})
     assert ctx["dup"] == "child"

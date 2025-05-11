@@ -1,6 +1,6 @@
 import logging
 
-from tangl33.core import EdgeKind, render_handler, Fragment
+from tangl33.core import EdgeKind, render_cap, Fragment
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ def render_str(s: str, **ctx):
     logger.debug( list(ctx.keys()) )
     return j2tmpl.render(ctx)
 
-@render_handler()
+@render_cap()
 def render_text(node, driver, graph, ctx):
     """Render a basic text fragment from node content."""
     logger.debug(f'Rendering text fragment from node {node!r}')
@@ -19,7 +19,7 @@ def render_text(node, driver, graph, ctx):
         s = render_str(node.locals['text'], **ctx)
         return Fragment(node_uid=node.uid, text=s)
 
-@render_handler()
+@render_cap()
 def render_choices(node, driver, graph, ctx):
     """Render available choices from outgoing edges."""
     choices = []

@@ -51,7 +51,7 @@ def gather(node: Node, graph: Graph, cap_cache: HandlerCache, globals: Mapping) 
             effective_tier = tier
 
         for owner in owners:
-            for cap in cap_cache.iter_phase(Phase.CONTEXT, effective_tier):
+            for cap in cap_cache.iter_phase(Phase.GATHER, effective_tier):
                 if cap.should_run(globals) and cap.owner_uid == owner.uid:
                     layers.append(cap.apply(owner, None, graph, globals))
 

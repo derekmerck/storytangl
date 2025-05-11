@@ -1,42 +1,42 @@
 from typing import Callable
 
-from ..enums import Phase, Tier
+from ..enums import Phase, Tier, Service
 from ..capability import Capability
 
-class RedirectHandler(Capability):
+class RedirectCap(Capability):
     def apply(self, node, driver, graph, ctx):  # returns Optional[Edge]
         return self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.REDIRECTS, **meta)
+        super().__init__(phase=Phase.RESOLVE, service=Service.CHOICE, **meta)
         self.func = func
 
-def redirect_handler(priority: int = 0, **kw):
-    def _wrap(fn): return RedirectHandler(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
+def redirect_cap(priority: int = 0, **kw):
+    def _wrap(fn): return RedirectCap(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
     return _wrap
 
-class EffectHandler(Capability):
+class EffectCap(Capability):
     def apply(self, node, driver, graph, ctx):  # mutates state
         self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.EFFECTS, **meta)
+        super().__init__(phase=Phase.RESOLVE, service=Service.EFFECT, **meta)
         self.func = func
 
 # todo: I think we need an effect handler, this should probably be with that.
 
-def effect_handler(priority: int = 0, **kw):
-    def _wrap(fn): return EffectHandler(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
+def effect_cap(priority: int = 0, **kw):
+    def _wrap(fn): return EffectCap(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
     return _wrap
 
-class ContinueHandler(Capability):
+class ContinueCap(Capability):
     def apply(self, node, driver, graph, ctx):  # returns Optional[Edge]
         return self.func(node, driver, graph, ctx)
 
     def __init__(self, func: Callable, **meta):
-        super().__init__(phase=Phase.CONTINUES, **meta)
+        super().__init__(phase=Phase.FINALIZE, service=Service.CHOICE, **meta)
         self.func = func
 
-def continue_handler(priority: int = 0, **kw):
-    def _wrap(fn): return ContinueHandler(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
+def continue_cap(priority: int = 0, **kw):
+    def _wrap(fn): return ContinueCap(fn, tier=kw.get("tier", Tier.NODE), priority=priority)
     return _wrap

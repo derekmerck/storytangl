@@ -40,13 +40,13 @@ class Service(Enum):
 # todo: Don't need "phase" anymore?  Use service instead?
 class Phase(IntEnum):
     """There are multiple phases in handling a step"""
-    CONTEXT = 10          # context services only
-    REDIRECTS = 15        # todo: remove, this is before choice
+    GATHER = 10          # context services only
+    # REDIRECTS = 15        # todo: remove, this is before choice
     RESOLVE = 20          # 5 services can register here: provider, gate, before choice, effect, manual choice
-    EFFECTS = 25          # todo: remove, this is effects service at resolve
+    # EFFECTS = 25          # todo: remove, this is effects service at resolve
     RENDER = 30           # render services only
     FINALIZE = 40         # 2 services can register here: effect, after choice
-    CONTINUES = 45        # todo: remove, this is after choice
+    # CONTINUES = 45        # todo: remove, this is after choice
 
 class Tier(IntEnum):
     """

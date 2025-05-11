@@ -1,9 +1,9 @@
 tangl.core
 ==========
 
-Core architecture for the StoryTangl33 capability-based narrative engine.
+Core architecture for the StoryTangl capability-based narrative engine.
 
-StoryTangl33 reframes interactive fiction as a process of collapsing a latent 
+StoryTangl reframes interactive fiction as a process of collapsing a latent 
 capability-rich graph through a structured resolution protocol:
 
 * **Requirements** pull structure into being from nodes, graphs, and domains
@@ -11,7 +11,7 @@ capability-rich graph through a structured resolution protocol:
 * The **Cursor** iterates phases in a deterministic, auditable fashion
 * A persistent **Journal** stores the narrative as rendered fragments
 
-The StoryTangl33 architecture follows quantum narrative principles where the
+The StoryTangl architecture follows quantum narrative principles where the
 latent story space becomes concrete through observation (traversal) in a way
 that prioritizes local causality over global state.
 
@@ -67,13 +67,13 @@ flowchart RL
     end
 
     subgraph context
-        ContextHandler --> Capability
+        ContextCap --> Capability
         gather --> HandlerCache
         gather --> graph_
     end
 
     subgraph render
-        RenderHandler --> Capability
+        RenderCap --> Capability
         Fragment --> Entity
         Journal --> Fragment
         render_fragments --> Node

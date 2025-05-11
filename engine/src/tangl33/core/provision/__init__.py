@@ -1,2 +1,2 @@
-from .resource_provider import ResourceProvider
+from .provider_cap import ProviderCap
 from .template import Template

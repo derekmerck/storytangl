@@ -1,7 +1,7 @@
 from ..enums import Tier
 from ..requirement import Requirement
 from ..graph import Node, Graph, Edge, EdgeKind
-from ..provision import ResourceProvider
+from ..provision import ProviderCap
 from ..runtime import ProviderRegistry, HandlerCache
 from ..type_hints import StringMap
 from ..context import make_role_injector
@@ -11,7 +11,7 @@ def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cap_cache: HandlerC
     def _find_or_create(req: Requirement,
                         scope_tier: Tier,
                         reg: ProviderRegistry,
-                        ctx: StringMap) -> ResourceProvider | None:
+                        ctx: StringMap) -> ProviderCap | None:
         """Return an existing provider that satisfies *req* or create one."""
         # 1. search outward
         for tier in Tier.range_inwards(scope_tier):  # NODE → … → GLOBAL

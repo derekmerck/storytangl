@@ -1,20 +1,15 @@
 # setup basic handlers and providers
-from tangl33.core.context.context_handler import context_handler
-from tangl33.core.render.render_handler   import render_handler
-from tangl33.core.cursor.step_handlers    import (
-    redirect_handler, continue_handler, effect_handler
+from tangl33.core.context.context_cap import context_cap
+from tangl33.core.render.render_cap   import render_cap
+from tangl33.core.cursor.step_caps    import (
+    redirect_cap, continue_cap, effect_cap
 )
 from tangl33.core.render.fragment import Fragment
 from tangl33.core.graph.edge import EdgeKind, Edge, EdgeTrigger
 
 from .renderers import render_text, render_choices
 
-# @render_handler()                     # Phase.RENDER @ Tier.NODE
-# def render_text(node, *_):
-#     if "text" in node.locals:
-#         return Fragment(text=node.locals["text"], node_uid=node.uid)
-
-@continue_handler()
+@continue_cap()
 def auto_continue(node, driver, graph, ctx):
     # auto-advance if exactly one CHOICE edge
     choices = [e for e in graph.edges_out.get(node.uid, [])

@@ -34,7 +34,8 @@ collections = {
     # "overview": (["docs/overview-ext"], [])
 }
 
-file_exts = [".py", ".toml", ".md", ".rst"]
+file_exts = [".py"]
+# file_exts = [".py", ".toml", ".md", ".rst"]
 
 MINIFY = False
 STRIP = True

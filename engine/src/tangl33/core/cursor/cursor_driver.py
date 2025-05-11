@@ -41,33 +41,23 @@ class CursorDriver:
 
         ctx = gather(node, self.graph, self.cap_cache, self.globals)
 
-        # from ..provision import Template
-        # templates = TieredMap[Template]()
-        # templates.inject(Tier.DOMAIN, self.domain.get_templates())
-        #
-        # from ..capability import Capability
-        # cap_cache = TieredMap[Capability]()
-        # cap_cache.inject(Tier.GLOBAL, self.cap_cache)
-
-        # ctx['templates'] = self.domain.get_templates()
-
         # 1. resolve unmet requirements (may mutate graph)
-        resolve(node, self.graph, self.prov_reg, self.cap_cache, ctx)
+        next_edge = resolve(node, self.graph, self.prov_reg, self.cap_cache, ctx)
+
+        if next_edge:
+            # 1.5 cursor advance
+            self.cursor_uid = next_edge.dst_uid
+
+        self._render_phase(node, ctx)
 
         # 2. phase loop
-        next_edge = (
-            self._run_phase(node, Phase.REDIRECTS, ctx)
-            or self._run_phase(node, Phase.EFFECTS , ctx)
-            or self._render_phase(node, ctx)
-            or self._run_phase(node, Phase.CONTINUES, ctx)
-        )
-
-        # 3. cursor advance
+        next_edge = self._run_phase(node, Phase.FINALIZE, ctx)
         if next_edge:
+            # 2.5. cursor advance
             self.cursor_uid = next_edge.dst_uid
-        else:
-            # block on player input or end-state
-            pass
+
+        # 3. block on player input or end-state
+        pass
 
     # -----------------------------------------------------------------
     # helpers

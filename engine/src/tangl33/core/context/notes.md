@@ -21,5 +21,5 @@ decisions (redirects, rendering, etc.) will operate.
 
 See Also
 --------
-ContextHandler: Capability for providing context layers
+ContextCap: Capability for providing context layers
 gather: Core algorithm for context assembly

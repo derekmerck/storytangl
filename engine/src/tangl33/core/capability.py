@@ -4,7 +4,7 @@ tangl.core.capability
 
 Executable behavior units with phased, tiered execution semantics.
 
-Capabilities are the primary extension mechanism in StoryTangl33,
+Capabilities are the primary extension mechanism in StoryTangl,
 representing discrete behaviors that execute during specific phases
 of graph traversal. Key features include:
 
@@ -26,7 +26,7 @@ flexibility for authors and developers.
 
 See Also
 --------
-context_handler, render_handler, redirect_handler, continue_handler:
+context_cap, render_cap, redirect_handler, continue_handler:
     Decorator factories for common capability types
 """
 
@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
-from .enums import Phase, Tier
+from .enums import Phase, Tier, Service
 from .type_hints import Predicate, StringMap
 
 if TYPE_CHECKING:
@@ -47,15 +47,16 @@ if TYPE_CHECKING:
 @dataclass(kw_only=True)
 class Capability:
     """
-    A single scheduled unit of work.
+    A single scheduled unit of service work for a given phase and tier
 
     Order is **deterministic across phases / tiers** and
     **priority-sorted within the same phase/tier**.
     """
     phase: Phase
     tier: Tier
+    service: Service
     priority: int = 0
-    predicate: Predicate = lambda ctx: True
+    predicate: Predicate = lambda ctx: True  # ctx should satisfy the predicate
     owner_uid: UUID = None  # points back to registering provider, but avoids import
 
     # -----------------------------------------------------------------
@@ -66,12 +67,13 @@ class Capability:
 
     def apply(self, node: Node, driver, graph: Graph, ctx: StringMap) -> Any:
         """
-        Sub-classes override.  Return type depends on phase:
-        * CONTEXT   →  Mapping layer
-        * CHECK_REDIRECTS  →  Optional[Edge]
-        * APPLY_EFFECTS    →  None
+        Sub-classes override.  Return type depends on service type:
+        * PROVIDER         -> New node to link as a provider
+        * CONTEXT          →  Mapping layer
+        * CHOICE           →  Optional[Edge]
+        * GATE             → ?
+        * EFFECTS          →  None
         * RENDER           →  list[Fragment]
-        * CHECK_CONTINUES  →  Optional[Edge]
         """
         raise NotImplementedError
 
@@ -80,8 +82,8 @@ class Capability:
     # -----------------------------------------------------------------
 
     def _sort_key(self):
-        """(phase, tier, -priority)  → deterministic ascending"""
-        return (self.phase, self.tier, -self.priority)
+        """(phase, tier, service, -priority)  → deterministic ascending"""
+        return (self.phase, self.tier, self.service, -self.priority)
 
     def __lt__(self, other: Capability):
         return self._sort_key() < other._sort_key()

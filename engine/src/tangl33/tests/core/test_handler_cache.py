@@ -1,14 +1,14 @@
-from tangl33.core import Capability, HandlerCache, Phase, Tier
+from tangl33.core import Capability, HandlerCache, Phase, Tier, Service
 
 # ---------------------------------------------------------------------------
 # Helpers: lightweight dummy Capability for testing
 # ---------------------------------------------------------------------------
-def make_cap(priority: int, phase: Phase = Phase.CONTEXT,
+def make_cap(priority: int, phase: Phase = Phase.GATHER,
              tier: Tier = Tier.NODE) -> Capability:
     class DummyCap(Capability):
         def apply(self, *a, **kw):  # pragma: no cover
             pass
-    return DummyCap(phase=phase, tier=tier, priority=priority)
+    return DummyCap(phase=phase, tier=tier, service=Service.CONTEXT, priority=priority)
 
 
 # ---------------------------------------------------------------------------
@@ -38,14 +38,14 @@ def test_priority_sort_descending():
 
 def test_phase_tier_isolation():
     cache = HandlerCache()
-    a = make_cap(priority=1, phase=Phase.CONTEXT, tier=Tier.NODE)
+    a = make_cap(priority=1, phase=Phase.GATHER, tier=Tier.NODE)
     b = make_cap(priority=1, phase=Phase.RENDER, tier=Tier.NODE)
-    c = make_cap(priority=1, phase=Phase.CONTEXT, tier=Tier.GRAPH)
+    c = make_cap(priority=1, phase=Phase.GATHER, tier=Tier.GRAPH)
 
     for cap in (a, b, c):
         cache.register(cap)
 
     # Only 'a' matches its exact (phase, tier)
-    assert list(cache.iter_phase(Phase.CONTEXT, Tier.NODE)) == [a]
+    assert list(cache.iter_phase(Phase.GATHER, Tier.NODE)) == [a]
     # Empty when nothing registered
     assert list(cache.iter_phase(Phase.RESOLVE, Tier.DOMAIN)) == []

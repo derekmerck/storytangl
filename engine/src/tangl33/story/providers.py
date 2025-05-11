@@ -1,4 +1,4 @@
-from tangl33.core import ProvisionError, ResourceProvider, Tier
+from tangl33.core import ProvisionError, ProviderCap, Tier
 
 class CharacterStrategy:
     """Strategy for creating/selecting character nodes."""
@@ -31,7 +31,7 @@ class CharacterStrategy:
         graph.add(node)
 
         # wrap the node in a provider-cap and register that
-        cap = ResourceProvider(
+        cap = ProviderCap(
             owner_uid=node.uid,
             provides={"character"},
             tier=Tier.GRAPH

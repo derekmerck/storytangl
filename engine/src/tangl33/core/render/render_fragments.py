@@ -4,7 +4,7 @@ from ..render.fragment import Fragment
 from ..type_hints import StringMap
 
 def render_fragments(node, ctx: StringMap, cap_cache: HandlerCache) -> list[Fragment]:
-    """Run RenderHandlers tier-ordered and collect fragments."""
+    """Run RenderCaps tier-ordered and collect fragments."""
     frags: list[Fragment] = []
 
     for tier in Tier.range_inwards(Tier.NODE):          # NODE → GLOBAL

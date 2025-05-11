@@ -1,2 +1,2 @@
 from .cursor_driver import CursorDriver
-from .step_handlers import RedirectHandler, redirect_handler, ContinueHandler, continue_handler, EffectHandler, effect_handler
+from .step_caps import RedirectCap, redirect_cap, ContinueCap, continue_cap, EffectCap, effect_cap
