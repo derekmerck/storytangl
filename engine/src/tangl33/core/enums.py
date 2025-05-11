@@ -29,26 +29,21 @@ from enum import IntEnum, Enum, auto
 from tangl33.utils.smart_missing import SmartMissing
 
 class Service(SmartMissing, Enum):
-    PROVIDER = auto()  # satisfies a requirement, provides a node-like to link
-    CONTEXT = auto()   # provides a map layer
+    PROVIDER = auto()  # creates a node/tree that satisfies a requirement, provides a new node-like to link
+    TEMPLATE = auto()  # provides templates to meet requirements, sub-service for provider
+    CONTEXT = auto()   # provides a layered context map
     GATE = auto()
     EFFECT = auto()    # mutates graph
     RENDER = auto()    # provides a list of fragments for the journal
-    CHOICE = auto()    # provides structural edges to further content
-    # todo: CHOICE may be before (redirect), after (continue), or manual selection
-    #       should we call each a different service?
-    # todo: provide a FINALIZE service for bookkeeping, then phase is redundant
+    CHOICE = auto()    # provides structural edges to further content, user trigger:before or trigger:after to auto-follow
 
 # todo: Don't need "phase" anymore?  Use service instead?
 class Phase(SmartMissing, IntEnum):
     """There are multiple phases in handling a step"""
     GATHER = 10          # context services only
-    # REDIRECTS = 15        # todo: remove, this is before choice
-    RESOLVE = 20          # 5 services can register here: provider, gate, before choice, effect, manual choice
-    # EFFECTS = 25          # todo: remove, this is effects service at resolve
+    RESOLVE = 20          # 5 services can register here: builder, gate, before choice, effect
     RENDER = 30           # render services only
     FINALIZE = 40         # 2 services can register here: effect, after choice
-    # CONTINUES = 45        # todo: remove, this is after choice
 
 class Tier(SmartMissing, IntEnum):
     """
@@ -57,17 +52,17 @@ class Tier(SmartMissing, IntEnum):
     adding at the 'default' tier will run it last or possibly not at all, if
     a result can be returned earlier.
     """
-    PRIORITY = FIRST = 10   # do _before_ the normal phase actions
+    PRIORITY = FIRST = 10   # do _before_ the normal scope actions
     NODE = 20               # graph.node
     ANCESTORS = 30          # active subgraph
     GRAPH = 40              # graph.graph
     DOMAIN = 50             # graph.domain
     USER = 60
     GLOBAL = 70             # graph.global_scope
-    DEFAULT = LAST = 80     # do _after_ the normal phase actions
+    DEFAULT = LAST = 80     # do _after_ the normal scope actions
 
     @classmethod
-    def range_inwards(cls, start: "Tier | int | None" = None):
+    def range_outwards(cls, start: "Tier | int | None" = None):
         """
         Return tiers from *inner* to *outer* (NODE → … → GLOBAL).
         If *start* is given, begin at that tier (inclusive).
@@ -82,7 +77,7 @@ class Tier(SmartMissing, IntEnum):
             return tiers
 
     @classmethod
-    def range_outwards(cls, start: "Tier | int | None" = None):
+    def range_inwards(cls, start: "Tier | int | None" = None):
         """
         Return tiers from *outer* to *inner* (GLOBAL → … → NODE).
         If *start* is given, begin at that tier (inclusive).

@@ -20,7 +20,7 @@ class EdgeTrigger(Enum):
 
 class EdgeState(Enum):
     LATENT = auto()
-    RESERVED = auto()
+    RESOLVED = auto()
     OPEN = auto()
     VISITED = auto()
 

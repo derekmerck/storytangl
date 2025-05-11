@@ -24,7 +24,11 @@ class Graph(ScopeMixin, Registry[Node]):
              trigger: EdgeTrigger | str | None = None,
              **_locals) -> Edge:
         src_uid = src if isinstance(src, UUID) else src.uid
+        if src_uid not in self:
+            raise RuntimeError(f"Tried to link, but source node {src_uid} not in graph")
         dst_uid = dst if isinstance(dst, UUID) else dst.uid
+        if dst_uid not in self:
+            raise RuntimeError(f"Tried to link but destination node {dst_uid} not in graph")
         directed = directed if directed is not None else (kind is not EdgeKind.ASSOCIATION)
         if trigger and isinstance(trigger, str):
             trigger = EdgeTrigger[trigger.upper()]
@@ -43,5 +47,3 @@ class Graph(ScopeMixin, Registry[Node]):
 
     def unlink(self, edge: Edge) -> None:
         ...
-
-    domain: Optional[Domain] = None

@@ -31,7 +31,7 @@ def create_sample_story():
 
     # Create domain with templates
     domain = Domain()
-    domain.templates["villager"] = Template(
+    domain._templates["villager"] = Template(
         provides={"character"},
         build=lambda params: StoryNode(
             label="villager",

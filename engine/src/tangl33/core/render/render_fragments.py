@@ -7,7 +7,7 @@
 #     """Run RenderCaps tier-ordered and collect fragments."""
 #     frags: list[Fragment] = []
 #
-#     for tier in Tier.range_inwards(Tier.NODE):          # NODE → GLOBAL
+#     for tier in Tier.range_outwards(Tier.NODE):          # NODE → GLOBAL
 #         for cap in cap_cache.iter_phase(Phase.RENDER, tier):
 #             # ── run NODE-tier handlers bound to *this* node
 #             #    and any handler whose owner_uid == None (global renderer)
@@ -41,7 +41,7 @@ def render_fragments(node, graph, domain, ctx) -> list[Fragment]:
     frags: list[Fragment] = []
 
     # --------------------------------------------------------- 2. iterate by tier precedence
-    for tier in Tier.range_inwards(Tier.NODE):          # NODE → GLOBAL
+    for tier in Tier.range_outwards(Tier.NODE):          # NODE → GLOBAL
         layer = handlers._get_layer(tier)               # helper: returns the mapping for that tier
         if not layer:
             continue

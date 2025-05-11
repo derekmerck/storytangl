@@ -63,6 +63,9 @@ class Registry(dict, Generic[EntityT]):
     def get(self, key: UUID) -> Optional[EntityT]:
         return self.data.get(key)
 
+    def __getitem__(self, key: UUID) -> Optional[EntityT]:
+        return self.data.get(key)
+
     def __contains__(self, key: UUID) -> bool:
         return key in self.data
 

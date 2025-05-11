@@ -14,7 +14,7 @@ def test_hello_world():
         b = Node(label="B", locals={"text": "You reach the village."})
         c = Node(label="C", locals={"text": "You look around for an inn."})
 
-        g = Graph(); g.add_all(a, b)
+        g = Graph(); g.add_all(a, b, c)
         g.link(a, b, EdgeKind.CHOICE, label="→ Continue")
         g.link(b, c, EdgeKind.CHOICE, trigger="after")
 

@@ -11,5 +11,5 @@ def make_role_injector(node_uid, requirement, provider_uid, slot_index=0):
 
     # owner_uid = node that issued the requirement, tier = NODE
     return ContextCap(layer,
-                          tier=Tier.NODE,
-                          owner_uid=node_uid)
+                      tier=Tier.NODE,
+                      owner_uid=node_uid)

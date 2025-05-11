@@ -14,7 +14,7 @@ def resolve(node: Node, graph: Graph, reg: ProviderRegistry, cap_cache: HandlerC
                         ctx: StringMap) -> ProviderCap | None:
         """Return an existing provider that satisfies *req* or create one."""
         # 1. search outward
-        for tier in Tier.range_inwards(scope_tier):  # NODE → … → GLOBAL
+        for tier in Tier.range_outwards(scope_tier):  # NODE → … → GLOBAL
             for prov in reg.providers(req.key, tier):
                 if prov.predicate(ctx) and req.strategy.select(prov, req, ctx):
                     return prov
