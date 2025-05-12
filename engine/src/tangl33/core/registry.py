@@ -12,9 +12,7 @@ objects with enhanced retrieval options:
 - Type safety via generic parameters
 - Composition over inheritance for extensibility
 
-The Registry underpins the core StoryTangl graph management,
-supporting specialized variants like ProviderRegistry
-that index based on multiple dimensions.
+The Registry underpins the core StoryTangl graph management.
 
 This component is foundational as it enables decoupling between
 storage patterns and retrieval logic, letting capabilities

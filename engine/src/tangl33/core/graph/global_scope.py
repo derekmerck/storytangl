@@ -1,7 +1,6 @@
 from typing import ClassVar, Self
 from dataclasses import dataclass
 
-from .. import Service
 from ..type_hints import StringMap
 from ..entity import Entity
 from .scope_mixin import ScopeMixin
@@ -24,7 +23,7 @@ class GlobalScope(ScopeMixin, Entity):
             raise RuntimeError()
         return super().__new__(cls)
 
-    # For domains / global scope, expose .globals as a read-only view
-    @property
-    def globals(self) -> StringMap:
-        return self.locals    # alias, purely semantic
+    # # For domains / global scope, expose locals as r/o globals
+    # @property
+    # def globals(self) -> StringMap:
+    #     return self.locals    # alias, purely semantic

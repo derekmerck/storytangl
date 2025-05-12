@@ -19,11 +19,15 @@ def gather_context(node, graph, domain) -> StringMap:
         GLOBAL=GlobalScope.get_instance().local_layer()
     )
 
+    return ctx_view
+
     # ---------------------------------------------------------
     # 2. walk tiers inner→outer, merging dicts
     layers = []
     for tier in Tier.range_outwards(Tier.NODE):
-        # todo: Should we use context_caps instead?
+        # todo: I feel like we should use context_caps here and update the base ctx.
+        #       There is no particular reason to just re-write the ctx-view like this, I think?
+        #       Originally not done with a cap b/c of bootstrapping, but now ctx is independent of handlers
         layers.append(ctx_view._get_layer(tier))
     # _earlier_ tiers closer to the origin win
     return ChainMap(*layers)  # plain dict for speed

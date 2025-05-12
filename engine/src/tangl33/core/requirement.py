@@ -24,14 +24,17 @@ embodying the "quantum narrative" metaphor.
 See Also
 --------
 resolver: System for matching requirements to providers
-ResourceProvider: The capability that fulfills requirements
 """
-
+from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Dict, Protocol, runtime_checkable
+from typing import Any, Mapping, Dict, Protocol, runtime_checkable, TYPE_CHECKING
 
+from .type_hints import StringMap, ProvisionKey
 from .enums import Tier
 from .exceptions import ProvisionError
+
+if TYPE_CHECKING:
+    from .provision import ProviderCap
 
 
 # ------------------------------------------------------------
@@ -39,25 +42,25 @@ from .exceptions import ProvisionError
 # ------------------------------------------------------------
 @runtime_checkable
 class Strategy(Protocol):
-    def create(self, req: "Requirement", ctx: Mapping[str, Any]):
+    def create(self, req: Requirement, ctx: StringMap):
         """Instantiate a new ProvisionCap when no existing provider matches."""
 
-    def select(self, prov, req: "Requirement", ctx: Mapping[str, Any]) -> bool:
+    def select(self, prov, req: Requirement, ctx: StringMap) -> bool:
         """Return True if *prov* satisfies *req* in the current context."""
 
 
 # built-in “direct” strategy
 class DirectStrategy:
-    def create(self, req: "Requirement", ctx):
+    def create(self, req: Requirement, ctx: StringMap):
         raise ProvisionError(f"No provider for {req.key!r}")
 
     # A direct match accepts the first provider whose advertised key matches
     # and whose params (if any) are a superset of the requirement params.
-    def select(self, prov, req: "Requirement", ctx):
+    def select(self, prov: 'ProviderCap', req: Requirement, ctx):
         if req.key not in getattr(prov, "provides", ()):
             return False
         if req.criteria:
-            if not prov.matches(req.criteria):
+            if not prov.matches(**req.criteria):
                 return False
         return True
 
@@ -73,11 +76,11 @@ class Requirement:
     • **params**    – opaque dict passed to predicates / factories
     • **tier**      – where the *requester* sits (defaults to its node)
     """
-    key: str
+    key: ProvisionKey
     strategy: Strategy = DirectStrategy()
-    params: Dict[str, Any] = field(default_factory=dict)
-    criteria: Dict[str, Any] = field(default_factory=dict)
-    tier: Tier = Tier.NODE
+    params: StringMap = field(default_factory=dict)
+    criteria: StringMap = field(default_factory=dict)
+    tier: Tier = Tier.NODE  # Scope to evaluate within
 
     # hash / eq let us memoise during recursive resolution
     def __hash__(self): return hash((self.key, frozenset(self.params.items()), self.tier))

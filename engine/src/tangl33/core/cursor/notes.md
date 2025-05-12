@@ -18,5 +18,4 @@ through capability injection.
 
 See Also
 --------
-redirect_handler, effect_handler, continue_handler: 
-    Specialized capability factories for cursor phases
+EffectCap: Specialized capability factories for the EFFECT service

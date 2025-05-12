@@ -9,7 +9,7 @@ from ..render.journal import Journal
 from ..tier_view import TierView
 from ..graph import Graph, EdgeKind, EdgeTrigger, EdgeState, GlobalScope, Domain
 from ..context.gather_context import gather_context
-from ..resolve.resolve_requirements import resolve_requirements
+from ..provision.resolve_requirements import resolve_requirements
 
 logger = logging.getLogger(__name__)
 

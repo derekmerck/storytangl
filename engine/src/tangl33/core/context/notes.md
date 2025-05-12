@@ -15,11 +15,11 @@ This implementation uses ChainMap for efficient layered access,
 and provides a clear protocol for how information shadows across
 scope boundaries.
 
-StringMap gathering occurs at the beginning of traversal,
+Context gathering occurs at the beginning of traversal,
 establishing the environment in which all subsequent phase
 decisions (redirects, rendering, etc.) will operate.
 
 See Also
 --------
-ContextCap: Capability for providing context layers
-gather: Core algorithm for context assembly
+ContextCap: Capability for providing layers to the CONTEXT service
+gather_context: Core algorithm for context assembly

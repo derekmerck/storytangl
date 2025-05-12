@@ -27,7 +27,7 @@ flexibility for authors and developers.
 See Also
 --------
 context_cap, render_cap, redirect_handler, continue_handler:
-    Decorator factories for common capability types
+    Decorator factories for service capabilities
 """
 
 from __future__ import annotations
@@ -59,6 +59,8 @@ class Capability:
     predicate: Predicate = lambda ctx: True  # ctx should satisfy the predicate
     owner_uid: UUID = None  # points back to registering provider, but avoids import
 
+    # Note, only PROVIDER capabilities need provision keys, b/c only PROVIDERS match requirements
+
     # -----------------------------------------------------------------
     # core API
     # -----------------------------------------------------------------
@@ -76,6 +78,8 @@ class Capability:
         * RENDER           →  list[Fragment]
         """
         raise NotImplementedError
+
+    # todo: Should gating be in here?
 
     # -----------------------------------------------------------------
     # rich comparison for heap / sort() stability

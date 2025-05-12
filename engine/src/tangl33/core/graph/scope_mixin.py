@@ -11,10 +11,12 @@ if TYPE_CHECKING:
 
 @dataclass(kw_only=True)
 class ScopeMixin:
-    # ---------------------------------------------------------------------  locals (Context layer)
+    # ---------------------------------------------------------------------
+    # locals (Context layer)
     locals: StringMap = field(default_factory=dict, metadata=dict(service=Service.CONTEXT))
 
-    # ---------------------------------------------------------------------  private service dicts
+    # ---------------------------------------------------------------------
+    # private service dicts
     _handlers: dict[Service, list] = field(
         default_factory=lambda: defaultdict(list), init=False, repr=False
     )
@@ -22,7 +24,8 @@ class ScopeMixin:
         default_factory=dict, init=False, repr=False
     )
 
-    # ---------------------------------------------------------------------  public accessors (Scope protocol)
+    # ---------------------------------------------------------------------
+    # public accessors (Scope protocol)
     def handler_layer(self, service: Service | str) -> list:
         """
         Return **this scope’s** capability list for the given service.

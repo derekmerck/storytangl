@@ -20,3 +20,7 @@ explicit while keeping the core data structure lightweight.
 
 Unlike traditional property graphs, StoryTangl's graph is designed
 specifically for phased traversal driven by the cursor system.
+
+See Also
+--------
+RedirectCap, ContinueCap: Specialized capability factories for the Choice service

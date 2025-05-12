@@ -1,16 +1,13 @@
 # setup basic handlers and providers
-from tangl33.core.context.context_cap import context_cap
-from tangl33.core.render.render_cap   import render_cap
-from tangl33.core.cursor.step_caps    import redirect_cap, continue_cap, effect_cap
-from tangl33.core.render.fragment import Fragment
-from tangl33.core.graph.edge import EdgeKind, Edge, EdgeTrigger
+from tangl33.core.type_hints import StringMap
+from tangl33.core import context_cap, render_cap, effect_cap, redirect_cap, continue_cap, EdgeKind, Edge, EdgeTrigger, Node, Graph, Domain
 
 from .renderers import render_text, render_choices
 from ..core.graph import GlobalScope
 
 
 @continue_cap()
-def auto_continue(node, driver, graph, ctx):
+def auto_continue(node: Node, driver, graph: Graph, ctx: StringMap):
     # auto-advance if exactly one CHOICE edge
     choices = [e for e in graph.edges_out.get(node.uid, [])
                if e.kind is EdgeKind and e.trigger is EdgeTrigger.AFTER]

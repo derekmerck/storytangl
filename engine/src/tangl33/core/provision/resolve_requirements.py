@@ -1,13 +1,39 @@
-import logging
+"""
+tangl.core.resolve
+===================
 
+Resolution system for matching requirements to suitable providers.
+
+The resolver is the algorithmic heart of StoryTangl's dynamic narrative
+generation, implementing a sophisticated matching protocol:
+
+1. Start with a node's requirements
+2. Search for matching providers in increasingly broader scopes
+3. For each scope, check all providers against requirement criteria
+4. When a match is found, create any necessary graph connections
+5. If no match exists, attempt dynamic creation through strategies
+
+This process embodies the "quantum collapse" of the story space, where
+potential story elements only become concrete when needed by the
+current narrative path.
+"""
+from __future__ import annotations
+from uuid import UUID
+import logging
+from typing import TYPE_CHECKING
+
+from ..type_hints import StringMap
 from ..enums import Service, Tier
 from ..tier_view import TierView
-from ..graph import GlobalScope, EdgeKind, EdgeState, EdgeTrigger, Node
+from ..graph import GlobalScope, EdgeKind, EdgeState, EdgeTrigger, Node, Graph, Domain
+
+if TYPE_CHECKING:
+    from ..requirement import Requirement
 
 logger = logging.getLogger(__name__)
 
-
-def resolve_requirements(node, graph, domain, ctx):
+# todo: this is a nice, consistent interface, but what if we want to use additional scopes, like a user level scope with custom providers for achievements?
+def resolve_requirements(node: Node, graph: Graph, domain: Domain, ctx: StringMap):
     logger.debug(f"Resolving node {node!r}")
 
     # ---------------------------------------------------------
@@ -45,7 +71,9 @@ def resolve_requirements(node, graph, domain, ctx):
             next_edge = edge
             break
 
-def _resolve_target(uid, graph, providers, templates, ctx, depth=1):
+# todo: should this take node, graph, domain?  There might be a domain level provider...
+# todo: type_hint providers, templates as generic TierView[list[Provider]]??
+def _resolve_target(uid: UUID, graph: Graph, provider_view, template_view, ctx: StringMap, depth=1):
 
     # ---------- target missing?  ----------
     if uid not in graph:
@@ -54,9 +82,9 @@ def _resolve_target(uid, graph, providers, templates, ctx, depth=1):
     # trivial depth-first resolver (1 hop)
     tgt = graph[uid]
     for req in getattr(tgt, "requires", []):
-        prov = _find_provider(req, graph, providers, ctx)
+        prov = _find_provider(req, graph, provider_view, ctx)
         if not prov:
-            prov = _build_from_template(req, graph, templates, ctx)
+            prov = _build_from_template(req, graph, template_view, ctx)
             if prov is not None:
                 graph.add(prov)
         if prov:
@@ -72,14 +100,14 @@ def _resolve_target(uid, graph, providers, templates, ctx, depth=1):
             return False
     return True
 
-def _find_provider(req, graph, provider_view, ctx):
+def _find_provider(req: Requirement, graph: Graph, provider_view, ctx: StringMap):
     for tier in Tier.range_outwards(Tier.NODE):
         for prov in provider_view._get_layer(tier):
             if prov.provides(req) and req.strategy.select(prov, req, ctx):
                 return prov
     return None
 
-def _build_from_template(req, graph, template_view, ctx):
+def _build_from_template(req: Requirement, graph: Graph, template_view, ctx: StringMap):
     for tier in Tier.range_outwards(Tier.NODE):
         for tpl in template_view._get_layer(tier).values():
             if req.key in tpl.provides:

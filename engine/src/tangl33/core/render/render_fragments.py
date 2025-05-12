@@ -1,9 +1,10 @@
+from ..type_hints import StringMap
 from ..tier_view  import TierView
 from ..enums      import Tier, Service
-from ..graph      import GlobalScope
+from ..graph      import GlobalScope, Node, Graph, Domain
 from .fragment    import Fragment
 
-def render_fragments(node, graph, domain, ctx) -> list[Fragment]:
+def render_fragments(node: Node, graph: Graph, domain: Domain, ctx: StringMap) -> list[Fragment]:
     # ---------------------------------------------------------
     # 1. compose view
     handlers = TierView.compose(
