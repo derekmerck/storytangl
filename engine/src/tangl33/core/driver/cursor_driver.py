@@ -3,16 +3,17 @@ import logging
 from collections import ChainMap
 
 from ..type_hints import StringMap
-from ..enums import Phase, Tier, Service
+from ..enums import CoreScope, CoreService
 from ..tier_view import TierView
 
-from ..render.journal import Journal
-from ..graph import Graph, EdgeKind, EdgeTrigger, EdgeState, GlobalScope, Domain
+from ..graph import Graph, EdgeKind, EdgeTrigger, EdgeState
+from ..scope import GlobalScope, Domain
 
 # Phase helpers
-from ..context.gather_context import gather_context
-from ..provision.resolve_requirements import resolve_requirements
-from ..render.render_fragments import render_fragments
+from ..service.context.gather_context import gather_context
+from ..service.provision.resolve_requirements import resolve_requirements
+from ..service.render import Journal
+from ..service.render.render_fragments import render_fragments
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ class CursorDriver:
         # -------------------
         next_edge = self._run_finalize_phase(node, self.graph, self.domain, ctx)
         # todo: this is stubbed out, why are we changing the interface here and trying to
-        #       use a multi-service tier view?
+        #       use a multi-service CoreScope view?
         # todo: run after-effect phase
         if next_edge:
             # 2.5. cursor advance
@@ -84,11 +85,11 @@ class CursorDriver:
 
     def _run_gate_phase(self, node, handlers_view, ctx):
         # 1) run GATE caps (stat predicates, etc.)
-        for tier in Tier.range_outwards(Tier.NODE):
-            for cap in handlers_view.iter_layer(tier):
-                if cap.service is not Service.GATE:
+        for scope in CoreScope.range_outwards(CoreScope.NODE):
+            for cap in handlers_view.iter_layer(scope):
+                if cap.service is not CoreService.GATE:
                     continue
-                if tier is Tier.NODE and cap.owner_uid not in (None, node.uid):
+                if scope is CoreScope.NODE and cap.owner_uid not in (None, node.uid):
                     continue
                 cap.apply(node, self, self.graph, ctx)
 
@@ -104,8 +105,8 @@ class CursorDriver:
         # -> call after effects (bookkeeping)
         # -> find satisfied after choices and optional short circuit
         # AFTER-Choice selection
-        for tier in Tier.range_outwards(Tier.NODE):
-            for cap in handlers_view.iter_layer(tier):
+        for CoreScope in CoreScope.range_outwards(CoreScope.NODE):
+            for cap in handlers_view.iter_layer(CoreScope):
                 if (cap.service is Service.CHOICE and
                     cap.trigger is EdgeTrigger.AFTER and
                     cap.predicate(ctx)):

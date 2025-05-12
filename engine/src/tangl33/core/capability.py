@@ -9,14 +9,14 @@ representing discrete behaviors that execute during specific phases
 of graph traversal. Key features include:
 
 - Phase-targeted execution (context gathering, rendering, etc.)
-- Tier-based scope control (node-local, graph-wide, etc.)
-- Priority-based ordering within phase/tier combinations
+- CoreScope-based scope control (node-local, graph-wide, etc.)
+- Priority-based ordering within phase/CoreScope combinations
 - Conditional activation through predicates
 - Owner-based filtering for node-specific behaviors
 
 This design enables a clean separation between:
 - WHAT happens (the capability implementation)
-- WHEN it happens (phase, tier, priority)
+- WHEN it happens (phase, CoreScope, priority)
 - WHERE it happens (owner node)
 - IF it happens (predicate)
 
@@ -35,11 +35,11 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
-from .enums import Phase, Tier, Service
+from .enums import CoreScope, CoreService
 from .type_hints import Predicate, StringMap
 
 if TYPE_CHECKING:
-    from .graph import Node, Graph
+    from .scope import Node, Graph
 
 # ------------------------------------------------------------
 # Capability base
@@ -47,14 +47,14 @@ if TYPE_CHECKING:
 @dataclass(kw_only=True)
 class Capability:
     """
-    A single scheduled unit of service work for a given phase and tier
+    A single scheduled unit of service work for a given phase and CoreScope
 
     Order is **deterministic across phases / tiers** and
-    **priority-sorted within the same phase/tier**.
+    **priority-sorted within the same phase/CoreScope**.
     """
-    phase: Phase
-    tier: Tier
-    service: Service
+    # phase: DriverPhase
+    CoreScope: CoreScope
+    service: CoreService
     priority: int = 0
     predicate: Predicate = lambda ctx: True  # ctx should satisfy the predicate
     owner_uid: UUID = None  # points back to registering provider, but avoids import
@@ -85,9 +85,10 @@ class Capability:
     # rich comparison for heap / sort() stability
     # -----------------------------------------------------------------
 
+    # todo: do we use this or want to use phase?  caps don't care what phase they belong to, just what phase they are being called in (basically before or after).  They will only be sorted _within_ a service bucket anyway.  And they get sorted at by CoreScope level in the view.
     def _sort_key(self):
-        """(phase, tier, service, -priority)  → deterministic ascending"""
-        return (self.phase, self.tier, self.service, -self.priority)
+        """(phase, CoreScope, service, -priority)  → deterministic ascending"""
+        return (self.CoreScope, -self.priority)
 
     def __lt__(self, other: Capability):
         return self._sort_key() < other._sort_key()

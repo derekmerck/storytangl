@@ -1,5 +1,5 @@
-tangl.core.context
-==================
+tangl.core.service.context
+==========================
 
 Contextual data gathering across nested narrative scopes.
 

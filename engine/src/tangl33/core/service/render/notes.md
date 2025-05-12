@@ -1,5 +1,5 @@
-tangl.core.render
-=================
+tangl.core.service.render
+=========================
 
 Content projection from graph structure to presentation fragments.
 

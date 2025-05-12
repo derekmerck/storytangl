@@ -1,26 +1,26 @@
-from tangl33.core import Tier, TierView, Service
+from tangl33.core import CoreScope, TierView, CoreService
 from tangl33.core.tier_view import _sanitise
 
 
 def test_inject_and_order():
     tm = TierView()
-    tm.inject(Tier.DOMAIN,  {"x": 1})
+    tm.inject(CoreScope.DOMAIN,  {"x": 1})
 
-    # NODE layer stays at index of Tier.NODE and remains empty
-    assert list(tm.maps)[tm._tier_index.index(Tier.NODE)] == {}
+    # NODE layer stays at index of CoreScope.NODE and remains empty
+    assert list(tm.maps)[tm._tier_index.index(CoreScope.NODE)] == {}
 
     # DOMAIN layer contains our value
-    assert list(tm.maps)[tm._tier_index.index(Tier.DOMAIN)] == {"x": 1}
+    assert list(tm.maps)[tm._tier_index.index(CoreScope.DOMAIN)] == {"x": 1}
     assert tm['x'] == 1
 
-    tm.inject(Tier.NODE,    {"y": 2})
-    assert list(tm.maps)[tm._tier_index.index(Tier.NODE)] == {"y": 2}
-    assert list(tm.maps)[tm._tier_index.index(Tier.DOMAIN)] == {"x": 1}      # DOMAIN last
+    tm.inject(CoreScope.NODE,    {"y": 2})
+    assert list(tm.maps)[tm._tier_index.index(CoreScope.NODE)] == {"y": 2}
+    assert list(tm.maps)[tm._tier_index.index(CoreScope.DOMAIN)] == {"x": 1}      # DOMAIN last
     assert tm['x'] == 1
     assert tm['y'] == 2
 
     # shadow domain
-    tm.inject(Tier.GRAPH, {"x": 3})
+    tm.inject(CoreScope.GRAPH, {"x": 3})
     assert tm['x'] == 3
     assert tm['y'] == 2
 
@@ -31,19 +31,19 @@ def test_sanitise():
 
 def test_sanitised_keys():
     tm = TierView()
-    tm.inject(Tier.NODE, {"little-dog": 1, "123bad": 2})
+    tm.inject(CoreScope.NODE, {"little-dog": 1, "123bad": 2})
     assert "little_dog" in tm
     assert "_123bad" in tm
 
 
 def test_compose_precedence_and_shadowing():
-    # make three simple layers for the PROVIDER service
+    # make three simple layers for the PROVIDER CoreService
     node_layer   = {"x": "node"}
     graph_layer  = {"x": "graph", "g": "graph"}
     domain_layer = {"d": "domain"}
 
     view = TierView.compose(
-        service=Service.PROVIDER,
+        service=CoreService.PROVIDER,
         NODE=node_layer,
         GRAPH=graph_layer,
         DOMAIN=domain_layer,

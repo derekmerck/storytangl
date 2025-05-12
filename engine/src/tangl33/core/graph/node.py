@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import logging
 
 from ..entity import Entity
-from .scope_mixin import ScopeMixin
+from ..scope.scope_mixin import ScopeMixin
 
 logger = logging.getLogger(__name__)
 

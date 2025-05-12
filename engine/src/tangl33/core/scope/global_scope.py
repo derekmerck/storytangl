@@ -1,7 +1,6 @@
 from typing import ClassVar, Self
 from dataclasses import dataclass
 
-from ..type_hints import StringMap
 from ..entity import Entity
 from .scope_mixin import ScopeMixin
 

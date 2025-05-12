@@ -1,5 +1,5 @@
-tangl.core.provision
-====================
+tangl.core.service.provision
+============================
 
 Provider implementations that satisfy declared requirements.
 

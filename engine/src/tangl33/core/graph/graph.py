@@ -4,8 +4,7 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from ..registry import Registry
-from .scope_mixin import ScopeMixin
-from .domain import Domain
+from ..scope.scope_mixin import ScopeMixin
 from .node import Node
 from .edge import Edge, EdgeKind, EdgeTrigger
 

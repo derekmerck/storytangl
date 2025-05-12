@@ -3,14 +3,14 @@ from typing import TYPE_CHECKING
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from .. import Phase, Service
-from ..type_hints import ProvisionKey
-from ..capability import Capability
-from ..entity import Entity
-from ..type_hints import StringMap
+from ... import CoreService
+from ...type_hints import ProvisionKey
+from ...capability import Capability
+from ...entity import Entity
+from ...type_hints import StringMap
 
 if TYPE_CHECKING:
-   from ..graph import Node, Graph
+   from ...scope import Node, Graph
 
 @dataclass(kw_only=True)
 class ProviderCap(Capability, Entity):
@@ -19,11 +19,11 @@ class ProviderCap(Capability, Entity):
 
     *provides* is a set of keys this provider can satisfy.
     """
-    service: Service = Service.PROVIDER
-    phase: Phase = Phase.RESOLVE
+    service: CoreService = CoreService.PROVIDER
+    # phase: DriverPhase = DriverPhase.RESOLVE
     provides: set[ProvisionKey] = field(default_factory=set)
 
     # In most cases apply() just returns the provider-node reference
-    def apply(self, node: 'Node', driver, graph: 'Graph', ctx: StringMap) -> 'Node':
+    def apply(self, node: Node, driver, graph: Graph, ctx: StringMap) -> Node:
         return node
 

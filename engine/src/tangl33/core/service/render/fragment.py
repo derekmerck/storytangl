@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from ..entity import Entity
+from ...entity import Entity
 
 @dataclass(kw_only=True)
 class Fragment(Entity):

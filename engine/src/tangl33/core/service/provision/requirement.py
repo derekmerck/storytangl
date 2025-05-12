@@ -29,9 +29,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Dict, Protocol, runtime_checkable, TYPE_CHECKING
 
-from ..type_hints import StringMap, ProvisionKey
-from ..enums import Tier
-from ..exceptions import ProvisionError
+from ...type_hints import StringMap, ProvisionKey
+from ...enums import CoreScope
+from ...exceptions import ProvisionError
 
 if TYPE_CHECKING:
     from .provider_cap import ProviderCap
@@ -74,19 +74,19 @@ class Requirement:
     • **strategy**  – object implementing the Strategy protocol
     • **criteria**  – selection criteria for matching a provider
     • **params**    – opaque dict passed to predicates / factories
-    • **tier**      – where the *requester* sits (defaults to its node)
+    • **CoreScope**      – where the *requester* sits (defaults to its node)
     """
     key: ProvisionKey
     strategy: Strategy = DirectStrategy()
     params: StringMap = field(default_factory=dict)
     criteria: StringMap = field(default_factory=dict)
-    tier: Tier = Tier.NODE  # Scope to evaluate within
+    CoreScope: CoreScope = CoreScope.NODE  # Scope to evaluate within
 
     # hash / eq let us memoise during recursive resolution
-    def __hash__(self): return hash((self.key, frozenset(self.params.items()), self.tier))
+    def __hash__(self): return hash((self.key, frozenset(self.params.items()), self.CoreScope))
     def __eq__(self, other): return (
         isinstance(other, Requirement)
         and self.key == other.key
         and self.params == other.params
-        and self.tier == other.tier
+        and self.CoreScope == other.CoreScope
     )

@@ -1,7 +1,7 @@
 import pytest
 
 from tangl33.core import ContextCap, ProviderCap, RedirectCap
-from tangl33.core import Tier, Requirement
+from tangl33.core import CoreScope, Requirement
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -26,25 +26,25 @@ def _redirect(node, driver, graph, ctx):
 # Capability— behaviour & ordering
 # ---------------------------------------------------------------------------
 def test_context_h_apply_and_predicate():
-    cap = ContextCap(_ctx_layer, tier=Tier.NODE, priority=0)
+    cap = ContextCap(_ctx_layer, CoreScope=CoreScope.NODE, priority=0)
     assert cap.should_run(ctx_empty) is True
     result = cap.apply(dummy_node, dummy_driver, dummy_graph, ctx_empty)
     assert result == {"extra": 1}
 
 
 def test_res_prov_apply_and_provides():
-    cap = ProviderCap(provides={"shop"}, tier=Tier.GRAPH, owner_uid=None)
+    cap = ProviderCap(provides={"shop"}, CoreScope=CoreScope.GRAPH, owner_uid=None)
     out = cap.apply(dummy_node, dummy_driver, dummy_graph, ctx_empty)
     assert out is dummy_node
     assert "shop" in cap.provides
 
 
 def test_capability_deterministic_sorting():
-    a = ContextCap(_ctx_layer, tier=Tier.NODE, priority=0)               # CONTEXT / NODE / prio 0
-    b = RedirectCap(_redirect, tier=Tier.NODE, priority=0)               # CHECK_REDIRECTS / NODE / prio 0
-    c = ContextCap(_ctx_layer, tier=Tier.NODE, priority=10)              # higher priority → before 'a'
+    a = ContextCap(_ctx_layer, CoreScope=CoreScope.NODE, priority=0)               # CONTEXT / NODE / prio 0
+    b = RedirectCap(_redirect, CoreScope=CoreScope.NODE, priority=0)               # CHECK_REDIRECTS / NODE / prio 0
+    c = ContextCap(_ctx_layer, CoreScope=CoreScope.NODE, priority=10)              # higher priority → before 'a'
 
-    # Expected order: phase, then tier, then -priority
+    # Expected order: phase, then CoreScope, then -priority
     caps = [a, b, c]
     caps_sorted = sorted(caps)
     assert caps_sorted == [c, a, b]

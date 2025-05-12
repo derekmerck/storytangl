@@ -1,4 +1,4 @@
-from tangl33.core import ProvisionError, ProviderCap, Tier
+from tangl33.core import ProvisionError, ProviderCap, CoreScope
 
 class CharacterStrategy:
     """Strategy for creating/selecting character nodes."""
@@ -22,6 +22,6 @@ class CharacterStrategy:
         cap = ProviderCap(
             owner_uid=node.uid,
             provides={"character"},
-            tier=Tier.GRAPH
+            CoreScope=CoreScope.GRAPH
         )
         return cap

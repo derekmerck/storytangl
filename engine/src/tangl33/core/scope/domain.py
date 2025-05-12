@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-from ..type_hints import StringMap
 from ..entity import Entity
 from .scope_mixin import ScopeMixin
 

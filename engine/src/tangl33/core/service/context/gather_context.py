@@ -1,16 +1,16 @@
 from collections import ChainMap
 
-from ..type_hints import StringMap
-from ..tier_view import TierView
-from ..enums import Service, Tier
-from ..graph import GlobalScope
+from ...type_hints import StringMap
+from ...tier_view import TierView
+from ...enums import CoreService, CoreScope
+from ...scope import GlobalScope
 
 def gather_context(node, graph, domain) -> StringMap:
 
     # ---------------------------------------------------------
     # 1. compose view
     ctx_view = TierView.compose(
-        service=Service.CONTEXT,
+        service=CoreService.CONTEXT,
         NODE=node.local_layer(),  # locals dict
         ANCESTORS=ChainMap(*(anc.local_layer()
                              for anc in node.iter_ancestors(graph=graph))),
@@ -25,9 +25,9 @@ def gather_context(node, graph, domain) -> StringMap:
     # ---------------------------------------------------------
     # 2. walk tiers inner→outer, merging dicts
     layers = []
-    for tier in Tier.range_outwards(Tier.NODE):
+    for CoreScope in CoreScope.range_outwards(CoreScope.NODE):
         # todo: I feel like we should use context_caps here and update the base ctx.
         #       Originally not done with a cap b/c of bootstrapping, but now ctx is independent of handlers
-        layers.append(ctx_view._get_layer(tier))
+        layers.append(ctx_view._get_layer(CoreScope))
     # _earlier_ tiers closer to the origin win
     return ChainMap(*layers)  # plain dict for speed

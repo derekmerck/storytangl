@@ -22,10 +22,11 @@ from uuid import UUID
 import logging
 from typing import TYPE_CHECKING
 
-from ..type_hints import StringMap
-from ..enums import Service, Tier
-from ..tier_view import TierView
-from ..graph import GlobalScope, EdgeKind, EdgeState, EdgeTrigger, Node, Graph, Domain
+from ...type_hints import StringMap
+from ...enums import CoreService, CoreScope
+from ...tier_view import TierView
+from ...graph import EdgeKind, EdgeState, EdgeTrigger, Node, Graph
+from ...scope import GlobalScope, Domain
 
 if TYPE_CHECKING:
     from .requirement import Requirement
@@ -39,14 +40,14 @@ def resolve_requirements(node: Node, graph: Graph, domain: Domain, ctx: StringMa
     # ---------------------------------------------------------
     # 1. compose views
     provider_view = TierView.compose(
-        service=Service.PROVIDER,
-        NODE=node.handler_layer(Service.PROVIDER),
-        GRAPH=graph.handler_layer(Service.PROVIDER),
-        DOMAIN=domain.handler_layer(Service.PROVIDER),
-        GLOBAL=GlobalScope.get_instance().handler_layer(Service.PROVIDER)
+        service=CoreService.PROVIDER,
+        NODE=node.handler_layer(CoreService.PROVIDER),
+        GRAPH=graph.handler_layer(CoreService.PROVIDER),
+        DOMAIN=domain.handler_layer(CoreService.PROVIDER),
+        GLOBAL=GlobalScope.get_instance().handler_layer(CoreService.PROVIDER)
     )
     template_view = TierView.compose(
-        service=Service.TEMPLATE,
+        service=CoreService.TEMPLATE,
         NODE=node.template_layer(),
         GRAPH=graph.template_layer(),
         DOMAIN=domain.template_layer(),
@@ -101,18 +102,18 @@ def _resolve_target(uid: UUID, graph: Graph, provider_view, template_view, ctx: 
     return True
 
 def _find_provider(req: Requirement, graph: Graph, provider_view, ctx: StringMap):
-    for tier in Tier.range_outwards(Tier.NODE):
-        for prov in provider_view._get_layer(tier):
+    for scope in CoreScope.range_outwards(CoreScope.NODE):
+        for prov in provider_view._get_layer(scope):
             if prov.provides(req) and req.strategy.select(prov, req, ctx):
                 return prov
     return None
 
 def _build_from_template(req: Requirement, graph: Graph, template_view, ctx: StringMap):
-    for tier in Tier.range_outwards(Tier.NODE):
-        for tpl in template_view._get_layer(tier).values():
+    for scope in CoreScope.range_outwards(CoreScope.NODE):
+        for tpl in template_view._get_layer(scope).values():
             if req.key in tpl.provides:
                 cap = tpl.build(ctx)  # returns ProviderCap
                 # store in the proper layer so later look-ups see it
-                graph.handler_layer(Service.PROVIDER).append(cap)
+                graph.handler_layer(CoreService.PROVIDER).append(cap)
                 return cap
     return None
