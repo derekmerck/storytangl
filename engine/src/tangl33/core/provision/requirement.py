@@ -29,12 +29,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Dict, Protocol, runtime_checkable, TYPE_CHECKING
 
-from .type_hints import StringMap, ProvisionKey
-from .enums import Tier
-from .exceptions import ProvisionError
+from ..type_hints import StringMap, ProvisionKey
+from ..enums import Tier
+from ..exceptions import ProvisionError
 
 if TYPE_CHECKING:
-    from .provision import ProviderCap
+    from .provider_cap import ProviderCap
 
 
 # ------------------------------------------------------------

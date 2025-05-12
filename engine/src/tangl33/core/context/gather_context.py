@@ -19,6 +19,7 @@ def gather_context(node, graph, domain) -> StringMap:
         GLOBAL=GlobalScope.get_instance().local_layer()
     )
 
+    # todo: There is no particular reason to re-write the ctx-view like below, I think?
     return ctx_view
 
     # ---------------------------------------------------------
@@ -26,7 +27,6 @@ def gather_context(node, graph, domain) -> StringMap:
     layers = []
     for tier in Tier.range_outwards(Tier.NODE):
         # todo: I feel like we should use context_caps here and update the base ctx.
-        #       There is no particular reason to just re-write the ctx-view like this, I think?
         #       Originally not done with a cap b/c of bootstrapping, but now ctx is independent of handlers
         layers.append(ctx_view._get_layer(tier))
     # _earlier_ tiers closer to the origin win

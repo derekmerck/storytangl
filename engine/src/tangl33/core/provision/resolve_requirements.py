@@ -1,6 +1,6 @@
 """
-tangl.core.resolve
-===================
+tangl.core.resolve_requirements
+===============================
 
 Resolution system for matching requirements to suitable providers.
 
@@ -28,7 +28,7 @@ from ..tier_view import TierView
 from ..graph import GlobalScope, EdgeKind, EdgeState, EdgeTrigger, Node, Graph, Domain
 
 if TYPE_CHECKING:
-    from ..requirement import Requirement
+    from .requirement import Requirement
 
 logger = logging.getLogger(__name__)
 

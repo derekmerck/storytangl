@@ -1,7 +1,3 @@
-"""
-Extended core tests: provision index, resolver, context gather & iter_ancestors.
-Run: pytest -q
-"""
 from uuid import uuid4
 import pytest
 from collections import ChainMap
@@ -10,13 +6,7 @@ from tangl33.core.enums import Phase, Tier
 from tangl33.core.graph.edge import EdgeKind
 from tangl33.core.graph.node import Node
 from tangl33.core.graph.graph import Graph
-# from tangl33.core.runtime.handler_cache import HandlerCache
-# from tangl33.core.runtime.provider_registry import ProviderRegistry
-from tangl33.core.provision.provider_cap import ProviderCap
-from tangl33.core.requirement import Requirement
-# from tangl33.core.context.gather import gather
-# from tangl33.core.resolver.resolve import resolve
-from tangl33.core.type_hints import StringMap
+from tangl33.core.provision import ProviderCap, Requirement
 
 # -----------------------------------------------------------------------------
 # ProvisionRegistry & resolver basics

@@ -3,7 +3,7 @@ from typing import Callable, Mapping
 
 from ..entity import Entity
 from ..graph import Node
-from ..requirement import Requirement
+from .requirement import Requirement
 
 # todo: want provides and build to be required, but can't put req's after defaults in Entity
 

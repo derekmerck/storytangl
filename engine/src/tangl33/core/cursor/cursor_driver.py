@@ -4,12 +4,15 @@ from collections import ChainMap
 
 from ..type_hints import StringMap
 from ..enums import Phase, Tier, Service
-from ..render.render_fragments import render_fragments
-from ..render.journal import Journal
 from ..tier_view import TierView
+
+from ..render.journal import Journal
 from ..graph import Graph, EdgeKind, EdgeTrigger, EdgeState, GlobalScope, Domain
+
+# Phase helpers
 from ..context.gather_context import gather_context
 from ..provision.resolve_requirements import resolve_requirements
+from ..render.render_fragments import render_fragments
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +48,10 @@ class CursorDriver:
         next_edge = resolve_requirements(node, self.graph, self.domain, ctx)
         # todo: this doesn't return a 'next_edge' anymore?
 
-        # todo: run new gate phase
+        # todo: run 'before-effect phase'
+
+        # todo: run new gate phase, or is this just another predicate part of resolution,
+        #       it's resolvable but still latent b/c unavailable?
         if next_edge:
             # 2.5 cursor advance
             self.cursor_uid = next_edge.dst_uid
@@ -59,7 +65,11 @@ class CursorDriver:
         self.journal.append_fragments(frags)
 
         # 4. finalize phase and check continues
+        # -------------------
         next_edge = self._run_finalize_phase(node, self.graph, self.domain, ctx)
+        # todo: this is stubbed out, why are we changing the interface here and trying to
+        #       use a multi-service tier view?
+        # todo: run after-effect phase
         if next_edge:
             # 2.5. cursor advance
             self.cursor_uid = next_edge.dst_uid

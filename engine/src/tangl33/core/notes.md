@@ -7,7 +7,7 @@ StoryTangl reframes interactive fiction as a process of collapsing a latent
 capability-rich graph through a structured resolution protocol:
 
 * **Requirements** pull structure into being from nodes, graphs, and domains
-* **Capabilities** push effects, redirects, and media outward from these structures
+* **Capabilities** push effects, paths, and narrative content outward from these structures
 * The **Cursor** iterates phases in a deterministic, auditable fashion
 * A persistent **Journal** stores the narrative as rendered fragments
 
@@ -19,51 +19,51 @@ Package Organization
 -------------------
 * Entity:           Base data structure with identity and matching
 * Registry:         Collection of entities with search utilities
-* Graph:            Connected entities (nodes and edges) with traversal semantics
 * Capability:       Phase-based computational units with tiered execution rules  
-* Requirement:      Declarative expression of dependencies with resolution strategies
-* Provision:        Dynamic providers that satisfy requirements
-* StringMap:          Scoped information gathering across graph tiers
+* Graph:            Connected entities (nodes and edges) with traversal semantics
+* Provision:        Dynamic provider resolution to satisfy declarative requirements
+* Context:          Scoped environment gathering across organizational tiers
 * Render:           Content projection to representation-agnostic fragments
 * Cursor:           The driver of phased graph traversal and journal updates
-* Resolver:         The system for matching requirements to providers
 
 ```mermaid
-flowchart RL
+flowchart LR
     subgraph base 
         Entity
-        Enums
-        EntityRegistry -- has --> Entity
+        Registry -- has --> Entity
         Capability
-        Requirement
         TierView
     end
 
     subgraph graph_
-        Node -- is --> Entity
-        Node -- has --> Graph
-        Graph -- has --> Node
+        GlobalScope -- is --> ScopeMixin
+        Domain -- is --> ScopeMixin
         Graph -- is --> EntityRegistry
+        Graph -- is --> ScopeMixin
+        Graph -- has --> Node
         Graph -- has --> Edge
-        Edge
+        Node -- is --> Entity
+        Node -- is --> ScopeMixin
+        RedirectCap --> Capability
+        ContinueCap --> Capability
     end
 
     subgraph provision
+        Requirement
         ProviderCap -- is --> Entity
         ProviderCap -- is --> Capability
         Template  -- has --> ProviderCap
         Template -- builds --> Node
+        resolve_reqs --> ProviderCap
+        resolve_reqs --> Requirement
+        resolve_reqs -- builds --> Node
+        resolve_reqs --> TierView
     end
  
-    subgraph resolver
-        resolve --> Requirement
-        resolve --> graph_
-        resolve --> TierView
-    end
-
     subgraph context
         ContextCap --> Capability
-        gather --> TierView
+        gather_context --> TierView
+        gather_context --> ContextCap
     end
 
     subgraph render
@@ -71,18 +71,21 @@ flowchart RL
         Fragment --> Entity
         Journal --> Fragment
         render_fragments --> Node
+        render_fragments --> RenderCap
+        render_fragments -- builds --> Fragment
         render_fragments --> Journal
         render_fragments --> TierView
     end
 
     subgraph cursor
-        RedirectCap --> Capability
-        ContinueCap --> Capability
         EffectCap --> Capability
         CursorDriver --> Node
-        CursorDriver --> resolver
-        CursorDriver --> context
-        CursorDriver --> render
+        CursorDriver --> resolve_reqs
+        CursorDriver --> gather_context
+        CursorDriver --> render_fragments
+        CursorDriver --> RedirectCap
+        CursorDriver --> ContinueCap
+        CursorDriver --> EffectCap
     end
 ```
 
