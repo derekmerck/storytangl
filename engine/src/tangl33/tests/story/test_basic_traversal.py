@@ -1,4 +1,4 @@
-from tangl33.core import Graph, EdgeKind, HandlerCache, ProviderRegistry, Journal, CursorDriver, Domain
+from tangl33.core import Graph, EdgeKind, Journal, CursorDriver, Domain
 from tangl33.story import StoryNode, register_base_capabilities
 
 def test_basic_traversal():
@@ -13,16 +13,14 @@ def test_basic_traversal():
     graph.link(node_a, node_b, EdgeKind.CHOICE)
 
     # Create minimal runtime
-    cache = HandlerCache()
-    reg = ProviderRegistry()
     journal = Journal()
     domain = Domain()
 
     # Register minimal capabilities
-    register_base_capabilities(cache)
+    register_base_capabilities()
 
     # Create driver
-    driver = CursorDriver(graph, cache, reg, domain, journal)
+    driver = CursorDriver(graph, domain, journal)
     driver.cursor_uid = node_a.uid
 
     # Step once

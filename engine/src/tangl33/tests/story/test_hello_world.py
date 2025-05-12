@@ -1,6 +1,6 @@
 import logging
 
-from tangl33.core import Graph, Node, Edge, EdgeKind, Domain, HandlerCache, ProviderRegistry, Journal, CursorDriver
+from tangl33.core import Graph, Node, Edge, EdgeKind, Domain, Journal, CursorDriver
 from tangl33.story import register_base_capabilities
 
 logging.basicConfig(level=logging.DEBUG)
@@ -22,12 +22,11 @@ def test_hello_world():
 
     graph, entry_uid = build_graph()
 
-    cache = HandlerCache(); register_base_capabilities(cache)
-    prov  = ProviderRegistry()
+    register_base_capabilities()
     dom   = Domain()
     jour  = Journal()
 
-    driver = CursorDriver(graph, cache, prov, dom, jour)
+    driver = CursorDriver(graph, dom, jour)
     driver.cursor_uid = entry_uid
 
     # -------- cycle 1 --------

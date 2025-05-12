@@ -26,6 +26,7 @@ class CharacterStrategy:
         if not tpl:
             raise ProvisionError(f"No template for character: {tpl_name}")
 
+        # todo: do this _in_ create or in resolver?
         node = tpl.build(ctx)                      # returns StoryNode
         graph = ctx["graph"]                       # pass graph in resolver context
         graph.add(node)

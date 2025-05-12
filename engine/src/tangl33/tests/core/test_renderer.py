@@ -1,6 +1,6 @@
 from tangl33.core import Node, Graph, Domain, RenderCap, render_fragments, Fragment, Tier
 
-def test_render_text_fragment(cap_cache, graph):
+def test_render_text_fragment(graph):
     node = Node(label="line", locals={"text": "Hello"})
     graph.add(node)
     domain = Domain()

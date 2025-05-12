@@ -36,12 +36,12 @@ flowchart RL
         EntityRegistry -- has --> Entity
         Capability
         Requirement
+        TierView
     end
 
     subgraph graph_
         Node -- is --> Entity
         Node -- has --> Graph
-        StructureNode -- is --> Node
         Graph -- has --> Node
         Graph -- is --> EntityRegistry
         Graph -- has --> Edge
@@ -49,27 +49,21 @@ flowchart RL
     end
 
     subgraph provision
-        ResourceProvider -- is --> Entity
-        ResourceProvider -- is --> Capability
-        Template  -- has --> ResourceProvider
+        ProviderCap -- is --> Entity
+        ProviderCap -- is --> Capability
+        Template  -- has --> ProviderCap
         Template -- builds --> Node
     end
-
-   subgraph runtime
-        HandlerCache  -- has --> Capability
-        ProviderRegistry -- has --> ResourceProvider
-    end
-    
+ 
     subgraph resolver
         resolve --> Requirement
-        resolve --> runtime
         resolve --> graph_
+        resolve --> TierView
     end
 
     subgraph context
         ContextCap --> Capability
-        gather --> HandlerCache
-        gather --> graph_
+        gather --> TierView
     end
 
     subgraph render
@@ -77,15 +71,15 @@ flowchart RL
         Fragment --> Entity
         Journal --> Fragment
         render_fragments --> Node
-        render_fragments --> HandlerCache
         render_fragments --> Journal
+        render_fragments --> TierView
     end
 
     subgraph cursor
         RedirectCap --> Capability
         ContinueCap --> Capability
         EffectCap --> Capability
-        CursorDriver --> StructureNode
+        CursorDriver --> Node
         CursorDriver --> resolver
         CursorDriver --> context
         CursorDriver --> render

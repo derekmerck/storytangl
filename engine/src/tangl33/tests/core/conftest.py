@@ -1,6 +1,6 @@
 import pytest
 
-from tangl33.core import Graph, Node, HandlerCache, ProviderRegistry, Domain
+from tangl33.core import Graph, Node, Domain
 
 # -----------------------------------------------------------------------------
 # Fixture helpers
@@ -13,13 +13,13 @@ def graph():
     g.add(root); g.add(child)
     return g
 
-@pytest.fixture
-def cap_cache():
-    return HandlerCache()
-
-@pytest.fixture
-def prov_reg():
-    return ProviderRegistry()
+# @pytest.fixture
+# def cap_cache():
+#     return HandlerCache()
+#
+# @pytest.fixture
+# def prov_reg():
+#     return ProviderRegistry()
 
 @pytest.fixture
 def domain():

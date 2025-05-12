@@ -10,17 +10,18 @@ from tangl33.core.enums import Phase, Tier
 from tangl33.core.graph.edge import EdgeKind
 from tangl33.core.graph.node import Node
 from tangl33.core.graph.graph import Graph
-from tangl33.core.runtime.handler_cache import HandlerCache
-from tangl33.core.runtime.provider_registry import ProviderRegistry
+# from tangl33.core.runtime.handler_cache import HandlerCache
+# from tangl33.core.runtime.provider_registry import ProviderRegistry
 from tangl33.core.provision.provider_cap import ProviderCap
 from tangl33.core.requirement import Requirement
-from tangl33.core.context.gather import gather
-from tangl33.core.resolver.resolve import resolve
+# from tangl33.core.context.gather import gather
+# from tangl33.core.resolver.resolve import resolve
 from tangl33.core.type_hints import StringMap
 
 # -----------------------------------------------------------------------------
 # ProvisionRegistry & resolver basics
 # -----------------------------------------------------------------------------
+@pytest.mark.skip(reason="deprecated")
 def test_provision_registry_lookup(prov_reg):
     cap = ProviderCap(
         owner_uid=uuid4(),
@@ -31,6 +32,7 @@ def test_provision_registry_lookup(prov_reg):
     found = list(prov_reg.providers("shop", Tier.GRAPH))
     assert found == [cap]
 
+@pytest.mark.skip(reason="deprecated")
 def test_resolver_creates_link(graph, prov_reg, cap_cache):
     shop_node = Node(label="shop")
     shop_cap  = ProviderCap(
