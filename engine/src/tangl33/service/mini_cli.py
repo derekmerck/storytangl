@@ -1,4 +1,4 @@
-from tangl33.core import Graph, HandlerCache, ProviderRegistry, Journal, CursorDriver, EdgeKind, Domain
+from tangl33.core import Graph, Journal, CursorDriver, EdgeKind, Domain
 from tangl33.core.graph.edge import EdgeTrigger
 from tangl33.story import register_base_capabilities
 
@@ -38,18 +38,16 @@ def run_story(entry_node, graph=None, domain=None):
     domain = domain or Domain()
 
     # Set up runtime components
-    cap_cache = HandlerCache()
-    prov_reg = ProviderRegistry()
     journal = Journal()
 
     # Create driver
-    driver = CursorDriver(graph, cap_cache, prov_reg, domain, journal)
+    driver = CursorDriver(graph, domain, journal)
     driver.cursor_uid = entry_node.uid
     logger.debug(f"graph keys: {list(graph.keys())}")
     logger.debug(f"d.graph keys: {list(driver.graph.keys())}")
 
     # Initialize any global capabilities
-    register_base_capabilities(cap_cache)
+    register_base_capabilities()
 
     # Main loop
     while True:

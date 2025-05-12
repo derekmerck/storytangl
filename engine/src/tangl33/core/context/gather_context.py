@@ -23,6 +23,7 @@ def gather_context(node, graph, domain) -> StringMap:
     # 2. walk tiers inner→outer, merging dicts
     layers = []
     for tier in Tier.range_outwards(Tier.NODE):
+        # todo: Should we use context_caps instead?
         layers.append(ctx_view._get_layer(tier))
     # _earlier_ tiers closer to the origin win
     return ChainMap(*layers)  # plain dict for speed

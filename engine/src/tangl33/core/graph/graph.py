@@ -47,3 +47,5 @@ class Graph(ScopeMixin, Registry[Node]):
 
     def unlink(self, edge: Edge) -> None:
         ...
+
+
