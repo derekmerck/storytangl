@@ -1,8 +1,8 @@
 from ...type_hints import StringMap
-from ...tier_view  import TierView
 from ...enums      import CoreScope, CoreService
 from ...graph      import Node, Graph
 from ...scope      import GlobalScope, Domain
+from ..tier_view  import TierView
 from .fragment     import Fragment
 
 def render_fragments(node: Node, graph: Graph, domain: Domain, ctx: StringMap) -> list[Fragment]:

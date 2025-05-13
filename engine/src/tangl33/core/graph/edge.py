@@ -13,16 +13,18 @@ class EdgeKind(Enum):
     CHOICE = auto()      # structural node → structural node
     META = auto()        # low-level (e.g., debug)
 
-class EdgeTrigger(Enum):
-    MANUAL = auto()
-    BEFORE = auto()
-    AFTER = auto()
-
 class EdgeState(Enum):
     LATENT = auto()
     RESOLVED = auto()
     OPEN = auto()
     VISITED = auto()
+
+# todo: this belongs with service.choice, choices should return edges with triggers
+#       its part of the choice cap, not of the edge?
+class ChoiceTrigger(Enum):
+    MANUAL = auto()
+    BEFORE = auto()
+    AFTER = auto()
 
 @dataclass(kw_only=True)
 class Edge(Entity):
@@ -30,7 +32,7 @@ class Edge(Entity):
     dst_uid: UUID
     kind: EdgeKind
     state: EdgeState = EdgeState.LATENT  # starts out as a potential edge
-    trigger: EdgeTrigger = EdgeTrigger.MANUAL
+    trigger: ChoiceTrigger = ChoiceTrigger.MANUAL
     directed: bool = True
     # data: dict | None = field(default_factory=dict)
     # use _locals_ instead to match entity expectations

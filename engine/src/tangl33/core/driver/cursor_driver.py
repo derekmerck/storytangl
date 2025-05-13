@@ -4,14 +4,16 @@ from collections import ChainMap
 
 from ..type_hints import StringMap
 from ..enums import CoreScope, CoreService
-from ..tier_view import TierView
+from ..service.tier_view import TierView  # todo: no longer necessary after refactoring out service controller calls
 
-from ..graph import Graph, EdgeKind, EdgeTrigger, EdgeState
-from ..scope import GlobalScope, Domain
+from ..graph import Graph, ChoiceTrigger, EdgeState
+from ..scope import Domain
 
 # Phase helpers
 from ..service.context.gather_context import gather_context
 from ..service.provision.resolve_requirements import resolve_requirements
+from ..service.gate.apply_gating import apply_gating
+from ..service.effect.apply_effects import apply_effects
 from ..service.render import Journal
 from ..service.render.render_fragments import render_fragments
 
@@ -83,20 +85,7 @@ class CursorDriver:
     # helpers
     # -----------------------------------------------------------------
 
-    def _run_gate_phase(self, node, handlers_view, ctx):
-        # 1) run GATE caps (stat predicates, etc.)
-        for scope in CoreScope.range_outwards(CoreScope.NODE):
-            for cap in handlers_view.iter_layer(scope):
-                if cap.service is not CoreService.GATE:
-                    continue
-                if scope is CoreScope.NODE and cap.owner_uid not in (None, node.uid):
-                    continue
-                cap.apply(node, self, self.graph, ctx)
 
-        # 2) set edge.state → OPEN when gate passes
-        for edge in filter(lambda x: x.kind is EdgeKind.CHOICE, self.graph.edges_out[node.uid]):
-            if edge.state == EdgeState.RESOLVED and edge.gate_pred(ctx):
-                edge.state = EdgeState.OPEN
 
     # def _run_finalize_phase(self, node, graph, domain, ctx):
     def _run_finalize_phase(self, node, handlers_view, ctx, *args, **kwargs):
@@ -108,7 +97,7 @@ class CursorDriver:
         for CoreScope in CoreScope.range_outwards(CoreScope.NODE):
             for cap in handlers_view.iter_layer(CoreScope):
                 if (cap.service is Service.CHOICE and
-                    cap.trigger is EdgeTrigger.AFTER and
+                    cap.trigger is ChoiceTrigger.AFTER and
                     cap.predicate(ctx)):
                     edge = cap.build_edge(node, self.graph, ctx)
                     if edge.open:

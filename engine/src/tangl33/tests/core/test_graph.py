@@ -1,5 +1,5 @@
 
-from tangl33.core import Edge, EdgeTrigger
+from tangl33.core import Edge, ChoiceTrigger
 
 def test_edge_enum():
-    assert len(list(EdgeTrigger)) == 3
+    assert len(list(ChoiceTrigger)) == 3

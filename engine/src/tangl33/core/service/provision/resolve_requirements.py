@@ -24,9 +24,9 @@ from typing import TYPE_CHECKING
 
 from ...type_hints import StringMap
 from ...enums import CoreService, CoreScope
-from ...tier_view import TierView
-from ...graph import EdgeKind, EdgeState, EdgeTrigger, Node, Graph
+from ...graph import EdgeKind, EdgeState, ChoiceTrigger, Node, Graph
 from ...scope import GlobalScope, Domain
+from ..tier_view import TierView
 
 if TYPE_CHECKING:
     from .requirement import Requirement
@@ -67,7 +67,7 @@ def resolve_requirements(node: Node, graph: Graph, domain: Domain, ctx: StringMa
 
         # ---------- 2. first BEFORE-choice wins ----------
         if (edge.state is EdgeState.RESOLVED
-                and edge.trigger is EdgeTrigger.BEFORE
+                and edge.trigger is ChoiceTrigger.BEFORE
                 and edge.open):
             next_edge = edge
             break

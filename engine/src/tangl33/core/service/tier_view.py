@@ -2,8 +2,8 @@ from collections import ChainMap
 from typing import Mapping, Any, Iterable, TypeVar, Generic, Self
 
 from tangl33.utils.sanitize_keys import _sanitise
-from .type_hints import StringMap
-from .enums import CoreScope
+from ..type_hints import StringMap
+from ..enums import CoreScope, CoreService
 
 T = TypeVar("T")
 
@@ -69,3 +69,4 @@ class TierView(ChainMap[str | tuple[CoreScope | str, str], T], Generic[T]):
             scope, key = key
             self._get_layer(scope)[key] = value
         super().__setitem__(key, value)
+

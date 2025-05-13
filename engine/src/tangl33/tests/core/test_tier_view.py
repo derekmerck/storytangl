@@ -1,5 +1,5 @@
 from tangl33.core import CoreScope, TierView, CoreService
-from tangl33.core.tier_view import _sanitise
+from tangl33.core.service.tier_view import _sanitise
 
 
 def test_inject_and_order():

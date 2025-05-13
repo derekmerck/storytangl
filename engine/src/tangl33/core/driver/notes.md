@@ -1,4 +1,4 @@
-tangl.core.cursor
+tangl.core.driver
 =================
 
 Traversal controller implementing the phased graph exploration protocol.

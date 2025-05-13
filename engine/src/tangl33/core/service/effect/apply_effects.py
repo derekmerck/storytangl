@@ -1,0 +1,3 @@
+
+def apply_effects(*args, **kwargs):
+    ...

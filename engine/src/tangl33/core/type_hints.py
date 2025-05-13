@@ -20,7 +20,7 @@ ProvisionKey = str
 StringMap = Mapping[str, Any]
 Predicate = Callable[[StringMap], bool]          # return True to run
 
-class Scope(Protocol):
+class ScopeP(Protocol):
     # service handlers
     def handler_layer(self): ...   # Returns a callable registry?
     # provisioning resources
