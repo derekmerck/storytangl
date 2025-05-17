@@ -1,6 +1,6 @@
 from typing import Callable, Optional, Literal, Dict, Any
 
-from .entity import Entity
+from ...entity import Entity
 
 # Requirements:
 # - Select _provider_, uses `entity.match(**req_criteria)`; then links
