@@ -81,7 +81,7 @@ def get_file_strings(root_dir):
 
                 if STRIP and filepath.endswith(".py"):
                     data = data.splitlines()
-                    data = list(filter(lambda v: bool(v) and not re.match(r"^ *#", v), data))
+                    # data = list(filter(lambda v: bool(v) and not re.match(r"^ *#", v), data))
                     data = list(filter(lambda v: bool(v) and not re.match(r"^ *logger\.debug", v), data))
                     data = list(filter(lambda v: bool(v) and not re.match(r"^ *(from|import)\b", v), data))
                     data = list(filter(lambda v: bool(v) and not re.match(r"^ *(if TYPE_CHECKING:)", v), data))

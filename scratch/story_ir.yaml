@@ -1,0 +1,149 @@
+# story_ir.yaml
+
+version: 1.0  # schema vers
+
+# entity:
+#   label:
+#   desc:
+#   tags:
+
+domain:
+  # special 'broadest' scope singleton, all structures and concepts belong to a domain
+  label:
+  desc:
+
+structure:
+  nodes:  # provide scope, render as fragments, may link to structure or to recruited concepts
+    - type: ST
+      label:
+      desc:
+
+  paths:  # link structure nodes
+    - type: PT
+      label:
+      desc:
+      tags:
+      from: ref
+      to: ref
+      preconditions: [ x, y, z ]
+
+concepts:
+  nodes:  # supportive, _may_ render as adjunct services
+
+  associations:  # link concepts to one another
+
+
+
+
+# two ways to represent:
+entities:
+  - type: StructureT | ConceptT
+    label: abc
+    tags: []
+  - type: StructureT | ConceptT
+    label: def
+    parent: abc  # concept
+
+# -- or ---
+
+structure_t:
+  - label: abc
+
+    concept_t:
+      - label: def
+        # implicit parent
+
+
+scopes:  # entity types that provide structure
+
+  # ---------- Domain ----------
+  # broadest scope subtype
+  - type: domain
+    id: "fantasy_realm"
+    title: "Fantasy Realm"  # alias to entity.label
+
+    meta:  # any entity can version itself, domains _must_ version themselves
+      description: "A magical world with heroes, villains, and adventures."
+      version: 1.0
+      author: "tangledev"
+
+    globals:  # alias to entity.locals
+      initial_facts:  # if multiple start states, they would all share these assertions
+        - "sunrise"
+        - "peaceful"
+    tags: ["high-fantasy", "epic"]
+
+  # ---------- Story States & Events ----------
+  states:
+    - id: "start_state"
+      label: "Beginning"
+      facts:
+        - "player_in_town_square"
+      # Provisions are conditions that must be met to reach a state.
+      provisions:
+        - requires: "shop_keep_exists"
+          action: "find_or_create"
+
+  events:
+    - id: "enter_town"
+      label: "Enter Town Square"
+      preconditions:
+        - "player_location == 'gate'"
+      effects:
+        - "player_location = 'town_square'"
+      description: "The hero enters the bustling town square."
+
+# ---------- Concepts (actors, items, locations) ----------
+concepts:
+  - id: "player_001"
+    type: "actor"
+    label: "Hero"
+    domain: "fantasy_realm"
+    tags: ["protagonist", "brave"]
+    properties:
+      body: 4
+      mind: 3
+      mana: 2
+    # Linked components could be part of properties or a separate list
+    links:
+      look: "look_hero_default"
+
+  - id: "look_hero_default"
+    type: "look"
+    label: "Default Appearance"
+    domain: "fantasy_realm"
+    tags: ["appearance", "default"]
+    properties:
+      outfit: "casual"
+      hair: "brown"
+
+
+# ---------- Links and Paths ----------
+# A link can represent a transition or graph edge between states/entities.
+links:
+  - id: "edge_001"
+    from: "start_state"
+    to: "enter_town"
+    type: "event_transition"
+
+# ---------- Challenges / Game Components ----------
+challenges:
+  - id: "challenge_armored_bandit"
+    label: "Fight Armored Bandit"
+    type: "stat_challenge"
+    domain: "fantasy_realm"
+    taskee: "player_001"
+    stat: "body"
+    difficulty: 3
+    bonuses:
+      - source: "sword_bonus"
+    penalties:
+      - condition: "tired"
+    cost:
+      - stat: "mana"
+        amount: 1
+    reward:
+      - stat_boost: { stat: "body", amount: 1 }
+    dramatization:
+      strategy: "narrative_cheat"
+      hints: "His eyes narrow as he prepares to strike."
