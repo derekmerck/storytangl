@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterator, Optional
-from uuid import UUID
+from typing import TYPE_CHECKING, Iterator
 
 from ..entity import Entity
 

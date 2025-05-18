@@ -1,1 +1,0 @@
-from .resolve_requirements import resolve_requirements

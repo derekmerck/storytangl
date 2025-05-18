@@ -3,10 +3,9 @@ from typing import Literal, Any
 from ..entity import Entity
 
 FragmentKind = Literal['content', 'resource', 'control']
-ContentEncoding = Literal['text', 'binary']
+ContentKind = Literal['text', 'uri', 'data']
 
 class ContentFragment(Entity):
     fragment_kind: FragmentKind = 'content'
     content: Any = None
-    encoding: ContentEncoding = 'text'
-    mime_type: str = 'text/plain'
+    content_kind: ContentKind = 'text'

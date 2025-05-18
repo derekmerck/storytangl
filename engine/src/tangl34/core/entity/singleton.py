@@ -2,6 +2,7 @@ from typing import ClassVar, Self
 
 from pydantic import ConfigDict
 
+from ..type_hints import UnstructuredData
 from .entity import Entity
 from .registry import Registry
 
@@ -23,3 +24,12 @@ class Singleton(Entity):
 
     def __reduce__(self):
         return self.get_instance, self.label
+
+    @classmethod
+    def structure(cls, data) -> Self:
+        obj_cls = data.pop('obj_cls')
+        label = data.pop('label')
+        return obj_cls(label=label)
+
+    def unstructure(self) -> UnstructuredData:
+        return {'obj_cls': self.__class__, 'label': self.label}

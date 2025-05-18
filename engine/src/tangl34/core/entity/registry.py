@@ -1,14 +1,17 @@
-from typing import TypeVar, Generic, Dict, Optional, List, Iterator
+from typing import TypeVar, Generic, Dict, Optional, List, Iterator, Self
 from uuid import UUID
 
+from pydantic import PrivateAttr
+
+from ..type_hints import UnstructuredData
 from .entity import Entity
 
 EntityT = TypeVar("EntityT", bound=Entity)
 
-class Registry(Generic[EntityT]):
-    """Simple runtime registry with optional constraints and named lookup."""
-    def __init__(self):
-        self._items: Dict[UUID, EntityT] = {}
+class Registry(Entity, Generic[EntityT]):
+    """Runtime registry with optional constraints and lookup by criteria."""
+
+    _items: dict[UUID, EntityT] = PrivateAttr(default_factory=dict)
 
     def add(self, item: EntityT) -> None:
         self._items[item.uid] = item
@@ -21,9 +24,6 @@ class Registry(Generic[EntityT]):
     def get(self, uid: UUID) -> Optional[EntityT]:
         return self._items.get(uid)
 
-    def all(self) -> List[EntityT]:
-        return list(self._items.values())
-
     def find_one(self, **criteria) -> Optional[EntityT]:
         return next(item for item in self if item.match(**criteria))
 
@@ -34,8 +34,20 @@ class Registry(Generic[EntityT]):
         return len(self._items)
 
     def __bool__(self) -> bool:
-        return len(self) > 0
+        return len(self._items) > 0
 
     def __iter__(self) -> Iterator[EntityT]:
         return iter(self._items.values())
 
+    @classmethod
+    def structure(cls, data) -> Self:
+        items = data.pop("items")
+        obj = super().structure(data)
+        for e in items:
+            obj.add( super().structure(e) )
+        return obj
+
+    def unstructure(self) -> UnstructuredData:
+        data = super().unstructure()
+        data['items'] = [ e.unstructure() for e in self.values() ]
+        return data

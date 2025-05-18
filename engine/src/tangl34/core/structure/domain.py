@@ -6,6 +6,6 @@ if TYPE_CHECKING:
     from .graph import Graph
 
 class Domain(Singleton):
-    # Broadest scope, provides story templates
+    # Broadest scope, provides story templates, initial graph
 
-    def create_graph(self) -> Graph: ...
+    def create_graph(self, *args, **kwargs) -> Graph: ...

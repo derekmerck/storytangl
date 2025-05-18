@@ -1,3 +1,0 @@
-
-def gather_providers(*scope, ctx):
-    ...

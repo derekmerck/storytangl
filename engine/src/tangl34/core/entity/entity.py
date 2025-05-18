@@ -2,13 +2,9 @@ from functools import cached_property
 from typing import Any, Dict, List, Optional, Self, Callable
 from uuid import UUID, uuid4
 
-import pydantic
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, field_serializer, ValidationInfo
 
-from persistence.conftest import serializer
-
-UnstructuredData = dict[str, Any]
-Context = dict[str, Any]
+from ..type_hints import Context, UnstructuredData
 
 class Entity(BaseModel):
     """Base class for everything that exists and can be named, tagged, or serialized."""
@@ -20,12 +16,12 @@ class Entity(BaseModel):
 
     @field_validator("label", mode="before")
     @classmethod
-    def _default_label(cls, value, info: pydantic.ValidationInfo) -> Optional[str]:
+    def _default_label(cls, value, info: ValidationInfo) -> Optional[str]:
         if not value:
             value = str(info.data.get("uid"))[0:6]
         return value
 
-    @serializer("tags")
+    @field_serializer("tags")
     @classmethod
     def _as_list(cls, value: Any) -> List[str]:
         return list(value)
@@ -36,8 +32,8 @@ class Entity(BaseModel):
                 return False
         return True
 
-    # gating is built-in b/c its used extensively
-    def satisfied(self, ctx: Context) -> bool:
+    # predicate gating is built-in b/c its used extensively
+    def satisfied(self, *, ctx: Context, **kwargs) -> bool:
         return self.predicate(ctx)
 
     def __repr__(self) -> str:

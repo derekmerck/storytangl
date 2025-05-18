@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 class EdgeKind(Enum):
     COMPONENT = "component"  # has-a, child
     ASSOCIATE = "associate"  # linked
-    PROVIDES = "provides"    # concept provider, in context as role
-    CHOICE = "choice"        # structure provider, in choices
+    PROVIDES = "provides"    # concept provider, included in context as role
+    CHOICE = "choice"        # structure provider, included in choices
 
 class Edge(Entity):
     src_id: UUID
