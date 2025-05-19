@@ -47,20 +47,20 @@ class Requirement(Entity):
         """Placeholder for invoking builder or fallback capability."""
         return False
 
-
-class Requirement(Entity):
-    req_criteria: dict[str, Any] = Field(default_factory=dict)
-    satisfied_by: Optional[Link] = None
-    obligation: Literal["find_or_create", "find_only", "create_only"] = "find_or_create"
-    # find or create will try to find first and then build, requester will be gated if provision cannot be created
-    # find only will _not_ try to build, requester will be gated if provision is un-findable
-    # create only will always try to create a provision if the req is unsatisfied
-    # builder is for "soft reqs" that can be waived by an inline resource
-    builder: Optional[Provider] = None
-
-    def find_match(self): ...
-    def find_match_builder(self): ...
-
-class StructureRequirement(Requirement):
-    # Links a _path_ to a structure node
-    phase: Optional[Literal["before", "after"]] = None
+#
+# class Requirement(Entity):
+#     req_criteria: dict[str, Any] = Field(default_factory=dict)
+#     satisfied_by: Optional[Link] = None
+#     obligation: Literal["find_or_create", "find_only", "create_only"] = "find_or_create"
+#     # find or create will try to find first and then build, requester will be gated if provision cannot be created
+#     # find only will _not_ try to build, requester will be gated if provision is un-findable
+#     # create only will always try to create a provision if the req is unsatisfied
+#     # builder is for "soft reqs" that can be waived by an inline resource
+#     builder: Optional[Provider] = None
+#
+#     def find_match(self): ...
+#     def find_match_builder(self): ...
+#
+# class StructureRequirement(Requirement):
+#     # Links a _path_ to a structure node
+#     phase: Optional[Literal["before", "after"]] = None

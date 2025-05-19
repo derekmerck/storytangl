@@ -8,6 +8,12 @@ from ..handlers.provision import resolve_requirements, requires_choice
 from ..handlers.render import render_fragments
 from ..handlers.effects import apply_effects
 
+def discover_scopes(caller, *scopes): return [caller] + list(scopes)
+def gather_context(*scopes): return {"dummy": 1}
+def resolve_requirements(*args, **kwargs): return True
+def requires_choice(*args, **kwargs): return None
+def apply_effects(*args, **kwargs): return None
+def render_fragments(*args, **kwargs): return []
 
 class CursorDriver(BaseModel):
     cursor: Node    # Assumes scoped node

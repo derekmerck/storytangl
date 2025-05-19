@@ -26,3 +26,7 @@ class Edge(Entity):
 
     def dst(self, g: Graph) -> Node:
         return g.get(self.dst_id)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}:{str(self.src_id)[:6]}->{str(self.dst_id)[:6]}>"
+

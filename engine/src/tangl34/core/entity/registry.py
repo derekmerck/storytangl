@@ -17,7 +17,7 @@ class Registry(Entity, Generic[EntityT]):
         self._items[item.uid] = item
 
     def remove(self, item: EntityT | UUID) -> None:
-        if not issubclass(item, UUID):
+        if not isinstance(item, UUID):
             item = getattr(item, "uid", None)
         self._items.pop(item, None)
 
@@ -38,6 +38,9 @@ class Registry(Entity, Generic[EntityT]):
 
     def __iter__(self) -> Iterator[EntityT]:
         return iter(self._items.values())
+
+    def clear(self):
+        self._items.clear()
 
     @classmethod
     def structure(cls, data) -> Self:
