@@ -145,9 +145,9 @@ class HasHandlers:
             objects = *objects, global_scope
         handlers = []
         for obj in objects:
-            for base in type(obj).mro():
-                reg = getattr(base, "_handler_registry", None)
-                if reg:
-                    handlers.extend(reg.find_all_for(caller, service, ctx))
+            # for base in type(obj).mro():  # We walk the mro during class creation
+            reg = getattr(obj, "_handler_registry", None)
+            if reg:
+                handlers.extend(reg.find_all_for(caller, service, ctx))
         # Sorting by the handler's sort key
         return sorted(handlers, key=lambda h: h.caller_sort_key(caller))

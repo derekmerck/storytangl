@@ -3,14 +3,17 @@ from typing import Literal, Optional
 import random
 import logging
 
+from pydantic import Field
+
 from tangl.utils.safe_builtins import safe_builtins
 from ..type_hints import Expr, StringMap
 from .enums import ServiceKind
-from .base import handler, HasHandlers
+from .base import handler
+from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
-class HasEffects(HasHandlers):
+class HasEffects(HasContext):
     """
     A handler class for managing and applying effect strategies for Entities.
     Provides functionality to execute effects using dynamic namespaces.
@@ -18,7 +21,7 @@ class HasEffects(HasHandlers):
     KeyFeatures:
       - `apply_effects(entity)`: Applies effects attached to entity
     """
-    effects: list[Expr] = None
+    effects: list[Expr] = Field(default_factory=list)
 
     @classmethod
     def exec_expr(cls, expr: Expr, *, ctx) -> StringMap:
@@ -40,7 +43,7 @@ class HasEffects(HasHandlers):
         return ctx
 
     @handler(ServiceKind.EFFECT)
-    def _apply_my_effects(self, caller, ctx):
+    def _apply_my_effects(self, ctx):
         for expr in self.effects:
             self.exec_expr(expr, ctx=ctx)
 

@@ -7,11 +7,12 @@ from ..type_hints import Context, StringMap
 from ..journal import ContentFragment
 from ..entity import Entity
 from .enums import ServiceKind
-from .base import handler, HasHandlers
+from .base import handler
+from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
-class Renderable(HasHandlers):
+class Renderable(HasContext):
     content: str = None
     jinja_env: ClassVar[jinja2.Environment] = jinja2.Environment()
 
