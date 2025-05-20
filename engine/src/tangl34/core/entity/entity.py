@@ -1,10 +1,13 @@
 from functools import cached_property
 from typing import Any, Dict, List, Optional, Self, Callable, Type
 from uuid import UUID, uuid4
+import logging
 
 from pydantic import BaseModel, Field, field_validator, field_serializer, ValidationInfo
 
 from ..type_hints import Context, UnstructuredData
+
+logger = logging.getLogger(__name__)
 
 class Entity(BaseModel):
     """Base class for everything that exists and can be named, tagged, or serialized."""
@@ -39,6 +42,7 @@ class Entity(BaseModel):
     # predicate gating is built-in b/c its used extensively
     def satisfied(self, *, ctx: Context, **kwargs) -> bool:
         if self.predicate is None:
+            logger.debug("No predicate, return True")
             return True
         return self.predicate(ctx)
 

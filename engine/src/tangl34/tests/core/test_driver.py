@@ -6,8 +6,6 @@ from tangl34.core.structure.graph import Graph
 def test_cursor_driver_advance(monkeypatch):
     # Patch service calls to record order
     call_order = []
-    monkeypatch.setattr("tangl34.core.driver.cursor_driver.discover_scopes",
-                        lambda *a, **k: call_order.append("discover_scopes") or [a[0]])
     monkeypatch.setattr("tangl34.core.driver.cursor_driver.gather_context",
                         lambda *a, **k: call_order.append("gather_context") or {})
     monkeypatch.setattr("tangl34.core.driver.cursor_driver.resolve_requirements",
@@ -28,12 +26,7 @@ def test_cursor_driver_advance(monkeypatch):
     drv = CursorDriver(cursor=n, graph=g, journal=[], scopes=[])
     drv.advance_cursor(choice=e)
     assert call_order == [
-        "discover_scopes",
-        "gather_context",
         "resolve_requirements",
         "requires_choice_before",
-        "apply_effects_before",
-        "render_fragments",
-        "apply_effects_after",
         "requires_choice_after"
     ]

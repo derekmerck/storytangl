@@ -4,8 +4,7 @@ from typing import Any, Optional
 from ...type_hints import Context
 from ...entity import Entity, Registry
 from ..enums import ServiceKind
-from ..handler import Handler
-from ..gather import gather_handlers
+from ..base import Handler
 from .requirement import Requirement
 
 class Provider(Handler):
