@@ -13,6 +13,8 @@ from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
+# todo: Optional dry-run mode: run effects in a way that reports what would change without changing anything.
+
 class HasEffects(HasContext):
     """
     A handler class for managing and applying effect strategies for Entities.
@@ -55,7 +57,7 @@ class HasEffects(HasContext):
     def apply_effects(cls, trigger: Literal["before", "after"], caller, *objects, ctx):
         # If you want to apply caller's effects on another object/scope, provide a different context
         logger.debug("applying effects")
-        # todo: gather handlers should take a criteria filter?  Or put phase into the ctx and add a predicate for it?
+        # todo: gather handlers should take a criteria filter ('before')?  Or put phase into the ctx and add a predicate for it?
         for h in cls.gather_handlers(ServiceKind.EFFECT, caller, *objects, ctx=ctx):
             logger.debug(f"Calling: {h!r}")
             h.func(caller, ctx)

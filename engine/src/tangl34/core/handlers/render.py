@@ -12,6 +12,8 @@ from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
+# todo: Template engine swappability: Let Renderable accept a template_engine parameter, so users can drop in their own (e.g., string.Template, Mako) with no code change.
+
 class Renderable(HasContext):
     content: str = None
     jinja_env: ClassVar[jinja2.Environment] = jinja2.Environment()

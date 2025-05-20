@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+# todo: Cache sorted handler lists per (service, caller class, scopes) as in v33
+
 @total_ordering
 class Handler(Entity, Generic[T]):
     # inherits label, predicate, etc from Entity

@@ -1,44 +1,51 @@
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 from ..structure import Graph, Node, Edge
-from ..journal import Journal
+from ..journal import HasJournal
 from ..handlers import Scope, Renderable, HasContext, HasEffects
-from ..handlers.provision import resolve_requirements, requires_choice
+# from ..handlers.provision import resolve_requirements, requires_choice
 
-def gather_context(*scopes): return {"dummy": 1}
+# todo: remove stub functions for the prior handler api
 def resolve_requirements(*args, **kwargs): return True
 def requires_choice(*args, **kwargs): return None
-def apply_effects(*args, **kwargs): return None
-def render_fragments(*args, **kwargs): return []
 
 class CursorDriver(BaseModel):
     cursor: Node    # Assumes scoped node
     graph: Graph    # Assumes scoped graph
     scopes: list[Scope] = Field(default_factory=list)  # additional scopes, e.g., domain, user
-    journal: Journal
+    journal: HasJournal
 
-    def advance_cursor(self, choice: Edge, bookmarks = None):
+    def advance_cursor(self, choice: Edge, section_bookmark = None) -> Optional[Edge]:
 
         self.cursor = choice.dst(self.graph)
 
         # 1) CONTEXT
-        # scopes = self.cursor, self.graph, *self.scopes
         ctx = HasContext.gather_context(self.cursor, self.graph, *self.scopes)
 
         # 2) BEFORE
-        resolve_requirements(self.cursor, self.graph, *self.scopes, ctx=ctx)  # update structure and choices
+        # Update structure and choices
+        resolve_requirements(self.cursor, self.graph, *self.scopes, ctx=ctx)
+        # Check for pre-req short circuit
         if edge := requires_choice("before", self.cursor, self.graph, ctx=ctx):
-            return edge # pre-req short circuit
-        HasEffects.apply_effects("before", self.cursor, self.graph, *self.scopes, ctx=ctx)  # update state
+            return edge
+        # Pre-update state
+        HasEffects.apply_effects("before", self.cursor, self.graph, *self.scopes, ctx=ctx)
 
         # 3) RENDER
-        frags = Renderable.render_content(self.cursor, self.graph, *self.scopes, ctx=ctx)
         # Setting, current action and impact, images, choices
-        self.journal.extend(frags)  # update journal, todo: include bookmarks
+        frags = Renderable.render_content(self.cursor, self.graph, *self.scopes, ctx=ctx)
+        # Update journal
+        if section_bookmark:
+            self.journal.start_journal_section(section_bookmark)
+        self.journal.add_journal_entry(frags)
 
         # 4) AFTER
-        HasEffects.apply_effects("after", self.cursor, self.graph, *self.scopes, ctx=ctx)  # update state
+        # Post-update state
+        HasEffects.apply_effects("after", self.cursor, self.graph, *self.scopes, ctx=ctx)
+        # Check for post-req short circuit
         if edge := requires_choice("after", self.cursor, self.graph, ctx=ctx):
-            return edge  # post-req short circuit
+            return edge
 
         # Block on user input

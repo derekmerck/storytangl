@@ -1,2 +1,2 @@
 from .content_fragment import ContentFragment
-from .journal import Journal
+from .has_journal import HasJournal
