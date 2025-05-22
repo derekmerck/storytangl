@@ -1,4 +1,4 @@
-from typing import Literal, Any, Optional
+from typing import Any, Optional
 
 from ..entity import Entity
 
@@ -6,6 +6,9 @@ class ContentFragment(Entity):
     """
     Minimal content fragment—just the fundamental unit for journal/log output.
     Extended elsewhere.
+
+    Fragments may be connected to their originating structure nodes by 'blame'
+    edges if they are part of the same graph.
     """
     fragment_type: str = "content"  # e.g., 'text', 'choice', 'media'
     content: Any

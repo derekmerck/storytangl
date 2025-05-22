@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class Graph(Registry[Union[Node, Edge]]):
 
-    def add_edge(self, src: Node, dst: Edge, edge_kind: EdgeKind = None) -> Edge:
+    def add_edge(self, src: Node, dst: Node, edge_kind: EdgeKind = None) -> Edge:
         e = Edge(src_id=src.uid, dst_id=dst.uid, edge_kind=edge_kind)
         self.add(e)
         return e

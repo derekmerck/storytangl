@@ -9,13 +9,13 @@ from tangl.utils.safe_builtins import safe_builtins
 from ..type_hints import Expr, StringMap
 from .enums import ServiceKind
 from .base import handler
-from .context import HasContext
+from .context import HasStringMap
 
 logger = logging.getLogger(__name__)
 
 # todo: Optional dry-run mode: run effects in a way that reports what would change without changing anything.
 
-class HasEffects(HasContext):
+class HasEffects(HasStringMap):
     """
     A handler class for managing and applying effect strategies for Entities.
     Provides functionality to execute effects using dynamic namespaces.

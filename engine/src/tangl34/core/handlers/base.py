@@ -5,7 +5,7 @@ import logging
 
 from pydantic import model_validator, Field, field_validator
 
-from ..type_hints import Context
+from ..type_hints import StringMap
 from ..entity import Entity, Registry
 from .enums import ServiceKind
 
@@ -19,7 +19,7 @@ T = TypeVar("T")
 class Handler(Entity, Generic[T]):
     # inherits label, predicate, etc from Entity
 
-    func: Callable[[Entity, Context], T]  # Return type is determined by service
+    func: Callable[[Entity, StringMap], T]  # Return type is determined by service
     service: ServiceKind
     caller_criteria: dict[str, Any] = Field(default_factory=dict)
     priority: int = 0
@@ -38,7 +38,7 @@ class Handler(Entity, Generic[T]):
         self.label = f"{self.service.name}:{self.func.__name__}"
         return self
 
-    def __call__(self, entity: Entity, context: Context) -> T:
+    def __call__(self, entity: Entity, context: StringMap) -> T:
         return self.func(entity, context)
 
     def __lt__(self, other):
@@ -58,8 +58,8 @@ class Handler(Entity, Generic[T]):
                 class_depth_for(caller, self.owner_cls),
                 self.registration_order)
 
-    def satisfied(self, *, caller: Entity, ctx: Context) -> bool:
-        return caller.match(**self.caller_criteria) and super().satisfied(ctx=ctx)
+    def is_satisfied(self, *, caller: Entity, ctx: StringMap) -> bool:
+        return caller.match(**self.caller_criteria) and super().is_satisfied(ctx=ctx)
 
 
 class HandlerRegistry(Registry[Handler]):
@@ -67,7 +67,7 @@ class HandlerRegistry(Registry[Handler]):
     _global_handler_registration_counter: ClassVar[int] = 0
 
     def register_handler(self, service: ServiceKind, priority: int=0, caller_criteria=None, owner_cls: Type[HasHandlers] = None, is_instance_handler: bool = False):
-        def decorator(func: Callable[[Entity, Context], Any]):
+        def decorator(func: Callable[[Entity, StringMap], Any]):
             handler = Handler(
                 func=func,
                 service=service,
@@ -89,9 +89,9 @@ class HandlerRegistry(Registry[Handler]):
     def find_all(self, **criteria: Any) -> list[Handler]:
         return sorted(super().find_all(**criteria))
 
-    def find_all_for(self, caller: Entity, service: ServiceKind, ctx: Context) -> list[Handler]:
+    def find_all_for(self, caller: Entity, service: ServiceKind, ctx: StringMap) -> list[Handler]:
         return sorted(
-            filter(lambda x: x.service is service and x.satisfied(caller=caller, ctx=ctx), self),
+            filter(lambda x: x.service is service and x.is_satisfied(caller=caller, ctx=ctx), self),
             key=lambda x: x.caller_sort_key(caller=caller))
 
 def handler(service_kind, *, priority=10, caller_criteria=None):

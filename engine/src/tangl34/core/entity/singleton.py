@@ -8,7 +8,19 @@ from .registry import Registry
 
 
 class Singleton(Entity):
+    """
+    A singleton pattern entity-type, allowing only one instance per label.
 
+    This class provides functionality for enforcing the singleton pattern where
+    instances are uniquely identified by a label. Attempts to create additional
+    instances with the same label will raise a runtime error. Designed for use
+    cases where controlled instance management is required.
+
+    :ivar label: Name identifier for the singleton instance.
+    :type label: str
+    :ivar _instances: Registry of all instances of subclass.
+    :type _instances: ClassVar[Registry[Self]]
+    """
     model_config = ConfigDict(frozen=True)
 
     label: str = Field(...)

@@ -3,23 +3,23 @@ from typing import ClassVar, Self
 
 import jinja2
 
-from ..type_hints import Context, StringMap
+from ..type_hints import StringMap, StringMap
 from ..journal import ContentFragment
 from ..entity import Entity
 from .enums import ServiceKind
 from .base import handler
-from .context import HasContext
+from .context import HasStringMap
 
 logger = logging.getLogger(__name__)
 
 # todo: Template engine swappability: Let Renderable accept a template_engine parameter, so users can drop in their own (e.g., string.Template, Mako) with no code change.
 
-class Renderable(HasContext):
+class Renderable(HasStringMap):
     content: str = None
     jinja_env: ClassVar[jinja2.Environment] = jinja2.Environment()
 
     @classmethod
-    def render_str(cls, s: str, *, ctx: Context, env: jinja2.Environment = None) -> str:
+    def render_str(cls, s: str, *, ctx: StringMap, env: jinja2.Environment = None) -> str:
         """
         Render a string as a Jinja2 template using the given environment
         and context.

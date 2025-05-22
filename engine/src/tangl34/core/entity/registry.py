@@ -9,7 +9,17 @@ from .entity import Entity
 EntityT = TypeVar("EntityT", bound=Entity)
 
 class Registry(Entity, Generic[EntityT]):
-    """Runtime registry with optional constraints and lookup by criteria."""
+    """
+    Registry class for managing and organizing multiple entities.
+
+    The Registry class provides methods to add, remove, retrieve, and search
+    entities by their IDs or specific criteria. It uses a private
+    dictionary to manage entities and implements iterable and boolean
+    interfaces for convenience.
+
+    :ivar _items: Private dictionary storing entities with their UUIDs as keys.
+    :type _items: dict[UUID, EntityT]
+    """
 
     _items: dict[UUID, EntityT] = PrivateAttr(default_factory=dict)
 

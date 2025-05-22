@@ -1,5 +1,5 @@
 from tangl34.core.handlers import Handler, HandlerRegistry, ServiceKind, HasHandlers
-from tangl34.core.entity import Entity, Context
+from tangl34.core.entity import Entity, StringMap
 
 class DummyEntity(Entity):
     foo: int = None
@@ -26,7 +26,7 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
         label="test",
         predicate=always_true,
     )
-    assert h.satisfied(caller=caller, ctx=ctx)
+    assert h.is_satisfied(caller=caller, ctx=ctx)
     # Handler with caller_criteria foo=2, will NOT match
     h2 = Handler(
         func=lambda x, y: 1,
@@ -36,7 +36,7 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
         label="test",
         predicate=always_true,
     )
-    assert not h2.satisfied(caller=caller, ctx=ctx)
+    assert not h2.is_satisfied(caller=caller, ctx=ctx)
     # Handler with predicate always_false
     h3 = Handler(
         func=lambda x, y: 1,
@@ -46,7 +46,7 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
         label="test",
         predicate=always_false,
     )
-    assert not h3.satisfied(caller=caller, ctx=ctx)
+    assert not h3.is_satisfied(caller=caller, ctx=ctx)
 
 def test_handlerregistry_register_and_iter_handlers():
     registry = HandlerRegistry()

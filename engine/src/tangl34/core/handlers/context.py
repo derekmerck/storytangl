@@ -7,7 +7,7 @@ from .enums import ServiceKind
 
 logger = logging.getLogger(__name__)
 
-class HasContext(HasHandlers):
+class HasStringMap(HasHandlers):
 
     locals: dict = Field(default_factory=dict)
 

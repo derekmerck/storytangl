@@ -1,66 +1,58 @@
-from typing import Callable, Optional, Literal, Dict, Any
+from typing import Optional, Literal, Any
+from uuid import UUID
 
+from pydantic import Field
+
+from ...type_hints import StringMap, Predicate
 from ...entity import Entity
+from ...structure import Edge, EdgeKind, Graph
+from .enums import ResolutionState
 
-# Requirements:
-# - Select _provider_, uses `entity.match(**req_criteria)`; then links
-# - Select _builder_ uses `entity.provides_match(**req_criteria)`, where the entity is an indirect provider, then calls entity.build(ctx) and links
-
-# Gated, available:
-# - Uses entity.predicate(ctx) -> bool (where ctx is an entity's ns view)
-
-class Requirement(Entity):
+class Requirement(Edge):
     """
-    A Requirement represents a declarative need that a node may have within a given context.
+    Declarative need to link a resource in the graph. May be attached to nodes/events/choices as a
+    'requires' edge with an initially undefined destination.
+
+    _Resource requirements_ are resolved by a _provisioner_, which may choose to create a new resource
+    if it cannot find one that satisfies the requirement within the allowable search scope.
+
+    The returned resource is attached to the requirement with a 'provider' edge and can be accessed
+    by the requirement's label from the owner's context.
 
     Terminology:
-    - requirement_gate: a callable predicate (ctx → bool) that determines whether this requirement applies.
+    - label: a locally unique string that identifies the requirement in the context of its parent node.
+    - predicate: a callable predicate (ctx → bool) that determines whether this requirement applies.
     - provider_criteria: a dict of attribute filters used to identify matching providers.
-    - fallback_cap: an optional capability used to satisfy the requirement if no provider is found.
+    - provider_predicate: a function that takes the provider.context? and returns a boolean.
     - scope_bounds: defines how far the resolution search should go (e.g. local, graph, domain, global).
+    - obligation: determines how the requirement is handled, e.g. "find_only", "find_or_create", "create_only", "optional".  Optional requirements are ignored if unresolvable.    - fallback_provisioner: an optional local provisioner that can satisfy the requirement if obligation can't be met.
+    - resolution_state: the current state of the requirement, e.g. "unresolved", "resolved", "unresolvable", "in_progress".
     """
+    edge_kind: EdgeKind = EdgeKind.REQUIREMENT
+    dst_id: Optional[UUID] = Field(None, alias="provider_id")
+    provider_criteria: StringMap = Field(default_factory=dict)
+    provider_predicate: Predicate = Field(None)  # todo: is a predicate just part of the criteria?
+    scope_bounds: Any = None
+    obligation: Literal["find_only", "find_or_create", "create_only", "optional"] = "find_or_create"
+    fallback_provisioner: Optional['Provisioner'] = None
+    resolution_state: Optional[ResolutionState] = ResolutionState.UNRESOLVED
 
-    scope_bounds: Any = None  # Limits where to search for satisfying providers
-    requirement_gate: Callable[[Dict[str, Any]], bool]  # Predicate that gates whether the requirement is active
-    provider_criteria: Dict[str, Any]  # Used for provider match or can-provide-match
-    fallback_cap: Optional['Capability'] = None  # Fallback capability for soft resolution
+    # alias to dest
+    def provider(self, g: Graph) -> Optional[Entity]:
+        if self.dst_id is not None:
+            return super().dst(g)
 
-    def satisfied(self, ctx: Dict[str, Any]) -> bool:
-        """Check whether the requirement is active and should be processed."""
-        return self.requirement_gate(ctx)
+    @property
+    def is_resolved(self) -> bool:
+        return self.resolution_state is ResolutionState.RESOLVED or self.resolution_state is ResolutionState.UNRESOLVED and self.obligation == "optional"
 
-    def satisfied_by(self, provider: Entity) -> bool:
+    def is_satisfied(self, *, ctx: StringMap, **kwargs) -> bool:
+        # resolved and ungated
+        return self.is_resolved and super().is_satisfied(ctx=ctx, **kwargs)
+
+    def matches_provider(self, provider: Entity) -> bool:
         """Check whether the given provider satisfies this requirement."""
         return provider.match(**self.provider_criteria)
 
-    def resolve(self, ctx: Dict[str, Any]) -> bool:
-        """Attempt to resolve the requirement by any means: direct, indirect, or fallback."""
-        return (self.satisfied(ctx) or
-                self.find_satisfier(ctx) or
-                self.create_satisfier(ctx))
-
-    def find_satisfier(self, ctx: Dict[str, Any]) -> bool:
-        """Placeholder for search among existing providers."""
-        return False
-
-    def create_satisfier(self, ctx: Dict[str, Any]) -> bool:
-        """Placeholder for invoking builder or fallback capability."""
-        return False
-
-#
-# class Requirement(Entity):
-#     req_criteria: dict[str, Any] = Field(default_factory=dict)
-#     satisfied_by: Optional[Link] = None
-#     obligation: Literal["find_or_create", "find_only", "create_only"] = "find_or_create"
-#     # find or create will try to find first and then build, requester will be gated if provision cannot be created
-#     # find only will _not_ try to build, requester will be gated if provision is un-findable
-#     # create only will always try to create a provision if the req is unsatisfied
-#     # builder is for "soft reqs" that can be waived by an inline resource
-#     builder: Optional[Provider] = None
-#
-#     def find_match(self): ...
-#     def find_match_builder(self): ...
-#
-# class StructureRequirement(Requirement):
-#     # Links a _path_ to a structure node
-#     phase: Optional[Literal["before", "after"]] = None
+    # todo: when a provider is assigned, we can add a blame edge to the provisioner that
+    #       provided it as well

@@ -25,8 +25,8 @@ def test_entity_structure_unstructure():
 
 def test_predicate_satisfied():
     e = TestEntity(foo=1, predicate=lambda ctx: ctx.get("flag", False))
-    assert e.satisfied(ctx={"flag": True})
-    assert not e.satisfied(ctx={"flag": False})
+    assert e.is_satisfied(ctx={"flag": True})
+    assert not e.is_satisfied(ctx={"flag": False})
 
 def test_registry_add_get_find_remove():
     reg = Registry[TestEntity]()

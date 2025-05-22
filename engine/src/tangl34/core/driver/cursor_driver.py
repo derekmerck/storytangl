@@ -1,17 +1,24 @@
 from typing import Optional
+import logging
 
 from pydantic import BaseModel, Field
 
-from ..structure import Graph, Node, Edge
+from ..structure import Graph, Node, Edge, EdgeKind
 from ..journal import HasJournal
-from ..handlers import Scope, Renderable, HasContext, HasEffects
-# from ..handlers.provision import resolve_requirements, requires_choice
+from ..handlers import Scope, Renderable, HasStringMap, HasEffects
+
+logger = logging.getLogger(__name__)
 
 # todo: remove stub functions for the prior handler api
 def resolve_requirements(*args, **kwargs): return True
 def requires_choice(*args, **kwargs): return None
 
 class CursorDriver(BaseModel):
+    """
+    Consume a story-space in a 'feed-forward' manner, incrementally expanding the narrative horizon, pruning unreachable states, and logging output to the journal.
+
+    This is in-contrast to 'feed-backward' processes like inferring a lane in story-space from an existing narrative.
+    """
     cursor: Node    # Assumes scoped node
     graph: Graph    # Assumes scoped graph
     scopes: list[Scope] = Field(default_factory=list)  # additional scopes, e.g., domain, user
@@ -19,10 +26,14 @@ class CursorDriver(BaseModel):
 
     def advance_cursor(self, choice: Edge, section_bookmark = None) -> Optional[Edge]:
 
+        if not choice.edge_kind is EdgeKind.CHOICE:
+            logger.error(f"{choice!r}")
+            raise RuntimeError(f"Trying to follow a {choice.edge_kind} edge.")
+
         self.cursor = choice.dst(self.graph)
 
         # 1) CONTEXT
-        ctx = HasContext.gather_context(self.cursor, self.graph, *self.scopes)
+        ctx = HasStringMap.gather_context(self.cursor, self.graph, *self.scopes)
 
         # 2) BEFORE
         # Update structure and choices
