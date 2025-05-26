@@ -1,9 +1,12 @@
 from __future__ import annotations
 from abc import abstractmethod
-from typing import Any, Optional, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Self
 from abc import ABC
 import logging
 
+from pydantic import Field
+
+from .enums import ResolutionState
 from ...type_hints import StringMap, UnstructuredData
 from ...entity import Entity, Registry
 from ..enums import ServiceKind
@@ -19,80 +22,87 @@ class Provisioner(Handler, ABC):
     """
     Provisioner is a handler that can produce an entity that satisfies a Requirement,
     either through discovery or creation.
+
+    Provisioners must implement two functions: 'satisfies_requirement(req, ctx)' and
+    'get_provider(req, ctx)'.  The first is used to determine whether a requirement can
+    be satisfied at all, and the second is used to find or create the entity that satisfies.
+
+    The cursor driver's entry point is the 'resolve_all_requirements' function, which will
+    attempt to extend the story resolution horizon by guaranteeing a resolution for candidate
+    upcoming structure nodes.
     """
 
-    def can_satisfy_requirement(self, req: Requirement) -> bool:
-        # Override this for more complicated provisioning logic
-        return self.get_provider(req) is not None
+    @abstractmethod
+    def satisfies_requirement(self, req: Requirement, ctx: StringMap) -> bool:
+        ...
 
     @abstractmethod
-    def get_provider(self, req: Requirement, ctx: StringMap):
+    def get_provider(self, req: Requirement, ctx: StringMap) -> Optional[Entity]:
         ...
 
     @classmethod
-    def try_find_provisioners(cls, req, caller, *objects, ctx):
-        provider_handlers = cls.gather_handlers(ServiceKind.PROVISION, *objects, obj_cls=FindProvisioner)
-        for h in provider_handlers:
-            if h.can_satisfy_requirement(req):
-                return h.get_provider(req, ctx)
-
-    @classmethod
-    def try_build_provisioners(cls, req, caller, *objects, ctx):
-        provider_handlers = cls.gather_handlers(ServiceKind.PROVISION, *objects, obj_cls=BuildProvisioner)
-        for h in provider_handlers:
-            if h.can_satisfy_requirement(req):
-                return h.get_provider(req, ctx)
-
-    @classmethod
-    def resolve_requirement(cls, req: Requirement, caller, *objects, ctx):
+    def resolve_requirement(cls, req: Requirement, caller, *objects, ctx: StringMap) -> bool:
         # If you want to apply caller's effects on another object/scope, provide a different context
         logger.debug(f"resolving requirement {req!r}")
-        if req.obligation in ("find_only", "find_or_create"):
-            if x := cls.try_find_provisioners(req, caller, *objects, ctx=ctx):
-                return x
-        if req.obligation in ("find_or_create", "create_only"):
-            if x := cls.try_build_provisioners(req, caller, *objects, ctx=ctx):
-                return x
 
-    @classmethod
-    def resolve_requirements2(cls, caller, *objects, ctx):
+        if req.is_resolved:
+            return True
 
-        graph = objects[0]  # type: Graph
+        # todo: prune objects to the allowed req.scope-range
 
-        for req in caller.requirements:  # type: Requirement
-            if req.is_satisfied(ctx=ctx):
-                continue
+        def find_provisioner(req, provisioner_cls) -> Optional[Self]:
+            provider_handlers = cls.gather_handlers(ServiceKind.PROVISION, caller, *objects, obj_cls=provisioner_cls)
+            for h in provider_handlers:
+                if h.satisfies_requirement(req, ctx=ctx):
+                    return h
 
-            prov = None
-            match req.obligation:
-                case "find_or_create":
-                    prov = cls.try_find_provisioners(req, *objects, ctx=ctx) or cls.try_build_provisioners(req, *objects, ctx=ctx)
-                case "find_only":
-                    prov = cls.try_find_provisioners(req, *objects, ctx=ctx)
-                case "always_create":
-                    prov = cls.try_build_provisioners(req, *objects, ctx=ctx)
-                case _ if req.hard:
-                    return False
-            if prov:
-                from ...structure import Graph, EdgeKind
-                req.dst_id = prov.uid
-                graph.add_edge(prov, caller, edge_kind=EdgeKind.PROVIDES)
-                # should return handler as well
-                # graph.add_edge(caller, h, edge_kind=EdgeKind.BLAME)
+        match req.obligation:
+            case "find_or_create":
+                prov_h = find_provisioner(req, FindProvisioner) or find_provisioner(req, BuildProvisioner)
+            case "find_only":
+                prov_h = find_provisioner(req, FindProvisioner)
+            case "create_only":
+                prov_h = find_provisioner(req, BuildProvisioner)
+            case _:
+                prov_h = None
+
+        if prov_h is not None:
+            prov = prov_h.get_provider(req, ctx=ctx)
+            req.resolution_state = ResolutionState.RESOLVED
+            req.dst_id = prov.uid
+
+            from ...structure import Graph, EdgeKind
+            g = objects[0]  # type: Graph
+            g.add(prov)
+            g.add_edge(prov, caller, edge_kind=EdgeKind.PROVIDES)
+            # g.add_edge(prov, prov_h, edge_kind=EdgeKind.BLAME)
+            # todo: this won't work as is, handlers aren't in the graph...
+        else:
+            req.resolution_state = ResolutionState.UNRESOLVABLE
         return True
 
     @classmethod
-    def resolve_all_requirements(cls, caller, *objects, ctx):
-        for req in caller.requirements:
-            cls.resolve_requirement(req, caller, *objects, ctx=ctx)
+    def resolve_all_requirements(cls, caller, *objects, ctx) -> bool:
+        for req in caller.requirements:  # type: Requirement
+            if req.is_satisfied(ctx=ctx):
+                continue
+            if not cls.resolve_requirement(req, caller, *objects, ctx=ctx):
+                return False
+        return True
 
 
 class FindProvisioner(Provisioner):
     # Search a scope for available entities that satisfy the requirement criteria
+    provider_registry: Registry = Field(default_factory=Registry)  
+    # this should be the graph or a scope-level node registry for this requirement criteria
+    # graph should offer one of these automatically, domain can offer one for world-level assets, etc.
+    
+    def satisfies_requirement(self, req: Requirement, ctx: StringMap) -> bool:
+        return self.get_provider(req, ctx=ctx) is not None
 
-    def get_provider(self, req: Requirement, provider_registry: Registry, ctx = None):
+    def get_provider(self, req: Requirement, ctx = None):
         # todo: actually want to check satisfies req and ungated by predicate
-        return provider_registry.find_one(**req.provider_criteria)
+        return self.provider_registry.find_one(**req.provider_criteria)
 
 
 class BuildProvisioner(Provisioner):
@@ -102,7 +112,7 @@ class BuildProvisioner(Provisioner):
     def build(self, req: Requirement, ctx: StringMap) -> Entity:
         return self.func(req, ctx)
 
-    def satisfies_requirement(self, req: Requirement) -> bool:
+    def satisfies_requirement(self, req: Requirement, ctx: StringMap) -> bool:
         return req.matches_provider(self.provider_features)
 
     def get_provider(self, req: Requirement, ctx: StringMap) -> Entity:
@@ -114,6 +124,7 @@ class ProviderTemplate(Entity):
     data: UnstructuredData
 
     def satisfies_requirement(self, req: Requirement) -> bool:
+        # the entity built from this template will match the required criteria
         ...
 
 
