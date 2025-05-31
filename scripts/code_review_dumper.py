@@ -14,29 +14,27 @@ Pathlike = str | Path
 
 # name: ([ include ], [ ignore ] )
 BASE_DIR = Path(__file__).parent.parent
-PKG_32  = Path("engine/src/tangl")
-PKG_33 = Path("engine/src/tangl33")
-PKG_34 = Path("engine/src/tangl34")
+PKG_DIR  = Path("engine/src/tangl")
 
 collections = {
-    "full32": ([PKG_32], []),
-    "full33": ([PKG_33], []),
-    "full34": ([PKG_34], []),
+    "full": ([PKG_DIR], []),
+    # "full33": ([PKG_33], []),
+    # "full34": ([PKG_34], []),
 
-    "core32": ([PKG_32 / "core"], []),
-    "core33": ([PKG_33 / "core"], []),
-    "core34": ([PKG_34 / "core"], []),
+    "core34": ([PKG_DIR / "core/entity", PKG_DIR / "core/handler"], []),
+    # "core33": ([PKG_33 / "core"], []),
+    # "core34": ([PKG_34 / "core"], []),
 
     # story only
-    "story32": ([PKG_32 / "story"], []),
-    "story33": ([PKG_33 / "story"], []),
-    "story34": ([PKG_33 / "story"], []),
-
-    # # media only
-    "media32": ([PKG_32 / "media"], []),
-
-    # service only
-    "service32": ([PKG_32 / "service"], []),
+    # "story32": ([PKG_32 / "story"], []),
+    # "story33": ([PKG_33 / "story"], []),
+    # "story34": ([PKG_33 / "story"], []),
+    #
+    # # # media only
+    # "media32": ([PKG_32 / "media"], []),
+    #
+    # # service only
+    # "service32": ([PKG_32 / "service"], []),
 
     # tests only
     # "tests": (["engine/tests"], []),

@@ -1,13 +1,10 @@
-from typing import Protocol, Any, Type, Union, Dict, NewType, Callable, TYPE_CHECKING
+from typing import Protocol, Any, Type, Union, Dict
 from uuid import UUID
 from enum import Enum
 from pathlib import Path
 
-if TYPE_CHECKING:
-    from .core.base import Entity
-
 # General types
-StringMap = NewType('StringMap', dict[str, Any])  # A dict with identifier-safe string keys
+StringMap = Dict[str, Any]
 Primitive = str | int | float | Enum | bool
 Pathlike = Path | str
 Typelike = Type | str
@@ -18,20 +15,17 @@ Expr = str           # Evaluable/executable string expression
 UniqueLabel = str    # Must be unique within namespace, may be used for hashing
 Hash = bytes         # Digests are bytes
 Identifier = Union[UUID, UniqueLabel, Hash]
-Tag = Union[Enum, str, int]  # Tags may be enums, strs, or ints
+Tag = Enum | str | int  # Tags may be enums, strs, or ints
 ClassName = str      # Unique name of an entity subclass
 TemplateName = str   # Unique name of a default attributes template
 TemplateMap = dict[TemplateName, dict[str, Any]]
-Step = int           # Traversal step counter
-# A function that takes a context and returns a boolean if the context satisfies the predicate
-Predicate = Callable[['Entity', StringMap], bool]  # func(entity, ctx) = bool
+Step = int           # Counter for traversal steps
 
 # Used by storage and serializers
 class HasUid(Protocol):
     uid: UUID
 FlatData = str | bytes
 UnstructuredData = StringMap
-# A string map of kwargs suitable for structuring a HasUid instance, includes an 'obj_cls' and 'uid' key
 
 # UI style hints
 StyleId = str            # ui element id, #id or id=name

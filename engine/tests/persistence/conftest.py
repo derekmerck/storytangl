@@ -2,7 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from tangl.config import settings
+try:
+    from tangl.config import settings
+except ImportError:
+    settings = {}
 from tangl.persistence.serializers import *
 from tangl.persistence.storage import *
 from tangl.persistence.structuring import StructuringHandler

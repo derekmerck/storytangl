@@ -2,11 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Type, Literal, TypeVar
 
+from tangl.config import settings
 from tangl.type_hints import Pathlike
-try:
-    from tangl.config import settings
-except ImportError:
-    settings = {}
 from .storage import InMemoryStorage, FileStorage, RedisStorage, MongoStorage
 from .serializers import PickleSerializationHandler, JsonSerializationHandler, YamlSerializationHandler, BsonSerializationHandler
 from .structuring import StructuringHandler
@@ -25,12 +22,12 @@ PersistenceManagerName = Literal[
     "bson_mongo"
 ]
 
-DEFAULT_PERSISTENCE_MGR = settings.get('service.persistence', 'native_in_mem')  # type: PersistenceManagerName
+DEFAULT_PERSISTENCE_MGR = settings.get('service.persistence', 'native_in_mem')  # type: PersistanceManagerName
 DEFAULT_USER_DATA_PATH = settings.get('service.paths.user_data', Path("~/tmp").expanduser())
-DEFAULT_REDIS_URL = settings.get('service.apis.redis.url', False)
-DEFAULT_MONGO_URL = settings.get('service.apis.mongo.url', False)
+DEFAULT_REDIS_URL = settings.get('service.apis.redis.url')
+DEFAULT_MONGO_URL = settings.get('service.apis.mongo.url')
 
-ManagerT = TypeVar("ManagerT", bound=PersistenceManager)
+ManagerType = TypeVar("ManagerType", bound=PersistenceManager)
 
 
 class PersistenceManagerFactory:
@@ -49,12 +46,12 @@ class PersistenceManagerFactory:
 
     @classmethod
     def create_persistence_manager(cls,
-                                   manager_cls: Type[ManagerT] = PersistenceManager,
+                                   manager_cls: Type[ManagerType] = PersistenceManager,
                                    manager_name: PersistenceManagerName = DEFAULT_PERSISTENCE_MGR,
                                    structuring: Type[StructuringHandler] = StructuringHandler,
                                    user_data_path: Pathlike = DEFAULT_USER_DATA_PATH,
                                    redis_url: str = DEFAULT_REDIS_URL,
-                                   mongo_url: str = DEFAULT_MONGO_URL) -> ManagerT:
+                                   mongo_url: str = DEFAULT_MONGO_URL) -> ManagerType:
         """
         Use the project settings defaults to instantiate a persistence manager, optionally using the
         given StructuringHandler, if one is both provided and required.
@@ -99,14 +96,14 @@ class PersistenceManagerFactory:
     # Structured in-mem, no structuring _or_ serialization handler required
 
     @staticmethod
-    def native_in_mem(manager_cls: Type[ManagerT] = PersistenceManager) -> ManagerT:
+    def native_in_mem(manager_cls: Type[ManagerType] = PersistenceManager) -> ManagerType:
         return manager_cls(
             storage=InMemoryStorage()
         )
 
     @staticmethod
-    def unstructured_in_mem(manager_cls: Type[ManagerT] = PersistenceManager,
-                            structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+    def unstructured_in_mem(manager_cls: Type[ManagerType] = PersistenceManager,
+                            structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerType:
         return manager_cls(
             storage=InMemoryStorage(),
             structuring=structuring
@@ -117,23 +114,23 @@ class PersistenceManagerFactory:
     # ------------------------
 
     @staticmethod
-    def pickle_in_mem(manager_cls: Type[ManagerT] = PersistenceManager) -> ManagerT:
+    def pickle_in_mem(manager_cls: Type[ManagerType] = PersistenceManager) -> ManagerType:
         return manager_cls(
             storage=InMemoryStorage(),
             serializer=PickleSerializationHandler
         )
 
     @staticmethod
-    def pickle_file(manager_cls: Type[ManagerT] = PersistenceManager,
-                    base_path: Path = DEFAULT_USER_DATA_PATH) -> ManagerT:
+    def pickle_file(manager_cls: Type[ManagerType] = PersistenceManager,
+                    base_path: Path = DEFAULT_USER_DATA_PATH) -> ManagerType:
         return manager_cls(
             storage=FileStorage(base_path=base_path, ext="pkl", binary_rw=True),
             serializer=PickleSerializationHandler
         )
 
     @staticmethod
-    def pickle_redis(manager_cls: Type[ManagerT] = PersistenceManager,
-                     url=DEFAULT_REDIS_URL) -> ManagerT:
+    def pickle_redis(manager_cls: Type[ManagerType] = PersistenceManager,
+                     url=DEFAULT_REDIS_URL) -> ManagerType:
         if not (settings and settings.service.apis.redis.enabled):
             raise ImportError
         return manager_cls(
@@ -146,9 +143,9 @@ class PersistenceManagerFactory:
     # ------------------------
 
     @staticmethod
-    def json_redis(manager_cls: Type[ManagerT] = PersistenceManager,
+    def json_redis(manager_cls: Type[ManagerType] = PersistenceManager,
                    url = DEFAULT_REDIS_URL,
-                   structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+                   structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerType:
         if not settings.service.apis.redis.enabled:
             raise ImportError
         return manager_cls(
@@ -158,9 +155,9 @@ class PersistenceManagerFactory:
         )
 
     @staticmethod
-    def json_file(manager_cls: Type[ManagerT] = PersistenceManager,
+    def json_file(manager_cls: Type[ManagerType] = PersistenceManager,
                   base_path: Path = DEFAULT_USER_DATA_PATH,
-                  structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+                  structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerType:
         return manager_cls(
             storage=FileStorage(base_path=base_path, ext="json", binary_rw=False),
             serializer=JsonSerializationHandler,
@@ -168,9 +165,9 @@ class PersistenceManagerFactory:
         )
 
     @staticmethod
-    def yaml_file(manager_cls: Type[ManagerT] = PersistenceManager,
+    def yaml_file(manager_cls: Type[ManagerType] = PersistenceManager,
                   base_path: Path = DEFAULT_USER_DATA_PATH,
-                  structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+                  structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerType:
         return manager_cls(
             storage=FileStorage(base_path=base_path, ext="yaml", binary_rw=False),
             serializer=YamlSerializationHandler,
@@ -182,9 +179,9 @@ class PersistenceManagerFactory:
     # ------------------------
 
     @staticmethod
-    def bson_file(manager_cls: Type[ManagerT] = PersistenceManager,
+    def bson_file(manager_cls: Type[ManagerType] = PersistenceManager,
                   base_path: Path = DEFAULT_USER_DATA_PATH,
-                  structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+                  structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerType:
         if not (settings and settings.service.apis.mongo.enabled):
             raise ImportError
         return manager_cls(
@@ -194,9 +191,9 @@ class PersistenceManagerFactory:
         )
 
     @staticmethod
-    def bson_mongo(manager_cls: Type[ManagerT] = PersistenceManager,
+    def bson_mongo(manager_cls: Type[ManagerType] = PersistenceManager,
                    url=DEFAULT_MONGO_URL,
-                   structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+                   structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerType:
         if not (settings and settings.service.apis.mongo.enabled):
             raise ImportError
         return manager_cls(

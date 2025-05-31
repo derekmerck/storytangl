@@ -74,7 +74,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
         if self.storage is not None:
             if hasattr(structured, 'uid'):
                 uid = structured.uid
-            elif isinstance(structured, dict) and 'uid' in structured:
+            elif isinstance(structured, UnstructuredData) and 'uid' in structured:
                 uid = structured['uid']
             else:
                 raise KeyError(f"Unable to infer key for {structured}")

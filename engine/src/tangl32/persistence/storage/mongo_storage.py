@@ -1,10 +1,6 @@
 from uuid import UUID
 
-try:
-    from tangl.config import settings
-except ImportError:
-    settings = {}
-
+from tangl.config import settings
 from tangl.type_hints import FlatData
 
 try:
