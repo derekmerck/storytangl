@@ -32,10 +32,12 @@ class Entity(BaseModelPlus):
     def matches(self, **criteria) -> bool:
         for k, v in criteria.items():
             if k.startswith("has_") and hasattr(self, k):
+                logger.debug(f"Calling has_{k}({v})")
                 func = getattr(self, k)
                 if not func(v):
                     return False
             elif getattr(self, k, None) != v:
+                logger.debug(f"Comparing self.{k} == {v}")
                 return False
         return True
 
@@ -83,3 +85,6 @@ class Entity(BaseModelPlus):
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}:{self.label}>"
+
+    dirty: bool = False
+    # indicator that entity has been tampered with, invalidates certain debugging

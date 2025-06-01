@@ -1,5 +1,5 @@
 import pytest
-from tangl.narrative.lang.nominal import Nominal
+from tangl.lang.nominal import Nominal
 
 
 def test_default_plural():

@@ -2,7 +2,7 @@ import pytest
 import uuid
 import pickle
 
-from tangl.core.base import Node, Graph
+from tangl.core.entity import Node, Graph
 
 
 # Test the Node class and its methods

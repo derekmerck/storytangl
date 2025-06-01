@@ -1,6 +1,6 @@
 import pydantic
 
-from tangl.narrative.lang.has_personal_name import HasPersonalName
+from tangl.lang.has_personal_name import HasPersonalName
 
 import pytest
 

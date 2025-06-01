@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Optional, Iterator, Self
+from typing import TypeVar, Generic, Optional, Iterator, Self, Callable
 from uuid import UUID
 import itertools
 
@@ -55,11 +55,13 @@ class Registry(Entity, Generic[EntityT]):
     def find_first(self, *, sort_key, **criteria) -> Optional[EntityT]:
         return self.find_one(sort_key=sort_key, **criteria)
 
-    def find_all(self, sort_key=None, **criteria) -> Iterator[EntityT]:
+    def find_all(self, sort_key=None, filt: Callable[[EntityT], bool] = None, **criteria) -> Iterator[EntityT]:
+        # todo: filt is only implemented here for now b/c changing the entire interface is a pain
+        filt = filt or (lambda x: True)
         if sort_key is None:
-            yield from (item for item in self if item.matches(**criteria))
+            yield from (item for item in self if item.matches(**criteria) and filt(item))
         else:
-            yield from (item for item in sorted(self, key=sort_key) if item.matches(**criteria))
+            yield from (item for item in sorted(self, key=sort_key) if item.matches(**criteria) and filt(item))
 
     def __len__(self) -> int:
         return len(self._items)

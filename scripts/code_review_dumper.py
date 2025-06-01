@@ -21,7 +21,7 @@ collections = {
     # "full33": ([PKG_33], []),
     # "full34": ([PKG_34], []),
 
-    "core34": ([PKG_DIR / "core/entity", PKG_DIR / "core/handler"], []),
+    "core34": ([PKG_DIR / "core/entity", PKG_DIR / "core/handler"], ["singleton"]),
     # "core33": ([PKG_33 / "core"], []),
     # "core34": ([PKG_34 / "core"], []),
 

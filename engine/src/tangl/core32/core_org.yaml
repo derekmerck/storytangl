@@ -8,7 +8,7 @@ classes:
         - uid
         - label
         - tags
-        - match(features)
+        - matches(**criteria)
         - structure/unstructure()
 
       mixins:
@@ -16,11 +16,11 @@ classes:
         - ExpandsTemplates:
         - HasContext:
             has: [locals, gather_context()]
-        - HasConditions:  # Runtime eval
-            has: [exprs, eval_expr(), check_conditions()]
+        - Satisfiable:  # Runtime eval
+            has: [predicates, is_satisfied()]
             friends: [HasContext]
         - HasEffects:     # Runtime exec
-            has: [exprs, exec_expr(), apply_effect()]
+            has: [effects, apply_effects()]
             friends: [HasContext]
         - Available:
             has: [lock/unlock(), is_avail()]

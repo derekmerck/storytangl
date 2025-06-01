@@ -1,13 +1,16 @@
 from typing import ClassVar, Type, Callable, Any, Literal, Self, Optional, Iterator
+from collections import ChainMap
+import itertools
+import logging
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Registry
 from tangl.core.entity.registry import RegistryP
 from .base_handler import BaseHandler, BaseHandlerP
 
-ServiceKind = str
+logger = logging.getLogger(__name__)
 
-ExecuteAllStrategy = Literal["gather", "pipeline", "all_true", "first"]
+AggregationStrategy = Literal["gather", "merge", "pipeline", "all_true", "first"]
 
 class HandlerRegistryP(RegistryP[BaseHandlerP]):
 
@@ -32,10 +35,10 @@ class HandlerRegistryP(RegistryP[BaseHandlerP]):
     @classmethod
     def chain_execute_first(cls, caller: Entity, *registries: Self, ctx: StringMap, **criteria): ...
 
-    default_execute_all_strategy: ExecuteAllStrategy
-    def execute_all(self, caller: Entity, *, ctx: StringMap, strategy: ExecuteAllStrategy = None, **criteria): ...
+    default_aggregation_strategy: AggregationStrategy
+    def execute_all(self, caller: Entity, *, ctx: StringMap, strategy: AggregationStrategy = None, **criteria): ...
     @classmethod
-    def chain_execute_all(cls, caller: Entity, *registries: Self, ctx: StringMap, strategy: ExecuteAllStrategy = None, **criteria): ...
+    def chain_execute_all(cls, caller: Entity, *registries: Self, ctx: StringMap, strategy: AggregationStrategy = None, **criteria): ...
 
 
 class HandlerRegistry(Registry[BaseHandler]):
@@ -77,13 +80,14 @@ class HandlerRegistry(Registry[BaseHandler]):
     # SORTED FIND FOR
 
     def find_all_for(self, caller: Entity, *, ctx: StringMap, **criteria) -> Iterator[BaseHandler]:
+        # There are 2 types of criteria here:
+        # - criteria for the _handler_ to activate
+        # - criteria for the _calling entity_ to access the handler
         criteria = criteria or {}
-        # todo: add criteria, entity matches handler criteria, has class handler wants, ctx satisfied on h
-        criteria.update({})
-        return self.find_all(sort_key=lambda x: x.sort_key(caller=caller), **criteria)
-        # return sorted(
-        #     filter(lambda x: x.service is service and x.is_satisfied(caller=caller, ctx=ctx), self),
-        #     key=lambda x: x.caller_sort_key(caller=caller))
+        handlers = self.find_all(sort_key=lambda x: x.sort_key(caller=caller),
+                                 filt = lambda x: caller.matches(**x.caller_criteria),
+                                 **criteria, has_owner_cls=caller)
+        return handlers
 
     def find_first_for(self, caller: Entity, *, ctx: StringMap, **criteria) -> Optional[BaseHandler]:
         return next(self.find_all_for(caller, ctx=ctx, **criteria), None)
@@ -119,7 +123,6 @@ class HandlerRegistry(Registry[BaseHandler]):
             result = h.func(caller, ctx)
             if result is not None:
                 results.append(result)
-        # If all the same type, list or dict, flatten or merge
         return results
 
     @classmethod
@@ -138,16 +141,26 @@ class HandlerRegistry(Registry[BaseHandler]):
                 yield result
 
     # handler registries may define a default kind if they expect to be homogeneous wrt kind
-    default_execute_all_strategy: ExecuteAllStrategy = "gather"
+    default_aggregation_strategy: AggregationStrategy = "gather"
 
     @classmethod
-    def _execute_many(cls, handlers: list[BaseHandler], caller: Entity, *, strategy: ExecuteAllStrategy = None, ctx: StringMap):
+    def _execute_many(cls, handlers: list[BaseHandler], caller: Entity, *, strategy: AggregationStrategy, ctx: StringMap):
 
-        strategy = strategy or cls.default_execute_all_strategy
+        logger.debug(f"Calling many handlers with strategy {strategy}.")
         match strategy:
             case "gather":
                 # Gather and merge all results if they are all the same type (list or dict)
                 return cls._call_handlers(handlers, caller, ctx=ctx)
+            case "merge":
+                logger.debug(f"Merging results.")
+                # gather, if all the same type, list or dict, merge into a single result
+                results = cls._call_handlers(handlers, caller, ctx=ctx)
+                if all([isinstance(r, dict) for r in results]):
+                    return ChainMap(*reversed(results))
+                if all([isinstance(r, list) for r in results]):
+                    return list(itertools.chain.from_iterable(results))
+                logger.warning(f"Unable to merge results of different types {[(type(r), r) for r in results]}.")
+                return results
             case "pipeline":
                 # Return _last_ non-None result, feed prior results forward as kwarg/ctx field
                 return cls._call_pipeline(handlers, caller, ctx=ctx)
@@ -161,13 +174,25 @@ class HandlerRegistry(Registry[BaseHandler]):
                 # Return an iterator of raw call results for aggregation elsewhere
                 return cls._iter_handlers(handlers, caller, ctx=ctx)
             case _:
-                raise ValueError(f"Unknown execute_all strategy: {strategy}")
+                raise ValueError(f"Unknown aggregation strategy: {strategy}")
 
-    def execute_all(self, caller: Entity, *, ctx: StringMap, strategy: ExecuteAllStrategy = None, **criteria):
+    def execute_all(self, caller: Entity, *, ctx: StringMap,
+                    strategy: AggregationStrategy = None,
+                    extra_handlers: list[BaseHandler] = None,
+                    **criteria):
         handlers = self.find_all_for(caller, ctx=ctx, **criteria)
+        if extra_handlers:
+            def filt_(h: BaseHandler) -> bool:
+                nonlocal caller
+                return h.matches(**criteria, has_owner_cls=caller) and caller.matches(**h.caller_criteria)
+            extra_handlers = filter(filt_, extra_handlers)
+            handlers = sorted(itertools.chain(handlers, extra_handlers),
+                              key=lambda x: x.sort_key(caller=caller))
+        strategy = strategy or self.default_aggregation_strategy
         return self._execute_many(handlers, caller, strategy=strategy, ctx=ctx)
 
     @classmethod
-    def chain_execute_all(cls, caller: Entity, *registries: Self, ctx: StringMap, strategy: ExecuteAllStrategy = None, **criteria):
+    def chain_execute_all(cls, caller: Entity, *registries: Self, ctx: StringMap, strategy: AggregationStrategy = None, **criteria):
         handlers = cls.chain_find_all_for(caller, *registries, ctx, **criteria)
+        strategy = strategy or cls.default_aggregation_strategy
         return cls._execute_many(handlers, caller, strategy=strategy, ctx=ctx)

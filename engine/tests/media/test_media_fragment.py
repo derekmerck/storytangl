@@ -1,3 +1,7 @@
+import pytest
+
+pytest.skip("deprecated", allow_module_level=True)
+
 from tangl.media.media_fragment import MediaFragment, MediaPresentationHints
 
 def test_media_fragment_with_url():

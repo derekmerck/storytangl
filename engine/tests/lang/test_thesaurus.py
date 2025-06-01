@@ -1,5 +1,5 @@
 import pytest
-from tangl.narrative.lang.thesaurus import Synset, Thesaurus, PartOfSpeach
+from tangl.lang.thesaurus import Synset, Thesaurus, PartOfSpeach
 
 # Fixture for sample data
 @pytest.fixture

@@ -27,6 +27,10 @@ class Singleton(Entity):
             return cls._instances.find_one(label=label)
 
     @classmethod
+    def has_instance(cls, label) -> bool:
+        return label in [ i.label for i in cls._instances ]
+
+    @classmethod
     def clear_instances(cls):
         cls._instances.clear()
 
@@ -45,7 +49,7 @@ class Singleton(Entity):
     @model_validator(mode="before")
     def _confirm_new(cls, data):
         label = data.get('label')
-        if label in cls.all_instance_labels():
+        if cls.has_instance(label):
             raise KeyError(f"Label {label} is already registered, 'get_instance' instead")
         return data
 

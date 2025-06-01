@@ -3,9 +3,6 @@ from uuid import UUID
 from enum import Enum
 from pathlib import Path
 
-if TYPE_CHECKING:
-    from .core.base import Entity
-
 # General types
 StringMap = NewType('StringMap', dict[str, Any])  # A dict with identifier-safe string keys
 Primitive = str | int | float | Enum | bool
@@ -23,8 +20,6 @@ ClassName = str      # Unique name of an entity subclass
 TemplateName = str   # Unique name of a default attributes template
 TemplateMap = dict[TemplateName, dict[str, Any]]
 Step = int           # Traversal step counter
-# A function that takes a context and returns a boolean if the context satisfies the predicate
-Predicate = Callable[['Entity', StringMap], bool]  # func(entity, ctx) = bool
 
 # Used by storage and serializers
 class HasUid(Protocol):

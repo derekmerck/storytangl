@@ -2,11 +2,14 @@ from __future__ import annotations
 from typing import Iterator, Union, TypeVar, Generic, Literal
 from uuid import UUID
 import itertools
+import logging
 
 from pydantic import Field, model_validator
 
 from .entity import Entity
 from .registry import Registry
+
+logger = logging.getLogger(__name__)
 
 class Node(Entity):
     graph: Graph = Field(None, json_schema_extra={'cmp': False}, exclude=True)
@@ -48,8 +51,22 @@ class Edge(Entity, Generic[NodeT]):
         self.dest_id = node.uid
 
     def __repr__(self) -> str:
-        src_label = self.src.label if self.src else self.src_id.hex
-        dest_label = self.dest.label if self.src else self.dest_id.hex
+        if self.src_id:
+            if self.graph is not None:
+                src_label = self.src.label
+            else:
+                src_label = self.src_id.hex
+        else:
+            src_label = "anon"
+
+        if self.dest_id:
+            if self.graph is not None:
+                dest_label = self.dest.label
+            else:
+                dest_label = self.dest_id.hex
+        else:
+            dest_label = "anon"
+
         return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
 
     @model_validator(mode='after')
@@ -61,14 +78,15 @@ class Edge(Entity, Generic[NodeT]):
 class Graph(Registry[Union[Node, Edge]]):
 
     def add(self, item: Node | Edge):
-        item.graph = self
+        logger.debug(f"Adding {item!r} to graph {self!r}")
         if item not in self:
+            item.graph = self
             super().add(item)
+        else:
+            raise ValueError(f"Item {item!r} already exists in graph {self!r}")
 
     def add_edge(self, src: Node, dest: Node, **kwargs) -> Edge:
-        e = Edge(src_id=src.uid, dest_id=dest.uid, graph=self, **kwargs)
-        self.add(e)
-        return e
+        return Edge(src_id=src.uid, dest_id=dest.uid, graph=self, **kwargs)
 
     def find_edges(self, node: Node, *, direction: Literal["in", "out"] = None, **criteria) -> Iterator[Edge]:
         match direction:
