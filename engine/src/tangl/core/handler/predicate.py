@@ -46,6 +46,8 @@ class Satisfiable(Entity):
             for item in data:
                 if isinstance(item, Predicate):
                     res.append(item)
+                elif isinstance(item, dict):
+                    res.append(Predicate(**item))
                 elif isinstance(item, str):
                     res.append(Predicate(raw_expr=item))
                 else:

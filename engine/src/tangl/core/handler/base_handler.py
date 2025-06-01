@@ -33,11 +33,14 @@ class BaseHandler(Entity, Generic[T]):
     def owner_cls(self) -> Optional[Type[Entity]]:
         if self.owner_cls_ is None:
             self.owner_cls_ = self._infer_owner_cls()
+        logger.debug(f"h:{self.func.__name__}.owner_cls={self.owner_cls_}")
         return self.owner_cls_
 
     # terminology here is a little off, this is the an inv func relative to has_cls
     def has_owner_cls(self, entity: Entity) -> bool:
+        logger.debug(f"h:Comparing owner_cls to caller_cls={entity.__class__}")
         if self.owner_cls is None:
+            logger.debug(f"h:owner_cls is None, so always true")
             return True
         return isinstance(entity, self.owner_cls)
 

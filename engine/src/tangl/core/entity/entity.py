@@ -32,12 +32,13 @@ class Entity(BaseModelPlus):
     def matches(self, **criteria) -> bool:
         for k, v in criteria.items():
             if k.startswith("has_") and hasattr(self, k):
-                logger.debug(f"Calling has_{k}({v})")
+                logger.debug(f"Calling {self.__class__}.{k}({v!r})")
                 func = getattr(self, k)
                 if not func(v):
+                    logger.debug(f"Failed checking {k}")
                     return False
             elif getattr(self, k, None) != v:
-                logger.debug(f"Comparing self.{k} == {v}")
+                logger.debug(f"Failed comparing {self.__class__}.{k} == {v}")
                 return False
         return True
 

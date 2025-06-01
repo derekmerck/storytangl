@@ -45,6 +45,8 @@ class HasEffects(Entity):
             for item in data:
                 if isinstance(item, RuntimeEffect):
                     res.append(item)
+                elif isinstance(item, dict):
+                    res.append(RuntimeEffect(**item))
                 elif isinstance(item, str):
                     res.append(RuntimeEffect(raw_expr=item))
                 else:

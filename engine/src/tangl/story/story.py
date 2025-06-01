@@ -1,8 +1,8 @@
 # incrementally resolve a narrative solution frontier
 from typing import NewType
 
-from tangl34.core.trace import TraceFragment
-from tangl34.core.driver import CursorDriver
+from tangl.core.solver.journal import ContentFragment
+from tangl.core.solver import CursorDriver
 
 JournalEntry = NewType("JournalEntry", list[TraceFragment])
 

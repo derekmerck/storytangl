@@ -1,6 +1,6 @@
 # setup basic handlers and providers
-from tangl33.core.type_hints import StringMap
-from tangl33.core import context_cap, render_cap, effect_cap, redirect_cap, continue_cap, EdgeKind, Edge, ChoiceTrigger, Node, Graph, Domain
+from tangl.type_hints import StringMap
+from tangl.core import context_cap, render_cap, effect_cap, redirect_cap, continue_cap, EdgeKind, Edge, ChoiceTrigger, Node, Graph, Domain
 
 from .renderers import render_text, render_choices
 from ..core.scope import GlobalScope

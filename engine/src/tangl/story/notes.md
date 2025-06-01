@@ -3,7 +3,7 @@ Graph Untangling as Story Telling
 
 Consider "feature untangling" as a virtual machine for telling story programs.
 
-- **Fabula** -- the tangled story space, all _possible_ events and concepts for a given story domain, noumenal story (kant), the story itself (shoppenhaur)
+- **Fabula** -- the tangled story space, all _possible_ events and concepts for a given story domain, noumenal story (kant), the story itself (schoppenhaur)
 - **Episodic Process** -- flow control along structural nodes and edges, realizing and ordering events and concepts from the fabula into a stable configuration, and updating the syuzhet, the story resolved by will
 - **Syuzhet** -- the trace content or journal of an episodic process given a set of choices, phenomenal story, the story at hand
 

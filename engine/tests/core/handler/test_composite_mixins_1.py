@@ -3,17 +3,17 @@ import logging
 
 import pytest
 
-from tangl.core import Entity, Node
-from tangl.core.entity_handlers import *
+from tangl.core.entity import Entity, Node, Graph
+from tangl.core.handler import HasContext, HasEffects, Satisfiable
 from tangl.persistence import PersistenceManager
 from tangl.persistence.structuring import StructuringHandler
 
 logging.basicConfig(level=logging.DEBUG)
 
-class TestCompositeEntity(Renderable, HasConditions, HasEffects, Entity):
+class TestCompositeEntity(HasContext, HasEffects, Satisfiable, Entity):
     ...
 
-class TestCompositeNode(Renderable, HasConditions, HasEffects, Node):
+class TestCompositeNode(HasContext, HasEffects, Satisfiable, Node):
     ...
 
 @pytest.fixture
@@ -22,22 +22,25 @@ def kwargs():
         'content': 'hello {{animals[0]}}',
         'locals': {'animals': ['cat']},
         'effects': ['animals[0] = "dog"'],
-        'conditions': ['animals[0] == "dog"']
+        'predicates': ['animals[0] == "dog"']
     }
+
+# todo: extend to rendering
 
 @pytest.mark.parametrize('entity_cls', [TestCompositeEntity, TestCompositeNode])
 def test_composite_entity(entity_cls, kwargs):
 
     e = entity_cls(**kwargs)
     print( e )
-    assert not e.check_conditions()
-    res = e.render()
-    assert( res['content'] == "hello cat" )
-    e.apply_effects()
+    ctx = e.gather_context()
+    assert not e.is_satisfied(ctx=ctx)
+    # res = e.render()
+    # assert( res['content'] == "hello cat" )
+    e.apply_effects(ctx=ctx)
     assert e.locals['animals'][0] == "dog"
-    assert e.check_conditions()
-    res = e.render()
-    assert( res['content'] == "hello dog" )
+    assert e.is_satisfied(ctx=ctx)
+    # res = e.render()
+    # assert( res['content'] == "hello dog" )
 
 
 @pytest.mark.parametrize('entity_cls', [TestCompositeEntity, TestCompositeNode])

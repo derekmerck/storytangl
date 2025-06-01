@@ -1,4 +1,4 @@
-from tangl33.core import Node, Edge
+from tangl.core import Node, Edge
 
 class StoryNode(Node):
     """A traversable narrative node in the story."""

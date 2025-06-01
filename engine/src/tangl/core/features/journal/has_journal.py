@@ -7,27 +7,32 @@ from pydantic import Field
 
 from tangl.utils.bookmarked_list import BookmarkedList
 from tangl.core.entity import Registry
-from .content_fragment import ContentFragment
-
-if TYPE_CHECKING:
-    from ..structure import Node
+from tangl.core.entity import Node, Graph
+from ..feature_nodes import ContentFragment, BlameEdge
 
 logger = logging.getLogger(__name__)
+
+# todo: a resolution process might have several different trace journals, for example,
+#       std out with content vs process out with process metadata (why, what was added, etc.)
+#       Consider them as channels?
+
+# todo: add a pydantic schema for bookmarked list so we can get rid of arbitrary types allowed
+#       and manage serialization better.
 
 class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
     """
     Manages a journal of trace fragments with functionalities for bookmarking,
     retrieving, and organizing entries.
 
-    The `HasTraceJournal` class extends the functionality of a registry to include
+    The `HasJournal` class extends the functionality of a registry to include
     bookmarking and organizing content fragments into a journal. Each fragment
     can be uniquely identified and associated with sections or entries. It also
     provides mechanisms to establish relationships between fragments and their
     originating structural nodes.
 
-    :ivar trace_journal: A list of bookmarks, where each bookmark corresponds to
+    :ivar journal: A list of bookmarks, where each bookmark corresponds to
         a unique identifier for journal sections or entries.
-    :type trace_journal: BookmarkedList[UUID]
+    :type journal: BookmarkedList[UUID]
     :ivar fragment_counter: A counter that keeps track of the sequence
         number for content fragments.
     :type fragment_counter: int
@@ -53,8 +58,9 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
         self.add(item)
         # If the call indicates the originating structure node, record it as a blame edge
         if blame is not None:
-            from ..structure import Graph, EdgeKind
-            Graph.add_edge(self, src=item, dst=blame, edge_kind=EdgeKind.BLAME)
+            # todo: maybe this shouldn't be a mixin?
+            edge = BlameEdge(src=item, dst=blame, graph=self)
+            super().add(edge)
 
     def add_journal_entry(self, items: list[ContentFragment], blame: Node = None):
         if not items:

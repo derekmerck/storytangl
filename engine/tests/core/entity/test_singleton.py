@@ -4,13 +4,27 @@ import pytest
 
 
 class MyTestSingleton(Singleton):
-    pass
+
+    def __init_subclass__(cls, **kwargs):
+        print(f"Subclass init {cls.__name__}")
+        super().__init_subclass__(**kwargs)
 
 @pytest.fixture(autouse=True)
 def clear_my_test_singleton():
     MyTestSingleton.clear_instances()
     yield
     MyTestSingleton.clear_instances()
+
+def test_subclass_shadowing():
+    s1 = MyTestSingleton(label="unique")
+
+    class MyTestSingletonSub(MyTestSingleton):
+        pass
+
+    s2 = MyTestSingletonSub(label="unique")  # This should pass, unique is unique in subclass registry
+    assert MyTestSingletonSub.get_instance("unique") is s2, "Subclass get_instance should shadow parent class registry"
+
+    assert MyTestSingleton.get_instance("unique") is s1, "Subclass registry should _not_ shadow parent class registry"
 
 def test_singleton_creation():
 

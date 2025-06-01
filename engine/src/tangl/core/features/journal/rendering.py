@@ -3,7 +3,7 @@ from typing import Any
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
 from tangl.core.handler import HandlerRegistry
-from .content_fragment import ContentFragment
+from ..feature_nodes import ContentFragment
 
 
 render_handler = HandlerRegistry(label='render_handler', default_aggregation_strategy="pipeline")

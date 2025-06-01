@@ -56,18 +56,25 @@ class HandlerRegistry(Registry[BaseHandler]):
     def mark_register(cls, **kwargs):
         # Defer registering class-level handler definitions
         def decorator(func):
+            logger.debug(f"Marking handler {func} for registration.")
             h = BaseHandler(func=func, **kwargs)
             setattr(func, "_register_handler", h)
             return func
         return decorator
 
-    def register_marked_handlers(self, owner_cls):
+    def register_marked_handlers(self, owner_cls: Type[Entity]):
         # This handler registry should manage class handlers for owner_cls
-        for name, func in vars(owner_cls).items():
+        # todo: This is fragile and promiscuous, it does _not_ filter by criteria,
+        #       so the same function annotation might bind to multiple registries.
+        #       At a minimum, it should probably check the label of the registry.
+        logger.debug(f"Registering marked handlers for {owner_cls}.")
+        for name, func in owner_cls.__dict__.items():
             if hasattr(func, "_register_handler"):
+                logger.debug(f"-> Registering {func} for {owner_cls}.")
                 h = func._register_handler
-                if not h.owner_class:
-                    h.owner_class = owner_cls
+                # This is confusing, we want to test and set the cardinal owner class here
+                if not h.owner_cls_:
+                    h.owner_cls_ = owner_cls
                 self.add(h)
 
     _global_registration_counter: ClassVar[int] = 0

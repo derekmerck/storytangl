@@ -1,4 +1,4 @@
-from tangl33.core import ProvisionError, ProviderCap, CoreScope
+from tangl.core import ProvisionError, ProviderCap, CoreScope
 
 class CharacterStrategy:
     """Strategy for creating/selecting character nodes."""

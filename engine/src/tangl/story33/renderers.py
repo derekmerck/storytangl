@@ -1,6 +1,6 @@
 import logging
 
-from tangl33.core import EdgeKind, render_cap, Fragment
+from tangl.core import EdgeKind, render_cap, Fragment
 
 logger = logging.getLogger(__name__)
 

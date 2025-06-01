@@ -10,6 +10,11 @@ class WorldInitializationError( TanglException, ValueError ):
     pass
 
 
+class ProvisionError( TanglException, RuntimeError):
+    # raised when a provisioning task fails and a node cannot be resolved
+    pass
+
+
 class AssociationHandlerError( TanglException, ValueError ):
     # raised when an illegal node association is attempted (e.g., a trade
     # for an item that node does not own)
