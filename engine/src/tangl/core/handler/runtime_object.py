@@ -32,8 +32,21 @@ class RuntimeObject(BaseModel):
 
     @classmethod
     def exec_raw_expr(cls, expr: Expr, *, ctx: StringMap) -> StringMap:
-        logger.debug(f"exec_raw_expr: {expr} {ctx}")
-        exec(expr, g, ctx)
+        """
+        Execute an effect expression within the given namespace.
+
+        :param expr: The effect expression to be executed.
+        :param ctx: A dict of local variables to be used in the expression.
+        :return dict: StringMap with updated context
+        """
+        if not expr:
+            return
+        logger.debug(f"exec raw: {expr} with {ctx}")
+        try:
+            exec( expr, g, ctx )
+        except (SyntaxError, TypeError, KeyError, AttributeError, NameError):
+            logger.critical(f"Failed to apply expr: '{expr}'")
+            raise
         return ctx
 
     @classmethod

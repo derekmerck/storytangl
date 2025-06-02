@@ -1,1 +1,0 @@
-Revise or create narration or dialog according to character voice.

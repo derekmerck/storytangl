@@ -1,6 +1,8 @@
 # anything secret or local
 *secret*
 .secrets.*
+!hash_secret.py
+!test_hash_secret.py
 *.local*
 
 # temporary

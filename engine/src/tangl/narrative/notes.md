@@ -1,0 +1,1 @@
+Revise or create discourse, narration, or dialog according to pov and character voice.

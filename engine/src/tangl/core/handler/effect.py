@@ -31,6 +31,13 @@ effect_handler = HandlerRegistry(label="effect_handler", default_aggregation_str
 
 # Mixin with EffectHandler registry
 class HasEffects(Entity):
+    """
+    A handler class for managing and applying effect strategies for Entities.
+    Provides functionality to execute effects using dynamic namespaces.
+
+    KeyFeatures:
+      - `apply_effects(entity)`: Applies effects attached to entity
+    """
 
     effects: list[RuntimeEffect] = Field(default_factory=list)
 

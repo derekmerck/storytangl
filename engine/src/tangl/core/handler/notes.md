@@ -1,5 +1,5 @@
-Tangl.core.handler
-------------------
+`tangl.core.handler`
+--------------------
 
 Basic vocabulary for describing interactions of elements and state in the framework
 
@@ -15,9 +15,9 @@ Basic vocabulary for describing interactions of elements and state in the framew
 **Predicates**
 - Runtime entity gating given a context
 - _Predicate_ is a wrapper for various means of evaluating satisfaction given a context
-- _AvailabilityHandler_ is a specialized handler that can test whether a node both _matches_ criteria (shape) and _satisfies_ a predicate given a context (data) at runtime.
+- _AvailabilityHandler_ is a specialized handler that can test whether a node both _matches_ criteria (shape) and _satisfies_ a predicate given a context (data) at runtime for gating
 
 **Effects**
-- Runtime entity actions upon a context
+- Runtime entity actions upon a context after system creation
 - _RuntimeEffect_ is a wrapper for various means of executing functions on a context
 - _EffectHandler_ is a specialized handler that can apply effects at runtime

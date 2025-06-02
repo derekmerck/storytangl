@@ -14,7 +14,7 @@ class MediaRegistry(Registry[MRT]):
     deduplication and flexible indexing strategies.
     """
     on_index: HandlerRegistry[MRT] = None
-    rit_cls: Type[MRT] = MRT
+    mrt_cls: Type[MRT] = MRT
 
     @model_validator(mode="after")
     def _default_on_index(self):
@@ -27,19 +27,18 @@ class MediaRegistry(Registry[MRT]):
 
     def index(self,
               items: Iterable,
-              rit_cls: Type[MRT] = None,
-              extra_handlers: Callable = None,
-              **context) -> list[MRT]:
+              mrt_cls: Type[MRT] = None,
+              extra_handlers: list[BaseHandler] = None) -> list[MRT]:
         """
         Index a collection of data resources, deduplicating by content hash
         and running through the indexing pipeline.
         """
-        rit_cls = rit_cls or self.rit_cls
+        mrt_cls = mrt_cls or self.mrt_cls
 
         results = []
         for item in items:
             # Initial record creation
-            record = rit_cls.from_source(item)
+            record = mrt_cls.from_source(item)
 
             # Check for duplicates by content
             if record in self:
@@ -47,7 +46,7 @@ class MediaRegistry(Registry[MRT]):
                 continue
 
             # Run through indexing pipeline
-            self.on_index.execute(record, extra_handlers=extra_handlers, **context)
+            self.on_index.execute_all(record, ctx=None, extra_handlers=extra_handlers)
 
             # Add to registry
             self.add(record)

@@ -3,7 +3,7 @@ from typing import Callable, Any, Generic, TypeVar, Optional, Type, Self
 import logging
 import functools
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from tangl.type_hints import StringMap
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
@@ -29,12 +29,22 @@ class BaseHandler(Entity, Generic[T]):
     caller_criteria: StringMap = Field(default_factory=dict)
     owner_cls_: Optional[Type[Entity]] = Field(None, alias="owner_cls")
 
+    @field_validator('caller_criteria', mode="before")
+    def _convert_none_to_empty_dict(cls, data):
+        if data is None:
+            data = {}
+        return data
+
     @property
     def owner_cls(self) -> Optional[Type[Entity]]:
         if self.owner_cls_ is None:
             self.owner_cls_ = self._infer_owner_cls()
         logger.debug(f"h:{self.func.__name__}.owner_cls={self.owner_cls_}")
         return self.owner_cls_
+
+    @owner_cls.setter
+    def owner_cls(self, value: Type[Entity]):
+        self.owner_cls_ = value
 
     # terminology here is a little off, this is the an inv func relative to has_cls
     def has_owner_cls(self, entity: Entity) -> bool:
@@ -72,6 +82,11 @@ class BaseHandler(Entity, Generic[T]):
                 logger.debug(f'Failed to dereference owner class')
                 # return None if we can't evaluate it
                 return None
+
+    @property
+    def label(self):
+        # default label is func name
+        return self.label_ or self.func.__name__
 
     def has_func_name(self, value: str) -> bool:
         return self.func.__name__ == value

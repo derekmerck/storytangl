@@ -1,5 +1,5 @@
-Tangl.core.entity
------------------
+`tangl.core.entity`
+------------------
 
 Basic vocabulary for describing any element in the framework
 

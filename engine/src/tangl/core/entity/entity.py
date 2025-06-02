@@ -80,6 +80,10 @@ class Entity(BaseModelPlus):
     def label(self) -> str:
         return self.label_ or self.short_uid
 
+    @label.setter
+    def label(self, value: str):
+        self.label_ = value
+
     @property
     def short_uid(self) -> str:
         return shortuuid.encode(self.uid)
