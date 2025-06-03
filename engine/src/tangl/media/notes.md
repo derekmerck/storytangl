@@ -1,33 +1,29 @@
 `tangl.media`
 =============
 
-1. **media script item**: concrete ref (path, id), criteria (tags), actual data, or template/spec to realize, creates -> media node at graph creation
-3. **media node**: edge-like object in a story graph that links a concept or structure node to a unique media record via ref, criteria, or template/spec, media nodes with template/specs can 'realize' them based on their current context when rendered
-2. **media resource**: data blob on disk/in mem, pre-existing or dynamically created by media forges
-4. **media record**: pointer to a media resource findable by aliases, mediates node/fragment -> resource
-5. **media registry**: searchable domain registry of media records
-6. **media journal fragment**: holds a copy of the record provided by the generating node
-7. **media forge**: Singletons that can handle various types of specs (e.g., paperdolls, gen ai), takes spec, returns media and possibly revised spec (e.g., with random parameters noted, etc.)
+### Overview
 
-- As media journal fragments are _created_, media records are validated or media specs are realized and transformed into records, if necessary
+- As media deps are _provisioned_, matching media records are discovered or media specs are realized by forges
+- As structure nodes with media deps are _rendered_, media content fragments are created from the media record
 - As media journal fragments are _queried_, the response handler converts media records into client-relative urls or data in the final response item
 
-Media Registry: Holds media records
-Media Creator: Various "forges" that can create different sorts of media from specifications
+### Vocabulary
 
+1. **MediaDependency**: edge-like object in a feature graph that links a concept or structure node to a media resource node via ref, criteria, or template/spec.
 
+2. **MediaScriptItem**: concrete ref (path, id), criteria (tags), actual data, or template/spec to realize, creates -> media dep and possibly pre-registers a mrt at graph creation
 
-Media Node is the 'glue' that connects a story node to the sd image creator.
+3. **MediaProvisioner**: Specialized provisioning handler that supports a media dep's template/specs, can search media registries or invoke a media creator to 'realize' data from the current context to create, register, and link media resources.  May be invoked at graph init to validate media deps, or may be invoked dynamically at runtime to satisfy a media dep based on the current context.
 
-- story media script w path/url, media registry alias, or spec
-- story media node is rendered
-  - **path** is passed directly to the media fragment
-  - **registry alias** is validated and the canonical id is passed to the media fragment
-  - **spec** is transformed using an appropriate adapter for the parent node (actor, block, etc.) and its aliases are searched in the registry
-    - if the spec alias is already in the media registry: pass
-    - otherwise:
-      - ask the spec what kind of creator it needs and invoke it
-      - the spec may also be updated server-side with seed info or other random processes, so creators return a realized spec and associated media
-      - register the returned media and update the node spec if the node is unrepeatable, otherwise leave it as the template so it can be re-rendered when the context is updated
-      - provide the registered media record id in the media fragment
+4. **MediaResourceTag**: Indirect resource node, pointer to a media data blob on-disk (as a path) or in-mem, discoverable by both requirement metadata (name="abc") or data (hash=123) identifiers, satisfies deps, mediates fragment -> data
+
+5. **MediaData**: data blob on disk/in mem, pre-existing or dynamically created by media forges, annotated by a **MediaDataType**.
+
+6. **MediaRegistry**: registry of media resource tags, searchable by both requirement or data identifiers.
+
+7. **MediaContentFragment**: holds a link to the MRT provided by the generating node.  The MRT is dereferenced to a client-relative path or client-friendly format when serialized to a data transfer object.
+
+8. **MediaSpec**: Specialized forge-specific templates that serve as the interface between media deps and forges
+
+9. **MediaForge**: Singletons that can handle various types of specs (e.g., paperdolls, gen ai), takes spec, returns media and possibly revised spec (e.g., with random parameters noted, etc.)  Other than the spec interface, forges are _independent_ of framework-specific features unless otherwise noted (those provided by `tangle.core`.)
 

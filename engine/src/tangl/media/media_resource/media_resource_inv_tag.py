@@ -13,9 +13,9 @@ from tangl.utils.compute_data_hash import compute_data_hash
 from tangl.core.entity import Entity
 from .media_data_type import MediaDataType
 
-class MediaRegistryTag(Entity):
+class MediaResourceInventoryTag(Entity):
     """
-    MediaRegistryTags track data resources, in-mem or on disk.
+    MediaResourceInventoryTags track data resources, in-mem or on disk.
 
     MRT's for media data can be dereferenced by the response handler at the
     service layer to generate a client-relative media path.
@@ -24,7 +24,7 @@ class MediaRegistryTag(Entity):
     path: Optional[Path] = None
     data: Optional[Any] = None
     # Must have one or the other if no pre-computed content hash
-    content_hash: Hash = None
+    content_hash: Hash = Field(None, json_schema_extra={'is_identifier': True})
 
     @model_validator(mode="before")
     @classmethod

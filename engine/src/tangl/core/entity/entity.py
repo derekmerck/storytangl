@@ -1,4 +1,4 @@
-from typing import Optional, Self, Type, Protocol, Any
+from typing import Optional, Self, Type, Protocol, Any, Callable, ClassVar, Iterator
 from uuid import UUID, uuid4
 import logging
 
@@ -6,7 +6,7 @@ import shortuuid
 from pydantic import Field, field_validator, ValidationInfo
 
 from tangl.utils.base_model_plus import BaseModelPlus
-from tangl.type_hints import UnstructuredData, Tag
+from tangl.type_hints import UnstructuredData, Tag, Identifier
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +21,13 @@ class EntityP(Protocol):
     def structure(cls, data: UnstructuredData) -> Self: ...
     def unstructure(self) -> UnstructuredData: ...
 
+def identifier_property(func: Callable[[Any], Any]) -> property:
+    func._is_identifier = True
+    prop = property(func)
+    return prop
 
 class Entity(BaseModelPlus):
-    uid: UUID = Field(default_factory=uuid4)
+    uid: UUID = Field(default_factory=uuid4, json_schema_extra={'is_identifier': True})
     label_: Optional[str] = Field(None, alias="label")
     tags: set[Tag] = Field(default_factory=set)
 
@@ -48,6 +52,33 @@ class Entity(BaseModelPlus):
 
     def has_cls(self, obj_cls: Type[Self]) -> bool:
         return isinstance(self, obj_cls)
+
+    def iter_aliases(self) -> Iterator[Identifier]:
+
+        def _iter_annotated_field_values():
+            for fname, field in self.model_fields.items():
+                field_extras = field.json_schema_extra or {}
+                if field_extras.get("is_identifier", False):
+                    yield getattr(self, fname)
+
+        def _iter_annotated_class_values():
+            for base in self.__class__.__mro__:
+                for v in vars(base).values():
+                    if isinstance(v, property) and getattr(v.fget, "_is_identifier", False):
+                        logger.debug(f"Found identifier property {v.fget.__name__}")
+                        yield v.fget(self)
+
+        yield from _iter_annotated_field_values()
+        yield from _iter_annotated_class_values()
+
+    def has_identifier(self, *alias: Identifier) -> bool:
+        if len(alias) == 1 and alias[0] is None:
+            raise ValueError("Undefined check for empty identifier alias")
+        identifiers = set(self.iter_aliases())
+        for a in alias:
+            if a in identifiers:
+                return True
+        return False
 
     def has_tags(self, *tags: Tag) -> bool:
         logger.debug(f"Comparing query tags {tags} against {self!r} with tags={self.tags}")
@@ -76,7 +107,7 @@ class Entity(BaseModelPlus):
 
     # UTILITIES
 
-    @property
+    @identifier_property
     def label(self) -> str:
         return self.label_ or self.short_uid
 
@@ -84,7 +115,7 @@ class Entity(BaseModelPlus):
     def label(self, value: str):
         self.label_ = value
 
-    @property
+    @identifier_property
     def short_uid(self) -> str:
         return shortuuid.encode(self.uid)
 

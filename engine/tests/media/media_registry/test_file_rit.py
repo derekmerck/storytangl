@@ -7,7 +7,7 @@ from PIL import Image
 
 from tangl.utils.compute_data_hash import compute_data_hash
 from tangl.utils.get_file_mtime import get_file_mtime
-from tangl.media.media_registry import MediaDataType, MediaRegistryTag
+from tangl.media.media_resource import MediaDataType, MediaResourceInventoryTag as MediaRIT
 
 @pytest.fixture
 def temp_fp():
@@ -34,7 +34,7 @@ def test_get_mtime(temp_fp):
 
 
 def test_file_rit_initialization(temp_fp):
-    resource_tag = MediaRegistryTag(path=temp_fp, label='test', data_type=MediaDataType.IMAGE)
+    resource_tag = MediaRIT(path=temp_fp, label='test', data_type=MediaDataType.IMAGE)
     assert resource_tag.label == "test"
     assert resource_tag.data_type == MediaDataType.IMAGE
 
@@ -54,5 +54,5 @@ def temp_image_fp():
 
 
 def test_resource_type_inference(temp_image_fp):
-    mrt = MediaRegistryTag(path=temp_image_fp)
+    mrt = MediaRIT(path=temp_image_fp)
     assert mrt.data_type is MediaDataType.IMAGE

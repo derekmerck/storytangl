@@ -2,20 +2,23 @@ from __future__ import annotations
 import abc
 from typing import Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, BaseModel
 
 # from tangl.media.protocols import MediaForgeProtocol
 # from tangl.media.media_spec import MediaSpecification
 # from tangl.script.script_models import BaseScriptItem
 # from tangl.utils.response_models import StyleHints
 from tangl.type_hints import StyleDict, UniqueLabel
-from tangl.core import Node, PresentationHints
-from ...media_spec import MediaSpec
+# from tangl.core import Node, PresentationHints
+# from ...media_spec import MediaSpec
 from .svg_source_manager import SvgSourceManager
 from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
-class VectorScriptItem(BaseScriptItem, extra="allow"):
+MediaSpec = BaseModel
+PresentationHints = dict
+
+class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
     """
     This could be marked in two ways, as a direct call to named groups,
     or as an indirect call to build up appropriate groups from a reference
@@ -48,14 +51,14 @@ class VectorScriptItem(BaseScriptItem, extra="allow"):
         return self
 
 
-class VectorSpec(MediaSpec):
+class VectorSpec(MediaSpec, arbitrary_types_allowed=True):
 
     #: registry of shapes and styles
     source_manager: SvgSourceManager = None
 
     transform: SvgTransform = Field(default_factory=list)   # transform for the entire scene
     shapes: list[ SvgGroup ] = Field(default_factory=list)  # each group can have its own transform
-    styles: dict[ StyleDict ] = Field(default_factory=dict)
+    styles: dict[ str, str ] = Field(default_factory=dict)
 
     # may be relevant to track the labels of the shape and style collections loaded to create this??
 

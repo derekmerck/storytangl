@@ -1,8 +1,8 @@
 import cmd2
 
 from tangl.service.api_endpoints import ServiceManager
-from tangl.business.story.story_controller import StoryController
-from tangl.service.user.user_controller import UserController
+from tangl.story.story_controller import StoryController
+from tangl.user.user_controller import UserController
 from cmd2_adapter import Cmd2Adapter
 
 

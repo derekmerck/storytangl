@@ -6,15 +6,15 @@ from pydantic import model_validator
 
 from tangl.core.entity import Registry
 from tangl.core.handler import HandlerRegistry, BaseHandler
-from .media_registry_tag import MediaRegistryTag as MRT
+from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
-class MediaRegistry(Registry[MRT]):
+class MediaResourceRegistry(Registry[MediaRIT]):
     """
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
     """
-    on_index: HandlerRegistry[MRT] = None
-    mrt_cls: Type[MRT] = MRT
+    on_index: HandlerRegistry[MediaRIT] = None
+    mrt_cls: Type[MediaRIT] = MediaRIT
 
     @model_validator(mode="after")
     def _default_on_index(self):
@@ -27,8 +27,8 @@ class MediaRegistry(Registry[MRT]):
 
     def index(self,
               items: Iterable,
-              mrt_cls: Type[MRT] = None,
-              extra_handlers: list[BaseHandler] = None) -> list[MRT]:
+              mrt_cls: Type[MediaRIT] = None,
+              extra_handlers: list[BaseHandler] = None) -> list[MediaRIT]:
         """
         Index a collection of data resources, deduplicating by content hash
         and running through the indexing pipeline.
@@ -54,8 +54,8 @@ class MediaRegistry(Registry[MRT]):
 
         return results
 
-    def __contains__(self, item: MRT | UUID) -> bool:
+    def __contains__(self, item: MediaRIT | UUID) -> bool:
         """Find existing record with matching content hash"""
-        if isinstance(item, MRT):
+        if isinstance(item, MediaRIT):
             return bool( self.find_one(alias=item.content_hash) )
         return super().__contains__(item)
