@@ -17,3 +17,4 @@ class MediaProvisioner(DependencyProvisioner):
           - register the returned media and update the node spec if the node is unrepeatable, otherwise leave it as the template so it can be re-rendered when the context is updated
           - link the new rit
     """
+    ...

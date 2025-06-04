@@ -8,7 +8,7 @@ from pydantic import Field, field_validator
 from tangl.type_hints import StringMap
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 from tangl.core.entity import Entity
-from tangl.core.entity.entity import EntityP
+from tangl.core.entity.entity import EntityP, match_logger
 from .enums import HandlerPriority
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class BaseHandler(Entity, Generic[T]):
     def owner_cls(self) -> Optional[Type[Entity]]:
         if self.owner_cls_ is None:
             self.owner_cls_ = self._infer_owner_cls()
-        logger.debug(f"h:{self.func.__name__}.owner_cls={self.owner_cls_}")
+        match_logger.debug(f"h:{self.func.__name__}.owner_cls={self.owner_cls_}")
         return self.owner_cls_
 
     @owner_cls.setter
@@ -48,9 +48,9 @@ class BaseHandler(Entity, Generic[T]):
 
     # terminology here is a little off, this is the an inv func relative to has_cls
     def has_owner_cls(self, entity: Entity) -> bool:
-        logger.debug(f"h:Comparing owner_cls to caller_cls={entity.__class__}")
+        match_logger.debug(f"h:Comparing owner_cls to caller_cls={entity.__class__}")
         if self.owner_cls is None:
-            logger.debug(f"h:owner_cls is None, so always true")
+            match_logger.debug(f"h:owner_cls is None, so always true")
             return True
         return isinstance(entity, self.owner_cls)
 

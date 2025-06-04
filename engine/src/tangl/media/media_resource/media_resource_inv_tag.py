@@ -8,11 +8,14 @@ from pathlib import Path
 from pydantic import Field, model_validator
 
 from tangl.type_hints import Hash
-from tangl.utils.shelved2 import shelved
+from tangl.utils.shelved2 import shelved, clear_shelf
 from tangl.utils.compute_data_hash import compute_data_hash
 from tangl.core.entity import Entity
 from .media_data_type import MediaDataType
 
+# todo: this is technically a ResourceNode when used in a graph,
+#       but it gets used without a graph, too, so it makes more sense as
+#       any entity.
 class MediaResourceInventoryTag(Entity):
     """
     MediaResourceInventoryTags track data resources, in-mem or on disk.
@@ -67,10 +70,9 @@ class MediaResourceInventoryTag(Entity):
         # for matching `find(expired=True)`
         return self.expiry < datetime.now()
 
-    # todo: see load_yaml_resource for ref on caching with hash as check key
     @shelved(fn="rits")
     @staticmethod
-    def _from_path(cls, path: Path) -> 'ResourceInventoryTag':
+    def _from_path(cls, path: Path) -> 'MediaResourceInventoryTag':
         return cls(path=path)
 
     @classmethod
@@ -79,3 +81,7 @@ class MediaResourceInventoryTag(Entity):
             mtime = item.stat().st_mtime
             return cls._from_path(cls, item, check_value=mtime)
         raise NotImplementedError("Can only load from file paths currently")
+
+    @classmethod
+    def clear_from_source_cache(cls):
+        clear_shelf("rits")

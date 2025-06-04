@@ -27,3 +27,58 @@
 
 9. **MediaForge**: Singletons that can handle various types of specs (e.g., paperdolls, gen ai), takes spec, returns media and possibly revised spec (e.g., with random parameters noted, etc.)  Other than the spec interface, forges are _independent_ of framework-specific features unless otherwise noted (those provided by `tangle.core`.)
 
+
+```mermaid
+flowchart RL
+    
+    subgraph .core
+        Entity
+        JournalFragment
+        DependencyEdge
+        Registry
+        HandlerRegistry
+    end
+ 
+    subgraph .media_resource
+        MediaRIT -- is --> Entity
+        MediaRegistry -- is --> Registry
+        MediaRegistry -- has --> MediaRIT
+        MediaDependency -- is --> DependencyEdge
+        MediaDependency -- has --> MediaRIT
+        MediaProvisioner -- discovers --> MediaRIT
+        MediaProvisioner -- is --> HandlerRegistry
+        media_handler -- is --> MediaProvisioner
+    end
+    
+    subgraph .media_creators
+        subgraph .base
+            MediaSpec -- is --> Entity
+            MediaForge -- accepts --> MediaSpec
+            MediaForge -- provides --> MediaRIT
+        end
+        subgraph .stable_forge
+            StableForge -- is --> MediaForge
+            StableSpec -- is --> MediaSpec
+            StableForge -- uses --> StableSpec
+        end
+        subgraph .svg_forge
+            SvgForge -- is --> MediaForge
+            SvgSpec -- is --> MediaSpec
+            SvgForge -- uses --> SvgSpec
+        end
+        subgraph .tts_forge
+            TtsForge -- is --> MediaForge
+            TtsSpec -- is --> MediaSpec
+            TtsForge -- uses --> TtsSpec
+        end
+        subgraph ...\n...\n...
+            ...EtcForge -- is --> MediaForge
+            ...EtcSpec -- is --> MediaSpec
+            ...EtcForge -- uses --> ...EtcSpec
+        end
+    end
+
+    MediaFragment -- is --> JournalFragment
+    MediaFragment -- has --> MediaRIT
+    
+```

@@ -1,14 +1,18 @@
-from typing import Optional, Self, Type, Protocol, Any, Callable, ClassVar, Iterator
+from typing import Iterable, Optional, Self, Type, Protocol, Any, Callable, ClassVar, Iterator
 from uuid import UUID, uuid4
 import logging
+import unicodedata
 
 import shortuuid
 from pydantic import Field, field_validator, ValidationInfo
 
 from tangl.utils.base_model_plus import BaseModelPlus
+from tangl.utils.sanitize_str import sanitise_str
 from tangl.type_hints import UnstructuredData, Tag, Identifier
 
 logger = logging.getLogger(__name__)
+match_logger = logging.getLogger(f"{__name__}.match_logger")  # Very verbose
+match_logger.setLevel(logging.INFO)
 
 
 class EntityP(Protocol):
@@ -35,14 +39,16 @@ class Entity(BaseModelPlus):
 
     def matches(self, **criteria) -> bool:
         for k, v in criteria.items():
-            if k.startswith("has_") and hasattr(self, k):
-                logger.debug(f"Calling {self.__class__}.{k}({v!r})")
-                func = getattr(self, k)
+            match_logger.debug(f"Matching {k}: {v}")
+            has_k = f"has_{k}" if not k.startswith("has_") else k
+            if hasattr(self, has_k):
+                match_logger.debug(f"Checking {v!r}.{has_k}()")
+                func = getattr(self, has_k)
                 if not func(v):
-                    logger.debug(f"Failed checking {k}")
+                    match_logger.debug(f"Failed checking {has_k}")
                     return False
             elif getattr(self, k, None) != v:
-                logger.debug(f"Failed comparing {self.__class__}.{k} == {v}")
+                match_logger.debug(f"Failed comparing {self!r}.{k} == {v}")
                 return False
         return True
 
@@ -59,14 +65,23 @@ class Entity(BaseModelPlus):
             for fname, field in self.model_fields.items():
                 field_extras = field.json_schema_extra or {}
                 if field_extras.get("is_identifier", False):
-                    yield getattr(self, fname)
+                    prop_value = getattr(self, fname)
+                    match_logger.debug(f"Found identifier attrib {fname} = {prop_value}")
+                    if isinstance(prop_value, Identifier):
+                        yield prop_value
+                    elif isinstance(prop_value, Iterable):
+                        yield from prop_value
 
         def _iter_annotated_class_values():
             for base in self.__class__.__mro__:
                 for v in vars(base).values():
                     if isinstance(v, property) and getattr(v.fget, "_is_identifier", False):
-                        logger.debug(f"Found identifier property {v.fget.__name__}")
-                        yield v.fget(self)
+                        match_logger.debug(f"Found identifier property {v.fget.__name__}")
+                        prop_value = v.fget(self)
+                        if isinstance(prop_value, Identifier):
+                            yield prop_value
+                        elif isinstance(prop_value, Iterable):
+                            yield from prop_value
 
         yield from _iter_annotated_field_values()
         yield from _iter_annotated_class_values()
@@ -80,8 +95,11 @@ class Entity(BaseModelPlus):
                 return True
         return False
 
+    # ironic alias for has_alias
+    has_alias = has_identifier
+
     def has_tags(self, *tags: Tag) -> bool:
-        logger.debug(f"Comparing query tags {tags} against {self!r} with tags={self.tags}")
+        match_logger.debug(f"Comparing query tags {tags} against {self!r} with tags={self.tags}")
         if len(tags) == 1 and tags[0] is None:
             return len(self.tags) == 0  # check for empty
         if len(tags) == 1 and isinstance(tags[0], (list, set)):
@@ -106,6 +124,13 @@ class Entity(BaseModelPlus):
         return data
 
     # UTILITIES
+
+    @field_validator('label_', mode="after")
+    @classmethod
+    def _sanitize_label(cls, value):
+        if isinstance(value, str):
+            value = sanitise_str(value)
+        return value
 
     @identifier_property
     def label(self) -> str:

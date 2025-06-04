@@ -1,6 +1,7 @@
 from typing import TypeVar, Generic, Optional, Iterator, Self, Callable
 from uuid import UUID
 import itertools
+from collections import Counter
 
 from pydantic import PrivateAttr
 
@@ -104,6 +105,9 @@ class Registry(Entity, Generic[EntityT]):
 
     def all_tags(self) -> set[Tag]:
         return set(itertools.chain.from_iterable(i.tags for i in self))
+
+    def all_tags_frequency(self) -> Counter[Tag]:
+        return Counter(itertools.chain.from_iterable(i.tags for i in self))
 
     # STRUCTURING
 

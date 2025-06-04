@@ -9,6 +9,7 @@ from tangl.core.entity.registry import RegistryP
 from .base_handler import BaseHandler, BaseHandlerP
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 AggregationStrategy = Literal["gather", "merge", "pipeline", "all_true", "first"]
 
