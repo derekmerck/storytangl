@@ -11,7 +11,7 @@ from tangl.type_hints import Hash
 from tangl.utils.shelved2 import shelved, clear_shelf
 from tangl.utils.compute_data_hash import compute_data_hash
 from tangl.core.entity import Entity
-from .media_data_type import MediaDataType
+from ..enums import MediaDataType
 
 # todo: this is technically a ResourceNode when used in a graph,
 #       but it gets used without a graph, too, so it makes more sense as

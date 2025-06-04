@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from media.creators.svg_forge.svg_source_manager import SvgSourceManager
+from tangl.media.media_creators.svg_forge.svg_source_manager import SvgSourceManager
 
 def sample_svg_data() -> tuple[etree.Element, etree.Element]:
     root = etree.Element('svg', xmlns="http://www.w3.org/2000/svg")

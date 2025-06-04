@@ -142,11 +142,11 @@ def test_entity_instantiation1():
     e = Entity(**kwargs)
     print( e )
 
-    assert e.label == "test label"
+    assert e.label == "test_label"   # sanitized, no spaces or unicode
 
     d = e.unstructure()
     print( d )
-    assert d['label'] == "test label"
+    assert d['label'] == "test_label"
 
     # does not hash
     with pytest.raises(TypeError):

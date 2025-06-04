@@ -1,5 +1,5 @@
 import pytest
-from media.creators.svg_forge.svg_transform import SvgTransform
+from tangl.media.media_creators.svg_forge.svg_transform import SvgTransform
 
 def test_translate():
     svg_transform = SvgTransform().translate(10, 20)

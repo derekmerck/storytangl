@@ -1,7 +1,6 @@
 from typing import Literal, Optional
 from pydantic import BaseModel
 
-# Media Presentation Hints
 ShapeName = Literal['landscape', 'portrait', 'square', 'avatar', 'banner', 'bg']
 PositionName = Literal['top', 'bottom', 'left', 'right', 'cover', 'inline']
 SizeName = Literal['small', 'medium', 'large']
@@ -12,8 +11,10 @@ TransitionName = Literal['fade_in', 'fade_out', 'remove',
 DurationName = Literal['short', 'medium', 'long']
 TimingName = Literal['start', 'stop', 'pause', 'restart', 'loop']
 
-# originally "MediaStagingHints"
-class MediaPresentationHints(BaseModel, extra="allow"):
+class PresentationHints(BaseModel, extra="allow"):
+    """
+    Staging or playback hints for media fragment content.
+    """
     media_shape: Optional[ShapeName | float] = None  # aspect ratio
     media_size: Optional[SizeName | tuple[int, int] | tuple[float, float] | float] = None  # dims or scale
     media_position: Optional[PositionName | tuple[int, int] | tuple[float, float]] = None  # pixel or ndc coords

@@ -7,7 +7,7 @@ from PIL import Image
 
 from tangl.utils.compute_data_hash import compute_data_hash
 from tangl.utils.get_file_mtime import get_file_mtime
-from tangl.media.media_resource import MediaDataType, MediaResourceInventoryTag as MediaRIT
+from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 
 @pytest.fixture
 def temp_fp():

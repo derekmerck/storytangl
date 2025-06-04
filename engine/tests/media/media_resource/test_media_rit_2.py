@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta
-from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT, MediaDataType
+from tangl.media import MediaResourceInventoryTag as MediaRIT, MediaDataType
 
 def test_resource_inventory_tag_initialization():
     tag = MediaRIT(label="test", content_hash=b"hash123", data_type=MediaDataType.IMAGE)

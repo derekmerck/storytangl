@@ -47,7 +47,7 @@ import cmd2
 import pydantic
 
 from tangl.info import __version__
-from tangl.utils.response_models import BaseResponse
+# from tangl.utils.response_models import BaseResponse
 
 # Don't delete this import, it registers the command sets
 from tangl.cli.controllers import *

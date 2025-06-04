@@ -44,9 +44,10 @@ flowchart RL
         MediaRegistry -- is --> Registry
         MediaRegistry -- has --> MediaRIT
         MediaDependency -- is --> DependencyEdge
-        MediaDependency -- has --> MediaRIT
-        MediaProvisioner -- discovers --> MediaRIT
+        MediaDependency -- wants --> MediaRIT
         MediaProvisioner -- is --> HandlerRegistry
+        MediaProvisioner -- discovers --> MediaRIT
+        MediaProvisioner -- resolves --> MediaDependency
         media_handler -- is --> MediaProvisioner
     end
     
@@ -78,7 +79,9 @@ flowchart RL
         end
     end
 
-    MediaFragment -- is --> JournalFragment
-    MediaFragment -- has --> MediaRIT
+    subgraph .media_fragment 
+        MediaFragment -- is --> JournalFragment
+        MediaFragment -- has --> MediaRIT     
+    end
     
 ```

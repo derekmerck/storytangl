@@ -11,8 +11,10 @@ from ..feature_nodes import _FeatureEdge, _FeatureNode, ResourceNode
 
 ##### OPEN EDGES ####
 
+ResourceT = TypeVar('ResourceT', bound=ResourceNode)
+
 # open dependencies on the frontier will be provisioned by the resolver
-class DependencyEdge(_FeatureEdge[_FeatureNode, Optional[ResourceNode]]):  # open dest
+class DependencyEdge(_FeatureEdge[_FeatureNode, Optional[ResourceT]], Generic[ResourceT]):  # open dest
     dest_id: Optional[UUID] = Field(None)  # Optional now
     dest_criteria: StringMap = Field(default_factory=dict)
     dest_predicate: Predicate = None
@@ -36,7 +38,7 @@ class RequirementEdge(_FeatureEdge[Optional[_FeatureNode], _FeatureNode]):  # op
     #     return self.dest is not None
 
 
-class ResolvableNode(FeatureNode):
+class ResolvableNode(_FeatureNode):
 
     @property
     def is_resolved(self) -> bool:

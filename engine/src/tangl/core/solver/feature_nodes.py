@@ -1,4 +1,5 @@
 from typing import Literal, Generic, TypeVar, Any, Optional
+from enum import Enum
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Edge, Node, Graph
@@ -51,7 +52,7 @@ class ContentFragment(_FeatureNode):
     Edges between journal items are implicit in sequence since the journal is strictly 
     linear and monotonic in sequence.
     """
-    content_type: Optional[str] = None  # intent for content, e.g., 'text', 'choice', 'media'
+    content_type: Optional[str|Enum] = None  # intent for content, e.g., 'text', 'choice', 'media'
     content: Any
     sequence: Optional[int] = None
     # mime-type is added in the service layer, when the fragment is serialized into a dto.

@@ -1,5 +1,5 @@
 
-from media.creators.svg_forge.svg_group import SvgGroup, SvgTransform
+from tangl.media.media_creators.svg_forge.svg_group import SvgGroup, SvgTransform
 
 from lxml import etree
 

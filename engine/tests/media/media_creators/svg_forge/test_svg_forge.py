@@ -1,7 +1,7 @@
 # test_svg_forge.py
 
 import pytest
-from media.creators.svg_forge import VectorForge as SvgForge
+from tangl.media.media_creators.svg_forge import VectorForge as SvgForge
 
 from lxml import etree
 
