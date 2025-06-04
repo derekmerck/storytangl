@@ -30,7 +30,7 @@ class MediaRole(Enum):
     CHARACTER_VOX = "character_vox"  # for dialog, has actor, attitude
 
     MUSIC = "music"     # soundtrack audio
-    SFX   = "sfx"
+    SFX   = "sound_fx"
 
     # --------------
 

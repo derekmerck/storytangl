@@ -10,8 +10,8 @@ from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, Has
 from .world import World
 
 if TYPE_CHECKING:
-    from tangl.user import User
-    from tangl.story.story_graph import Story
+    from tangl.service.user import User
+    from tangl.story.story import Story
 else:
     # Fallbacks for endpoint type hinting
     class User: pass

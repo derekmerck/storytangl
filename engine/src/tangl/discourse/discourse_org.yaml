@@ -1,4 +1,4 @@
-# Narrative Subpackage
+# Discourse Subpackage
 # --------------------
 deps: [core, story, utils]
 classes:

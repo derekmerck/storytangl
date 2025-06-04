@@ -26,6 +26,13 @@ class Node(Entity):
             self.graph.add(self)
         return self
 
+
+class AnonymousEdge(Entity):
+    # Minimal Edge that does not require a graph so it can be garbage collected
+    source: Node
+    dest: Node
+
+
 NodeT = TypeVar("NodeT", bound=Node)
 
 class Edge(Entity, Generic[NodeT]):

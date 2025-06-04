@@ -3,13 +3,13 @@ from typing import Any
 from pydantic import BaseModel
 
 from tangl.type_hints import Identifier, Expr, UnstructuredData
-# from tangl.service.response import ContentResponse, InfoResponse
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
 # from tangl.media.media_record import MediaRecord, MediaDataType
-from tangl.core.graph import SimpleEdge
-from tangl.core import TraversableEdge, HasEffects, HasConditions, ContentFragment
-from .story_graph import Story
-from .story_node import StoryNode
+# from tangl.service.response import ContentResponse, InfoResponse
+from tangl.core.entity import Node, AnonymousEdge
+from tangl.core.handler import context_handler, Predicate, RuntimeEffect
+from tangl.core.solver import ChoiceEdge, ContentFragment
+from .story import Story
 
 class StoryController(HasApiEndpoints):
     """
@@ -38,8 +38,7 @@ class StoryController(HasApiEndpoints):
     def get_journal_entry(self, story: Story, item = -1) -> list[ContentFragment]:
         # JournalEntries are formatted as content fragments and interpreted as an
         # ordered list of styled narrative entries
-        journal = story.journal
-        return journal[item]
+        return story.journal.get_entry(item)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
     def get_story_info(self, story: Story, **kwargs) -> list[ContentFragment]:
@@ -48,16 +47,16 @@ class StoryController(HasApiEndpoints):
         return story.get_info(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
-    def get_story_media(self, story: Story, media: 'MediaRecord' | Identifier, **kwargs) -> 'MediaDataType':
+    def get_story_media(self, story: Story, media: 'MediaRIT' | Identifier, **kwargs) -> 'MediaDataType':
         if isinstance(media, Identifier):
-            media = story.find_one(alias=media)  # type: MediaRecord
+            media = story.graph.find_one(alias=media)  # type: MediaRIT
         return media.get_content(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, method_type=MethodType.UPDATE)
-    def do_step(self, story: Story, edge: TraversableEdge | Identifier, **kwargs):
+    def do_step(self, story: Story, edge: ChoiceEdge | Identifier, **kwargs):
         if isinstance(edge, Identifier):
-            edge = story.find_one(alias=edge)  # type: TraversableEdge
-        story.resolve_step(edge, **kwargs)
+            edge = story.graph.find_one(alias=edge)  # type: ChoiceEdge
+        story.resolve_choice(edge, **kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, method_type=MethodType.UPDATE)
     def undo_step(self, story: Story):
@@ -71,18 +70,18 @@ class StoryController(HasApiEndpoints):
     # may not be reproducible.
 
     @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)
-    def goto_node(self, story: Story, node: StoryNode | Identifier):
+    def goto_node(self, story: Story, node: Node | Identifier):
         if isinstance(node, Identifier):
-            node = story.find_one(alias=node)
+            node = story.graph.find_one(alias=node)
         node.dirty = True  # Jumping logic arbitrarily
-        anonymous_edge = SimpleEdge(predecessor=story.cursor, successor=node)
-        story.resolve_step(anonymous_edge)
+        anonymous_edge = AnonymousEdge(source=story.cursor, dest=node)
+        story.resolve_choice(anonymous_edge)
 
     # Read func, but make this an update, so it writes back the story marked as dirty
     @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)
-    def get_node_info(self, story: Story, node: StoryNode | Identifier) -> UnstructuredData:
+    def get_node_info(self, story: Story, node: Node | Identifier) -> UnstructuredData:
         if isinstance(node, Identifier):
-            node = story.find_one(alias=node)
+            node = story.graph.find_one(alias=node)
         node.dirty = True  # Inspecting internal values
         data = node.model_dump()
         return data
@@ -93,8 +92,8 @@ class StoryController(HasApiEndpoints):
                           response_type=ResponseType.RUNTIME)
     def check_condition(self, story: Story, expr: Expr) -> Any:
         story.dirty = True  # Testing internal values
-        context = story.gather_context()
-        result = HasConditions.eval_str(expr, **context)
+        ctx = context_handler.execute_all(story, ctx=None)
+        result = Predicate.eval_raw_expr(expr, ctx=ctx)
         return result
 
     @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED,
@@ -102,5 +101,5 @@ class StoryController(HasApiEndpoints):
                           response_type=ResponseType.RUNTIME)
     def apply_effect(self, story: Story, effect: Expr):
         story.dirty = True  # Updating internal values arbitrarily
-        context = story.gather_context()
-        HasEffects.exec_str(effect, **context)
+        ctx = context_handler.execute_all(story, ctx=None)
+        RuntimeEffect.exec_raw_expr(effect, ctx=ctx)

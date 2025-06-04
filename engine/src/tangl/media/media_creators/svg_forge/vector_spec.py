@@ -15,8 +15,8 @@ from .svg_source_manager import SvgSourceManager
 from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
-MediaSpec = BaseModel
-PresentationHints = dict
+from tangl.media.media_spec import MediaSpec
+from tangl.media.media_fragment import PresentationHints
 
 class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
     """

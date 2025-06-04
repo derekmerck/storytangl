@@ -2,7 +2,7 @@ from typing import Literal, Generic, TypeVar, Any, Optional
 from enum import Enum
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Edge, Node, Graph
+from tangl.core.entity import Entity, Edge, Node, Graph
 from tangl.core.handler import HasContext, Satisfiable
 
 # todo: need phased effect as well, like choice with when

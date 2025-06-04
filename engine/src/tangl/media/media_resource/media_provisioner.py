@@ -1,5 +1,5 @@
 from tangl.core.solver.provisioner.provision_dependency import DependencyProvisioner
-from ..media_creators.media_spec import MediaSpec
+from ..media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from .media_resource_registry import MediaResourceRegistry
 

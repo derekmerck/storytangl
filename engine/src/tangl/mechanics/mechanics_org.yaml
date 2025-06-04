@@ -1,6 +1,7 @@
 # Mechanics Subpackage
 # --------------------
-deps: [story, core, media, narrative, utils]
+namespace: True
+deps: [story, core, media, discourse, utils]
 classes:
 
   # Complex Concepts

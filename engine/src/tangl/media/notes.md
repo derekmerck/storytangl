@@ -3,7 +3,7 @@
 
 ### Overview
 
-- As media deps are _provisioned_, matching media records are discovered or media specs are realized by forges
+- As media dependencies are _provisioned_, matching media records are discovered or media specs are realized by forges
 - As structure nodes with media deps are _rendered_, media content fragments are created from the media record
 - As media journal fragments are _queried_, the response handler converts media records into client-relative urls or data in the final response item
 

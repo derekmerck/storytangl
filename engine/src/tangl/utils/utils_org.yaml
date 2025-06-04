@@ -1,3 +1,4 @@
 # Utils Subpackage
 # ----------------
+namespace: True
 deps: None  # No _internal_ dependencies on other subpackages
