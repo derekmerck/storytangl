@@ -5,6 +5,7 @@ from pydantic import field_validator, Field
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
 from .handler_registry import HandlerRegistry
+from .context import HasContext
 from .runtime_object import RuntimeObject
 
 logger = logging.getLogger(__name__)
@@ -16,22 +17,21 @@ class Predicate(RuntimeObject):
         raise NotImplementedError("Structured predicate evaluation not yet implemented")
 
     def evaluate(self, entity: Entity, *, ctx: StringMap = None):
-        ctx_ = ctx or {} | {'self': entity}  # type: StringMap
         if self.structured_expr is not None:
-            return self.eval_structured_expr(self.structured_expr, ctx=ctx_)
+            return self.eval_structured_expr(self.structured_expr, ctx=ctx)
         elif self.raw_expr is not None:
-            return self.eval_raw_expr(self.raw_expr, ctx=ctx_)
+            return self.eval_raw_expr(self.raw_expr, ctx=ctx)
         elif self.handler is not None:
             return self.handler(entity, ctx)
         elif self.func is not None:
             return self.func(entity, ctx)
         return True
 
-availability_handler = HandlerRegistry(
-    label="availability_handler",
+on_check_satisfied = HandlerRegistry(
+    label="check_satisfied",
     default_aggregation_strategy="all_true")
 
-class Satisfiable(Entity):
+class Satisfiable(HasContext):
 
     predicates: list[Predicate] = Field(default_factory=list)
 
@@ -55,12 +55,13 @@ class Satisfiable(Entity):
             return res
         raise ValueError(f"Invalid predicate definition: {data}")
 
-    @availability_handler.register()
-    def _check_my_predicates(self, ctx: StringMap = None) -> bool:
+    @on_check_satisfied.register()
+    def _check_my_predicates(self, ctx: StringMap) -> bool:
         for predicate in self.predicates:
             if not predicate.evaluate(self, ctx=ctx):
                 return False
         return True
 
-    def is_satisfied(self, *, ctx: StringMap) -> bool:
-        return availability_handler.execute_all(self, ctx=ctx)
+    def is_satisfied(self, ctx: StringMap = None) -> bool:
+        ctx = ctx if ctx is not None else self.gather_context()
+        return on_check_satisfied.execute_all(self, ctx=ctx)

@@ -1,10 +1,10 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import context_handler, HasContext, Predicate, availability_handler, Satisfiable
+from tangl.core.handler import on_gather_context, HasContext, Predicate, on_check_satisfied, Satisfiable
 from tangl.utils.safe_builtins import safe_builtins
 
-MyConditionEntity = type('MyConditionEntity', (HasContext, Satisfiable, Entity), {} )
+MyConditionEntity = type('MyConditionEntity', (Satisfiable, Entity), {} )
 
 
 @pytest.fixture
@@ -14,14 +14,14 @@ def conditional_entity():
 
 def test_conditional_entity(conditional_entity):
 
-    context = context_handler.execute_all(conditional_entity, ctx=None)
+    context = on_gather_context.execute_all(conditional_entity, ctx=None)
     print(context)
     assert context['test_val'] is True
 
     context = conditional_entity.gather_context()
     assert context['test_val'] is True
 
-    result = availability_handler.execute_first(conditional_entity, ctx=context)
+    result = on_check_satisfied.execute_first(conditional_entity, ctx=context)
     assert result
 
     result = conditional_entity.is_satisfied(ctx=context)

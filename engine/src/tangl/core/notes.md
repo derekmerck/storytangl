@@ -28,8 +28,8 @@ flowchart RL
         Handler -- is --> Entity
         HandlerRegistry -- is --> Registry
         HandlerRegistry -- has --> Handler
-        context_handler -- is --> HandlerRegistry
-        effect_handler -- is --> HandlerRegistry
+        on_gather_context -- is --> HandlerRegistry
+        on_apply_effects -- is --> HandlerRegistry
         predicate_handler -- is --> HandlerRegistry
     end
 
@@ -65,29 +65,29 @@ flowchart RL
             provision_handler -- builds --> StructureNode
         end
         subgraph .render
-            render_handler -- is --> HandlerRegistry
-            render_handler -- builds --> JournalFragment
+            on_render_content -- is --> HandlerRegistry
+            on_render_content -- builds --> JournalFragment
             Journal -- has --> JournalFragment
         end
         
         resolve_step -- has --> Journal
         resolve_step -- has --> AbsFeatureGraph
         resolve_step -- cursor --> StructureNode
-        resolve_step -- calls --> context_handler
+        resolve_step -- calls --> on_gather_context
         resolve_step -- calls --> predicate_handler
-        resolve_step -- calls --> effect_handler
+        resolve_step -- calls --> on_apply_effects
         resolve_step -- calls --> provision_handler
-        resolve_step -- calls --> render_handler
+        resolve_step -- calls --> on_render_content
     end
 ```
 
 
 ### Tangled Feature Space
 
-- Intermediate representation (IR) for a network of possible but unrealized interdependent features in superposition
+- Intermediate representation (IR) for a space of possible but unrealized interdependent features in superposition
 - Declarative rules and constraints for realizing and modifying features, dependencies, initial state
 - Use a self-evolving graph to incrementally satisfy constraints, identify or realize interdependencies, and discover control paths under a given control pattern
-- The finalized graph provides a globally valid and stable configuration of "untangled" state and shape features for one possible lane through the space
+- The finalized graph provides a globally valid and stable configuration of "untangled" state and affordances for one possible lane through the space
 - Trace of the control pattern moving through the graph provides an up-to-date linear history of the process
 
 ### Inspirations

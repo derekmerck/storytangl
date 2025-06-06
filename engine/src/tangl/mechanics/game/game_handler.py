@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import Field, field_validator, model_validator
 
-from tangl.core.handler import HandlerRegistry, HasContext, context_handler
+from tangl.core.handler import HandlerRegistry, HasContext, on_gather_context
 from tangl.core.entity import Entity, Node
 from .enums import GameResult
 
@@ -258,7 +258,7 @@ class Game(HasContext, Entity):
     def result(self):
         return self.game_handler_cls.check_game_result(self)
 
-    @context_handler.register()
+    @on_gather_context.register()
     def _include_game_status(self):
         R = GameResult
         res = {
@@ -286,7 +286,7 @@ class Game(HasContext, Entity):
         }
         return res
 
-    @context_handler.register()
+    @on_gather_context.register()
     def _add_game_result_enum_to_ns(self):
         # for evaluating enums like `R.WIN`
         return {'R': GameResult}

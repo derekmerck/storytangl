@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Node, Graph
-from tangl.core.handler import HasContext, context_handler
+from tangl.core.handler import HasContext, on_gather_context
 
 
 class MyNode(HasContext, Node):
@@ -22,12 +22,12 @@ def test_gather_locals():
 @pytest.mark.xfail(reason="graph needs to be implemented as a scope now")
 def test_gather_context_aggregation():
     class RoleNode(MyNode):
-        @context_handler.register(priority=20)
+        @on_gather_context.register(priority=20)
         def role_handler(self, _):
             return {"shopkeeper": "npc123"}
 
     class MyGraph(Graph, HasContext):
-        @context_handler.register(priority=50)
+        @on_gather_context.register(priority=50)
         def directory_handler(self, _):
             return {"nodes": {"test": "node123"}}
 

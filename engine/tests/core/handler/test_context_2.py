@@ -3,7 +3,7 @@ from typing import Mapping
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import context_handler, HasContext
+from tangl.core.handler import on_gather_context, HasContext
 
 MyContextEntity = type('MyContext', (HasContext, Entity), {} )
 
@@ -13,7 +13,7 @@ def context_entity():
 
 def test_context_entity(context_entity):
 
-    result = context_handler.execute_all(context_entity, ctx=None)
+    result = on_gather_context.execute_all(context_entity, ctx=None)
     assert result['entity'] == "hello entity"
 
 

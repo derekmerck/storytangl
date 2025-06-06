@@ -1,22 +1,22 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HasContext, context_handler, Satisfiable, availability_handler
+from tangl.core.handler import HasContext, on_gather_context, Satisfiable, on_check_satisfied
 
 # todo: extend to rendering
 
-class MyEntity(HasContext, Satisfiable, Entity):
+class MyEntity(Satisfiable, Entity):
 
-    @context_handler.register()
+    @on_gather_context.register()
     def _mock_data(self, ctx) -> dict:
         return {'abc': 'foo'}
 
-    # @render_handler.register()
+    # @on_render_content.register()
     # def _mock_render(self, **context) -> dict:
     #     s = self.render_str("this should say 'foo': {{ abc }}", **context)
     #     return {'content': s}
 
-    @availability_handler.register()
+    @on_check_satisfied.register()
     def _mock_conditions(self, ctx) -> list:
         return [ "abc == 'foo'" ]
 

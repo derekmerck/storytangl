@@ -1,2 +1,2 @@
 from .has_journal import HasJournal
-from .rendering import Renderable, render_handler
+from .rendering import Renderable, on_render_content

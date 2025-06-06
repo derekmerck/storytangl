@@ -3,7 +3,7 @@ from idlelib.run import MyHandler
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
-from tangl.core.handler import context_handler, HandlerRegistry, HasContext
+from tangl.core.handler import on_gather_context, HandlerRegistry, HasContext
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -20,7 +20,7 @@ def test_handler_registry_deferred_registration():
     # types bc we would need to come up with a discriminator annotation to signal each
     # registry instance which functions to attend to.  So this should be considered fragile.
 
-    context_handler.register_marked_handlers(MyEntity)
+    on_gather_context.register_marked_handlers(MyEntity)
 
     e = MyEntity(locals={'key': 'bar'})
     assert e.gather_context()['key'] == 'bar', "works as expected with locals"

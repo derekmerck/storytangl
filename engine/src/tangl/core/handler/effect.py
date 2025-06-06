@@ -2,12 +2,11 @@ import logging
 
 from pydantic import Field, field_validator
 
-from tangl.type_hints import StringMap, Expr
-from tangl.utils.safe_builtins import safe_builtins
+from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
 from .handler_registry import HandlerRegistry
 from .runtime_object import RuntimeObject
-from .context import context_handler
+from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +14,10 @@ class RuntimeEffect(RuntimeObject):
     # Similar to a predicate, carries a function that can update the context
 
     def execute(self, entity: Entity, *, ctx: StringMap):
-        ctx_ = ctx or {} | {'self': entity}  # type: StringMap
         if self.structured_expr is not None:
-            return self.exec_structured_expr(self.structured_expr, ctx=ctx_)
+            return self.exec_structured_expr(self.structured_expr, ctx=ctx)
         elif self.raw_expr is not None:
-            return self.exec_raw_expr(self.raw_expr, ctx=ctx_)
+            return self.exec_raw_expr(self.raw_expr, ctx=ctx)
         elif self.handler is not None:
             return self.handler(entity, ctx)
         elif self.func is not None:
@@ -27,10 +25,10 @@ class RuntimeEffect(RuntimeObject):
         return None
         # todo: copy direct ctx updates like locals back to locals?
 
-effect_handler = HandlerRegistry(label="effect_handler", default_aggregation_strategy="pipeline")
+on_apply_effects = HandlerRegistry(label="apply_effects", default_aggregation_strategy="pipeline")
 
 # Mixin with EffectHandler registry
-class HasEffects(Entity):
+class HasEffects(HasContext):
     """
     A handler class for managing and applying effect strategies for Entities.
     Provides functionality to execute effects using dynamic namespaces.
@@ -61,11 +59,12 @@ class HasEffects(Entity):
             return res
         raise ValueError(f"Invalid effect definition: {data}")
 
-    @effect_handler.register()
+    @on_apply_effects.register()
     def _execute_effects(self, ctx: StringMap):
         for effect in self.effects:
             ctx = effect.execute(self, ctx=ctx)
         return ctx
 
-    def apply_effects(self, *, ctx: StringMap) -> bool:
-        return effect_handler.execute_all(self, ctx=ctx)
+    def apply_effects(self, ctx: StringMap = None) -> bool:
+        ctx = ctx if ctx is not None else self.gather_context()
+        return on_apply_effects.execute_all(self, ctx=ctx)

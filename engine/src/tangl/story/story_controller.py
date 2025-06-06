@@ -7,7 +7,7 @@ from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, Ac
 # from tangl.media.media_record import MediaRecord, MediaDataType
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.core.entity import Node, AnonymousEdge
-from tangl.core.handler import context_handler, Predicate, RuntimeEffect
+from tangl.core.handler import on_gather_context, Predicate, RuntimeEffect
 from tangl.core.solver import ChoiceEdge, ContentFragment
 from .story import Story
 
@@ -38,7 +38,7 @@ class StoryController(HasApiEndpoints):
     def get_journal_entry(self, story: Story, item = -1) -> list[ContentFragment]:
         # JournalEntries are formatted as content fragments and interpreted as an
         # ordered list of styled narrative entries
-        return story.journal.get_entry(item)
+        return story.get_journal_entry(item)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
     def get_story_info(self, story: Story, **kwargs) -> list[ContentFragment]:
@@ -49,13 +49,13 @@ class StoryController(HasApiEndpoints):
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
     def get_story_media(self, story: Story, media: 'MediaRIT' | Identifier, **kwargs) -> 'MediaDataType':
         if isinstance(media, Identifier):
-            media = story.graph.find_one(alias=media)  # type: MediaRIT
+            media = story.find_one(alias=media)  # type: MediaRIT
         return media.get_content(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, method_type=MethodType.UPDATE)
     def do_step(self, story: Story, edge: ChoiceEdge | Identifier, **kwargs):
         if isinstance(edge, Identifier):
-            edge = story.graph.find_one(alias=edge)  # type: ChoiceEdge
+            edge = story.find_one(alias=edge)  # type: ChoiceEdge
         story.resolve_choice(edge, **kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, method_type=MethodType.UPDATE)
@@ -72,7 +72,7 @@ class StoryController(HasApiEndpoints):
     @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)
     def goto_node(self, story: Story, node: Node | Identifier):
         if isinstance(node, Identifier):
-            node = story.graph.find_one(alias=node)
+            node = story.find_one(alias=node)
         node.dirty = True  # Jumping logic arbitrarily
         anonymous_edge = AnonymousEdge(source=story.cursor, dest=node)
         story.resolve_choice(anonymous_edge)
@@ -81,7 +81,7 @@ class StoryController(HasApiEndpoints):
     @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED, method_type=MethodType.UPDATE)
     def get_node_info(self, story: Story, node: Node | Identifier) -> UnstructuredData:
         if isinstance(node, Identifier):
-            node = story.graph.find_one(alias=node)
+            node = story.find_one(alias=node)
         node.dirty = True  # Inspecting internal values
         data = node.model_dump()
         return data
@@ -92,7 +92,7 @@ class StoryController(HasApiEndpoints):
                           response_type=ResponseType.RUNTIME)
     def check_condition(self, story: Story, expr: Expr) -> Any:
         story.dirty = True  # Testing internal values
-        ctx = context_handler.execute_all(story, ctx=None)
+        ctx = on_gather_context.execute_all(story, ctx=None)
         result = Predicate.eval_raw_expr(expr, ctx=ctx)
         return result
 
@@ -101,5 +101,5 @@ class StoryController(HasApiEndpoints):
                           response_type=ResponseType.RUNTIME)
     def apply_effect(self, story: Story, effect: Expr):
         story.dirty = True  # Updating internal values arbitrarily
-        ctx = context_handler.execute_all(story, ctx=None)
+        ctx = on_gather_context.execute_all(story, ctx=None)
         RuntimeEffect.exec_raw_expr(effect, ctx=ctx)

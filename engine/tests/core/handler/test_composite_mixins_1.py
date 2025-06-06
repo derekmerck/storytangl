@@ -10,10 +10,10 @@ from tangl.persistence.structuring import StructuringHandler
 
 logging.basicConfig(level=logging.DEBUG)
 
-class TestCompositeEntity(HasContext, HasEffects, Satisfiable, Entity):
+class TestCompositeEntity(HasEffects, Satisfiable, Entity):
     ...
 
-class TestCompositeNode(HasContext, HasEffects, Satisfiable, Node):
+class TestCompositeNode(HasEffects, Satisfiable, Node):
     ...
 
 @pytest.fixture

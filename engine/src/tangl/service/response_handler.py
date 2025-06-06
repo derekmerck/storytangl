@@ -13,11 +13,11 @@ from tangl.core.handler import HandlerRegistry
 
 OutputMode = Literal["html", "ascii"]
 
-response_handler = HandlerRegistry(default_aggregation_strategy="pipeline")
+on_handle_response = HandlerRegistry(default_aggregation_strategy="pipeline")
 
 class ResponseHandler:
 
-    @response_handler.register()
+    @on_handle_response.register()
     @staticmethod
     def md_text_items(response: 'BaseResponse', **kwargs):
         md = MarkdownIt()
@@ -33,4 +33,4 @@ class ResponseHandler:
             for item in response:
                 cls.handle_response(item, **kwargs)
         else:
-            return response_handler.execute(response, **kwargs)
+            return on_handle_response.execute(response, **kwargs)

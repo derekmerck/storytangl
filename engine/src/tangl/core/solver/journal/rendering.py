@@ -6,18 +6,20 @@ from tangl.core.handler import HandlerRegistry
 from ..feature_nodes import ContentFragment
 
 
-render_handler = HandlerRegistry(label='render_handler', default_aggregation_strategy="pipeline")
+on_render_content = HandlerRegistry(label='on_render_content', default_aggregation_strategy="pipeline")
 
 class Renderable(Entity):
 
     content: Any = None
 
-    @render_handler.register()
-    def _provide_content(self):
+    @on_render_content.register()
+    def _provide_content(self, ctx: StringMap) -> StringMap:
         return {'content': self.content}
 
-    @render_handler.register(priority=100)  # last
+    @on_render_content.register(priority=100)  # last
     def _assemble_fragments(self, ctx: StringMap) -> list[ContentFragment]:
         result = ctx.pop("result", None)
-        ...
         return result
+
+    def render_content(self, ctx: StringMap) -> list[ContentFragment]:
+        return on_render_content.execute_all(self, ctx=ctx)

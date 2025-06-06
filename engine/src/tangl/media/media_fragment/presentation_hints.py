@@ -13,7 +13,9 @@ TimingName = Literal['start', 'stop', 'pause', 'restart', 'loop']
 
 class PresentationHints(BaseModel, extra="allow"):
     """
-    Staging or playback hints for media fragment content.
+    Media PresentationHints hints are similar to dialog annotations -- they provide
+    additional client-side suggestions for client staging, position, arrival, and
+    departure transitions.
     """
     media_shape: Optional[ShapeName | float] = None  # aspect ratio
     media_size: Optional[SizeName | tuple[int, int] | tuple[float, float] | float] = None  # dims or scale

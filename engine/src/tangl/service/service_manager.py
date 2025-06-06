@@ -8,8 +8,8 @@ from uuid import UUID
 from .api_endpoint import HasApiEndpoints, ApiEndpoint, MethodType, AccessLevel
 
 if TYPE_CHECKING:
-    from tangl.story.story_graph import Story
-    from tangl.user import User
+    from tangl.story.story import Story
+    from tangl.service.user import User
 
 class ServiceManager:
     """

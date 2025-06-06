@@ -4,12 +4,12 @@ import types
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import availability_handler, effect_handler, HasContext, Satisfiable, HasEffects, RuntimeEffect
+from tangl.core.handler import Satisfiable, HasEffects, RuntimeEffect
 
-MyEffectEntity = type('MyEffectEntity', (HasEffects, HasContext, Entity), {} )
+MyEffectEntity = type('MyEffectEntity', (HasEffects, Entity), {} )
 
 
-def test_effect_handler_builtins():
+def test_on_apply_effects_builtins():
     r = MyEffectEntity()
 
     # can access "safe builtins"
@@ -28,7 +28,7 @@ def test_apply_effects():
     )
 
     # Apply effect
-    test_entity.apply_effects(ctx=test_entity.gather_context())
+    test_entity.apply_effects()
     updated_namespace = test_entity.gather_context()
 
     # Verify that the change is reflected in the namespace
@@ -37,7 +37,7 @@ def test_apply_effects():
 def test_apply_effect1():
     n = MyEffectEntity( locals={'abc': {} },
                         effects=["abc['foo'] = 'bar'"])
-    n.apply_effects(ctx=n.gather_context())
+    n.apply_effects()
     assert n.locals['abc']['foo'] == 'bar'
 
 
@@ -53,7 +53,7 @@ def test_apply_effect2():
     print( ctx )
     assert ctx.maps[0] is node.locals
 
-    node.apply_effects(ctx=node.gather_context())
+    node.apply_effects()
     assert node.locals["name"] == "Alice"
 
 def test_apply_effects3():
@@ -61,7 +61,7 @@ def test_apply_effects3():
     namespace = {"x": 10}
 
     mixin = MyEffectEntity(effects=effects, locals=namespace)
-    mixin.apply_effects(ctx=mixin.gather_context())
+    mixin.apply_effects()
     assert mixin.locals["x"] == 15
 
 def test_apply_effects_to():
@@ -75,42 +75,42 @@ def test_multiple_effects():
     n = MyEffectEntity(
         locals={'abc': {}},
         effects=["abc['foo'] = 'bar'", "abc['foobar'] = abc['foo']"])
-    n.apply_effects(ctx=n.gather_context())
+    n.apply_effects()
     assert n.locals['abc']['foo'] == 'bar'
     assert n.locals['abc']['foobar'] == 'bar'
 
 def test_effect_conditional_execution():
     n = MyEffectEntity(locals={'condition': True, 'foo': {}},
                             effects=["if condition: foo['abc'] = 1"])
-    n.apply_effects(ctx=n.gather_context())
+    n.apply_effects()
     assert n.locals['foo']['abc'] == 1
 
 def test_effect_no_local_change():
     n = MyEffectEntity(effects=["non_existent['foo'] = 'bar'"])
     with pytest.raises(NameError):
-        n.apply_effects(ctx=n.gather_context())  # Expecting NameError since 'non_existent' is not in locals
+        n.apply_effects()  # Expecting NameError since 'non_existent' is not in locals
 
     n.locals['non_existent'] = 0
 
     with pytest.raises(TypeError):
-        n.apply_effects(ctx=n.gather_context())  # Expecting TypeError since can't assign kv to an int
+        n.apply_effects()  # Expecting TypeError since can't assign kv to an int
 
 def test_effect_dynamic_namespace_update():
     n = MyEffectEntity(locals={'foo': types.SimpleNamespace(counter=0)},
-                            effects=["foo.counter += 1", "foo.counter += 1"])
-    n.apply_effects(ctx=n.gather_context())
+                       effects=["foo.counter += 1", "foo.counter += 1"])
+    n.apply_effects()
     assert n.locals['foo'].counter == 2
 
 # todo: this should not work as implemented, i think?  maybe b/c it's a chainmap?
 def test_effect_dynamic_locals_update():
     n = MyEffectEntity(locals={'foo': 0},
                        effects=["foo += 1", "foo += 1"])
-    n.apply_effects(ctx=n.gather_context())
+    n.apply_effects()
     assert n.locals['foo'] == 2
 
 def test_conditional_applyable():
 
-    MyCEEntity = type('MyCEEntity', (Satisfiable, HasContext, HasEffects, Entity), {} )
+    MyCEEntity = type('MyCEEntity', (HasEffects, Satisfiable, Entity), {} )
 
     conditions = ["'sword' in inventory"]
     effects = ["inventory.remove('sword')", "inventory.append('elixir')"]
@@ -118,15 +118,15 @@ def test_conditional_applyable():
 
     mixin = MyCEEntity(locals=namespace, predicates=conditions, effects=effects)
 
-    assert mixin.is_satisfied(ctx=mixin.gather_context()) is True
-    mixin.apply_effects(ctx=mixin.gather_context())
+    assert mixin.is_satisfied() is True
+    mixin.apply_effects()
     assert mixin.locals["inventory"] == ['shield', 'elixir']
 
     A = MyCEEntity( conditions=["A is None"], locals={"A": None} )
-    assert( A.is_satisfied(ctx=A.gather_context()) is True )
+    assert( A.is_satisfied() is True )
 
     B = MyCEEntity( effects=["B['foo']=5"], locals={"B": {'bar': 10}} )
-    B.apply_effects(ctx=B.gather_context())
+    B.apply_effects()
     assert B.locals['B']['foo'] == 5
 
     D = MyCEEntity( effects=["d=5"], locals={"d": 10} )

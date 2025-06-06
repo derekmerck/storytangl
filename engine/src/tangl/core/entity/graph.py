@@ -12,6 +12,7 @@ from .registry import Registry
 logger = logging.getLogger(__name__)
 
 class Node(Entity):
+
     graph: Graph = Field(None, json_schema_extra={'cmp': False}, exclude=True)
 
     def edges(self, *, direction: Literal["in", "out"] = None, **criteria) -> Iterator[Edge]:

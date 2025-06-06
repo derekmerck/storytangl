@@ -21,7 +21,7 @@ from tangl.core.handler import HasContext, Satisfiable
 
 #### TYPED NODES ####
 
-class _FeatureNode(HasContext, Satisfiable, Node):
+class _FeatureNode(Satisfiable, Node):
     # Node with built-in context and gating
     ...
 
@@ -65,7 +65,7 @@ When = Literal["before", "after"]
 SourceT = TypeVar("SourceT", bound=Node)
 DestT = TypeVar("DestT", bound=Node)
 
-class _FeatureEdge(HasContext, Satisfiable, Edge, Generic[SourceT, DestT]):
+class _FeatureEdge(Satisfiable, Edge, Generic[SourceT, DestT]):
     # Edge with built-in context and gating
     ...
 
