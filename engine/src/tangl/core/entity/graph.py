@@ -34,28 +34,29 @@ class AnonymousEdge(Entity):
     dest: Node
 
 
-NodeT = TypeVar("NodeT", bound=Node)
+SourceT = TypeVar("SourceT", bound=Node)
+DestT = TypeVar("DestT", bound=Node)
 
-class Edge(Entity, Generic[NodeT]):
+class Edge(Entity, Generic[SourceT, DestT]):
     graph: Graph = Field(None, json_schema_extra={'cmp': False}, exclude=True)
 
     src_id: UUID
     dest_id: UUID
 
     @property
-    def src(self) -> Node:
+    def src(self) -> SourceT:
         return self.graph.get(self.src_id)
 
     @src.setter
-    def src(self, node: Node):
+    def src(self, node: SourceT):
         self.src_id = node.uid
 
     @property
-    def dest(self) -> NodeT:
+    def dest(self) -> DestT:
         return self.graph.get(self.dest_id)
 
     @dest.setter
-    def dest(self, node: NodeT):
+    def dest(self, node: DestT):
         self.dest_id = node.uid
 
     def __repr__(self) -> str:

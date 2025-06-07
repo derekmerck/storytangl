@@ -10,6 +10,10 @@ from .handler_registry import HandlerRegistry
 logger = logging.getLogger(__name__)
 
 on_gather_context = HandlerRegistry(label="gather_context", default_aggregation_strategy="merge")
+"""
+The global pipeline for gathering context. Handlers for context
+should decorate methods with ``@on_gather_context.register(...)``.
+"""
 
 class HasContext(Entity):
 

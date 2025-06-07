@@ -26,6 +26,10 @@ class RuntimeEffect(RuntimeObject):
         # todo: copy direct ctx updates like locals back to locals?
 
 on_apply_effects = HandlerRegistry(label="apply_effects", default_aggregation_strategy="pipeline")
+"""
+The global pipeline for effects. Handlers for applying effects
+should decorate methods with ``@on_apply_effects.register(...)``.
+"""
 
 # Mixin with EffectHandler registry
 class HasEffects(HasContext):

@@ -6,57 +6,53 @@ Defines the :func:`on_render` pipeline for rendering content from a
 This pipeline depends on (or at least benefits from) the 'gather_context'
 pipeline provided by :class:`HasContext`.
 """
-
-from __future__ import annotations
-from typing import ClassVar, Mapping
+from typing import Any, ClassVar
 import logging
 
 import jinja2
 
 from tangl.type_hints import StringMap
-from ..handler_pipeline import HandlerPipeline, PipelineStrategy
-from .has_context import HasContext
+from tangl.core.handler import HandlerRegistry
+from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
-on_render = HandlerPipeline[HasContext, dict](
-            label="on_render",
-            pipeline_strategy=PipelineStrategy.GATHER
-        )
+
+on_render_content = HandlerRegistry(label='render_content', default_aggregation_strategy="merge")
 """
 The global pipeline for rendering. Handlers for rendering
-should decorate methods with ``@on_render.register(...)``.
+should decorate methods with ``@on_render_content.register(...)``.
 """
 
 class Renderable(HasContext):
     """
-    An entity that can produce rendered output (text, HTML, etc.)
-    via Jinja2 templates, or other mechanisms. Inherits
-    :class:`HasContext` so it can also gather context from a parent
-    or graph.
+   An entity that can produce rendered output (text, HTML, etc.)
+   via Jinja2 templates, or other mechanisms. Inherits
+   :class:`HasContext` so it can also gather context from a parent
+   or graph.
 
-    **Design Overview**:
-      - :meth:`render` merges any user-supplied context with
-        :meth:`gather_context`.
-      - The pipeline :attr:`on_render` is set to
-        :attr:`PipelineStrategy.GATHER`, so multiple handlers can
-        combine partial rendering data.
-      - By default, this class registers a single handler
-        (:meth:`_provide_label_and_text`) that returns a dict with
-        label and rendered text.
+   **Design Overview**:
+     - :meth:`render` merges any user-supplied context with
+       :meth:`gather_context`.
+     - The pipeline :attr:`on_render` is set to
+       :attr:`PipelineStrategy.GATHER`, so multiple handlers can
+       combine partial rendering data.
+     - By default, this class registers a single handler
+       (:meth:`_provide_label_and_text`) that returns a dict with
+       label and rendered text.
 
-    :ivar text: Optional text or template source to render.
-    :type text: str
-    :cvar jinja_env: A class-level :class:`jinja2.Environment` used
-                     for template rendering if none is explicitly
-                     provided.
-    :type jinja_env: ClassVar[jinja2.Environment]
-    """
+   :ivar text: Optional text or template source to render.
+   :type text: str
+   :cvar jinja_env: A class-level :class:`jinja2.Environment` used
+                    for template rendering if none is explicitly
+                    provided.
+   :type jinja_env: ClassVar[jinja2.Environment]
+   """
     content: str = None
     jinja_env: ClassVar[jinja2.Environment] = jinja2.Environment()
 
     @classmethod
-    def render_str(cls, s: str, env: jinja2.Environment = None, **context) -> str:
+    def render_str(cls, s: str, *, ctx: StringMap, env: jinja2.Environment = None) -> str:
         """
         Render a string as a Jinja2 template using the given environment
         and context.
@@ -75,11 +71,13 @@ class Renderable(HasContext):
         if not env:
             env = cls.jinja_env
         templ = env.from_string(s)
-        logger.debug(f'rendering {s} with {context}')
-        return templ.render(**context)
+        logger.debug(f'rendering {s} with {ctx}')
+        return templ.render(ctx)
 
-    @on_render.register()
-    def _provide_label_and_text(self, **context) -> StringMap:
+    content: Any = None
+
+    @on_render_content.register()
+    def _provide_label_and_content(self, ctx: StringMap) -> StringMap:
         """
         A default rendering handler that includes the entity's label
         and a Jinja2-rendered version of :attr:`text`.
@@ -88,12 +86,10 @@ class Renderable(HasContext):
         :return: A dictionary with keys ``"label"`` and ``"text"``.
         :rtype: dict[str, Any]
         """
-        return {
-            'label': self.label,
-            'content': self.render_str(self.content, **context)
-        }
+        return {'label': self.label,
+                'content': self.render_str(self.content, ctx=ctx)}
 
-    def render(self, **context) -> StringMap:
+    def render_content(self, ctx: StringMap = None) -> StringMap:
         """
         Invoke the :func:`on_render` pipeline for this entity,
         gathering or merging any partial rendering data from
@@ -107,5 +103,5 @@ class Renderable(HasContext):
                  or dict, depending on the pipeline's strategy and
                  the types returned by handlers.
         """
-        context = context or self.gather_context()
-        return on_render.execute(self, **context)
+        ctx = ctx if ctx is not None else self.gather_context()
+        return on_render_content.execute_all(self, ctx=ctx)

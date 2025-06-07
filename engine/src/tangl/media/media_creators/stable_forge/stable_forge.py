@@ -11,7 +11,7 @@ StableSpecT = TypeVar('StableSpecT', bound=StableSpec)
 
 class StableForge:
     """
-    Implements MediaForge
+    Implements MediaForgeP
     """
 
     def create_media(self, spec: StableSpecT) -> tuple[Image, Optional[StableSpecT]]:

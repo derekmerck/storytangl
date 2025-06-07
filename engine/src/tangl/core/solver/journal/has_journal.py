@@ -5,10 +5,11 @@ import logging
 
 from pydantic import Field
 
+from tangl.type_hints import UnstructuredData
 from tangl.utils.bookmarked_list import BookmarkedList
 from tangl.core.entity import Registry
 from tangl.core.entity import Node, Graph
-from ..feature_nodes import ContentFragment, BlameEdge
+from ..abs_feature_graph import ContentFragment, BlameEdge
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,9 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
         items = self.journal.get_slice(which, bookmark_type="section")
         return [self.get(uid) for uid in items]
 
-    def add_fragment(self, item: ContentFragment, blame: Node = None):
+    def add_fragment(self, item: ContentFragment | UnstructuredData, blame: Node = None):
+        if isinstance(item, dict):
+            item = ContentFragment.structure(item)
         if not isinstance(item, ContentFragment):
             raise ValueError(f"Trying to add wrong type {type(item)} to graph via journal")
         if item.sequence is None:

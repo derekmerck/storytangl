@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4
 
-from tangl.core.solver.feature_nodes import ContentFragment
+from tangl.core.solver.abs_feature_graph import ContentFragment
 from tangl.core.solver.journal import HasJournal
 
 class TestHasJournal(HasJournal):

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 class TtsForge:
     """
-    Implements MediaForge
+    Implements MediaForgeP
     """
 
     @classmethod

@@ -1,15 +1,15 @@
 from __future__ import annotations
-from typing import Optional, Literal
+from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import ConfigDict
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Node, Edge, Graph
-from tangl.core.handler import BaseHandler, HandlerRegistry, on_check_satisfied, on_gather_context, on_apply_effects, HasEffects
-from .journal import HasJournal as Journal, on_render_content
-from .feature_nodes import ChoiceEdge, When
-from .provisioner import dependency_provisioner
+from tangl.core.handler import on_check_satisfied, on_gather_context, on_apply_effects, HasEffects, on_render_content
+from .journal import HasJournal as Journal
+from .abs_feature_graph import ChoiceEdge, When
+from .provisioner import on_provision_dependency, ResolvableNode
 
 Scope = dict
 # todo: need a "scoped context handler" that does chaining
@@ -25,13 +25,14 @@ class ForwardResolver(Entity):
     cursor_id: UUID
     journal: Journal
     scopes: list[Scope]
+    step_counter: int = 0
 
     @property
-    def cursor(self) -> Node:
+    def cursor(self) -> ResolvableNode:
         return self.graph.get(self.cursor_id)
 
     @cursor.setter
-    def cursor(self, cursor: Node) -> None:
+    def cursor(self, cursor: ResolvableNode) -> None:
         self.cursor_id = cursor.uid
 
     def _check_choices(self, when: When, *, ctx: StringMap) -> Optional[Edge]:
@@ -64,12 +65,12 @@ class ForwardResolver(Entity):
 
         # Update cursor
         self.cursor = node
+        self.step_counter += 1
 
         # Resolve frontier edges
-        # dependency_provisioner.provision_node(node, ctx=ctx)
-        # # Resolve requirements
-        # # Adds edges with open source to the frontier
-        # ProvisionHandler.link_requirements(node, ctx=ctx)
+        ResolvableNode.provision_dependencies(self.cursor, ctx)
+        ResolvableNode.provision_affordances(self.cursor, ctx=ctx)
+        # todo: Check for critical affordances in the current scopes
 
         # Check for 'before' auto-advance
         if (next_edge := self._check_choices("before", ctx=ctx)) is not None:

@@ -30,6 +30,10 @@ class Predicate(RuntimeObject):
 on_check_satisfied = HandlerRegistry(
     label="check_satisfied",
     default_aggregation_strategy="all_true")
+"""
+The global pipeline for evaluating local predicates. Handlers for predicates
+should decorate methods with ``@on_check_satisfied.register(...)``.
+"""
 
 class Satisfiable(HasContext):
 

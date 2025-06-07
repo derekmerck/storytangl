@@ -11,15 +11,18 @@ flowchart RL
         Entity
         Registry -- is --> Entity
         Registry -- has --> Entity
-        subgraph singleton_
-          Singleton -- has --> Registry
-          SingletonNode -- is --> Singleton
-          SingletonNode -- is --> Node
-        end
-        subgraph graph_
+        subgraph .graph
+            Node -- is --> Entity
+            Edge -- is --> Entity
             Graph -- is --> Registry
-            Graph -- has --> Node
-            Graph -- has --> Edge
+            Graph <-- has --> Node
+            Graph <-- has --> Edge
+        end
+        subgraph .singleton
+            Singleton -- is --> Entity
+            Singleton -- has --> Registry
+            SingletonNode -- is --> Singleton
+            SingletonNode -- is --> Node
         end
             
     end
@@ -30,7 +33,8 @@ flowchart RL
         HandlerRegistry -- has --> Handler
         on_gather_context -- is --> HandlerRegistry
         on_apply_effects -- is --> HandlerRegistry
-        predicate_handler -- is --> HandlerRegistry
+        on_check_satisfied -- is --> HandlerRegistry
+        on_render_content -- is --> HandlerRegistry
     end
 
     subgraph .solver
@@ -59,13 +63,12 @@ flowchart RL
             
         end
         subgraph .provisioner
-            provision_handler -- is --> HandlerRegistry
-            provision_handler -- uses --> DependencyEdge
-            provision_handler -- builds --> ResourceNode
-            provision_handler -- builds --> StructureNode
+            on_provision_dep -- is --> HandlerRegistry
+            on_provision_dep -- uses --> DependencyEdge
+            on_provision_dep -- builds --> ResourceNode
+            on_provision_dep -- builds --> StructureNode
         end
-        subgraph .render
-            on_render_content -- is --> HandlerRegistry
+        subgraph .journal
             on_render_content -- builds --> JournalFragment
             Journal -- has --> JournalFragment
         end
@@ -74,9 +77,9 @@ flowchart RL
         resolve_step -- has --> AbsFeatureGraph
         resolve_step -- cursor --> StructureNode
         resolve_step -- calls --> on_gather_context
-        resolve_step -- calls --> predicate_handler
+        resolve_step -- calls --> on_check_satisfied
         resolve_step -- calls --> on_apply_effects
-        resolve_step -- calls --> provision_handler
+        resolve_step -- calls --> on_provision_dep
         resolve_step -- calls --> on_render_content
     end
 ```
@@ -96,3 +99,4 @@ flowchart RL
 - Constraint Satisfaction and Logic Programming (nodes & dependencies → constraints & resolution)
 - Software Package Dependency Resolution (dependency edges → abstract package reqs; resource nodes → concrete packages)
 - Compiler & Intermediate Representation (tangled features → abstract IR; untangle -> interpreter; trace journal → trace IR)
+- Quantum wavefunction collapse (tangled features are in state of interdependent quantum superposition -> interpreter collapses space into a stable measurement)

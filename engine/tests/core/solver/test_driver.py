@@ -1,8 +1,7 @@
 import pytest
 
-from tangl.core.entity import Graph
+from tangl.core.entity import Graph, Node
 from tangl.core.solver import HasJournal, ChoiceEdge
-from tangl.core.solver.feature_nodes import _FeatureNode as Node
 from tangl.core.solver.forward_resolve import ForwardResolver
 
 def test_cursor_driver_guard_rail_on_choice():

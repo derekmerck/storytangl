@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Protocol, runtime_checkable, Any
 
-from media.old.protocols import MediaSpecP
+# from media.old.protocols import MediaSpecP
 from tangl.compilers.story_script import BaseScriptItem
 from tangl.type_hints import Pathlike, Identifier, StringMap, Expr
 

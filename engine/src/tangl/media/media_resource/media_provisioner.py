@@ -1,9 +1,13 @@
-from tangl.core.solver.provisioner.provision_dependency import DependencyProvisioner
+from tangl.type_hints import Pathlike
+from tangl.core.handler import HandlerRegistry
+from tangl.core.solver.provisioner import ResolvableNode
 from ..media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from .media_resource_registry import MediaResourceRegistry
 
-class MediaProvisioner(DependencyProvisioner):
+on_provision_media = HandlerRegistry(label="provision_media")
+
+class HasMedia(ResolvableNode):
     """
     - story media script w path/url, media registry alias, or spec
     - story media dep is provisioned:
@@ -17,4 +21,6 @@ class MediaProvisioner(DependencyProvisioner):
           - register the returned media and update the node spec if the node is unrepeatable, otherwise leave it as the template so it can be re-rendered when the context is updated
           - link the new rit
     """
-    ...
+    media_path: Pathlike = None
+    media_rit: MediaRIT = None
+    media_spec: MediaSpec = None

@@ -1,2 +1,2 @@
-from .open_feature_edge import DependencyEdge, RequirementEdge
-from .provision_dependency import dependency_provisioner
+from .dependency import DependencyEdge, AffordanceEdge
+from .provisioning import on_provision_dependency, ResolvableNode
