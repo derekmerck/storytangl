@@ -9,7 +9,8 @@ from ..registry import Registry
 
 class Singleton(Entity):
     model_config = ConfigDict(frozen=True)
-    label: UniqueLabel = Field(...)  # Must be unique within the class registry
+    label_: UniqueLabel = Field(..., alias="label")
+    # Required now, must be unique within the class registry
 
     _instances: ClassVar[Registry[Self]] = Registry(label="singleton_instances")
     """
