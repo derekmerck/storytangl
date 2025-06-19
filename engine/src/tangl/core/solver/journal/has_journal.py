@@ -54,9 +54,10 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
             item = ContentFragment.structure(item)
         if not isinstance(item, ContentFragment):
             raise ValueError(f"Trying to add wrong type {type(item)} to graph via journal")
-        if item.sequence is None:
-            # Record the fragment counter as the sequence num
-            item.sequence = self.fragment_counter
+        # todo: need to unfreeze or set with a trick
+        # if item.sequence is None:
+        #     # Record the fragment counter as the sequence num
+        #     item.sequence = self.fragment_counter
         self.fragment_counter += 1
         self.add(item)
         # If the call indicates the originating structure node, record it as a blame edge

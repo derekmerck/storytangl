@@ -14,14 +14,15 @@ def conditional_entity():
 
 def test_conditional_entity(conditional_entity):
 
-    context = on_gather_context.execute_all(conditional_entity, ctx=None)
+    context = on_gather_context.execute_all_for(conditional_entity, ctx=None)
     print(context)
     assert context['test_val'] is True
 
     context = conditional_entity.gather_context()
     assert context['test_val'] is True
 
-    result = on_check_satisfied.execute_first(conditional_entity, ctx=context)
+    # It won't aggregate with check first for
+    result = on_check_satisfied.execute_all_for(conditional_entity, ctx=context)
     assert result
 
     result = conditional_entity.is_satisfied(ctx=context)

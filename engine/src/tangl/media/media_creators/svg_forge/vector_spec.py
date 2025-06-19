@@ -16,7 +16,7 @@ from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
 from tangl.media.media_spec import MediaSpec
-from tangl.media.media_fragment import PresentationHints
+from tangl.media.media_fragment import StagingHints
 
 class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
     """
@@ -42,7 +42,7 @@ class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
     label: UniqueLabel = None
     ref: UniqueLabel = None
 
-    style_hints: PresentationHints = None
+    staging_hints: StagingHints = None
 
     @model_validator(mode='after')
     def _check_exactly_one(self):

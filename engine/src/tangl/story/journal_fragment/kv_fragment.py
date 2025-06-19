@@ -11,6 +11,6 @@ from .content_fragment import ContentFragment
 
 class KvFragment(ContentFragment, extra='allow', arbitrary_types_allowed=True):
     # Used for info-responses that require ordered, hinted kv data (story info, world info, etc.)
-    fragment_type: Literal["kv"] = Field("kv", alias='type')
+    fragment_type: Literal["kv"] = "kv"
     content: list[OrderedTupleDict] = Field(...)
 

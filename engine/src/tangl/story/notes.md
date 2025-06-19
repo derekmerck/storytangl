@@ -65,3 +65,12 @@ Example
 	•	Dragon provided by creating or recruiting existing dragon resource
 •	Edit Actions:
 	•	Reuse existing dragon, create new sword, modify hero’s attributes
+
+------
+
+Connected entity structure representing the latent story space.
+
+StoryTangl graphs are the backbone of narrative representation, where:
+- Story elements (scenes, actors, objects) are nodes
+- Relationships (ownership, traversal options) are edges
+- State is distributed locally rather than in a global dictionary

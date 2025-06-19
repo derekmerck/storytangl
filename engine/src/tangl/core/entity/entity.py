@@ -15,16 +15,6 @@ match_logger = logging.getLogger(f"{__name__}.match_logger")  # Very verbose
 match_logger.setLevel(logging.INFO)
 
 
-class EntityP(Protocol):
-    # Minimal public interface provided by Entity subclasses
-    uid: UUID
-    label: str
-    tags: set[Tag]
-    def matches(self, **criteria: Any) -> bool: ...
-    @classmethod
-    def structure(cls, data: UnstructuredData) -> Self: ...
-    def unstructure(self) -> UnstructuredData: ...
-
 def identifier_property(func: Callable[[Any], Any]) -> property:
     func._is_identifier = True
     prop = property(func)
@@ -57,6 +47,8 @@ class Entity(BaseModelPlus):
         return filter(lambda e: e.matches(**criteria), *entities)
 
     def has_cls(self, obj_cls: Type[Self]) -> bool:
+        if obj_cls is None:
+            return True
         return isinstance(self, obj_cls)
 
     def iter_aliases(self) -> Iterator[Identifier]:

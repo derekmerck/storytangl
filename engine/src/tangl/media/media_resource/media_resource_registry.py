@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import model_validator
 
 from tangl.core.entity import Registry
-from tangl.core.handler import HandlerRegistry, BaseHandler
+from tangl.core.dispatch import HandlerRegistry, Handler
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 class MediaResourceRegistry(Registry[MediaRIT]):
@@ -28,7 +28,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     def index(self,
               items: Iterable,
               mrt_cls: Type[MediaRIT] = None,
-              extra_handlers: list[BaseHandler] = None) -> list[MediaRIT]:
+              extra_handlers: list[Handler] = None) -> list[MediaRIT]:
         """
         Index a collection of data resources, deduplicating by content hash
         and running through the indexing pipeline.

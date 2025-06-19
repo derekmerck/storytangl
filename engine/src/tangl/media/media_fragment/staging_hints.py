@@ -11,9 +11,9 @@ TransitionName = Literal['fade_in', 'fade_out', 'remove',
 DurationName = Literal['short', 'medium', 'long']
 TimingName = Literal['start', 'stop', 'pause', 'restart', 'loop']
 
-class PresentationHints(BaseModel, extra="allow"):
+class StagingHints(BaseModel, extra="allow"):
     """
-    Media PresentationHints hints are similar to dialog annotations -- they provide
+    Media StagingHints are similar to dialog StyleHint annotations -- they provide
     additional client-side suggestions for client staging, position, arrival, and
     departure transitions.
     """

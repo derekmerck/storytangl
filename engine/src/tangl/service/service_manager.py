@@ -73,8 +73,7 @@ class ServiceManager:
         :param component:
             Either an instance or a class that inherits :class:`HasApiEndpoints`.
         """
-        # If component is a class, instantiate it, or vice versa.
-        # Or maybe your pattern is that each component is already a class instance:
+        # If component is a class, instantiate it
         if inspect.isclass(component):
             component_instance = component()
         else:

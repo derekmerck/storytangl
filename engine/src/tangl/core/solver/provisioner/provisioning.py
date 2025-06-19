@@ -1,8 +1,9 @@
 from typing import Optional
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Node
-from tangl.core.handler import HandlerRegistry, HandlerPriority as Priority, on_check_satisfied
+from tangl.core.entity import Node, Edge
+from tangl.core.dispatch import HandlerRegistry, HandlerPriority as Priority
+from tangl.core.handler import on_check_satisfied
 from .dependency import DependencyEdge, AffordanceEdge
 
 #### HANDLERS ####
@@ -14,12 +15,12 @@ The global pipeline for provisioning dependencies. Handlers for resolving
 dependencies should decorate methods with ``@on_provision_dependency.register(...)``.
 """
 
-@on_provision_dependency.register(priority=Priority.EARLY)
-def search_direct_providers(dep: DependencyEdge | AffordanceEdge, ctx: StringMap) -> Optional[Node]:
+@on_provision_dependency.register(priority=Priority.EARLY, is_resolvable=True)
+def search_direct_providers(caller: Edge, ctx: StringMap) -> Optional[Node]:
     ...
 
-@on_provision_dependency.register(priority=Priority.LATE)
-def search_indirect_providers(dep: DependencyEdge | AffordanceEdge, ctx: StringMap) -> Optional[Node]:
+@on_provision_dependency.register(priority=Priority.LATE, is_resolvable=True)
+def search_indirect_providers(caller: Edge, ctx: StringMap) -> Optional[Node]:
     ...
 
 # on_provision_affordances = HandlerRegistry(
@@ -29,17 +30,17 @@ def search_indirect_providers(dep: DependencyEdge | AffordanceEdge, ctx: StringM
 # affordance requirements should decorate methods with ``@on_provision_affordance.register(...)``.
 # """
 
-class ResolvableNode(Node):
+class ResoluableNode(Node):
 
     @property
     def dependencies(self):
-        return list( *self.edges(has_cls=DependencyEdge, direct="out"),
-                     *self.edges(has_cls=AffordanceEdge, direct="in") )
+        return list( *self.edges(has_cls=DependencyEdge, direction="out"),
+                     *self.edges(has_cls=AffordanceEdge, direction="in") )
 
     @property
     def affordances(self):
-        return list( *self.edges(has_cls=DependencyEdge, direct="in"),
-                     *self.edges(has_cls=AffordanceEdge, direct="out") )
+        return list( *self.edges(has_cls=DependencyEdge, direction="in"),
+                     *self.edges(has_cls=AffordanceEdge, direction="out") )
 
     def provision_dependencies(self, ctx: StringMap = None) -> bool:
         ctx = ctx or self.gather_context()

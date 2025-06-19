@@ -6,7 +6,7 @@ from tangl.info import __version__, __title__, __url__
 from tangl.utils.app_uptime import app_uptime
 # todo: Be sure to import app uptime on startup so the clock starts running
 from tangl.service.api_endpoint import HasApiEndpoints, ApiEndpoint, AccessLevel, MethodType, ResponseType
-from .system_info import SystemInfo
+from .system_info_model import SystemInfo
 
 logger = logging.getLogger(__name__)
 

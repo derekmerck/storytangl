@@ -12,13 +12,13 @@ import logging
 import jinja2
 
 from tangl.type_hints import StringMap
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .context import HasContext
 
 logger = logging.getLogger(__name__)
 
 
-on_render_content = HandlerRegistry(label='render_content', default_aggregation_strategy="merge")
+on_render_content = HandlerRegistry(label='render_content', aggregation_strategy="merge")
 """
 The global pipeline for rendering. Handlers for rendering
 should decorate methods with ``@on_render_content.register(...)``.
@@ -104,4 +104,4 @@ class Renderable(HasContext):
                  the types returned by handlers.
         """
         ctx = ctx if ctx is not None else self.gather_context()
-        return on_render_content.execute_all(self, ctx=ctx)
+        return on_render_content.execute_all_for(self, ctx=ctx)

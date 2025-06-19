@@ -23,12 +23,12 @@ def test_gather_locals():
 def test_gather_context_aggregation():
     class RoleNode(MyNode):
         @on_gather_context.register(priority=20)
-        def role_handler(self, _):
+        def role_handler(self, **_):
             return {"shopkeeper": "npc123"}
 
     class MyGraph(Graph, HasContext):
         @on_gather_context.register(priority=50)
-        def directory_handler(self, _):
+        def directory_handler(self, **_):
             return {"nodes": {"test": "node123"}}
 
     node = RoleNode(label="testnode")

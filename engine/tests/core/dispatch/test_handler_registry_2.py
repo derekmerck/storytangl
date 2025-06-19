@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HandlerPriority, HandlerRegistry
+from tangl.core.dispatch import HandlerPriority, HandlerRegistry
 
 MyPipeline = HandlerRegistry(
     label="MyPipeline",
-    default_aggregation_strategy="merge")
+    aggregation_strategy="merge")
 
 class BaseEntity(Entity):
 
@@ -52,7 +52,7 @@ class OverrideEntity(BaseEntity):
 
 def test_basic():
     entity = BaseEntity()
-    result = MyPipeline.execute_all(entity, ctx=None)
+    result = MyPipeline.execute_all_for(entity, ctx=None)
     print(result)  # Output: {'base': 'processed'}
     assert {'base'} == {*result}
 
@@ -60,26 +60,26 @@ def test_basic():
 def test_domain():
 
     entity = BaseEntity(domain="special_domain")
-    result = MyPipeline.execute_all(entity, ctx=None)
+    result = MyPipeline.execute_all_for(entity, ctx=None)
     print(result)  # Output: {'base': 'processed', 'domain': 'processed'}
     assert {'base', 'domain'} == {*result}
 
 def test_mro():
     entity = SubEntity()
-    result = MyPipeline.execute_all(entity, ctx=None)
+    result = MyPipeline.execute_all_for(entity, ctx=None)
     print(result)  # Output: {'sub': 'processed', 'base': 'processed'}
     assert {'base', 'sub'} == {*result}
 
 @pytest.mark.xfail(reason="Domain locking not working")
 def test_mro_and_domain():
     entity = SubEntity(domain="special_domain")
-    result = MyPipeline.execute_all(entity)
+    result = MyPipeline.execute_all_for(entity)
     print(result)  # Output: {'domain': 'processed', 'sub': 'processed', 'base': 'processed'}
     assert {'base', 'sub', 'domain'} == {*result}
 
 def test_priority_mro():
     entity = OverrideEntity()
-    result = MyPipeline.execute_all(entity, ctx=None)
+    result = MyPipeline.execute_all_for(entity, ctx=None)
     print(result)  # Output: {'base': 'override'}
     assert {'base'} == {*result}
     assert result['base'] == "override"
@@ -87,7 +87,7 @@ def test_priority_mro():
 @pytest.mark.xfail(reason="Domain locking not working")
 def test_priority_mro_domain():
     entity = OverrideEntity(domain="special_domain")
-    result = MyPipeline.execute_all(entity, ctx=None)
+    result = MyPipeline.execute_all_for(entity, ctx=None)
     print(result)  # Output: {'base': 'override', 'domain': 'processed'}
     assert {'base', 'domain'} == {*result}
     assert result['base'] == "override"
@@ -95,12 +95,12 @@ def test_priority_mro_domain():
 
 def test_return_first_mode():
     entity = SubEntity()
-    first_result = MyPipeline.execute_all(entity, ctx=None, strategy="first")
+    first_result = MyPipeline.execute_all_for(entity, ctx=None, strategy="first")
     print(first_result)
     assert isinstance(first_result, dict)
     assert len(first_result) == 1
 
 def test_return_iter():
     entity = SubEntity()
-    iter_result = MyPipeline.execute_all(entity, ctx=None, strategy="iter")
+    iter_result = MyPipeline.execute_all_for(entity, ctx=None, strategy="iter")
     assert hasattr(iter_result, '__next__'), "return_iter should return an iterator"

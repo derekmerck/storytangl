@@ -1,7 +1,13 @@
 `tangl.core`
 ============
 
-Models and algorithms for an incremental, graph-based feature untangling framework
+Models and algorithms for an incremental, graph-based feature untangling framework.
+
+Entities can be attached to graphs or domains and register handlers for various functions that become available to subscribers in their scope.
+
+Basic handlers include gathering a scoped context for a node, evaluating predicates and applying effects, and rendering output.
+
+The solver evolves and grows the feature graph from a root node, maintaining a consistent, coherent state of local data and interdependencies.
 
 ### Package Organization
 
@@ -27,13 +33,18 @@ flowchart RL
             
     end
     
-    subgraph .handler
+    subgraph .dispatch
         Handler -- is --> Entity
         HandlerRegistry -- is --> Registry
         HandlerRegistry -- has --> Handler
+    end
+    
+    subgraph .handler
         on_gather_context -- is --> HandlerRegistry
         on_apply_effects -- is --> HandlerRegistry
+        on_apply_effects -- has --> RuntimeEffect
         on_check_satisfied -- is --> HandlerRegistry
+        on_check_satisfied -- has --> Predicate
         on_render_content -- is --> HandlerRegistry
     end
 

@@ -4,7 +4,7 @@ from pydantic import Field, field_validator
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
-from .handler_registry import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .runtime_object import RuntimeObject
 from .context import HasContext
 
@@ -25,7 +25,7 @@ class RuntimeEffect(RuntimeObject):
         return None
         # todo: copy direct ctx updates like locals back to locals?
 
-on_apply_effects = HandlerRegistry(label="apply_effects", default_aggregation_strategy="pipeline")
+on_apply_effects = HandlerRegistry(label="apply_effects", aggregation_strategy="pipeline")
 """
 The global pipeline for effects. Handlers for applying effects
 should decorate methods with ``@on_apply_effects.register(...)``.
@@ -71,4 +71,4 @@ class HasEffects(HasContext):
 
     def apply_effects(self, ctx: StringMap = None) -> bool:
         ctx = ctx if ctx is not None else self.gather_context()
-        return on_apply_effects.execute_all(self, ctx=ctx)
+        return on_apply_effects.execute_all_for(self, ctx=ctx)

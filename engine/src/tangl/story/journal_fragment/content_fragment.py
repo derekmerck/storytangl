@@ -37,13 +37,7 @@ class ContentFragment(Entity, extra='allow'):
     - content (str): Optional value/text/media for the fragment
     - content_format: Instruction for how to parse content field, ie, markdown or encoded data
     """
-    # fragments are immutable once created
-    model_config = ConfigDict(frozen=True)
-
     # base features
-    fragment_type: str = Field(..., alias='type')  # content, group, update, kv
-    content: Any = Field(...)
-    content_format: str = Field(None, alias='format')
     presentation_hints: Optional[PresentationHints] = Field(None, alias='hints')
 
     # If the fragment belongs to a group of fragments, declare the master's fragment_id
@@ -61,7 +55,3 @@ class ContentFragment(Entity, extra='allow'):
     # Params to be included with the cb if the fragment is "activated", ie, a choice, link, button, input, rollover hint, custom ui event trigger
     activation_payload: Optional[Any] = None
 
-    def __str__(self):
-        data = self.model_dump()
-        s = yaml.dump(data, default_flow_style=False)
-        return s

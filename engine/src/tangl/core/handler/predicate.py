@@ -4,7 +4,7 @@ from pydantic import field_validator, Field
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
-from .handler_registry import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .context import HasContext
 from .runtime_object import RuntimeObject
 
@@ -29,7 +29,7 @@ class Predicate(RuntimeObject):
 
 on_check_satisfied = HandlerRegistry(
     label="check_satisfied",
-    default_aggregation_strategy="all_true")
+    aggregation_strategy="all_true")
 """
 The global pipeline for evaluating local predicates. Handlers for predicates
 should decorate methods with ``@on_check_satisfied.register(...)``.
@@ -60,12 +60,12 @@ class Satisfiable(HasContext):
         raise ValueError(f"Invalid predicate definition: {data}")
 
     @on_check_satisfied.register()
-    def _check_my_predicates(self, ctx: StringMap) -> bool:
+    def _check_my_predicates(self, *, ctx: StringMap) -> bool:
         for predicate in self.predicates:
             if not predicate.evaluate(self, ctx=ctx):
                 return False
         return True
 
-    def is_satisfied(self, ctx: StringMap = None) -> bool:
+    def is_satisfied(self, *, ctx: StringMap = None) -> bool:
         ctx = ctx if ctx is not None else self.gather_context()
-        return on_check_satisfied.execute_all(self, ctx=ctx)
+        return on_check_satisfied.execute_all_for(self, ctx=ctx)

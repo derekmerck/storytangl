@@ -79,3 +79,7 @@ class AffordanceEdge(Satisfiable, Edge[Optional[NodeT], Node], Generic[NodeT]):
     @property
     def is_resolved(self) -> bool:
         return self.source is not None
+
+    @property
+    def is_resolvable(self):
+        return True

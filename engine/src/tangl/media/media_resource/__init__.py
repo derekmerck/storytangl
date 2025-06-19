@@ -1,4 +1,4 @@
 from .media_resource_inv_tag import MediaResourceInventoryTag
 from .media_resource_registry import MediaResourceRegistry
-from .media_dependency import MediaDependency
-from .media_provisioner import HasMedia, on_provision_media
+from .media_dependency import MediaDep
+from .media_provisioning import HasMedia, on_provision_media

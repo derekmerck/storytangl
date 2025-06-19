@@ -13,7 +13,7 @@ def context_entity():
 
 def test_context_entity(context_entity):
 
-    result = on_gather_context.execute_all(context_entity, ctx=None)
+    result = on_gather_context.execute_all_for(context_entity, ctx=None)
     assert result['entity'] == "hello entity"
 
 

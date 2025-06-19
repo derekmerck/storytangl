@@ -5,7 +5,7 @@ from tangl.core.handler import HasContext, on_gather_context, Satisfiable, on_ch
 
 # todo: extend to rendering
 
-class MyEntity(Satisfiable, Entity):
+class MyEntity2(Satisfiable, Entity):
 
     @on_gather_context.register()
     def _mock_data(self, ctx) -> dict:
@@ -23,7 +23,7 @@ class MyEntity(Satisfiable, Entity):
 
 @pytest.fixture
 def entity():
-    return MyEntity()
+    return MyEntity2()
 
 
 def test_ns(entity):

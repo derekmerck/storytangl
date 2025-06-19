@@ -1,33 +1,79 @@
 from __future__ import annotations
-from typing import Callable, Any, Generic, TypeVar, Optional, Type, Self
+from typing import Generic, Union, Type, Self, runtime_checkable, Protocol, Any, Optional, TypeVar
+
 import logging
 import functools
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, BaseModel, ValidationInfo
 
-from tangl.type_hints import StringMap
+from tangl.type_hints import StringMap, Primitive
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 from tangl.core.entity import Entity
-from tangl.core.entity.entity import EntityP, match_logger
+from tangl.core.entity.entity import match_logger
 from .enums import HandlerPriority
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Union[Entity, Primitive])
 
-class BaseHandlerP(EntityP):
-    func: Callable[[Entity, StringMap], Any]
-    priority: int = HandlerPriority.DEFAULT
-    caller_criteria: StringMap
-    owner_cls: Optional[Type[Entity]]  # class that defines this handler
+@runtime_checkable
+class HandlerFunc(Protocol[T]):
+    def __call__(
+        self,
+        entity: Entity,
+        ctx: dict,
+        *,
+        caller: Optional[Entity] = None,
+        other: Optional[Entity] = None,
+        result: Optional[Any] = None,
+    ) -> T: ...
+
+class HandlerResult(BaseModel):
+    result: Any
+    status: str
+    errors: list
+    handler: BaseHandler
+
+PipelineResult = list[HandlerResult]
+
+"""
+Registration pattern:
+
+decorator: handler
+- creates a handler wrapper and attaches it to the function
+- may not know caller class for predicate, looks for "other", "result", and "caller" in sig
+
+registration:
+on init subclass - check all class funcs and look for handler objects to register
+
+"""
 
 @functools.total_ordering
-class BaseHandler(Entity, Generic[T]):
-    func: Callable[[Entity, StringMap], T]  # Return type is determined by handler kind
+class BaseHandler(Entity, Generic[T], arbitrary_types_allowed=True):
+    func: HandlerFunc[T]  # Return type is determined by handler kind
+
+    service_name: Optional[str] = None
     priority: int | HandlerPriority = HandlerPriority.DEFAULT
 
+    takes_caller: bool = False
+    # some instance handlers are defined on an owner that is not the caller
+    takes_other: bool = False
+    # some handlers can compare or mediate between two entities
+    takes_result: bool = True
+    # some handlers are 'pipeline ready'
+
+    caller_cls: Type[Entity] = Entity
     caller_criteria: StringMap = Field(default_factory=dict)
+
+    promiscuous: bool = False  # ignore owner-class, include "caller" field in kwargs
+    owner: Optional[Entity] = None
     owner_cls_: Optional[Type[Entity]] = Field(None, alias="owner_cls")
+
+    @field_validator("owner", mode="after")
+    @classmethod
+    def _confirm_owner_if_promiscuous(cls, value, info: ValidationInfo) -> None:
+        if info.data.get("promiscuous") and value is None:
+            raise ValueError("Promiscuous bindings require a declared owner")
 
     @field_validator('caller_criteria', mode="before")
     def _convert_none_to_empty_dict(cls, data):
@@ -37,7 +83,8 @@ class BaseHandler(Entity, Generic[T]):
 
     @property
     def owner_cls(self) -> Optional[Type[Entity]]:
-        if self.owner_cls_ is None:
+        # If it's explicitly set to None, ignore it
+        if self.owner_cls_ is None and "owner_cls_" not in self.model_fields_set:
             self.owner_cls_ = self._infer_owner_cls()
         match_logger.debug(f"h:{self.func.__name__}.owner_cls={self.owner_cls_}")
         return self.owner_cls_
@@ -46,7 +93,7 @@ class BaseHandler(Entity, Generic[T]):
     def owner_cls(self, value: Type[Entity]):
         self.owner_cls_ = value
 
-    # terminology here is a little off, this is the an inv func relative to has_cls
+    # terminology here is a little off, this is the inv func relative to has_cls
     def has_owner_cls(self, entity: Entity) -> bool:
         match_logger.debug(f"h:Comparing owner_cls to caller_cls={entity.__class__}")
         if self.owner_cls is None:
@@ -88,17 +135,23 @@ class BaseHandler(Entity, Generic[T]):
         # default label is func name
         return self.label_ or self.func.__name__
 
+    # For matching
     def has_func_name(self, value: str) -> bool:
         return self.func.__name__ == value
 
     is_instance_handler: bool = False     # Instance handlers sort before class handlers
     registration_order: int = -1
 
-    def __call__(self, entity: Entity, context: StringMap) -> T:
+    def __call__(self, entity: Entity, context: StringMap, caller: Entity = None) -> T:
+        if self.promiscuous:
+            # bind owner to 'self' and inject the caller as a kwarg
+            return self.func(self.owner, context, caller=entity)
+        # it's an inherited function
         return self.func(entity, context)
 
     def sort_key(self, caller: Entity = None):
 
+        # Cannot infer relative mro distance without a reference caller
         if caller is None:
             return self.priority, not self.is_instance_handler, self.registration_order
 

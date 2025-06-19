@@ -1,14 +1,14 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HandlerRegistry, HandlerPriority, BaseHandler
+from tangl.core.dispatch import HandlerRegistry, HandlerPriority, Handler as BaseHandler
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 
 
 @pytest.fixture(autouse=True)
 def renderable_pipeline_and_classes():
 
-    on_render = HandlerRegistry(label="on_render", default_aggregation_strategy="merge")
+    on_render = HandlerRegistry(label="on_render", aggregation_strategy="merge")
 
     class RenderableTestEntity(Entity):
 
@@ -17,7 +17,7 @@ def renderable_pipeline_and_classes():
             return {'hello': 'world', 'foo': 'bar'}
 
         def render(self):
-            return on_render.execute_all(self, ctx=None)
+            return on_render.execute_all_for(self, ctx=None)
 
     class MyRenderableTestEntity(RenderableTestEntity):
 
@@ -35,13 +35,21 @@ def test_renderable_pipeline(renderable_pipeline_and_classes):
     assert dereference_obj_cls(Entity, "RenderableTestEntity") is RenderableTestEntity
 
     renderable_test_handler = on_render.find_one(has_func_name="_rendering_handler")
-    assert renderable_test_handler.owner_cls is RenderableTestEntity
-    my_renderable_test_handler = on_render.find_one(has_func_name="_my_rendering_handler")
-    assert my_renderable_test_handler.owner_cls is MyRenderableTestEntity
+    assert renderable_test_handler.caller_cls is RenderableTestEntity
+    assert renderable_test_handler.matches_caller(RenderableTestEntity())
+    assert renderable_test_handler.matches_caller(MyRenderableTestEntity()), "Subclasses inherit handlers from superclasses"
 
-    result = on_render.execute_all(RenderableTestEntity(), ctx=None)
+    res = on_render.find_all_for(RenderableTestEntity(), ctx=None)
+    print( list(res) )
+
+    my_renderable_test_handler = on_render.find_one(has_func_name="_my_rendering_handler")
+    assert my_renderable_test_handler.caller_cls is MyRenderableTestEntity
+    assert my_renderable_test_handler.matches_caller(MyRenderableTestEntity())
+    assert not my_renderable_test_handler.matches_caller(RenderableTestEntity()), "Superclasses do not see subclass handlers"
+
+    result = on_render.execute_all_for(RenderableTestEntity(), ctx=None)
     assert dict(result) == {'hello': 'world', 'foo': 'bar'}
-    result = on_render.execute_all(MyRenderableTestEntity(), ctx=None)
+    result = on_render.execute_all_for(MyRenderableTestEntity(), ctx=None)
     assert dict(result) == {'hello': 'world2', 'foo': 'bar'}
 
     result = RenderableTestEntity().render()
@@ -54,28 +62,30 @@ def test_extra_handlers_with_priority():
     """Test that extra handlers respect priority ordering"""
     on_process = HandlerRegistry(
         label="test_pipeline",
-        default_aggregation_strategy="gather"
+        aggregation_strategy="gather"
     )
 
     entity = Entity()
 
     # Register a normal priority handler
     @on_process.register(priority=HandlerPriority.NORMAL)
-    def base_handler(e, ctx):
+    def base_handler(caller: Entity, ctx):
         return "base"
 
     # Create handlers with different priorities
     early_handler = BaseHandler(
         func=lambda e, ctx: "early",
-        priority=HandlerPriority.EARLY
+        priority=HandlerPriority.EARLY,
+        caller_cls=Entity
     )
 
     late_handler = BaseHandler(
         func=lambda e, ctx: "late",
-        priority=HandlerPriority.LATE
+        priority=HandlerPriority.LATE,
+        caller_cls=Entity
     )
 
-    result = on_process.execute_all(
+    result = on_process.execute_all_for(
         entity,
         ctx=None,
         extra_handlers=[late_handler, early_handler]
@@ -93,23 +103,23 @@ def test_extra_handlers_with_class_restrictions():
 
     on_render = HandlerRegistry(
         label="test_pipeline",
-        default_aggregation_strategy="merge"
+        aggregation_strategy="merge"
     )
 
     # Register base handler
     @on_render.register()
-    def base_handler(e: Entity, ctx):
+    def base_handler(caller: Entity, ctx):
         return {"base": "value"}
 
     # Create class-specific handler
     special_handler = BaseHandler(
         func=lambda e, ctx: {"special": "value"},
-        owner_cls=SpecialEntity
+        caller_cls=SpecialEntity
     )
 
     # Should only get base handler
     regular_entity = Entity()
-    result = on_render.execute_all(
+    result = on_render.execute_all_for(
         regular_entity,
         ctx=None,
         extra_handlers=[special_handler]
@@ -118,7 +128,7 @@ def test_extra_handlers_with_class_restrictions():
 
     # Should get both handlers
     special_entity = SpecialEntity()
-    result = on_render.execute_all(
+    result = on_render.execute_all_for(
         special_entity,
         ctx=None,
         extra_handlers=[special_handler]
@@ -131,36 +141,41 @@ def test_pipeline_strategy_with_extra_handlers():
 
     on_process = HandlerRegistry(
         label="test_pipeline",
-        default_aggregation_strategy="pipeline"
+        aggregation_strategy="pipeline"
     )
 
     entity = Entity()
 
     # Register base handler
     @on_process.register(priority=HandlerPriority.FIRST)
-    def base_handler(e: Entity, ctx):
+    def base_handler(caller: Entity, *, ctx):
         return {'value': 1}
 
     # Create increment handlers
     plus_two = BaseHandler(
-        func=lambda e, ctx: {'value': ctx["value"] + 2}
+        func=lambda e, *, ctx: {'value': ctx["value"] + 2},
+        caller_cls=Entity
     )
 
+    # should just merge them in order since same priority and no registration value
     times_two = BaseHandler(
-        func=lambda e, ctx: {'value': ctx["value"] * 2}
+        func=lambda e, *, ctx: {'value': ctx["value"] * 2},
+        caller_cls=Entity
     )
 
     # Test different handler combinations
-    ctx = on_process.execute_all(entity, ctx={})
+    print(list(on_process.find_all_for(entity, ctx={})))
+    ctx = on_process.execute_all_for(entity, ctx={})
     assert ctx["value"] == 1  # Just base handler
 
-    ctx = on_process.execute_all(entity, ctx={}, extra_handlers=[plus_two])
+    print(list(on_process.find_all_for(entity, ctx={}, extra_handlers=[plus_two])))
+    ctx = on_process.execute_all_for(entity, ctx={}, extra_handlers=[plus_two])
     assert ctx["value"] == 3, "Processes extra handler 1 + 2 = 3"
 
-    ctx = on_process.execute_all(entity, ctx={}, extra_handlers=[plus_two, times_two])
+    ctx = on_process.execute_all_for(entity, ctx={}, extra_handlers=[plus_two, times_two])
     assert ctx["value"] == 6, "Multiple extra handlers (1 + 2) * 2 = 6"
 
-    ctx = on_process.execute_all(entity, ctx={}, extra_handlers=[times_two, plus_two])
+    ctx = on_process.execute_all_for(entity, ctx={}, extra_handlers=[times_two, plus_two])
     assert ctx["value"] == 4, "Order should be respected (1 * 2) + 2 = 4"
 
 

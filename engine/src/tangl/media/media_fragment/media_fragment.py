@@ -7,13 +7,13 @@ from pydantic import Field, field_serializer, AnyUrl
 
 from tangl.type_hints import Pathlike
 from tangl.core.solver import ContentFragment
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
 # from tangl.media.enums import MediaRole
 from tangl.media.type_hints import Media
 from ..enums import MediaDataType
-from .presentation_hints import PresentationHints
+from .staging_hints import StagingHints
 
 ContentFormatType = Literal['url', 'data', 'xml', 'json', 'rit']
 # Media fragments can have a RIT as content and need to be _dereferenced_ at the service
@@ -30,20 +30,19 @@ class MediaFragment(ContentFragment, extra='allow'):
     inline data or url, or from a media dependency linked to a MediaRIT.
 
     Attributes:
+      - label (str): Text associated with the content (caption, label, lyric, etc.)
       - content_type: image, vec, vo, music, sfx, anim, mov
       - content: Path, xml, dict, binary, or RIT
       - content_format: path, xml, json, binary, rit
       - media_role (MediaRole): Intended use, e.g., `narrative_im`
-      - text (str): Text associated with the content (caption, label, lyric, etc.)
 
     Only one of url or data may be provided.
     """
-    content_type: MediaDataType = Field(MediaDataType.MEDIA, alias='type')
+    content_type: MediaDataType = MediaDataType.MEDIA
     content: Pathlike | bytes | str | dict | MediaRIT
-    content_format: ContentFormatType = Field(..., alias='format')
-    media_hints: Optional[PresentationHints] = None
+    content_format: ContentFormatType
+    staging_hints: Optional[StagingHints] = None
     media_role: Optional[str] = None  # fragment's intended use
-    presentation_hints: Optional[PresentationHints] = None
 
     # todo: could also pickle it if creating a dto to a python client
     @field_serializer("content")

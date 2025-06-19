@@ -9,7 +9,8 @@ import jinja2
 from pydantic import BaseModel
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HandlerPriority, on_render_content, Renderable, on_gather_context, HasContext
+from tangl.core.dispatch import HandlerPriority
+from tangl.core.handler import on_render_content, Renderable, on_gather_context, HasContext
 
 MyRenderableEntity = type('MyRenderableEntity', (Renderable, Entity), {} )
 
@@ -20,13 +21,13 @@ def renderable_entity():
 
 def test_renderable_entity(renderable_entity):
 
-    context = on_gather_context.execute_all(renderable_entity, ctx=None)
+    context = on_gather_context.execute_all_for(renderable_entity, ctx=None)
     assert context['msg'] == 'hello entity'
 
     context = renderable_entity.gather_context()
     assert context['msg'] == 'hello entity'
 
-    result = on_render_content.execute_all(renderable_entity, ctx=context)
+    result = on_render_content.execute_all_for(renderable_entity, ctx=context)
     assert result['content'] == "msg: hello entity"
 
     result = renderable_entity.render_content()
@@ -125,7 +126,7 @@ def test_accumulate_rendering():
     assert r.get("icon") == "bar"
     assert r.get('text') is None
 
-    rr = on_render_content.execute_all(node, ctx={"abc": 123})
+    rr = on_render_content.execute_all_for(node, ctx={"abc": 123})
     assert rr.get("icon") == "bar"
     assert rr.get('text') == 123
 

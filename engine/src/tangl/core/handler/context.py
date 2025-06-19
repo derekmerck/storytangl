@@ -4,33 +4,29 @@ import logging
 from pydantic import Field
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Entity
-from .handler_registry import HandlerRegistry
+from tangl.core.entity import Node, Graph
+from tangl.core.dispatch import HandlerRegistry, HandlerPriority, HasHandlers
 
 logger = logging.getLogger(__name__)
 
-on_gather_context = HandlerRegistry(label="gather_context", default_aggregation_strategy="merge")
+on_gather_context = HandlerRegistry(label="gather_context", aggregation_strategy="merge")
 """
 The global pipeline for gathering context. Handlers for context
 should decorate methods with ``@on_gather_context.register(...)``.
 """
 
-class HasContext(Entity):
+class HasContext(HasHandlers):
 
     locals: StringMap = Field(default_factory=dict)
 
-    @on_gather_context.register(priority=100)
-    def _provide_my_locals(self, *args):
+    # Merge in _late_ so they overwrite everything else
+    @on_gather_context.register(priority=HandlerPriority.LATE)
+    def _provide_my_locals(self, **kwargs) -> StringMap:
         return self.locals
 
     @on_gather_context.register()
-    def _provide_my_self(self, *args):
+    def _provide_my_self(self, **kwargs) -> StringMap:
         return {'self': self}
 
     def gather_context(self):
-        return on_gather_context.execute_all(self, ctx=None)
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        logger.debug(f"Post-init registering _context_ handlers for {cls.__name__}")
-        on_gather_context.register_marked_handlers(cls)
+        return on_gather_context.execute_all_for(self, ctx=None)

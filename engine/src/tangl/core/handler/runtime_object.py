@@ -7,7 +7,7 @@ from pydantic import model_validator, BaseModel
 from tangl.type_hints import StringMap, Expr
 from tangl.utils.safe_builtins import safe_builtins
 from tangl.core.entity import Entity
-from .base_handler import BaseHandler
+from tangl.core.dispatch import Handler
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class RuntimeObject(BaseModel):
     # predicates and runtime effects are normalized wrappers for a process definition
     structured_expr: Optional[StringMap] = None
     raw_expr: Optional[Expr] = None
-    handler: Optional[BaseHandler] = None
+    handler: Optional[Handler] = None
     func: Optional[Callable[[Entity, StringMap], bool]] = None
 
     @model_validator(mode="after")
