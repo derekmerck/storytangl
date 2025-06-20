@@ -228,3 +228,8 @@ class HasHandlers(Entity):
         logger.debug("Checking instance handlers")
         HandlerRegistry.register_instance_handlers(self, requires_binding=True)
         return self
+
+    def __del__(self):
+        # todo: unregister on del
+        # Only want to remove this instance's bound handlers
+        HandlerRegistry.unregister_instance_handlers(self, requires_binding=True)

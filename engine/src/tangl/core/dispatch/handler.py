@@ -259,3 +259,6 @@ class Handler(Entity, Generic[T], arbitrary_types_allowed=True):
 
     def __lt__(self, other: Self):
         return self.sort_key() < other.sort_key()
+
+    def __hash__(self) -> int:
+        return hash(self.func)

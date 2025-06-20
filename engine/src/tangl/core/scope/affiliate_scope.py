@@ -2,7 +2,7 @@ import logging
 from typing import Self
 from collections import ChainMap
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 
 from tangl.info import __version__
 from tangl.type_hints import StringMap
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class AffiliateScope(HasContext, HasHandlers):
     """
-    Affiliate scopes are just collections of affiliated entities with some
+    Affiliate scopes are collections of affiliated entities with some
     shared context.  It is strictly opt-in, the scope itself doesn't track
     its members.
 
@@ -54,24 +54,3 @@ class HasAffiliateScopes(HasContext):
         else:
             maps = [ d.gather_context() for d in self.domains ]
             return ChainMap( *maps )
-
-
-class MyScope(AffiliateScope):
-
-    @on_gather_context.register(caller_cls=Entity, domain=Self)
-    def _log_request_from_caller(self, caller: Entity, **kwargs):
-        msg = f"{self!r}.on_gather() invoked for {caller!r}"
-        logger.debug(msg)
-
-
-logging.basicConfig(level=logging.DEBUG)
-
-def test_affiliate_scope():
-    entity = HasAffiliateScopes(locals={"foo": "bar"}, domain=MyScope())
-    logger.debug( f"context: {entity.gather_context()}" )
-    ctx = entity.gather_context()
-    assert ctx["foo"] == "bar"
-    assert 'self' in ctx
-    assert 'tangl_version' in ctx
-
-    # should trigger logging as well b/c of the affiliate handler ...

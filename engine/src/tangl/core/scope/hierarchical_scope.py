@@ -10,7 +10,7 @@ from tangl.core.dispatch import HasHandlers, HandlerPriority as Priority
 from tangl.core.handler import HasContext, on_gather_context
 
 
-class HierarchicalScope(Node, HasContext, HasHandlers):
+class HierarchicalScope(HasContext, HasHandlers, Node):
     """
     Represents a one-to-many hierarchical scope with parent-child relationships
     -- graphs and subgraphs _do_ care about which nodes/subgraphs belong to them.
@@ -34,10 +34,10 @@ class HierarchicalScope(Node, HasContext, HasHandlers):
     # Either a node, or None if it is a partition on the graph itself
 
     @property
-    def parent(self) -> Graph | Node:
+    def parent(self) -> Optional[Node]:
         if self.parent_id is not None:
             return self.graph.get(self.parent_id)
-        return self.graph
+        return None
 
     @parent.setter
     def parent(self, value: None | Node) -> None:
@@ -96,5 +96,8 @@ class HierarchicalScope(Node, HasContext, HasHandlers):
             if isinstance(self.parent, HasContext):
                 return self.parent.get_context()
         else:
+            # Pipelines will only collect each handler once, but this is a pipeline _inside_
+            # a pipeline, so it would trigger for ancestor.  Wrapping it with parent is None
+            # means only the root of a dag will trigger it.
             if isinstance(self.graph, HasContext):
                 return self.graph.get_context()

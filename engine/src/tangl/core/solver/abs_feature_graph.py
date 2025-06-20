@@ -1,7 +1,7 @@
 from typing import Literal, Any, Optional
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import ConfigDict
 import yaml
 
 from tangl.type_hints import StringMap
@@ -75,3 +75,5 @@ class AssociationEdge(Edge[Node, Node]):
 # class TraceEdge(Edge[ContentFragment, ContentFragment]):
 #     # Linear across ContentFragment seq
 #     ...
+
+# DependencyEdge and AffordanceEdge are detailed in the provisioner subpackage

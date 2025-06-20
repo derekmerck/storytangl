@@ -1,7 +1,7 @@
 `tangl.core`
 ============
 
-Models and algorithms for an incremental, graph-based feature untangling framework.
+Models and algorithms for an incremental, graph-based "feature untangling" framework.
 
 Entities can be attached to graphs or domains and register handlers for various functions that become available to subscribers in their scope.
 

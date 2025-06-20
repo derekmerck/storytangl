@@ -67,6 +67,9 @@ class Singleton(Entity):
     def __hash__(self):
         return hash((self.__class__, self.label),)
 
+    def __del__(self):
+        self._instances.remove(self)
+
     @classmethod
     def structure(cls, data) -> Self:
         obj_cls = data.pop('obj_cls')
