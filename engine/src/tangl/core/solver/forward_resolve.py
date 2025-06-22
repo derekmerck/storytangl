@@ -6,11 +6,10 @@ from pydantic import Field
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Edge, Graph
-from tangl.core.handler import HasEffects, Renderable, HasContext
-from . import HasJournal
+from tangl.core.handler import HasEffects, Renderable
 from .journal import HasJournal as Journal
 from .abs_feature_graph import ChoiceEdge, StructureNode, When
-from .provisioner import ResoluableNode
+from .provisioner import ResolvableNode
 
 class ForwardResolver(Entity):
     """
@@ -27,7 +26,7 @@ class ForwardResolver(Entity):
     cursor_return_stack: list[UUID] = Field(default_factory=list)
 
     @property
-    def cursor(self) -> Union[ StructureNode, HasEffects, Renderable, ResoluableNode ]:
+    def cursor(self) -> Union[ StructureNode, HasEffects, Renderable, ResolvableNode ]:
         return self.graph.get(self.cursor_id)
 
     @cursor.setter
@@ -75,8 +74,8 @@ class ForwardResolver(Entity):
         self.step_counter += 1
 
         # Resolve frontier edges
-        self.cursor.provision_dependencies(ctx=ctx, scopes=self.scopes)  # anything this node _needs_
-        self.cursor.provision_affordances(ctx=ctx, scopes=self.scopes)   # anything this node can provide
+        self.cursor.provision_dependencies(ctx=ctx)  # anything this node _needs_
+        self.cursor.provision_affordances(ctx=ctx)   # anything this node can provide
         # todo: Check for critical affordances in the current scopes
 
         # Check for 'before' auto-advance
@@ -84,15 +83,15 @@ class ForwardResolver(Entity):
             return next_edge
 
         # Update context with 'before' effects
-        self.cursor.apply_effects(ctx=ctx, scopes=self.scopes, when="before")
+        self.cursor.apply_effects(ctx=ctx, when="before")
 
         # Generate trace content
-        fragments = self.cursor.render_content(ctx=ctx, scopes=self.scopes)
+        fragments = self.cursor.render_content(ctx=ctx)
         if self.journal is not None:
             self.journal.add_entry(fragments, bookmark=bookmark)
 
         # Update context with 'after' effects
-        self.cursor.apply_effects(ctx=ctx, scopes=self.scopes, when="after")
+        self.cursor.apply_effects(ctx=ctx, when="after")
 
         # Check for 'after' auto-advance
         if (next_edge := self._check_choices("after", ctx=ctx)) is not None:
