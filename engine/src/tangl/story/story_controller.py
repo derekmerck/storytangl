@@ -8,8 +8,9 @@ from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, Ac
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.core.entity import Node, AnonymousEdge
 from tangl.core.handler import on_gather_context, Predicate, RuntimeEffect
-from tangl.core.solver import ChoiceEdge, ContentFragment
+from tangl.core.solver import ChoiceEdge
 from .story import Story
+from .content_fragment import ContentFragment
 
 class StoryController(HasApiEndpoints):
     """

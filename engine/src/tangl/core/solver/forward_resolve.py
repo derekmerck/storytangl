@@ -75,7 +75,7 @@ class ForwardResolver(Entity):
 
         # Resolve frontier edges
         self.cursor.provision_dependencies(ctx=ctx)  # anything this node _needs_
-        self.cursor.provision_affordances(ctx=ctx)   # anything this node can provide
+        self.cursor.discover_affordances(ctx=ctx)   # anything this node can provide
         # todo: Check for critical affordances in the current scopes
 
         # Check for 'before' auto-advance

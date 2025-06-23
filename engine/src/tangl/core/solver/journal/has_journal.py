@@ -9,7 +9,8 @@ from tangl.type_hints import UnstructuredData
 from tangl.utils.bookmarked_list import BookmarkedList
 from tangl.core.entity import Registry
 from tangl.core.entity import Node, Graph
-from ..abs_feature_graph import ContentFragment, BlameEdge
+from ..abs_feature_graph import BlameEdge
+from .journal_fragment import JournalFragment
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 # todo: add a pydantic schema for bookmarked list so we can get rid of arbitrary types allowed
 #       and manage serialization better.
 
-class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
+class HasJournal(Registry[JournalFragment], arbitrary_types_allowed=True):
     """
     Manages a journal of trace fragments with functionalities for bookmarking,
     retrieving, and organizing entries.
@@ -45,14 +46,14 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
     def start_journal_section(self, which):
         self.journal.set_bookmark(which, bookmark_type="section")
 
-    def get_journal_section(self, which=-1) -> list[ContentFragment]:
+    def get_journal_section(self, which=-1) -> list[JournalFragment]:
         items = self.journal.get_slice(which, bookmark_type="section")
         return [self.get(uid) for uid in items]
 
-    def add_fragment(self, item: ContentFragment | UnstructuredData, blame: Node = None):
+    def add_fragment(self, item: JournalFragment | UnstructuredData, blame: Node = None):
         if isinstance(item, dict):
-            item = ContentFragment.structure(item)
-        if not isinstance(item, ContentFragment):
+            item = JournalFragment.structure(item)
+        if not isinstance(item, JournalFragment):
             raise ValueError(f"Trying to add wrong type {type(item)} to graph via journal")
         # todo: need to unfreeze or set with a trick
         # if item.sequence is None:
@@ -66,7 +67,7 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
             edge = BlameEdge(src=item, dst=blame, graph=self)
             super().add(edge)
 
-    def add_journal_entry(self, items: list[ContentFragment], blame: Node = None):
+    def add_journal_entry(self, items: list[JournalFragment], blame: Node = None):
         if not items:
             logger.warning("Tried to do a no-op journal update.  This is harmless, but probably not what you intended to do.")
             return
@@ -79,7 +80,7 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
                                bookmark_name=bookmark_name,
                                bookmark_type="entry")
 
-    def get_journal_entry(self, which=-1) -> list[ContentFragment]:
+    def get_journal_entry(self, which=-1) -> list[JournalFragment]:
         # early stop types param looks for terminating section edges, as well
         items = self.journal.get_slice(which, bookmark_type="entry", early_stop_types=["section"])
         return [self.get(uid) for uid in items]

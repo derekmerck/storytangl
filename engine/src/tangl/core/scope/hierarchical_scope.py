@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from os import WCONTINUED
 from typing import Optional, Iterator, Self, ClassVar
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Node, Graph
@@ -10,7 +12,7 @@ from tangl.core.dispatch import HasHandlers, HandlerPriority as Priority
 from tangl.core.handler import HasContext, on_gather_context
 
 
-class HierarchicalScope(HasContext, HasHandlers, Node):
+class HierarchicalScope(HasContext, Node):
     """
     Represents a one-to-many hierarchical scope with parent-child relationships
     -- graphs and subgraphs _do_ care about which nodes/subgraphs belong to them.
@@ -32,6 +34,19 @@ class HierarchicalScope(HasContext, HasHandlers, Node):
     """
     parent_id: Optional[UUID] = None
     # Either a node, or None if it is a partition on the graph itself
+
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_parent_to_id(cls, data):
+        parent = data.pop("parent", None)
+        if parent is not None:
+            if "parent_id" in data:
+                if parent.uid != data["parent_id"]:
+                    raise ValueError("Mismatched parent_id and parent in build kwargs")
+                # otherwise can just ignore parent
+            else:
+                data["parent_id"] = parent.uid
+        return data
 
     @property
     def parent(self) -> Optional[Node]:
@@ -94,10 +109,10 @@ class HierarchicalScope(HasContext, HasHandlers, Node):
         # Gather ancestor context recursively
         if self.parent is not None:
             if isinstance(self.parent, HasContext):
-                return self.parent.get_context()
+                return self.parent.gather_context()
         else:
-            # Pipelines will only collect each handler once, but this is a pipeline _inside_
-            # a pipeline, so it would trigger for ancestor.  Wrapping it with parent is None
-            # means only the root of a dag will trigger it.
+            # Pipelines will only collect each handler once, but this is a nested pipeline
+            # _inside_ another pipeline, so it would trigger for ancestor.
+            # Wrapping it with 'if parent is None' means only the root of a dag will trigger it.
             if isinstance(self.graph, HasContext):
-                return self.graph.get_context()
+                return self.graph.gather_context()

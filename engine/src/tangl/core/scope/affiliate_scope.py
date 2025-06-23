@@ -1,8 +1,7 @@
 import logging
-from typing import Self
 from collections import ChainMap
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field
 
 from tangl.info import __version__
 from tangl.type_hints import StringMap
@@ -12,7 +11,7 @@ from tangl.core.handler import HasContext, on_gather_context
 
 logger = logging.getLogger(__name__)
 
-class AffiliateScope(HasContext, HasHandlers):
+class AffiliateScope(HasContext):
     """
     Affiliate scopes are collections of affiliated entities with some
     shared context.  It is strictly opt-in, the scope itself doesn't track
@@ -32,6 +31,7 @@ global_domain = AffiliateScope(label="global_domain")
 
 @on_gather_context.register(caller_cls=Entity, bind_to=global_domain)
 def inject_version_info(self, caller: Entity, **kwargs):
+    """For _all_ callers, the global domain injects system-level shared context."""
     return {"tangl_version": __version__}
 
 
@@ -49,8 +49,8 @@ class HasAffiliateScopes(HasContext):
         # graph's context only once.
         if len(self.domains) == 0:
             return None
-        elif len(self.domains) == 1:
-            return self.domains[0].gather_context()
+        maps = [ d.gather_context() for d in self.domains ]
+        if len(maps) == 1:
+            return maps[0]
         else:
-            maps = [ d.gather_context() for d in self.domains ]
             return ChainMap( *maps )

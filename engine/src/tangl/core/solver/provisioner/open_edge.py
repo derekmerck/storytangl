@@ -57,8 +57,9 @@ class AffordanceEdge(HasRequirement[NodeT], Edge[Optional[NodeT], Node], Generic
     paths will be unavailable if they cannot be provided).
 
     _All_ affordances in the scope (i.e., visible to this node) will be tested _against_ the
-    frontier to see if they can be linked. This is usually to present a flexible choice or
-    introduce a resource asap.
+    frontier to see if they can be linked. This is usually to present choices or resources that
+    follow an entity, like a character avatar that is always available in that character's dialogs,
+    or choices that become active whenever specific conditions are met.
 
     Hard affordances in the scope with a satisfied indirect provider (i.e., a new source
     resource can be immediately linked) may also pre-create a source that will have priority

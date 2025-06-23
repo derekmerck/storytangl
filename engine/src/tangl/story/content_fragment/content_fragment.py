@@ -7,10 +7,10 @@ import yaml
 
 import tangl.utils.setup_yaml
 from tangl.type_hints import Identifier
-from ..entity import Entity
+from tangl.core.solver.journal import JournalFragment
 from .presentation_hints import PresentationHints
 
-class ContentFragment(Entity, extra='allow'):
+class ContentFragment(JournalFragment, extra='allow'):
     """
     Represents a basic content element and the core schema for communicating
     story- and info-content to the front-end.

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Type, Self, ClassVar, Iterator, Literal, Any
+from typing import Type, Self, ClassVar, Iterator, Literal, Any, Mapping
 from itertools import chain
 import logging
 import heapq
@@ -166,7 +166,7 @@ class HandlerRegistry(Registry[Handler]):
                 logger.debug(f"Merging results.")
                 # gather, if all the same type, list or dict, merge into a single result
                 results = cls._call_handlers(handlers, caller, ctx=ctx)
-                if all([isinstance(r, dict) for r in results]):
+                if all([isinstance(r, Mapping) for r in results]):
                     return ChainMap(*reversed(results))
                 if all([isinstance(r, list) for r in results]):
                     return list(chain.from_iterable(results))
@@ -229,7 +229,7 @@ class HasHandlers(Entity):
         HandlerRegistry.register_instance_handlers(self, requires_binding=True)
         return self
 
-    def __del__(self):
-        # todo: unregister on del
-        # Only want to remove this instance's bound handlers
-        HandlerRegistry.unregister_instance_handlers(self, requires_binding=True)
+    # def __del__(self):
+    #     # todo: unregister on del
+    #     # Only want to remove this instance's bound handlers
+    #     HandlerRegistry.unregister_instance_handlers(self, requires_binding=True)

@@ -1,15 +1,14 @@
 import pytest
 from uuid import uuid4
 
-from tangl.core.solver.abs_feature_graph import ContentFragment
-from tangl.core.solver.journal import HasJournal
+from tangl.core.solver.journal import HasJournal, JournalFragment
 
 class TestHasJournal(HasJournal):
     # Inherit everything, no change needed for test
     pass
 
 def make_fragments(n, kind="text"):
-    return [ContentFragment(uid=uuid4(),
+    return [JournalFragment(uid=uuid4(),
                             content_type=kind,
                             label=f"Frag {i}",
                             content=f"Content {i}") for i in range(n)]
@@ -54,7 +53,7 @@ def test_add_and_retrieve_entry():
     # Entries should be retrievable
     entry = journal_graph.get_journal_entry()
     assert len(entry) == 3
-    assert all(isinstance(f, ContentFragment) for f in entry)
+    assert all(isinstance(f, JournalFragment) for f in entry)
 
 def test_section_bookmark_and_slice():
     journal_graph = TestHasJournal()
