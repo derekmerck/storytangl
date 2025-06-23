@@ -9,7 +9,7 @@ class TestHasJournal(HasJournal):
 
 def make_fragments(n, kind="text"):
     return [JournalFragment(uid=uuid4(),
-                            content_type=kind,
+                            type=kind,
                             label=f"Frag {i}",
                             content=f"Content {i}") for i in range(n)]
 
@@ -67,8 +67,8 @@ def test_section_bookmark_and_slice():
     section1 = journal_graph.get_journal_section("start")
     # Should include the two summary fragments (frags2)
     assert len(section1) == 2
-    assert section1[0].content_type == "summary"
-    assert section1[1].content_type == "summary"
+    assert section1[0].fragment_type == "summary"
+    assert section1[1].fragment_type == "summary"
 
 def test_multiple_entries_and_sections():
     journal_graph = TestHasJournal()
@@ -82,12 +82,12 @@ def test_multiple_entries_and_sections():
     # Should be able to retrieve last entry (the last two frags)
     last_entry = journal_graph.get_journal_entry(-1)
     assert len(last_entry) == 2
-    assert last_entry[0].content_type == "kind2"
+    assert last_entry[0].fragment_type == "kind2"
     # Retrieve a named section by its bookmark
     sec1 = journal_graph.get_journal_section("sec1")
     # Should get the two fragments added after sec1
     assert len(sec1) == 2
-    assert sec1[0].content_type == "kind2"
+    assert sec1[0].fragment_type == "kind2"
 
 def test_duplicate_bookmark_raises():
     journal_graph = TestHasJournal()
