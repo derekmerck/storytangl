@@ -42,6 +42,14 @@ class DependencyEdge(HasRequirement[NodeT], Edge[Node, Optional[NodeT]], Generic
             data["dest_criteria"].setdefault("alias", dest_ref)
         return data
 
+    @property
+    def dest(self) -> NodeT | None:
+        return self.provider
+
+    @dest.setter
+    def dest(self, value: NodeT | None) -> None:
+        self.provider = value
+
 
 class AffordanceEdge(HasRequirement[NodeT], Edge[Optional[NodeT], Node], Generic[NodeT]):
     """
@@ -67,10 +75,10 @@ class AffordanceEdge(HasRequirement[NodeT], Edge[Optional[NodeT], Node], Generic
     everywhere in a scene.
     """
     # open source
-    source_id: Optional[UUID] = Field(None)  # Optional now
-    source_ref: Optional[Identifier] = Field(None, init_var=True)  # sugar for criteria={'alias': ref}
-    req_criteria: StringMap = Field(default_factory=dict, alias="source_criteria")
-    req_predicate: Predicate = Field(None, alias="source_predicate")
+    src_id: Optional[UUID] = Field(None)  # Optional now
+    src_ref: Optional[Identifier] = Field(None, init_var=True)  # sugar for criteria={'alias': ref}
+    req_criteria: StringMap = Field(default_factory=dict, alias="src_criteria")
+    req_predicate: Predicate = Field(None, alias="src_predicate")
 
     @model_validator(mode="before")
     @classmethod
@@ -81,3 +89,11 @@ class AffordanceEdge(HasRequirement[NodeT], Edge[Optional[NodeT], Node], Generic
                 data["source_criteria"] = {}
             data["source_criteria"].setdefault("alias", source_ref)
         return data
+
+    @property
+    def src(self):
+        return self.provider
+
+    @src.setter
+    def src(self, value):
+        self.provider = value

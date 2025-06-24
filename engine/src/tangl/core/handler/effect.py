@@ -64,11 +64,11 @@ class HasEffects(HasContext):
         raise ValueError(f"Invalid effect definition: {data}")
 
     @on_apply_effects.register()
-    def _execute_effects(self, ctx: StringMap):
+    def _execute_effects(self, *, ctx: StringMap) -> StringMap:
         for effect in self.effects:
             ctx = effect.execute(self, ctx=ctx)
         return ctx
 
     def apply_effects(self, ctx: StringMap = None) -> bool:
-        ctx = ctx if ctx is not None else self.gather_context()
+        ctx = ctx or self.gather_context()
         return on_apply_effects.execute_all_for(self, ctx=ctx)

@@ -4,9 +4,10 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Node, Graph  # Graph req for pydantic
+from tangl.core.entity import Node, Edge, Graph  # Graph req for pydantic
+from tangl.core.entity.graph import GraphItem
 from tangl.core.dispatch import HandlerRegistry, HandlerPriority as Priority
-from tangl.core.handler import Satisfiable, Predicate
+from tangl.core.handler import HasContext, Predicate
 from .template import EntityTemplate
 
 #### HANDLERS ####
@@ -20,7 +21,7 @@ requirements should decorate methods with ``@on_provision_requirement.register(.
 
 NodeT = TypeVar("NodeT", bound=Node)
 
-class HasRequirement(Satisfiable, Node, Generic[NodeT]):
+class HasRequirement(HasContext, GraphItem, Generic[NodeT]):
 
     provider_id: Optional[UUID] = None
     req_criteria: Optional[StringMap] = Field(default_factory=dict)
@@ -30,19 +31,20 @@ class HasRequirement(Satisfiable, Node, Generic[NodeT]):
     fallback_template: EntityTemplate = None
 
     @field_validator("fallback_template", mode="before")
+    @classmethod
     def _cast_fallback_template(cls, v):
         if isinstance(v, dict):
             v = EntityTemplate(data=v)
         return v
 
     @property
-    def provider(self) -> NodeT:
+    def provider(self) -> NodeT | None:
         if self.provider_id is not None:
             return self.graph.get(self.provider_id)
         return None
 
     @provider.setter
-    def provider(self, value: NodeT | None):
+    def provider(self, value: NodeT | None) -> None:
         if value is not None:
             if value not in self.graph:
                 self.graph.add(value)

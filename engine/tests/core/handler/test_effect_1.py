@@ -26,8 +26,7 @@ def test_effect_order():
         def effect2(self, ctx):
             ctx["order"] = ctx.get("order", []) + ["second"]
     node = EffectOrderNode()
-    ctx = {}
-    node.apply_effects(ctx=ctx)
+    ctx = node.apply_effects()
     assert ctx["order"] == ["first", "second"]
 
 @pytest.mark.skip(reason="doesn't work like this")

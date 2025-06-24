@@ -70,7 +70,7 @@ class HandlerRegistry(Registry[Handler]):
 
         criteria filters for which handlers to try and register.
         """
-        if owner is not None and not isinstance(owner, Entity):
+        if not isinstance(owner, Entity):
             raise RuntimeError(f"owner inst must be Entity, not {type(owner)}")
 
         # logger.debug(f"looking at attribs on owner {owner.__class__.__mro__!r}")
@@ -80,7 +80,7 @@ class HandlerRegistry(Registry[Handler]):
             if (h := getattr(item, "_handler", None)) is not None:
                 if not h.matches(**criteria):
                     continue
-                # want to accept h
+                # want to consider h
 
                 # try to bind it
                 if h.requires_binding:
@@ -205,9 +205,9 @@ class HandlerRegistry(Registry[Handler]):
         return ctx
 
     @classmethod
-    def _iter_handlers(cls, handlers: list[Handler], entity, *, ctx: StringMap) -> Iterator[Any]:
+    def _iter_handlers(cls, handlers: list[Handler], caller: Entity, *, ctx: StringMap) -> Iterator[Any]:
         for h in handlers:
-            result = h(entity, ctx=ctx)
+            result = h(caller, ctx=ctx)
             if result is not None:
                 yield result
 

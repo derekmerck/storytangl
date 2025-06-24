@@ -77,7 +77,7 @@ class Renderable(HasContext):
     content: Any = None
 
     @on_render_content.register()
-    def _provide_label_and_content(self, ctx: StringMap) -> StringMap:
+    def _provide_label_and_content(self, *, ctx: StringMap) -> StringMap:
         """
         A default rendering handler that includes the entity's label
         and a Jinja2-rendered version of :attr:`text`.
@@ -103,5 +103,5 @@ class Renderable(HasContext):
                  or dict, depending on the pipeline's strategy and
                  the types returned by handlers.
         """
-        ctx = ctx if ctx is not None else self.gather_context()
+        ctx = ctx or self.gather_context()
         return on_render_content.execute_all_for(self, ctx=ctx)

@@ -66,6 +66,6 @@ class Satisfiable(HasContext):
                 return False
         return True
 
-    def is_satisfied(self, *, ctx: StringMap = None) -> bool:
+    def is_satisfied(self, ctx: StringMap = None) -> bool:
         ctx = ctx if ctx is not None else self.gather_context()
         return on_check_satisfied.execute_all_for(self, ctx=ctx)

@@ -11,9 +11,12 @@ from .registry import Registry
 
 logger = logging.getLogger(__name__)
 
-class Node(Entity):
+class GraphItem(Entity):
 
     graph: Graph = Field(None, json_schema_extra={'cmp': False}, exclude=True)
+
+
+class Node(GraphItem):
 
     def edges(self, *, direction: Literal["in", "out"] = None, **criteria) -> Iterator[Edge]:
         return self.graph.find_edges(self, direction=direction, **criteria)
@@ -37,8 +40,7 @@ class AnonymousEdge(Entity):
 SourceT = TypeVar("SourceT", bound=Node)
 DestT = TypeVar("DestT", bound=Node)
 
-class Edge(Entity, Generic[SourceT, DestT]):
-    graph: Graph = Field(None, json_schema_extra={'cmp': False}, exclude=True)
+class Edge(GraphItem, Generic[SourceT, DestT]):
 
     src_id: UUID
     dest_id: UUID
@@ -84,9 +86,9 @@ class Edge(Entity, Generic[SourceT, DestT]):
             self.graph.add(self)
         return self
 
-class Graph(Registry[Union[Node, Edge]]):
+class Graph(Registry[GraphItem]):
 
-    def add(self, item: Node | Edge):
+    def add(self, item: GraphItem):
         logger.debug(f"Adding {item!r} to graph {self!r}")
         if item not in self:
             item.graph = self

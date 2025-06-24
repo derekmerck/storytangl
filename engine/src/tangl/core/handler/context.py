@@ -4,7 +4,6 @@ import logging
 from pydantic import Field
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Node, Graph
 from tangl.core.dispatch import HandlerRegistry, HandlerPriority, HasHandlers
 
 logger = logging.getLogger(__name__)
