@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from typing import Optional
 
 from pydantic import Field
 
@@ -27,5 +28,18 @@ class HasContext(HasHandlers):
     def _provide_my_self(self, **kwargs) -> StringMap:
         return {'self': self}
 
+    @on_gather_context.register()
+    def _provide_is_dirty(self, **kwargs) -> Optional[StringMap]:
+        # This should have its own `any_true` pipeline, but we can do it
+        # more simply but just only returning a value on True, otherwise
+        # None will be ignored when the context is flattened.  If we return
+        # False, a late False could clobber an earlier True.
+        if not hasattr(self, "is_dirty"):
+            raise RuntimeError(f"Non-entity caller: {self!r}")
+
+        if self.is_dirty:
+            return {'dirty': True}
+
     def gather_context(self):
         return on_gather_context.execute_all_for(self, ctx=None)
+

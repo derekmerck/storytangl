@@ -4,7 +4,7 @@ import logging
 import pytest
 
 from tangl.core.entity import Entity, Node, Graph
-from tangl.core.handler import HasContext, HasEffects, Satisfiable
+from tangl.core.handler import HasEffects, Satisfiable
 from tangl.persistence import PersistenceManager
 from tangl.persistence.structuring import StructuringHandler
 

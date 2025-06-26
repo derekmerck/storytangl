@@ -7,8 +7,8 @@ from pydantic import Field
 
 from tangl.type_hints import UnstructuredData
 from tangl.utils.bookmarked_list import BookmarkedList
-from tangl.core.entity import Registry
-from tangl.core.entity import Node, Graph
+from tangl.core.entity import Registry, Node, Graph
+from tangl.core.fragment import BaseFragment
 from ..abs_feature_graph import BlameEdge
 from .content_fragment import ContentFragment
 
@@ -56,7 +56,7 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
     def add_fragment(self, item: ContentFragment | UnstructuredData, blame: Node = None):
         if isinstance(item, dict):
             item = ContentFragment.structure(item)
-        if not isinstance(item, ContentFragment):
+        if not isinstance(item, BaseFragment):
             raise ValueError(f"Trying to add wrong type {type(item)} to graph via journal")
         # todo: need to unfreeze or set with a trick
         # if item.sequence is None:

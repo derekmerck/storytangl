@@ -2,14 +2,14 @@
 from typing import NewType
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HasContext, on_gather_context, TamperEvident
+from tangl.core.handler import HasContext, on_gather_context
 from tangl.core.solver.forward_resolve import ForwardResolver
 from tangl.core.solver.journal import ContentFragment
 
 JournalEntry = NewType("JournalEntry", list[ContentFragment])
 
 
-class Story(TamperEvident, HasContext, ForwardResolver):
+class Story(HasContext, ForwardResolver):
 
     user: 'User' = None            # todo: Inject this into resolution domains?
     story_domain: 'Domain' = None  # todo: Inject this into resolution domains?
@@ -35,8 +35,3 @@ class Story(TamperEvident, HasContext, ForwardResolver):
 
     def add_journal_entry(self, entry):
         return self.journal.add_entry(entry)
-
-    # Tamper-Evident
-    @property
-    def is_dirty(self):
-        return self.dirty or any(v.dirty for v in self.values() if hasattr(v, "dirty"))

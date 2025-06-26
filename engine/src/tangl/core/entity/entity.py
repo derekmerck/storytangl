@@ -152,5 +152,15 @@ class Entity(BaseModelPlus):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}:{self.label}>"
 
-    dirty: bool = False
-    # indicator that entity has been tampered with, invalidates certain debugging
+    is_dirty_: bool = False
+    # audit indicator that the entity has been tampered with, invalidates certain debugging
+
+    @property
+    def is_dirty(self) -> bool:
+        return self.is_dirty_
+
+    @is_dirty.setter
+    def is_dirty(self, value: bool):
+        if value is not True:
+            raise RuntimeError("Can't unset dirty")
+        self.is_dirty_ = True

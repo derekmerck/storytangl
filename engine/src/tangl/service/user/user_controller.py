@@ -11,21 +11,13 @@ from tangl.type_hints import Identifier, Hash
 from tangl.service.api_endpoint import ApiEndpoint, AccessLevel, HasApiEndpoints
 from tangl.media import MediaResourceInventoryTag as MediaRIT, MediaDataType
 from .user import User
+from .user_info import UserInfo
 
 if TYPE_CHECKING:
     from tangl.story.story import Story
 else:
     # Fallbacks for endpoint type hinting
     class Story: pass
-
-class UserInfo(BaseModel):
-    user_id: UUID
-    created_at: datetime
-    # ... etc. could inherit from UserWorldMetadata
-
-    @classmethod
-    def from_user(cls, user: User, **kwargs) -> UserInfo:
-        ...
 
 class ApiKeyInfo(BaseModel):
     secret: str
@@ -84,6 +76,6 @@ class UserController(HasApiEndpoints):
         story.user.unlink_story(story)
         return (story.uid,)
 
-    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, group="system")
+    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, group="system", response_type="info")
     def get_key_for_secret(self, secret: str, **kwargs) -> ApiKeyInfo:
         return ApiKeyInfo(secret=secret)

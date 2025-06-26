@@ -1,11 +1,11 @@
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import Field
 
 from tangl.core.entity import Node, Graph  # req Graph for pydantic validation
 from tangl.core.fragment import BaseFragment, PresentationHints, ControlFragment
 
-class ContentFragment(BaseFragment, Node):
+class ContentFragment(BaseFragment):
     # red, output, linked within by red, without by yellow
     """
     ContentFragments are Nodes on the graph, they are connected to their
@@ -17,7 +17,7 @@ class ContentFragment(BaseFragment, Node):
     Edges between content fragments are implicit in sequence since the journal is
     strictly linear and monotonic in sequence.
     """
-    fragment_type: str = Field("content", alias='type')
+    fragment_type: Literal["content"] = Field("content", alias="type")
 
     # base features
     presentation_hints: Optional[PresentationHints] = Field(None, alias='hints')

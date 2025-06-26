@@ -2,7 +2,7 @@ from typing import Optional, Any
 from enum import Enum
 
 import yaml
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, BaseModel
 
 from tangl.core.entity import Entity
 

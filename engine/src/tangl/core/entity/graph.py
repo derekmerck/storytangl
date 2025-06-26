@@ -107,3 +107,8 @@ class Graph(Registry[GraphItem]):
                 return self.find_all(src_id=node.uid, **criteria)
             case _:
                 return itertools.chain(self.find_all(src_id=node.uid, **criteria), self.find_all(dest_id=node.uid, **criteria))
+
+    @property
+    def is_dirty(self):
+        return self.is_dirty_ or \
+            any([node.is_dirty for node in self])
