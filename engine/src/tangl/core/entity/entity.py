@@ -90,13 +90,21 @@ class Entity(BaseModelPlus):
     # ironic alias for has_alias
     has_alias = has_identifier
 
+    def _attrib_is_superset_of(self, attrib: str, *items) -> bool:
+        data = getattr(self, attrib, None)
+        if not isinstance(data, set):
+            raise ValueError(f"Invalid attrib for contains, {attrib!r} is not a set")
+        if len(items) == 1 and items[0] is None:
+            # If we are trying to match "None", we want to know if this attrib is empty
+            return len(data) == 0  # check for empty
+        if len(items) == 1 and isinstance(items[0], (list, set)):
+            # Only one item was provided
+            items = items[0]
+        return set(items).issubset(data)
+
     def has_tags(self, *tags: Tag) -> bool:
         match_logger.debug(f"Comparing query tags {tags} against {self!r} with tags={self.tags}")
-        if len(tags) == 1 and tags[0] is None:
-            return len(self.tags) == 0  # check for empty
-        if len(tags) == 1 and isinstance(tags[0], (list, set)):
-            tags = tags[0]
-        return set(tags).issubset(self.tags)
+        return self._attrib_is_superset_of("tags", *tags)
 
     # STRUCTURING
 

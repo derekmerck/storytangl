@@ -16,7 +16,9 @@ class ResolvableNode(Node):
         return list( *self.edges(has_cls=DependencyEdge, direction="in"),
                      *self.edges(has_cls=AffordanceEdge, direction="out") )
 
-    # todo: consider order, if an actor, for example, has been provided as an affordance, it should get priority over actors anywhere, which gets priority over creating something new
+    # todo: consider order, if an actor, for example, has been provided as an
+    #       affordance, it should get priority over actors anywhere, which gets
+    #       priority over creating something new
     def provision_dependencies(self, *, ctx: StringMap = None) -> bool:
         ctx = ctx or self.gather_context()
         for dep in self.dependencies:

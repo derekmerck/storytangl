@@ -1,7 +1,5 @@
 from typing import Any
 
-from pydantic import BaseModel
-
 from tangl.type_hints import Identifier, Expr, UnstructuredData
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, AccessLevel, HasApiEndpoints
 # from tangl.media.media_record import MediaRecord, MediaDataType

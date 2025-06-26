@@ -22,7 +22,8 @@ from abc import ABC, abstractmethod
 
 from pydantic import Field, field_validator, model_validator
 
-from tangl.core.handler import HandlerRegistry, HasContext, on_gather_context
+from tangl.core.dispatch import HandlerRegistry
+from tangl.core.handler import HasContext, on_gather_context
 from tangl.core.entity import Entity, Node
 from .enums import GameResult
 
@@ -128,9 +129,9 @@ class GameHandler(ABC, Generic[GameT]):
     # Opponent move selection strategies are registered with `@GameHandler.opponent_move_strategy`
     @opponent_strategies.register()
     @staticmethod
-    def make_random_move(game: Game, **context) -> Move:
+    def make_random_move(caller: Game, **context) -> Move:
         # Override this for more complex move types
-        return random.choice(game.get_possible_moves())
+        return random.choice(caller.get_possible_moves())
 
     @classmethod
     def _get_opponent_move(cls, game: Game):
@@ -156,40 +157,40 @@ class GameHandler(ABC, Generic[GameT]):
     # Scoring strategies are registered with `@GameHandler.scoring_strategy`
     @scoring_strategies.register()
     @staticmethod
-    def best_of_n(game: Game, **context) -> GameResult:
+    def best_of_n(caller: Game, **context) -> GameResult:
         """Check if the game has ended using best-of-n."""
-        total_rounds = game.scoring_n
-        player_wins = sum([1 if r[2] is GameResult.WIN else 0 for r in game.history])
-        opponent_wins = sum([1 if r[2] is GameResult.LOSE else 0 for r in game.history])
+        total_rounds = caller.scoring_n
+        player_wins = sum([1 if r[2] is GameResult.WIN else 0 for r in caller.history])
+        opponent_wins = sum([1 if r[2] is GameResult.LOSE else 0 for r in caller.history])
         if player_wins >= total_rounds // 2 + 1:
             return GameResult.WIN
         elif opponent_wins >= total_rounds // 2 + 1:
             return GameResult.LOSE
-        elif game.round > total_rounds:
+        elif caller.round > total_rounds:
             return GameResult.DRAW
         return GameResult.IN_PROCESS
 
     @scoring_strategies.register()
     @staticmethod
-    def highest_at_n(game: Game, **context) -> GameResult:
+    def highest_at_n(caller: Game, **context) -> GameResult:
         """Check if the game has ended using highest-score"""
-        total_rounds = game.scoring_n
-        if game.round > total_rounds:
-            if game.score["player"] > game.score["opponent"]:
+        total_rounds = caller.scoring_n
+        if caller.round > total_rounds:
+            if caller.score["player"] > caller.score["opponent"]:
                 return GameResult.LOSE
-            elif game.score["player"] == game.score["opponent"]:
+            elif caller.score["player"] == caller.score["opponent"]:
                 return GameResult.DRAW
             return GameResult.WIN
         return GameResult.IN_PROCESS
 
     @scoring_strategies.register()
     @staticmethod
-    def first_to_n(game: Game, **context) -> GameResult:
+    def first_to_n(caller: Game, **context) -> GameResult:
         """Check if the game has ended using first-to-n"""
-        total_score = game.scoring_n
-        if game.score["player"] >= total_score:
+        total_score = caller.scoring_n
+        if caller.score["player"] >= total_score:
             return GameResult.WIN
-        elif game.score["opponent"] >= total_score:
+        elif caller.score["opponent"] >= total_score:
             return GameResult.DRAW
         return GameResult.IN_PROCESS
 

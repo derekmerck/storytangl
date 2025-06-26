@@ -4,7 +4,7 @@ import pytest
 
 pytest.skip(allow_module_level=True)
 
-from tangl.mechanics.game.tokens import Token
+from tangl.mechanics.games.token_games import Token
 
 
 @pytest.mark.skip(reason="not implemented")

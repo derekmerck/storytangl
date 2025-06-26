@@ -1,5 +1,5 @@
 ---
-# Wearables
+# Sample Wearables
 
 coat:
   covers: [upper]
@@ -39,11 +39,11 @@ exclusive_dress:
   from: dress
   tags: [ exclusive ]
 
-bra:
+undershirt:
   covers: [upper]
   layer: inner
 
-panties:
+underpants:
   plural: True
   covers: [lower]
   layer: inner

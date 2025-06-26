@@ -5,7 +5,7 @@ import random
 
 from pydantic import ConfigDict, Field
 
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .game_handler import GameHandler, Game
 from .enums import GameResult
 
@@ -56,23 +56,23 @@ class TrivialGameHandler(GameHandler):
 
     @opponent_strategies.register()
     @staticmethod
-    def always_win(game: TrivialGame, player_move: WinLoseMove = None) -> WinLoseMove:
+    def always_win(caller: TrivialGame, player_move: WinLoseMove = None) -> WinLoseMove:
         return TrivialGameHandler.WinLoseMove.WIN
 
     @opponent_strategies.register()
     @staticmethod
-    def always_lose(game: Game, player_move: WinLoseMove = None) -> WinLoseMove:
+    def always_lose(caller: Game, player_move: WinLoseMove = None) -> WinLoseMove:
         return TrivialGameHandler.WinLoseMove.LOSE
 
     @opponent_strategies.register()
     @staticmethod
-    def always_draw(game: Game, player_move: WinLoseMove = None, **context) -> WinLoseMove:
+    def always_draw(caller: Game, player_move: WinLoseMove = None, **context) -> WinLoseMove:
         return TrivialGameHandler.WinLoseMove.DRAW
 
     # todo: these are revision _only_ strategies b/c they required a player move
     @opponent_strategies.register()
     @staticmethod
-    def always_oppose(game: Game, player_move: WinLoseMove, **context) -> WinLoseMove:
+    def always_oppose(caller: Game, player_move: WinLoseMove, **context) -> WinLoseMove:
         if player_move == TrivialGameHandler.WinLoseMove.WIN:
             return TrivialGameHandler.WinLoseMove.LOSE
         elif player_move == TrivialGameHandler.WinLoseMove.LOSE:
@@ -81,12 +81,12 @@ class TrivialGameHandler(GameHandler):
 
     @opponent_strategies.register()
     @staticmethod
-    def always_agree(game: Game, player_move: WinLoseMove, **context) -> WinLoseMove:
+    def always_agree(caller: Game, player_move: WinLoseMove, **context) -> WinLoseMove:
         return player_move
 
     @scoring_strategies.register()
     @staticmethod
-    def most_wins_played(game: Game, **context) -> GameResult:
+    def most_wins_played(caller: Game, **context) -> GameResult:
         """Determine the winner based on who played the most wins after n rounds."""
         if game.round > game.scoring_n:
             player_wins = sum(1 for result in game.history if result[0] == TrivialGameHandler.WinLoseMove.WIN)
@@ -102,7 +102,7 @@ class TrivialGameHandler(GameHandler):
 
     @scoring_strategies.register()
     @staticmethod
-    def points_after_n(game: TrivialGame, **context) -> GameResult:
+    def points_after_n(caller: TrivialGame, **context) -> GameResult:
         """End the game after n rounds, win if player has at least m points else lose."""
         if game.round > game.scoring_n:
             if game.score["player"] >= game.scoring_n:

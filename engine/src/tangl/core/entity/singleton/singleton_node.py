@@ -16,6 +16,44 @@ logger = logging.getLogger(__name__)
 WrappedType = TypeVar("WrappedType", bound=Singleton)
 
 class SingletonNode(Node, Generic[WrappedType]):
+    """
+    SingletonNode is a :class:`~tangl.core.graph.Node` extension that wraps a
+    :class:`~tangl.core.entity.Singleton` with instance-specific
+    state, enabling it to be attached to a graph while maintaining singleton
+    behavior.
+
+    Key Features
+    ------------
+    * **Singleton Wrapper**: Wraps a Singleton, providing graph connectivity.  The wrapped Singleton is accessed via the :attr:`reference_entity` property.
+    * **Instance Variables**: Supports instance-specific variables.  Instance variables must be marked with :code:`json_schema_extra={"instance_var": True}` in the Singleton.
+    * **Method Rebinding**: Class methods are rebound to the wrapped instance.
+    * **Dynamic Class Creation**: Provides a method :meth:`create_wrapper_cls` to create wrapper classes for specific Singleton types.
+    * **Supports Generics**: SingletonNode[Singleton] automatically creates an appropriate class wrapper.
+
+    Usage
+    -----
+    .. code-block:: python
+        from tangl.core.graph import SingletonNode, Graph
+        from tangl.core import Singleton
+
+        class MyConstant(Singleton):
+            value: int
+            state: str = Field(default="initial", json_schema_extra={"instance_var": True})
+
+        MyConstantNode = SingletonNode.create_wrapper_cls("MyConstantNode", MyConstant)
+
+        graph = Graph()
+        const_node1 = MyConstantNode(label="CONSTANT_1", value=42, graph=graph)
+        const_node2 = MyConstantNode(label="CONSTANT_1", state="modified", graph=graph)
+
+        print(const_node1.value == const_node2.value)  # True (42)
+        print(const_node1.state != const_node2.state)  # True ("initial" != "modified")
+
+    Related Components
+    ------------------
+    * :class:`~tangl.core.entity.Singleton`: The base class for singleton entities.
+    * :class:`~tangl.core.graph.Node`: The base class for graph nodes.
+    """
     # Allows embedding a Singleton into a mutable node so its properties can be
     # referenced indirectly via a graph
     # Note that singletons are frozen, so the referred attributes are immutable.
@@ -88,4 +126,7 @@ class SingletonNode(Node, Generic[WrappedType]):
         Unfortunately difficult to use pydantic's native Generic handling with this b/c we
         want to manipulate the fields as the model is created.
         """
+        if isinstance(wrapped_cls, TypeVar):
+            # Sometimes we want to use a type var
+            wrapped_cls = wrapped_cls.__bound__
         return cls._create_wrapper_cls(wrapped_cls)

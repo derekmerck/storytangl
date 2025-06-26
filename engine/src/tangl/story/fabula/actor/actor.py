@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 
-from tangl.core import Associating, Renderable, on_associate, on_disassociate, on_can_associate, on_can_disassociate
+# from tangl.core import Associating, Renderable, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 from tangl.story.story_node import StoryNode
 
 if TYPE_CHECKING:
@@ -9,9 +9,12 @@ if TYPE_CHECKING:
 
 class Actor(Associating, Renderable, StoryNode):
     """
-    The Actor class extends the StoryNode class and represents a character or entity within the narrative.
+    The Actor class extends the StoryNode class and represents a character or entity
+    within the narrative.
 
-    Complex features like "Look" and "Outfit" are delegated to child nodes with their own handlers or managers.
+    Higher order character features like demographics, look, and outfit are delegated to
+    associated resource nodes with their own handlers or managers defined in the
+    `tangl.mechanics` subpackage.
     """
 
     name: Optional[str] = None

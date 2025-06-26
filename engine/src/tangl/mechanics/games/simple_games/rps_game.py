@@ -2,8 +2,8 @@ from __future__ import annotations
 import random
 from enum import Enum
 
-from tangl.core.handler import HandlerRegistry
-from tangl.mechanics.game.game_handler import Game, GameHandler, GameResult
+from tangl.core.dispatch import HandlerRegistry
+from tangl.mechanics.games.game_handler import Game, GameHandler, GameResult
 
 from ..game_handler import opponent_strategies, scoring_strategies
 # opponent_strategies = HandlerRegistry(label='opponent_strategies')
@@ -39,22 +39,22 @@ class RpsGameHandler(GameHandler):
 
     @opponent_strategies.register()
     @staticmethod
-    def always_rock(game: Game, player_move: RpsMove = None) -> RpsMove:
+    def always_rock(caller: Game, player_move: RpsMove = None) -> RpsMove:
         return RpsMove.ROCK
 
     @opponent_strategies.register()
     @staticmethod
-    def always_paper(game: Game, player_move: RpsMove = None) -> RpsMove:
+    def always_paper(caller: Game, player_move: RpsMove = None) -> RpsMove:
         return RpsMove.PAPER
 
     @opponent_strategies.register()
     @staticmethod
-    def always_scissors(game: Game, player_move: RpsMove = None) -> RpsMove:
+    def always_scissors(caller: Game, player_move: RpsMove = None) -> RpsMove:
         return RpsMove.SCISSORS
 
     @opponent_strategies.register()
     @staticmethod
-    def force_win(game: Game, player_move: RpsMove) -> RpsMove:
+    def force_win(caller: Game, player_move: RpsMove) -> RpsMove:
         if player_move is RpsMove.ROCK:
             return RpsMove.PAPER
         elif player_move is RpsMove.PAPER:
@@ -64,7 +64,7 @@ class RpsGameHandler(GameHandler):
 
     @opponent_strategies.register()
     @staticmethod
-    def force_lose(game: RpsGame, player_move: RpsMove) -> RpsMove:
+    def force_lose(caller: RpsGame, player_move: RpsMove) -> RpsMove:
         if player_move is RpsGameHandler.RpsMove.ROCK:
             return RpsGameHandler.RpsMove.SCISSORS
         elif player_move is RpsGameHandler.RpsMove.PAPER:
@@ -129,7 +129,7 @@ class RpslsGameHandler(GameHandler):
 
     @opponent_strategies.register()
     @staticmethod
-    def force_win(game: Game, player_move: RpslsMove) -> RpslsMove:
+    def force_win(caller: Game, player_move: RpslsMove) -> RpslsMove:
         for move, beats in cls.WINNING_RPSLMOVES.items():
             if player_move in beats:
                 return move
@@ -138,7 +138,7 @@ class RpslsGameHandler(GameHandler):
 
     @opponent_strategies.register()
     @staticmethod
-    def force_lose(game: Game, player_move: RpslsMove) -> RpslsMove:
+    def force_lose(caller: Game, player_move: RpslsMove) -> RpslsMove:
         return random.choice( cls.WINNING_RPSLMOVES[player_move] )
 
 class RpslsGame(Game):

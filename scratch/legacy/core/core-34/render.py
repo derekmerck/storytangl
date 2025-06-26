@@ -3,7 +3,7 @@ from typing import ClassVar, Self
 
 import jinja2
 
-from tangl34.type_hints import StringMap, StringMap
+from tangl.type_hints import StringMap, StringMap
 from ..trace import TraceFragment
 from ..entity import Entity
 from .enums import ServiceKind

@@ -5,8 +5,8 @@ import logging
 
 from pydantic import model_validator, Field, field_validator
 
-from tangl34.type_hints import StringMap
-from ..entity import Entity, Registry
+from tangl.type_hints import StringMap
+from tangl.core.entity import Entity, Registry
 from .enums import ServiceKind
 
 logger = logging.getLogger(__name__)

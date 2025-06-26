@@ -1,3 +1,3 @@
-from tangl.core import KvFragment
+from tangl.core.solver.journal import KvFragment
 
 StoryInfo = KvFragment

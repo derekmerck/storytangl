@@ -14,7 +14,7 @@ from .handler import Handler
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-AggregationStrategy = Literal["gather", "merge", "pipeline", "all_true", "first"]
+AggregationStrategy = Literal["gather", "merge", "pipeline", "all_true", "first", "iter"]
 
 
 class HandlerRegistry(Registry[Handler]):

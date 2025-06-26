@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.mechanics.game.card_games.playing_card import PlayingCard, suits
+from tangl.mechanics.games.card_games.playing_card import PlayingCard, suits
 
 def test_card_creation():
     card = PlayingCard(1, 's')

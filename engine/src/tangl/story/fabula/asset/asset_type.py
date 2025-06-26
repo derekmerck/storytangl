@@ -1,21 +1,27 @@
 """
-Assets come in two flavors:
+Assets come in three flavors:
 - Discrete
 - Countable
+- Simple
 
-Both are based on singleton reference classes.
+Discrete and Countable are based on singleton reference classes.
 - Discrete assets are wrapped in a SingletonNode class and associated with other nodes in the story graph.
 - Countable assets are inventoried in an AssetWallet counter that can be attached to a story node type.
+
+Simple assets are just a tag-like inventory of strings and enums with no higher-order handlers.
+In a pinch, they could also contain asset type singletons.
 
 Moving assets is handled through a Transaction handler pipeline.
 
 Assets of a given class have instance inheritance from already registered peers via a "from" field.
 
 Note, Entities can have countable assets stored in a wallet component, however, discrete assets
-are associated, so they require a node/graph structure.
+are associated, so they require a node/graph structure.  Simple assets require neither wallet
+nor graph, they are tracked via a set attribute "inv" on the host entity.
 """
 
-from tangl.core import InheritingSingleton, Renderable, HasContext, Associating
+from tangl.core.entity import InheritingSingleton
+from tangl.core.handler import Renderable, HasContext  # Associating
 
 class AssetType(Renderable, HasContext, InheritingSingleton):
     """

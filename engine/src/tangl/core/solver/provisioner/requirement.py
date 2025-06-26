@@ -98,7 +98,6 @@ class HasRequirement(HasContext, GraphItem, Generic[NodeT]):
 
     @on_provision_requirement.register(priority=Priority.LAST)
     def _use_fallback_template(self, *, ctx: StringMap) -> NodeT | None:
-        from .template import EntityTemplate
         if self.fallback_template is not None:
             # this just calls structure, but we can use NodeTemplate for consistency
             # todo: inject NodeT into the template as obj_cls default

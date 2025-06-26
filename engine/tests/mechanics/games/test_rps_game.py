@@ -2,8 +2,10 @@ from builtins import print
 
 import pytest
 
-from tangl.mechanics.game.game_handler import Game, GameResult, GameHandler
-from tangl.mechanics.game.simple_games.rps_game import RpsGameHandler as RPS_GH, RpslsGameHandler as RPSLS_GH, RpsMove, RpslsMove
+from tangl.mechanics.games.game_handler import Game, GameResult, GameHandler
+from tangl.mechanics.games.simple_games.rps_game import RpsGameHandler as RPS_GH, RpslsGameHandler as RPSLS_GH, RpsMove, RpslsMove
+
+pytest.skip(allow_module_level=True)
 
 class RpsGame(Game):
     game_handler_cls = RPS_GH

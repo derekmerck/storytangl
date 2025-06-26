@@ -6,7 +6,7 @@ import logging
 
 from pydantic import Field
 
-from tangl34.type_hints import StringMap, UnstructuredData
+from tangl.type_hints import StringMap, UnstructuredData
 from .enums import ResolutionState
 from ...entity import Entity, Registry
 from ..enums import ServiceKind

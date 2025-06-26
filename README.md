@@ -2,6 +2,19 @@
 
 **TanglDev, Spring 2025**  
 
+## Overview
+
+StoryTangl is an interactive storytelling engine for creating, hosting, and playing
+dynamic, interactive narrative experiences. It is designed to support a wide range 
+of storytelling styles, from simple branching narratives to complex, state-driven
+worlds with dynamically generated content. It is capable of concurrently handling
+multiple story worlds and multiple users.
+
+The framework is thoroughly documented with `Sphinx`, and documentation is
+accessible on [ReadTheDocs](https://readthedocs.org/projects/StoryTangl). This
+includes both story-author and developer guides, as well as the OpenApi specification
+for the REST API server.
+
 **The Tangl Abstract Narrative Graph Library for Interactive Stories**, inspired by morphological shape models, compiler theory, superposition, Kantian categoricals, and a weaving metaphor.
 
 StoryTangl aims to **separate** the concerns of narrative structure, story content, stateful navigation, and final presentation. By **representing stories** as an abstract graph that “collapses” into a linear narrative under user or system choices, it supports traditional linear novels, branching CYOAs, sandbox RPGs, and more.
@@ -28,6 +41,49 @@ At scale, Tangl can be hosted as a **multi-world server**:
 2. **Manage** multiple user sessions, each with its own story instance.  
 3. **Coordinate** real-time branching or updates if desired (cooperative narratives, analytics on user paths, etc.).  
 4. **Expose** a REST or GraphQL API for remote clients, from web front-ends to game engines like Unity or Ren’Py.
+
+---
+
+
+## Usage
+
+### Install with `pip`
+
+Install and run a tangl story server on port 8000.
+```bash
+$ pip install storytangl
+$ tangl-serve
+```
+or run a story from the command-line interface (CLI).
+```bash
+$ tangl-cli
+```
+
+(Currently distributing on PyPI-testing.)
+
+### From source
+
+Requires `git+lfs` and `poetry`.
+
+```bash
+$ git clone https://github.com/tangldev/storytangl
+$ cd storytangl
+$ git lfs pull
+$ pip install poetry
+$ poetry install --only main
+$ tangl-serve
+```
+
+### Docker
+
+The git repo includes a Dockerfile for the reference app that can be used as
+a quick-start on a PAAS environment.
+
+```bash
+$ docker build . -t storytangl:3.4
+$ docker run -p 8000:8000 storytangl:3.4
+```
+
 
 ---
 
@@ -209,3 +265,27 @@ We welcome feedback, bug reports, and feature requests. For more advanced usage 
 ---
 
 **Tangl** strives to offer a **unifying framework** for interactive fiction—where authors can craft intricate branching worlds, and readers can explore or shape them in multiple formats. By **weaving** the threads of structure, semantics, state navigation, and final presentation, Tangl aspires to push narrative design into new dimensions.
+
+
+## Modding
+
+Any game world can be 'modded' by registering new plugins or media locations
+with the game world manager.  
+
+Media that follows the world's default naming convention will be selected 
+preferentially.  The main game engine includes hooks to various key features 
+like game initialization and turn advancement.  Each game-world has its own
+sandboxed plugin-manager.
+
+## Development
+
+We use Git and Git-LFS for source and basic media version control and 
+collaboration.
+
+The unit-test-suite targets 85% coverage.  We utilize `pytest` as our testing
+framework, and tests run automatically on every commit to the main branch.
+
+## License
+
+MIT except BSD on the Demographics module name-banks, which includes content
+directly lifted from a BSD-licensed project, see that subpackage for details.

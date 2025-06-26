@@ -3,9 +3,9 @@ import pytest
 
 pytest.skip(allow_module_level=True)
 
-from tangl.mechanics.game.simple_games.rps_game import RpsGameHandler, RpsMove
-from tangl.mechanics.game.token_games.game_token import TokenHandler
-from tangl.mechanics.game.token_games.token_game import RpsGameToken
+from tangl.mechanics.games.simple_games.rps_game import RpsGameHandler, RpsMove
+from tangl.mechanics.games.token_games.game_token import TokenHandler
+from tangl.mechanics.games.token_games.token_game import RpsGameToken
 
 Mv = RpsMove
 

@@ -261,4 +261,5 @@ class Handler(Entity, Generic[T], arbitrary_types_allowed=True):
         return self.sort_key() < other.sort_key()
 
     def __hash__(self) -> int:
+        # delegate hash, assuming each func can only correspond to a single handler
         return hash(self.func)

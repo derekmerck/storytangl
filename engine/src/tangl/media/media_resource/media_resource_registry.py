@@ -21,7 +21,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
         if not self.on_index:
             self.on_index = HandlerRegistry (
             label=f"{self.label}_indexer",
-            default_aggregation_strategy="gather"
+            aggregation_strategy="gather"
         )
         return self
 
@@ -46,7 +46,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
                 continue
 
             # Run through indexing pipeline
-            self.on_index.execute_all(record, ctx=None, extra_handlers=extra_handlers)
+            self.on_index.execute_all_for(record, ctx=None, extra_handlers=extra_handlers)
 
             # Add to registry
             self.add(record)

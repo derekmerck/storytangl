@@ -3,23 +3,11 @@ from typing import NewType
 
 from tangl.core.entity import Entity
 from tangl.core.handler import HasContext, on_gather_context
+from tangl.core.scope.tamper_evident import TamperEvident
 from tangl.core.solver.forward_resolve import ForwardResolver
 from tangl.core.solver.journal import JournalFragment
 
 JournalEntry = NewType("JournalEntry", list[JournalFragment])
-
-class TamperEvident(Entity):
-
-    dirty: bool = False  # flag for when the entity has been tampered with
-
-    @property
-    def is_dirty(self) -> bool:
-        return self.dirty
-
-    @on_gather_context.register()
-    def _provide_is_dirty(self):
-        if self.is_dirty:
-            return {'dirty': True}
 
 
 class Story(TamperEvident, HasContext, ForwardResolver):

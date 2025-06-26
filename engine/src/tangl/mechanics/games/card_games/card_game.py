@@ -1,6 +1,6 @@
 from pydantic import ConfigDict
 
-from tangl.mechanics.game.game_handler import GameHandler, Game
+from tangl.mechanics.games.game_handler import GameHandler, Game
 from .playing_card import PlayingCard, Suit
 
 CardGroup = list[PlayingCard]
