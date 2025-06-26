@@ -8,7 +8,7 @@ from tangl.config import settings
 from tangl.type_hints import UniqueLabel
 from tangl.story import StoryInfo
 from tangl.story.world import WorldInfo, WorldList, WorldSceneList
-from tangl.journal import JournalEntry
+from tangl.core.solver import JournalFragment
 from tangl.user import UserInfo
 from tangl.service.service_manager_abc import ServiceManagerAbc, RuntimeInfo, SystemInfo, MediaResponse, public_endpoint, dev_endpoint, client_endpoint
 

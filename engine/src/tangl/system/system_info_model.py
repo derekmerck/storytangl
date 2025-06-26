@@ -1,15 +1,16 @@
 from typing import Any, Optional
 
-from pydantic import BaseModel, AnyUrl
+from pydantic import AnyUrl
 
 from tangl.info import __url__
+from tangl.service.response import BaseResponse
 
-class SystemInfo(BaseModel):
+class SystemInfo(BaseResponse):
     engine: str
     version: str
     uptime: str
-    worlds: int
-    users: int
+    worlds: list[str]
+    num_users: int
     homepage_url: AnyUrl = __url__
     # media: Optional[list[MediaRecord | JournalMediaFragment]] = None
 

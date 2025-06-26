@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import Field, field_serializer, AnyUrl
 
 from tangl.type_hints import Pathlike
-from tangl.core.solver import JournalFragment
+from tangl.core.fragment import BaseFragment, ControlFragment
 from tangl.core.dispatch import HandlerRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
@@ -24,9 +24,9 @@ media_fragment_handler = HandlerRegistry(
     label="media_fragment_handler",
     aggregation_strategy="pipeline")
 
-class MediaFragment(JournalFragment, extra='allow'):
+class MediaFragment(BaseFragment, extra='allow'):
     """
-    This is a type of ContentFragment that can be generated according to
+    This is a type of fragment that can be generated according to
     inline data or url, or from a media dependency linked to a MediaRIT.
 
     Attributes:
@@ -50,4 +50,3 @@ class MediaFragment(JournalFragment, extra='allow'):
         if self.content_format == "data" and isinstance(self.content, bytes):
             return b64encode(content)
         return str(content)
-

@@ -2,6 +2,7 @@ from typing import Iterable, Optional, Self, Type, Protocol, Any, Callable, Clas
 from uuid import UUID, uuid4
 import logging
 import unicodedata
+from functools import wraps
 
 import shortuuid
 from pydantic import Field, field_validator, ValidationInfo
@@ -113,15 +114,19 @@ class Entity(BaseModelPlus):
         obj_cls = data.pop("obj_cls", cls)
         return obj_cls(**data)
 
-    def unstructure(self, **kwargs) -> UnstructuredData:
+    @wraps(BaseModelPlus.model_dump)
+    def model_dump(self, **kwargs) -> UnstructuredData:
         kwargs.setdefault("exclude_unset", True)
         kwargs.setdefault("exclude_none", True)
         kwargs.setdefault("exclude_defaults", True)
         kwargs.setdefault("by_alias", True)
-        data = self.model_dump(**kwargs)
+        data = super().model_dump(**kwargs)
         data['uid'] = self.uid  # May not be included b/c it's considered default/unset
         data['obj_cls'] = self.__class__
         return data
+
+    def unstructure(self, **kwargs) -> UnstructuredData:
+        return self.model_dump(**kwargs)
 
     # UTILITIES
 

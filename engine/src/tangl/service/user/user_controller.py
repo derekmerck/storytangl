@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import base64
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel, field_serializer, computed_field
+from pydantic import BaseModel, computed_field
 
 from tangl.type_hints import Identifier, Hash
 from tangl.service.api_endpoint import ApiEndpoint, AccessLevel, HasApiEndpoints

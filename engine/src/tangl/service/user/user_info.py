@@ -1,12 +1,14 @@
-import collections
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import Field
+
 from tangl.type_hints import UniqueLabel
-from tangl.utils.response_models import BaseResponse
+from tangl.service.response import BaseResponse
 
 class UserInfo(BaseResponse):
+    fragment_type: Literal["user_info"] = Field("user_info", alias="type")
     user_id: UUID
     user_secret: str
     created_dt: datetime
@@ -16,5 +18,6 @@ class UserInfo(BaseResponse):
     turns_played: int = 0
     achievements: Optional[set[str]]
 
-
+# todo: should probably just return a full user info object for consistency
+import collections
 UserSecret = collections.namedtuple("UserSecret", ["user_id", "user_secret"])

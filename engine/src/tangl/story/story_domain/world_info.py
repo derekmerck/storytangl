@@ -4,15 +4,17 @@ from pydantic import BaseModel, field_validator, Field, ConfigDict
 
 from tangl.type_hints import UniqueLabel
 # from tangl.media import MediaNode, JournalMediaItem
-from tangl.utils.response_models import BaseResponse, KvItem
-from tangl.scripting.script_metadata_model import ScriptMetadata
+from tangl.core.fragment import KvFragment
+from tangl.service.response import BaseResponse
+# from tangl.scripting.script_metadata_model import ScriptMetadata
 
+ScriptMetadata = dict
 
-class WorldInfo(ScriptMetadata):
+class WorldInfo(BaseResponse, ScriptMetadata):
     label: UniqueLabel
 
 
-class WorldListItem(KvItem):
+class WorldList(KvFragment):
 
     model_config = ConfigDict(
         json_schema_extra = {
@@ -20,11 +22,6 @@ class WorldListItem(KvItem):
         }
     )
 
-WorldList = list[WorldListItem]
 
-
-class WorldSceneItem(KvItem):
-    pass
-
-WorldSceneList = list[WorldSceneItem]
-
+class WorldSceneList(KvFragment):
+    ...

@@ -2,11 +2,11 @@ import pytest
 
 pytest.skip(allow_module_level=True)
 
-from tangl.core.fragment import ContentFragment, GroupFragment
+from tangl.core.fragment import BaseFragment, GroupFragment
 
 ##### Grouped Fragments
 
-TextFragment = MediaFragment = ContentFragment
+TextFragment = MediaFragment = BaseFragment
 
 def test_group_creation_and_membership():
     # Create a group fragment representing a dialog exchange

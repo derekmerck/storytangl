@@ -9,12 +9,12 @@ from pydantic import BaseModel, Field, field_validator, field_serializer
 
 from tangl.type_hints import UniqueLabel, StringMap, Hash
 from tangl.utils.hash_secret import hash_for_secret
-from tangl.core import Entity
-from tangl.core import on_gather_context, HasContext
+from tangl.core.entity import Entity
+from tangl.core.handler import on_gather_context, HasContext
 from .achievement import UserAchievementRecord
 
 if TYPE_CHECKING:
-    from tangl.story.story_graph import Story
+    from tangl.story.story import Story
 
 StoryId = UUID
 WorldId = UniqueLabel

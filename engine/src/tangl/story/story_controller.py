@@ -6,8 +6,7 @@ from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, Ac
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.core.entity import Node, AnonymousEdge
 from tangl.core.handler import on_gather_context, Predicate, RuntimeEffect
-from tangl.core.solver import ChoiceEdge
-from tangl.core.solver.journal import JournalFragment
+from tangl.core.solver import ChoiceEdge, ContentFragment
 from .story import Story
 
 class StoryController(HasApiEndpoints):
@@ -34,13 +33,13 @@ class StoryController(HasApiEndpoints):
     """
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
-    def get_journal_entry(self, story: Story, item = -1) -> list[JournalFragment]:
+    def get_journal_entry(self, story: Story, item = -1) -> list[ContentFragment]:
         # JournalEntries are formatted as content fragments and interpreted as an
         # ordered list of styled narrative entries
         return story.get_journal_entry(item)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.CONTENT)
-    def get_story_info(self, story: Story, **kwargs) -> list[JournalFragment]:
+    def get_story_info(self, story: Story, **kwargs) -> list[ContentFragment]:
         # StoryInfo is formatted as content fragments and can be interpreted as
         # an ordered, styled kv list
         return story.get_info(**kwargs)

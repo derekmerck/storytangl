@@ -5,8 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from tangl.type_hints import UniqueLabel
-from tangl.core import Singleton
-from tangl.core.graph import SingletonNode
+from tangl.core.entity import Singleton, SingletonNode
 
 StoryId = UUID
 WorldId = UniqueLabel

@@ -1,13 +1,15 @@
 import uuid
 from uuid import UUID
 
-from tangl.core.fragment import ContentFragment, ControlFragment, KvFragment, GroupFragment, PresentationHints
+import pytest
+
+from tangl.core.fragment import BaseFragment, ControlFragment, KvFragment, GroupFragment, PresentationHints
 
 #### Base Fragment
 
 def test_content_fragment_creation():
     # Test basic fragment creation
-    fragment = ContentFragment(
+    fragment = BaseFragment(
         type="test",
         content="Test content"
     )
@@ -18,7 +20,7 @@ def test_content_fragment_creation():
 
 def test_fragment_serialization():
     # Test that fragments serialize correctly
-    fragment = ContentFragment(
+    fragment = BaseFragment(
         type="test",
         label="test_label",
         content="Test content",
@@ -46,9 +48,10 @@ def test_update_fragment():
 
 #### Activatable
 
+@pytest.mark.xfail(raises=AttributeError, reason="belongs on story choice fragment")
 def test_activatable_fragment():
     # Test fragment with activation capability
-    fragment = ContentFragment(
+    fragment = BaseFragment(
         type="choice",
         content="Choose this option",
         activatable=True,

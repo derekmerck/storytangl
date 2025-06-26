@@ -1,3 +1,4 @@
-from tangl.core.solver.journal import KvFragment
+from tangl.core.fragment import KvFragment
 
+# This can be whatever the author wants...
 StoryInfo = KvFragment

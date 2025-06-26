@@ -2,12 +2,11 @@
 from typing import NewType
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HasContext, on_gather_context
-from tangl.core.scope.tamper_evident import TamperEvident
+from tangl.core.handler import HasContext, on_gather_context, TamperEvident
 from tangl.core.solver.forward_resolve import ForwardResolver
-from tangl.core.solver.journal import JournalFragment
+from tangl.core.solver.journal import ContentFragment
 
-JournalEntry = NewType("JournalEntry", list[JournalFragment])
+JournalEntry = NewType("JournalEntry", list[ContentFragment])
 
 
 class Story(TamperEvident, HasContext, ForwardResolver):
