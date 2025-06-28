@@ -3,7 +3,7 @@ import logging
 
 from tangl.core.entity import Entity
 from tangl.core.scope import AffiliateScope, HasAffiliateScopes
-from tangl.core.handler import on_gather_context
+from tangl.core.handlers import on_gather_context
 
 logger = logging.getLogger(__name__)
 

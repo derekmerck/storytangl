@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # todo: a resolution process might have several different trace journals, for example,
 #       std out with content vs process out with process metadata (why, what was added, etc.)
-#       Consider them as channels?
+#       Consider them as channels?  Previously generalized as a "LinearLayer"
 
 # todo: add a pydantic schema for bookmarked list so we can get rid of arbitrary types allowed
 #       and manage serialization better.
@@ -56,6 +56,7 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
     def add_fragment(self, item: ContentFragment | UnstructuredData, blame: Node = None):
         if isinstance(item, dict):
             item = ContentFragment.structure(item)
+            # todo: Actually want to use the discriminated union
         if not isinstance(item, BaseFragment):
             raise ValueError(f"Trying to add wrong type {type(item)} to graph via journal")
         # todo: need to unfreeze or set with a trick

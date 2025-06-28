@@ -6,7 +6,7 @@ from pydantic import Field
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Edge, Graph
-from tangl.core.handler import HasEffects, Renderable
+from tangl.core.handlers import HasEffects, Renderable
 from .journal import HasJournal as Journal
 from .abs_feature_graph import ChoiceEdge, StructureNode, When
 from .provisioner import ResolvableNode

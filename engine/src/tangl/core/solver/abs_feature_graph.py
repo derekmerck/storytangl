@@ -2,7 +2,7 @@ from typing import Literal
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Edge, Node, Graph  # Must import graph to define Node subclasses
-from tangl.core.handler import Satisfiable
+from tangl.core.handlers import Satisfiable
 
 
 #### TYPED NODES ####

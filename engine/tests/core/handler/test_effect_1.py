@@ -1,7 +1,7 @@
 from typing import ClassVar
 import pytest
 from tangl.core.entity import Entity
-from tangl.core.handler import HasEffects, on_apply_effects
+from tangl.core.handlers import HasEffects, on_apply_effects
 
 class TestEffectNode(HasEffects, Entity):
 

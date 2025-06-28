@@ -4,7 +4,7 @@ import logging
 from pydantic import Field, field_validator
 
 from tangl.type_hints import Tags, ClassName, Typelike
-from tangl.core.handler import BaseHandler
+from tangl.core.handlers import BaseHandler
 from tangl.core.entity import Entity
 from .block import Block
 from .action import Action

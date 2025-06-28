@@ -1,7 +1,7 @@
 """
 renderable.py
 
-Defines the :func:`on_render` pipeline for rendering content from a
+Defines the :func:`on_render_content` pipeline for rendering content from a
 :class:`Renderable` entity, potentially utilizing Jinja2 templates.
 This pipeline depends on (or at least benefits from) the 'gather_context'
 pipeline provided by :class:`HasContext`.

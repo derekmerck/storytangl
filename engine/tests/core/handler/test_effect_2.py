@@ -4,7 +4,7 @@ import types
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import Satisfiable, HasEffects, RuntimeEffect
+from tangl.core.handlers import Satisfiable, HasEffects, RuntimeEffect
 
 MyEffectEntity = type('MyEffectEntity', (HasEffects, Entity), {} )
 

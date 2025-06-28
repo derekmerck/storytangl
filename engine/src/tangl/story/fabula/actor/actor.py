@@ -2,12 +2,13 @@ from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 
 # from tangl.core import Associating, Renderable, on_associate, on_disassociate, on_can_associate, on_can_disassociate
-from tangl.story.story_node import StoryNode
+# from tangl.story.story_node import StoryNode
+from tangl.core.handlers import Renderable
 
 if TYPE_CHECKING:
     from .role import Role
 
-class Actor(Associating, Renderable, StoryNode):
+class Actor(Renderable):
     """
     The Actor class extends the StoryNode class and represents a character or entity
     within the narrative.
@@ -31,7 +32,7 @@ class Actor(Associating, Renderable, StoryNode):
     def describe(self):
         ...
 
-    @on_can_associate.register()
+    # @on_can_associate.register()
     def _can_associate_role(self, other: Role, **kwargs):
         if other in self.roles:
             raise ValueError("Actor is already in this role")

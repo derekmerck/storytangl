@@ -2,7 +2,7 @@
 from typing import NewType
 
 from tangl.core.entity import Entity
-from tangl.core.handler import HasContext, on_gather_context
+from tangl.core.handlers import HasContext, on_gather_context
 from tangl.core.solver.forward_resolve import ForwardResolver
 from tangl.core.solver.journal import ContentFragment
 

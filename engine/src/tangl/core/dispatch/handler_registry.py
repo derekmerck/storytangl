@@ -18,7 +18,20 @@ AggregationStrategy = Literal["gather", "merge", "pipeline", "all_true", "first"
 
 
 class HandlerRegistry(Registry[Handler]):
+    """
+    HandlerRegistry provides a "contextual dispatch" system.  It resolves and
+    executes an ordered list of functions for a task and calling class based on:
 
+    - Behavioral grouping ("task" handlers)
+    - Class hierarchy (MRO)
+    - External categorization ("domain" plugins)
+
+    It can also finalize the result in several different ways, from returning
+    the entire list of results, an iterator of method calls, to flattening to a
+    single primitive type.
+
+    Functions can be registered directly or using a decorator.
+    """
     ### REGISTRATION ###
     registration_count: ClassVar[int] = 0
 

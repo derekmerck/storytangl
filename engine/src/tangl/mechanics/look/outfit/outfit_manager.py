@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from tangl.core.handler import BaseHandler
+from tangl.core.handlers import BaseHandler
 from tangl.core import RenderHandler
 from tangl.story import StoryNode
 from .wearable import Wearable

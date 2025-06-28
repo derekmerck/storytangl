@@ -1,25 +1,31 @@
 import logging
+from typing import Optional
 
 from pydantic import Field, model_validator, field_validator
 
 from tangl.type_hints import UniqueLabel, StringMap, Identifier
-from tangl.core import DynamicEdge, on_associate, on_disassociate, on_can_associate, on_can_disassociate
-from tangl.story.story_node import StoryNode
+# from tangl.core import DynamicEdge, on_associate, on_disassociate, on_can_associate, on_can_disassociate
+# from tangl.story.story_node import StoryNode
+from tangl.core.handlers import Predicate
+from tangl.core.solver import DependencyEdge
 from .location import Location
 
 logger = logging.getLogger(__name__)
 
-class Setting(StoryNode, DynamicEdge[Location]):
+class Setting(DependencyEdge[Location]):
     # Scene setting, indirect reference to a concrete loc
 
-    successor_ref: Identifier = Field(None, alias="location_ref")
-    successor_template: StringMap = Field(None, alias="location_template")
-    successor_criteria: StringMap = Field(None, alias="location_criteria")
-    # successor_conditions: Strings = Field(None, alias='location_conditions')
+    loc_ref: Optional[Identifier] = Field(None, init_var=True)  # sugar for criteria={'alias': ref}
+    req_criteria: StringMap = Field(default_factory=dict, alias="loc_criteria")
+    req_predicate: Predicate = Field(None, alias="loc_predicate")
 
     @property
-    def location(self) -> Location:
-        return self.successor
+    def location(self) -> Location | None:
+        return self.provider
+
+    @location.setter
+    def dest(self, value: Location | None) -> None:
+        self.provider = value
 
     @field_validator('label', mode="after")
     @classmethod

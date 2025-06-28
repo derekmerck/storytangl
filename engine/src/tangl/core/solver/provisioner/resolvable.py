@@ -1,6 +1,6 @@
 from tangl.type_hints import StringMap
 from tangl.core.entity import Node
-from tangl.core.handler import on_check_satisfied
+from tangl.core.handlers import on_check_satisfied
 from .open_edge import DependencyEdge, AffordanceEdge
 
 

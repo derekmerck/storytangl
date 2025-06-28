@@ -30,6 +30,11 @@ flowchart RL
             SingletonNode -- is --> Singleton
             SingletonNode -- is --> Node
         end
+        subgraph .fragment
+            BaseFragment -- is --> Entity
+            ControlFragment -- is --> BaseFragment
+            KvFragment -- is --> BaseFragment
+        end
             
     end
     
@@ -39,7 +44,7 @@ flowchart RL
         HandlerRegistry -- has --> Handler
     end
     
-    subgraph .handler
+    subgraph .handlers
         on_gather_context -- is --> HandlerRegistry
         on_apply_effects -- is --> HandlerRegistry
         on_apply_effects -- has --> RuntimeEffect
@@ -53,23 +58,15 @@ flowchart RL
             AbsFeatureGraph -- is --> Graph
             AbsFeatureGraph -- has --> StructureNode
             AbsFeatureGraph -- has --> ResourceNode
-            AbsFeatureGraph -- has --> JournalFragment
             AbsFeatureGraph -- has --> ControlEdge
-            AbsFeatureGraph -- has --> DependencyEdge
             AbsFeatureGraph -- has --> BlameEdge
             
             StructureNode -- is --> Node
             StructureNode -- has --> ControlEdge
-            StructureNode -- has --> DependencyEdge
-            
+                                    
             ResourceNode -- is --> Node
-            ResourceNode -- has --> DependencyEdge
-            
-            JournalFragment -- is --> Node
-            JournalFragment -- has --> BlameEdge
             
             ControlEdge -- is --> Edge
-            DependencyEdge -- is --> Edge
             BlameEdge -- is --> Edge
             
         end
@@ -78,10 +75,19 @@ flowchart RL
             on_provision_dep -- uses --> DependencyEdge
             on_provision_dep -- builds --> ResourceNode
             on_provision_dep -- builds --> StructureNode
+            DependencyEdge -- is --> Edge
+            ResourceNode -- has --> DependencyEdge
+            AbsFeatureGraph -- has --> DependencyEdge
+            StructureNode -- has --> DependencyEdge
+
         end
         subgraph .journal
-            on_render_content -- builds --> JournalFragment
-            Journal -- has --> JournalFragment
+            on_render_content -- builds --> ContentFragment
+            Journal -- has --> ContentFragment
+            ContentFragment -- is --> BaseFragment
+            ContentFragment -- is --> Node
+            ContentFragment -- has --> BlameEdge
+            AbsFeatureGraph -- has --> ContentFragment
         end
         
         resolve_step -- has --> Journal

@@ -1,8 +1,9 @@
 from typing import ClassVar, Self
+from uuid import UUID
 
 from pydantic import ConfigDict, Field, model_validator
 
-from tangl.type_hints import UnstructuredData, UniqueLabel
+from tangl.type_hints import UnstructuredData, UniqueLabel, Identifier
 from ..entity import Entity
 from ..registry import Registry
 
@@ -23,13 +24,29 @@ class Singleton(Entity):
         cls._instances = Registry[cls](label=f"{cls.__name__.lower()}_instances")
 
     @classmethod
-    def get_instance(cls, label) -> Self:
-        if label in [ i.label for i in cls._instances ]:
-            return cls._instances.find_one(label=label)
+    def get_instance(cls, key: Identifier) -> Self:
+        # Generally we don't want to use UID b/c it's inconsistent between runs
+        if isinstance(key, UUID):
+            return cls._instances[key]
+        elif isinstance(key, str):
+            if key in [ i.label for i in cls._instances ]:
+                return cls.find_instance(label=key)
+        else:
+            raise TypeError(f"{key} is not an instance of {cls.__name__}")
 
     @classmethod
-    def has_instance(cls, label) -> bool:
-        return label in [ i.label for i in cls._instances ]
+    def has_instance(cls, key: Identifier) -> bool:
+        # Generally we don't want to use UID b/c it's inconsistent between runs
+        if isinstance(key, UUID):
+            return key in cls._instances
+        elif isinstance(key, str):
+            return key in [ i.label for i in cls._instances ]
+        else:
+            raise TypeError(f"{key} is not an instance of {cls.__name__}")
+
+    @classmethod
+    def find_instance(cls, **criteria) -> Self:
+        return cls._instances.find_one(**criteria)
 
     @classmethod
     def clear_instances(cls):
@@ -74,7 +91,7 @@ class Singleton(Entity):
     def structure(cls, data) -> Self:
         obj_cls = data.pop('obj_cls')
         label = data.pop('label')
-        return obj_cls.get_instance(label=label)
+        return obj_cls.get_instance(label)
 
     def unstructure(self) -> UnstructuredData:
         return UnstructuredData({'obj_cls': self.__class__, 'label': self.label})

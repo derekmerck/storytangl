@@ -9,10 +9,12 @@ from pydantic import Field
 
 from tangl.type_hints import UniqueLabel, Expr
 from tangl.utils.topological_sort import topological_sort
-from tangl.core import TaskHandler
-from tangl.core import Singleton
-from tangl.core import HasEffects, HasConditions, HasContext, Renderable, on_render, on_gather_context, on_check_conditions
-from tangl.core import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
+from tangl.core.entity import Singleton, Entity
+from tangl.core.handlers import HasContext, HasEffects, Renderable, on_render_content, on_gather_context, \
+    on_check_satisfied, Satisfiable
+
+
+# from tangl.core import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 
 
 class BadgeHandler:
@@ -21,7 +23,7 @@ class BadgeHandler:
     def add_badge(cls, node: HasBadges, badge: BadgeLike):
         badge = cls.normalize_badgelike(badge)
         if not badge.check_satisfied_by(node):
-            raise RuntimeError(f"Cannot add badge {badge.label} to {node.label}")
+            raise RuntimeError(f"Cannot add badge {badge!r} to {node!r}")
         node.associate_with(badge, as_parent=False)
         cls.compute_dynamic_badges(node)
 
@@ -61,7 +63,7 @@ class BadgeHandler:
         raise RuntimeError(f"Unable to normalize arg badge: {badge} as a Badge ({type(badge)}, {badge_cls}")
 
 
-class Badge(HasEffects, HasConditions, Renderable, Associating, Singleton):
+class Badge(HasEffects, Satisfiable, Renderable, Singleton):  # todo: Associating
     """
     A Badge is an intangible asset-like SingletonEntity that can be associated
     conditionally with StoryNodes.
@@ -164,7 +166,7 @@ class Badge(HasEffects, HasConditions, Renderable, Associating, Singleton):
         # Irrelevant
         pass
 
-    @on_can_disassociate.register()
+    # @on_can_disassociate.register()
     def _check_detach_conditions(self, other: HasBadges, **kwargs):
         if self.dynamic_detach and not self.detach_conditions:
             return not ConditionHandler.check_conditions_satisfied_by(self.conditions, other)
@@ -173,7 +175,7 @@ class Badge(HasEffects, HasConditions, Renderable, Associating, Singleton):
         return True
 
 
-class HasBadges(Associating):
+class HasBadges(Entity):   # Associating
     """Story node mixin for handling badges."""
 
     # @pydantic.model_validator(mode="after")
@@ -209,7 +211,7 @@ class HasBadges(Associating):
         BadgeHandler.compute_dynamic_badges(self)
 
     @on_gather_context.register()
-    def _include_badges_in_ns(self) -> Mapping:
+    def _provide_badge_hooks(self) -> Mapping:
         return {
             'badges': self.badges,
             'add_badge': self.add_badge,
@@ -217,7 +219,7 @@ class HasBadges(Associating):
             'has_badges': self.has_badges  # method to check if badge is present by name
         }
 
-    @on_render.register()
+    @on_render_content.register()
     def _include_badges_in_render(self, **kwargs):
         return {'badges': [ self.render(b) for b in self.badges ] }
 

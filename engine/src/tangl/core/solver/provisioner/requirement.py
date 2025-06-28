@@ -7,7 +7,7 @@ from tangl.type_hints import StringMap
 from tangl.core.entity import Node, Edge, Graph  # Graph req for pydantic
 from tangl.core.entity.graph import GraphItem
 from tangl.core.dispatch import HandlerRegistry, HandlerPriority as Priority
-from tangl.core.handler import HasContext, Predicate
+from tangl.core.handlers import HasContext, Predicate
 from .template import EntityTemplate
 
 #### HANDLERS ####

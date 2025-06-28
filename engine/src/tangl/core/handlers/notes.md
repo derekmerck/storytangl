@@ -1,4 +1,4 @@
-`tangl.core.handler`
+`tangl.core.handlers`
 --------------------
 
 Basic vocabulary for describing interactions of elements and state in the framework

@@ -5,7 +5,7 @@ from pydantic import Field
 from tangl.core.entity import Node, Graph  # req Graph for pydantic validation
 from tangl.core.fragment import BaseFragment, PresentationHints, ControlFragment
 
-class ContentFragment(BaseFragment):
+class ContentFragment(BaseFragment, Node):
     # red, output, linked within by red, without by yellow
     """
     ContentFragments are Nodes on the graph, they are connected to their

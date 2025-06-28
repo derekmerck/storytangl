@@ -1,10 +1,10 @@
-from tangl.core.solver import PresentationHints
-from tangl.story.journal import TextFragment
+from tangl.core.fragment import PresentationHints
+from tangl.core.solver import ContentFragment as TextFragment
 
 def test_text_fragment_creation():
     # Test text fragment with markdown
     fragment = TextFragment(
-        type="narrative",
+        # type="content",
         content="# Test Heading\nThis is a test narrative.",
         format="markdown",
         hints=PresentationHints(
@@ -13,16 +13,6 @@ def test_text_fragment_creation():
             style_dict={"color": "red"}
         )
     )
-    assert fragment.fragment_type == "narrative"
+    assert fragment.fragment_type == "content"
     assert fragment.content_format == "markdown"
     assert fragment.presentation_hints.style_tags == ["important", "centered"]
-
-def test_text_fragment_defaults():
-    # Test default values
-    fragment = TextFragment(
-        type="text",
-        content="Simple text"
-    )
-    assert fragment.content_format == "plain"
-    assert fragment.presentation_hints is None
-

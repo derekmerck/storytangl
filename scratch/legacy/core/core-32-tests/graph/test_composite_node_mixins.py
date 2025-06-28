@@ -1,9 +1,8 @@
 import pytest
-from tangl.core import Node, Graph
-from tangl.core.entity_handlers import *
-from tangl.core.graph_handlers import *
+from tangl.core.entity import Node, Graph
+from tangl.core.handler import HasContext
 
-class TestMixinNode(Available, HasScopedContext, Node):
+class TestMixinNode(HasContext, Node):
     pass
 
 @pytest.fixture

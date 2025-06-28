@@ -1,6 +1,6 @@
 import pytest
-from tangl34.core.handlers import Scope, global_scope, ServiceKind, handler
-from tangl34.core.entity import Entity
+from tangl.core.handlers import Scope, global_scope, ServiceKind, handler
+from tangl.core.entity import Entity
 
 
 # Dummy entity to pass as 'caller'

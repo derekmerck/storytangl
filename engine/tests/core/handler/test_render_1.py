@@ -3,7 +3,7 @@ from typing import ClassVar
 import pytest
 
 from tangl.core.entity import Node, Graph
-from tangl.core.handler import HasContext, Renderable, on_render_content
+from tangl.core.handlers import HasContext, Renderable, on_render_content
 
 class TestNode(Renderable, HasContext, Node):
     content: ClassVar[str] = "Hello, {{ name }}!"

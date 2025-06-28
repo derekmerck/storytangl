@@ -3,18 +3,14 @@ import logging
 
 import pytest
 
-from tangl.core.entity import Entity, Node, Graph
-from tangl.core.handler import HasEffects, Satisfiable
-from tangl.persistence import PersistenceManager
-from tangl.persistence.structuring import StructuringHandler
+from tangl.core.entity import Entity
+from tangl.core.handlers import *
 
 logging.basicConfig(level=logging.DEBUG)
 
-class TestCompositeEntity(HasEffects, Satisfiable, Entity):
-    ...
+TestCompositeEntity = type('TestNamespaceEntity', (Renderable, Satisfiable, HasEffects, Entity), {} )
+TestCompositeNode = type('TestNamespaceNode', (Renderable, Satisfiable, HasEffects, Entity), {} )
 
-class TestCompositeNode(HasEffects, Satisfiable, Node):
-    ...
 
 @pytest.fixture
 def kwargs():
@@ -25,22 +21,19 @@ def kwargs():
         'predicates': ['animals[0] == "dog"']
     }
 
-# todo: extend to rendering
-
 @pytest.mark.parametrize('entity_cls', [TestCompositeEntity, TestCompositeNode])
 def test_composite_entity(entity_cls, kwargs):
 
     e = entity_cls(**kwargs)
     print( e )
-    ctx = e.gather_context()
-    assert not e.is_satisfied(ctx=ctx)
-    # res = e.render()
-    # assert( res['content'] == "hello cat" )
-    e.apply_effects(ctx=ctx)
+    assert not e.is_satisfied()
+    res = e.render_content()
+    assert( res['content'] == "hello cat" )
+    e.apply_effects()
     assert e.locals['animals'][0] == "dog"
-    assert e.is_satisfied(ctx=ctx)
-    # res = e.render()
-    # assert( res['content'] == "hello dog" )
+    assert e.is_satisfied()
+    res = e.render_content()
+    assert( res['content'] == "hello dog" )
 
 
 @pytest.mark.parametrize('entity_cls', [TestCompositeEntity, TestCompositeNode])
@@ -49,17 +42,13 @@ def test_composite_entity_structuring(entity_cls, kwargs):
     e = entity_cls(**kwargs)
     print( e )
 
-    unstructured_data = StructuringHandler.unstructure( e )
+    unstructured_data = Entity.unstructure( e )
     print( unstructured_data )
-    obj = StructuringHandler.structure( unstructured_data )
+    obj = Entity.structure( unstructured_data )
     print( obj.__class__ )
     assert obj == e
 
-    serialized_data = PersistenceManager(
-        structuring=StructuringHandler
-    ).save( e )
-    print( serialized_data )
-    obj = PersistenceManager(
-        structuring=StructuringHandler
-    ).load( None, data=serialized_data )
+    unstructured_data = Entity.unstructure( e )
+    print( unstructured_data )
+    obj = Entity.structure( data=unstructured_data )
     assert obj == e

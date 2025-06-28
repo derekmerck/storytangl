@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Node, Graph
-from tangl.core.handler import HasContext, on_gather_context
+from tangl.core.handlers import HasContext, on_gather_context
 
 
 class MyNode(HasContext, Node):

@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 
 from tangl.core.entity import Entity
-from tangl.core.handler import on_gather_context, HasContext
+from tangl.core.handlers import on_gather_context, HasContext
 
 logging.basicConfig(level=logging.DEBUG)
 
