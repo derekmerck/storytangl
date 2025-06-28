@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from tangl.core.fragment import ControlFragment, GroupFragment, PresentationHints
+from tangl.core.entity.fragment import GroupFragment
 from tangl.core.solver.journal import ContentFragment
 
 

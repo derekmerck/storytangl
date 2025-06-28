@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 from uuid import UUID
 import logging
 
@@ -7,8 +6,8 @@ from pydantic import Field
 
 from tangl.type_hints import UnstructuredData
 from tangl.utils.bookmarked_list import BookmarkedList
-from tangl.core.entity import Registry, Node, Graph
-from tangl.core.fragment import BaseFragment
+from tangl.core.entity import Registry, Node
+from tangl.core.entity.fragment import BaseFragment
 from ..abs_feature_graph import BlameEdge
 from .content_fragment import ContentFragment
 

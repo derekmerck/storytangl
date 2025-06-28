@@ -5,13 +5,11 @@
 #       or multiple fragment layers?  This would require careful integration with
 #       history.
 
-import functools
-
 from pydantic import Field
 
 from tangl.utils.bookmarked_list import BookmarkedList
 from tangl.core.graph import Graph
-from tangl.core.fragment import ContentFragment
+from tangl.core.entity.fragment import ContentFragment
 
 class HasLinearLayer(Graph):
 

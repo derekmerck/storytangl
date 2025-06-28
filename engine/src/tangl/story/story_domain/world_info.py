@@ -1,10 +1,8 @@
-from typing import Optional, Any
-
-from pydantic import BaseModel, field_validator, Field, ConfigDict
+from pydantic import ConfigDict
 
 from tangl.type_hints import UniqueLabel
 # from tangl.media import MediaNode, JournalMediaItem
-from tangl.core.fragment import KvFragment
+from tangl.core.entity.fragment import KvFragment
 from tangl.service.response import BaseResponse
 # from tangl.scripting.script_metadata_model import ScriptMetadata
 

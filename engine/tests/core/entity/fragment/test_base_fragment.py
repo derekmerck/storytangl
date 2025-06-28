@@ -3,7 +3,8 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core.fragment import BaseFragment, ControlFragment, KvFragment, GroupFragment, PresentationHints
+from tangl.core.entity.fragment import BaseFragment, ControlFragment
+
 
 #### Base Fragment
 

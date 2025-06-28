@@ -1,4 +1,4 @@
-from tangl.core.fragment import PresentationHints
+from tangl.core.entity.fragment import PresentationHints
 from tangl.core.solver import ContentFragment as TextFragment
 
 def test_text_fragment_creation():

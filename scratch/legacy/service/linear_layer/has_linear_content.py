@@ -1,9 +1,7 @@
 import functools
 
-from pydantic import Field
-
 from tangl.utils.bookmarked_list import BookmarkedList, BName, BType
-from tangl.core.fragment import ContentFragment
+from tangl.core.entity.fragment import ContentFragment
 from .has_linear_layer import HasLinearLayer
 
 class HasLinearContent(HasLinearLayer):

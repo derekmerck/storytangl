@@ -2,7 +2,7 @@ import pytest
 
 pytest.skip(allow_module_level=True)
 
-from tangl.core.fragment import BaseFragment, GroupFragment
+from tangl.core.entity.fragment import BaseFragment, GroupFragment
 
 ##### Grouped Fragments
 

@@ -1,17 +1,15 @@
 from __future__ import annotations
-from typing import Literal, Optional, TYPE_CHECKING, Union
+from typing import Literal, Optional
 from base64 import b64encode
-from uuid import UUID
 
-from pydantic import Field, field_serializer, AnyUrl
+from pydantic import field_serializer
 
 from tangl.type_hints import Pathlike
-from tangl.core.fragment import BaseFragment, ControlFragment
+from tangl.core.entity.fragment import BaseFragment
 from tangl.core.dispatch import HandlerRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
 # from tangl.media.enums import MediaRole
-from tangl.media.type_hints import Media
 from ..enums import MediaDataType
 from .staging_hints import StagingHints
 

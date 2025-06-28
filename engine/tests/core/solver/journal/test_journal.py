@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4
 
-from tangl.core.fragment import BaseFragment as JournalFragment
+from tangl.core.entity.fragment import BaseFragment as JournalFragment
 from tangl.core.solver.journal import HasJournal
 
 class TestHasJournal(HasJournal):

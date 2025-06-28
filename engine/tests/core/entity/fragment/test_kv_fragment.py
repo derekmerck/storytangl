@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.core.fragment import KvFragment
+from tangl.core.entity.fragment import KvFragment
 
 pytest.skip(allow_module_level=True)
 

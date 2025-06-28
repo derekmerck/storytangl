@@ -1,8 +1,7 @@
-from typing import Optional, Any, Literal, Tuple, Union
+from typing import Optional, Any, Literal
 
-from pydantic import Field, BaseModel, ConfigDict, model_validator
+from pydantic import Field
 
-from tangl.core.fragment import ControlFragment, GroupFragment, PresentationHints
 from tangl.core.solver.journal import ContentFragment
 
 

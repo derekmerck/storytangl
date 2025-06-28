@@ -2,8 +2,9 @@ from typing import Optional, Literal
 
 from pydantic import Field
 
-from tangl.core.entity import Node, Graph  # req Graph for pydantic validation
-from tangl.core.fragment import BaseFragment, PresentationHints, ControlFragment
+from tangl.core.entity import Node  # req Graph for pydantic validation
+from tangl.core.entity.fragment import BaseFragment, PresentationHints
+
 
 class ContentFragment(BaseFragment, Node):
     # red, output, linked within by red, without by yellow
