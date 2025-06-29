@@ -1,20 +1,8 @@
 from __future__ import annotations
-from typing import Protocol
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Node
 from .open_edge import DependencyEdge, AffordanceEdge
-
-class ProvisionManager:
-
-    def provision_dependencies(self, node: Resolvable, ctx: StringMap = None) -> bool:
-        return node.provision_dependencies(ctx=ctx)
-
-    def is_resolved(self, node: Resolvable, ctx: StringMap = None) -> bool:
-        return node.is_resolved(ctx=ctx)
-
-    def discover_affordances(self, node: Resolvable, ctx: StringMap = None):
-        raise NotImplementedError()
 
 
 class Resolvable(Node):
@@ -56,4 +44,4 @@ class Resolvable(Node):
         ctx = ctx or self.gather_context()
         # todo: this is not quite right...
         # All dependencies and requirements are resolved, or unresolvable but inactive or weak
-        return all(dep.is_resolved(ctx=ctx) or not dep.is_satisfied(ctx=ctx) for dep in self.dependencies)
+        return all(dep.is_resolved() or not dep.is_satisfied(ctx=ctx) for dep in self.dependencies)

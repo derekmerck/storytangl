@@ -9,6 +9,7 @@ pipeline provided by :class:`HasContext`.
 from __future__ import annotations
 from typing import Any, ClassVar, Protocol
 import logging
+from contextvars import ContextVar
 
 import jinja2
 
@@ -25,10 +26,16 @@ The global pipeline for rendering. Handlers for rendering
 should decorate methods with ``@on_render_content.register(...)``.
 """
 
-class RenderManager:
+_RENDER_SVC = ContextVar('_RENDER_SVC', default=lambda entity, ctx: on_render_content.execute_all_for(entity, ctx=ctx))
+# Enables replumbing rendering handler for testing and analytics
 
-    def render_content(self, entity: Renderable, ctx: StringMap = None) -> Any:
-        return entity.render_content(ctx=ctx)
+class RenderServiceI(Protocol):
+    def __call__(self, node: Renderable, *, ctx: StringMap) -> StringMap: ...
+
+# class RenderManager:
+#
+#     def render_content(self, entity: Renderable, ctx: StringMap = None) -> Any:
+#         return entity.render_content(ctx=ctx)
 
 
 class Renderable(HasContext):
@@ -111,4 +118,6 @@ class Renderable(HasContext):
                  the types returned by handlers.
         """
         ctx = ctx or self.gather_context()
-        return on_render_content.execute_all_for(self, ctx=ctx)
+        render_svc = _RENDER_SVC.get()  # type: RenderServiceI
+        return render_svc(self, ctx=ctx)
+        # return on_render_content.execute_all_for(self, ctx=ctx)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 from typing import Protocol
+from contextvars import ContextVar
 
 from pydantic import Field, field_validator
 
@@ -32,10 +33,18 @@ on_apply_effects = HandlerRegistry(label="apply_effects", aggregation_strategy="
 The global pipeline for effects. Handlers for applying effects
 should decorate methods with ``@on_apply_effects.register(...)``.
 """
-class EffectManager:
 
-    def apply_effects(self, entity: HasEffects, ctx: StringMap = None) -> StringMap:
-        return entity.apply_effects(ctx=ctx)
+_EFFECT_SVC = ContextVar('_EFFECT_SVC', default=lambda entity, ctx: on_apply_effects.execute_all_for(entity, ctx=ctx))
+# Enables replumbing effect handler for testing and analytics
+
+class EffectServiceI(Protocol):
+    def __call__(self, entity: HasEffects, *, ctx: StringMap) -> StringMap: ...
+
+
+# class EffectManager:
+#
+#     def apply_effects(self, entity: HasEffects, ctx: StringMap = None) -> StringMap:
+#         return entity.apply_effects(ctx=ctx)
 
 
 # Mixin with EffectHandler registry
@@ -78,4 +87,5 @@ class HasEffects(HasContext):
 
     def apply_effects(self, ctx: StringMap = None) -> StringMap:
         ctx = ctx or self.gather_context()
-        return on_apply_effects.execute_all_for(self, ctx=ctx)
+        effect_svc = _EFFECT_SVC.get()  # type: EffectServiceI
+        return effect_svc(self, ctx=ctx)

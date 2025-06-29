@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Protocol
 import logging
+from contextvars import ContextVar
 
 from pydantic import field_validator, Field
 
@@ -37,10 +38,17 @@ The global pipeline for evaluating local predicates. Handlers for predicates
 should decorate methods with ``@on_check_satisfied.register(...)``.
 """
 
-class PredicateManager:
+_PRED_SVC = ContextVar('_PRED_SVC', default=lambda node, ctx: on_check_satisfied.execute_all_for(node, ctx=ctx))
+# Enables replumbing predicate handler for testing and analytics
 
-    def is_satisfied(self, entity: Satisfiable, ctx: StringMap = None) -> bool:
-        return entity.is_satisfied(ctx=ctx)
+class PredicateServiceI(Protocol):
+    def __call__(self, node: Satisfiable, *, ctx: StringMap) -> bool: ...
+
+
+# class PredicateManager:
+#
+#     def is_satisfied(self, entity: Satisfiable, ctx: StringMap = None) -> bool:
+#         return entity.is_satisfied(ctx=ctx)
 
 
 class Satisfiable(HasContext):
@@ -76,4 +84,6 @@ class Satisfiable(HasContext):
 
     def is_satisfied(self, ctx: StringMap = None) -> bool:
         ctx = ctx if ctx is not None else self.gather_context()
-        return on_check_satisfied.execute_all_for(self, ctx=ctx)
+        pred_svc = _PRED_SVC.get()  # type: PredicateServiceI
+        return pred_svc(self, ctx=ctx)
+        # return on_check_satisfied.execute_all_for(self, ctx=ctx)

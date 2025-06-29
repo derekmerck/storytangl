@@ -1,5 +1,7 @@
-from typing import Generic, TypeVar, Optional
+from __future__ import annotations
+from typing import Generic, TypeVar, Optional, Protocol
 from uuid import UUID
+from contextvars import ContextVar
 
 from pydantic import Field, field_validator
 
@@ -18,6 +20,13 @@ on_provision_requirement = HandlerRegistry(
 The global pipeline for provisioning requirements. Handlers for resolving 
 requirements should decorate methods with ``@on_provision_requirement.register(...)``.
 """
+
+_PROV_SVC = ContextVar('_PROV_SVC', default=lambda req, ctx: on_provision_requirement.execute_all_for(req, ctx=ctx))
+# Enables replumbing provisioning handler for testing and analytics
+
+class ProvisionerServiceI(Protocol):
+    def __call__(self, node: HasRequirement, ctx: StringMap = None) -> bool: ...
+
 
 NodeT = TypeVar("NodeT", bound=Node)
 
@@ -64,7 +73,8 @@ class HasRequirement(HasContext, GraphItem, Generic[NodeT]):
             raise RuntimeError("Can not reprovision without clearing provider first")
 
         ctx = ctx or self.gather_context()
-        provider = on_provision_requirement.execute_all_for(self, ctx=ctx)
+        prov_svc = _PROV_SVC.get()
+        provider = prov_svc(self, ctx=ctx)
         # this checks satisfied, matches, and tries to create and register
 
         if provider is not None:
@@ -72,7 +82,7 @@ class HasRequirement(HasContext, GraphItem, Generic[NodeT]):
         else:
             self.is_unresolvable = True
 
-        return self.is_resolved
+        return self.is_resolved()
 
     # todo: this is an ad hoc implementation, should do it more carefully with scopes,
     #       but it should work for now.

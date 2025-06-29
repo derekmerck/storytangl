@@ -22,6 +22,7 @@ collections = {
     # "full34": ([PKG_34], []),
 
     "core34": ([PKG_DIR / "core"], []),
+    "solver34": ([PKG_DIR / "core/solver", PKG_DIR / "core/services"], []),
     # "core33": ([PKG_33 / "core"], []),
     # "core34": ([PKG_34 / "core"], []),
 

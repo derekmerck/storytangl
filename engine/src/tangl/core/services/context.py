@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 from typing import Optional, Protocol, Any
+from contextvars import ContextVar
 
 from pydantic import Field
 
@@ -14,11 +15,15 @@ on_gather_context = HandlerRegistry(label="gather_context", aggregation_strategy
 The global pipeline for gathering context. Handlers for context
 should decorate methods with ``@on_gather_context.register(...)``.
 """
-class ContextManager:
 
-    def gather_context(self, node: HasContext):
-        return node.gather_context()
+_CTX_SVC = ContextVar('_CTX_SVC', default=lambda entity: on_gather_context.execute_all_for(entity, ctx=None))
+# Enables replumbing context handler for testing and analytics
 
+class ContextServiceI(Protocol):
+    def __call__(self, entity: HasContext) -> StringMap: ...
+
+# class ContextManager:
+#     def gather_context(self, node: HasContext) -> StringMap: ...
 
 class HasContext(HasHandlers):
 
@@ -46,5 +51,7 @@ class HasContext(HasHandlers):
             return {'dirty': True}
 
     def gather_context(self):
-        return on_gather_context.execute_all_for(self, ctx=None)
+        ctx_svc = _CTX_SVC.get()  # type: ContextServiceI
+        return ctx_svc(self)
+        # return on_gather_context.execute_all_for(self, ctx=None)
 

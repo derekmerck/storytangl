@@ -2,14 +2,12 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Edge, Graph, Node
 from .abs_feature_graph import ChoiceEdge, StructureNode, When
-from .provisioner import Resolvable
 from .journal import HasJournal as Journal
-from .solver_services import SolverServices
 
 
 class ForwardResolver(Entity):
@@ -27,11 +25,9 @@ class ForwardResolver(Entity):
 
     cursor_return_stack: list[UUID] = Field(default_factory=list)
 
-    _s: SolverServices = PrivateAttr(default_factory=SolverServices)
-
     @property
     def cursor(self) -> StructureNode:
-        return self._s.graph.get(self.graph, self.cursor_id)
+        return self.graph.get(self.cursor_id)
 
     @cursor.setter
     def cursor(self, cursor: StructureNode) -> None:
@@ -57,9 +53,9 @@ class ForwardResolver(Entity):
     def _check_for_active_choice(self, node: StructureNode, *, ctx: StringMap,
                                  when: When = None) -> Optional[Edge]:
 
-        for choice in self._s.graph.find_edges(node, direction="out", choice_type=when, has_cls=ChoiceEdge):
-            if self._s.prov.is_resolved(choice) and \
-               self._s.pred.is_satisfied(choice, ctx=ctx):
+        for choice in self.graph.find_edges(node, direction="out", choice_type=when, has_cls=ChoiceEdge):
+            if choice.is_resolved and \
+               choice.is_satisfied(ctx=ctx):
                 # Automatically advance frontier
                 return choice
 
@@ -73,9 +69,9 @@ class ForwardResolver(Entity):
             raise RuntimeError(f"Cannot advance, {edge!r} is not on cursor")
         node = edge.dest
 
-        ctx = self._s.ctx.gather_context(node)
+        ctx = node.gather_context()
 
-        if not self._s.pred.is_satisfied(node, ctx=ctx):
+        if not node.is_satisfied(ctx=ctx):
             raise RuntimeError(f"Cannot advance, {node!r} is unavailable")
 
         # Commit cursor update
@@ -83,8 +79,8 @@ class ForwardResolver(Entity):
         self.step_counter += 1
 
         # Resolve frontier edges
-        self._s.prov.provision_dependencies(node, ctx=ctx)  # anything this node _needs_
-        self._s.prov.discover_affordances(node, ctx=ctx)    # anything the graph can provide for it
+        node.provision_dependencies(ctx=ctx)  # anything this node _needs_
+        node.discover_affordances(ctx=ctx)    # anything the graph can provide for it
         # todo: Check for critical affordances in the current scopes, things this node needs to provide
 
         # Check for 'before' auto-advance
@@ -92,14 +88,14 @@ class ForwardResolver(Entity):
             return next_edge
 
         # Update context with 'before' effects
-        self._s.effect.apply_effects(node, ctx=ctx, when="before")
+        node.apply_effects(ctx=ctx, when="before")
 
         # Generate trace content
         fragments = self._s.render.render_content(node, ctx=ctx)
-        self._s.journal.add_entry(self.journal, fragments, bookmark=bookmark)
+        self.journal.add_entry(fragments, bookmark=bookmark)
 
         # Update context with 'after' effects
-        self._s.effect.apply_effects(node, ctx=ctx, when="after")
+        node.apply_effects(ctx=ctx, when="after")
 
         # Check for 'after' auto-advance
         if (next_edge := self._check_for_active_choice(node, ctx=ctx, when="after")) is not None:
