@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handlers import HasContext, on_gather_context, Satisfiable, on_check_satisfied
+from tangl.core.services import HasContext, on_gather_context, Satisfiable, on_check_satisfied
 
 # todo: extend to rendering
 

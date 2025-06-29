@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from tangl.type_hints import Tag
 from tangl.core.entity import Entity
-from tangl.core.handlers import on_gather_context, on_render_content
+from tangl.core.services import on_gather_context, on_render_content
 
 class HasSimpleAssets(Entity):
     """

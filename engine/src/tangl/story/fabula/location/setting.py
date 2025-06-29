@@ -6,7 +6,7 @@ from pydantic import Field, model_validator, field_validator
 from tangl.type_hints import UniqueLabel, StringMap, Identifier
 # from tangl.core import DynamicEdge, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 # from tangl.story.story_node import StoryNode
-from tangl.core.handlers import Predicate
+from tangl.core.services import Predicate
 from tangl.core.solver import DependencyEdge
 from .location import Location
 

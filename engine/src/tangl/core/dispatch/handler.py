@@ -3,6 +3,7 @@ from typing import Generic, Callable, TypeVar, Type, Self, ClassVar, Optional, U
 import inspect
 from functools import partial, total_ordering
 import logging
+import weakref
 
 from pydantic import field_validator, ValidationInfo, Field, PrivateAttr
 
@@ -166,7 +167,9 @@ class Handler(Entity, Generic[T], arbitrary_types_allowed=True):
         # Once it's bound, we no longer care about the owner.
         if not self.requires_binding:
             raise RuntimeError("not an owner-bound method, cannot bind owner")
-        new_func = partial(self.func, owner)
+        # Use a weakref here so a registry won't hold a zombie pointer
+        _owner = weakref.proxy(owner)
+        new_func = partial(self.func, _owner)
         label = f"{self.func.__name__}@{owner.label}"
 
         logger.debug("Checking caller criteria")

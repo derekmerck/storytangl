@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Protocol
 import logging
 
 from pydantic import field_validator, Field
@@ -34,6 +36,12 @@ on_check_satisfied = HandlerRegistry(
 The global pipeline for evaluating local predicates. Handlers for predicates
 should decorate methods with ``@on_check_satisfied.register(...)``.
 """
+
+class PredicateManager:
+
+    def is_satisfied(self, entity: Satisfiable, ctx: StringMap = None) -> bool:
+        return entity.is_satisfied(ctx=ctx)
+
 
 class Satisfiable(HasContext):
 

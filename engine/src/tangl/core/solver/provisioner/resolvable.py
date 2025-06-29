@@ -1,10 +1,23 @@
+from __future__ import annotations
+from typing import Protocol
+
 from tangl.type_hints import StringMap
 from tangl.core.entity import Node
-from tangl.core.handlers import on_check_satisfied
 from .open_edge import DependencyEdge, AffordanceEdge
 
+class ProvisionManager:
 
-class ResolvableNode(Node):
+    def provision_dependencies(self, node: Resolvable, ctx: StringMap = None) -> bool:
+        return node.provision_dependencies(ctx=ctx)
+
+    def is_resolved(self, node: Resolvable, ctx: StringMap = None) -> bool:
+        return node.is_resolved(ctx=ctx)
+
+    def discover_affordances(self, node: Resolvable, ctx: StringMap = None):
+        raise NotImplementedError()
+
+
+class Resolvable(Node):
 
     @property
     def dependencies(self):
@@ -22,9 +35,9 @@ class ResolvableNode(Node):
     def provision_dependencies(self, *, ctx: StringMap = None) -> bool:
         ctx = ctx or self.gather_context()
         for dep in self.dependencies:
-            if dep.is_satisfied(ctx=ctx) and not dep.is_resolved:
+            if dep.is_satisfied(ctx=ctx) and not dep.is_resolved(ctx=ctx):
                 dep.resolve_requirement(ctx=ctx)
-        return self.is_resolved
+        return self.is_resolved(ctx=ctx)
 
     def discover_affordances(self, *, ctx: StringMap = None):
         # This will attach affordances in scope to _this_ node temporarily, while it is being evaluated
@@ -35,11 +48,12 @@ class ResolvableNode(Node):
             if self.matches(**aff.source_criteria) and aff.is_satisfied(ctx=ctx):
                 aff.src_id = self.uid  # Now it's a temporary dep
 
-    @on_check_satisfied.register()
-    def _confirm_is_resolved(self, ctx: StringMap) -> bool:
-        return self.is_resolved
+    # @on_check_satisfied.register()
+    # def _confirm_is_resolved(self, ctx: StringMap) -> bool:
+    #     return self.is_resolved(ctx=ctx)
 
-    @property
-    def is_resolved(self) -> bool:
+    def is_resolved(self, *, ctx: StringMap = None) -> bool:
+        ctx = ctx or self.gather_context()
+        # todo: this is not quite right...
         # All dependencies and requirements are resolved, or unresolvable but inactive or weak
-        return all(dep.is_resolved or not dep.is_satisfied(ctx=self) for dep in self.dependencies)
+        return all(dep.is_resolved(ctx=ctx) or not dep.is_satisfied(ctx=ctx) for dep in self.dependencies)

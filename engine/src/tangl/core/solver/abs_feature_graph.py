@@ -1,13 +1,14 @@
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Edge, Node, Graph  # Must import graph to define Node subclasses
-from tangl.core.handlers import Satisfiable
+from tangl.core.services import Satisfiable, HasEffects, Renderable
+from .provisioner import Resolvable
 
 
 #### TYPED NODES ####
 
-class StructureNode(Satisfiable, Node):
+class StructureNode(Satisfiable, HasEffects, Renderable, Resolvable):
     # events, linked within by choice/flow control edge, blue
 
     # scoped in hierarchical subgraphs, where parent is node in the super-graph that contains this one

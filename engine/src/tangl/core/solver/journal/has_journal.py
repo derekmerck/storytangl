@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Protocol
 from uuid import UUID
 import logging
 
@@ -22,6 +23,11 @@ logger = logging.getLogger(__name__)
 #       and manage serialization better.
 
 JournalEntry = list[ContentFragment]
+
+class JournalManager:
+
+    def add_entry(self, journal: HasJournal, items: JournalEntry, blame: Node = None):
+        return journal.add_entry(items, blame=blame)
 
 class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
     """

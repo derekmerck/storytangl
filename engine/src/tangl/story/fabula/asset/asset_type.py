@@ -21,7 +21,7 @@ nor graph, they are tracked via a set attribute "inv" on the host entity.
 """
 
 from tangl.core.entity import InheritingSingleton
-from tangl.core.handlers import Renderable, HasContext  # Associating
+from tangl.core.services import Renderable, HasContext  # Associating
 
 class AssetType(Renderable, HasContext, InheritingSingleton):
     """

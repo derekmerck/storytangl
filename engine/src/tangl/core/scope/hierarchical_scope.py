@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Node, Graph
 from tangl.core.dispatch import HasHandlers, HandlerPriority as Priority
-from tangl.core.handlers import HasContext, on_gather_context
+from tangl.core.services import HasContext, on_gather_context
 
 
 class HierarchicalScope(HasContext, Node):

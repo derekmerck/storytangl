@@ -10,7 +10,7 @@ from pydantic import Field
 from tangl.type_hints import UniqueLabel, Expr
 from tangl.utils.topological_sort import topological_sort
 from tangl.core.entity import Singleton, Entity
-from tangl.core.handlers import HasContext, HasEffects, Renderable, on_render_content, on_gather_context, \
+from tangl.core.services import HasContext, HasEffects, Renderable, on_render_content, on_gather_context, \
     on_check_satisfied, Satisfiable
 
 

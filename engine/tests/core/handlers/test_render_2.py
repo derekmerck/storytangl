@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from tangl.core.entity import Entity
 from tangl.core.dispatch import HandlerPriority
-from tangl.core.handlers import on_render_content, Renderable, on_gather_context, HasContext
+from tangl.core.services import on_render_content, Renderable, on_gather_context, HasContext
 
 MyRenderableEntity = type('MyRenderableEntity', (Renderable, Entity), {} )
 

@@ -5,7 +5,7 @@ from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap, Identifier
 from tangl.core.entity import Edge, Node
-from tangl.core.handlers import Predicate
+from tangl.core.services import Predicate
 from .requirement import HasRequirement
 
 

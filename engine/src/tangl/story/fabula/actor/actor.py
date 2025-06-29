@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING
 
 # from tangl.core import Associating, Renderable, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 # from tangl.story.story_node import StoryNode
-from tangl.core.handlers import Renderable
+from tangl.core.services import Renderable
 
 if TYPE_CHECKING:
     from .role import Role

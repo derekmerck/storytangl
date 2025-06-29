@@ -5,7 +5,7 @@ from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, Ac
 # from tangl.media.media_record import MediaRecord, MediaDataType
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.core.entity import Node, AnonymousEdge
-from tangl.core.handlers import on_gather_context, Predicate, RuntimeEffect
+from tangl.core.services import on_gather_context, Predicate, RuntimeEffect
 from tangl.core.solver import ChoiceEdge, ContentFragment
 from .story import Story
 

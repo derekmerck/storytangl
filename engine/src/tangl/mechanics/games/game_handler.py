@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 from pydantic import Field, field_validator, model_validator
 
 from tangl.core.dispatch import HandlerRegistry
-from tangl.core.handlers import HasContext, on_gather_context
+from tangl.core.services import HasContext, on_gather_context
 from tangl.core.entity import Entity, Node
 from .enums import GameResult
 

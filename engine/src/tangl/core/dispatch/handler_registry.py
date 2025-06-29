@@ -16,6 +16,9 @@ logger.setLevel(logging.INFO)
 
 AggregationStrategy = Literal["gather", "merge", "pipeline", "all_true", "first", "iter"]
 
+# todo: Consider if instance-bound methods should be limited to singletons to avoid
+#       serialization/deserialization issues?
+
 
 class HandlerRegistry(Registry[Handler]):
     """

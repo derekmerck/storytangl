@@ -1,4 +1,6 @@
+from __future__ import annotations
 import logging
+from typing import Protocol
 
 from pydantic import Field, field_validator
 
@@ -30,6 +32,11 @@ on_apply_effects = HandlerRegistry(label="apply_effects", aggregation_strategy="
 The global pipeline for effects. Handlers for applying effects
 should decorate methods with ``@on_apply_effects.register(...)``.
 """
+class EffectManager:
+
+    def apply_effects(self, entity: HasEffects, ctx: StringMap = None) -> StringMap:
+        return entity.apply_effects(ctx=ctx)
+
 
 # Mixin with EffectHandler registry
 class HasEffects(HasContext):
@@ -69,6 +76,6 @@ class HasEffects(HasContext):
             ctx = effect.execute(self, ctx=ctx)
         return ctx
 
-    def apply_effects(self, ctx: StringMap = None) -> bool:
+    def apply_effects(self, ctx: StringMap = None) -> StringMap:
         ctx = ctx or self.gather_context()
         return on_apply_effects.execute_all_for(self, ctx=ctx)

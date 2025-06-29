@@ -7,8 +7,8 @@ from tangl.type_hints import StringMap
 from tangl.core.entity import Node, Edge, Graph  # Graph req for pydantic
 from tangl.core.entity.graph.graph import GraphItem
 from tangl.core.dispatch import HandlerRegistry, HandlerPriority as Priority
-from tangl.core.handlers import HasContext, Predicate
-from .template import EntityTemplate
+from tangl.core.services import HasContext, Predicate
+from .entity_template import EntityTemplate
 
 #### HANDLERS ####
 
@@ -52,8 +52,7 @@ class HasRequirement(HasContext, GraphItem, Generic[NodeT]):
         else:
             self.provider_id = None
 
-    @property
-    def is_resolved(self) -> bool:
+    def is_resolved(self, **kwargs) -> bool:
         # Note: resolvability is _not_ part of satisfied/available.
         # - Satisfied on the req is for if the req is _active_
         # - Resolved is for if it has been _linked_

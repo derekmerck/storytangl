@@ -1,5 +1,5 @@
 from tangl.type_hints import StringMap
-from tangl.core.handlers import Renderable, HandlerPriority as Priority
+from tangl.core.services import Renderable, HandlerPriority as Priority
 from tangl.media import MediaResourceInventoryTag as MediaRIT, MediaSpec, on_adapt_media_spec
 
 class StableSpec(MediaSpec):

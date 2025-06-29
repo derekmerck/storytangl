@@ -7,7 +7,7 @@ from tangl.info import __version__
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Graph
 from tangl.core.dispatch import HasHandlers, HandlerPriority as Priority
-from tangl.core.handlers import HasContext, on_gather_context
+from tangl.core.services import HasContext, on_gather_context
 
 logger = logging.getLogger(__name__)
 

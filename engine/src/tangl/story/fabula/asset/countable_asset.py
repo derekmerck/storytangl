@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
 from tangl.core.entity import Entity
-from tangl.core.handlers import on_gather_context, on_render_content
+from tangl.core.services import on_gather_context, on_render_content
 from .asset_type import AssetType
 
 class CountableAsset(AssetType):

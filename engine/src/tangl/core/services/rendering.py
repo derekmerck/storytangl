@@ -6,7 +6,8 @@ Defines the :func:`on_render_content` pipeline for rendering content from a
 This pipeline depends on (or at least benefits from) the 'gather_context'
 pipeline provided by :class:`HasContext`.
 """
-from typing import Any, ClassVar
+from __future__ import annotations
+from typing import Any, ClassVar, Protocol
 import logging
 
 import jinja2
@@ -23,6 +24,12 @@ on_render_content = HandlerRegistry(label='render_content', aggregation_strategy
 The global pipeline for rendering. Handlers for rendering
 should decorate methods with ``@on_render_content.register(...)``.
 """
+
+class RenderManager:
+
+    def render_content(self, entity: Renderable, ctx: StringMap = None) -> Any:
+        return entity.render_content(ctx=ctx)
+
 
 class Renderable(HasContext):
     """

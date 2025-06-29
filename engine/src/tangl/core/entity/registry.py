@@ -102,6 +102,12 @@ class Registry(Entity, Generic[EntityT]):
             return item in self.all()
         raise TypeError(f"'{item}' is not an instance of UUID or Entity")
 
+    @property
+    def is_dirty(self):
+        # One bad apple ruins the barrel
+        return self.is_dirty_ or \
+            any([item.is_dirty for item in self])
+
     # -------- CHAINED FIND ----------
 
     @classmethod

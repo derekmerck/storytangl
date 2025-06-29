@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional, Iterable, TYPE_CHECKING
 
 from tangl.core.entity import Node
-from tangl.core.handlers import Renderable
+from tangl.core.services import Renderable
 # Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
 from ..actor import Extras
 

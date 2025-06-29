@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from typing import Optional
+from typing import Optional, Protocol, Any
 
 from pydantic import Field
 
@@ -14,6 +14,11 @@ on_gather_context = HandlerRegistry(label="gather_context", aggregation_strategy
 The global pipeline for gathering context. Handlers for context
 should decorate methods with ``@on_gather_context.register(...)``.
 """
+class ContextManager:
+
+    def gather_context(self, node: HasContext):
+        return node.gather_context()
+
 
 class HasContext(HasHandlers):
 

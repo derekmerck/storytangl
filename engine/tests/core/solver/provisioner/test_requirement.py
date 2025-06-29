@@ -2,7 +2,7 @@ import pytest
 
 from tangl.core.entity import Graph, Node, Registry
 from tangl.core.solver.provisioner.requirement import HasRequirement
-from tangl.core.solver.provisioner.template import EntityTemplate, TemplateProvider
+from tangl.core.solver.provisioner.entity_template import EntityTemplate, TemplateProvider
 
 class MockNode(Node):
     name: str

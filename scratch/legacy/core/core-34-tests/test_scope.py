@@ -1,5 +1,5 @@
 import pytest
-from tangl.core.handlers import Scope, global_scope, ServiceKind, handler
+from tangl.core.services import Scope, global_scope, ServiceKind, handler
 from tangl.core.entity import Entity
 
 

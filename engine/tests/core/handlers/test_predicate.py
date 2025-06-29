@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handlers import on_gather_context, HasContext, Predicate, on_check_satisfied, Satisfiable
+from tangl.core.services import on_gather_context, HasContext, Predicate, on_check_satisfied, Satisfiable
 from tangl.utils.safe_builtins import safe_builtins
 
 MyConditionEntity = type('MyConditionEntity', (Satisfiable, Entity), {} )

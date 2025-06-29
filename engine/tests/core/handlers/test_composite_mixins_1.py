@@ -4,7 +4,7 @@ import logging
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handlers import *
+from tangl.core.services import *
 
 logging.basicConfig(level=logging.DEBUG)
 
