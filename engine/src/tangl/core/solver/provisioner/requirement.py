@@ -20,12 +20,10 @@ on_provision_requirement = HandlerRegistry(
 The global pipeline for provisioning requirements. Handlers for resolving 
 requirements should decorate methods with ``@on_provision_requirement.register(...)``.
 """
-
-_PROV_SVC = ContextVar('_PROV_SVC', default=lambda req, ctx: on_provision_requirement.execute_all_for(req, ctx=ctx))
+def default_provision_svc(req: HasRequirement, *, ctx: StringMap) -> Optional[Node]:
+    return on_provision_requirement.execute_all_for(req, ctx=ctx)
+_PROV_SVC = ContextVar('_PROV_SVC', default=default_provision_svc )
 # Enables replumbing provisioning handler for testing and analytics
-
-class ProvisionerServiceI(Protocol):
-    def __call__(self, node: HasRequirement, ctx: StringMap = None) -> bool: ...
 
 
 NodeT = TypeVar("NodeT", bound=Node)

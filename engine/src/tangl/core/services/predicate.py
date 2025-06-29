@@ -38,17 +38,10 @@ The global pipeline for evaluating local predicates. Handlers for predicates
 should decorate methods with ``@on_check_satisfied.register(...)``.
 """
 
-_PRED_SVC = ContextVar('_PRED_SVC', default=lambda node, ctx: on_check_satisfied.execute_all_for(node, ctx=ctx))
+def default_predicate_svc(entity: Satisfiable, *, ctx: StringMap):
+    return on_check_satisfied.execute_all_for(entity, ctx=ctx)
+_PRED_SVC = ContextVar('_PRED_SVC', default=default_predicate_svc )
 # Enables replumbing predicate handler for testing and analytics
-
-class PredicateServiceI(Protocol):
-    def __call__(self, node: Satisfiable, *, ctx: StringMap) -> bool: ...
-
-
-# class PredicateManager:
-#
-#     def is_satisfied(self, entity: Satisfiable, ctx: StringMap = None) -> bool:
-#         return entity.is_satisfied(ctx=ctx)
 
 
 class Satisfiable(HasContext):
@@ -84,6 +77,6 @@ class Satisfiable(HasContext):
 
     def is_satisfied(self, ctx: StringMap = None) -> bool:
         ctx = ctx if ctx is not None else self.gather_context()
-        pred_svc = _PRED_SVC.get()  # type: PredicateServiceI
+        pred_svc = _PRED_SVC.get()
         return pred_svc(self, ctx=ctx)
         # return on_check_satisfied.execute_all_for(self, ctx=ctx)

@@ -34,17 +34,10 @@ The global pipeline for effects. Handlers for applying effects
 should decorate methods with ``@on_apply_effects.register(...)``.
 """
 
-_EFFECT_SVC = ContextVar('_EFFECT_SVC', default=lambda entity, ctx: on_apply_effects.execute_all_for(entity, ctx=ctx))
+def default_effect_svc(entity: HasContext, *, ctx: StringMap) -> StringMap:
+    return on_apply_effects.execute_all_for(entity, ctx=ctx)
+_EFFECT_SVC = ContextVar('_EFFECT_SVC', default=default_effect_svc)
 # Enables replumbing effect handler for testing and analytics
-
-class EffectServiceI(Protocol):
-    def __call__(self, entity: HasEffects, *, ctx: StringMap) -> StringMap: ...
-
-
-# class EffectManager:
-#
-#     def apply_effects(self, entity: HasEffects, ctx: StringMap = None) -> StringMap:
-#         return entity.apply_effects(ctx=ctx)
 
 
 # Mixin with EffectHandler registry
@@ -87,5 +80,5 @@ class HasEffects(HasContext):
 
     def apply_effects(self, ctx: StringMap = None) -> StringMap:
         ctx = ctx or self.gather_context()
-        effect_svc = _EFFECT_SVC.get()  # type: EffectServiceI
+        effect_svc = _EFFECT_SVC.get()
         return effect_svc(self, ctx=ctx)

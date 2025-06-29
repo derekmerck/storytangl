@@ -25,17 +25,10 @@ on_render_content = HandlerRegistry(label='render_content', aggregation_strategy
 The global pipeline for rendering. Handlers for rendering
 should decorate methods with ``@on_render_content.register(...)``.
 """
-
-_RENDER_SVC = ContextVar('_RENDER_SVC', default=lambda entity, ctx: on_render_content.execute_all_for(entity, ctx=ctx))
+def default_render_svc(entity: Renderable, *, ctx: StringMap) -> StringMap:
+    return on_render_content.execute_all_for(entity, ctx=ctx)
+_RENDER_SVC = ContextVar('_RENDER_SVC', default=default_render_svc)
 # Enables replumbing rendering handler for testing and analytics
-
-class RenderServiceI(Protocol):
-    def __call__(self, node: Renderable, *, ctx: StringMap) -> StringMap: ...
-
-# class RenderManager:
-#
-#     def render_content(self, entity: Renderable, ctx: StringMap = None) -> Any:
-#         return entity.render_content(ctx=ctx)
 
 
 class Renderable(HasContext):
@@ -118,6 +111,6 @@ class Renderable(HasContext):
                  the types returned by handlers.
         """
         ctx = ctx or self.gather_context()
-        render_svc = _RENDER_SVC.get()  # type: RenderServiceI
+        render_svc = _RENDER_SVC.get()
         return render_svc(self, ctx=ctx)
         # return on_render_content.execute_all_for(self, ctx=ctx)

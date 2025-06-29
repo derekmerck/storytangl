@@ -2,11 +2,10 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Mapping, Any, Iterator, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .context import _CTX_SVC
-    from .predicate import _PRED_SVC
-    from .rendering import _RENDER_SVC
-    from .effect import _EFFECT_SVC
+from .context import _CTX_SVC
+from .predicate import _PRED_SVC
+from .rendering import _RENDER_SVC
+from .effect import _EFFECT_SVC
 
 @contextmanager
 def service_ctx(overrides: Mapping[ContextVar[Any], Any]) -> Iterator[None]:

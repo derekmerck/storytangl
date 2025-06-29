@@ -15,15 +15,10 @@ on_gather_context = HandlerRegistry(label="gather_context", aggregation_strategy
 The global pipeline for gathering context. Handlers for context
 should decorate methods with ``@on_gather_context.register(...)``.
 """
-
-_CTX_SVC = ContextVar('_CTX_SVC', default=lambda entity: on_gather_context.execute_all_for(entity, ctx=None))
+def default_ctx_svc(entity: HasContext) -> StringMap:
+    return on_gather_context.execute_all_for(entity, ctx=None)
+_CTX_SVC = ContextVar('_CTX_SVC', default=default_ctx_svc )
 # Enables replumbing context handler for testing and analytics
-
-class ContextServiceI(Protocol):
-    def __call__(self, entity: HasContext) -> StringMap: ...
-
-# class ContextManager:
-#     def gather_context(self, node: HasContext) -> StringMap: ...
 
 class HasContext(HasHandlers):
 
@@ -51,7 +46,5 @@ class HasContext(HasHandlers):
             return {'dirty': True}
 
     def gather_context(self):
-        ctx_svc = _CTX_SVC.get()  # type: ContextServiceI
+        ctx_svc = _CTX_SVC.get()
         return ctx_svc(self)
-        # return on_gather_context.execute_all_for(self, ctx=None)
-
