@@ -9,13 +9,13 @@ from tangl.core.entity import Entity
 
 class BaseFragment(Entity):
     """
-    Represents a minimal content element and the core schema for communicating
-    content to the front-end.
+    Specialized entity the provides the core schema for communicating content
+    to a tangl consumer front-end.
 
     - JournalFragments and InfoFragments are _content_ objects in the fragment stream
     - GroupFragments, and UpdateFragments are _control_ objects in the fragment stream
-    - KvFragments, MediaFragments, and DiscourseFragments have special rules for how the
-    content field is represented.
+    - KvFragments, MediaFragments, and DiscourseFragments are domain-specific constructs
+      that have their own special rules for how their content field is represented.
 
     Attributes:
     - fragment_type: General type of fragment, i.e., text, media, kv, runtime, used

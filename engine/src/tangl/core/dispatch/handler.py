@@ -1,14 +1,16 @@
 from __future__ import annotations
-from typing import Generic, Callable, TypeVar, Type, Self, ClassVar, Optional, Union, TYPE_CHECKING
+from typing import Generic, Callable, TypeVar, Type, Self, ClassVar, Optional, Union, TYPE_CHECKING, overload, Literal, Any
 import inspect
 from functools import partial, total_ordering
 import logging
 import weakref
+from datetime import datetime, timedelta
 
 from pydantic import field_validator, ValidationInfo, Field, PrivateAttr
 
 from tangl.type_hints import StringMap, Typelike
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
+from tangl.utils.summary_repr import summary_repr
 from tangl.core.entity import Entity, Registry, Singleton
 from tangl.core.entity.entity import identifier_property
 from .enums import HandlerPriority
@@ -18,7 +20,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 T = TypeVar('T')
+
+class HandlerCallReceipt(Entity, Generic[T]):
+    handler: Handler
+    sort_priority: tuple[int, int, int]  # (explicit priority, mro dist, reg order)
+    result: T
+    ctx_delta: Optional[StringMap] = Field(None, exclude=True)
+
+    @identifier_property
+    def label(self):
+        """<HandlerCallReceipt:my_func>"""
+        label = f"{self.__class__.__name__}:{self.handler.label_ or self.handler.func.__name__}"
+        return f"<{label}>"
+
+    def summary_repr(self, max_len=20, max_items=3) -> str:
+        """<h:my_func()->10>"""
+        label = f"h:{self.handler.label_ or self.handler.func.__name__}"
+        # we don't need to repeat caller in each one since these get layered into a service receipt for the caller, but I'll leave the empty str for consistency
+        data = ''
+        result = summary_repr(self.result, max_len=max_len, max_items=max_items)
+        return f"<{label}({data})->{result}>"
 
 @total_ordering
 class Handler(Entity, Generic[T], arbitrary_types_allowed=True):
@@ -191,7 +214,7 @@ class Handler(Entity, Generic[T], arbitrary_types_allowed=True):
                     'requires_binding': False})
         return h_bound
 
-    def __call__(self, caller: Entity, *, ctx: StringMap | None, other: Entity = None, result: T = None) -> T:
+    def __call__(self, caller: Entity, *, ctx: StringMap | None, other: Entity = None, result: T = None) -> HandlerCallReceipt[T]:
         if self.requires_binding:
             raise RuntimeError("cannot call owner-bound method handler without binding owner")
         kwargs = {}
@@ -209,7 +232,11 @@ class Handler(Entity, Generic[T], arbitrary_types_allowed=True):
         else:
             func = self.func
 
-        return func(caller, ctx=ctx, **kwargs)
+        result = func(caller, ctx=ctx, **kwargs)
+        receipt = HandlerCallReceipt(handler=self,
+                                     sort_priority=self.sort_key(caller),
+                                     result=result)
+        return receipt
 
     @classmethod
     def define(cls, *, registry: HandlerRegistry = None, bind_to: Entity = None, **kwargs):

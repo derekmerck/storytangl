@@ -152,6 +152,10 @@ class Entity(BaseModelPlus):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}:{self.label}>"
 
+    def summary_repr(self, **kwargs) -> str:
+        # Entity reprs are already concise and specific
+        return repr(self)
+
     is_dirty_: bool = False
     # audit indicator that the entity has been tampered with, invalidates certain debugging
 

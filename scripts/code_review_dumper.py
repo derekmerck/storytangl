@@ -18,27 +18,32 @@ PKG_DIR  = Path("engine/src/tangl")
 
 collections = {
     "full": ([PKG_DIR], []),
-    # "full33": ([PKG_33], []),
-    # "full34": ([PKG_34], []),
 
-    "core34": ([PKG_DIR / "core"], []),
-    "solver34": ([PKG_DIR / "core/solver", PKG_DIR / "core/services"], []),
-    # "core33": ([PKG_33 / "core"], []),
-    # "core34": ([PKG_34 / "core"], []),
+    # core models, behaviors only
+    # ---------------------------
+    "core": ([PKG_DIR / "core"], []),
 
-    # story only
-    # "story32": ([PKG_32 / "story"], []),
-    # "story33": ([PKG_33 / "story"], []),
-    # "story34": ([PKG_33 / "story"], []),
-    #
-    # # # media only
-    # "media32": ([PKG_32 / "media"], []),
-    #
-    # # service only
-    # "service32": ([PKG_32 / "service"], []),
+    # narrative related
+    # -------------
+    # story overlay
+    "story": ([PKG_DIR / "story"], []),
+    # complex mechanics
+    "mechanics": ([PKG_DIR / "story"], []),
+    # narrative only, no creators
+    "discourse": ([PKG_DIR / "discourse"], ["discourse_creators"]),
+    # media only, no creators
+    "media": ([PKG_DIR / "media"], ["media_creators"]),
 
-    # tests only
-    # "tests": (["engine/tests"], []),
+    # service layer
+    # -------------
+    "service": ([PKG_DIR / "service"], []),
+
+    # utils
+    "utils": ([PKG_DIR / "core/solver", PKG_DIR / "core/services"], []),
+
+    # tests
+    "tests": ([BASE_DIR / "engine/tests"], []),
+
     # overview only
     # "overview": (["docs/overview-ext"], [])
 }
@@ -81,7 +86,8 @@ def get_file_strings(root_dir):
                 if STRIP and filepath.endswith(".py"):
                     data = data.splitlines()
                     # data = list(filter(lambda v: bool(v) and not re.match(r"^ *#", v), data))
-                    data = list(filter(lambda v: bool(v) and not re.match(r"^ *logger\.debug", v), data))
+                    # data = list(filter(lambda v: bool(v) and not re.match(r"^ *logger\.debug", v), data))
+                    data = list(filter(lambda v: bool(v) and not re.match(r"^ *logger =", v), data))
                     data = list(filter(lambda v: bool(v) and not re.match(r"^ *(from|import)\b", v), data))
                     data = list(filter(lambda v: bool(v) and not re.match(r"^ *(if TYPE_CHECKING:)", v), data))
 
@@ -190,23 +196,13 @@ if __name__ == "__main__":
         file_strings = []
         for root_dir in root_dirs:
 
-            # if root_dir.startswith("../"):
-            #     data = run_tree_command(root_dir[3:])
-            #
-            # if root_dir.startswith("../docs"):
-            #     data = run_tree_command("docs")
-            # elif root_dir.startswith("../clients/cli/afc"):
-            #     data = run_tree_command("clients/cli/afc")
-            # elif root_dir.startswith("../server/afc"):
-            #     data = run_tree_command("server/afc")
-            # else:
             data = run_tree_command(root_dir)
             header = f'# Tree: {root_dir}\n"""\n'
             footer = '\n"""\n# --- End of tree ---\n\n'
             data = header + data + footer
             file_strings.append( data )
 
-            if not run_once and c in ["tests"]:
+            if not run_once and c.startswith("tests"):
                 run_once = True
                 data = run_coverage_report()
                 header = f'# Coverage\n"""\n'
