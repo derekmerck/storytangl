@@ -22,6 +22,8 @@ collections = {
     # core models, behaviors only
     # ---------------------------
     "core": ([PKG_DIR / "core"], []),
+    "core35": ([PKG_DIR / "core35"], []),
+    "core36": ([PKG_DIR / "core36"], []),
 
     # narrative related
     # -------------

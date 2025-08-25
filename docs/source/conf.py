@@ -34,3 +34,23 @@ exclude_patterns = []
 
 html_theme = 'alabaster'
 html_static_path = ['_static']
+
+
+import commonmark
+
+# Note: to get :class:`foo` to work, you have to escape the ticks
+#       i.e., :class:\`foo\' works
+def docstring(app, what, name, obj, options, lines):
+    md  = '\n'.join(lines)
+    ast = commonmark.Parser().parse(md)
+    rst = commonmark.ReStructuredTextRenderer().render(ast)
+    lines.clear()
+    lines += rst.splitlines()
+
+    # if md.find(":class:"):
+    #     print( rst )
+
+def setup(app):
+    app.connect('autodoc-process-docstring', docstring)
+
+autodoc_typehints_description_target = "documented"

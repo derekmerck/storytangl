@@ -9,6 +9,7 @@ from .model import StoryIR, Shape, Node, Edge, Patch, Op     # adjust import pat
 # ---------------------------------------------------------------------------
 # msgspec encoder/decoder with PMap/PVector hooks
 # ---------------------------------------------------------------------------
+from .scope import Layer, LayerStack
 
 def _enc_hook(obj):
     from pyrsistent import PMap, PVector
@@ -16,6 +17,12 @@ def _enc_hook(obj):
         return dict(obj)
     if isinstance(obj, PVector):
         return list(obj)
+    if isinstance(obj, LayerStack):
+        # Represent stack as list[dict] so msgspec can encode it
+        return [_enc_hook(layer) for layer in obj._stack]
+    if isinstance(obj, Layer):
+        return {'locals': obj.locals, 'scope_id': obj.scope_id}
+
     raise TypeError
 
 _encoder = msgspec.msgpack.Encoder(enc_hook=_enc_hook)
@@ -38,34 +45,32 @@ def restore(blob: bytes) -> StoryIR:
 # ---------------------------------------------------------------------------
 
 class PatchLogWriter:
-    def __init__(self, file: io.BufferedWriter):
-        self._zw = zstandard.ZstdCompressor().stream_writer(file)
+    def __init__(self, fp):
+        self._fp = fp
+        self._buf: list[Patch] = []
 
     def append(self, patch: Patch):
-        self._zw.write(_encoder.encode(patch))
+        self._buf.append(patch)
 
     def close(self):
-        self._zw.flush(zstandard.FLUSH_FRAME)
-        self._zw.close()
+        packed = _encoder.encode(self._buf)          # encode LIST once
+        self._fp.write(zstandard.compress(packed))
+        self._fp.close()
 
 class PatchLogReader(Iterable[Patch]):
-    def __init__(self, file: io.BufferedReader):
-        print( "trying to create reader" )
-        self._zr = zstandard.ZstdDecompressor().stream_reader(file)
-        self._reader = msgspec.msgpack.Decoder(type=Patch)
-        print( "created reader" )
+    def __init__(self, fp):
+        raw = zstandard.decompress(fp.read())
+        self._patches: list[Patch] = msgspec.msgpack.decode(raw, type=list[Patch])
+        # self._idx = 0
 
-    def __iter__(self):
-        return self
+    def __iter__(self): yield from self._patches
 
-    def __next__(self):
-        print('called next on reader')
-        try:
-            result = self._reader.decode(self._zr.read())
-            print( result )
-            return result
-        except msgspec.DecodeError:
-            raise StopIteration
+    # def __next__(self):
+    #     if self._idx >= len(self._patches):
+    #         raise StopIteration
+    #     p = self._patches[self._idx]
+    #     self._idx += 1
+    #     return p
 
 # ---------------------------------------------------------------------------
 # Patch applier (minimal ops for S-0)
@@ -87,10 +92,15 @@ def _del_in_pmap(base: PMap, path: Tuple[str, ...]) -> PMap:
     return base.remove(key)
 
 def apply_patch(ir: StoryIR, p: Patch) -> StoryIR:
-    if p.op is Op.SET:
-        if p.path and p.path[0] == "state":
-            new_state = ir.state.set(p.path[1], p.after)
-            return ir.evolve(state=new_state, tick=p.tick)
+    # if p.op is Op.SET:
+    #     if p.path and p.path[0] == "state":
+    #         new_state = ir.state.set(p.path[1], p.after)
+    #         return ir.evolve(state=new_state, tick=p.tick)
+
+    if p.op is Op.SET and p.path[0] == "state":
+        new_state = ir.state.set(p.path[1], p.after)
+        return ir.evolve(state=new_state, tick=p.tick)  # ← return new IR
+
     if p.op is Op.DELETE and p.path and p.path[0] == "state":
         new_state = ir.state.remove(p.path[1])
         return ir.evolve(state=new_state, tick=p.tick)
@@ -109,7 +119,15 @@ def apply_patch(ir: StoryIR, p: Patch) -> StoryIR:
         )
         return ir.evolve(shape=new_shape, tick=p.tick)
 
-    raise NotImplementedError(f"Patch op {p.op} not supported in S-0")
+    if p.op is Op.SET and p.path[0] == "layer":
+        # find and mutate the layer’s locals
+        scope_id = p.path[1]
+        layer = next(l for l in ir.layer_stack._stack if l.scope_id == scope_id)
+        key = p.path[2]  # "visited.scene"
+        layer.locals = layer.locals.set(key, p.after)
+        return ir.evolve(tick=p.tick)
+
+    raise NotImplementedError(f"Patch op {p.op} for {p.path} not supported in S-0")
 
 # ---------------------------------------------------------------------------
 

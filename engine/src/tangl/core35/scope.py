@@ -1,10 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, Optional, List, TYPE_CHECKING
+from typing import Dict, Optional, List, TYPE_CHECKING, Self
 
 from pyrsistent import pmap, PMap
 
 from .behaviors.behavior_registry import BehaviorRegistry, _NOOP_BEHAVIOR
+
+if TYPE_CHECKING:
+    from .model import Shape
 
 @dataclass(frozen=True, slots=True)
 class ScopeMeta:
@@ -46,9 +49,33 @@ class Layer:
     locals: PMap = field(default_factory=pmap)
     behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
 
+
 class LayerStack:
-    def __init__(self):
-        self._stack: list[Layer] = []
+    def __init__(self, stack: list[Layer] = None):
+        self._stack: list[Layer] = stack or []
+
+    # This isn't a dataclass, so it doesn't have a default compare by value
+    def __eq__(self, other: Self) -> bool:
+        if not isinstance(other, LayerStack):
+            return False
+        if len(self._stack) != len(other._stack):
+            return False
+        for this, that in zip(self._stack, other._stack):
+            if this != that:
+                return False
+        return True
+
+    @classmethod
+    def from_raw(cls, d: list) -> Self:
+        stack = []
+        for item in d:
+            if isinstance(item, Layer):
+                stack.append(item)
+            elif isinstance(item, dict):
+                stack.append(Layer(**item))
+            else:
+                raise TypeError(f"Unexpected type {type(item)}")
+        return cls(stack=stack)
 
     # -------------------------------------------------
     def top(self) -> Layer:
@@ -71,21 +98,45 @@ class LayerStack:
         return _NOOP_BEHAVIOR
 
     # "villain.hp" → ("villain","hp") split once
-    def lookup_var(self, dotted: str, state: PMap | None = None):
-        head, *rest = dotted.split(".", 1)
+    # def lookup_var(self, dotted: str, state: PMap | None = None):
+    #     head, *rest = dotted.split(".", 1)
+    #     tail = rest[0] if rest else None
+    #
+    #     for layer in reversed(self._stack):          # top → root
+    #         if head in layer.locals:
+    #             val = layer.locals[head]
+    #             return val[tail] if tail else val    # recurse on PMap
+    #
+    #     if state is not None and head in state:
+    #         val = state[head]
+    #         return val[tail] if tail else val
+    #
+    #     raise KeyError(dotted)
+
+    def lookup_var(self, dotted: str, state: PMap, shape: Shape = None):
+        head, *rest = dotted.split('.', 1)
         tail = rest[0] if rest else None
 
-        for layer in reversed(self._stack):          # top → root
+        # 1. walk layers (unchanged)
+        for layer in reversed(self._stack):
             if head in layer.locals:
                 val = layer.locals[head]
-                return val[tail] if tail else val    # recurse on PMap
-
-        if state is not None and head in state:
+                return val[tail] if tail else val
+        if head in state:
             val = state[head]
             return val[tail] if tail else val
 
-        raise KeyError(dotted)
+        # 2. NEW – shape layer (read-only)
+        if shape is not None:
+            if head in shape.nodes and (not tail or tail == "node"):
+                return shape.nodes[head]
+            if tail and head in shape.nodes and tail == "locals":
+                return shape.nodes[head].locals
+            edge_index = {e.id: e for e in shape.edges}
+            if head in edge_index and (not tail or tail == "edge"):
+                return edge_index[head]
 
+        raise KeyError(dotted)
 
 class ScopeManager:
     def __init__(self, tree: ScopeTree, stack: LayerStack):

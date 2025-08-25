@@ -6,6 +6,9 @@ import pytest
 from tangl.core35.model import StoryIR, Shape, Patch, Op, Node, Edge
 from tangl.core35.io import snapshot, restore, PatchLogWriter, PatchLogReader, apply_patch
 from tangl.core35.engine import step
+from tangl.core35.behaviors.default_behaviors import noop_behaviors, stub_behaviors
+from tangl.core35.behaviors.behavior_registry import _NOOP_BEHAVIOR
+from .scope import ScopeMeta, ScopeTree, ScopeManager, Layer, LayerStack, build_scope_tree
 from tangl.core35.context import Context
 
 def test_patchlog_roundtrip_mock_reader(tmp_path):
@@ -69,13 +72,11 @@ def test_patchlog_roundtrip(tmp_path: pathlib.Path):
 
 def test_phase_runner_noop():
     ir = StoryIR()                          # empty but valid
-    from tangl.core35.behaviors.default_behaviors import behaviors
-    ir2, patches = step(ir, behaviors)
-    assert ir2 == ir
+    ir2, patches = step(ir, noop_behaviors)
+    assert ir2.layer_stack == ir.layer_stack and ir2.state == ir.state
+    # tick has changed though, so we can't just compare ir2 == ir
     assert patches == []
 
-from .scope import ScopeMeta, ScopeTree, ScopeManager, Layer, LayerStack
-from tangl.core35.behaviors.behavior_registry import _NOOP_BEHAVIOR
 
 def test_layer_shadowing():
     # Build fake scopes root -> scene -> mini
@@ -127,7 +128,7 @@ def test_lookup_var_shadow():
     stack.push(Layer("root", locals=pmap({"x": 1})))
     stack.push(Layer("child", locals=pmap({"y": 2})))
 
-    view = Context(stack, pmap({"z": 3}), tick=-1)
+    view = Context(None, stack, pmap({"z": 3}), tick=-1)
     assert view.var("y") == 2      # found in child
     assert view.var("x") == 1      # falls through to root
     assert view.var("z") == 3     # global
@@ -141,25 +142,72 @@ def test_lookup_var_shadow():
 def test_context_setter():
     stack = LayerStack()
     stack.push(Layer("root"))
-    ctx = Context(stack, pmap(), tick=0)
+    ctx = Context(None, stack, pmap(), tick=0)
 
     ctx2, p = ctx.set_var("player.hp", 100)
     assert ctx2.var("player.hp") == 100
     assert p.path == ("state", "player.hp") or p.path[0] == "layer"
 
-@pytest.fixture
-def graph_ir():
-    root = Node(id="n_root", scope_id="root")
+def test_two_tick_traversal(tmp_path):
+    # --- Build toy graph ----------
+    root  = Node(id="n_root",  scope_id="root")
     scene = Node(id="n_scene", scope_id="scene")
-    mini = Node(id="n_mini", scope_id="mini")
+    mini  = Node(id="n_mini",  scope_id="mini")
 
-    e1 = Edge(id="e1", src="n_root", dst="n_scene", predicate="true")
-    e2 = Edge(id="e2", src="n_scene", dst="n_mini", predicate="true")
+    e1 = Edge("e1", "n_root", "n_scene", "true")
+    e2 = Edge("e2", "n_scene", "n_mini", "true")
+    root.outgoing = (e1,)
+    scene.outgoing = (e2,)
 
     shape = Shape(nodes=pmap({n.id: n for n in (root, scene, mini)}),
                   edges=pvector([e1, e2]))
-    ir0 = StoryIR(shape=shape)
-    return ir0
 
-def test_pred(graph_ir):
-    ...
+    # ir0 = StoryIR(shape=shape, state=pmap({
+    #     "cursor": "n_root",
+    #     # convenient back-refs so behaviors can ctx.var("n_root.node")
+    #     "n_root.node":  root,
+    #     "n_scene.node": scene,
+    #     "n_mini.node":  mini,
+    # }))
+
+    ir0 = StoryIR(
+        shape=shape,
+        state=pmap({
+            "cursor": "n_root",
+            # "n_root": pmap({"node": root}),
+            # "n_scene": pmap({"node": scene}),
+            # "n_mini": pmap({"node": mini}),
+        })
+    )
+
+    # --- Prime stack with root layer & scope manager ----
+    tree = build_scope_tree(shape.nodes)
+    ir0.layer_stack.scope_manager = ScopeManager(tree=tree, stack=ir0.layer_stack)
+    ir0.layer_stack.push(Layer("root"))
+    # stack = LayerStack()
+    # stack.push(Layer("root"))
+    # stack.scope_manager = ScopeManager(tree, stack)   # quick and dirty
+    # ir0 = ir0.evolve(layer_stack=stack)  # attach the primed stack
+
+    # --- Run two ticks --------------
+    ir1, p1 = step(ir0, stub_behaviors)        # root -> scene
+    assert len(p1) > 0
+    assert any(p.path == ("state", "cursor") for p in p1), f"state.cursor should be in a patch ({p1})"
+
+    ir2, p2 = step(ir1, stub_behaviors)        # scene -> mini
+    assert any(p.path == ("state", "cursor") and p.after == "n_mini" for p in p2)
+
+    # --- Snapshot + patchlog -------
+    snap = snapshot(ir0)
+    with open(tmp_path/"log", "wb") as fp:
+        w = PatchLogWriter(fp); [w.append(x) for x in (*p1,*p2)]; w.close()
+
+    # --- Restore & replay ----------
+    ir_r = restore(snap)
+    with open(tmp_path/"log","rb") as fp:
+        for patch in PatchLogReader(fp):
+            ir_r = apply_patch(ir_r, patch)
+
+    # assert ir_r == ir2
+    assert ir_r.state["cursor"] == "n_mini", f"Cursor {ir_r.state['cursor']} should be n_mini"
+    assert ir_r.state["visited.mini"] is True, f"mini.visited should be True"

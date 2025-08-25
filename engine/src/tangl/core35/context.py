@@ -1,18 +1,20 @@
 from dataclasses import dataclass, replace
 from typing import Any, Tuple
 from pyrsistent import PMap, pmap
+from .model import Shape
 from .scope import LayerStack
 from .io import Patch, Op
 
 @dataclass(frozen=True, slots=True)
 class Context:
+    shape: Shape
     stack: LayerStack
     state: PMap                 # global
     tick:  int
 
     # ------------------------ LOOK-UPS ----------------------------------
     def var(self, dotted: str) -> Any:
-        return self.stack.lookup_var(dotted, self.state)
+        return self.stack.lookup_var(dotted, self.state, self.shape)
 
     def behavior(self, key: str):
         return self.stack.lookup_behavior(key)

@@ -1,20 +1,24 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum, auto
-from typing import Any
+from typing import Any, Self
 
 from pyrsistent import pmap, pvector, PMap, PVector
+
+from .scope import LayerStack
 
 
 NodeId = str
 EdgeId = str
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class Node:
     id: NodeId
     scope_id: str
     tags: frozenset[str] = frozenset()
     locals: PMap = pmap()      # immutable
+
+    outgoing: tuple[Edge, ...] = field(default_factory=lambda: ())   # default until real builder fills it
 
 @dataclass(frozen=True, slots=True)
 class Edge:
@@ -33,7 +37,7 @@ class Shape:
 class StoryIR:
     shape: Shape = field(default_factory=Shape)
     state: PMap = field(default_factory=pmap)              # global key → val
-    layer_stack: tuple = ()           # empty for S-0
+    layer_stack: LayerStack = field(default_factory=LayerStack)
     tick: int = 0
 
     @classmethod
@@ -52,11 +56,11 @@ class StoryIR:
                 nodes=convert(d["shape"]["nodes"]),
                 edges=pvector(d["shape"]["edges"])),
             state=convert(d["state"]),
-            layer_stack=tuple(d["layer_stack"]),
+            layer_stack=LayerStack.from_raw(d["layer_stack"]),
             tick=d["tick"],
         )
 
-    def evolve(self, **changes) -> "StoryIR":
+    def evolve(self, **changes) -> Self:
         """
         Return a new StoryIR with specified fields replaced.
         Equivalent to dataclasses.replace but preserves type hints.

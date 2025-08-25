@@ -10,11 +10,11 @@ from enum import IntEnum, auto
 class Phase(IntEnum):
     PREDICATE   = 10   # allowed to enter
     PROVISION   = 20   # advance resolution frontier, resolve next step dependencies, affordances
-    PREREQS     = 30   # check resolved choice predicates, redirect with jump/jr if required
+    # PREREQS     = 30   # check resolved choice predicates, redirect with jump/jr if required
     EFFECTS     = 40   # mutate state before
-    RENDER      = 50   # generate trace fragments
-    COMPOSE     = 60   # assemble journal entry from candidate trace fragments, create groups and ladders
-    BOOKKEEPING = 70   # mutate state after (e.g., consume resources that were needed for rendering)
-    POSTREQS    = 80   # check resolved choice predicates, continue automatically with jump/jr if required
+    # RENDER      = 50   # generate trace fragments
+    # COMPOSE     = 60   # assemble journal entry from candidate trace fragments, create groups and ladders
+    # BOOKKEEPING = 70   # mutate state after (e.g., consume resources that were needed for rendering)
+    # POSTREQS    = 80   # check resolved choice predicates, continue automatically with jump/jr if required
 
     # Otherwise, the logic confirms at least one choice exists, then blocks for a selection
