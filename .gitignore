@@ -10,7 +10,7 @@ dump*
 tmp*
 **/old
 **/old_*
-# schemas
+#schemas
 #extras*
 
 # source
@@ -70,6 +70,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+.benchmarks/
 
 # Node/Yarn
 node_modules

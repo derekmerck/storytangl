@@ -1,6 +1,6 @@
 # StoryTangl
 
-**TanglDev, Spring 2025**  
+**TanglDev, Spring 2026**  
 
 ## Overview
 
@@ -27,7 +27,7 @@ StoryTangl aims to **separate** the concerns of narrative structure, story conte
 
 Use Tangl to:
 
-1. **Load** a single story definition from a Storydown (Markdown+YAML) or other source.  
+1. **Load** a single story definition from a `tangldown` script (Markdown+YAML) or other source.  
 2. **Compile** a story definition into an intermediate representation or “story world.”  
 3. **Create** a story instance (graph) from that world to track reader navigation and state.  
 4. **Navigate** or "play" a story line as a user, by picking branches or letting the system auto-select algorithmically.  
@@ -80,8 +80,8 @@ The git repo includes a Dockerfile for the reference app that can be used as
 a quick-start on a PAAS environment.
 
 ```bash
-$ docker build . -t storytangl:3.4
-$ docker run -p 8000:8000 storytangl:3.4
+$ docker build . -t storytangl:4
+$ docker run -p 8000:8000 storytangl:4
 ```
 
 
@@ -196,10 +196,10 @@ By **keeping these layers distinct**, we can ingest a single “semantic core”
 
 ---
 
-## Writing in Storydown
+## Writing in tangldown
 
 *(Placeholder for future examples)*  
-Tangl supports a **Markdown+YAML** hybrid DSL called **Storydown**, allowing authors to mix normal prose with embedded metadata. Example:
+Tangl supports a **Markdown+YAML** hybrid DSL called **tangldown**, allowing authors to mix normal prose with embedded metadata. Example:
 
 `````markdown
 # Scene: The Tavern
@@ -214,7 +214,7 @@ constraints:
 Aria steps into the dimly lit tavern...
 `````
 
-The parser turns this into a **story world** definition, which you can compile, instantiate, and navigate.  A smart parser will even make simple inferences, like the scene ids, characters, and settings directly from the text content.
+The parser turns this into a **story world** definition, which you can compile, instantiate, and navigate.  A smart parser will even make simple inferences, like the scene ids, characters, and settings directly from a content block's tags and text content.
 
 ---
 
@@ -260,7 +260,7 @@ The parser turns this into a **story world** definition, which you can compile, 
 
 ## Contributing
 
-We welcome feedback, bug reports, and feature requests. For more advanced usage details and code examples, see our [Documentation](#) (placeholder link). 
+We welcome feedback, bug reports, and feature requests. For more advanced usage details and code examples, see our [Documentation](#). 
 
 ---
 

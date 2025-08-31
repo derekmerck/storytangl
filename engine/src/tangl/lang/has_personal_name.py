@@ -6,6 +6,10 @@ from .gendered_nominals import gn, normalize_gn
 
 logger = logging.getLogger(__name__)
 
+# DEPRECATED!
+from warnings import deprecated
+deprecated("Prefer 'lang.personal_name', which uses the more robust nameparser library")
+
 class HasPersonalName(BaseModel):
     """
     Follows western naming order

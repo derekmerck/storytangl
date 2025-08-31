@@ -1,5 +1,6 @@
 # Version History
 
+- 3.7, 2026, dependency-driven interpreter
 - 3.2, 2025, StoryTangl 3-layer ANG
 - 3.1, 2024
 - 2.9, 2024, strategy-based task handlers

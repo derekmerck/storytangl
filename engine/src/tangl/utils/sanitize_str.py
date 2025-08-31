@@ -6,7 +6,7 @@ _SANITISE_RE = re.compile(r"[^0-9a-zA-Z_]+")
 
 def sanitise_str(value: str) -> str:
     """
-    Turn *value* into a valid Python identifier:
+    Turn *value* into a valid Python identifier for StringMap type.
 
     * replace illegal chars with '_'      →  "little-dog"  →  "little_dog"
     * prefix '_' if it would start with # →  "123abc"      →  "_123abc"
