@@ -89,16 +89,16 @@ class Scope(Entity):
     def active_domains(self) -> Iterator[Domain]:
         seen = set()
         for d in self.domain_registry.find_domains_for(self.anchor):
-            if d not in seen:
-                seen.add(d)
+            if d.uid not in seen:
+                seen.add(d.uid)
                 yield d
         for ancestor in self.anchor.ancestors():
             for d in self.domain_registry.find_domains_for(ancestor):
-                if d not in seen:
-                    seen.add(d)
+                if d.uid not in seen:
+                    seen.add(d.uid)
                     yield d
-        if global_domain not in seen:
-            seen.add(global_domain)  # irrelevant but included for completeness
+        if global_domain.uid not in seen:
+            seen.add(global_domain.uid)  # irrelevant but included for completeness
             yield global_domain
 
     @classmethod

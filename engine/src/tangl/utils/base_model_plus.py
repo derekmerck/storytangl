@@ -1,7 +1,9 @@
-from typing import Any, Self, Type
+from typing import Any, Self, Type, Iterator
 import logging
 
+import yaml
 from pydantic import BaseModel, field_validator, field_serializer, FieldValidationInfo
+from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
 
@@ -34,36 +36,68 @@ class BaseModelPlus(BaseModel):
         field_names = [ f.alias if f.alias else k for k, f in cls.model_fields.items() ]
         return field_names
 
+    @classmethod
+    def _fields(cls, **criteria) -> Iterator[str]:
+        """
+        Returns fields with attribs or json_extra metadata keys = values.
+
+        By default, we infer opt-out metadata flags, "don't use me for something".
+        If you want an opt-in or other field comparison, set the constraint value to a tuple
+        with the (target value, default value).
+
+        That is, use `_field(k=(t,f), ...)` to indicate the target value and default value,
+        if the default is not True.
+        """
+        def matches(field, **criteria):
+            for k, v in criteria.items():
+                if isinstance(v, tuple):
+                    v, default_annotation = v
+                else:
+                    default_annotation = True
+                extra = field.json_schema_extra or {}
+                # Check for both field.key or json_extra[key] or use default
+                if hasattr(field, k):
+                    annotation = getattr(field, k, None)
+                else:
+                    annotation = extra.get(k, None)
+                if annotation is None:
+                    annotation = default_annotation
+                if annotation != v:
+                    logger.debug(f'{k} => {annotation} != {v}')
+                    return False
+            return True
+
+        for n, f in cls.model_fields.items():
+            if matches(f, **criteria):
+                logger.debug(f"Including field: {n}")
+                yield n
+            else:
+                logger.debug(f"Skipping field: {n}")
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+        # Not marked as compare=False (opt-out), and not exclude=True (opt-in)
+        for f in self._fields(compare=True, exclude=(False, False)):
+            if getattr(self, f) != getattr(other, f):
+                return False
+        return True
+
     def reset_fields(self):
         """
         Reset flagged entity fields to their default state.
-
         To flag a field for reset, set `json_schema_extra={reset_field: True}` .
         """
-        for field_name, field_info in self.model_fields.items():
-            extra = field_info.json_schema_extra or {}
-            if extra.get('reset_field', False):
-                default_value = field_info.get_default(call_default_factory=True)
-                logger.debug(f"updating: {field_name} = {default_value}")
-                setattr(self, field_name, default_value)
+        for field in self._fields(reset=(True, False)):
+            field_info = self.model_fields[field]
+            default_value = field_info.get_default(call_default_factory=True)
+            logger.debug(f"updating: {field} = {default_value}")
+            setattr(self, field, default_value)
 
     # There is no built-in method for excluding fields from comparison with pydantic.
     # For this approach, set json_schema_extra = {'cmp', false} on fields to ignore.
     # Other approaches include unlinking fields during comparison then relinking them, or
     # comparing model_dumps with excluded fields.
-
-    @classmethod
-    def cmp_fields(cls):
-        return [k for k, f in cls.model_fields.items()
-                if not f.json_schema_extra or f.json_schema_extra.get("cmp", True)]
-
-    def __eq__(self, other: Self) -> bool:
-        if self.__class__ is not other.__class__:
-            return False
-        for field in self.cmp_fields():
-            if getattr(self, field) != getattr(other, field):
-                return False
-        return True
 
     @classmethod
     def _pydantic_field_type_is(cls, field_name: str, query_type: Type):
@@ -75,3 +109,7 @@ class BaseModelPlus(BaseModel):
             return True
         return False
 
+    def __str__(self):
+        data = self.model_dump()
+        s = yaml.dump(data, default_flow_style=False)
+        return s

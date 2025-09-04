@@ -40,7 +40,7 @@ def test_ornaments():
     assert "navel" in s
     assert "brand" in s
 
-    orn.remove_ornament( o4.label )
+    orn.remove_ornament( o4 )
     s = orn.describe()['ornaments']
     print( s )
     assert "scars" in s

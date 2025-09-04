@@ -22,10 +22,15 @@ from abc import ABC, abstractmethod
 
 from pydantic import Field, field_validator, model_validator
 
-from tangl.core.dispatch import HandlerRegistry
-from tangl.core.services import HasContext, on_gather_context
-from tangl.core.entity import Entity, Node
+from tangl.core.handler import HandlerRegistry
+# from tangl.core.services import HasContext, on_gather_context
+from tangl.core.entity import Entity
+from tangl.core.graph import Node
 from .enums import GameResult
+
+class HasContext:
+    pass
+on_gather_context = HandlerRegistry(label="gather_context")
 
 # Move-type for any GameHandler may be a simple Enum or a more complex
 # parameterized dataclass

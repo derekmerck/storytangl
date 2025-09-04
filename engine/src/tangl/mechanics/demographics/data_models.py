@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 
-from fontTools.ttLib.tables.otTables import DeltaSetIndexMap
 from pydantic import BaseModel, Field, field_validator
 
 from tangl.utils.load_yaml_resource import load_yaml_resource
@@ -32,8 +31,8 @@ class Region(Singleton):
     @classmethod
     def _convert_subtypes(cls, data):
         def _resolve_subtype(label):
-            if Subtype.has_instance(label):
-                return Subtype.get_instance(label)
+            if x := Subtype.find_instance(label=label):
+                return x
             else:
                 return Subtype(label=label)
         res = {_resolve_subtype(k): v for k, v in data.items()}
@@ -80,8 +79,8 @@ class Country(Singleton):
     def _convert_subtypes(cls, data):
 
         def _resolve_subtype(label):
-            if Subtype.has_instance(label):
-                return Subtype.get_instance(label)
+            if x := Subtype.find_instance(label=label):
+                return x
             else:
                 return Subtype(label=label)
 
@@ -99,8 +98,8 @@ class Country(Singleton):
             if not isinstance(subtype, str):
                 raise TypeError('subtype must be str or Subtype')
             key = f"{self.label}_{subtype}"
-            if NameBank.has_instance(key):
-                return NameBank.get_instance(key)
+            if x := NameBank.find_instance(label=key):
+                return x
         return NameBank.get_instance(self.label)
 
     # __hash__ = Singleton.__hash__

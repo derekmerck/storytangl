@@ -29,7 +29,7 @@ def test_resource_inventory_tag_expiry_conversion():
     assert tag.expiry.date() == (now + expiry_delta).date()
 
 
-# @pytest.mark.xfail(reason="aliases not implemented yet in current rev")
+@pytest.mark.xfail(reason="aliases not implemented yet in current rev")
 def test_resource_inventory_tag_get_aliases():
     tag = MediaRIT(label="test", content_hash=b"hash123", data_type=MediaDataType.IMAGE)
     assert tag.matches(alias=b"hash123")

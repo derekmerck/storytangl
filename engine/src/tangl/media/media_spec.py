@@ -2,7 +2,7 @@ from typing import Self
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
-from tangl.core.dispatch import HandlerRegistry, HandlerPriority as Priority
+from tangl.core.handler import HandlerRegistry, HandlerPriority as Priority
 from .type_hints import Media
 
 on_adapt_media_spec = HandlerRegistry(label="adapt_media_spec", default_aggregation_strategy="pipeline")

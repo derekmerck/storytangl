@@ -25,7 +25,7 @@ class DemographicSampler:
 
     @classmethod
     def sample_region(cls, weighted=False) -> Country:
-        regions = Region.all_instances()  # type: list[Region]
+        regions = list(Region.all_instances())  # type: list[Region]
         if not regions:
             raise IndexError('No regions found')
         if weighted:

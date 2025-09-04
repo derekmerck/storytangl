@@ -1,9 +1,11 @@
 from pydantic import ConfigDict
 
-from tangl.core.solver.provisioner import DependencyEdge
+# from tangl.core.provision import DependencyEdge
 from ..type_hints import Media
 from ..media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+
+DependencyEdge = list
 
 
 class MediaDep(DependencyEdge[MediaRIT]):

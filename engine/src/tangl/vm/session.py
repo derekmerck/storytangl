@@ -1,16 +1,12 @@
 # tangl/vm/session.py
 import functools
-from typing import Any, TypeVar, TYPE_CHECKING
 from enum import Enum
 from uuid import UUID
 from dataclasses import dataclass, field
 from copy import deepcopy
 import logging
 
-if TYPE_CHECKING:
-    from collections import ChainMap
-
-from tangl.type_hints import StringMap, Step
+from tangl.type_hints import Step
 from tangl.core.graph import Graph, Edge, Node
 from tangl.core.domain import DomainRegistry, NS
 from .context import Context
@@ -18,14 +14,22 @@ from .events import ReplayWatcher, Event, WatchedRegistry
 
 logger = logging.getLogger(__name__)
 
+# In principle, could merge validate/prereqs, cleanup/postreqs, but they have
+# different aggregation mechanisms, so it's maybe best to keep them distinct.
 
 class ResolutionPhase(Enum):
-    INIT = "init"            # Does not run, just indicates not ready
-    VALIDATE = "validate"
-    PROVISION = "provision"
-    UPDATE = "update"
-    JOURNAL = "journal"
-    CLEANUP = "cleanup"
+
+    INIT = "init"            # Does not run, just indicates not started
+    VALIDATE = "validate"    # return ALL true or None
+    PROVISION = "provision"  # updates graph/data on frontier in place and GATHERS receipts
+    PREREQS = "prereqs"      # return ANY (first) avail prereq edge to a provisioned node to break and redirect
+    UPDATE = "update"        # updates graph/data in place and GATHERS receipts
+    JOURNAL = "journal"      # return PIPE of generated fragments, needs post-processor commit
+    CLEANUP = "cleanup"      # updates graph/data in place and GATHERS receipts
+    POSTREQS = "postreqs"    # return ANY (first) avail postreq edge to provisioned node to redirect
+
+    # Otherwise we also need to guarantee that at least one selectable edge to a
+    # provisioned node exists on the frontier
 
 P = ResolutionPhase
 
@@ -68,12 +72,16 @@ class Session:
             del self.context
 
     def get_ns(self, phase: ResolutionPhase) -> NS:
-        ns = self.context.get_ns()
+        base_ns = self.context.get_ns()
         # The session itself also provides a ns domain layer
-        # could just write these directly into the context layer or move the context
-        # layer vars here, but we will separate for consistency for now
-        session_layer = {'results': [], 'phase': phase}
-        return ns.new_child(session_layer)
+        session_layer = {
+            "cursor": self.cursor,  # should be included by context layer, duplicated for safety
+            "step": self.step,      # should be included by context layer, duplicated for safety
+
+            "phase": phase,         # phase annotation for handlers
+            "results": [],          # receipts from handlers run during this phase
+        }
+        return base_ns.new_child(session_layer)
 
     def run_phase(self, phase: P) -> NS:
         ns = self.get_ns(phase)          # creates context if necessary
@@ -83,27 +91,46 @@ class Session:
 
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
+
+        # This should be in the step, not in the control loop, I think
         self.step += 1
         self.cursor_id = edge.destination_id
-        self._invalidate_context()
-        _ = self.run_phase(P.VALIDATE)  # may set an edge to next cursor
+        self._invalidate_context()       # updated the anchor, need to rebuild scope
 
-        # terminate trampoline explicitly for now
+        # Make sure that this cursor is allowed
+        ns = self.run_phase(P.VALIDATE)
+        res = ns["results"]
+        if not all(res):
+            raise RuntimeError(f"Proposed next cursor is not valid!")
+
+        # May mutate graph/data
+        ns = self.run_phase(P.PROVISION)      # No-op for now
+
+        # Check for prereq cursor redirects
+        # todo: implement j/r redirect stack
+        ns = self.run_phase(P.PREREQS)  # may set an edge to next cursor
+        res = ns["results"]
+        if res and isinstance(res[-1], Edge):
+            return res[-1]
+
+        ns = self.run_phase(P.UPDATE)         # No-op for now
+
+        # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
+
+        # Generate the output content for the current state
+        ns = self.run_phase(P.JOURNAL)
+        # todo: compose and copy wherever to where-ever it goes, as entry nodes or into a separate journal object
+        # todo: If fragments are stored as nodes, we should update the preview graph again since cleanup might want to see the journal.  Otherwise the journal needs to be stored somewhere else?  In the ns?
+
+        # Cleanup bookkeeping
+        ns = self.run_phase(P.CLEANUP)
+
+        # check for postreq cursor redirects
+        ns = self.run_phase(P.POSTREQS)    # may set an edge to next cursor
+        res = ns["results"]
+        if res and isinstance(res[-1], Edge):
+            return res[-1]
         return None
-
-        # res = ns["results"]
-        # if res and isinstance(res[-1], Edge):
-        #     return res[-1]
-        # # self.run_phase(P.PROVISION)
-        # self.run_phase(P.UPDATE)
-        # # If we are using event sourcing, we _may_ need to recreate a preview graph now, depending on whether the context holds a mutable copy or the immutable source
-        # # self.run_phase(P.JOURNAL)
-        # # todo: and copy contents wherever they go, nodes or a separate journal object
-        # ns = self.run_phase(P.CLEANUP)  # may set an edge to next cursor
-        # res = ns["results"]
-        # if res and isinstance(res[-1], Edge):
-        #     return res[-1]
-        # return None
 
     def resolve_choice(self, choice) -> None:
         # follows edges until no next edge is returned

@@ -76,7 +76,7 @@ class Handler(Conditional, Entity):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     func: HandlerFunc
-    priority: HandlerPriority = HandlerPriority.NORMAL
+    priority: HandlerPriority | int = HandlerPriority.NORMAL
     reg_number: int = -1  # assumes handler in no more than 1 registry
 
     def __call__(self, ns: StringMap) -> JobReceipt:
@@ -101,16 +101,16 @@ class HandlerRegistry(Registry[Handler]):
             return func
         return decorator
 
-    def find(self, *predicates: Predicate, **criteria) -> Iterator[Handler]:
-        yield from sorted(super().find(*predicates, **criteria))
+    def find_all(self, **criteria) -> Iterator[Handler]:
+        yield from sorted(super().find_all(**criteria))
 
-    def run_one(self, ns: StringMap, *predicates, **criteria) -> Optional[JobReceipt]:
-        _handlers = self.find(*predicates, **criteria)
+    def run_one(self, ns: StringMap, **criteria) -> Optional[JobReceipt]:
+        _handlers = self.find_all(**criteria)
         h = next(_handlers, None)
         return h(ns) if h else None
 
-    def run(self, ns: StringMap, *predicates, **criteria) -> Iterator[JobReceipt]:
-        _handlers = self.find(*predicates, **criteria)
+    def run_all(self, ns: StringMap, *predicates, **criteria) -> Iterator[JobReceipt]:
+        _handlers = self.find_all(*predicates, **criteria)
         for h in _handlers:
             yield h(ns)
 

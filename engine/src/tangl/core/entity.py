@@ -1,19 +1,21 @@
-import dataclasses
+from __future__ import annotations
 from uuid import UUID, uuid4
-from typing import Optional, Self, TypeVar, Generic, Iterator, ClassVar, Type, Callable, overload
+from typing import Optional, Self, TypeVar, Generic, Iterator, ClassVar, Type, Callable, overload, Iterable
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import shortuuid
 
-from tangl.type_hints import StringMap, UniqueLabel, Tag, Predicate
+from tangl.type_hints import StringMap, UniqueLabel, Tag
 from tangl.utils.hasher import hashing_func
+from tangl.utils.base_model_plus import BaseModelPlus
+from tangl.utils.sanitize_str import sanitise_str
 
 logger = logging.getLogger(__name__)
 match_logger = logging.getLogger(__name__ + '.match')
 match_logger.setLevel(logging.WARNING)
 
-class Entity(BaseModel):
+class Entity(BaseModelPlus):
     """
     Entity is the base class for all managed objects.
 
@@ -41,76 +43,80 @@ class Entity(BaseModel):
     # - automatically set default values  .str=100
     # - indicate relationships            @other_node.friendship=+10
 
+    @field_validator('label', mode="after")
+    @classmethod
+    def _sanitize_label(cls, value):
+        if isinstance(value, str):
+            value = sanitise_str(value)
+        return value
+
     def get_label(self) -> str:
         if self.label is not None:
             return self.label
         else:
-            return self.uid.hex
+            return self.short_uid()
 
-    def matches(self, *predicates: Callable[[Self], bool], **criteria) -> bool:
+    def matches(self, predicate: Callable[[Entity], bool] = None, **criteria) -> bool:
         # Callable predicate funcs on self were passed
-        if not all([ p(self) for p in predicates ]):
+        if predicate is not None and not predicate(self):
             return False
         for k, v in criteria.items():
             # Sugar to test individual attributes
             if not hasattr(self, k):
-                match_logger.debug(f'False: entity {self} has no attribute {k}')
+                match_logger.debug(f'False: entity {self!r} has no attribute {k}')
                 # Doesn't exist
                 return False
             item = getattr(self, k)
             if (k.startswith("has_") or k.startswith("is_")) and callable(item):
                 if not item(v):
                     # Is it a predicate attrib that returns false, like `has_tags={a,b,c}`?
-                    match_logger.debug(f'False: entity {self}.{k}({v}) is False')
+                    match_logger.debug(f'False: entity {self!r}.{k}({v}) is False')
                     return False
+                match_logger.debug(f'True: entity {self!r}.{k}({v}) is True')
             elif item != v:
-                match_logger.debug(f'False: entity {self}.{k} != {v}')
+                match_logger.debug(f'False: entity {self!r}.{k} != {v}')
                 # Is it a straight comparison and not equal?
                 return False
         return True
 
-    # Any has methods should not have side effects as they may be called through **criteria args
-    def has_tags(self, tags: set[Tag]) -> bool:
-        return set(tags).issubset(self.tags)
+    @classmethod
+    def filter_by_criteria(cls, values, **criteria) -> Iterator[Self]:
+        return filter(lambda x: x.matches(**criteria), values)
+
+    # Any `has_` methods should not have side effects as they may be called through **criteria args
+    def has_tags(self, *tags: Tag) -> bool:
+        # Normalize args to set[Tag]
+        if isinstance(tags, Tag):
+            tags = { tags }
+        else:
+            tags = set(tags)
+        match_logger.debug(f"Comparing query tags {set(tags)} against {self.tags}")
+        return tags.issubset(self.tags)
 
     def is_instance(self, obj_cls: Type[Self]) -> bool:
         # helper func for matches
         return isinstance(self, obj_cls)
 
-    @classmethod
-    def _fields(cls, **criteria) -> Iterator[str]:
-        # in general, we use opt-out metadata flags,
-        # "don't use me for something"
-        #
-        # But it's easy enough to add metadata key defaults per-field as well, if eventually required.
-        default_annotation = True
-        for n, f in cls.model_fields.items():
-            for k, v in criteria.items():
-                extra = f.json_schema_extra or {}
-                if (getattr(f, k, default_annotation) == v or
-                        extra.get(k, default_annotation) == v):
-                    yield n
+    def short_uid(self) -> str:
+        return shortuuid.encode(self.uid)
+
+    def __repr__(self) -> str:
+        s = self.label or self.short_uid()
+        return f"<{self.__class__.__name__}:{s}>"
 
     def _id_hash(self) -> bytes:
         # For persistent id's, use either the uid or a field annotated as UniqueLabel
         return hashing_func(self.uid, self.__class__)
 
-    def __hash__(self) -> int:
-        return hash((self.uid, self.__class__))
+    # Entities are not frozen, should not be hashed or used in sets, use the uid directly if necessary
+    # def __hash__(self) -> int:
+    #     return hash((self.uid, self.__class__))
 
     def _state_hash(self) -> bytes:
         # Data thumbprint for auditing
         state_data = self.unstructure()
         logger.debug(state_data)
         return hashing_func(state_data)
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, self.__class__):
-            return False
-        for f in self._fields(compare=True):
-            if getattr(self, f) != getattr(other, f):
-                return False
-        return True
 
     @classmethod
     def structure(cls, data: StringMap) -> Self:
@@ -139,13 +145,14 @@ class Entity(BaseModel):
         """
         Unstructure an object into a string-keyed dict of unflattened data.
         """
-        exclude = set(self._fields(serialize=False))
-        logger.debug(f"exclude={exclude}")
+        # Just use field attrib 'exclude' when using Pydantic (missing from dataclass)
+        # exclude = set(self._fields(serialize=False))
+        # logger.debug(f"exclude={exclude}")
         data = self.model_dump(
             exclude_unset=True,
             exclude_none=True,
             exclude_defaults=True,
-            exclude=exclude,
+            # exclude=exclude,
         )
         data['uid'] = self.uid
         data["obj_cls"] = self.__class__
@@ -153,14 +160,16 @@ class Entity(BaseModel):
         # it can be unflattened with `Entity.dereference_cls_name`
         return data
 
+    is_dirty: bool = False
+    # audit indicator that the entity has been tampered with, invalidates certain debugging
+
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
 
 class Registry(Entity, Generic[VT]):
     data: dict[UUID, VT] = Field(default_factory=dict,
-                                 json_schema_extra={'serialize': False,
-                                                    'compare': False})
+                                 json_schema_extra={'compare': False})
 
     def add(self, entity: VT):
         self.data[entity.uid] = entity
@@ -172,7 +181,11 @@ class Registry(Entity, Generic[VT]):
             )
         return self.data.get(key)
 
-    def remove(self, key: UUID):
+    def remove(self, key: VT | UUID):
+        if isinstance(key, Entity):
+            key = key.uid
+        if not isinstance(key, UUID):
+            raise ValueError(f"Wrong type for remove key {key}")
         self.data.pop(key)
 
     def keys(self) -> Iterator[UUID]:
@@ -191,18 +204,18 @@ class Registry(Entity, Generic[VT]):
         self.data.clear()
 
     @overload
-    def find(self, *predicates: Callable[[VT], bool], is_instance: FT, **criteria) -> Iterator[FT]:
+    def find_all(self, *, is_instance: FT, **criteria) -> Iterator[FT]:
         ...
 
     @overload
-    def find(self, *predicates: Callable[[VT], bool], **criteria) -> Iterator[VT]:
+    def find_all(self, **criteria) -> Iterator[VT]:
         ...
 
-    def find(self, *predicates, **criteria):
-        return filter(lambda x: x.matches(*predicates, **criteria), self.values())
+    def find_all(self, **criteria):
+        return Entity.filter_by_criteria(self.values(), **criteria)
 
-    def find_one(self, *predicates: Callable[[VT], bool], **criteria) -> Optional[VT]:
-        return next(self.find(*predicates, **criteria), None)
+    def find_one(self, **criteria) -> Optional[VT]:
+        return next(self.find_all(**criteria), None)
 
     def __contains__(self, key: UUID | str | VT) -> bool:
         if isinstance(key, UUID):
@@ -214,7 +227,7 @@ class Registry(Entity, Generic[VT]):
         raise ValueError(f"Unexpected key type for contains {type(key)}")
 
     def all_labels(self) -> list[str]:
-        return [x.label for x in self.data.values() if x.label is not None]
+        return [x.get_label() for x in self.data.values() if x.get_label() is not None]
 
     def all_tags(self) -> set[str]:
         tags = set()
@@ -238,16 +251,11 @@ class Registry(Entity, Generic[VT]):
             data['_data'].append(v.unstructure())
         return data
 
-    def short_uid(self) -> str:
-        return shortuuid.encode(self.uid)
-
-    def __repr__(self) -> str:
-        s = self.label or self.short_uid()
-        return f"<{self.__class__.__name__}:{s}>"
-
-
 class Singleton(Entity):
     # can ignore uid in comparison, but label must be unique within class
+
+    model_config = ConfigDict(frozen=True)
+
     label: UniqueLabel
     _instances: ClassVar[Registry[Self]] = Registry()
 
@@ -262,19 +270,35 @@ class Singleton(Entity):
         self._instances.add(self)
 
     @classmethod
-    def get_instance(cls, label: str) -> Optional[Self]:
-        return cls._instances.find_one(label=label)
+    def get_instance(cls, key: UUID | UniqueLabel) -> Optional[Self]:
+        if isinstance(key, UUID):
+            return cls._instances.get(key)
+        elif isinstance(key, UniqueLabel):
+            return cls.find_instance(label=key)
+        raise ValueError(f"Unexpected key type for get instance {key}")
+
+    @classmethod
+    def find_instance(cls, **criteria) -> Optional[Self]:
+        return cls._instances.find_one(**criteria)
 
     @classmethod
     def clear_instances(cls) -> None:
         cls._instances.clear()
 
+    @classmethod
+    def all_instances(cls) -> Iterator[Self]:
+        return cls._instances.values()
+
+    @classmethod
+    def all_instance_labels(cls) -> list[str]:
+        return cls._instances.all_labels()
+
     def _id_hash(self) -> bytes:
         # For persistent id's, either the uid or a field annotated as UniqueLabel
-        return hashing_func(self.label, self.__class__)
+        return hashing_func(self.__class__, self.label)
 
     def __hash__(self) -> int:
-        return hash((self.label, self.__class__))
+        return hash((self.__class__, self.label))
 
     @classmethod
     def structure(cls, data: dict) -> Self:

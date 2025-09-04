@@ -90,12 +90,16 @@ def process_directory(root: Path, outfile_name: str):
 
 
 if __name__ == "__main__":
-    # process_directory(pkg_root, "tangl37_archive.py")
-    process_directory(tests_root / 'v37',  "tangl37_tests_archive.py")
+    # current
     process_directory(pkg_root / "core",   "tangl37_core_archive.py")
     process_directory(pkg_root / "vm",     "tangl37_vm_archive.py")
 
+    # testing
+    process_directory(tests_root / 'v37',  "tangl37_tests_archive.py")
+
+    # legacy
     process_directory(pkg_root / "core34", "tangl34_core_archive.py")
     process_directory(pkg_root / "vm34",   "tangl34_vm_archive.py")
-    process_directory(pkg_root / "core36", "tangl36_core_archive.py")
     process_directory(pkg_root / "core35", "tangl35_core_archive.py")
+    process_directory(pkg_root / "core36", "tangl36_core_archive.py")
+    process_directory(pkg_root / "vm36",   "tangl36_vm_archive.py")

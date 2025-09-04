@@ -4,7 +4,7 @@ from uuid import UUID
 from typing import Optional, Iterator, Iterable
 import functools
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from tangl.type_hints import Identifier
 from tangl.utils.hasher import hashing_func
@@ -13,10 +13,15 @@ from .entity import Entity, Registry
 
 class GraphItem(Entity):
     """Base abstraction for all graph elements, self-aware"""
-    graph: Graph = Field(default=None,
-                         json_schema_extra={"serialize": False,
-                                            "compare": False})
+    graph: Graph = Field(default=None, exclude=True)
+    # graph is for local dereferencing only, do not serialize to prevent recursions
     # hold id only for peer graph items to prevent recursions, see edge
+
+    @model_validator(mode='after')
+    def _register_with_graph(self):
+        if self.graph is not None:
+            self.graph.add(self)
+        return self
 
     # use cached-property and invalidate if re-parented
     @functools.cached_property
@@ -57,8 +62,6 @@ class GraphItem(Entity):
             return hashing_func(self.uid, self.__class__, self.graph.uid)
         else:
             return super()._id_hash()
-
-    __hash__ = Entity.__hash__
 
 
 class Graph(Registry[GraphItem]):
@@ -104,25 +107,23 @@ class Graph(Registry[GraphItem]):
     # special finds
     def find_nodes(self, **criteria) -> Iterator[Node]:
         criteria.setdefault("is_instance", Node)
-        return self.find(**criteria)
+        return self.find_all(**criteria)
 
     def find_edges(self, **criteria) -> Iterator[Edge]:
         # find edges in = find_edges(destination=node)
         # find edges out = find_edges(source=node)
         criteria.setdefault("is_instance", Edge)
-        return self.find(**criteria)
+        return self.find_all(**criteria)
 
     def find_subgraphs(self, **criteria) -> Iterator[Subgraph]:
         criteria.setdefault("is_instance", Subgraph)
-        return self.find(**criteria)
+        return self.find_all(**criteria)
 
     def get(self, key: Identifier):
         if isinstance(key, UUID):
             return super().get(key)
         elif isinstance(key, str):
             return self.find_one(label=key) or self.find_one(path=key)
-
-    __hash__ = Entity.__hash__
 
     def _validate_linkable(self, item: GraphItem):
         if not isinstance(item, GraphItem):
@@ -146,11 +147,14 @@ class Node(GraphItem):
     def edges(self, **criteria) -> list[Edge]:
         return list(self.edges_in(**criteria)) + list(self.edges_out(**criteria))
 
-    __hash__ = Entity.__hash__
+    def add_edge_to(self, node: Edge, edge_type: Enum | str = None) -> None:
+        Edge(source_id=self.uid, destination_id=node.uid, graph=self.graph)
 
+    def add_edge_from(self, node: Node) -> None:
+        Edge(source_id=node.uid, destination_id=self.uid, graph=self.graph)
 
 class Edge(GraphItem):
-    edge_type: Optional[Enum] = None       # No need to enumerate this yet
+    edge_type: Optional[Enum|str] = None       # No need to enumerate this yet
     source_id:  Optional[UUID] = None      # usually parent
     destination_id: Optional[UUID] = None  # attach to a structure (choice) or dependency (role, loc, etc.)
 
@@ -197,8 +201,6 @@ class Edge(GraphItem):
 
         return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
 
-    __hash__ = Entity.__hash__
-
 
 class Subgraph(GraphItem):
     subgraph_type: Optional[Enum] = None  # No need to enumerate this yet
@@ -237,5 +239,3 @@ class Subgraph(GraphItem):
 
     def find_one(self, *predicates, **criteria) -> Optional[GraphItem]:
         return next(self.find(*predicates, **criteria), None)
-
-    __hash__ = Entity.__hash__

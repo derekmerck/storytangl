@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import model_validator
 
 from tangl.core.entity import Registry
-from tangl.core.dispatch import HandlerRegistry, Handler
+from tangl.core.handler import HandlerRegistry, Handler
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 class MediaResourceRegistry(Registry[MediaRIT]):
@@ -13,7 +13,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
     """
-    on_index: HandlerRegistry[MediaRIT] = None
+    on_index: HandlerRegistry = None
     mrt_cls: Type[MediaRIT] = MediaRIT
 
     @model_validator(mode="after")

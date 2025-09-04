@@ -6,7 +6,7 @@ import importlib
 import io
 import re
 
-from bson.binary import VECTOR_SUBTYPE
+# from bson.binary import VECTOR_SUBTYPE
 from pydantic import field_validator, ValidationInfo, Field
 from lxml import etree
 from lxml.etree import Element

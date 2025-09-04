@@ -16,7 +16,8 @@ from enum import auto, Flag
 
 from pydantic import Field
 
-from tangl.core.entity import Entity, Node, Graph
+from tangl.core.entity import Entity
+from tangl.core.graph import Node, Graph
 # from tangl.core import Renderable, on_render
 # from tangl.story.story_node import StoryNode
 from tangl.lang.helpers import oxford_join
@@ -70,14 +71,10 @@ class Ornamentation(Node):
     def add_ornament(self, ornament: Ornament ):
         self.collection.append(ornament)
 
-    def remove_ornament(self, ornament_label: str):
-        _candidates = [ x for x in self.collection if x.label == ornament_label ]
-        if _candidates:
-            i = self.collection.index( _candidates[0] )
-            self.collection.pop( i )
-            return
-
-        raise RuntimeError(f"No such ornament {ornament_label}")
+    def remove_ornament(self, ornament: Ornament ):
+        # todo: add a convenience accessor
+        if ornament in self.collection:
+            self.collection.remove(ornament)
 
     # def __bool__(self):
     #     return len(self.ornaments) > 0
