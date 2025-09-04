@@ -2,7 +2,7 @@ from __future__ import annotations
 import random
 from enum import Enum
 
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from tangl.mechanics.games.game_handler import Game, GameHandler, GameResult
 
 from ..game_handler import opponent_strategies, scoring_strategies

@@ -14,7 +14,7 @@ import PIL.Image
 from PIL.Image import Image
 
 from tangl.config import settings
-from tangl.core.entity import Singleton
+from tangl.core.singleton import Singleton
 from . import __title__, __version__
 from .svg_source_manager import SvgSourceManager
 from .svg_group import SvgGroup

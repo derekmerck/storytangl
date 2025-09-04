@@ -3,7 +3,7 @@
 
 Basic vocabulary for describing the shape and basic behaviors of any element in the framework.
 
-Entity and low-level modules such as Graph, Handler, Domain, Provision that depend only on Entity and one another. 
+Entity and low-level, abstract modules such as Graph, Handler, Domain/Scope, and Provisioner that depend only on Entity and one another. 
 
 Modules should not depend on other application- or task-specific tangl subpackages.
 
@@ -23,22 +23,16 @@ Modules should not depend on other application- or task-specific tangl subpackag
 **Singleton**
 - Immutable entities with unique names that can be shared within a semantic scope
 
-**Graphs**
-- A Graph is a registry of GraphItems, Nodes, Edges, and Subgraphs
+**Dispatch**
+- Handlers and HandlerRegistries
+- JobReceipt
+
+**Graph**
+- A Graph is a registry of **GraphItems**, **Nodes**, **Edges**, and **Subgraphs**
 - GraphItem topology provide _shape features_
 - Nodes may be connected by Edges
-- Subgraphs are collections of Nodes that 
-
-**Edge**
-- An entity that lives on a Graph and connects a source node to a destination node
-
-**Subgraph**
-- An entity that lives on a Graph and gathers multiple nodes into a single unit
+- Subgraphs are collections of Nodes that form a structural domain
 - When nodes are also subgraphs, they can provide a scale-space shape representation
 
-**Domains and Scopes**
-...
-
-**Provisioning**
-...
-
+**Domain**
+- Domains are shared capabilities, they publish a namespace layer (vars) and handlers

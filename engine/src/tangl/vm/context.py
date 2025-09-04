@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from tangl.type_hints import Step
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, DomainRegistry
-from tangl.core.handler import Handler
-from tangl.core.provision import Provider
+from tangl.core.dispatch import Handler
+from .planning import Provider
 
 # dataclass for simplified init, not serialized or tracked
 @dataclass

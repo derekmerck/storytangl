@@ -1,6 +1,6 @@
 # tangl/vm/session.py
 import functools
-from enum import Enum
+from enum import IntEnum
 from uuid import UUID
 from dataclasses import dataclass, field
 from copy import deepcopy
@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 # In principle, could merge validate/prereqs, cleanup/postreqs, but they have
 # different aggregation mechanisms, so it's maybe best to keep them distinct.
 
-class ResolutionPhase(Enum):
+class ResolutionPhase(IntEnum):
 
-    INIT = "init"            # Does not run, just indicates not started
-    VALIDATE = "validate"    # return ALL true or None
-    PROVISION = "provision"  # updates graph/data on frontier in place and GATHERS receipts
-    PREREQS = "prereqs"      # return ANY (first) avail prereq edge to a provisioned node to break and redirect
-    UPDATE = "update"        # updates graph/data in place and GATHERS receipts
-    JOURNAL = "journal"      # return PIPE of generated fragments, needs post-processor commit
-    CLEANUP = "cleanup"      # updates graph/data in place and GATHERS receipts
-    POSTREQS = "postreqs"    # return ANY (first) avail postreq edge to provisioned node to redirect
+    INIT = 0         # Does not run, just indicates not started
+    VALIDATE = 10    # check avail new cursor Predicate, return ALL true or None
+    PLANNING = 20    # resolve Dependencies and Affordances; updates graph/data on frontier in place and GATHERS receipts
+    PREREQS = 30     # return ANY (first) avail prereq edge to a provisioned node to break and redirect
+    UPDATE = 40      # mutates graph/data in place and GATHERS receipts
+    JOURNAL = 50     # return PIPE of generated fragments, needs post-processor composite and commit; previously "RENDER"
+    FINALIZE = 60    # cleanup, commit events, consume resources, etc.; updates graph/data in place and GATHERS receipts
+    POSTREQS = 70    # return ANY (first) avail postreq edge to avail, provisioned node to break and redirect
 
-    # Otherwise we also need to guarantee that at least one selectable edge to a
-    # provisioned node exists on the frontier
+    # Otherwise we also need to guarantee that at least **one** selectable edge
+    # to a provisioned node exists on the frontier.
 
 P = ResolutionPhase
 
@@ -104,7 +104,7 @@ class Session:
             raise RuntimeError(f"Proposed next cursor is not valid!")
 
         # May mutate graph/data
-        ns = self.run_phase(P.PROVISION)      # No-op for now
+        ns = self.run_phase(P.PLANNING)      # No-op for now
 
         # Check for prereq cursor redirects
         # todo: implement j/r redirect stack
@@ -123,7 +123,7 @@ class Session:
         # todo: If fragments are stored as nodes, we should update the preview graph again since cleanup might want to see the journal.  Otherwise the journal needs to be stored somewhere else?  In the ns?
 
         # Cleanup bookkeeping
-        ns = self.run_phase(P.CLEANUP)
+        ns = self.run_phase(P.FINALIZE)
 
         # check for postreq cursor redirects
         ns = self.run_phase(P.POSTREQS)    # may set an edge to next cursor

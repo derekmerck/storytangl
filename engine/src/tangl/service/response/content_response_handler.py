@@ -5,7 +5,7 @@ from markdown_it import MarkdownIt
 
 logging.getLogger('markdown_it').setLevel(logging.WARNING)
 
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .content_response import ContentResponse
 
 OutputMode = Literal["html", "ascii"]

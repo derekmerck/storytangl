@@ -1,4 +1,4 @@
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .media_dependency import MediaDep
 
 on_provision_media = HandlerRegistry(label="provision_media")

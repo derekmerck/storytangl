@@ -1,6 +1,7 @@
 import pytest
 
-from tangl.core.entity import Entity, Registry
+from tangl.core.entity import Entity
+from tangl.core.registry import Registry
 
 class TestEntity(Entity):
     foo: int = 0

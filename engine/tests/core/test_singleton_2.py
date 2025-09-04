@@ -5,7 +5,7 @@ import pickle
 from pydantic import BaseModel, Field, ValidationError
 import pytest
 
-from tangl.core.entity import Singleton
+from tangl.core.singleton import Singleton
 
 # Test fixtures
 # 

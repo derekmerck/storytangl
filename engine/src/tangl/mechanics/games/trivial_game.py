@@ -5,7 +5,7 @@ import random
 
 from pydantic import ConfigDict, Field
 
-from tangl.core.handler import HandlerRegistry
+from tangl.core.dispatch import HandlerRegistry
 from .game_handler import GameHandler, Game
 from .enums import GameResult
 

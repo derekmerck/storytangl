@@ -3,7 +3,7 @@ import uuid
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import Handler, HandlerPriority, HandlerRegistry, JobReceipt
+from tangl.core.dispatch import Handler, HandlerPriority, HandlerRegistry, JobReceipt
 
 class DummyEntity(Entity):
     foo: int = None

@@ -14,6 +14,7 @@ ignore_imports = True
 project_root = Path(__file__).parent.parent
 pkg_root = project_root / "engine/src/tangl"
 tests_root = project_root / "engine/tests"
+legacy_root = project_root / "scratch/legacy"
 outfile_dir = project_root / "tmp/dumps"
 
 def get_tree(root: Path):
@@ -25,15 +26,27 @@ def get_tree(root: Path):
                             ).stdout
     return result
 
-def process_directory(root: Path, outfile_name: str):
+def process_directory(root: Path,
+                      outfile_name: str,
+                      include_mds: bool = False,
+                      prepend_files: list[Path] = None):
 
     print( root )
     data = {}
     files = list(root.glob("**/*.py"))  # + list(root.glob("**/*.md"))
+    if include_mds:
+        files = files + list(root.glob("**/*.md"))
+    if prepend_files is not None:
+        files = prepend_files + files
     for f in files:
         with open(f) as fp:
-            name = f.relative_to(root)
+            try:
+                name = f.relative_to(root)
+            except ValueError:
+                name = f.relative_to(pkg_root)
             content = fp.read()
+            if f.suffix == ".md":
+                content = '"""\n' + content + '"""\n'
             if content:
                 data[name] = content
 
@@ -44,9 +57,18 @@ def process_directory(root: Path, outfile_name: str):
 
     def _fp(fn):
         result = Path(fn).relative_to(project_root)
-        if 'engine/src/' in str(result):
-            result = result.relative_to('engine/src/')
+        for p in ['engine/src/', 'engine/tests/', 'scratch/legacy/']:
+            if p in str(result):
+                result = result.relative_to(p)
         return result
+
+        # if 'engine/src/' in str(result):
+        #     result = result.relative_to('engine/src/')
+        # elif 'engine/tests/' in str(result):
+        #     result = result.relative_to('engine/tests/')
+        # elif 'scratch/legacy/' in str(result):
+        #     result = result.relative_to('scratch/legacy/')
+        # return result
 
     def _marker(label: str):
         return f"\n# {'-'*10} {label} {'-'*10}\n"
@@ -91,15 +113,19 @@ def process_directory(root: Path, outfile_name: str):
 
 if __name__ == "__main__":
     # current
-    process_directory(pkg_root / "core",   "tangl37_core_archive.py")
+    process_directory(pkg_root / "core",
+                      "tangl37_core_archive.py",
+                      include_mds=True,
+                      prepend_files=[pkg_root / "type_hints.py"])
     process_directory(pkg_root / "vm",     "tangl37_vm_archive.py")
 
     # testing
-    process_directory(tests_root / 'v37',  "tangl37_tests_archive.py")
+    process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")
+    process_directory(tests_root / 'vm',   "tangl37_vm_tests_archive.py")
 
     # legacy
-    process_directory(pkg_root / "core34", "tangl34_core_archive.py")
-    process_directory(pkg_root / "vm34",   "tangl34_vm_archive.py")
-    process_directory(pkg_root / "core35", "tangl35_core_archive.py")
-    process_directory(pkg_root / "core36", "tangl36_core_archive.py")
-    process_directory(pkg_root / "vm36",   "tangl36_vm_archive.py")
+    process_directory(legacy_root / "core/core-34", "tangl34_core_archive.py")
+    process_directory(legacy_root / "vm/vm-34",     "tangl34_vm_archive.py")
+    process_directory(legacy_root / "core/core-35", "tangl35_core_archive.py")
+    process_directory(legacy_root / "core/core-36", "tangl36_core_archive.py")
+    process_directory(legacy_root / "vm/vm-36",     "tangl36_vm_archive.py")

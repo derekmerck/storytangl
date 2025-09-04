@@ -27,6 +27,6 @@ def test_get_ns_returns_fresh_top_layer_per_phase(session):
     from tangl.vm.session import ResolutionPhase as P
     ns1 = session.get_ns(P.VALIDATE)
     ns1["sentinel"] = True
-    ns2 = session.get_ns(P.CLEANUP)
+    ns2 = session.get_ns(P.FINALIZE)
     assert "sentinel" not in ns2
-    assert ns2["phase"] is P.CLEANUP
+    assert ns2["phase"] is P.FINALIZE

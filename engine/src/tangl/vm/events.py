@@ -10,7 +10,8 @@ from copy import deepcopy
 from pydantic import Field, ConfigDict
 import wrapt
 
-from tangl.core.entity import Entity, Registry, VT
+from tangl.core.entity import Entity
+from tangl.core.registry import Registry, VT
 
 
 class EventType(Enum):

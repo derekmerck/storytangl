@@ -4,7 +4,7 @@ import logging
 from pydantic import BaseModel, Field, field_validator
 
 from tangl.utils.load_yaml_resource import load_yaml_resource
-from tangl.core.entity import Singleton
+from tangl.core.singleton import Singleton
 # todo: want to be able to influence weighting for region, country, subtype, gender on random sample
 #       for example, prefer this region, country, subtype, gender
 

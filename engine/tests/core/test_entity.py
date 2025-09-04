@@ -2,7 +2,7 @@ import pytest
 from uuid import UUID
 import pickle
 
-from tangl.core.entity import Entity, Registry
+from tangl.core.entity import Entity
 
 class TestEntity(Entity):
     foo: int = 0

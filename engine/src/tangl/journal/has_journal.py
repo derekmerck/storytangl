@@ -7,7 +7,7 @@ from pydantic import Field
 
 from tangl.type_hints import UnstructuredData
 from tangl.utils.bookmarked_list import BookmarkedList
-from tangl.core.entity import Registry
+from tangl.core.registry import Registry
 from tangl.core.graph import Node
 from tangl.journal.fragment import BaseFragment
 # from ..abs_feature_graph import BlameEdge
