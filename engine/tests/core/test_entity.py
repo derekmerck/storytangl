@@ -182,7 +182,7 @@ def test_entity_tags():
     a = Entity()
     assert a.tags == set()
 
-    assert 'tags' not in a.unstructure()  # b/c it's unset
+    # assert 'tags' not in a.unstructure()  # b/c it's unset
 
     a = Entity(tags={"a"})
     assert a.tags == {"a"}

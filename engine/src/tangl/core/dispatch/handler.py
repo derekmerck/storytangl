@@ -1,17 +1,13 @@
 from __future__ import annotations
 import functools
 from enum import IntEnum
-from typing import TypeAlias, Literal, Any, ClassVar, Iterator, Optional, Iterable, Callable, Protocol
-from uuid import UUID
+from typing import TypeAlias, Any, Callable
 
-from pydantic import model_validator, Field, ConfigDict
+from pydantic import ConfigDict
 
-from tangl.type_hints import Predicate, StringMap
+from tangl.type_hints import StringMap as NS
 from tangl.core.entity import Entity, Conditional
-from tangl.core.registry import Registry
 from .job_receipt import JobReceipt
-
-NS = StringMap
 
 HandlerFunc: TypeAlias = Callable[[NS], Any]
 
@@ -54,7 +50,7 @@ class Handler(Conditional, Entity):
     priority: HandlerPriority | int = HandlerPriority.NORMAL
     reg_number: int = -1  # assumes handler in no more than 1 registry
 
-    def __call__(self, ns: StringMap) -> JobReceipt:
+    def __call__(self, ns: NS) -> JobReceipt:
         if not self.available(ns):
             raise RuntimeError(f"Handler {self} not available")
         return JobReceipt(blame_id=self.uid,

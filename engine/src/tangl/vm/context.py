@@ -6,11 +6,11 @@ from uuid import UUID
 import functools
 from dataclasses import dataclass, field
 
-from tangl.type_hints import Step
+from tangl.type_hints import Step, StringMap
 from tangl.core.graph import Graph, Node
-from tangl.core.domain import Scope, NS, DomainRegistry
+from tangl.core.domain import Scope, DomainRegistry, NS
 from tangl.core.dispatch import Handler
-from .planning import Provider
+from .planning import Provisioner
 
 # dataclass for simplified init, not serialized or tracked
 @dataclass
@@ -59,5 +59,5 @@ class Context:
     def get_handlers(self, **criteria) -> Iterator[Handler]:
         return self.scope.get_handlers(**criteria)
 
-    def get_providers(self, **criteria) -> Iterator[Provider]:
+    def get_providers(self, **criteria) -> Iterator[Provisioner]:
         return self.scope.get_providers(**criteria)

@@ -1,4 +1,5 @@
-# The Abstract Narrative Graph Lib (Tangl)
+StoryTangl - Project Mission (v3.2)
+===================================
 
 ## Overview
 

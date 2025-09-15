@@ -52,7 +52,7 @@ def test_event_replay_create_update_delete_roundtrip():
     wg.remove(n2.uid)
 
     # now replay on a deepcopy of the original graph
-    g2 = Event.replay_all(w.events, g)
+    g2 = w.replay(g)
     assert g2.find_one(label="ONE") is not None
     assert g2.find_one(label="two") is None
 
@@ -69,8 +69,8 @@ def test_event_replay_is_idempotent():
     pn.label = "Z"
 
     # apply twice to fresh clones; results should match
-    g1 = Event.replay_all(w.events, g)
-    g2 = Event.replay_all(w.events, g)
+    g1 = w.replay(g)
+    g2 = w.replay(g)
     assert g1.find_one(label="Z") and g2.find_one(label="Z")
 
 @pytest.mark.xfail(reason="haven't decided where to keep locals yet and need a watched mapping proxy")

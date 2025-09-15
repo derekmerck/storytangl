@@ -48,4 +48,4 @@ class Subgraph(GraphItem):
                 yield member
 
     def find_one(self, **criteria) -> Optional[GraphItem]:
-        return next(self.find_one(**criteria), None)
+        return next(self.find_all(**criteria), None)

@@ -1,15 +1,14 @@
-from typing import Any, Iterable
+from typing import Any, Iterable, TypeAlias
 from collections import ChainMap
 
 from pydantic import Field
 
-from tangl.type_hints import StringMap, Predicate
+from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 from tangl.core.graph import Node
 from tangl.core.dispatch import HandlerRegistry, DEFAULT_HANDLERS
 
-NS = ChainMap[str, Any]
 
 try:
     from tangl.info import __version__

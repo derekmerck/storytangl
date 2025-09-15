@@ -1,10 +1,34 @@
 # tangl/core/registry.py
+"""
+tangl.core.registry
+===================
+
+Collection management for entities with robust search capabilities.
+
+The Registry provides a generic dictionary-like container for Entity
+objects with enhanced retrieval options:
+
+- UUID-based direct access for performance-critical operations
+- Criteria-based flexible search for dynamic discovery
+- Type safety via generic parameters
+- Composition over inheritance for extensibility
+
+The Registry underpins the core StoryTangl graph management.
+
+This component is foundational as it enables decoupling between
+storage patterns and retrieval logic, letting capabilities
+find requirements and vice versa without direct references.
+"""
+
 from typing import TypeVar, Generic, Optional, Iterator, overload, Self
 from uuid import UUID
+from collections import Counter
+import itertools
+import warnings
 
 from pydantic import Field
 
-from tangl.type_hints import StringMap
+from tangl.type_hints import StringMap, Tag
 from .entity import Entity
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
@@ -31,6 +55,53 @@ class Registry(Entity, Generic[VT]):
             raise ValueError(f"Wrong type for remove key {key}")
         self.data.pop(key)
 
+    @property
+    def is_dirty(self):
+        # One bad apple ruins the barrel
+        return self.is_dirty_ or \
+            any([item.is_dirty for item in self])
+
+    # -------- FIND IN COLLECTION ----------
+
+    @overload
+    def find_all(self, *, is_instance: FT, **criteria) -> Iterator[FT]:
+        ...
+
+    @overload
+    def find_all(self, **criteria) -> Iterator[VT]:
+        ...
+
+    def find_all(self, sort_key = None, **criteria):
+        iter_values = Entity.filter_by_criteria(self.values(), **criteria)
+        if sort_key is None:
+            yield from iter_values
+        else:
+            yield from sorted(iter_values, key=sort_key)
+
+    def find_one(self, **criteria) -> Optional[VT]:
+        if "uid" in criteria:
+            return self.get(criteria["uid"])
+        return next(self.find_all(**criteria), None)
+
+    # -------- CHAINED FIND ----------
+
+    @classmethod
+    def chain_find_all(cls, *registries: Self, sort_key = None, **criteria) -> Iterator[VT]:
+        iter_values = itertools.chain.from_iterable(
+            r.find_all(**criteria) for r in registries)
+        if sort_key is None:
+            yield from iter_values
+        else:
+            yield from sorted(iter_values, key=sort_key)
+
+    @classmethod
+    def chain_find_one(cls, *registries: Self, sort_key = None, **criteria) -> Optional[VT]:
+        if sort_key is None:
+            warnings.warn("chain_find_one with no sort key is legal, but it may not be what you want, it is just reg[0].find_one()")
+        return next(cls.chain_find_all(*registries, sort_key=sort_key, **criteria), None)
+
+    # -------- DELEGATE MAPPING METHODS -----------
+
     def keys(self) -> Iterator[UUID]:
         return iter(self.data.keys())
 
@@ -43,22 +114,11 @@ class Registry(Entity, Generic[VT]):
     def __len__(self) -> int:
         return len(self.data)
 
+    def __iter__(self) -> Iterator[VT]:
+        return iter(self.data.values())
+
     def clear(self) -> None:
         self.data.clear()
-
-    @overload
-    def find_all(self, *, is_instance: FT, **criteria) -> Iterator[FT]:
-        ...
-
-    @overload
-    def find_all(self, **criteria) -> Iterator[VT]:
-        ...
-
-    def find_all(self, **criteria):
-        return Entity.filter_by_criteria(self.values(), **criteria)
-
-    def find_one(self, **criteria) -> Optional[VT]:
-        return next(self.find_all(**criteria), None)
 
     def __contains__(self, key: UUID | str | VT) -> bool:
         if isinstance(key, UUID):
@@ -69,14 +129,31 @@ class Registry(Entity, Generic[VT]):
             return key in self.all_labels()
         raise ValueError(f"Unexpected key type for contains {type(key)}")
 
+    # -------- SUMMARY HELPERS ----------
+
     def all_labels(self) -> list[str]:
         return [x.get_label() for x in self.data.values() if x.get_label() is not None]
 
-    def all_tags(self) -> set[str]:
-        tags = set()
-        for x in self.data.values():
-            tags.update(x.tags)
-        return tags
+    def all_tags(self) -> set[Tag]:
+        return set(itertools.chain.from_iterable(i.tags for i in self))
+
+    def all_tags_frequency(self) -> Counter[Tag]:
+        return Counter(itertools.chain.from_iterable(i.tags for i in self))
+
+    # -------- EVENT SOURCED REPLAY ----------
+
+    def _add_silent(self, entity: VT):
+        self.data[entity.uid] = entity
+
+    def _get_silent(self, key: UUID) -> Optional[VT]:
+        return self.data.get(key)
+
+    def _remove_silent(self, key: VT | UUID):
+        if isinstance(key, Entity):
+            key = key.uid
+        self.data.pop(key)
+
+    # -------- STRUCTURING AND UNSTRUCTURING ----------
 
     @classmethod
     def structure(cls, data: StringMap) -> Self:

@@ -1,12 +1,13 @@
 from __future__ import annotations
 from uuid import UUID, uuid4
-from typing import Optional, Self, TypeVar, Generic, Iterator, ClassVar, Type, Callable, overload, Iterable
+from typing import Optional, Self, Iterator, Type, Callable
 import logging
+from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator
 import shortuuid
 
-from tangl.type_hints import StringMap, UniqueLabel, Tag
+from tangl.type_hints import StringMap, Tag, Predicate
 from tangl.utils.hasher import hashing_func
 from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitise_str
@@ -86,11 +87,11 @@ class Entity(BaseModelPlus):
     # Any `has_` methods should not have side effects as they may be called through **criteria args
     def has_tags(self, *tags: Tag) -> bool:
         # Normalize args to set[Tag]
-        if isinstance(tags, Tag):
-            tags = { tags }
+        if len(tags) == 1 and isinstance(tags[0], set):
+            tags = tags[0]  # already a set of tags
         else:
             tags = set(tags)
-        match_logger.debug(f"Comparing query tags {set(tags)} against {self.tags}")
+        match_logger.debug(f"Comparing query tags {tags} against {self.tags}")
         return tags.issubset(self.tags)
 
     def is_instance(self, obj_cls: Type[Self]) -> bool:
@@ -99,6 +100,13 @@ class Entity(BaseModelPlus):
 
     def short_uid(self) -> str:
         return shortuuid.encode(self.uid)
+
+    is_dirty_: bool = Field(default=False, alias="is_dirty")
+    # audit indicator that the entity has been tampered with, invalidates certain debugging
+
+    @property
+    def is_dirty(self):
+        return self.is_dirty_
 
     def __repr__(self) -> str:
         s = self.label or self.short_uid()
@@ -149,20 +157,16 @@ class Entity(BaseModelPlus):
         # exclude = set(self._fields(serialize=False))
         # logger.debug(f"exclude={exclude}")
         data = self.model_dump(
-            exclude_unset=True,
+            # exclude_unset=True,  # too many things are mutated after being initially unset
             exclude_none=True,
             exclude_defaults=True,
             # exclude=exclude,
         )
-        data['uid'] = self.uid
+        data['uid'] = self.uid  # uid is considered Unset initially
         data["obj_cls"] = self.__class__
         # The 'obj_cls' key _may_ be flattened by some serializers.  If flattened as qual name,
         # it can be unflattened with `Entity.dereference_cls_name`
         return data
-
-    is_dirty: bool = False
-    # audit indicator that the entity has been tampered with, invalidates certain debugging
-
 
 
 class Conditional(BaseModel):

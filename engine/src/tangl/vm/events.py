@@ -1,7 +1,6 @@
 # tangl/vm/events.py
 from __future__ import annotations
 from dataclasses import dataclass, field
-
 from enum import Enum
 from uuid import UUID
 from typing import ClassVar, Protocol, Any, Iterable, Optional
@@ -29,9 +28,9 @@ class Event(Entity):
     value: Any = Field(...)
     old_value: Any | None = None
 
-    def replay(self, registry: Registry) -> None:
+    def apply(self, registry: Registry) -> None:
         if not isinstance(registry, Registry):
-            raise TypeError("Event replay should be called directly on a Registry")
+            raise TypeError("Event.apply should be called directly on a Registry")
         if self.source_id == registry.uid:
             source = registry
         else:
@@ -52,25 +51,13 @@ class Event(Entity):
             case EventType.DELETE:
                 # slightly obtuse, but probably rarely used
                 # if it has a _name_ it's a delattr,
-                # if it has a value, it's a remove item
+                # if it has a _value_, it's a remove item
                 if self.name is not None:
                     delattr(source, self.name)
                 elif self.value is not None:
                     source.remove(self.value)
                 else:
                     raise ValueError("Must have a attrib name or a value-key for remove")
-            case _:
-                pass
-
-    @classmethod
-    def replay_all(cls, events: Iterable[Event], registry: Registry) -> Registry:
-        # returns an _updated copy_ of the source
-        if not isinstance(registry, Registry):
-            raise TypeError("Event replay should be called directly on a Registry")
-        _registry = deepcopy(registry)
-        for event in events:
-            event.replay(_registry)
-        return _registry
 
 class EventWatcher(Protocol):
     def submit(self, event: Event) -> None: ...
@@ -87,8 +74,15 @@ class ReplayWatcher:
     def submit(self, event: Event) -> None:
         self.events.append(event)
 
-    def replay_all(self, registry: Registry) -> Registry:
-        return Event.replay_all(self.events, registry)
+    def replay(self, registry: Registry) -> Registry:
+        # todo: need to sort events by type, seq so all deletes happen at the end, for example
+        # returns an _updated copy_ of the source
+        if not isinstance(registry, Registry):
+            raise TypeError("Event replay should be called directly on a Registry")
+        _registry = deepcopy(registry)
+        for event in self.events:
+            event.apply(_registry)
+        return _registry
 
 class WatchedEntityProxy(wrapt.ObjectProxy):
     _watchers: list[EventWatcher]

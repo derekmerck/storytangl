@@ -4,7 +4,7 @@ import pytest
 
 from tangl.core.entity import Entity
 from tangl.core.graph import Graph
-from tangl.vm.planning import Provisioner, Provider, ProvisionOffer, ProvisionRequirement
+from tangl.vm.planning import Provisioner, Requirement
 
 # ---------- Provisioning orchestration ----------
 
@@ -25,7 +25,7 @@ def test_provisioner_runs_offers_with_ns_and_returns_job_receipts():
             cost=1.0,
         )]
 
-    prov = Provider(_get_affordances_func=get_affordances)
+    prov = Provisioner(_get_affordances_func=get_affordances)
 
     ns = {"scope": "abc"}
     receipts = Provisioner.run([prov], ns=ns, requirement=None)
@@ -35,7 +35,7 @@ def test_provisioner_runs_offers_with_ns_and_returns_job_receipts():
 
 @pytest.mark.xfail(reason="not working")
 def test_provisioner_blame_tuple_when_requirement_present():
-    req = ProvisionRequirement(dependency_id=uuid.uuid4(), criteria={"k": "v"})
+    req = Requirement(dependency_id=uuid.uuid4(), criteria={"k": "v"})
 
     def get_offers(ns, requirement):
         def accept(_ns):
@@ -49,7 +49,7 @@ def test_provisioner_blame_tuple_when_requirement_present():
             cost=1.0,
         )]
 
-    prov = Provider(_get_affordances_func=None, _get_offers_func=get_offers)
+    prov = Provisioner(_get_affordances_func=None, _get_offers_func=get_offers)
     receipts = Provisioner.run([prov], ns={"x": 1}, requirement=req)
     assert len(receipts) == 1
     assert isinstance(receipts[0].blame_id, tuple) and len(receipts[0].blame_id) == 2

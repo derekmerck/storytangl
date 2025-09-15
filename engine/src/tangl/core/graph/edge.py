@@ -4,6 +4,7 @@ from typing import Optional, Iterator, TYPE_CHECKING
 from enum import Enum
 from uuid import UUID
 
+from tangl.core.entity import Entity
 from .graph import GraphItem, Graph
 
 if TYPE_CHECKING:
@@ -56,4 +57,11 @@ class Edge(GraphItem):
             dest_label = "anon"
 
         return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
+
+class AnonymousEdge(Entity):
+    # Minimal Edge that does not require a graph, so it can be garbage collected
+    source: Node
+    dest: Node
+
+    __repr__ = Edge.__repr__
 

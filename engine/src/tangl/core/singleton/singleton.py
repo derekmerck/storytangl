@@ -1,6 +1,6 @@
 # tangl/core/singleton.py
 from __future__ import annotations
-from typing import ClassVar, Self, Optional
+from typing import ClassVar, Self, Optional, Iterator
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -16,10 +16,11 @@ class Singleton(Entity):
     model_config = ConfigDict(frozen=True)
 
     label: UniqueLabel
-    _instances: ClassVar[Registry[Self]] = Registry()
+    _instances: ClassVar[Registry[Self]] = Registry(label="singleton_instances")
 
     def __init_subclass__(cls, **kwargs):
-        cls._instances = Registry()  # keep an instance registry per subclass
+        label = cls.__name__.lower() + "_instances"
+        cls._instances = Registry(label=label)  # keep an instance registry per subclass
         super().__init_subclass__()
 
     def __init__(self, *, label: str, **kwargs):
@@ -30,6 +31,7 @@ class Singleton(Entity):
 
     @classmethod
     def get_instance(cls, key: UUID | UniqueLabel) -> Optional[Self]:
+        # In this case, we will allow get by str and assume it's the label
         if isinstance(key, UUID):
             return cls._instances.get(key)
         elif isinstance(key, UniqueLabel):

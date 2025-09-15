@@ -18,7 +18,7 @@ UniqueLabel: TypeAlias = str    # Must be unique within namespace, may be used f
 Identifier: TypeAlias = Union[UUID, UniqueLabel, Hash]  # Any unique alias assigned to an instance
 Expr: TypeAlias = str           # Evaluable/executable string expression
 Tag: TypeAlias = Union[Enum, str, int]  # Tags may be enums, strs, or ints
-ClassName: TypeAlias = str      # Unique name of an entity subclass
+ClassName: TypeAlias = UniqueLabel      # Unique name of an entity subclass
 TemplateName: TypeAlias = str   # Unique name of a default attributes template
 TemplateMap: TypeAlias = dict[TemplateName, StringMap]  # Collection of default attributes by name
 Step: TypeAlias = int           # Graph traversal or resolution step counter
@@ -26,7 +26,7 @@ Step: TypeAlias = int           # Graph traversal or resolution step counter
 # Used by storage and serializers
 class HasUid(Protocol):
     uid: UUID
-UnstructuredData = StringMap
+UnstructuredData: TypeAlias = StringMap
 # A string map of kwargs suitable for structuring a HasUid instance, includes an 'obj_cls' and 'uid' key
 FlatData: TypeAlias = str | bytes
 # A data-stream representation of an object suitable for serialization

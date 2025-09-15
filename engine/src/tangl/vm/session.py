@@ -1,14 +1,17 @@
 # tangl/vm/session.py
+from __future__ import annotations
+from typing import Literal, Optional
 import functools
-from enum import IntEnum
+from enum import IntEnum, Enum
 from uuid import UUID
 from dataclasses import dataclass, field
 from copy import deepcopy
 import logging
 
-from tangl.type_hints import Step
+from tangl.type_hints import Step, StringMap as NS
+from tangl.core.entity import Conditional
 from tangl.core.graph import Graph, Edge, Node
-from tangl.core.domain import DomainRegistry, NS
+from tangl.core.domain import DomainRegistry
 from .context import Context
 from .events import ReplayWatcher, Event, WatchedRegistry
 
@@ -32,6 +35,13 @@ class ResolutionPhase(IntEnum):
     # to a provisioned node exists on the frontier.
 
 P = ResolutionPhase
+
+class ChoiceEdge(Edge, Conditional):
+    # Need to introduce concept of selectable vs. automatically followed edges.
+    # Previously called 'traversable edge', these ONLY link 'structural' nodes.
+    trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
+    # If trigger phase is not None, edge will auto-trigger if conditions are met.
+    # Otherwise, it is considered Selectable and will be presented to the
 
 # dataclass for simplified init, not serialized or tracked
 @dataclass
@@ -60,6 +70,7 @@ class Session:
     @functools.cached_property
     def context(self) -> Context:
         if self.event_sourced:
+            # Use a watched registry proxy if using event sourcing mechanism
             _graph = self.get_preview_graph()  # copy w events applied
             graph: Graph = WatchedRegistry(wrapped=_graph, watchers=[self.event_watcher])
         else:
@@ -77,7 +88,6 @@ class Session:
         session_layer = {
             "cursor": self.cursor,  # should be included by context layer, duplicated for safety
             "step": self.step,      # should be included by context layer, duplicated for safety
-
             "phase": phase,         # phase annotation for handlers
             "results": [],          # receipts from handlers run during this phase
         }

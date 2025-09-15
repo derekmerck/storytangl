@@ -1,6 +1,6 @@
 # Scope is a node-anchored view of all relevant affiliate and structured domains.
 
-from typing import Any, Iterator, Self, Iterable
+from typing import Any, Iterator, TypeAlias
 import functools
 from collections import ChainMap
 import itertools
@@ -12,7 +12,9 @@ from tangl.core.entity import Entity
 from tangl.core.graph import Graph, Node
 from tangl.core.registry import Registry
 from tangl.core.dispatch import Handler
-from .domain import Domain, global_domain, NS
+from .domain import Domain, global_domain
+
+NS: TypeAlias = ChainMap[str, Any]
 
 class Scope(Entity):
 

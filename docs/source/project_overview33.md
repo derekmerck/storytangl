@@ -1,5 +1,5 @@
-StoryTangl
-==========
+StoryTangl - Project Mission (v3.3)
+===================================
 
 A high dimensional latent 'story space' that can represent all of the possible concepts and realizations that apply to a particular story form.
 

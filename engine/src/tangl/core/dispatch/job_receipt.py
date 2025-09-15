@@ -4,9 +4,9 @@ import functools
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import model_validator
+from pydantic import model_validator, Field
 
-from tangl.type_hints import StringMap
+from tangl.type_hints import UnstructuredData
 from tangl.core.entity import Entity
 
 @functools.total_ordering
@@ -14,11 +14,11 @@ class JobReceipt(Entity):
 
     blame_id: UUID | tuple[UUID, ...]  # blame
     result: Any
-    seq: int
+    seq: int = Field(init=False)       # type checking, ignore missing
 
     @model_validator(mode="before")
     @classmethod
-    def _set_seq(cls, data: StringMap):
+    def _set_seq(cls, data: UnstructuredData) -> UnstructuredData:
         data = dict(data or {})
         if data.get('seq') is None:   # unassigned or passed none
             # Don't want to incr if not using it
