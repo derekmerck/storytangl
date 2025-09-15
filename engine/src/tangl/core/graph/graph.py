@@ -6,7 +6,7 @@ import functools
 from pydantic import Field, model_validator
 
 from tangl.type_hints import Identifier
-from tangl.utils.hasher import hashing_func
+from tangl.utils.hashing import hashing_func
 from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from tangl.utils.compute_data_hash import compute_data_hash
+from tangl.utils.hashing import compute_data_hash
 from tangl.utils.get_file_mtime import get_file_mtime
 from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 

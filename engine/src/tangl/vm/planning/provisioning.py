@@ -1,24 +1,20 @@
 # tangl/vm/provisioning.py
 from __future__ import annotations
-from dataclasses import dataclass
-from unittest import case
-from uuid import UUID
-import functools
-from typing import Callable, Optional, Iterable
+from dataclasses import dataclass, field
+from typing import Optional
 
-from tangl.type_hints import StringMap, Predicate, Identifier, UnstructuredData
-from tangl.core import Entity, Handler, JobReceipt, Node, GraphItem, Graph
+from tangl.type_hints import StringMap, Identifier, UnstructuredData
+from tangl.core import Node, Registry
 from .requirement import Requirement, ProvisioningPolicy
 
 @dataclass
 class Provisioner:
     # Default provisioner for Dependency edges
+    # todo: Provisioners need to be implemented like handlers/handler registries, so
+    #       that they can be passed around in domains, I think
 
     requirement: Requirement
-
-    @property
-    def graph(self) -> Graph:
-        return self.requirement.graph
+    registries: list[Registry] = field(default_factory=list)
 
     def _resolve_existing(self,
                           provider_id: Optional[Identifier] = None,
@@ -31,7 +27,7 @@ class Provisioner:
             provider_criteria['alias'] = provider_id
         if not provider_criteria:
             raise ValueError("Must include some provider id or criteria")
-        return self.graph.find_one(criteria=provider_criteria)
+        return Registry.chain_find_one(self.requirement.graph, *self.registries, **provider_criteria)
 
     def _resolve_update(self,
                         provider_id: Optional[Identifier] = None,
@@ -64,11 +60,11 @@ class Provisioner:
     def _resolve_create(self, provider_template: UnstructuredData) -> Node:
         """Create successor from template"""
         provider = Node.structure(provider_template)
-        self.graph.add(provider)
         return provider
 
+    # todo: this is the fallback for "on_provision_media", it returns if nothing else does first
     def resolve(self) -> Optional[Node]:
-        """Attempt to resolve successor through available methods"""
+        """Attempt to resolve a provider for the requirement attribs and given policy"""
 
         provider = None
 

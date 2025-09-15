@@ -19,6 +19,14 @@ class Service(Singleton):
 class OtherService(Singleton):
     description: str | None = None
 
+@pytest.fixture(autouse=True)
+def clear_singletons():
+    Service.clear_instances()
+    OtherService.clear_instances()
+    yield
+    Service.clear_instances()
+    OtherService.clear_instances()
+
 
 # --- Entity tests --------------------------------------------------------------------
 

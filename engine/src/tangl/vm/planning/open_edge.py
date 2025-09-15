@@ -1,6 +1,8 @@
 # tangl/vm/open_edge.py
+from typing import TypeVar, Generic
+
 from tangl.core.graph import Edge, Node
-from .requirement import Requirement
+from .requirement import Requirement, NodeT
 
 # Provides the carrier mechanism to map requirements into the graph-topology.
 # Alternatively, they could be represented as control-Nodes that weld together
@@ -9,7 +11,7 @@ from .requirement import Requirement
 # These are dynamic edges that can provoke a topological update via an 'update' event
 # on their requirement component.  Need to be careful to watch that.
 
-class Dependency(Edge):
+class Dependency(Edge, Generic[NodeT]):
     """
     Dependencies are edges with defined sources and open destinations.  For example, a
     node might _require_ a green friend node before it can be used.
@@ -25,14 +27,14 @@ class Dependency(Edge):
     pre-existing direct or indirect provider is available.
     """
     # dependencies project into the ns of their **source** as {self.label: self.destination}
-    requirement: Requirement
+    requirement: Requirement[NodeT]
 
     @property
-    def destination(self):
+    def destination(self) -> NodeT:
         return self.requirement.provider
 
     @destination.setter
-    def destination(self, value):
+    def destination(self, value: NodeT) -> None:
         self.requirement.provider = value
 
     @property
@@ -40,7 +42,7 @@ class Dependency(Edge):
         return self.requirement.satisfied
 
 
-class Affordance(Edge):
+class Affordance(Edge, Generic[NodeT]):
     """
     Affordances are edges with defined destinations and open sources.  For example, a node may
     be available from any other node that has a green friend node available.
@@ -65,15 +67,15 @@ class Affordance(Edge):
     """
     # affordances project into the ns of the **destination** as {self.label: self.source}
 
-    requirement: Requirement
+    requirement: Requirement[NodeT]
     # note, default `hard_requirement` should be False
 
     @property
-    def source(self) -> Node:
+    def source(self) -> NodeT:
         return self.requirement.provider
 
     @source.setter
-    def source(self, value: Node):
+    def source(self, value: NodeT) -> None:
         self.requirement.provider = value
 
     @property

@@ -41,7 +41,8 @@ class ChoiceEdge(Edge, Conditional):
     # Previously called 'traversable edge', these ONLY link 'structural' nodes.
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
     # If trigger phase is not None, edge will auto-trigger if conditions are met.
-    # Otherwise, it is considered Selectable and will be presented to the
+    # Otherwise, it is considered Selectable and will be presented in the session
+    # output.
 
 # dataclass for simplified init, not serialized or tracked
 @dataclass
@@ -51,7 +52,7 @@ class Session:
     # Scope is inferred from Graph, cursor node, latent domains
     graph: Graph
     cursor_id: UUID
-    step: Step = -1
+    epoch: Step = -1
     domain_registry: DomainRegistry = field(default_factory=DomainRegistry)
 
     event_sourced: bool = False  # track effects on a mutable copy
@@ -64,7 +65,7 @@ class Session:
     def get_preview_graph(self):
         # create a disposable preview graph from the current event buffer
         _graph = deepcopy(self.graph)
-        _graph = Event.replay_all(self.event_watcher.events, _graph)
+        _graph = self.event_watcher.replay(_graph)
         return _graph
 
     @functools.cached_property
@@ -76,7 +77,7 @@ class Session:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph, self.cursor_id, self.step, self.domain_registry)
+        return Context(graph, self.cursor_id, self.epoch, self.domain_registry)
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):
@@ -86,8 +87,7 @@ class Session:
         base_ns = self.context.get_ns()
         # The session itself also provides a ns domain layer
         session_layer = {
-            "cursor": self.cursor,  # should be included by context layer, duplicated for safety
-            "step": self.step,      # should be included by context layer, duplicated for safety
+            # cursor and epoch are included by the context layer
             "phase": phase,         # phase annotation for handlers
             "results": [],          # receipts from handlers run during this phase
         }
@@ -103,7 +103,7 @@ class Session:
         logger.debug(f'Following edge {edge!r}')
 
         # This should be in the step, not in the control loop, I think
-        self.step += 1
+        self.epoch += 1
         self.cursor_id = edge.destination_id
         self._invalidate_context()       # updated the anchor, need to rebuild scope
 

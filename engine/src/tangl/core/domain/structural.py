@@ -1,0 +1,1 @@
+# structural scopes are inferred from an anchor node according to ancestors on a graph.

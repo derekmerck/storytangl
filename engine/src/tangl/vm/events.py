@@ -150,6 +150,9 @@ class WatchedEntityProxy(wrapt.ObjectProxy):
     def attach_watchers(self, auditors: Iterable[EventWatcher]) -> None:
         self._watchers.extend(auditors)
 
+    # todo: need to provide a wrapped collection proxy if getattr returns a
+    #       mutable collection like 'locals'
+
 
 class WatchedRegistry(WatchedEntityProxy):
     # proxy registry

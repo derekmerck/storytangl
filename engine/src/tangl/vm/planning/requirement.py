@@ -67,7 +67,9 @@ class Requirement(GraphItem, Generic[NodeT]):
         if value is None:
             self.provider_id = None
             return
-        self.graph._validate_linkable(value)
+        if value not in self.graph:
+            self.graph.add(value)
+        self.graph._validate_linkable(value)  # redundant check that it's in the graph
         self.provider_id = value.uid
 
     @property

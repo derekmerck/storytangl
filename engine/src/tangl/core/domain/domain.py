@@ -64,9 +64,7 @@ class DomainRegistry(Registry[Domain]):
 #     # indicated explicitly by tags or type/class membership
 #     ...
 
-# put generic finder/generic builder in here for provisioning
 global_domain = Domain(label="globals",
                        vars=DEFAULT_VARS,
                        handlers=DEFAULT_HANDLERS,
-                       # providers=DEFAULT_PROVISIONERS
                        )

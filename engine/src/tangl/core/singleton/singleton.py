@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import ConfigDict
 
 from tangl.type_hints import UniqueLabel, StringMap
-from tangl.utils.hasher import hashing_func
+from tangl.utils.hashing import hashing_func
 from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 

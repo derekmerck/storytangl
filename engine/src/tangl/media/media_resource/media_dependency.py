@@ -1,15 +1,16 @@
-from pydantic import ConfigDict
+from pydantic import ConfigDict, model_validator, Field
 
-# from tangl.core.provision import DependencyEdge
-from ..type_hints import Media
-from ..media_spec import MediaSpec
+from tangl.type_hints import Identifier
+from tangl.vm.planning import Dependency, Requirement
+from tangl.media.type_hints import Media
+from tangl.media.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
-DependencyEdge = list
 
-
-class MediaDep(DependencyEdge[MediaRIT]):
+class MediaDep(Dependency[MediaRIT]):
     """
+    Links a graph node to a media resource.
+
     - story media script w path/url, media registry alias, or spec
     - story media dep is provisioned:
       - **path** rit is discovered or created directly from the path/url and linked
@@ -22,12 +23,27 @@ class MediaDep(DependencyEdge[MediaRIT]):
           - register the returned media and update the node spec if the node is unrepeatable, otherwise leave it as the template so it can be re-rendered when the context is updated
           - link the new rit
     """
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-    media_path: str = None
-    media_data: Media = None
-    media_rit: MediaRIT = None
-    media_spec: MediaSpec = None
+    @model_validator(mode="before")
+    @classmethod
+    def _pre_resolve(cls, data):
+        # Does the linked rit resolve the type?
+        req_kwargs = {}
+        if "media_id" in data:
+            req_kwargs["identifier"] = data.pop("media_id")
+        if "media_path" in data:
+            req_kwargs["criteria"] = {'path': data.pop("media_path")}
+        if "media_data" in data:
+            # embedded data
+            req_kwargs["template"] = {'data': data.pop("media_data")}
+        if "media_spec" in data:
+            # create on demand
+            req_kwargs["template"] = {'spec': data.pop("media_spec")}
 
-    @property
-    def is_resolved(self) -> bool:
-        return any([ self.media_path, self.media_data, self.media_rit ])
+        requirement = Requirement(**req_kwargs)
+        data['requirement'] = requirement
+        return data
+
+    media_id: Identifier = Field(init_var=True)
+    media_path: str = Field(init_var=True)
+    media_data: Media = Field(init_var=True)
+    media_spec: MediaSpec = Field(init_var=True)

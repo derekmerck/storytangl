@@ -9,13 +9,13 @@ from pydantic import Field, model_validator
 
 from tangl.type_hints import Hash
 from tangl.utils.shelved2 import shelved, clear_shelf
-from tangl.utils.compute_data_hash import compute_data_hash
+from tangl.utils.hashing import compute_data_hash
 from tangl.core.entity import Entity
 from ..enums import MediaDataType
 
-# todo: this is technically a ResourceNode when used in a graph,
-#       but it gets used without a graph, too, so it makes more sense as
-#       any entity.
+# RITs are _technically_ resource-type Nodes when used in a graph,
+# but they can also be used without a graph, so it makes more sense
+# as an Entity rather than a GraphItem.
 class MediaResourceInventoryTag(Entity):
     """
     MediaResourceInventoryTags track data resources, in-mem or on disk.
@@ -72,7 +72,7 @@ class MediaResourceInventoryTag(Entity):
 
     @shelved(fn="rits")
     @staticmethod
-    def _from_path(cls, path: Path) -> 'MediaResourceInventoryTag':
+    def _from_path(cls, path: Path) -> MediaResourceInventoryTag:
         return cls(path=path)
 
     @classmethod

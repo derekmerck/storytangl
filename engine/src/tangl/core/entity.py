@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 import shortuuid
 
 from tangl.type_hints import StringMap, Tag, Predicate
-from tangl.utils.hasher import hashing_func
+from tangl.utils.hashing import hashing_func
 from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitise_str
 

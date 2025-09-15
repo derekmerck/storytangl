@@ -29,7 +29,8 @@ def get_tree(root: Path):
 def process_directory(root: Path,
                       outfile_name: str,
                       include_mds: bool = False,
-                      prepend_files: list[Path] = None):
+                      prepend_files: list[Path] = None,
+                      postpend_files: list[Path] = None):
 
     print( root )
     data = {}
@@ -38,6 +39,8 @@ def process_directory(root: Path,
         files = files + list(root.glob("**/*.md"))
     if prepend_files is not None:
         files = prepend_files + files
+    if postpend_files is not None:
+        files = files + postpend_files
     for f in files:
         with open(f) as fp:
             try:
@@ -91,20 +94,27 @@ def process_directory(root: Path,
     s += _marker('End content meta')
 
     for k, v in data.items():
+        if ignore_imports:
+            v = re.sub(r"^[^\n]*(?:from [\w.]+? )?import .+?\n", "", v, flags=re.MULTILINE)
+            # s = re.sub(r"^\W*from [\w.]+? import .+?\n", "", s, flags=re.MULTILINE)
+            v = re.sub(r"if TYPE_CHECKING:", "", v)
+        # get rid of file name comments
+        v = re.sub(r"^# [Tt]angl[/.].*\n+", "", v, flags=re.MULTILINE)
+
+        if not re.findall(r'\w', v):
+            # discard empty init files
+            print(f"Skipping {k}")
+            continue
+
         s += _start_f(k)
         s += v
         s += _end_f(k)
 
-    if ignore_imports:
-        s = re.sub(r"^[^\n]*(?:from [\w.]+? )?import .+?\n", "", s, flags=re.MULTILINE)
-        # s = re.sub(r"^\W*from [\w.]+? import .+?\n", "", s, flags=re.MULTILINE)
-    # get rid of file name comments
-    s = re.sub(r"^# [Tt]angl[/.].*\n+", "", s, flags=re.MULTILINE)
     # collapse multiple newlines to a double newline
     s = re.sub(r'\n{2,}', "\n\n", s)
     # get rid of leading newline
     s = s.lstrip("\n")
-    print(s)
+    # print(s)
 
     outfile = outfile_dir / outfile_name
     with outfile.open("w") as fp:
@@ -117,7 +127,10 @@ if __name__ == "__main__":
                       "tangl37_core_archive.py",
                       include_mds=True,
                       prepend_files=[pkg_root / "type_hints.py"])
-    process_directory(pkg_root / "vm",     "tangl37_vm_archive.py")
+    process_directory(pkg_root / "vm",
+                      "tangl37_vm_archive.py",
+                      include_mds=True,
+                      postpend_files=[pkg_root / "utils/hashing.py"])
 
     # testing
     process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")

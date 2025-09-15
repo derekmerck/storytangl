@@ -17,8 +17,11 @@ from .domain import Domain, global_domain
 NS: TypeAlias = ChainMap[str, Any]
 
 class Scope(Entity):
+    # A scope is an ordered collection of domains that are accessible/can influence
+    # an anchor node.  Domains may be explicitly affiliated or structurally inferred.
 
     graph: Graph = Field(default_factory=Graph)
+    # Has a graph, but is not a graph item, per se
     anchor_id: UUID = None
     domain_registry: Registry[Domain] = Field(default_factory=Registry)
 
@@ -60,12 +63,3 @@ class Scope(Entity):
     # todo: do we want to include general predicates here?
     def get_handlers(self, **criteria) -> Iterator[Handler]:
         return self.merge_handlers(*self.active_domains, **criteria)
-
-    # @classmethod
-    # def merge_providers(cls, *members, **criteria) -> Iterator[Provider]:
-    #     providers = (m.providers for m in members if m.matches(**criteria))
-    #     yield from itertools.chain(*providers)
-    #
-    # # todo: do we want to include general predicates here?
-    # def get_providers(self, **criteria) -> Iterator[Provider]:
-    #     return self.merge_providers(*self.active_domains, **criteria)

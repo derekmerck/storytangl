@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from tangl.utils.compute_data_hash import compute_data_hash
+from tangl.utils.hashing import compute_data_hash
 from tangl.utils.get_file_mtime import get_file_mtime
 from tangl.utils.shelved2 import shelved, clear_shelf
 

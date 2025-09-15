@@ -1,24 +1,16 @@
 from __future__ import annotations
 import base64
 import functools
-from hashlib import sha224
 import uuid
-import logging
 
-from tangl.config import settings
 from tangl.type_hints import Hash
-from tangl.utils.compute_data_hash import compute_data_hash
+from tangl.utils.hashing import compute_data_hash
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
-
-salt = settings.get("service.local.salt", "%s3krit s4Lt%")
-logger.debug( f"Hashing with salt: {salt}" )
 
 @functools.lru_cache
 def hash_for_secret(secret: str) -> Hash:
-    # Hash a secret string with salt
-    return compute_data_hash(secret + salt)
+    # Hash a secret string with salt into a 16 byte digest
+    return compute_data_hash(secret, digest_size=16)
 
 def uuid_for_secret(secret: str) -> uuid.UUID:
     # Compute a 16-byte uuid from a secret
