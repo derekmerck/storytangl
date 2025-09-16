@@ -8,7 +8,7 @@ from tangl.type_hints import Hash   # bytes
 
 try:
     from tangl.config import settings
-    HASHING_SALT = settings.hashing_salt
+    HASHING_SALT = settings.service.salt.encode('utf-8')
 except (ImportError, AttributeError):
     # Fallback
     HASHING_SALT = b'<!--2t0ryT4n5L--/>'
@@ -16,7 +16,7 @@ except (ImportError, AttributeError):
 logger = logging.getLogger(__name__)
 logger.debug( f"Hashing with salt: {HASHING_SALT}" )
 
-def hashing_func(*data, salt=HASHING_SALT, digest_size = None) -> Hash:
+def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
 
     if digest_size is None:
         # legacy, slightly more secure but can probably replace with blake
@@ -24,7 +24,7 @@ def hashing_func(*data, salt=HASHING_SALT, digest_size = None) -> Hash:
         hasher = sha224(salt)
     else:
         # provides digest size for creating ints or uids without truncating
-        hasher = blake2b(digest_size=digest_size)
+        hasher = blake2b(salt, digest_size=digest_size)
 
     for item in data:
         if isinstance(item, bytes):

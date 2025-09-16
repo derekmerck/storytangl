@@ -7,8 +7,7 @@ from uuid import UUID
 from tangl.core.entity import Entity
 from .graph import GraphItem, Graph
 
-if TYPE_CHECKING:
-    from .node import Node
+from .node import Node
 
 class Edge(GraphItem):
     edge_type: Optional[Enum|str] = None       # No need to enumerate this yet
@@ -16,11 +15,11 @@ class Edge(GraphItem):
     destination_id: Optional[UUID] = None      # attach to a structure (choice) or dependency (role, loc, etc.)
 
     @property
-    def source(self) -> Optional[GraphItem]:
+    def source(self) -> Optional[Node]:
         return self.graph.get(self.source_id)
 
     @source.setter
-    def source(self, value: Optional[GraphItem]) -> None:
+    def source(self, value: Optional[Node]) -> None:
         if value is None:
             self.source_id = None
             return
@@ -28,7 +27,7 @@ class Edge(GraphItem):
         self.source_id = value.uid
 
     @property
-    def destination(self) -> Optional[GraphItem]:
+    def destination(self) -> Optional[Node]:
         return self.graph.get(self.destination_id)
 
     @destination.setter
@@ -41,27 +40,26 @@ class Edge(GraphItem):
 
     def __repr__(self) -> str:
         if self.source is not None:
-            if self.graph is not None:
-                src_label = self.source.label or self.source.short_uid()
-            else:
-                src_label = self.source_id.hex
+            src_label = self.source.label or self.source.short_uid()
+        elif getattr(self, 'source_id', None) is not None:
+            src_label = self.source_id.hex
         else:
             src_label = "anon"
 
-        if self.destination_id:
-            if self.graph is not None:
-                dest_label = self.destination.label or self.destination.short_uid()
-            else:
-                dest_label = self.destination_id.hex
+        if self.destination is not None:
+            dest_label = self.destination.label or self.destination.short_uid()
+        elif getattr(self, 'destination_id', None) is not None:
+            dest_label = self.destination_id.hex
         else:
             dest_label = "anon"
 
         return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
 
+
 class AnonymousEdge(Entity):
     # Minimal Edge that does not require a graph, so it can be garbage collected
     source: Node
-    dest: Node
+    destination: Node
 
     __repr__ = Edge.__repr__
 

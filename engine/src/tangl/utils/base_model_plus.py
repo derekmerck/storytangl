@@ -6,6 +6,7 @@ from pydantic import BaseModel, field_validator, field_serializer, FieldValidati
 from pydantic.fields import FieldInfo
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class BaseModelPlus(BaseModel):
 
@@ -74,6 +75,10 @@ class BaseModelPlus(BaseModel):
             else:
                 logger.debug(f"Skipping field: {n}")
 
+    # There is no built-in method for excluding fields from comparison with pydantic.
+    # For this approach, set json_schema_extra = {'cmp', false} on fields to ignore.
+    # Other approaches include unlinking fields during comparison then relinking them, or
+    # comparing model_dumps with excluded fields.
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
@@ -93,11 +98,6 @@ class BaseModelPlus(BaseModel):
             default_value = field_info.get_default(call_default_factory=True)
             logger.debug(f"updating: {field} = {default_value}")
             setattr(self, field, default_value)
-
-    # There is no built-in method for excluding fields from comparison with pydantic.
-    # For this approach, set json_schema_extra = {'cmp', false} on fields to ignore.
-    # Other approaches include unlinking fields during comparison then relinking them, or
-    # comparing model_dumps with excluded fields.
 
     @classmethod
     def _pydantic_field_type_is(cls, field_name: str, query_type: Type):

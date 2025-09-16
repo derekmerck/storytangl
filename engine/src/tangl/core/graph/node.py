@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, Iterator, TYPE_CHECKING
 from enum import Enum
 
-from .graph import GraphItem, Graph
+from .graph import GraphItem, Graph  # Import graph for pydantic
 
 if TYPE_CHECKING:
     from .edge import Edge
@@ -20,10 +20,10 @@ class Node(GraphItem):
     def edges(self, **criteria) -> list[Edge]:
         return list(self.edges_in(**criteria)) + list(self.edges_out(**criteria))
 
-    def add_edge_to(self, node: Edge, edge_type: Enum | str = None) -> None:
+    def add_edge_to(self, node: Node, **attrs) -> None:
         from .edge import Edge
-        Edge(source_id=self.uid, destination_id=node.uid, graph=self.graph)
+        Edge(source_id=self.uid, destination_id=node.uid, graph=self.graph, **attrs)
 
-    def add_edge_from(self, node: Node) -> None:
+    def add_edge_from(self, node: Node, **attrs) -> None:
         from .edge import Edge
-        Edge(source_id=node.uid, destination_id=self.uid, graph=self.graph)
+        Edge(source_id=node.uid, destination_id=self.uid, graph=self.graph, **attrs)

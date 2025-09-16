@@ -21,7 +21,6 @@ class EventType(Enum):
 
 class Event(Entity):
     # Entities b/c they are persisted, structured, unstructured
-    model_config: ClassVar = ConfigDict(arbitrary_types_allowed=True)
     source_id: UUID = Field(...)
     event_type: EventType = Field(...)
     name: Optional[str] = None  # attrib name for update

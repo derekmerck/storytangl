@@ -1,7 +1,7 @@
 # tangl/core/dispatch/job_receipt.py
 from __future__ import annotations
 import functools
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 from uuid import UUID
 
 from pydantic import model_validator, Field
@@ -35,3 +35,11 @@ class JobReceipt(Entity):
     def __lt__(self, other: Any) -> bool:
         # Sorts non-receipts to the front without raising
         return self.seq < getattr(other, 'seq', -1)
+
+    @classmethod
+    def last_result(cls, *receipts: Self) -> Any | None:
+        return None if len(receipts) == 0 else receipts[-1].result
+
+    @classmethod
+    def all_true(cls, *receipts: Self) -> bool:
+        return all([bool(r.result) for r in receipts if r is not None])

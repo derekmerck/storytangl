@@ -1,13 +1,13 @@
+from __future__ import annotations
+import logging
+
+from pydantic import Field
+
 from pydantic import Field
 
 from tangl.type_hints import StringMap
 from .role import Role
 from .actor import Actor
-
-from __future__ import annotations
-import logging
-
-from pydantic import Field
 
 from tangl.graph.mixins import AssociationHandler
 from tangl.story.story import StoryNode

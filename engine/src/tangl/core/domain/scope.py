@@ -1,7 +1,7 @@
 # Scope is a node-anchored view of all relevant affiliate and structured domains.
 
 from typing import Any, Iterator, TypeAlias
-import functools
+from functools import cached_property
 from collections import ChainMap
 import itertools
 from uuid import UUID
@@ -29,21 +29,30 @@ class Scope(Entity):
     def anchor(self) -> Node:
         return self.graph.get(self.anchor_id)
 
-    @functools.cached_property
-    def active_domains(self) -> Iterator[Domain]:
+    def _iter_active_domains(self) -> Iterator[Domain]:
         seen = set()
+
+        # 1) structural (anchor -> nearest ancestors)
+        for sg in [self.anchor, *self.anchor.ancestors()]:
+            for d in self.domain_registry.find_domains_for(sg):
+                if d.uid not in seen:
+                    seen.add(d.uid)
+                    yield d
+
+        # 2) anything selected directly for the anchor
         for d in self.domain_registry.find_domains_for(self.anchor):
             if d.uid not in seen:
                 seen.add(d.uid)
                 yield d
-        for ancestor in self.anchor.ancestors():
-            for d in self.domain_registry.find_domains_for(ancestor):
-                if d.uid not in seen:
-                    seen.add(d.uid)
-                    yield d
+
+        # 3) always include globals, last
         if global_domain.uid not in seen:
             seen.add(global_domain.uid)  # irrelevant but included for completeness
             yield global_domain
+
+    @cached_property
+    def active_domains(self) -> list[Domain]:
+        return list(self._iter_active_domains())
 
     @classmethod
     def merge_vars(cls, *members, **criteria) -> NS:
@@ -51,15 +60,9 @@ class Scope(Entity):
         maps = ( m.vars for m in members if m.matches(**criteria) )
         return ChainMap(*maps)
 
-    @functools.cached_property
+    @cached_property
     def namespace(self) -> NS:
         return self.merge_vars(*self.active_domains)
 
-    @classmethod
-    def merge_handlers(cls, *members, **criteria) -> Iterator[Handler]:
-        handlers = ( m.handlers for m in members if m.matches(**criteria) )
-        yield from itertools.chain(*handlers)
-
-    # todo: do we want to include general predicates here?
     def get_handlers(self, **criteria) -> Iterator[Handler]:
-        return self.merge_handlers(*self.active_domains, **criteria)
+        return Registry.chain_find_all(*(d.handlers for d in self.active_domains), **criteria)

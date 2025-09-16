@@ -1,5 +1,33 @@
-from tangl.core.graph import Node, Graph
-from tangl.vm.session import ResolutionPhase as P, Session
+import uuid
+
+from tangl.core import Node, Graph, JobReceipt, global_domain
+from tangl.core.graph.edge import AnonymousEdge
+from tangl.vm.session import ResolutionPhase as P, Session, ChoiceEdge
+from tangl.vm import simple_handlers
+from tangl.vm.planning import Requirement, ProvisioningPolicy, Dependency
+
+def test_global_handlers_visible_in_scope():
+    g = Graph(label="x")
+    n = g.add_node(label="n1")
+    sess = Session(graph=g, cursor_id=n.uid)
+    sess.domain_registry.add(global_domain)
+    ns = sess.get_ns(P.VALIDATE)
+
+    print("Registered")
+    for h in global_domain.handlers.values():
+        print(h.func.__name__)
+        assert hasattr(h, "phase")
+
+    print("Has VALIDATE")
+    for h in global_domain.handlers.find_all(phase=P.VALIDATE):
+        print(h.func.__name__, h.available(ns))
+
+    ns = sess.run_phase(P.VALIDATE)
+    print( ns )
+    # validate_cursor should have produced a receipt
+    receipts = ns["results"]
+    assert len(receipts) >= 1
+    assert isinstance(receipts[0], JobReceipt)
 
 def test_ns_contract(session):
     ns = session.run_phase(P.VALIDATE)
@@ -38,3 +66,55 @@ def test_session_context_ns_has_phase_and_results():
     ns = sess.get_ns(P.VALIDATE)
     assert ns["phase"] is P.VALIDATE
     assert isinstance(ns["results"], list)
+
+def test_provisioning_create_policy_assigns_provider():
+    g = Graph(label="demo")
+    scene = g.add_node(label="scene")
+
+    req = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.CREATE,
+        template={"obj_cls": Node, "label": "Companion"}
+    )
+    Dependency[Node](graph=g, source_id=scene.uid, requirement=req, label="needs_companion")
+
+    sess = Session(graph=g, cursor_id=scene.uid)
+    sess.domain_registry.add(global_domain)
+
+    ns = sess.run_phase(P.PLANNING)
+    assert req.satisfied
+    assert g.get("Companion") is not None
+
+def test_prereq_redirect_and_journal_line():
+    g = Graph(label="demo")
+    start = g.add_node(label="start")
+    end = g.add_node(label="end")
+
+    ChoiceEdge(graph=g, source_id=start.uid, destination_id=end.uid, trigger_phase=P.PREREQS)
+
+    sess = Session(graph=g, cursor_id=start.uid)
+    sess.domain_registry.add(global_domain)
+
+    nxt = sess.follow_edge(AnonymousEdge(source=start, destination=end))  # first hop returns ChoiceEdge on PREREQS
+    # After following, epoch incremented and JOURNAL should run
+    ns = sess.run_phase(P.JOURNAL)
+    line = JobReceipt.last_result(*ns.get('results'))
+    print(line)
+    assert "[step " in line
+    assert "end" in line
+
+def test_rand_is_deterministic_for_same_context():
+    guid = uuid.uuid4()
+    nuid = uuid.uuid4()
+
+    g1 = Graph(uid=guid, label="demo")
+    a1 = g1.add_node(uid=nuid, label="A")
+    s1 = Session(graph=g1, cursor_id=a1.uid)
+    r1 = [s1.rand.random() for _ in range(3)]
+
+    g2 = Graph(uid=guid, label="demo")
+    a2 = g2.add_node(uid=nuid, label="A")
+    s2 = Session(graph=g2, cursor_id=a2.uid)
+    r2 = [s2.rand.random() for _ in range(3)]
+
+    assert r1 == r2

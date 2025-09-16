@@ -126,7 +126,9 @@ if __name__ == "__main__":
     process_directory(pkg_root / "core",
                       "tangl37_core_archive.py",
                       include_mds=True,
-                      prepend_files=[pkg_root / "type_hints.py"])
+                      prepend_files= [pkg_root / "type_hints.py",
+                                      pkg_root / "info.py"],
+                      postpend_files=[pkg_root / "utils/base_model_plus.py"])
     process_directory(pkg_root / "vm",
                       "tangl37_vm_archive.py",
                       include_mds=True,

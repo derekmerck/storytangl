@@ -1,17 +1,20 @@
 # tangl/vm/session.py
 from __future__ import annotations
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 import functools
 from enum import IntEnum, Enum
 from uuid import UUID
 from dataclasses import dataclass, field
 from copy import deepcopy
 import logging
+from random import Random
 
 from tangl.type_hints import Step, StringMap as NS
+from tangl.utils.hashing import hashing_func
 from tangl.core.entity import Conditional
 from tangl.core.graph import Graph, Edge, Node
 from tangl.core.domain import DomainRegistry
+from tangl.core.dispatch import JobReceipt
 from .context import Context
 from .events import ReplayWatcher, Event, WatchedRegistry
 
@@ -77,26 +80,35 @@ class Session:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph, self.cursor_id, self.epoch, self.domain_registry)
+        return Context(graph, self.cursor_id, self.domain_registry)
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):
             del self.context
 
+    @functools.cached_property
+    def rand(self):
+        # Guarantees the same RNG sequence given the same context for deterministic replay
+        h = hashing_func(self.graph.uid, self.epoch, self.cursor.uid, digest_size=8)
+        seed = int.from_bytes(h[:8], "big")
+        return Random(seed)
+
     def get_ns(self, phase: ResolutionPhase) -> NS:
         base_ns = self.context.get_ns()
         # The session itself also provides a ns domain layer
         session_layer = {
-            # cursor and epoch are included by the context layer
+            'cursor': self.cursor,
+            'epoch': self.epoch,
             "phase": phase,         # phase annotation for handlers
-            "results": [],          # receipts from handlers run during this phase
+            "rand": self.rand,
+            "results": [],          # type: list[JobReceipt]
         }
         return base_ns.new_child(session_layer)
 
     def run_phase(self, phase: P) -> NS:
-        ns = self.get_ns(phase)          # creates context if necessary
+        ns = self.get_ns(phase)          # creates context if necessary, resets results
         for h in self.context.get_handlers(phase=phase):
-            ns["results"].append(h(ns))
+            ns["results"].append(h(ns))  # add the receipt to the result stack
         return ns
 
     def follow_edge(self, edge: Edge) -> Edge | None:
@@ -104,13 +116,13 @@ class Session:
 
         # This should be in the step, not in the control loop, I think
         self.epoch += 1
-        self.cursor_id = edge.destination_id
+        self.cursor_id = edge.destination.uid
+        # Use the destination, not edge.dest_id in case its an anonymous edge
         self._invalidate_context()       # updated the anchor, need to rebuild scope
 
         # Make sure that this cursor is allowed
         ns = self.run_phase(P.VALIDATE)
-        res = ns["results"]
-        if not all(res):
+        if not JobReceipt.all_true(*ns.get('results')):
             raise RuntimeError(f"Proposed next cursor is not valid!")
 
         # May mutate graph/data
@@ -119,9 +131,9 @@ class Session:
         # Check for prereq cursor redirects
         # todo: implement j/r redirect stack
         ns = self.run_phase(P.PREREQS)  # may set an edge to next cursor
-        res = ns["results"]
-        if res and isinstance(res[-1], Edge):
-            return res[-1]
+        nxt = JobReceipt.last_result(*ns.get('results'))
+        if isinstance(nxt, Edge):
+            return nxt
 
         ns = self.run_phase(P.UPDATE)         # No-op for now
 
@@ -137,9 +149,9 @@ class Session:
 
         # check for postreq cursor redirects
         ns = self.run_phase(P.POSTREQS)    # may set an edge to next cursor
-        res = ns["results"]
-        if res and isinstance(res[-1], Edge):
-            return res[-1]
+        nxt = JobReceipt.last_result(*ns.get('results'))
+        if isinstance(nxt, Edge):
+            return nxt
         return None
 
     def resolve_choice(self, choice) -> None:

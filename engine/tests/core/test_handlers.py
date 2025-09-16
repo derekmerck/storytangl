@@ -125,3 +125,20 @@ def test_handler_registry_register_returns_function():
     # Should be callable as original function
     assert handler_e.__name__ == "handler_e"
     assert callable(handler_e)
+
+def test_handlers_run_in_priority_order():
+    reg = HandlerRegistry()
+    calls = []
+
+    @reg.register(priority=HandlerPriority.LATE)
+    def h3(ns): calls.append("LATE"); return True
+
+    @reg.register(priority=HandlerPriority.FIRST)
+    def h1(ns): calls.append("FIRST"); return True
+
+    @reg.register(priority=HandlerPriority.EARLY)
+    def h2(ns): calls.append("EARLY"); return True
+
+    ns = {}
+    list(reg.run_all(ns))
+    assert calls == ["FIRST", "EARLY", "LATE"]

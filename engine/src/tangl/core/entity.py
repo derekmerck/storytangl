@@ -7,7 +7,7 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 import shortuuid
 
-from tangl.type_hints import StringMap, Tag, Predicate
+from tangl.type_hints import StringMap, Tag, Predicate, Identifier
 from tangl.utils.hashing import hashing_func
 from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitise_str
@@ -15,6 +15,10 @@ from tangl.utils.sanitize_str import sanitise_str
 logger = logging.getLogger(__name__)
 match_logger = logging.getLogger(__name__ + '.match')
 match_logger.setLevel(logging.WARNING)
+
+def is_identifier(func: Callable) -> Callable:
+    setattr(func, '_is_identifier', True)
+    return func
 
 class Entity(BaseModelPlus):
     """
@@ -36,7 +40,7 @@ class Entity(BaseModelPlus):
 
     Singleton entities with a common api can be registered by unique label using the `Singleton` class.
     """
-    uid: UUID = Field(default_factory=uuid4)
+    uid: UUID = Field(default_factory=uuid4, json_schema_extra={'is_identifier': True})
     label: Optional[str] = None
     tags: set[Tag] = Field(default_factory=set)
     # tag syntax can be used by the _parser_ as sugar for various attributes
@@ -51,6 +55,7 @@ class Entity(BaseModelPlus):
             value = sanitise_str(value)
         return value
 
+    @is_identifier
     def get_label(self) -> str:
         if self.label is not None:
             return self.label
@@ -85,6 +90,23 @@ class Entity(BaseModelPlus):
         return filter(lambda x: x.matches(**criteria), values)
 
     # Any `has_` methods should not have side effects as they may be called through **criteria args
+
+    def get_identifiers(self) -> set[Identifier]:
+        result = set()
+        for f in self._fields(is_identifier=(True, False)):
+            value = getattr(self, f)
+            if value is not None:
+                result.add(value)
+        for ff in self.__class__.__dict__.values():
+            if callable(ff) and getattr(ff, '_is_identifier', False):
+                value = ff(self)
+                if value is not None:
+                    result.add(value)
+        return result
+
+    def has_alias(self, alias: Identifier) -> bool:
+        return alias in self.get_identifiers()
+
     def has_tags(self, *tags: Tag) -> bool:
         # Normalize args to set[Tag]
         if len(tags) == 1 and isinstance(tags[0], set):
@@ -98,6 +120,7 @@ class Entity(BaseModelPlus):
         # helper func for matches
         return isinstance(self, obj_cls)
 
+    @is_identifier
     def short_uid(self) -> str:
         return shortuuid.encode(self.uid)
 
@@ -112,6 +135,7 @@ class Entity(BaseModelPlus):
         s = self.label or self.short_uid()
         return f"<{self.__class__.__name__}:{s}>"
 
+    @is_identifier
     def _id_hash(self) -> bytes:
         # For persistent id's, use either the uid or a field annotated as UniqueLabel
         return hashing_func(self.uid, self.__class__)

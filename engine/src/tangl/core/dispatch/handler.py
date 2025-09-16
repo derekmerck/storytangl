@@ -44,7 +44,7 @@ class Handler(Conditional, Entity):
     # handlers take a namespace and return a receipt with a result
     # ordered by distance from caller in scope and reg order
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     func: HandlerFunc
     priority: HandlerPriority | int = HandlerPriority.NORMAL

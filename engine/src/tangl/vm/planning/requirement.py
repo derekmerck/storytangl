@@ -1,12 +1,12 @@
 # tangl/vm/requirement.py
-from enum import Flag, auto, Enum
+from enum import Enum
 from typing import Optional, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap, UnstructuredData, Identifier
-from tangl.core.graph import GraphItem, Node
+from tangl.core.graph import GraphItem, Node, Graph
 
 NodeT = TypeVar('NodeT', bound=Node)
 

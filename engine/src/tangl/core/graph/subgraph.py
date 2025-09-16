@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 # todo: should be a registry b/c its a collection?
 class Subgraph(GraphItem):
-    subgraph_type: Optional[Enum] = None  # No need to enumerate this yet
+    subgraph_type: Optional[Enum|str] = None  # No need to enumerate this yet
     member_ids: list[UUID] = Field(default_factory=list)
 
     @property

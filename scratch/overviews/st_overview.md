@@ -37,7 +37,7 @@ Realizing a narrative from the graph is a guided graph traversal problem.  As st
 
 **Concept nodes** are not visitable, but they can be dynamically linked to multiple nodes to fill various roles.  For example, an actor may fill similar roles in different scenes, or a piece of information may be discovered by different plot mechanisms, or a uniform 'look' might be shared by actors in multiple roles.
 
-**Projection nodes** are orgnanized strictly linearly into a 'journal'.  Each journal fragment knows which node created it, so the journal can be queried both for which nodes have been visited/actions taken, and also for which concepts have been introduced.  For example, if the journal doesn't already know about a particular actor through a realized plot node, we might provide a summary description when she is introduced.  Or if a minor event was missed in the plot, we can provide a canonical description ("a narrative waiver").
+**Projection nodes** are organized strictly linearly into a 'journal'.  Each journal fragment knows which node created it, so the journal can be queried both for which nodes have been visited/actions taken, and also for which concepts have been introduced.  For example, if the journal doesn't already know about a particular actor through a realized plot node, we might provide a summary description when she is introduced.  Or if a minor event was missed in the plot, we can provide a canonical description ("a narrative waiver").
 
 Concepts that the plot has recruited but are unknown to the reader are considered "narrative debt", like a scene that starts _in media res_ incurs the narrative debt of introducing the scene later.  A mystery is obliged to carry the narrative debt of "who done it" until the end.  Dramatic irony is a "narrative credit", a concept is presented before the event that will recruit it.  
 
@@ -60,7 +60,7 @@ StoryTangl's graph manager has a few key jobs, each of which can be intercepted 
 - Get part or all of the journal formatted within client constraints ("get journal")
 - Roll back the cursor and graph state using history diffs stored along with the journal ("undo")
 
-New story graphs are generated from a "story world", which provides a set of node templates and graph manager plugins.  The world is compiled from scripts, media, and code snippits according to the rules and format of whatever compiler is being used.  I imagine a range of compilers, from a trivial compiler that just takes templates as unstructured data and structures them into plot nodes, to a functional compiler, that takes a set of concept nodes with annotated depenencies and infers a graph of possible plot paths from the start to the end.
+New story graphs are generated from a "story world", which provides a set of node templates and graph manager plugins.  The world is compiled from scripts, media, and code snippits according to the rules and format of whatever compiler is being used.  I imagine a range of compilers, from a trivial compiler that just takes templates as unstructured data and structures them into plot nodes, to a functional compiler, that takes a set of concept nodes with annotated dependencies and infers a graph of possible plot paths from the start to the end.
 
 As story graphs are collapsed into a journal, the journal fragments can be incrementally provided to a user client that may support different levels of styling and media and returns simple interactions/choices/inputs to the story server.  For example, a CLI, a web interface, a TCL client, or a Ren'Py plugin.
 
@@ -73,7 +73,7 @@ Client Interactions
 
 Each role's interactions focus on a subset of the graph manager's features.
 
-Key creatior interactions:
+Key creator interactions:
 
 - create a new story from a world
 

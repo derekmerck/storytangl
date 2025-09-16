@@ -1,7 +1,7 @@
 # tangl/vm/open_edge.py
-from typing import TypeVar, Generic
+from typing import Generic
 
-from tangl.core.graph import Edge, Node
+from tangl.core.graph import Edge, Graph
 from .requirement import Requirement, NodeT
 
 # Provides the carrier mechanism to map requirements into the graph-topology.
