@@ -6,9 +6,15 @@ from typing import TypeAlias, Any, Callable
 from pydantic import ConfigDict
 
 from tangl.type_hints import StringMap as NS
-from tangl.core.entity import Entity, Conditional
+from tangl.utils.base_model_plus import HasSeq
+from tangl.core.entity import Entity, Selectable
 from .job_receipt import JobReceipt
 
+# todo: this is an entity handler, should include the caller and caller's current scope _or_
+#       it's handlers/ns
+#       may want to include prior results/artifacts in the ns, or as a side-channel?
+
+# HandlerFunc: TypeAlias = Callable[[Entity, NS], Any]
 HandlerFunc: TypeAlias = Callable[[NS], Any]
 
 # this would be better, but pydantic does not like making a schema for it
@@ -19,7 +25,7 @@ class HandlerPriority(IntEnum):
     """
     Execution priorities for handlers.
 
-    Each TaskHandler is assigned a priority to control high-level ordering.
+    Each Handler is assigned a priority to control high-level ordering.
     The pipeline sorts handlers by these priorities first, with the
     following semantics:
 
@@ -40,22 +46,23 @@ class HandlerPriority(IntEnum):
     LAST = 100
 
 @functools.total_ordering
-class Handler(Conditional, Entity):
+class Handler(HasSeq, Selectable, Entity):
     # handlers take a namespace and return a receipt with a result
-    # ordered by distance from caller in scope and reg order
+    # ordered by distance from caller in scope and instance seq
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     func: HandlerFunc
     priority: HandlerPriority | int = HandlerPriority.NORMAL
-    reg_number: int = -1  # assumes handler in no more than 1 registry
+
+    def has_func_name(self, value: str) -> bool:
+        return self.func.__name__ == value
 
     def __call__(self, ns: NS) -> JobReceipt:
-        if not self.available(ns):
-            raise RuntimeError(f"Handler {self} not available")
         return JobReceipt(blame_id=self.uid,
                           result=self.func(ns))
 
     def __lt__(self, other) -> bool:
-        # order by priority, then registration number, then uid as a final deterministic tie-breaker
-        return (self.priority, self.reg_number, self.uid) < (other.priority, other.reg_number, other.uid)
+        # order by priority, then registration number (may duplicate if merging registries),
+        # then uid as a final deterministic tie-breaker
+        return (self.priority, self.seq, self.uid) < (other.priority, other.seq, other.uid)

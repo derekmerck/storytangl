@@ -1,2 +1,3 @@
-from .domain import Domain, DomainRegistry, global_domain
+from .domain import Domain, global_domain
+from .affiliate import AffiliateDomain
 from .scope import Scope, NS

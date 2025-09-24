@@ -1,8 +1,9 @@
 from __future__ import annotations
 from uuid import UUID, uuid4
-from typing import Optional, Self, Iterator, Type, Callable
+from typing import Optional, Self, Iterator, Type, Callable, Any, Iterable, TypeAlias
 import logging
 from enum import Enum
+from copy import copy
 
 from pydantic import BaseModel, Field, field_validator
 import shortuuid
@@ -41,7 +42,7 @@ class Entity(BaseModelPlus):
     Singleton entities with a common api can be registered by unique label using the `Singleton` class.
     """
     uid: UUID = Field(default_factory=uuid4, json_schema_extra={'is_identifier': True})
-    label: Optional[str] = None
+    label: Optional[str] = Field(None, json_schema_extra={'is_identifier': True})
     tags: set[Tag] = Field(default_factory=set)
     # tag syntax can be used by the _parser_ as sugar for various attributes
     # - indicate domain memberships       domain
@@ -62,7 +63,7 @@ class Entity(BaseModelPlus):
         else:
             return self.short_uid()
 
-    def matches(self, predicate: Callable[[Entity], bool] = None, **criteria) -> bool:
+    def matches(self, *, predicate: MatchPredicate = None, **criteria) -> bool:
         # Callable predicate funcs on self were passed
         if predicate is not None and not predicate(self):
             return False
@@ -86,7 +87,7 @@ class Entity(BaseModelPlus):
         return True
 
     @classmethod
-    def filter_by_criteria(cls, values, **criteria) -> Iterator[Self]:
+    def filter_by_criteria(cls, values: Iterable[Self], **criteria) -> Iterator[Self]:
         return filter(lambda x: x.matches(**criteria), values)
 
     # Any `has_` methods should not have side effects as they may be called through **criteria args
@@ -96,16 +97,25 @@ class Entity(BaseModelPlus):
         for f in self._fields(is_identifier=(True, False)):
             value = getattr(self, f)
             if value is not None:
-                result.add(value)
-        for ff in self.__class__.__dict__.values():
-            if callable(ff) and getattr(ff, '_is_identifier', False):
-                value = ff(self)
-                if value is not None:
+                if isinstance(value, set):
+                    result.update(value)
+                else:
                     result.add(value)
+        for cls in self.__class__.__mro__:
+            for ff in cls.__dict__.values():
+                if callable(ff) and getattr(ff, '_is_identifier', False):
+                    value = ff(self)
+                    if value is not None:
+                        if isinstance(value, set):
+                            result.update(value)
+                        else:
+                            result.add(value)
         return result
 
-    def has_alias(self, alias: Identifier) -> bool:
+    def has_identifier(self, alias: Identifier) -> bool:
         return alias in self.get_identifiers()
+
+    has_alias = has_identifier
 
     def has_tags(self, *tags: Tag) -> bool:
         # Normalize args to set[Tag]
@@ -166,7 +176,7 @@ class Entity(BaseModelPlus):
 
     @classmethod
     def dereference_cls_name(cls, name: str) -> Type[Self]:
-        # todo: Should memo-ize this
+        # todo: Should memo-ize this, move into utils mixin, StructuredModel protocol?
         if name == cls.__qualname__:
             return cls
         for _cls in cls.__subclasses__():
@@ -192,9 +202,44 @@ class Entity(BaseModelPlus):
         # it can be unflattened with `Entity.dereference_cls_name`
         return data
 
+MatchPredicate: TypeAlias = Callable[[Entity], bool]
+
+
+# Extension mixins
+
+class Selectable(BaseModel):
+    """
+    Inverse match, entity _satisfies_ or will be _selected_by_.
+
+    - providers publish what they satisfy as their selection criteria, a requirement tests
+      itself against them `Requirement.matches(**template_satisfies)`
+    - domains publish what their triggers are as their selection criteria, a node tests
+      itself against them `Node.matches(**domain_triggers)`
+    - A template might dynamically create its selection criteria from its label, type, and
+      a predicate
+    """
+    selection_criteria: StringMap = Field(default_factory=dict)
+    # include a selection MatchPredicate that will run on the _tester_ with the key
+    # {'predicate': lambda x: True}
+
+    def get_selection_criteria(self) -> StringMap:
+        # override this to create dynamic selections
+        return copy(self.selection_criteria)
+
+    @classmethod
+    def filter_for_selector(cls, values: Iterable[Self], *, selector: Entity) -> Iterator[Self]:
+        # or could use the symmetric helper `lambda x: helper x.satisfies(selector)`
+        return filter(lambda x: hasattr(x, 'get_selection_criteria') and selector.matches(**x.get_selection_criteria()), values)
+
+    def satisfies(self, selector: Entity) -> bool:
+        return selector.matches(**self.get_selection_criteria())
+
 
 class Conditional(BaseModel):
-    predicate: Optional[Predicate] = None
+    # todo: this becomes much more complicated when we want to eval (or eventually exec)
+    #       a string against the ns or unstructure a conditional
+    predicate: Predicate = Field(default=lambda x: True)
 
     def available(self, ns: StringMap) -> bool:
-        return self.predicate is None or self.predicate(ns) is True
+        return self.predicate(ns) is True
+

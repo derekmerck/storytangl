@@ -1,9 +1,9 @@
-from typing import Any, Self, Type, Iterator
+# tangl/utils/base_model_plus.py
+from typing import Any, Self, Type, Iterator, ClassVar
 import logging
 
-import yaml
-from pydantic import BaseModel, field_validator, field_serializer, FieldValidationInfo
-from pydantic.fields import FieldInfo
+from pydantic import BaseModel, field_validator, field_serializer, FieldValidationInfo, model_validator, Field
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -109,7 +109,39 @@ class BaseModelPlus(BaseModel):
             return True
         return False
 
-    def __str__(self):
-        data = self.model_dump()
-        s = yaml.dump(data, default_flow_style=False)
-        return s
+    # def __str__(self):
+    #     data = self.model_dump()
+    #     s = yaml.dump(data, default_flow_style=False)
+    #     return s
+
+class HasSeq(BaseModel):
+    # This is a helper mixin for total orderings
+
+    seq: int = Field(init=False)  # type checking, ignore missing
+
+    @model_validator(mode="before")
+    @classmethod
+    def _set_seq(cls, data):
+        data = dict(data or {})
+        if data.get('seq') is None:  # unassigned or passed none
+            # Don't want to incr if not using it
+            data['seq'] = cls.incr_count()
+        return data
+
+    _instance_count: ClassVar[int] = 0
+
+    def __init_subclass__(cls, **kwargs):
+        cls._instance_count = 0  # keep an instance counter per subclass
+        super().__init_subclass__()
+
+    @classmethod
+    def incr_count(cls) -> int:
+        cls._instance_count += 1
+        return cls._instance_count
+
+    def __lt__(self, other):
+        # Default __lt__ sorts non-seq to the front without raising
+        # Override as necessary in subclasses that want to
+        # support functools.total_ordering
+        return self.seq < getattr(other, 'seq', -1)
+

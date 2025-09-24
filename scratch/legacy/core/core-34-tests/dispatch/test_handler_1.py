@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.handler import Handler as BaseHandler, HandlerRegistry
+from tangl.core.dispatch import Handler as BaseHandler, HandlerRegistry
 from tangl.type_hints import StringMap
 
 class DummyEntity(Entity):
@@ -29,11 +29,11 @@ def test_handler_registry_register_and_iter_handlers():
     # Should be sorted by priority ascending (2, 5)
     assert handlers[0].func.__name__ == "handler_b"
     assert handlers[0].has_func_name("handler_b")
-    assert handlers[0].matches(func_name="handler_b")
+    assert handlers[0].matches(has_func_name="handler_b")
 
     assert handlers[1].func.__name__ == "handler_a"
     assert handlers[1].has_func_name("handler_a")
-    assert handlers[1].matches(func_name="handler_a")
+    assert handlers[1].matches(has_func_name="handler_a")
 
     # Test the call
     e = DummyEntity()

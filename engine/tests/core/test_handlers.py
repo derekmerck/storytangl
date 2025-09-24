@@ -14,6 +14,39 @@ def always_false(ctx): return False
 
 # ---------- Handlers & registry ----------
 
+
+def test_handler_registry_register_and_iter_handlers():
+    registry = HandlerRegistry(label="test_handlers")
+    called = []
+
+    @registry.register(priority=5)
+    def handler_a(ent, ctx):
+        called.append("A")
+        return "A"
+
+    @registry.register(priority=2)
+    def handler_b(ent, ctx):
+        called.append("B")
+        return "B"
+
+    handlers = sorted(registry.find_all())
+    assert len(handlers) == 2
+    # Should be sorted by priority ascending (2, 5)
+    assert handlers[0].func.__name__ == "handler_b"
+    assert handlers[0].has_func_name("handler_b")
+    assert handlers[0].matches(has_func_name="handler_b")
+
+    assert handlers[1].func.__name__ == "handler_a"
+    assert handlers[1].has_func_name("handler_a")
+    assert handlers[1].matches(has_func_name="handler_a")
+
+    # Test the call
+    e = DummyEntity()
+    ctx = {}
+    assert handlers[0].func(e, ctx) == "B"
+    assert handlers[1].func(e, ctx) == "A"
+    assert called == ["B", "A"]
+
 def test_handler_lt_tiebreaker_and_registry_sort():
     reg = HandlerRegistry()
     calls = []

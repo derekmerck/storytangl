@@ -5,7 +5,7 @@ from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.type_hints import Tag
 
 from tangl.core.entity import Entity
-from tangl.core.entity.entity import identifier_property
+from tangl.core.entity import is_identifier
 
 # class Entity(BaseModelPlus):
 #     uid: str = Field(default_factory=lambda: str(uuid4()), json_schema_extra={'is_identifier': True})
@@ -42,14 +42,15 @@ from tangl.core.entity.entity import identifier_property
 # Subclass with new field and property aliases
 class Character(Entity):
     name: str = Field(..., json_schema_extra={'is_identifier': True})
-    @identifier_property
+
+    @is_identifier
     def nickname(self):
         return f"nick_{self.name.lower()}"
 
 def test_entity_field_and_property_alias():
     uid = UUID(bytes=b"abcd"*4)
     e = Entity(uid=uid, label="hello")
-    aliases = set(e.iter_aliases())
+    aliases = set(e.get_identifiers())
     # Should include uid and label property value
     assert uid in aliases
     assert "hello" in aliases
@@ -62,7 +63,7 @@ def test_entity_field_and_property_alias():
 def test_character_inherits_and_extends_aliases():
     uid = UUID(bytes=b"efgh"*4)
     c = Character(uid=uid, label="main", name="Alice")
-    aliases = set(c.iter_aliases())
+    aliases = set(c.get_identifiers())
     # Should include base (uid, label), plus field (name) and property (nickname)
     assert uid in aliases
     assert "main" in aliases
@@ -78,13 +79,14 @@ def test_character_inherits_and_extends_aliases():
 def test_subclass_override_and_negative_cases():
     class Agent(Character):
         callsign: str = Field("BRAVO", json_schema_extra={'is_identifier': True})
-        @identifier_property
+
+        @is_identifier
         def agent_tag(self):
             return f"AGENT-{self.callsign}"
 
     uid = UUID(bytes=b"ijkl"*4)
     a = Agent(uid=uid, label="undercover", name="Bob", callsign="ECHO")
-    aliases = set(a.iter_aliases())
+    aliases = set(a.get_identifiers())
     assert uid in aliases
     assert "undercover" in aliases
     assert "Bob" in aliases

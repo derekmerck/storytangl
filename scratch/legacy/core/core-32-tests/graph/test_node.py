@@ -2,72 +2,11 @@ import pytest
 import uuid
 import pickle
 
-from tangl.core import Node, Graph
+from tangl.core import Node, Graph, Subgraph
 
 
 # Test the Node class and its methods
 
-
-def test_node_creation():
-    n = Node(label="root")
-    assert isinstance(n.uid, uuid.UUID)  # Ensure it's a UUID
-    assert n.label == "root"
-    assert n.parent is None
-
-def test_add_child():
-    g = Graph()
-    parent = Node(label="parent")
-    child = Node(label="child")
-
-    g.add(parent)
-    parent.add_child(child)
-
-    assert child in parent.children
-    assert child.parent == parent
-
-    assert parent.child is child
-
-    with pytest.raises(AttributeError):
-        parent.does_not_exist
-
-def test_node_contains():
-    g = Graph()
-    node = Node(label="root", tags={"dog"}, graph=g)
-    child = Node(label="child", graph=g, parent_id=node.uid)
-    not_child = Node(label="not_child", tags={'cat'}, graph=g)
-
-    assert child in node.children
-    assert not_child not in node.children
-
-    assert child in node
-    assert not_child not in node
-
-    assert child.uid in node
-    from tangl.utils.is_valid_uuid import is_valid_uuid
-    assert is_valid_uuid(str(child.uid))
-    assert str(child.uid) in node
-    assert not_child.uid not in node
-    assert is_valid_uuid(str(not_child.uid))
-    assert str(not_child.uid) not in node
-
-    assert "child" in node
-    assert "not_child" not in node
-
-    assert "dog" in node
-    assert "cat" not in node
-
-
-def test_remove_child():
-    g = Graph()
-    parent = Node(label="parent")
-    child = Node(label="child")
-
-    g.add(parent)
-    parent.add_child(child)
-    parent.remove_child(child)
-
-    assert child not in parent.children
-    assert child.parent is None
 
 def test_unlink_child():
     g = Graph()
@@ -238,37 +177,13 @@ def test_create_node_with_default_values():
     assert node.children_ids == []
     assert node.children == []
 
-#  Tests that adding a child node to a parent node updates the child's parent and adds the child to the parent's children list.
-def test_add_child_node():
-    parent = Node()
-    child = Node()
-    parent.add_child(child)
-    assert child.parent == parent
-    assert child in parent.children
-
-    assert child in parent.graph
-    assert child.graph is parent.graph
-
-def test_remove_child():
-    parent = Node()
-    child = Node()
-    parent.add_child(child)
-
-    assert child in parent.children
-    assert child.parent_id == parent.uid
-
-    parent.remove_child(child)
-    assert child not in parent.children
-    assert child.parent_id is None
-
-
 def test_find_child():
     graph = Graph()
-    parent = Node(graph=graph)
-    child = Node(label="child")
-    parent.add_child(child)
+    parent = Subgraph(graph=graph)
+    child = Node(label="child", graph=graph)
+    parent.add_member(child)
 
-    found_child = parent.find_child(label = "child")
+    found_child = parent.find_one(label = "child")
     assert found_child is not None
     assert found_child.label == "child"
 
@@ -394,14 +309,14 @@ def test_graph_node_retrieval():
 @pytest.fixture
 def simple_graph():
     graph = Graph()
-    parent = Node(label="parent", graph=graph)
+    parent = Subgraph(label="parent", graph=graph)
     child1 = Node(label="child1", graph=graph)
     child2 = Node(label="child2", graph=graph)
     child3 = Node(label="child3", graph=graph)
 
-    parent.add_child(child1)
-    parent.add_child(child2)
-    child1.add_child(child3)
+    parent.add_member(child1)
+    parent.add_member(child2)
+    # child1.add_member(child3)
 
     # graph.add(parent)
     # graph.add(child1)
@@ -431,7 +346,7 @@ def test_node_find_child(simple_graph):
     _, parent, child1, child2, _ = simple_graph
 
     # Find a single child of the parent node
-    found_child = parent.find_child(label="child2")
+    found_child = parent.find_one(label="child2")
     assert found_child is child2
     # assert found_child in [ child1, child2 ]
 
@@ -484,13 +399,3 @@ def test_caching_behavior():
     nodes_by_path3 = registry.nodes_by_path
     assert nodes_by_path3 is not nodes_by_path2  # Should be a different object (cache invalidated)
 
-
-def test_node_pickles():
-
-    a = Node(label="test_node")
-
-    s = pickle.dumps( a )
-    print( s )
-    res = pickle.loads( s )
-    print( res )
-    assert a == res

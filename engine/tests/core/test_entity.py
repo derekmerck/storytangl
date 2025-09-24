@@ -30,7 +30,6 @@ def test_predicate_satisfied():
     assert e.is_satisfied(ctx={"flag": True})
     assert not e.is_satisfied(ctx={"flag": False})
 
-
 def test_entity_creation():
     e = Entity()
     assert isinstance(e.uid, UUID)
@@ -51,6 +50,13 @@ def test_has_tags2():
     assert e.has_tags('tag1')
     assert e.has_tags('tag1', 'tag2')
     assert not e.has_tags('tag1', 'tag3')
+
+def test_has_tags3():
+    node = Entity(tags={'abc', 'def'})
+    assert node.has_tags("abc") is True
+    assert node.has_tags("abc", "def") is True
+    assert node.has_tags("abc", "def", "ghi") is False
+    assert node.has_tags("abc", "ghi") is False
 
 def test_matches():
     e = Entity(label="hero", tags={"magic"})

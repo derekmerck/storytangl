@@ -145,3 +145,61 @@ Concepts
 * Context:          Scoped environment gathering across organizational tiers
 * Render:           Content projection to representation-agnostic fragments
 * Cursor:           The driver of phased graph traversal and journal updates
+
+
+provides:
+- _structure_, _resource_, _content_ type nodes and subgraphs
+- _choice_, _dependency_, _blame_ type edges
+- _dependency_ (open destination), and _requirement_ (open source) type dynamic edges and provisioning
+- _journal_ for managing lists of content nodes
+
+- Edge subtype by purpose: 
+  - **Choice** (flow control path)
+  - **Dependency** (resource requirement)
+  - **Trace** (output sequencing)
+  - **Blame** (audit trail)
+  - 
+- Node Subtype by function:
+  - **Structure** (directed control flow)
+  - **Resource** (reusable functionality or data)
+  - **Trace fragment** (immutable snapshots of state following flow)
+
+**Subgraphs**
+- Nodes may partition into embedded communities of related nodes
+- All structural nodes live on a subgraph with a _source_ and a _sink_
+- Any structural node may expand to contain a subgraph of structural nodes with their own _source_ and _sink_, thus providing a _hierarchical scale space_
+- Resource nodes may _anchor_ a subgraph of related resources and structures, recruiting the anchor generally recruits the entire _resource space_
+- Trace fragments are organized on a linear manifold within the graph that follows the control flow. They correspond directly to structure nodes, so can be expanded or aggregated into a similar hierarchy of sub-sequences
+
+```
+book (top-level graph)
+├── chapter/act (subgraph/module)
+│   ├── scene (structure-subgraph)
+│   │   ├── verse/block (single structure node)
+│   │   │   └── line/fragment (single trace fragment)
+```
+
+
+
+# Layer 4: Interpreter
+Frame, Context, Session
+
+### Dispatch
+
+- Handlers and HandlerRegistries
+- JobReceipt
+- Domains and Scopes
+
+**Scoped Context**
+- Mapping of identifiers to data and shape features, handlers, and provisioners
+- Organized by node (local), graph scales (non-local), semantic scopes (namespaces, e.g., domain, user, global, class mro), with more relevant (closer) values shadowing less relevant (distant) values with the same identifier
+- Similar to composition of transforms in hierarchical shape models, provides a local view of the global state
+
+```
+global
+├── domain
+│   ├── mod/user overrides
+│   └── shared resources (singletons)
+└── local graph/subgraph
+    └── node/block context
+```

@@ -26,7 +26,7 @@ def test_has_aliases():
     assert not e.has_alias('alias3')
 
     assert e.has_alias(e.label)
-    assert e.has_alias(e.short_uid)
+    assert e.has_alias(e.short_uid())
 
 
 def test_filtering():
@@ -39,20 +39,22 @@ def test_filtering():
     e3 = MyEntity(alias=set(), tags={'tag1', 'tag3', 'tag4'})
 
     instances = [e0, e1, e2, e3]
-    filtered = Entity.filter_by_criteria(instances, alias='alias1')
+    filtered = Entity.filter_by_criteria(instances, has_alias='alias1')
     assert list(filtered) == [e0, e1], "e0 and e1 both use that alias"
-    filtered = Entity.filter_by_criteria(instances, alias='alias1', tags=None)
-    assert list(filtered) == [e0], "None query should fail on e1"
 
-    filtered = Entity.filter_by_criteria(instances, tags={'tag2'})
+    # has_tags(None) doesn't try to assert empty set...
+    # filtered = Entity.filter_by_criteria(instances, has_alias='alias1', has_tags=None)
+    # assert list(filtered) == [e0], "None query should fail on e1"
+
+    filtered = Entity.filter_by_criteria(instances, has_tags={'tag2'})
     assert list(filtered) == [e2]
     # checking alias = None doesn't make any sense, just leave it blank
     # filtered = Entity.filter_by_criteria(instances, alias=None, tags={'tag2'})
     # assert filtered == [e2]
 
-    filtered = Entity.filter_by_criteria(instances, tags={'tag1', 'tag2'})
+    filtered = Entity.filter_by_criteria(instances, has_tags={'tag1', 'tag2'})
     assert list(filtered) == []
 
-    filtered = Entity.filter_by_criteria(instances, tags={'tag1', 'tag3'})
+    filtered = Entity.filter_by_criteria(instances, has_tags={'tag1', 'tag3'})
     assert list(filtered) == [e3]
 

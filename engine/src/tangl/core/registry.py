@@ -29,7 +29,7 @@ import warnings
 from pydantic import Field
 
 from tangl.type_hints import StringMap, Tag
-from .entity import Entity
+from .entity import Entity, Selectable
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
@@ -99,6 +99,17 @@ class Registry(Entity, Generic[VT]):
         if sort_key is None:
             warnings.warn("chain_find_one with no sort key is legal, but it may not be what you want, it is just reg[0].find_one()")
         return next(cls.chain_find_all(*registries, sort_key=sort_key, **criteria), None)
+
+    # -------- FIND SATISFIERS -----------
+
+    def select_for(self, selector: Entity) -> Iterator[VT]:
+        # filter will gracefully fail if VT is not a Selectable
+        return Selectable.filter_for_selector(self.values(), selector=selector)
+
+    def select_one_for(self, selector: Entity) -> Optional[VT]:
+        return next(self.select_for(selector), None)
+
+    # chain select?
 
     # -------- DELEGATE MAPPING METHODS -----------
 

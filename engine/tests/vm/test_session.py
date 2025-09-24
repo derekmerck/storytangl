@@ -10,7 +10,6 @@ def test_global_handlers_visible_in_scope():
     g = Graph(label="x")
     n = g.add_node(label="n1")
     sess = Session(graph=g, cursor_id=n.uid)
-    sess.domain_registry.add(global_domain)
     ns = sess.get_ns(P.VALIDATE)
 
     print("Registered")
@@ -20,7 +19,7 @@ def test_global_handlers_visible_in_scope():
 
     print("Has VALIDATE")
     for h in global_domain.handlers.find_all(phase=P.VALIDATE):
-        print(h.func.__name__, h.available(ns))
+        print(h.func.__name__)
 
     ns = sess.run_phase(P.VALIDATE)
     print( ns )
@@ -79,7 +78,6 @@ def test_provisioning_create_policy_assigns_provider():
     Dependency[Node](graph=g, source_id=scene.uid, requirement=req, label="needs_companion")
 
     sess = Session(graph=g, cursor_id=scene.uid)
-    sess.domain_registry.add(global_domain)
 
     ns = sess.run_phase(P.PLANNING)
     assert req.satisfied
@@ -93,7 +91,6 @@ def test_prereq_redirect_and_journal_line():
     ChoiceEdge(graph=g, source_id=start.uid, destination_id=end.uid, trigger_phase=P.PREREQS)
 
     sess = Session(graph=g, cursor_id=start.uid)
-    sess.domain_registry.add(global_domain)
 
     nxt = sess.follow_edge(AnonymousEdge(source=start, destination=end))  # first hop returns ChoiceEdge on PREREQS
     # After following, epoch incremented and JOURNAL should run

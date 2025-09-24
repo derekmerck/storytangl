@@ -10,7 +10,7 @@ from .job_receipt import JobReceipt
 class HandlerRegistry(Registry[Handler]):
 
     def add(self, func: HandlerFunc, **attrs):
-        h = Handler(func=func, reg_number=len(self), **attrs)
+        h = Handler(func=func, **attrs)
         super().add(h)
 
     def register(self, **attrs):
@@ -19,6 +19,7 @@ class HandlerRegistry(Registry[Handler]):
             return func
         return decorator
 
+    # todo: is this is actually select_for plus criteria like phase=x?  Or keep a registry per phase?
     def find_all(self, **criteria) -> Iterator[Handler]:
         yield from sorted(super().find_all(**criteria))
 
@@ -40,4 +41,4 @@ class HandlerRegistry(Registry[Handler]):
         for h in _handlers:
             yield h(ns)
 
-DEFAULT_HANDLERS = HandlerRegistry()
+DEFAULT_HANDLERS = HandlerRegistry(label='default_handlers')

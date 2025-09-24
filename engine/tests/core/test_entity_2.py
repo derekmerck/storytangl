@@ -43,8 +43,8 @@ def test_entity_has_tags_and_matches_simple_attrs():
     assert not p.matches(name="Alice", age=31)
 
     # callable predicate(s) and mixed criteria
-    assert p.matches(lambda e: e.age == 30, name="Alice")
-    assert not p.matches(lambda e: e.age > 30)
+    assert p.matches(predicate=lambda e: e.age == 30, name="Alice")
+    assert not p.matches(predicate=lambda e: e.age > 30)
 
 
 def test_entity_matches_predicate_attribute_is_instance():

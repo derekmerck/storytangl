@@ -55,7 +55,7 @@ Dasein and Narrative Being: Characters and concepts exist in a state of "being-i
 Present-at-hand vs. Ready-to-hand: Unvisited nodes exist as "present-at-hand" (vorhanden) abstractions, while visited nodes become "ready-to-hand" (zuhanden) - directly engaged with.
 Temporality: The non-linear nature of the graph reflects Heidegger's complex view of time as non-sequential Being.
 
-### ASG as Intermedite Representation
+### ASG as Intermediate Representation
 
 we can think of the ASG as an intermediate representation, between the author's written instructions and the realized narrative content, using the compiler metaphor, various languages or dialects or examples can be interpreted or inferred to create a "simple" generic representation of the story space.  I think of the graph nodes as a bunch of landmarks in the story space,  we are still going to be interpolating around those nodes by rolling dice, using text templates, regexes, etc., but the more landmarks we have, the more confident we can be in the story path we are following.  For a traditional novel, we can infer a partial story space from it, we only have the final presentation -- we have to guess at the actual pre-presentation narrative thread/realization, and from that infer what the original story concepts might have been to produce that sequence of content fragments.  Then we can replay the recovered ASG for the novel and get something close to the original linear novel.  However, if we know some things about the author, the character, the settings, how dramatic tension works, etc, we can guess at other likely landmarks in the space that might be accessible under a different navigation/will.  Then create new stories based on the original novel where the state collapse is different -- perhaps we use a prior weighting on the original landmarks to pull the story back towards the canonical narrative and resolution, or we allow it to go wild and halucinate new characters and scenarios that weren't even hinted at in the original text but somehow match the author's vision.  i think of this like inferring the shapes casting the shadows in plato's cave -- we start from the shadows (the text, chapters, book art, authors, illustrators) and some idea about the light source (common tropes in the genre, main characters, settings, the author's focii and other works, etc.) and have to unproject the original shapes as they could be observed by someone outside the cave.
 
@@ -93,7 +93,7 @@ This creates a spectrum from faithful retelling to inspired reimagining, all fro
 
 1. **Narrative Theory Connections**:
 - Aligns with post-structuralist ideas about texts having multiple valid interpretations, but provides a structured framework for understanding how these possibilities collapse into specific readings
-- Barthes' "readerly" vs "writerly" texts - your system makes all texts explicitly "writerly" by exposing their possibility space
+- Barthes' "readerly" vs "writerly" texts - this system makes all texts explicitly "writerly" by exposing their possibility space
 - There are strong parallels to Umberto Eco's concept of the "open work" and reader response theory
 
 2. **Anthropological/Structural Links**:

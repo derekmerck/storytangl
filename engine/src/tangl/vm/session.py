@@ -12,9 +12,10 @@ from random import Random
 from tangl.type_hints import Step, StringMap as NS
 from tangl.utils.hashing import hashing_func
 from tangl.core.entity import Conditional
+from tangl.core.registry import Registry
 from tangl.core.graph import Graph, Edge, Node
-from tangl.core.domain import DomainRegistry
 from tangl.core.dispatch import JobReceipt
+from tangl.core.domain import AffiliateDomain
 from .context import Context
 from .events import ReplayWatcher, Event, WatchedRegistry
 
@@ -56,7 +57,7 @@ class Session:
     graph: Graph
     cursor_id: UUID
     epoch: Step = -1
-    domain_registry: DomainRegistry = field(default_factory=DomainRegistry)
+    domain_registries: list[Registry[AffiliateDomain]] = field(default_factory=list)
 
     event_sourced: bool = False  # track effects on a mutable copy
     event_watcher: ReplayWatcher = field(default_factory=ReplayWatcher)
@@ -64,6 +65,14 @@ class Session:
     @property
     def cursor(self) -> Node:
         return self.graph.get(self.cursor_id)
+
+    @property
+    def domain_registry(self) -> Registry[AffiliateDomain]:
+        # this is a convenience property that creates a registry
+        # if self.registries is empty and returns the first.
+        if not self.domain_registries:
+            self.domain_registries = [Registry()]
+        return self.domain_registries[0]
 
     def get_preview_graph(self):
         # create a disposable preview graph from the current event buffer
@@ -80,7 +89,7 @@ class Session:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph, self.cursor_id, self.domain_registry)
+        return Context(graph, self.cursor_id, self.domain_registries)
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):

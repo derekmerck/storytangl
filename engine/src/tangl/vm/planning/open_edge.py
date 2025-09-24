@@ -23,8 +23,8 @@ class Dependency(Edge, Generic[NodeT]):
     (provide if possible), and they may be restricted to only existing nodes, or using indirect
     providers to create and introduce a new node.
 
-    Hard dependencies may also carry their own fallback builder for when no satisfactory
-    pre-existing direct or indirect provider is available.
+    Hard dependencies may also carry their own fallback builder or waiver for when no
+    satisfactory pre-existing direct or indirect provider is available.
     """
     # dependencies project into the ns of their **source** as {self.label: self.destination}
     requirement: Requirement[NodeT]

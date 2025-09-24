@@ -20,7 +20,7 @@ def test_tiny_integration():
 
     # session
     sess = Session(graph=g, cursor_id=start.uid)
-    sess.domain_registry.add(global_domain)   # Option A, if not wired structurally
+    # sess.domain_registry.add(global_domain)   # Option A, if not wired structurally
 
     # drive
     ns = sess.get_ns(P.VALIDATE)

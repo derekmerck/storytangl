@@ -7,7 +7,7 @@ def make_graph():
     n2 = Node(label="end")
     g.add(n1)
     g.add(n2)
-    e = Edge(src_id=n1.uid, dest_id=n2.uid)
+    e = Edge(source_id=n1.uid, destination_id=n2.uid)
     g.add(e)
     return g, n1, n2, e
 
@@ -20,10 +20,10 @@ def test_graph_node_edge_add_get():
 def test_find_edges_direction_and_kind():
     g, n1, n2, e = make_graph()
     # Outgoing from n1
-    outs = list(g.find_edges(n1, direction="out"))
+    outs = list(g.find_edges(source=n1))
     assert outs == [e]
     # Incoming to n2
-    ins = list(g.find_edges(n2, direction="in"))
+    ins = list(g.find_edges(destination=n2))
     assert ins == [e]
     # # Filter by kind
     # choices = list(g.find_edges(n1, direction="out", edge_kind=EdgeKind.CHOICE))
@@ -31,5 +31,5 @@ def test_find_edges_direction_and_kind():
 
 def test_node_edges_delegates_to_graph():
     g, n1, n2, e = make_graph()
-    edges = list(n1.edges(direction="out"))
+    edges = list(n1.edges_out())
     assert edges == [e]

@@ -4,15 +4,28 @@ from typing import Optional, Iterator, TYPE_CHECKING
 from enum import Enum
 from uuid import UUID
 
+from pydantic import model_validator
+
 from tangl.core.entity import Entity
 from .graph import GraphItem, Graph
 
 from .node import Node
 
 class Edge(GraphItem):
+    # source and destination entities are converted to uids on create if needed
+
     edge_type: Optional[Enum|str] = None       # No need to enumerate this yet
     source_id:  Optional[UUID] = None          # usually parent
     destination_id: Optional[UUID] = None      # attach to a structure (choice) or dependency (role, loc, etc.)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _convert_to_uid(cls, data):
+        for attr in ("source", "destination"):
+            if attr in data and isinstance(data[attr], GraphItem):
+                entity = data.pop(attr)
+                data.setdefault(f"{attr}_id", entity.uid)
+        return data
 
     @property
     def source(self) -> Optional[Node]:

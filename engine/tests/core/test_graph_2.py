@@ -109,6 +109,7 @@ def test_find_nodes():
     assert list(registry.find_all(tags=node1.tags)) == [node1, node3]
 
 
+
 def test_graph_pickles():
 
     graph = Graph()

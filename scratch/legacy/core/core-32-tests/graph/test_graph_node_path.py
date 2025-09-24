@@ -1,5 +1,5 @@
 from uuid import uuid4
-from tangl.core.entity import Graph, Node
+from tangl.core.graph import Graph, Node
 
 
 def test_graph_lookup_by_path():
