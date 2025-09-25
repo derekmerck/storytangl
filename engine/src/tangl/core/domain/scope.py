@@ -13,8 +13,6 @@ from tangl.core.graph import Graph, Node, GraphItem
 from tangl.core.registry import Registry
 from tangl.core.dispatch import Handler
 from .domain import Domain, global_domain
-from .affiliate import AffiliateDomain
-from .structural import StructuralDomain
 
 NS: TypeAlias = ChainMap[str, Any]
 
@@ -30,7 +28,7 @@ class Scope(Entity):
     graph: Graph = Field(..., exclude=True)
     # Has a graph, but Scope is not a graph item, per se
     anchor_id: UUID
-    domain_registries: list[Registry[AffiliateDomain]] = Field(default_factory=list)
+    domain_registries: list[Registry[Domain]] = Field(default_factory=list)
 
     @property
     def anchor(self) -> Node:
@@ -49,10 +47,10 @@ class Scope(Entity):
 
         seen: set[UUID] = set()
 
-        def new_domain(domain: Domain):
+        def new_domain(domain_: Domain):
             nonlocal seen
-            if domain.uid not in seen:
-                seen.add(domain.uid)
+            if domain_.uid not in seen:
+                seen.add(domain_.uid)
                 return True
             return False
 
@@ -61,10 +59,10 @@ class Scope(Entity):
 
         for item in items:
             # 1) Include structural domain ancestors
-            if isinstance(item, StructuralDomain) and new_domain(item):
+            if isinstance(item, Domain) and new_domain(item):
                 # Include the item directly if it is a domain (e.g., scene, book)
                 yield item
-            # 2) Include affiliates of each ancestor
+            # 2) Include affiliates of the anchor and each ancestor
             for registry in registries:
                 for domain in registry.select_for(item):
                     if new_domain(domain):

@@ -8,8 +8,8 @@ from .planning import Requirement, Provisioner, Dependency, Affordance, Provisio
 
 # Resolution step
 from .context import Context
-from .session import Session, ChoiceEdge, ResolutionPhase
+from .frame import Frame, ChoiceEdge, ResolutionPhase
 
-# Simple session phase-bus handlers
+# Simple phase-bus handlers
 import tangl.vm.simple_handlers
 

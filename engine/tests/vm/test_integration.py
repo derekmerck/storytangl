@@ -1,5 +1,5 @@
 from tangl.core import Graph, Node, global_domain
-from tangl.vm import ChoiceEdge, ResolutionPhase as P, Requirement, Dependency, Affordance, ProvisioningPolicy, Session
+from tangl.vm import ChoiceEdge, ResolutionPhase as P, Requirement, Dependency, Affordance, ProvisioningPolicy, Frame
 
 def test_tiny_integration():
     # Build a tiny graph
@@ -18,13 +18,12 @@ def test_tiny_integration():
     )
     dep = Dependency[Node](graph=g, source_id=scene.uid, requirement=req, label="needs_companion")
 
-    # session
-    sess = Session(graph=g, cursor_id=start.uid)
-    # sess.domain_registry.add(global_domain)   # Option A, if not wired structurally
+    # Frame
+    sess = Frame(graph=g, cursor_id=start.uid)
 
     # drive
     ns = sess.get_ns(P.VALIDATE)
-    assert sess.run_phase(P.VALIDATE).get('results')  # basic sanity
+    assert sess.run_phase(P.VALIDATE)  # basic sanity
 
     # follow the choice; the loop runs PREREQS -> UPDATE -> JOURNAL -> FINALIZE -> POSTREQS
     sess.resolve_choice(choice)

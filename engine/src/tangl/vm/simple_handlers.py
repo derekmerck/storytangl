@@ -1,7 +1,8 @@
-# minimal phase handlers
+# minimal phase handlers for testing
+# note, the `register` decorator wraps the output in a JobReceipt
 
 from tangl.core import Node, global_domain, Graph
-from tangl.vm.session import ResolutionPhase as P, NS, ChoiceEdge
+from tangl.vm.frame import ResolutionPhase as P, NS, ChoiceEdge
 from tangl.vm.planning import Dependency, Provisioner
 
 @global_domain.handlers.register(phase=P.VALIDATE, priority=0)

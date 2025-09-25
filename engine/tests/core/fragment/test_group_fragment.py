@@ -1,47 +1,47 @@
 import pytest
 
-pytest.skip(allow_module_level=True)
 
-from tangl.journal.fragment import BaseFragment, GroupFragment
+from tangl.core.fragment import ContentFragment, GroupFragment
 
 ##### Grouped Fragments
 
-TextFragment = MediaFragment = BaseFragment
+TextFragment = MediaFragment = ContentFragment
 
+@pytest.mark.xfail(reason="refactored, not working like this")
 def test_group_creation_and_membership():
     # Create a group fragment representing a dialog exchange
     group = GroupFragment(
         type="group",
         group_type="dialog_exchange",
-        group_roles=[
-            {"role": "speaker", "type": "text"},
-            {"role": "avatar", "type": "image", "optional": True},
-            {"role": "dialog", "type": "text"}
-        ]
+        # group_roles=[
+        #     {"role": "speaker", "type": "text"},
+        #     {"role": "avatar", "type": "image", "optional": True},
+        #     {"role": "dialog", "type": "text"}
+        # ]
     )
 
     # Create member fragments
     speaker = TextFragment(
         type="text",
         content="Commander Shepard:",
-        group_id=group.uid,
-        group_role="speaker"
+        # group_id=group.uid,
+        # group_role="speaker"
     )
 
     avatar = MediaFragment(
         type="image",
         content="https://example.com/shepard.jpg",
         format="url",
-        group_id=group.uid,
-        group_role="avatar"
+        # group_id=group.uid,
+        # group_role="avatar"
     )
 
     dialog = TextFragment(
         type="text",
         content="I'm Commander Shepard, and this is my favorite store on the Citadel.",
         format="plain",
-        group_id=group.uid,
-        group_role="dialog"
+        # group_id=group.uid,
+        # group_role="dialog"
     )
 
     # Assertions

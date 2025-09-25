@@ -1,13 +1,13 @@
 from __future__ import annotations
 import functools
-from enum import IntEnum
-from typing import TypeAlias, Any, Callable
+from enum import IntEnum, Enum
+from typing import TypeAlias, Any, Callable, Optional
 
 from pydantic import ConfigDict
 
 from tangl.type_hints import StringMap as NS
 from tangl.utils.base_model_plus import HasSeq
-from tangl.core.entity import Entity, Selectable
+from tangl.core.entity import Entity, Selectable, is_identifier
 from .job_receipt import JobReceipt
 
 # todo: this is an entity handler, should include the caller and caller's current scope _or_
@@ -54,13 +54,19 @@ class Handler(HasSeq, Selectable, Entity):
 
     func: HandlerFunc
     priority: HandlerPriority | int = HandlerPriority.NORMAL
+    result_type: Optional[Enum | str] = None  # No need to enumerate this yet
 
     def has_func_name(self, value: str) -> bool:
         return self.func.__name__ == value
 
+    @is_identifier
+    def get_label(self) -> str:
+        return self.label or self.func.__name__
+
     def __call__(self, ns: NS) -> JobReceipt:
         return JobReceipt(blame_id=self.uid,
-                          result=self.func(ns))
+                          result=self.func(ns),
+                          result_type=self.result_type)
 
     def __lt__(self, other) -> bool:
         # order by priority, then registration number (may duplicate if merging registries),

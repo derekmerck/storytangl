@@ -3,7 +3,8 @@
 
 Basic vocabulary and low-level abstractions for describing the shape and basic behaviors of any element in the framework.
 
-## Layer 1: Identity & Collection
+
+## Layer 1: Identity
 
 **Entity**
 - Minimal base class for all managed objects
@@ -21,17 +22,18 @@ Basic vocabulary and low-level abstractions for describing the shape and basic b
 - Immutable entities with unique names that can be shared within a semantic scope
 
 ## Layer 2: Topology
-Graph, Node, Edge, Subgraph
+Graph, Node, Edge, Subgraph, Fragment
 
 - A Graph is a registry of **GraphItems**: **Nodes**, **Edges**, and **Subgraphs**
 - GraphItem topology provides _shape features_
 - Nodes may be connected by edges
 - Subgraphs are collections of nodes that form a structural domain
+- Fragments carry pre-image output and control information about a graph process, they are frozen and organized as linear manifold in the graph
 
-## Layer 3: Dispatch and Scope
+## Layer 3: Capability
 Handler, JobReceipt, Domain, Scope
 
-**Handler**
+**Dispatch**
 - Common api for actions on entities
 - Internal **HandlerFunc** takes a caller and namespace, produces a result
 - Handler creates a **JobReceipt** with audit info and the result for each invocation
@@ -42,4 +44,7 @@ Handler, JobReceipt, Domain, Scope
 - Structural domains are inferred from the graph topology (a node's ancestor subgraphs), affiliate domains are joined explicitly with tags or other selectors
 - Scopes are ordered structural and affiliate domain layers that bundles all capabilities visible to a single 'anchor' node on a given graph
 
-At the interpreter layer, a graph, a pointer to an anchor node, and the node's scoped capabilities make a **Frame** for the vm.  At each step, a step-handler is called with a cursor update, resulting a cascade of nested phase handler invocations that validate, extend, and navigate the resolution frontier.
+---
+
+`tangl.core` is an abstract dataclass module, its members should ONLY depend on:
+- **utils**

@@ -53,7 +53,7 @@ class Affordance(Edge, Generic[NodeT]):
     Affordances represent nodes that become available whenever conditions are met.
 
     Like dependencies, they can be marked soft (default, provide if possible) or hard (critical,
-    paths will be unavailable if they cannot be provided).
+    paths will be unavailable if resources cannot be created or linked).
 
     _All_ affordances in the scope (i.e., visible to this node) will be tested _against_ the
     frontier to see if they can be linked. This is usually to present choices or resources that

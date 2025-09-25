@@ -1,6 +1,6 @@
-# tangl/vm/session.py
+# tangl/vm/frame.py
 from __future__ import annotations
-from typing import Literal, Optional, Any
+from typing import Literal, Optional, Any, Callable, Type
 import functools
 from enum import IntEnum, Enum
 from uuid import UUID
@@ -18,11 +18,13 @@ from tangl.core.dispatch import JobReceipt
 from tangl.core.domain import AffiliateDomain
 from .context import Context
 from .events import ReplayWatcher, Event, WatchedRegistry
+from ..core import Entity
 
 logger = logging.getLogger(__name__)
 
-# In principle, could merge validate/prereqs, cleanup/postreqs, but they have
-# different aggregation mechanisms, so it's maybe best to keep them distinct.
+
+Fragment = Entity   # Trace content fragment
+Patch = Entity      # Trace update/event fragment
 
 class ResolutionPhase(IntEnum):
 
@@ -31,9 +33,23 @@ class ResolutionPhase(IntEnum):
     PLANNING = 20    # resolve Dependencies and Affordances; updates graph/data on frontier in place and GATHERS receipts
     PREREQS = 30     # return ANY (first) avail prereq edge to a provisioned node to break and redirect
     UPDATE = 40      # mutates graph/data in place and GATHERS receipts
-    JOURNAL = 50     # return PIPE of generated fragments, needs post-processor composite and commit; previously "RENDER"
-    FINALIZE = 60    # cleanup, commit events, consume resources, etc.; updates graph/data in place and GATHERS receipts
+    JOURNAL = 50     # return PIPES receipts to compose a list of FRAGMENTS
+    FINALIZE = 60    # cleanup, commit events, consume resources, etc.; updates graph/data in place and PIPE receipts to compose a Patch
     POSTREQS = 70    # return ANY (first) avail postreq edge to avail, provisioned node to break and redirect
+
+    def properties(self) -> tuple[Callable, Type]:
+        """Aggregation func and expected final result type by phase"""
+        _data = {
+            self.INIT: None,
+            self.VALIDATE: (JobReceipt.all_truthy,   bool),     # confirm all true
+            self.PLANNING: (JobReceipt.gather,       Any),
+            self.PREREQS:  (JobReceipt.first_result, Edge),     # check for any available jmp/jr
+            self.UPDATE:   (JobReceipt.gather,       Any),
+            self.JOURNAL:  (JobReceipt.last_result,  list[Fragment]), # pipe and compose a list of Fragments
+            self.FINALIZE: (JobReceipt.last_result,  Patch),    # pipe and compose a Patch (if event sourced)
+            self.POSTREQS: (JobReceipt.first_result, Edge)      # check for any available jmp/jr
+        }
+        return _data[self]
 
     # Otherwise we also need to guarantee that at least **one** selectable edge
     # to a provisioned node exists on the frontier.
@@ -45,13 +61,13 @@ class ChoiceEdge(Edge, Conditional):
     # Previously called 'traversable edge', these ONLY link 'structural' nodes.
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
     # If trigger phase is not None, edge will auto-trigger if conditions are met.
-    # Otherwise, it is considered Selectable and will be presented in the session
-    # output.
+    # Otherwise, it is considered Selectable (overloaded term?) and will be presented
+    # in the frame's session output.
 
 # dataclass for simplified init, not serialized or tracked
 @dataclass
-class Session:
-    # Session manages Context (graph, cursor)
+class Frame:
+    # Frame manages Context (graph, cursor) and the Phase bus
     # Context manages Scope (capabilities over active domain layers)
     # Scope is inferred from Graph, cursor node, latent domains
     graph: Graph
@@ -61,6 +77,9 @@ class Session:
 
     event_sourced: bool = False  # track effects on a mutable copy
     event_watcher: ReplayWatcher = field(default_factory=ReplayWatcher)
+
+    phase_receipts: dict[Enum, list[JobReceipt]] = field(default_factory=dict)
+    phase_outcome:  dict[Enum, Any] = field(default_factory=dict)
 
     @property
     def cursor(self) -> Node:
@@ -104,21 +123,33 @@ class Session:
 
     def get_ns(self, phase: ResolutionPhase) -> NS:
         base_ns = self.context.get_ns()
-        # The session itself also provides a ns domain layer
-        session_layer = {
+        # The frame itself also provides a ns domain layer
+        frame_layer = {
             'cursor': self.cursor,
             'epoch': self.epoch,
             "phase": phase,         # phase annotation for handlers
             "rand": self.rand,
             "results": [],          # type: list[JobReceipt]
         }
-        return base_ns.new_child(session_layer)
+        return base_ns.new_child(frame_layer)
 
-    def run_phase(self, phase: P) -> NS:
-        ns = self.get_ns(phase)          # creates context if necessary, resets results
-        for h in self.context.get_handlers(phase=phase):
-            ns["results"].append(h(ns))  # add the receipt to the result stack
-        return ns
+    def run_phase(self, phase: P) -> Any:
+        ns = self.get_ns(phase)  # creates context if necessary, resets results
+        handlers = list(self.context.get_handlers(phase=phase))
+        receipts = [h(ns) for h in handlers]
+
+        # Did it iteratively in ns so a compositor would have access to previous results for pipe
+        # for h in self.context.get_handlers(phase=phase):
+        #     ns["results"].append(h(ns))  # add the receipt to the result stack
+
+        agg_func, result_type = phase.properties()
+        outcome = agg_func(*receipts)
+
+        # stash results on the context for review/compositing
+        self.phase_receipts[phase] = receipts
+        self.phase_outcome[phase] = outcome
+
+        return outcome
 
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
@@ -130,37 +161,39 @@ class Session:
         self._invalidate_context()       # updated the anchor, need to rebuild scope
 
         # Make sure that this cursor is allowed
-        ns = self.run_phase(P.VALIDATE)
-        if not JobReceipt.all_true(*ns.get('results')):
+        if not self.run_phase(P.VALIDATE):
             raise RuntimeError(f"Proposed next cursor is not valid!")
 
         # May mutate graph/data
-        ns = self.run_phase(P.PLANNING)      # No-op for now
+        patch = self.run_phase(P.PLANNING)      # No-op for now
 
         # Check for prereq cursor redirects
         # todo: implement j/r redirect stack
-        ns = self.run_phase(P.PREREQS)  # may set an edge to next cursor
-        nxt = JobReceipt.last_result(*ns.get('results'))
-        if isinstance(nxt, Edge):
-            return nxt
+        if nxt := self.run_phase(P.PREREQS):  # may set an edge to next cursor
+            if isinstance(nxt, Edge):
+                return nxt
+            else:
+                raise RuntimeError(f"Proposed prereq jump is not a valid edge {type(nxt)}!")
 
-        ns = self.run_phase(P.UPDATE)         # No-op for now
+        patch = self.run_phase(P.UPDATE)         # No-op for now
 
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
 
         # Generate the output content for the current state
-        ns = self.run_phase(P.JOURNAL)
+        entry = self.run_phase(P.JOURNAL)
         # todo: compose and copy wherever to where-ever it goes, as entry nodes or into a separate journal object
         # todo: If fragments are stored as nodes, we should update the preview graph again since cleanup might want to see the journal.  Otherwise the journal needs to be stored somewhere else?  In the ns?
 
         # Cleanup bookkeeping
-        ns = self.run_phase(P.FINALIZE)
+        patch = self.run_phase(P.FINALIZE)
 
         # check for postreq cursor redirects
-        ns = self.run_phase(P.POSTREQS)    # may set an edge to next cursor
-        nxt = JobReceipt.last_result(*ns.get('results'))
-        if isinstance(nxt, Edge):
-            return nxt
+        if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor
+            if isinstance(nxt, Edge):
+                return nxt
+            else:
+                raise RuntimeError(f"Proposed postreq jump is not a valid edge {type(nxt)}!")
+
         return None
 
     def resolve_choice(self, choice) -> None:

@@ -5,7 +5,7 @@ from base64 import b64encode
 from pydantic import field_serializer
 
 from tangl.type_hints import Pathlike
-from tangl.journal.fragment import BaseFragment
+from tangl.core.fragment import ContentFragment
 from tangl.core.dispatch import HandlerRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
@@ -22,7 +22,7 @@ media_fragment_handler = HandlerRegistry(
     label="media_fragment_handler",
     aggregation_strategy="pipeline")
 
-class MediaFragment(BaseFragment, extra='allow'):
+class MediaFragment(ContentFragment, extra='allow'):
     """
     This is a type of fragment that can be generated according to
     inline data or url, or from a media dependency linked to a MediaRIT.

@@ -17,8 +17,8 @@ def test_proxy_sets_wrapped_and_emits(graph):
     assert rw.events[-1].old_value == "X"
 
 
-def test_events_default_off(session):
-    assert not hasattr(session.context.graph, "_watchers")
+def test_events_default_off(frame):
+    assert not hasattr(frame.context.graph, "_watchers")
 
 @pytest.mark.xfail(reason="removed this func for mvp")
 def test_preview_graph_is_copy(session):

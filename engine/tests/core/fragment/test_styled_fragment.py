@@ -1,8 +1,8 @@
-from tangl.journal.fragment import PresentationHints, ContentFragment
+from tangl.core.fragment import PresentationHints, StyledFragment
 
 def test_text_fragment_creation():
     # Test text fragment with markdown
-    fragment = ContentFragment(
+    fragment = StyledFragment(
         # type="content",
         content="# Test Heading\nThis is a test narrative.",
         format="markdown",

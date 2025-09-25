@@ -8,10 +8,10 @@ from pydantic import Field
 from tangl.type_hints import UnstructuredData
 from tangl.utils.bookmarked_list import BookmarkedList
 from tangl.core.registry import Registry
-from tangl.core.graph import Node
-from tangl.journal.fragment import BaseFragment
-# from ..abs_feature_graph import BlameEdge
-from .fragment.content_fragment import ContentFragment
+from tangl.core.graph import Node, Edge
+from tangl.core.fragment import ContentFragment, StyledFragment
+
+# This is actually like a journaling graph or something?
 
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ class HasJournal(Registry[ContentFragment], arbitrary_types_allowed=True):
         if isinstance(item, dict):
             item = ContentFragment.structure(item)
             # todo: Actually want to use the discriminated union
-        if not isinstance(item, BaseFragment):
+        if not isinstance(item, ContentFragment):
             raise ValueError(f"Trying to add wrong type {type(item)} to graph via journal")
         # todo: need to unfreeze or set with a trick
         # if item.sequence is None:

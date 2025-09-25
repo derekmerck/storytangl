@@ -8,8 +8,8 @@ from tangl.type_hints import StyleId, StyleClass, StyleDict
 
 class PresentationHints(BaseModel, extra="allow"):
     """
-    Presentation hints can include anything that the client and server can
-    agree on.
+    Presentation hints can include anything that the front-end and
+    back-end can agree on.
 
     Presentation hints are _not_ guaranteed to be respected by a client,
     although `style_dict['color']` is usually pretty easy to implement

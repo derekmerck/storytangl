@@ -12,6 +12,8 @@ class Provisioner:
     # Default provisioner for Dependency edges
     # todo: Provisioners need to be implemented like handlers/handler registries, so
     #       that they can be passed around in domains, I think
+    #       previously they yielded an offer job receipt with an 'accept' function
+    #       for the orchestrator to select
 
     requirement: Requirement
     registries: list[Registry] = field(default_factory=list)
@@ -24,10 +26,10 @@ class Provisioner:
         provider_criteria = provider_criteria or {}
         if provider_id is not None:
             # clobber existing if given
-            # Entity.has_alias(x) will match uid, get_label(), and short_uid() by default
+            # Entity.has_identifier(x) will match uid, get_label(), and short_uid() by default
             # for subclasses, it also matches fields tagged with "is_identifier" or methods
             # annotated with meth._is_identifier = True
-            provider_criteria['has_alias'] = provider_id
+            provider_criteria['has_identifier'] = provider_id
         if not provider_criteria:
             raise ValueError("Must include some provider id or criteria")
         return Registry.chain_find_one(self.requirement.graph, *self.registries, **provider_criteria)
@@ -65,7 +67,7 @@ class Provisioner:
         provider = Node.structure(provider_template)
         return provider
 
-    # todo: this is the fallback for "on_provision_media", it returns if nothing else does first
+    # todo: this is the fallback for "on_provision", it returns if nothing else does first
     def resolve(self) -> Optional[Node]:
         """Attempt to resolve a provider for the requirement attribs and given policy"""
 

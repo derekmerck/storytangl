@@ -58,10 +58,7 @@ class Entity(BaseModelPlus):
 
     @is_identifier
     def get_label(self) -> str:
-        if self.label is not None:
-            return self.label
-        else:
-            return self.short_uid()
+        return self.label or self.short_uid()
 
     def matches(self, *, predicate: MatchPredicate = None, **criteria) -> bool:
         # Callable predicate funcs on self were passed
@@ -142,7 +139,7 @@ class Entity(BaseModelPlus):
         return self.is_dirty_
 
     def __repr__(self) -> str:
-        s = self.label or self.short_uid()
+        s = self.get_label()
         return f"<{self.__class__.__name__}:{s}>"
 
     @is_identifier

@@ -1,4 +1,4 @@
-from tangl.journal.fragment import PresentationHints
+from tangl.core.fragment import PresentationHints
 
 ### TestPresentationHints:
 def test_presentation_hints():

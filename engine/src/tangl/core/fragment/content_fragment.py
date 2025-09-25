@@ -7,15 +7,10 @@ from pydantic import ConfigDict, Field, BaseModel
 from tangl.core.entity import Entity
 
 
-class BaseFragment(Entity):
+class ContentFragment(Entity):
     """
-    Specialized entity the provides the core schema for communicating content
-    to a tangl consumer front-end.
-
-    - JournalFragments and InfoFragments are _content_ objects in the fragment stream
-    - GroupFragments, and UpdateFragments are _control_ objects in the fragment stream
-    - KvFragments, MediaFragments, and DiscourseFragments are domain-specific constructs
-      that have their own special rules for how their content field is represented.
+    Specialized entity that provides the core schema for communicating content
+    about the graph to a front-end.
 
     Attributes:
     - fragment_type: General type of fragment, i.e., text, media, kv, runtime, used
@@ -32,8 +27,3 @@ class BaseFragment(Entity):
     content: Any
     content_format: Optional[str] = Field(None, alias='format')
     # seq and mime-type are added in the service layer, when the fragment is serialized into a dto.
-
-    # If not wrapped in a response packet, can be used with batches to assemble a
-    # response group on the client end
-    # response_id: Optional[Identifier] = None
-    # sequence: Optional[int] = None

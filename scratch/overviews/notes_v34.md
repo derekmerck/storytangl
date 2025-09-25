@@ -1,13 +1,6 @@
 `tangl.core`
 ============
 
-Models and algorithms for an incremental, graph-based "feature untangling" framework.
-
-Entities can be attached to graphs or domains and register handlers for various functions that become available to subscribers in their scope.
-
-Basic handlers include gathering a scoped context for a node, evaluating predicates and applying effects, and rendering output.
-
-The solver evolves and grows the feature graph from a root node, maintaining a consistent, coherent state of local data and interdependencies.
 
 ### Package Organization
 
@@ -42,6 +35,8 @@ flowchart RL
         Handler -- is --> Entity
         HandlerRegistry -- is --> Registry
         HandlerRegistry -- has --> Handler
+        JobReceipt -- is --> Entity
+        Handler -- creates --> JobReceipt
     end
     
     subgraph .handlers
@@ -180,10 +175,6 @@ book (top-level graph)
 ```
 
 
-
-# Layer 4: Interpreter
-Frame, Context, Session
-
 ### Dispatch
 
 - Handlers and HandlerRegistries
@@ -202,4 +193,60 @@ global
 │   └── shared resources (singletons)
 └── local graph/subgraph
     └── node/block context
+```
+
+
+
+resolving a lane in an indeterminate space with incremental graph representation of stable dependencies
+opinionated implementations for specific node and edge types and a graph resolver.
+
+
+provides:
+- **session** (unit of work, load/save graph, create context, run a tick)
+- **context** (process graph->domains->facts, capabilities at anchor)
+- **planning** (provisioner, provider, templates, builder, finder)
+- **event** log (create/apply update stack)
+
+**Provisioning**
+- Unresolved dependency edges must be annotated with requirement constraints for the destination's data and shape features, and the provisioners scope-range
+- **Provisioners** are special handlers that can perform graph editing operations (FIND, FIND_AND_MODIFY, CREATE, CREATE_AND_MODIFY, or WAIVE) to recruit or create nodes with appropriate data features
+- The graph can be dynamically reconfigured, but no dependency edges may be broken once a node is visited
+- Conflicting resolution strategies are resolved by edit distance, which penalizes topology change (introducing new nodes vs. modifying existing ones), scope-distance of the provisioner, and priority order
+- Dependency edges may be UNRESOLVED (no destination, un-tested), RESOLVED (destination assigned), RESOLVED_BUT_GATED (destination assigned but fails predicate), RESOLVED_AND_FROZEN (assigned and visited), or UNRESOLVABLE (no destination, tested)
+
+```
+provision(node, domains)
+    enumerate feasible edit actions given local constraints.
+    compute minimal-cost edits recursively, using memoization to avoid recomputation.
+```
+
+**Trace Rendering**
+- The _render handler_, a meta-handler that creates trace fragments from a resolved entity's state as part of flow control
+
+### Solvers
+
+**Feed-forward Resolution**
+- Generative untangle, discover a stable, untangled lane
+- Incrementally advance a solution frontier
+```
+forward_resolve(graph, cursor, trace, domains):
+    resolve all dependencies (optimal edits)
+    render trace node from resolved state
+    advance cursor (update frontier)
+```
+- Intent → IR → Graph → Trace
+```
+Script (DSL, YAML, etc.)
+    └──compile──> Declarative IR (abstract capabilities, rules, dependencies, templates)
+        └──instantiate──> Dependency Graph (resolved nodes/resources at runtime)
+            └──traverse──> Trace (runtime linearization)
+                └──present──> Client/User
+```
+
+**Feed-backward Validation**
+- Discriminative untangle, can this state be untangled
+```
+backward_verify(graph, sink, cursor, domains):
+    recursively check all upstream dependencies reachable and satisfiable
+    prune unreachable paths
 ```

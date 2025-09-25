@@ -11,3 +11,6 @@ from .dispatch import JobReceipt, Handler, HandlerRegistry
 
 # Opt-in and structural namespace, handler, and provider resolution
 from .domain import Domain, Scope, global_domain
+
+# Pre-image output content fragments
+from .fragment import ContentFragment

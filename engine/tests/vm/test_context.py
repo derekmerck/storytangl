@@ -23,10 +23,10 @@ def test_context_namespace_has_top_layer_and_is_not_polluting_domains():
     for m in ns.maps[1:]:
         assert "foo" not in m
 
-def test_get_ns_returns_fresh_top_layer_per_phase(session):
-    from tangl.vm.session import ResolutionPhase as P
-    ns1 = session.get_ns(P.VALIDATE)
+def test_get_ns_returns_fresh_top_layer_per_phase(frame):
+    from tangl.vm.frame import ResolutionPhase as P
+    ns1 = frame.get_ns(P.VALIDATE)
     ns1["sentinel"] = True
-    ns2 = session.get_ns(P.FINALIZE)
+    ns2 = frame.get_ns(P.FINALIZE)
     assert "sentinel" not in ns2
     assert ns2["phase"] is P.FINALIZE

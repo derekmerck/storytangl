@@ -3,7 +3,7 @@ import pytest
 
 from tangl.core.graph import Graph, Node
 from tangl.vm.context import Context
-from tangl.vm.session import Session
+from tangl.vm.frame import Frame
 
 @pytest.fixture
 def graph():
@@ -17,6 +17,6 @@ def context(graph):
     return Context(graph=graph, cursor_id=abc.uid)
 
 @pytest.fixture
-def session(graph):
+def frame(graph):
     abc = next( graph.find_nodes(label="abc") )
-    return Session(graph=graph, cursor_id=abc.uid)
+    return Frame(graph=graph, cursor_id=abc.uid)

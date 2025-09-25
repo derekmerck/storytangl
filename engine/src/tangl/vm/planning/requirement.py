@@ -17,7 +17,6 @@ class ProvisioningPolicy(Enum):
     CREATE = "create"      # create from template
     CLONE = "clone"        # find and evolve from template
 
-
 class Requirement(GraphItem, Generic[NodeT]):
 
     provider_id: Optional[UUID] = None
@@ -59,6 +58,8 @@ class Requirement(GraphItem, Generic[NodeT]):
 
     @property
     def provider(self) -> Optional[NodeT]:
+        # This needs to be a graph item rather than a component
+        # to ensure that we have access to the graph
         if self.provider_id is not None:
             return self.graph.get(self.provider_id)
 
