@@ -1,19 +1,19 @@
 import pytest
 
-from tangl.core.fragment import KvFragment
+from tangl.core.fragment import InfoFragment
 from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 
 #### TestKvFragment
 
-def test_kv_fragment_creation():
+def test_info_fragment_creation():
     # Test KV fragment with different value types
     otd = OrderedTupleDict()
     otd['score'] = 100, 'foo'
-    fragment = KvFragment(
-        type="kv",
+    fragment = InfoFragment(
+        type="info_fragment",
         content=otd
     )
-    assert fragment.fragment_type == "kv"
+    assert fragment.record_type == "info_fragment"
     assert fragment.content['score'] == (100, 'foo')
 
 

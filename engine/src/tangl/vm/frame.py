@@ -54,6 +54,9 @@ class ResolutionPhase(IntEnum):
     # Otherwise we also need to guarantee that at least **one** selectable edge
     # to a provisioned node exists on the frontier.
 
+    # todo: should store two patches per tick, pre-projection, post-projection, so projection
+    #       can be reproduced on replay under different handlers for example?
+
 P = ResolutionPhase
 
 class ChoiceEdge(Edge, Conditional):

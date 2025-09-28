@@ -18,6 +18,15 @@ The Registry underpins the core StoryTangl graph management.
 This component is foundational as it enables decoupling between
 storage patterns and retrieval logic, letting capabilities
 find requirements and vice versa without direct references.
+
+Registry is subclassed for multiple different applications.
+- **StreamRegistry** indexes sequential records with built-in sorting, slicing,
+  and channel filtering
+- **DispatchRegistry** indexes handlers and has built-in execution pipelines
+  and job receipts
+- **MediaRegistry** indexes external resources into singleton MediaRecords,
+  which can be dereferenced in the service layer to retrieve the original
+  data or client-relative path to it
 """
 
 from typing import TypeVar, Generic, Optional, Iterator, overload, Self
@@ -33,6 +42,10 @@ from .entity import Entity, Selectable
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
+
+# todo: registries _should_ have a hook for a local 'on_index' dispatch
+#       registry that runs on every add(item), but this becomes a recursive
+#       definition
 
 class Registry(Entity, Generic[VT]):
     data: dict[UUID, VT] = Field(default_factory=dict,

@@ -1,4 +1,4 @@
-# tangl/core/dispatch/handler_registry.py
+# tangl/core/dispatch/dispatch_registry.py
 from __future__ import annotations
 from typing import Iterator, Optional, Iterable
 
@@ -7,7 +7,7 @@ from tangl.core.registry import Registry
 from .handler import Handler, HandlerFunc
 from .job_receipt import JobReceipt
 
-class HandlerRegistry(Registry[Handler]):
+class DispatchRegistry(Registry[Handler]):
 
     def add(self, func: HandlerFunc, **attrs):
         h = Handler(func=func, **attrs)
@@ -41,4 +41,4 @@ class HandlerRegistry(Registry[Handler]):
         for h in _handlers:
             yield h(ns)
 
-DEFAULT_HANDLERS = HandlerRegistry(label='default_handlers')
+DEFAULT_HANDLERS = DispatchRegistry(label='default_handlers')

@@ -3,7 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core.fragment import ContentFragment, ControlFragment
+from tangl.core.fragment import ContentFragment, ControlFragment, PresentationHints
 
 
 #### Base Fragment
@@ -14,7 +14,7 @@ def test_content_fragment_creation():
         type="test",
         content="Test content"
     )
-    assert fragment.fragment_type == "test"
+    assert fragment.record_type == "test"
     assert fragment.content == "Test content"
     assert fragment.uid is not None
     assert isinstance(fragment.uid, UUID)
@@ -28,7 +28,7 @@ def test_fragment_serialization():
         format="plain"
     )
     data = fragment.model_dump()
-    assert data["fragment_type"] == "test"
+    assert data["record_type"] == "test"
     assert data["label"] == "test_label"
     assert data["content"] == "Test content"
     assert data["content_format"] == "plain"
@@ -38,27 +38,44 @@ def test_update_fragment():
     # Test update fragment creation and validation
     original_id = uuid.uuid4()
     update = ControlFragment(
-        type="update",
-        content="Updated content",
+        type="update_fragment",
+        payload={'content': "Updated content"},
         ref_id=original_id
     )
-    assert update.fragment_type == "update"
+    assert update.record_type == "update_fragment"
     assert update.reference_id == original_id
     assert update.reference_type == "content"
 
 
-#### Activatable
-
-@pytest.mark.xfail(raises=AttributeError, reason="belongs on story choice fragment")
-def test_activatable_fragment():
-    # Test fragment with activation capability
-    fragment = ContentFragment(
-        type="choice",
-        content="Choose this option",
-        activatable=True,
-        activation_payload={"action": "select_option", "option_id": 5}
+def test_text_fragment_creation():
+    # Test text fragment with markdown
+    fragment =ContentFragment(
+        # type="content",
+        content="# Test Heading\nThis is a test narrative.",
+        format="markdown",
+        hints=PresentationHints(
+            style_name="story-text",
+            style_tags=["important", "centered"],
+            style_dict={"color": "red"}
+        )
     )
-    assert fragment.activatable is True
-    assert fragment.active is True
-    assert fragment.activation_payload["option_id"] == 5
+    assert fragment.record_type == "content_fragment"
+    assert fragment.content_format == "markdown"
+    assert fragment.presentation_hints.style_tags == ["important", "centered"]
 
+
+# #### Activatable
+#
+# @pytest.mark.xfail(raises=AttributeError, reason="belongs on story choice fragment")
+# def test_activatable_fragment():
+#     # Test fragment with activation capability
+#     fragment = ContentFragment(
+#         type="choice",
+#         content="Choose this option",
+#         activatable=True,
+#         activation_payload={"action": "select_option", "option_id": 5}
+#     )
+#     assert fragment.activatable is True
+#     assert fragment.active is True
+#     assert fragment.activation_payload["option_id"] == 5
+#

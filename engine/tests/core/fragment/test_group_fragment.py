@@ -11,7 +11,7 @@ TextFragment = MediaFragment = ContentFragment
 def test_group_creation_and_membership():
     # Create a group fragment representing a dialog exchange
     group = GroupFragment(
-        type="group",
+        type="group_fragment",
         group_type="dialog_exchange",
         # group_roles=[
         #     {"role": "speaker", "type": "text"},
@@ -45,7 +45,7 @@ def test_group_creation_and_membership():
     )
 
     # Assertions
-    assert group.fragment_type == "group"
+    assert group.record_type == "group"
     assert speaker.group_id == group.uid
     assert avatar.group_id == group.uid
     assert dialog.group_id == group.uid

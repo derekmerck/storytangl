@@ -1,21 +1,17 @@
 # tangl/core/dispatch/job_receipt.py
 from __future__ import annotations
-import functools
-from typing import Any, ClassVar, Self, Optional, Type
-from uuid import UUID
+from typing import Any, Self, Optional, Type, Literal
 from enum import Enum
 
-# from pydantic import model_validator, Field
+from pydantic import Field
 
-# from tangl.type_hints import UnstructuredData
-from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity
+from tangl.core.record import Record
 
-@functools.total_ordering
-class JobReceipt(HasSeq, Entity):
-    # todo: could make this generic wrt result type?
+class JobReceipt(Record):
+    record_type: Literal['job_receipt'] = Field("job_receipt", alias='type')
 
-    blame_id: UUID | tuple[UUID, ...]         # end point(s) for blame edge on result
+    # blame_id: UUID | tuple[UUID, ...]         # end point(s) for blame edge on result
     result: Any
     result_type: Optional[Enum | str | Type[Entity]] = None  # use for validation
 
@@ -43,6 +39,3 @@ class JobReceipt(HasSeq, Entity):
     @classmethod
     def gather(cls, *receipts: Self) -> list[Any]:
         return [r.result for r in receipts if r is not None]
-
-    # could include an iter jobs in dispatch
-

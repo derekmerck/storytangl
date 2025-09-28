@@ -1,6 +1,6 @@
 from __future__ import annotations
 from uuid import UUID, uuid4
-from typing import Optional, Self, Iterator, Type, Callable, Any, Iterable, TypeAlias
+from typing import Optional, Self, Iterator, Type, Callable, Any, Iterable, TypeAlias, TypeVar
 import logging
 from enum import Enum
 from copy import copy
@@ -84,7 +84,7 @@ class Entity(BaseModelPlus):
         return True
 
     @classmethod
-    def filter_by_criteria(cls, values: Iterable[Self], **criteria) -> Iterator[Self]:
+    def filter_by_criteria(cls, values: Iterable[EntityT], **criteria) -> Iterator[EntityT]:
         return filter(lambda x: x.matches(**criteria), values)
 
     # Any `has_` methods should not have side effects as they may be called through **criteria args
@@ -199,6 +199,7 @@ class Entity(BaseModelPlus):
         # it can be unflattened with `Entity.dereference_cls_name`
         return data
 
+EntityT = TypeVar('EntityT', bound=Entity)
 MatchPredicate: TypeAlias = Callable[[Entity], bool]
 
 

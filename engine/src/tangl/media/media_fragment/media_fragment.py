@@ -6,7 +6,7 @@ from pydantic import field_serializer
 
 from tangl.type_hints import Pathlike
 from tangl.core.fragment import ContentFragment
-from tangl.core.dispatch import HandlerRegistry
+from tangl.core.dispatch import DispatchRegistry as HandlerRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
 # from tangl.media.enums import MediaRole

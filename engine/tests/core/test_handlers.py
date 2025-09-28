@@ -3,7 +3,7 @@ import uuid
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import Handler, HandlerPriority, HandlerRegistry, JobReceipt
+from tangl.core.dispatch import Handler, HandlerPriority, DispatchRegistry, JobReceipt
 
 class DummyEntity(Entity):
     foo: int = None
@@ -16,7 +16,7 @@ def always_false(ctx): return False
 
 
 def test_handler_registry_register_and_iter_handlers():
-    registry = HandlerRegistry(label="test_handlers")
+    registry = DispatchRegistry(label="test_handlers")
     called = []
 
     @registry.register(priority=5)
@@ -48,7 +48,7 @@ def test_handler_registry_register_and_iter_handlers():
     assert called == ["B", "A"]
 
 def test_handler_lt_tiebreaker_and_registry_sort():
-    reg = HandlerRegistry()
+    reg = DispatchRegistry()
     calls = []
 
     def h1(ns): calls.append(("h1", ns)); return "r1"
@@ -72,7 +72,7 @@ def test_run_handlers_utility_orders_input():
     hB = mk(lambda ns: order.append("B"), HandlerPriority.LAST,   1)
     hC = mk(lambda ns: order.append("C"), HandlerPriority.EARLY,  0)
 
-    list(HandlerRegistry.run_handlers({"ok": True}, [hA, hB, hC]))
+    list(DispatchRegistry.run_handlers({"ok": True}, [hA, hB, hC]))
     assert order == ["C", "A", "B"]
 
 def test_job_receipt_seq_monotonic():
@@ -82,7 +82,7 @@ def test_job_receipt_seq_monotonic():
 
 def test_handler_ordering_and_receipts():
     from tangl.vm.frame import ResolutionPhase as P
-    regs = HandlerRegistry()
+    regs = DispatchRegistry()
     calls = []
 
     @regs.register(priority=HandlerPriority.FIRST)
@@ -99,7 +99,7 @@ def test_handler_ordering_and_receipts():
 
 def test_handler_run_one_picks_first():
     from tangl.vm.frame import ResolutionPhase as P
-    regs = HandlerRegistry()
+    regs = DispatchRegistry()
 
     @regs.register(priority=HandlerPriority.LATE)
     def late(ns): return "late"
@@ -152,7 +152,7 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
 
 
 def test_handler_registry_register_returns_function():
-    registry = HandlerRegistry(label="test_handlers")
+    registry = DispatchRegistry(label="test_handlers")
     @registry.register(priority=1, caller_criteria={"foo": 1})
     def handler_e(ent, ctx): return "E"
     # Should be callable as original function
@@ -160,7 +160,7 @@ def test_handler_registry_register_returns_function():
     assert callable(handler_e)
 
 def test_handlers_run_in_priority_order():
-    reg = HandlerRegistry()
+    reg = DispatchRegistry()
     calls = []
 
     @reg.register(priority=HandlerPriority.LATE)

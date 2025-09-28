@@ -1,9 +1,8 @@
+# tangl.core.scope.py
 # Scope is a node-anchored view of all relevant affiliate and structured domains.
-
 from typing import Any, Iterator, TypeAlias
 from functools import cached_property
 from collections import ChainMap
-import itertools
 from uuid import UUID
 
 from pydantic import Field

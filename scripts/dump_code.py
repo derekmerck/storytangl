@@ -134,9 +134,18 @@ if __name__ == "__main__":
                       include_mds=True,
                       postpend_files=[pkg_root / "utils/hashing.py"])
 
+    process_directory(pkg_root / 'persistence', "tangl37_persist_archive.py")
+    process_directory(pkg_root / 'utils', "tangl37_utils_archive.py")
+
+    process_directory(pkg_root / 'story', "tangl3x_story_snippits.py", include_mds=True)
+    process_directory(pkg_root / 'mechanics', "tangl3x_mechanics_snippits.py", include_mds=True)
+    process_directory(pkg_root / 'media', "tangl3x_media_snippits.py", include_mds=True)
+
     # testing
     process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")
     process_directory(tests_root / 'vm',   "tangl37_vm_tests_archive.py")
+    process_directory(tests_root / 'persistence',   "tangl37_persist_tests_archive.py")
+    process_directory(tests_root / 'utils',   "tangl37_utils_tests_archive.py")
 
     # legacy
     process_directory(legacy_root / "core/core-34", "tangl34_core_archive.py")

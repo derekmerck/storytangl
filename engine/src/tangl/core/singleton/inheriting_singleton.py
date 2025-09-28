@@ -1,4 +1,4 @@
-import logging
+# tangl/core/singleton/inheriting_singleton.py
 from typing import Optional
 import logging
 

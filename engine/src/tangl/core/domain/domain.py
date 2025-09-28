@@ -6,7 +6,7 @@ from pydantic import Field
 from tangl.info import __version__
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
-from tangl.core.dispatch import HandlerRegistry, DEFAULT_HANDLERS
+from tangl.core.dispatch import DispatchRegistry, DEFAULT_HANDLERS
 
 # imported from tangl.__info__
 DEFAULT_VARS = {'version': __version__}
@@ -22,7 +22,7 @@ class Domain(Entity):
     or object class.
     """
     vars: StringMap = Field(default_factory=dict)
-    handlers: HandlerRegistry = Field(default_factory=HandlerRegistry)
+    handlers: DispatchRegistry = Field(default_factory=DispatchRegistry)
 
     def add_vars(self, vars: dict[str, Any]) -> None:
         self.vars.update(vars)

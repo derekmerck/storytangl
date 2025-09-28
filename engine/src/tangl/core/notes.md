@@ -18,8 +18,14 @@ Basic vocabulary and low-level abstractions for describing the shape and basic b
 - Collection of related entities
 - Searchable by feature
 
+**Record**
+- Frozen entities with monotonically increasing sequence numbers automatically assigned
+- **StreamRegistry** provides order, bookmarks, and channel selection on top of Registry. 
+
 **Singleton**
 - Immutable entities with unique names that can be shared within a semantic scope
+- May have instance inheritance
+- May be wrapped as shared references in Node instances
 
 ## Layer 2: Topology
 Graph, Node, Edge, Subgraph, Fragment

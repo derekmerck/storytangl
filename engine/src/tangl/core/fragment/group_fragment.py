@@ -1,18 +1,20 @@
+# tangl.core.fragment.group_fragment.py
 from typing import Literal, Any, Optional, Collection
 from uuid import UUID
 
 from pydantic import Field
 
-from tangl.core import GraphItem, Graph
-from .content_fragment import ContentFragment
+from tangl.core.registry import Registry
+from tangl.core.record import Record
 
 # This is basically a subgraph fragment
-class GroupFragment(ContentFragment, GraphItem, extra='allow'):
-    fragment_type: Literal['group'] = Field("group", alias='type')
+class GroupFragment(Record, extra='allow'):
+    record_type: Literal['group_fragment'] = Field("group_fragment", alias='type')
     # client-friendly name for the collection type, dialog, character card, spellbook, etc.
     group_type: Optional[str] = None  # group's intended role in fragment stream, e.g., dialog, list, card, etc.
-    content: list[UUID] = Field(...)
+    member_ids: list[UUID] = Field(default_factory=list)
 
-    @property
-    def members(self) -> list[ContentFragment]:
-        return [self.graph.get(uid) for uid in self.content]
+    def members(self, registry: Registry[Record]) -> list[Record]:
+        return [registry.get(uid) for uid in self.content]
+
+    # todo: probably want a member map too, with role assignments by group type

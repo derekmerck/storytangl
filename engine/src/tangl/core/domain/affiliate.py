@@ -1,10 +1,8 @@
 # tangl/core/domain/affiliate.py
-from typing import Iterator, ClassVar, Type
-from uuid import UUID
+from typing import ClassVar, Type
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity, Selectable, MatchPredicate
-from tangl.core.registry import Registry
 
 from .domain import global_domain, Domain
 

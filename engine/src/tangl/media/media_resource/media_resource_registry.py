@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import model_validator
 
 from tangl.core.registry import Registry
-from tangl.core.dispatch import HandlerRegistry, Handler
+from tangl.core.dispatch import DispatchRegistry as HandlerRegistry, Handler
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 class MediaResourceRegistry(Registry[MediaRIT]):
