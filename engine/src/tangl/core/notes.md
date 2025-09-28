@@ -3,7 +3,6 @@
 
 Basic vocabulary and low-level abstractions for describing the shape and basic behaviors of any element in the framework.
 
-
 ## Layer 1: Identity
 
 **Entity**
@@ -34,7 +33,7 @@ Graph, Node, Edge, Subgraph, Fragment
 - GraphItem topology provides _shape features_
 - Nodes may be connected by edges
 - Subgraphs are collections of nodes that form a structural domain
-- Fragments carry pre-image output and control information about a graph process, they are frozen and organized as linear manifold in the graph
+- Fragments carry pre-image output and control information about a graph process, they are sequential, frozen, and may link indirectly to graph items by uid, although they are not proper GraphItems themselves
 
 ## Layer 3: Capability
 Handler, JobReceipt, Domain, Scope

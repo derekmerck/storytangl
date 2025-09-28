@@ -98,3 +98,11 @@ Every story node "class" needs a few things:
 3. Content creators that know how to generate content for a node content spec, register blobs if required, and return a content dict for a node 
 4. Adapters that know how to convert different types of content dicts into appropriate narrative or media journal fragments
 5. An adapter that knows how to convert a graph or node into an info model
+
+---
+
+`tangl.story` is a simple application module, its members should ONLY depend on:
+- **core**
+- **utils**
+
+It is orthogonal to `tangl.vm` and should not have overlapping responsibilities other than providing feature handlers with appropriate phase names and return types.
