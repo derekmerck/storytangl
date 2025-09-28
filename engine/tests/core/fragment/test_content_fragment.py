@@ -11,10 +11,10 @@ from tangl.core.fragment import ContentFragment, ControlFragment, PresentationHi
 def test_content_fragment_creation():
     # Test basic fragment creation
     fragment = ContentFragment(
-        type="test",
+        fragment_type="test",
         content="Test content"
     )
-    assert fragment.record_type == "test"
+    assert fragment.fragment_type == "test"
     assert fragment.content == "Test content"
     assert fragment.uid is not None
     assert isinstance(fragment.uid, UUID)
@@ -22,13 +22,13 @@ def test_content_fragment_creation():
 def test_fragment_serialization():
     # Test that fragments serialize correctly
     fragment = ContentFragment(
-        type="test",
+        fragment_type="test",
         label="test_label",
         content="Test content",
         format="plain"
     )
     data = fragment.model_dump()
-    assert data["record_type"] == "test"
+    assert data["fragment_type"] == "test"
     assert data["label"] == "test_label"
     assert data["content"] == "Test content"
     assert data["content_format"] == "plain"
@@ -38,11 +38,11 @@ def test_update_fragment():
     # Test update fragment creation and validation
     original_id = uuid.uuid4()
     update = ControlFragment(
-        type="update_fragment",
+        fragment_type="update",
         payload={'content': "Updated content"},
         ref_id=original_id
     )
-    assert update.record_type == "update_fragment"
+    assert update.fragment_type == "update"
     assert update.reference_id == original_id
     assert update.reference_type == "content"
 
@@ -59,7 +59,7 @@ def test_text_fragment_creation():
             style_dict={"color": "red"}
         )
     )
-    assert fragment.record_type == "content_fragment"
+    assert fragment.fragment_type == "content"
     assert fragment.content_format == "markdown"
     assert fragment.presentation_hints.style_tags == ["important", "centered"]
 

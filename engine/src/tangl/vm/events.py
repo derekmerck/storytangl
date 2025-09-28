@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from uuid import UUID
-from typing import ClassVar, Protocol, Any, Iterable, Optional
+from typing import ClassVar, Protocol, Any, Iterable, Optional, Literal
 from copy import deepcopy
 
 from pydantic import Field, ConfigDict
 import wrapt
 
-from tangl.core.entity import Entity
-from tangl.core.registry import Registry, VT
+from tangl.core import Entity, Record, Registry
 
 
 class EventType(Enum):
@@ -19,10 +18,12 @@ class EventType(Enum):
     UPDATE = "update"
     DELETE = "delete"
 
-class Event(Entity):
-    # Entities b/c they are persisted, structured, unstructured
-    source_id: UUID = Field(...)
+class Event(Record):
+    # Records b/c they are persisted, structured, unstructured
+    record_type: Literal['event'] = 'event'
     event_type: EventType = Field(...)
+
+    source_id: UUID = Field(...)
     name: Optional[str] = None  # attrib name for update
     value: Any = Field(...)
     old_value: Any | None = None
@@ -157,7 +158,7 @@ class WatchedRegistry(WatchedEntityProxy):
     # proxy registry
     __wrapped__: Registry
 
-    def add(self, item: VT) -> None:
+    def add(self, item) -> None:
         self._emit(event_type=EventType.CREATE,
                    value=item)
         self.__wrapped__.add(item)

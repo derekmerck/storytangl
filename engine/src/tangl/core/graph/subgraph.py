@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 #       just need to implement pass-through for get and have add() and values() refer
 #       to a private member list
 class Subgraph(GraphItem):
-    subgraph_type: Optional[Enum|str] = None  # No need to enumerate this yet
+    subgraph_type: Optional[ str | Enum ] = None  # No need to enumerate this yet
     member_ids: list[UUID] = Field(default_factory=list)
 
     @property

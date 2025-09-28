@@ -18,4 +18,4 @@ from .dispatch import JobReceipt, Handler, DispatchRegistry
 from .domain import Domain, Scope, global_domain
 
 # Pre-image content output
-from .fragment import ContentFragment, ControlFragment, GroupFragment, InfoFragment, PresentationHints
+from .fragment import ContentFragment, ControlFragment, GroupFragment, KvFragment, PresentationHints

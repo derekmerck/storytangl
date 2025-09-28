@@ -15,12 +15,6 @@ def make_fragments(n, kind="text"):
                             label=f"Frag {i}",
                             content=f"Content {i}") for i in range(n)]
 
-def test_add_single_item():
-    journal_graph = TestHasJournal()
-    journal_graph.journal.add_item("first")
-    assert len(journal_graph.journal) == 1
-    assert journal_graph.journal.get_items() == ["first"]
-
 def test_add_single_entry():
     journal_graph = TestHasJournal()
     frags = make_fragments(1)
@@ -90,35 +84,4 @@ def test_multiple_entries_and_sections():
     # Should get the two fragments added after sec1
     assert len(sec1) == 2
     assert sec1[0].record_type == "kind2"
-
-def test_duplicate_bookmark_raises():
-    journal_graph = TestHasJournal()
-    journal_graph.start_journal_section("chapter1")
-    with pytest.raises(ValueError):
-        journal_graph.start_journal_section("chapter1")  # Duplicate name not allowed
-
-def test_early_stop_section():
-    journal_graph = TestHasJournal()
-    frags1 = make_fragments(2)
-    frags2 = make_fragments(2)
-    journal_graph.add_journal_entry(frags1)
-    journal_graph.start_journal_section("first")
-    journal_graph.add_journal_entry(frags2)
-    journal_graph.start_journal_section("second")
-    # Add another entry (after "second")
-    frags3 = make_fragments(2)
-    journal_graph.add_journal_entry(frags3)
-    # When getting first entry, should stop at "second" section
-    section = journal_graph.get_journal_entry(0)
-    assert len(section) == 2  # Only frags1, as next section is an early stop
-
-def test_empty_journal():
-    journal_graph = TestHasJournal()
-
-    assert len(journal_graph.journal) == 0
-    assert journal_graph.journal.get_items() == []
-    assert journal_graph.journal.get_bookmarks() == []
-
-    assert journal_graph.get_journal_entry() == []
-    assert journal_graph.get_journal_section("notfound") == []
 

@@ -137,7 +137,7 @@ class HasSeq(BaseModel):
     @classmethod
     def incr_count(cls) -> int:
         cls._instance_count += 1
-        return cls._instance_count
+        return cls._instance_count - 1
 
     def __lt__(self, other):
         # Default __lt__ sorts non-seq to the front without raising

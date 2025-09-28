@@ -1,6 +1,5 @@
 # tangl.core.record.py
 from __future__ import annotations
-
 import functools
 from typing import Optional, TypeVar, Self, Iterator
 import logging
@@ -21,6 +20,12 @@ logger = logging.getLogger(__name__)
 #       or owner. Practically this means that JournalFragment seq's, for example,
 #       will be monotonic in creation order, but NOT continuous if any other records
 #       are also being generated.
+
+# •	A RecordStream is append-only; seq is unique and monotonic.
+# •	Sections are half-open: get_section(X) yields seq ∈ [marker(X), next_marker); never overlaps.
+# •	Channels are derived—not a separate index: record_type == x or f"channel:{x}" in tags.
+# •	Push returns half-open bounds so callers can pass directly to get_slice.
+# •	A Record is frozen; mutate by creating a new one.
 
 @functools.total_ordering
 class Record(HasSeq, Entity):
@@ -88,10 +93,13 @@ class StreamRegistry(Registry[HasSeq]):
     # ---- bookmarks ----
 
     def set_marker(self, marker_name: str, marker_type: str = '_', marker_seq: int = None):
-        logger.debug(f"Adding marker: {marker_name}@{marker_type}")
-        marker_seq = marker_seq or self.max_seq + 1
+        if marker_seq is None:
+            marker_seq = self.max_seq
+        logger.debug(f"Adding marker: {marker_name}@{marker_type} to {marker_seq}")
         if marker_type not in self.markers:
             self.markers[marker_type] = {}
+        if marker_name in self.markers[marker_type]:
+            raise KeyError(f"Marker {marker_name} already exists")
         self.markers[marker_type][marker_name] = marker_seq
 
     def _next_marker_seq(self, start_seq: int, marker_type: str = "_") -> int:
@@ -101,7 +109,7 @@ class StreamRegistry(Registry[HasSeq]):
             return self.max_seq
         # sort all seqs of this type and pick the first strictly greater than start_seq
         next_seqs = sorted(s for s in md.values() if s > start_seq)
-        return next_seqs[0] if next_seqs else self.max_seq
+        return next_seqs[0] if next_seqs else self.max_seq + 1
 
     # ---- slicing ----
 
@@ -135,6 +143,7 @@ class StreamRegistry(Registry[HasSeq]):
             raise KeyError(f"{marker_name}@{marker_type} not found")
         start = md[marker_name]
         end = self._next_marker_seq(start, marker_type)
+        logger.debug(f"{marker_name}@{marker_type} start: {start} end: {end}")
         return self.get_slice(start_seq=start, end_seq=end, **criteria)
 
     # ---- add/push ----
@@ -171,6 +180,7 @@ class StreamRegistry(Registry[HasSeq]):
             it = self._ensure_seq(it)
             normalized.append(it)
         start_seq = min(normalized).seq
+        logger.debug(f"normalized: {[r.seq for r in sorted(normalized)]}")
 
         for it in normalized:
             self.add_record(it)
@@ -182,7 +192,7 @@ class StreamRegistry(Registry[HasSeq]):
         name = marker_name or first_label
         self.set_marker(name, marker_type, start_seq)
 
-        return start_seq, self.max_seq + 1
+        return start_seq, self.max_seq
 
     # ---- channel/criteria convenience ----
 
@@ -193,8 +203,9 @@ class StreamRegistry(Registry[HasSeq]):
 
         Same as find_all(has_channel=x, **criteria)
         """
-        criteria.setdefault('has_channel', channel)
-        yield from self.find_all(has_channel=channel, **criteria, sort_key=lambda x: x.seq)
+        if channel is not None:
+            criteria.setdefault('has_channel', channel)
+        yield from self.find_all(**criteria, sort_key=lambda x: x.seq)
 
     def last(self, channel: str = None, **criteria) -> Optional[Record]:
         """Last by seq that matches criteria."""

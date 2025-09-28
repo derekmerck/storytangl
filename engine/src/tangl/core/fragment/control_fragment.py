@@ -1,18 +1,20 @@
 # tangl.core.fragment.control_fragment.py
 from typing import Literal, Optional
+from enum import Enum
 
 from pydantic import Field, model_validator
 
 from tangl.type_hints import Identifier, UnstructuredData
-from tangl.core import Registry
-from tangl.core.record import Record
+from tangl.core.registry import Registry
+from .base_fragment import BaseFragment
 
-ControlFragmentType = Literal['update_fragment', 'delete_fragment']
+ControlFragmentType = Literal['update', 'delete']
 
-class ControlFragment(Record, extra='allow'):
+class ControlFragment(BaseFragment, extra='allow'):
     # a graph item fragment
-    record_type: ControlFragmentType = Field("update_fragment", alias='type')
-    reference_type: Literal['content'] = Field("content", alias='ref_type')
+    fragment_type: ControlFragmentType = 'update'
+
+    reference_type: str | Enum = Field('content', alias='ref_type')
     reference_id: Identifier = Field(..., alias='ref_id')
     # identifier (uid or unique label) for the content fragment that we want to update content or presentation for
 
@@ -25,5 +27,5 @@ class ControlFragment(Record, extra='allow'):
                 raise ValueError('payload cannot be None for an update fragment')
         return self
 
-    def reference(self, registry: Registry[Record]) -> Record:
+    def reference(self, registry: Registry[BaseFragment]) -> BaseFragment:
         return registry.find_one(identifier=self.reference_id)

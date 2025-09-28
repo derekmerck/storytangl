@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .edge import Edge
 
 class Node(GraphItem):
-    node_type: Optional[Enum] = None  # No need to enumerate this yet
+    node_type: Optional[str | Enum] = None  # No need to enumerate this yet
 
     def edges_in(self, **criteria) -> Iterator[Edge]:
         return self.graph.find_edges(destination=self, **criteria)
