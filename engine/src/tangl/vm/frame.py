@@ -11,20 +11,17 @@ from random import Random
 
 from tangl.type_hints import Step, StringMap as NS
 from tangl.utils.hashing import hashing_func
-from tangl.core.entity import Conditional
+from tangl.core.entity import Conditional, Entity
 from tangl.core.registry import Registry
+from tangl.core.record import StreamRegistry
 from tangl.core.graph import Graph, Edge, Node
 from tangl.core.dispatch import JobReceipt
 from tangl.core.domain import AffiliateDomain
+from tangl.core.fragment import BaseFragment
 from .context import Context
-from .events import ReplayWatcher, Event, WatchedRegistry
-from ..core import Entity
+from .events import ReplayWatcher, Event, WatchedRegistry, Patch
 
 logger = logging.getLogger(__name__)
-
-
-Fragment = Entity   # Trace content fragment
-Patch = Entity      # Trace update/event fragment
 
 class ResolutionPhase(IntEnum):
 
@@ -45,7 +42,7 @@ class ResolutionPhase(IntEnum):
             self.PLANNING: (JobReceipt.gather,       Any),
             self.PREREQS:  (JobReceipt.first_result, Edge),     # check for any available jmp/jr
             self.UPDATE:   (JobReceipt.gather,       Any),
-            self.JOURNAL:  (JobReceipt.last_result,  list[Fragment]), # pipe and compose a list of Fragments
+            self.JOURNAL:  (JobReceipt.last_result,  list[BaseFragment]), # pipe and compose a list of Fragments
             self.FINALIZE: (JobReceipt.last_result,  Patch),    # pipe and compose a Patch (if event sourced)
             self.POSTREQS: (JobReceipt.first_result, Edge)      # check for any available jmp/jr
         }
@@ -75,7 +72,7 @@ class Frame:
     # Scope is inferred from Graph, cursor node, latent domains
     graph: Graph
     cursor_id: UUID
-    epoch: Step = -1
+    step: Step = 0
     domain_registries: list[Registry[AffiliateDomain]] = field(default_factory=list)
 
     event_sourced: bool = False  # track effects on a mutable copy
@@ -83,6 +80,8 @@ class Frame:
 
     phase_receipts: dict[Enum, list[JobReceipt]] = field(default_factory=dict)
     phase_outcome:  dict[Enum, Any] = field(default_factory=dict)
+
+    records: StreamRegistry = field(default_factory=StreamRegistry)
 
     @property
     def cursor(self) -> Node:
@@ -120,7 +119,7 @@ class Frame:
     @functools.cached_property
     def rand(self):
         # Guarantees the same RNG sequence given the same context for deterministic replay
-        h = hashing_func(self.graph.uid, self.epoch, self.cursor.uid, digest_size=8)
+        h = hashing_func(self.graph.uid, self.step, self.cursor.uid, digest_size=8)
         seed = int.from_bytes(h[:8], "big")
         return Random(seed)
 
@@ -129,7 +128,7 @@ class Frame:
         # The frame itself also provides a ns domain layer
         frame_layer = {
             'cursor': self.cursor,
-            'epoch': self.epoch,
+            'step': self.step,
             "phase": phase,         # phase annotation for handlers
             "rand": self.rand,
             "results": [],          # type: list[JobReceipt]
@@ -157,9 +156,12 @@ class Frame:
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
 
-        # This should be in the step, not in the control loop, I think
-        self.epoch += 1
+        self.step += 1
         self.cursor_id = edge.destination.uid
+
+        # Set a marker on the record stream
+        self.records.set_marker(f"step{self.step:04}", "frame")
+
         # Use the destination, not edge.dest_id in case its an anonymous edge
         self._invalidate_context()       # updated the anchor, need to rebuild scope
 
@@ -187,8 +189,14 @@ class Frame:
         # todo: compose and copy wherever to where-ever it goes, as entry nodes or into a separate journal object
         # todo: If fragments are stored as nodes, we should update the preview graph again since cleanup might want to see the journal.  Otherwise the journal needs to be stored somewhere else?  In the ns?
 
+        # self.records.push_records(entry)
+
         # Cleanup bookkeeping
-        patch = self.run_phase(P.FINALIZE)
+        self.run_phase(P.FINALIZE)
+
+        if self.event_sourced:
+            patch = Patch(events=self.event_watcher.events, registry_id=self.graph.uid)
+            self.records.add_item(patch)
 
         # check for postreq cursor redirects
         if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor

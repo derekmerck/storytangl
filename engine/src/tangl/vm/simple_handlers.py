@@ -40,7 +40,7 @@ def update_noop(ns: NS):
 @global_domain.handlers.register(phase=P.JOURNAL, priority=50)
 def journal_line(ns: NS):
     cur: Node = ns["cursor"]
-    line = f"[step {ns['epoch']:03d}] {cur.label or cur.short_uid()}"
+    line = f"[step {ns['step']:03d}] {cur.label or cur.short_uid()}"
     return line
 
 @global_domain.handlers.register(phase=P.FINALIZE, priority=50)

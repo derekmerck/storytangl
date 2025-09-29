@@ -1,3 +1,4 @@
+from .base_fragment import BaseFragment
 from .content_fragment import ContentFragment
 from .control_fragment import ControlFragment
 from .group_fragment import GroupFragment

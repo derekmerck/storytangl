@@ -93,7 +93,7 @@ def test_prereq_redirect_and_journal_line():
     frame = Frame(graph=g, cursor_id=start.uid)
 
     nxt = frame.follow_edge(AnonymousEdge(source=start, destination=end))  # first hop returns ChoiceEdge on PREREQS
-    # After following, epoch incremented and JOURNAL should run
+    # After following, step incremented and JOURNAL should run
     line = frame.run_phase(P.JOURNAL)
     # line = JobReceipt.last_result(*ns.get('results'))
     print(line)

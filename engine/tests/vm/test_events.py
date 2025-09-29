@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.graph import Graph, Node
-from tangl.vm.events import ReplayWatcher, WatchedRegistry, WatchedEntityProxy, Event
+from tangl.vm.events import ReplayWatcher, WatchedRegistry, WatchedEntityProxy, Event, Patch
 
 
 def test_proxy_sets_wrapped_and_emits(graph):
@@ -51,8 +51,10 @@ def test_event_replay_create_update_delete_roundtrip():
     # DELETE: remove node by uid
     wg.remove(n2.uid)
 
+    p = Patch(events=w.events)
+
     # now replay on a deepcopy of the original graph
-    g2 = w.replay(g)
+    g2 = p.apply(g)
     assert g2.find_one(label="ONE") is not None
     assert g2.find_one(label="two") is None
 
@@ -68,9 +70,11 @@ def test_event_replay_is_idempotent():
     pn.label = "Y"
     pn.label = "Z"
 
+    p = Patch(events=w.events)
+
     # apply twice to fresh clones; results should match
-    g1 = w.replay(g)
-    g2 = w.replay(g)
+    g1 = p.apply(g)
+    g2 = p.apply(g)
     assert g1.find_one(label="Z") and g2.find_one(label="Z")
 
 @pytest.mark.xfail(reason="haven't decided where to keep locals yet and need a watched mapping proxy")

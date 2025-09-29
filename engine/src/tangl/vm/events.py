@@ -5,11 +5,13 @@ from enum import Enum
 from uuid import UUID
 from typing import ClassVar, Protocol, Any, Iterable, Optional, Literal
 from copy import deepcopy
+from functools import cached_property
 
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, model_validator
 import wrapt
 
-from tangl.core import Entity, Record, Registry
+from tangl.type_hints import Hash
+from tangl.core import Entity, Record, Registry, JobReceipt
 
 
 class EventType(Enum):
@@ -17,6 +19,13 @@ class EventType(Enum):
     READ = "read"
     UPDATE = "update"
     DELETE = "delete"
+
+    def apply_order(self) -> int:
+        _ORDER = {self.DELETE: 0,
+                  self.CREATE: 1,
+                  self.UPDATE: 2,
+                  self.READ: 3}
+        return _ORDER[self]
 
 class Event(Record):
     # Records b/c they are persisted, structured, unstructured
@@ -74,8 +83,27 @@ class ReplayWatcher:
     def submit(self, event: Event) -> None:
         self.events.append(event)
 
-    def replay(self, registry: Registry) -> Registry:
-        # todo: need to sort events by type, seq so all deletes happen at the end, for example
+
+class Patch(Record):
+    record_type: Literal['patch'] = 'patch'
+    registry_id: Optional[UUID] = None
+    registry_state_hash: Hash = None
+    events: list[Event]
+
+    # @cached_property
+    # def events(self) -> Iterable[Event]:
+    #     # canonicalize order so deletes < creates < updates < reads
+    #     return sorted(self.events_, key=lambda e: (e.event_type.apply_order(), e.seq))
+    # This will throw errors if we update a node and then delete it.  Could do this
+    # if important but need to ignore updates to missing nodes and maybe dedup multiple
+    # adds and deletes?
+
+    def apply(self, registry: Registry) -> Registry:
+        if self.registry_id and self.registry_id != registry.uid:
+            raise ValueError(f"Wrong registry for patch {registry.uid} != {self.registry_id}")
+        if self.registry_state_hash and self.registry_state_hash != registry._state_hash():
+            raise ValueError(f"Wrong registry state hash for patch")
+
         # returns an _updated copy_ of the source
         if not isinstance(registry, Registry):
             raise TypeError("Event replay should be called directly on a Registry")
@@ -83,6 +111,7 @@ class ReplayWatcher:
         for event in self.events:
             event.apply(_registry)
         return _registry
+
 
 class WatchedEntityProxy(wrapt.ObjectProxy):
     _watchers: list[EventWatcher]

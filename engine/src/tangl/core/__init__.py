@@ -17,5 +17,5 @@ from .dispatch import JobReceipt, Handler, DispatchRegistry
 # Opt-in and structurally scoped capability resolution
 from .domain import Domain, Scope, global_domain
 
-# Pre-image content output
-from .fragment import ContentFragment, ControlFragment, GroupFragment, KvFragment, PresentationHints
+# Pre-image content records
+from .fragment import BaseFragment, ContentFragment, ControlFragment, GroupFragment, KvFragment, PresentationHints

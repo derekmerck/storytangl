@@ -81,7 +81,7 @@ class StreamRegistry(Registry[HasSeq]):
     """
 
     markers: dict[str, dict[str, int]] = Field(default_factory=dict)
-    max_seq: int = -1
+    max_seq: int = 0
 
     def _ensure_seq(self, item: RecordT) -> RecordT:
         # If seq is missing or negative, assign next.
