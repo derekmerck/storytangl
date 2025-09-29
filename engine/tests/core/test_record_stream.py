@@ -13,7 +13,7 @@ def seqs(it):
 
 @pytest.fixture(autouse=True)
 def _reset_seq():
-    Record._instance_count = 0
+    Record._reset_instance_count()
 
 # --- basic record behavior -------------------------------------------------
 
@@ -43,7 +43,7 @@ def test_add_record_assigns_monotonic_seq():
     rs.add_record(mkrec("journal", label="b"))
     items = list(rs.find_all(sort_key=lambda x: x.seq))
     assert len(items) == 2
-    assert items[0].seq ==0
+    assert items[0].seq == 0
     assert items[1].seq == 1
     assert rs.max_seq == 1
 

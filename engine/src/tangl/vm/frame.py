@@ -81,6 +81,8 @@ class Frame:
     phase_receipts: dict[Enum, list[JobReceipt]] = field(default_factory=dict)
     phase_outcome:  dict[Enum, Any] = field(default_factory=dict)
 
+    # Practically, this is the output buffer for the step, so someone else needs
+    # to be holding onto it when the frame goes out of scope if we want to access it.
     records: StreamRegistry = field(default_factory=StreamRegistry)
 
     @property

@@ -1,4 +1,5 @@
 # tangl/utils/base_model_plus.py
+from functools import total_ordering
 from typing import Any, Self, Type, Iterator, ClassVar
 import logging
 
@@ -114,6 +115,7 @@ class BaseModelPlus(BaseModel):
     #     s = yaml.dump(data, default_flow_style=False)
     #     return s
 
+@total_ordering
 class HasSeq(BaseModel):
     # This is a helper mixin for total orderings
 
@@ -124,24 +126,29 @@ class HasSeq(BaseModel):
     def _set_seq(cls, data):
         data = dict(data or {})
         if data.get('seq') is None:  # unassigned or passed none
-            # Don't want to incr if not using it
+            # Only incr if not already set
             data['seq'] = cls.incr_count()
         return data
 
-    _instance_count: ClassVar[int] = 0
+    # start at -1 since we increment before returning the first value, which should be 0
+    _instance_count: ClassVar[int] = -1
 
-    def __init_subclass__(cls, **kwargs):
-        cls._instance_count = 0  # keep an instance counter per subclass
-        super().__init_subclass__()
+    @classmethod
+    def _reset_instance_count(cls):
+        cls._instance_count = -1
+
+    # Currently keeping seq across _all_ records of all types from all domains
+    # def __init_subclass__(cls, **kwargs):
+    #     cls._instance_count = 0  # keep an instance counter per subclass
+    #     super().__init_subclass__()
 
     @classmethod
     def incr_count(cls) -> int:
         cls._instance_count += 1
-        return cls._instance_count - 1
+        return cls._instance_count
 
     def __lt__(self, other):
         # Default __lt__ sorts non-seq to the front without raising
-        # Override as necessary in subclasses that want to
-        # support functools.total_ordering
+        # Override as necessary in subclasses that want a custom ordering
         return self.seq < getattr(other, 'seq', -1)
 
