@@ -11,7 +11,36 @@ from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 
 class Singleton(Entity):
-    # can ignore uid in comparison, but label must be unique within class
+    """
+    Singleton(label: UniqueStr)
+
+    Immutable, globally-registered entity identified by a unique label.
+
+    Why
+    ----
+    Models concept- or resource-level constants (e.g., fabula primitives,
+    media generators) that must have exactly one instance per label within a type.
+
+    Key Features
+    ------------
+    * **Per-class registry** – instances are stored in a class-scoped :class:`Registry` for lookup.
+    * **Label identity** – hashing/equality keyed by ``(class, label)``; ``uid`` ignored.
+    * **Frozen** – Pydantic config is frozen; instances are immutable.
+    * **Stable (de)serialization** – :meth:`structure` / :meth:`unstructure` by ``(class, label)`` to preserve identity.
+    * **Pickle-friendly** – :meth:`__reduce__` resolves back to existing instance.
+
+    API
+    ---
+    - :meth:`get_instance` / :meth:`find_instance(**criteria)<find_instance>` – lookup by UUID or label/criteria.
+    - :meth:`all_instances` / :meth:`all_instance_labels` – iterate/inspect.
+    - :meth:`clear_instances` – reset registry (tests, demos).
+    - :meth:`structure` / :meth:`unstructure` – (de)serialization by label.
+
+    See also
+    --------
+    :class:`~tangl.core.singleton.InheritingSingleton`
+    :class:`~tangl.core.singleton.SingletonNode`
+    """
 
     model_config = ConfigDict(frozen=True)
 

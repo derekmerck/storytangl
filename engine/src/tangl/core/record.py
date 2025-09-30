@@ -30,22 +30,26 @@ logger = logging.getLogger(__name__)
 @functools.total_ordering
 class Record(HasSeq, Entity):
     """
-    Specialized read-only Entity for capturing runtime info.
+    Record(record_type: str, blame: Entity)
 
-    Attributes:
-    - record_type (str | Enum): General intent for record, i.e., patch, journal,
-      audit, media, used for automatically inferring the record type
-    - label (str): Optional name/key for the record (defaults to unique short uid)
-    - tags (set[str]): Optional tags associated with this record, suggested to use
-      "channel:x" tags to further annotate intent beyond record type, if required
-    - seq: monotonically increasing sequence number shared by _all_ records of a class
-    - blame_id (uuid): Optional reference to originating entity. Record is not
-      registry-aware, though, so have to get at blamed instance using an adapter.
+    Immutable runtime artifact.
 
-    Methods:
-    - has_channel(name) -> bool: Check if this record wants to be included in a
-      named group. Compares name to record_type and checks if 'channel:{name}' is
-      in tags by default.
+    Why
+    ----
+    Records capture *what happened* in a resolution process—events, fragments,
+    snapshots—without allowing mutation. They form the audit trail and the
+    replayable history of a story.
+
+    Key Features
+    ------------
+    * **Frozen** – once created, cannot be changed.
+    * **Sequenced** – each record has a monotonic :attr:`seq` number.
+    * **Channels** – lightweight filtering by :meth:`has_channel`.
+
+    API
+    ---
+    - :meth:`blame` – dereference to the originating entity
+    - :meth:`has_channel` – check membership in a channel
     """
     # records are immutable once created
     model_config = ConfigDict(frozen=True, extra="allow")
@@ -74,10 +78,28 @@ RecordT = TypeVar('RecordT', bound=Record)
 
 class StreamRegistry(Registry[HasSeq]):
     """
-    Append-only registry of Records with bookmark support.
-    - Ordered by Record.seq (HasSeq)
-    - Bookmark 'sections' by (marker_type, marker_name) -> start_seq
-    - Query by criteria (has_channel, record_type, tags, labels, is_instance, etc.)
+    StreamRegistry(data: dict[~uuid.UUID, Record])
+
+    Append-only ordered stream of :class:`Record`.
+
+    Why
+    ----
+    Provides temporal ordering and bookmark semantics for records, enabling
+    logs, journals, and patches to be stored and queried without ambiguity.
+
+    Key Features
+    ------------
+    * **Monotonic seq** – strict temporal order.
+    * **Bookmarks** – mark sections with :meth:`set_marker`.
+    * **Slices** – extract intervals with :meth:`get_slice`.
+    * **Channels** – filter logical streams with :meth:`iter_channel`.
+
+    API
+    ---
+    - :meth:`add_record` / :meth:`push_records`
+    - :meth:`get_section(**criteria)<get_section>` – retrieve bookmarked section
+    - :meth:`iter_channel` – iterate filtered records
+    - :meth:`last(**criteria)<last>` – last matching record
     """
 
     markers: dict[str, dict[str, int]] = Field(default_factory=dict)
@@ -159,8 +181,7 @@ class StreamRegistry(Registry[HasSeq]):
 
     def push_records(
             self,
-            items: list[Record | UnstructuredData],
-            *,
+            *items: Record | UnstructuredData,
             marker_type: str = "entry",
             marker_name: Optional[str] = None,
     ) -> tuple[int, int]:

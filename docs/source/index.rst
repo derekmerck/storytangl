@@ -1,5 +1,5 @@
-Tangl
-===================
+StoryTangl
+==========
 
 Documentation is divided into 3 sections:
 
@@ -11,6 +11,4 @@ Documentation is divided into 3 sections:
    :maxdepth: 2
    :caption: Contents:
 
-   user_docs/index
-   developer_docs/index
    api_docs/tangl

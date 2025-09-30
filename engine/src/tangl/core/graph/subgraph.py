@@ -1,4 +1,3 @@
-# tangl/core/graph/subgraph.py
 from __future__ import annotations
 from typing import Optional, Iterator, TYPE_CHECKING
 from uuid import UUID
@@ -15,6 +14,30 @@ if TYPE_CHECKING:
 #       just need to implement pass-through for get and have add() and values() refer
 #       to a private member list
 class Subgraph(GraphItem):
+    """
+    Subgraph(members: list[GraphItem], subgraph_type: str)
+
+    Named grouping of graph items addressed by membership.
+
+    Why
+    ----
+    Represents hierarchical structure (e.g., scene/block) without duplicating
+    topology. Stores member ids only; resolution back to items is via the owner graph.
+
+    Key Features
+    ------------
+    * **Typed** – optional :attr:`subgraph_type`.
+    * **Membership** – :meth:`add_member`, :meth:`remove_member`, :meth:`has_member`.
+    * **Scoped search** – :meth:`find_all` / :meth:`find_one` over current members.
+
+    API
+    ---
+    - :attr:`member_ids` – list of UUIDs; see :meth:`members` to iterate live items.
+    - :meth:`members` – yields items by resolving ids through :class:`Graph.get`.
+    - :meth:`add_member` – validates same-graph and updates cached parent on items.
+    - :meth:`remove_member` – remove by item or UUID and invalidate cached parent.
+    - :meth:`find_all` / :meth:`find_one` – criteria-based search among members.
+    """
     subgraph_type: Optional[ str | Enum ] = None  # No need to enumerate this yet
     member_ids: list[UUID] = Field(default_factory=list)
 

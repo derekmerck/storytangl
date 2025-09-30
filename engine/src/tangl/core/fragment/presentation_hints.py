@@ -9,22 +9,30 @@ from tangl.type_hints import StyleId, StyleClass, StyleDict
 
 class PresentationHints(BaseModel, extra="allow"):
     """
-    Presentation hints can include anything that the front-end and
-    back-end can agree on.
+    Advisory styling metadata for fragments.
 
-    Presentation hints are _not_ guaranteed to be respected by a client,
-    although `style_dict['color']` is usually pretty easy to implement
+    Why
+    ----
+    Lets producers suggest how a client might present a fragment without binding
+    behavior. Clients may ignore hints; they are best-effort guidance.
 
-    These are some basic suggestions.
+    Key Features
+    ------------
+    * **Stable & frozen** – immutable model for auditability.
+    * **Common fields** – :attr:`style_name`, :attr:`style_tags`, :attr:`style_dict`, :attr:`icon`.
+    * **Clean serialization** – :meth:`model_dump` sets `by_alias=True` and `exclude_none=True`.
 
-    - style_name (str): Optional suggested presentation-style label or html-entity #id
-    - style_tags (list[str]): Optional list of tags or html-classes
-    - style_dict (dict[str, Any]): Optional suggested html style params (color, etc.)
-    - icon (str): Optional suggested icon (arrow, emoji, etc.)
+    API
+    ---
+    - :attr:`style_name` – suggested presentation id / CSS id.
+    - :attr:`style_tags` – list of tags / CSS classes.
+    - :attr:`style_dict` – key-value styles (e.g., `{"color": "#333"}`).
+    - :attr:`icon` – optional icon hint.
 
-    The tags field can be abused for free-form, fragment-type-specific tags like
-    ["portrait", "from_right", "2.0s"] for an image.  Or, use the dedicated
-    MediaPresentationHints model for type checking.
+    Notes
+    -----
+    You can encode lightweight semantics in tags (e.g., `portrait`, `from_right`,
+    `2.0s`). For richer media semantics, add domain-specific hint models.
     """
     model_config = ConfigDict(frozen=True)
 

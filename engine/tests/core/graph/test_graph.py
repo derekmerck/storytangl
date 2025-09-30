@@ -73,3 +73,42 @@ def test_subgraph_reparent_member_updates_parent_chain():
     assert a.parent == s2
     assert list(a.ancestors())[0] == s2
     assert s1 is not a.parent
+
+# structuring and eq
+
+def test_unstructure_and_eq_on_data_attr():
+
+    from tangl.core import Entity
+
+    g = Graph()
+    a = g.add_node(label="A")
+    b = g.add_node(label="B")
+    e = g.add_edge(a, b)  # no type semantics tested here
+
+    ud = g.model_dump()
+    assert 'data' in ud
+    assert '_data' not in ud
+
+    ud3 = Entity.unstructure(g)
+    assert 'data' not in ud3
+    assert '_data' not in ud3
+
+    ud2 = g.unstructure()
+    assert 'data' not in ud2
+    assert '_data' in ud2
+
+    # structure w Entity
+    gg = Entity.structure(ud2)
+    assert g == gg
+
+    # Changing data results in neq
+    gg.add_node(label="C")
+    assert g != gg
+
+    ud4 = g.unstructure()
+    # structuring didn't mutate the unstructured data
+    assert ud2 == ud4
+
+    # structure directly w Graph
+    ggg = Graph.structure(ud4)
+    assert g == ggg

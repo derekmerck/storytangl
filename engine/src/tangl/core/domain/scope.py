@@ -18,10 +18,25 @@ NS: TypeAlias = ChainMap[str, Any]
 
 class Scope(Entity):
     """
-    A scope is a transient, ordered collection of domains that are accessible to or
-    can influence an anchor node.
+    Scope(domains: Registry[Domain], graph: Graph, anchor: Node)
 
-    Domains may be explicitly affiliated or structurally inferred.
+    Ordered stack of active domains for a node.
+
+    Why
+    ----
+    Determines *what is visible and effective* from a given anchor in the graph.
+    Combines structural domains (ancestors) and affiliate domains (opt-in).
+
+    Key Features
+    ------------
+    * **Namespace** – merge of all domain vars, nearest-first.
+    * **Handlers** – aggregate handler registries into a unified pipeline.
+
+    API
+    ---
+    - :attr:`active_domains` – list of active domains given the anchor, graph, and domain registries available
+    - :attr:`namespace` – merged :class:`~python:collections.ChainMap`
+    - :meth:`get_handlers` – yield applicable handlers
     """
 
     graph: Graph = Field(..., exclude=True)

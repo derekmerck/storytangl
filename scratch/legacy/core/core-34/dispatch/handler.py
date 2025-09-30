@@ -11,8 +11,8 @@ from pydantic import field_validator, ValidationInfo, Field, PrivateAttr
 from tangl.type_hints import StringMap, Typelike
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 from tangl.utils.summary_repr import summary_repr
-from tangl.core.entity import Entity, Registry, Singleton
-from tangl.core.entity.entity import identifier_property
+from tangl.core import Entity, Registry, Singleton
+from tangl.core.entity import is_identifier
 from .enums import HandlerPriority
 
 if TYPE_CHECKING:
@@ -29,8 +29,7 @@ class HandlerCallReceipt(Entity, Generic[T]):
     result: T
     ctx_delta: Optional[StringMap] = Field(None, exclude=True)
 
-    @identifier_property
-    def label(self):
+    def get_label(self):
         """<HandlerCallReceipt:my_func>"""
         label = f"{self.__class__.__name__}:{self.handler.label_ or self.handler.func.__name__}"
         return f"<{label}>"

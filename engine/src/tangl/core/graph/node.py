@@ -9,6 +9,29 @@ if TYPE_CHECKING:
     from .edge import Edge
 
 class Node(GraphItem):
+    """
+    Node(node_type: str)
+
+    Vertex in the topology with convenience accessors for incident edges.
+
+    Why
+    ----
+    Provides small, composable primitives—nodes plus directional edges—from which
+    higher-level narrative structures can be built.
+
+    Key Features
+    ------------
+    * **Typed** – optional :attr:`node_type` for coarse classification.
+    * **Edge navigation** – :meth:`edges_in`, :meth:`edges_out`, :meth:`edges`.
+    * **Wiring helpers** – :meth:`add_edge_to`, :meth:`add_edge_from`, and removers.
+
+    API
+    ---
+    - :meth:`edges_in` / :meth:`edges_out` – iterators filtered by criteria.
+    - :meth:`edges` – convenience union of in/out edges.
+    - :meth:`add_edge_to` / :meth:`add_edge_from` – create edges within this node's graph.
+    - :meth:`remove_edge_to` / :meth:`remove_edge_from` – detach first matching edge if present.
+    """
     node_type: Optional[str | Enum] = None  # No need to enumerate this yet
 
     def edges_in(self, **criteria) -> Iterator[Edge]:

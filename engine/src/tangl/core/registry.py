@@ -48,8 +48,39 @@ FT = TypeVar("FT", bound=Entity)  # find type within registry
 #       definition
 
 class Registry(Entity, Generic[VT]):
+    """
+    Registry(data: dict[~uuid.UUID, Entity])
+
+    Generic searchable collection of :class:`Entity`.
+
+    Why
+    ----
+    Provides a flexible alternative to raw dicts: lookup by UUID, label, tags,
+    or arbitrary predicates. Serves as the foundation for higher-level managers
+    like graphs, record streams, and handler registries.
+
+    Key Features
+    ------------
+    * **UUID-based access** for fast, deterministic retrieval.
+    * **Criteria-based search** (:meth:`find_all`, :meth:`find_one`) for
+      flexible queries.
+    * **Chaining** across multiple registries via
+      :meth:`chain_find_all` / :meth:`chain_find_one`.
+    * **Selection** logic (:meth:`select_for`) for inverse-matching entities.
+
+    API
+    ---
+    - :meth:`add` / :meth:`remove` – manage membership
+    - :meth:`find_all(**criteria)<find_all>` – yield all matches
+    - :meth:`find_one(**criteria)<find_one>` – yield first match
+    - :meth:`chain_find_all` – search across registries
+    - :meth:`all_labels`, :meth:`all_tags` – summarization helpers
+    """
+
     data: dict[UUID, VT] = Field(default_factory=dict,
-                                 json_schema_extra={'compare': False})
+                                 json_schema_extra={'serialize': False})
+    # don't bother serializing this field b/c we will include it explicitly
+    # but do use it for comparison (using `exclude=True` would cover both).
 
     def add(self, entity: VT):
         self.data[entity.uid] = entity
@@ -181,7 +212,8 @@ class Registry(Entity, Generic[VT]):
 
     @classmethod
     def structure(cls, data: StringMap) -> Self:
-        _data = data.pop("_data", {})
+        # Be careful of nested delegation here
+        _data = data.pop("_data", {})  # local copy
         obj = super().structure(data)  # type: Self
         for v in _data:
             _obj = Entity.structure(v)

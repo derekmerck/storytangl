@@ -1,8 +1,7 @@
 from __future__ import annotations
 from uuid import UUID, uuid4
-from typing import Optional, Self, Iterator, Type, Callable, Any, Iterable, TypeAlias, TypeVar
+from typing import Optional, Self, Iterator, Type, Callable, Iterable, TypeAlias, TypeVar
 import logging
-from enum import Enum
 from copy import copy
 
 from pydantic import BaseModel, Field, field_validator
@@ -18,28 +17,43 @@ match_logger = logging.getLogger(__name__ + '.match')
 match_logger.setLevel(logging.WARNING)
 
 def is_identifier(func: Callable) -> Callable:
+    """Label Entity and subclass methods as providing an identifier."""
     setattr(func, '_is_identifier', True)
     return func
 
 class Entity(BaseModelPlus):
     """
-    Entity is the base class for all managed objects.
+    Entity(label: str, tags: set[str])
 
-    Main features:
-    - carry metadata with uid, convenience label and tags
-    - searchable by any characteristic/attribute or "has_" method
-    - compare by value, hash by id
-    - provide self-casting serialization (class mro provides part of scope hierarchy)
+    Base class for all managed objects in a narrative graph.
 
-    Entity classes can be further specialized to carry:
-    - locally scoped data (a mapping of identifiers to values that can be chained into a scoped namespace)
-    - shape (relationships and a relationship manager, i.e., nodes, edges, subgraphs, and a graph manager)
-    - domain/class behaviors (decorated handlers, functions on entities that are managed with handler registries)
-    - predicates (an evaluation behavior that determines if conditions are satisfied for a given task)
+    Why
+    ----
+    Entities abstract identity and comparability across the system. They provide
+    uniform identifiers, search predicates, and serialization. Everything else
+    (graphs, records, handlers) builds on this.
 
-    Entities can be gathered and discovered with the `Registry` class.
+    Key Features
+    ------------
+    * **Identifiers** – Each entity has a UUID plus optional label and tags.
+      Identifiers can be discovered via :meth:`get_identifiers` and matched with
+      :meth:`matches(has_identifier='foo')<matches>`.
+    * **Serialization** – :meth:`structure` and :meth:`unstructure` provide
+      round-trip conversion between entities and dict data.
+    * **Search** – Entities can be filtered by arbitrary attribute criteria
+      (e.g. :meth:`registry.find_all(label="scene1", has_tags={"npc"})<Registry.find_all>`).
 
-    Singleton entities with a common api can be registered by unique label using the `Singleton` class.
+    API
+    ---
+    - :meth:`matches(**criteria)<matches>` – test entity against criteria
+    - :meth:`get_identifiers` – collect all identifiers
+    - :meth:`has_tags` – membership test for tags
+    - :meth:`structure` / :meth:`unstructure` – (de)serialization
+
+    See also
+    --------
+    :class:`~tangl.core.entity.Selectable`
+    :class:`~tangl.core.entity.Conditional`
     """
     uid: UUID = Field(default_factory=uuid4, json_schema_extra={'is_identifier': True})
     label: Optional[str] = Field(None, json_schema_extra={'is_identifier': True})
@@ -131,7 +145,7 @@ class Entity(BaseModelPlus):
     def short_uid(self) -> str:
         return shortuuid.encode(self.uid)
 
-    is_dirty_: bool = Field(default=False, alias="is_dirty")
+    is_dirty_: bool = Field(default=False, alias="is_dirty")  #: :meta private:
     # audit indicator that the entity has been tampered with, invalidates certain debugging
 
     @property
@@ -151,6 +165,7 @@ class Entity(BaseModelPlus):
     # def __hash__(self) -> int:
     #     return hash((self.uid, self.__class__))
 
+    # Let's not use state-hash as an identifier so it isn't called repeatedly
     def _state_hash(self) -> bytes:
         # Data thumbprint for auditing
         state_data = self.unstructure()
@@ -169,7 +184,10 @@ class Entity(BaseModelPlus):
         # we can try to unflatten it as the qualified name against Entity
         if isinstance(obj_cls, str):
             obj_cls = Entity.dereference_cls_name(obj_cls)
-        return obj_cls(**_data)
+        if obj_cls is not cls:
+            # Call the correct class's structure() method without an obj_cls override
+            return obj_cls.structure(_data)
+        return cls(**_data)
 
     @classmethod
     def dereference_cls_name(cls, name: str) -> Type[Self]:
@@ -184,14 +202,14 @@ class Entity(BaseModelPlus):
         """
         Unstructure an object into a string-keyed dict of unflattened data.
         """
-        # Just use field attrib 'exclude' when using Pydantic (missing from dataclass)
-        # exclude = set(self._fields(serialize=False))
+        # Also excludes any fields attrib 'exclude' (Pydantic only, not dataclass)
+        exclude = set(self._fields(serialize=False))
         # logger.debug(f"exclude={exclude}")
         data = self.model_dump(
             # exclude_unset=True,  # too many things are mutated after being initially unset
             exclude_none=True,
             exclude_defaults=True,
-            # exclude=exclude,
+            exclude=exclude,
         )
         data['uid'] = self.uid  # uid is considered Unset initially
         data["obj_cls"] = self.__class__
@@ -207,14 +225,28 @@ MatchPredicate: TypeAlias = Callable[[Entity], bool]
 
 class Selectable(BaseModel):
     """
-    Inverse match, entity _satisfies_ or will be _selected_by_.
+    Selectable(selection_criteria: dict[str, ~typing.Any])
 
-    - providers publish what they satisfy as their selection criteria, a requirement tests
-      itself against them `Requirement.matches(**template_satisfies)`
-    - domains publish what their triggers are as their selection criteria, a node tests
-      itself against them `Node.matches(**domain_triggers)`
-    - A template might dynamically create its selection criteria from its label, type, and
-      a predicate
+    Inverse-matching mixin for publishing selection criteria.
+
+    Why
+    ----
+    Lets providers (domains, templates, handlers) declare what they *satisfy* so a
+    tester entity can call :meth:`Entity.matches` against those criteria.
+
+    Key Features
+    ------------
+    * **Static or dynamic** – override :meth:`get_selection_criteria` to compute
+      criteria from labels/types/state.
+    * **Helpers** – :meth:`satisfies` (entity → criteria) and
+      :meth:`filter_for_selector` (bulk filter).
+
+    API
+    ---
+    - :attr:`selection_criteria` – default criteria dict (may include `predicate`).
+    - :meth:`get_selection_criteria` – return criteria for inverse match.
+    - :meth:`satisfies` – :meth:`selector.matches(**selection_criteria)<matches>` sugar.
+    - :meth:`filter_for_selector` – iterator over values satisfying a selector.
     """
     selection_criteria: StringMap = Field(default_factory=dict)
     # include a selection MatchPredicate that will run on the _tester_ with the key
@@ -234,10 +266,27 @@ class Selectable(BaseModel):
 
 
 class Conditional(BaseModel):
-    # todo: this becomes much more complicated when we want to eval (or eventually exec)
-    #       a string against the ns or unstructure a conditional
+    """
+    Conditional(predicate: ~typing.Callable[[Entity, dict], bool])
+
+    Lightweight predicate gate for availability checks.
+
+    Why
+    ----
+    Wraps a callable predicate so conditionals can be stored, serialized, and
+    evaluated consistently across domains/handlers.
+
+    Key Features
+    ------------
+    * **Callable** – `predicate(ns)` returns truthy/falsey.
+    * **Portable** – designed for simple lambdas; richer expressions can be layered later.
+
+    API
+    ---
+    - :attr:`predicate` – `(ns: dict) -> bool`.
+    - :meth:`available` – evaluate predicate against a namespace.
+    """
     predicate: Predicate = Field(default=lambda x: True)
 
     def available(self, ns: StringMap) -> bool:
         return self.predicate(ns) is True
-

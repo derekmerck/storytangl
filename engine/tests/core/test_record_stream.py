@@ -68,7 +68,7 @@ def test_add_single_item():
 def test_push_records_sets_marker_and_returns_half_open_bounds():
     rs = RecordStream()
     a, b, c = mkrec("journal", label="A"), mkrec("patch", label="B"), mkrec("audit", label="C")
-    start, end = rs.push_records([a, b, c], marker_type="entry", marker_name="e1")
+    start, end = rs.push_records(a, b, c, marker_type="entry", marker_name="e1")
     # With three records, end should be start+2
     assert end - start == 2
     sec = list(rs.get_section("e1", "entry"))
@@ -79,10 +79,10 @@ def test_push_records_sets_marker_and_returns_half_open_bounds():
 def test_adjacent_sections_do_not_overlap():
     rs = RecordStream()
     # first entry
-    rs.push_records([mkrec("journal", label="e1a"), mkrec("journal", label="e1b")],
+    rs.push_records(mkrec("journal", label="e1a"), mkrec("journal", label="e1b"),
                     marker_type="entry", marker_name="e1")
     # second entry
-    rs.push_records([mkrec("journal", label="e2a")],
+    rs.push_records(mkrec("journal", label="e2a"),
                     marker_type="entry", marker_name="e2")
     s1 = [r.label for r in rs.get_section("e1", "entry")]
     s2 = [r.label for r in rs.get_section("e2", "entry")]
@@ -103,7 +103,7 @@ def test_get_slice_with_predicate_and_criteria():
     r0 = mkrec("journal", label="a", tags={"channel:journal"})
     r1 = mkrec("patch", label="b", tags={"channel:ops"})
     r2 = mkrec("journal", label="c", tags={"channel:journal"})
-    rs.push_records([r0, r1, r2], marker_type="entry", marker_name="e")
+    rs.push_records(r0, r1, r2, marker_type="entry", marker_name="e")
     # Half-open: select the middle record only
     mid_seq = rs.max_seq - 1
     sl = list(rs.get_slice(start_seq=mid_seq, end_seq=mid_seq + 1))

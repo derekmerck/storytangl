@@ -12,22 +12,29 @@ logger = logging.getLogger(__name__)
 
 class InheritingSingleton(Singleton):
     """
-    A Singleton mixin that supports attribute inheritance from existing instances.
+    InheritingSingleton(label: UniqueStr, from_ref: UniqueStr)
 
-    Attributes are inherited from a reference instance and can be selectively overridden.
-    This creates an inheritance chain without requiring class inheritance.  The inheritance
-    is controlled by the 'from_ref' keyword argument.
+    Singleton that can inherit default attributes from another instance.
 
-    Be careful to load them in order, the code does not provide any dependency resolution,
-    and inheritance is not tracked.
+    Why
+    ----
+    Compose constant families (e.g., "Default Camera" → "Portrait Camera") without
+    subclassing. Useful for fabula vocabularies, media presets, etc.
 
-    Example:
-        base = MySingleton(label="base", value=1, other=2)
-        child = MySingleton(label="child", from_ref="base", value=3)
-        # child.value == 3, child.other == 2
+    Key Features
+    ------------
+    * **Reference instances** – Defaults copied from a reference instance of same class before validation.
+    * **Selective override/merge** – dicts merged (``ref | data``), sets unioned, sequences extended.
+    * **Order-sensitive** – no dependency resolution; parents must be created first.
 
-    Parameters:
-        from_ref (str): The label of the reference entity to inherit attributes from.
+    API
+    ---
+    - :attr:`from_ref` – label of the source instance; consumed during model validation.
+    - Validator :meth:`_set_defaults_from_refs` – merges fields from the reference.
+
+    Notes
+    -----
+    Inheritance is not tracked; add your own metadata if you need lineage auditing.
     """
     from_ref: Optional[UniqueLabel] = Field(None, init_var=True)
     """The label of the reference entity to inherit attributes from.

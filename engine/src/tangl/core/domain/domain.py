@@ -13,13 +13,22 @@ DEFAULT_VARS = {'version': __version__}
 
 class Domain(Entity):
     """
-    Domains publish shared identifiers and handlers.  A Scope is an ordered aggregation of Domains
-    relative to a particular Node.
+    Domain(vars: dict[str, ~typing.Any], handlers: DispatchRegistry)
 
-    Affiliate domains may be explicitly adopted with a label- or type-based opt-in.
+    Bundle of capabilities: variables + handlers.
 
-    Structural domains are implicitly assigned by membership in a group, such as a subgraph
-    or object class.
+    Why
+    ----
+    A domain publishes a coherent namespace of identifiers and functions.
+    Domains can represent story rules, environmental constraints, or character
+    abilities. They can be affiliated (explicit, opt-in) or structural (implicit,
+    inferred from graph).
+
+    API
+    ---
+    - :attr:`vars` – shared identifiers/values
+    - :attr:`handlers` – registry of callable behaviors
+    - :meth:`add_vars`, :meth:`add_handler`, :meth:`register_handler`
     """
     vars: StringMap = Field(default_factory=dict)
     handlers: DispatchRegistry = Field(default_factory=DispatchRegistry)
@@ -30,6 +39,7 @@ class Domain(Entity):
     def add_handler(self, func, **attrs) -> None:
         self.handlers.add(func, **attrs)
 
+    # delegated decorator
     def register_handler(self, **attrs: Any) -> None:
         return self.handlers.register(**attrs)
 

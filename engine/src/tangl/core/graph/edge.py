@@ -12,7 +12,33 @@ from .graph import GraphItem, Graph
 from .node import Node
 
 class Edge(GraphItem):
-    # source and destination entities are converted to uids on create if needed
+    """
+    Edge(source: Node, destination: Node, edge_type: str)
+
+    Directed connection between two nodes in the same graph.
+
+    Why
+    ----
+    Encodes structure and flow (parent→child, dependency, sequence). Stores
+    endpoint ids for serialization, with properties that resolve to live nodes.
+
+    Key Features
+    ------------
+    * **Typed** – optional :attr:`edge_type`.
+    * **Endpoint conversion** – pre-init validator accepts ``source``/``destination``
+      as :class:`GraphItem` and converts them to ids.
+    * **Live accessors** – :attr:`source` / :attr:`destination` resolve via graph.
+
+    API
+    ---
+    - :attr:`source_id`, :attr:`destination_id` – UUIDs (nullable for dangling edges).
+    - :attr:`source` / :attr:`destination` – properties with validation on set.
+    - :meth:`__repr__` – compact label showing endpoints for debugging.
+
+    See also
+    --------
+    :class:`~tangl.core.graph.AnonymousEdge`
+    """
 
     edge_type: Optional[Enum|str] = None       # No need to enumerate this yet
     source_id:  Optional[UUID] = None          # usually parent
@@ -70,9 +96,23 @@ class Edge(GraphItem):
 
 
 class AnonymousEdge(Entity):
+    """
+    AnonymousEdge(source: Node, destination: Node)
+
+    Lightweight edge without a managing graph (GC-friendly helper).
+
+    Why
+    ----
+    Useful for transient computations (e.g., previews, diffs) where full graph
+    membership and registration would be unnecessary overhead.
+
+    API
+    ---
+    - :attr:`source` / :attr:`destination` – required node references.
+    - :meth:`__repr__` – mirrors :class:`Edge` formatting for consistency.
+    """
     # Minimal Edge that does not require a graph, so it can be garbage collected
     source: Node
     destination: Node
 
     __repr__ = Edge.__repr__
-

@@ -1,4 +1,3 @@
-# tangl/core/singleton/singleton_node.py
 from __future__ import annotations
 from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
@@ -18,42 +17,34 @@ WrappedType = TypeVar("WrappedType", bound=Singleton)
 
 class SingletonNode(Node, Generic[WrappedType]):
     """
-    SingletonNode is a :class:`~tangl.core.graph.Node` extension that wraps a
-    :class:`~tangl.core.entity.Singleton` with instance-specific
-    state, enabling it to be attached to a graph while maintaining singleton
-    behavior.
+    SingletonNode(from_ref: UniqueStr)
+
+    Graph node wrapper that attaches a :class:`Singleton` to a graph with node-local state.
+
+    Why
+    ----
+    Let immutable singletons participate in topology while allowing per-node state (e.g.,
+    position, runtime flags) that does not mutate the singleton itself.
 
     Key Features
     ------------
-    * **Singleton Wrapper**: Wraps a Singleton, providing graph connectivity.  The wrapped Singleton is accessed via the :attr:`reference_entity` property.
-    * **Instance Variables**: Supports instance-specific variables.  Instance variables must be marked with :code:`json_schema_extra={"instance_var": True}` in the Singleton.
-    * **Method Rebinding**: Class methods are rebound to the wrapped instance.
-    * **Dynamic Class Creation**: Provides a method :meth:`create_wrapper_cls` to create wrapper classes for specific Singleton types.
-    * **Supports Generics**: SingletonNode[Singleton] automatically creates an appropriate class wrapper.
+    * **Binding** – :attr:`wrapped_cls` points to the singleton class; :attr:`label` selects instance.
+    * **Delegation** – attribute access defers to the wrapped singleton; methods are rebound for convenience.
+    * **Instance vars** – singleton fields marked ``json_schema_extra={"instance_var": True}``
+      are materialized on the node for local override.
+    * **Dynamic wrappers** – :meth:`__class_getitem__` / :meth:`_create_wrapper_cls` generate typed wrappers on demand.
 
-    Usage
+    API
+    ---
+    - :attr:`wrapped_cls` – singleton type bound to this wrapper.
+    - :attr:`label` – required label of the referenced instance; validated at creation.
+    - :attr:`reference_singleton` – access the underlying instance.
+    - :meth:`_instance_vars` – collect instance-var field definitions from the wrapped class.
+    - :meth:`_create_wrapper_cls` – emit a new wrapper subclass with those fields.
+
+    Notes
     -----
-    .. code-block:: python
-        from tangl.core.graph import SingletonNode, Graph
-        from tangl.core import Singleton
-
-        class MyConstant(Singleton):
-            value: int
-            state: str = Field(default="initial", json_schema_extra={"instance_var": True})
-
-        MyConstantNode = SingletonNode.create_wrapper_cls("MyConstantNode", MyConstant)
-
-        graph = Graph()
-        const_node1 = MyConstantNode(label="CONSTANT_1", value=42, graph=graph)
-        const_node2 = MyConstantNode(label="CONSTANT_1", state="modified", graph=graph)
-
-        print(const_node1.value == const_node2.value)  # True (42)
-        print(const_node1.state != const_node2.state)  # True ("initial" != "modified")
-
-    Related Components
-    ------------------
-    * :class:`~tangl.core.entity.Singleton`: The base class for singleton entities.
-    * :class:`~tangl.core.graph.Node`: The base class for graph nodes.
+    Prefer modeling behavior in the singleton; keep node-local overrides minimal and explicit.
     """
     # Allows embedding a Singleton into a mutable node so its properties can be
     # referenced indirectly via a graph

@@ -12,6 +12,9 @@ from tangl.core.registry import Registry
 from tangl.core.domain import Scope, NS, AffiliateDomain
 from tangl.core.dispatch import Handler
 
+# todo: is context unnecessary now?  Or is Frame a subclass of Context, like
+#       a context that does stuff?
+
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)
 class Context:

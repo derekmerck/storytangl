@@ -1,4 +1,3 @@
-# tangl/core/graph/graph.py
 from __future__ import annotations
 from uuid import UUID
 from typing import Optional, Iterator, Iterable, TYPE_CHECKING
@@ -17,7 +16,32 @@ if TYPE_CHECKING:
     from .edge import Edge
 
 class GraphItem(Entity):
-    """Base abstraction for all graph elements, self-aware"""
+    """
+    GraphItem(graph: Graph)
+
+    Base abstraction for graph elements that are self-aware of their container graph.
+
+    Why
+    ----
+    Centralizes membership/parentage logic so :class:`Node`, :class:`Edge`, and
+    :class:`Subgraph` behave consistently. Instances auto-register with their
+    :attr:`graph` and expose ancestry utilities used throughout planning and scope.
+
+    Key Features
+    ------------
+    * **Auto-registration** – post-init validator calls ``graph.add(self)``.
+    * **Hierarchy helpers** – :meth:`parent`, :meth:`ancestors`, :meth:`root`, :meth:`path`.
+    * **Stable identity** – :meth:`_id_hash` includes the graph uid when present.
+
+    API
+    ---
+    - :attr:`graph` – back-reference to the owning :class:`Graph` (not serialized).
+    - :meth:`parent` – nearest containing :class:`Subgraph` (cached).
+    - :meth:`ancestors` – iterator of containing subgraphs (nearest → farthest).
+    - :meth:`root` – top-most containing subgraph or ``None``.
+    - :meth:`path` – dotted label path from root to self.
+    - :meth:`_invalidate_parent_attr` – clear cached parent on re-parenting.
+    """
     graph: Graph = Field(default=None, exclude=True)
     # graph is for local dereferencing only, do not serialize to prevent recursions
     # hold id only for peer graph items to prevent recursions, see edge
@@ -70,6 +94,33 @@ class GraphItem(Entity):
 
 
 class Graph(Registry[GraphItem]):
+    """
+    Graph(data: dict[~uuid.UUID, GraphItem])
+
+    Linked registry of :class:`GraphItem` objects (nodes, edges, subgraphs).
+
+    Why
+    ----
+    Treats the whole topology as a searchable registry while providing typed
+    helpers for construction and queries. Enforces link integrity so items always
+    belong to the same graph.
+
+    Key Features
+    ------------
+    * **Special adds** – :meth:`add_node`, :meth:`add_edge`, :meth:`add_subgraph`.
+    * **Typed finds** – :meth:`find_nodes`, :meth:`find_edges`, :meth:`find_subgraphs`.
+    * **Convenient get** – :meth:`get` by ``UUID`` or by ``label``/``path``.
+    * **Integrity checks** – :meth:`_validate_linkable` before wiring edges/groups.
+
+    API
+    ---
+    - :meth:`add` – attach any :class:`GraphItem` (sets ``item.graph`` then registers).
+    - :meth:`add_node` – create/register a node.
+    - :meth:`add_edge` – create/register an edge between items (accepts ``None`` endpoints).
+    - :meth:`add_subgraph` – create/register a subgraph and populate members.
+    - :meth:`find_nodes` / :meth:`find_edges` / :meth:`find_subgraphs` – filtered iterators.
+    - :meth:`get` – lookup by id or by label/path.
+    """
 
     # Stub out mutators
     # def add(self, *args) -> None:
@@ -118,6 +169,9 @@ class Graph(Registry[GraphItem]):
         criteria.setdefault("is_instance", Node)
         return self.find_all(**criteria)
 
+    def find_node(self, **criteria) -> Optional[Node]:
+        return next(self.find_nodes(**criteria), None)
+
     def find_edges(self, **criteria) -> Iterator[Edge]:
         from .edge import Edge
         # find edges in = find_edges(destination=node)
@@ -125,10 +179,16 @@ class Graph(Registry[GraphItem]):
         criteria.setdefault("is_instance", Edge)
         return self.find_all(**criteria)
 
+    def find_edge(self, **criteria) -> Optional[Edge]:
+        return next(self.find_edges(**criteria), None)
+
     def find_subgraphs(self, **criteria) -> Iterator[Subgraph]:
         from .subgraph import Subgraph
         criteria.setdefault("is_instance", Subgraph)
         return self.find_all(**criteria)
+
+    def find_subgraph(self, **criteria) -> Optional[Subgraph]:
+        return next(self.find_subgraphs(**criteria), None)
 
     def get(self, key: Identifier):
         if isinstance(key, UUID):
@@ -144,4 +204,3 @@ class Graph(Registry[GraphItem]):
         if item.uid not in self.data:
             raise ValueError(f"Link item must be added to graph first")
         return True
-

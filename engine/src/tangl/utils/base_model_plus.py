@@ -77,7 +77,7 @@ class BaseModelPlus(BaseModel):
                 logger.debug(f"Skipping field: {n}")
 
     # There is no built-in method for excluding fields from comparison with pydantic.
-    # For this approach, set json_schema_extra = {'cmp', false} on fields to ignore.
+    # For this approach, set json_schema_extra = {'compare', False} on fields to ignore.
     # Other approaches include unlinking fields during comparison then relinking them, or
     # comparing model_dumps with excluded fields.
     def __eq__(self, other) -> bool:

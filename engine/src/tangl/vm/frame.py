@@ -162,7 +162,7 @@ class Frame:
         self.cursor_id = edge.destination.uid
 
         # Set a marker on the record stream
-        self.records.set_marker(f"step{self.step:04}", "frame")
+        self.records.set_marker(f"step-{self.step:04d}", "frame")
 
         # Use the destination, not edge.dest_id in case its an anonymous edge
         self._invalidate_context()       # updated the anchor, need to rebuild scope
