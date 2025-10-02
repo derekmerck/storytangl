@@ -8,7 +8,7 @@ from collections import UserDict
 from pydantic import Field
 
 from tangl.type_hints import UniqueLabel
-from tangl.core.entity import Singleton as SingletonEntity
+from tangl.core import Singleton as SingletonEntity
 
 
 class SingletonMap(SingletonEntity, UserDict):

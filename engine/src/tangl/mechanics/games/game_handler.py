@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import Field, field_validator, model_validator
 
-from tangl.core.dispatch import DispatchRegistry as HandlerRegistry
+from tangl.core.dispatch import DispatchRegistry as DispatchRegistry
 # from tangl.core.services import HasContext, on_gather_context
 from tangl.core.entity import Entity
 from tangl.core.graph import Node
@@ -30,7 +30,7 @@ from .enums import GameResult
 
 class HasContext:
     pass
-on_gather_context = HandlerRegistry(label="gather_context")
+on_gather_context = DispatchRegistry(label="gather_context")
 
 # Move-type for any GameHandler may be a simple Enum or a more complex
 # parameterized dataclass
@@ -44,8 +44,8 @@ Move = TypeVar("Move")
 
 GameT = TypeVar("GameT", bound='Game')
 
-opponent_strategies = HandlerRegistry(label='opponent_strategies')
-scoring_strategies = HandlerRegistry(label='scoring_strategies')
+opponent_strategies = DispatchRegistry(label='opponent_strategies')
+scoring_strategies = DispatchRegistry(label='scoring_strategies')
 
 
 class GameHandler(ABC, Generic[GameT]):

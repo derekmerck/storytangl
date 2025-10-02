@@ -48,7 +48,7 @@ def process_directory(root: Path,
             except ValueError:
                 name = f.relative_to(pkg_root)
             content = fp.read()
-            if f.suffix == ".md":
+            if f.suffix in [".md", ".csv", ".txt", ".json"]:
                 content = '"""\n' + content + '"""\n'
             if content:
                 data[name] = content
@@ -134,6 +134,9 @@ if __name__ == "__main__":
                       include_mds=True,
                       postpend_files=[pkg_root / "utils/hashing.py"])
 
+    process_directory(pkg_root / 'lang', "tangl37_lang_archive.py",
+                      postpend_files=[pkg_root / "lang/pos/treebank-symbols.csv",
+                                      pkg_root / "lang/pos/treebank_symbols.pyi"])
     process_directory(pkg_root / 'persistence', "tangl37_persist_archive.py")
     process_directory(pkg_root / 'utils', "tangl37_utils_archive.py")
 
@@ -144,6 +147,7 @@ if __name__ == "__main__":
     # testing
     process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")
     process_directory(tests_root / 'vm',   "tangl37_vm_tests_archive.py")
+    process_directory(tests_root / 'lang',   "tangl37_lang_tests_archive.py")
     process_directory(tests_root / 'persistence',   "tangl37_persist_tests_archive.py")
     process_directory(tests_root / 'utils',   "tangl37_utils_tests_archive.py")
 

@@ -1,4 +1,4 @@
-# tangl/domain/structural.py
+# tangl/core/domain/structural.py
 
 # structural scopes are inferred from an anchor node according to ancestors on a graph.
 # for example, ancestors can have their own templates/vars and less frequently, handlers.

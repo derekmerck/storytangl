@@ -13,6 +13,8 @@ from tangl.utils.hashing import compute_data_hash
 from tangl.core.entity import Entity
 from ..enums import MediaDataType
 
+# todo: these are Records now
+
 # RITs are _technically_ resource-type Nodes when used in a graph,
 # but they can also be used without a graph, so it makes more sense
 # as an Entity rather than a GraphItem.

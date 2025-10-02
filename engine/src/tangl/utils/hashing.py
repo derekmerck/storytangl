@@ -21,29 +21,26 @@ def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
     if digest_size is None:
         # legacy, slightly more secure but can probably replace with blake
         # for speed and consistency
-        hasher = sha224(salt)
+        hasher = sha224()
+        hasher.update(salt)
     else:
         # provides digest size for creating ints or uids without truncating
-        hasher = blake2b(salt, digest_size=digest_size)
+        hasher = blake2b(digest_size=digest_size, salt=salt)
 
     for item in data:
         if isinstance(item, bytes):
             item_bytes = item
-        elif x := getattr(item, 'bytes', None):
-            # uids and such
-            item_bytes = x
-        elif getattr(item, 'to_bytes', None):
-            # ints
-            item: int
-            item_bytes = item.to_bytes(8, signed=True)
+        elif hasattr(item, 'bytes'):
+            item_bytes = item.bytes
+        elif isinstance(item, int):
+            # 8 bytes is enough for seeds; change if you need larger state
+            item_bytes = item.to_bytes(8, byteorder="big", signed=True)
         elif isinstance(item, str):
             item_bytes = item.encode('utf-8')
         elif isinstance(item, dict):
-            # unstructured state data
-            item_bytes = json.dumps(item, default=str).encode('utf-8')
+            item_bytes = json.dumps(item, default=str, sort_keys=True).encode('utf-8')
         else:
-            # Use bytes from the built-in hash
-            item_bytes = hash(item).to_bytes(8)
+            item_bytes = hash(item).to_bytes(8, byteorder="big", signed=True)
         hasher.update(item_bytes)
     return hasher.digest()
 

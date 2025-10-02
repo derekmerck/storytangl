@@ -27,7 +27,7 @@ def _missing_(cls: TreeBankSymbols, value):
             return v
 
 def is_verb(self: TreeBankSymbols):
-    if self in [self.VBD, self.VBP, self.VBZ]:
+    if self in [self.VBD, self.VBP, self.VBN, self.VBZ]:
         return True
     return False
 

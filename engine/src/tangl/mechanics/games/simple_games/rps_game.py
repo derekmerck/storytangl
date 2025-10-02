@@ -2,12 +2,12 @@ from __future__ import annotations
 import random
 from enum import Enum
 
-from tangl.core.dispatch import DispatchRegistry as HandlerRegistry
+from tangl.core.dispatch import DispatchRegistry as DispatchRegistry
 from tangl.mechanics.games.game_handler import Game, GameHandler, GameResult
 
 from ..game_handler import opponent_strategies, scoring_strategies
-# opponent_strategies = HandlerRegistry(label='opponent_strategies')
-# scoring_strategies = HandlerRegistry(label='scoring_strategies')
+# opponent_strategies = DispatchRegistry(label='opponent_strategies')
+# scoring_strategies = DispatchRegistry(label='scoring_strategies')
 
 
 class RpsMove(Enum):

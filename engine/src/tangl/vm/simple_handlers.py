@@ -1,9 +1,12 @@
 # minimal phase handlers for testing
 # note, the `register` decorator wraps the output in a JobReceipt
+import logging
 
-from tangl.core import Node, global_domain, Graph
-from tangl.vm.frame import ResolutionPhase as P, NS, ChoiceEdge
+from tangl.core import Node, global_domain, Graph, BaseFragment
+from tangl.vm.frame import ResolutionPhase as P, NS, ChoiceEdge, ResolutionPhase
 from tangl.vm.planning import Dependency, Provisioner
+
+logger = logging.getLogger(__name__)
 
 @global_domain.handlers.register(phase=P.VALIDATE, priority=0)
 def validate_cursor(ns: NS):
@@ -40,8 +43,23 @@ def update_noop(ns: NS):
 @global_domain.handlers.register(phase=P.JOURNAL, priority=50)
 def journal_line(ns: NS):
     cur: Node = ns["cursor"]
-    line = f"[step {ns['step']:03d}] {cur.label or cur.short_uid()}"
+    line = f"[step {ns['step']:04d}]: cursor at {cur.get_label()}"
+    logger.debug(f"JOURNAL: Outputting journal line: {line}")
     return line
+
+@global_domain.handlers.register(phase=P.JOURNAL, priority=100)
+def coerce_to_fragments(ns: NS):
+    # Simple compositor, should run _last_ just coerce to proper format
+    fragments = []
+    for receipt in ns.get("results", []):
+        result = receipt.result
+        if isinstance(result, BaseFragment):
+            fragments.append(result)
+        else:
+            f = BaseFragment(content=result)
+            fragments.append(f)
+    logger.debug(f"JOURNAL: Outputting fragments: {fragments}")
+    return fragments
 
 @global_domain.handlers.register(phase=P.FINALIZE, priority=50)
 def finalize_noop(ns: NS):

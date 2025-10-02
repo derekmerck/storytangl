@@ -13,9 +13,9 @@ TimingName = Literal['start', 'stop', 'pause', 'restart', 'loop']
 
 class StagingHints(BaseModel, extra="allow"):
     """
-    Media StagingHints are similar to dialog StyleHint annotations -- they provide
-    additional client-side suggestions for client staging, position, arrival, and
-    departure transitions.
+    Media StagingHints are similar to content PresentationHint annotations -- they
+    provide additional client-side suggestions for media staging, position, arrival,
+    and departure transitions.
     """
     media_shape: Optional[ShapeName | float] = None  # aspect ratio
     media_size: Optional[SizeName | tuple[int, int] | tuple[float, float] | float] = None  # dims or scale

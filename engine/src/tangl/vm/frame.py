@@ -1,4 +1,3 @@
-# tangl/vm/frame.py
 from __future__ import annotations
 from typing import Literal, Optional, Any, Callable, Type
 import functools
@@ -11,7 +10,7 @@ from random import Random
 
 from tangl.type_hints import Step, StringMap as NS
 from tangl.utils.hashing import hashing_func
-from tangl.core.entity import Conditional, Entity
+from tangl.core.entity import Conditional
 from tangl.core.registry import Registry
 from tangl.core.record import StreamRegistry
 from tangl.core.graph import Graph, Edge, Node
@@ -19,7 +18,7 @@ from tangl.core.dispatch import JobReceipt
 from tangl.core.domain import AffiliateDomain
 from tangl.core.fragment import BaseFragment
 from .context import Context
-from .events import ReplayWatcher, Event, WatchedRegistry, Patch
+from .replay import ReplayWatcher, WatchedRegistry, Patch
 
 logger = logging.getLogger(__name__)
 
@@ -139,12 +138,14 @@ class Frame:
 
     def run_phase(self, phase: P) -> Any:
         ns = self.get_ns(phase)  # creates context if necessary, resets results
-        handlers = list(self.context.get_handlers(phase=phase))
-        receipts = [h(ns) for h in handlers]
+        # handlers = list(self.context.get_handlers(phase=phase))
+        # receipts = [h(ns) for h in handlers]
 
-        # Did it iteratively in ns so a compositor would have access to previous results for pipe
-        # for h in self.context.get_handlers(phase=phase):
-        #     ns["results"].append(h(ns))  # add the receipt to the result stack
+        # Do it iteratively in ns so a compositor would have access to previous results for pipe
+        # Fix this so we call directly with caller, ctx=ctx and let the handler/wrapper parse out ns properly
+        for h in self.context.get_handlers(phase=phase):
+            ns["results"].append(h(ns))  # add the receipt to the result stack
+        receipts = ns["results"]
 
         agg_func, result_type = phase.properties()
         outcome = agg_func(*receipts)
@@ -187,18 +188,27 @@ class Frame:
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
 
         # Generate the output content for the current state
-        entry = self.run_phase(P.JOURNAL)
-        # todo: compose and copy wherever to where-ever it goes, as entry nodes or into a separate journal object
-        # todo: If fragments are stored as nodes, we should update the preview graph again since cleanup might want to see the journal.  Otherwise the journal needs to be stored somewhere else?  In the ns?
+        entry_fragments = self.run_phase(P.JOURNAL)
 
-        # self.records.push_records(entry)
+        if entry_fragments:
+            self.records.push_records(
+                *entry_fragments,
+                marker_type="journal",
+                marker_name=f"step-{self.step:04d}"
+            )
 
         # Cleanup bookkeeping
         self.run_phase(P.FINALIZE)
 
-        if self.event_sourced:
-            patch = Patch(events=self.event_watcher.events, registry_id=self.graph.uid)
-            self.records.add_item(patch)
+        if self.event_sourced and self.event_watcher.events:
+            patch = Patch(
+                events=self.event_watcher.events,
+                registry_id=self.graph.uid,
+                registry_state_hash=self.graph._state_hash()
+            )
+            self.records.add_record(patch)
+            # ready for next frame
+            self.event_watcher.clear()
 
         # check for postreq cursor redirects
         if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor
@@ -209,8 +219,16 @@ class Frame:
 
         return None
 
-    def resolve_choice(self, choice) -> None:
-        # follows edges until no next edge is returned
+    def resolve_choice(self, choice, post_step_hook = None) -> None:
+        """
+        Follows edges until no next edge is returned.
+
+        Call with Ledger.maybe_push_snapshot as the post_step_hook to take intermediate snapshots during a multi-step resolution.
+        """
+
         cur = choice
         while cur:
             cur = self.follow_edge(cur)
+
+            if post_step_hook:
+                post_step_hook(self)

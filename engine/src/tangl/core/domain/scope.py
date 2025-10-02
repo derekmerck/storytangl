@@ -1,4 +1,4 @@
-# tangl.core.scope.py
+# tangl/core/domain/scope.py
 # Scope is a node-anchored view of all relevant affiliate and structured domains.
 from typing import Any, Iterator, TypeAlias
 from functools import cached_property

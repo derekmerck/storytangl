@@ -13,7 +13,7 @@ class PoV(Enum):
 
     def person_and_plural(self) -> tuple[int, bool]:
         person: int = (((self.value - 1) % 3) + 1)
-        plural: bool = bool((self.value - 1) // 3) > 0
+        plural: bool = ((self.value - 1) // 3) > 0
         return person, plural
 
     def plural(self) -> PoV:

@@ -34,9 +34,13 @@ flowchart RL
     subgraph .core
         Entity
         JournalFragment
-        DependencyEdge
         Registry
-        HandlerRegistry
+        DispatchRegistry
+    end
+    
+    subgraph .vm
+        DependencyEdge
+        Provisioner
     end
  
     subgraph .media_resource
@@ -45,7 +49,7 @@ flowchart RL
         MediaRegistry -- has --> MediaRIT
         MediaDependency -- is --> DependencyEdge
         MediaDependency -- wants --> MediaRIT
-        MediaProvisioner -- is --> HandlerRegistry
+        MediaProvisioner -- is --> DispatchRegistry
         MediaProvisioner -- discovers --> MediaRIT
         MediaProvisioner -- resolves --> MediaDependency
         media_handler -- is --> MediaProvisioner

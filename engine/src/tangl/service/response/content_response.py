@@ -3,19 +3,28 @@ from typing import Union, Annotated
 
 from pydantic import Field
 
-from tangl.core.solver import ContentFragment
+from tangl.core import BaseFragment
 # from tangl.service.user import UserEventFragment
 from tangl.service.response.base_response import BaseResponse
 
 
 AnyContentFragment = Annotated[
     Union[
-        ContentFragment,
-        # MediaFragment,
-        # ChoiceFragment,
+        BaseFragment,
+
+        # Static content
+        # --------------
+        # ContentFragment
         # DialogFragment,
-        # # InfoFragment,
+        # MediaFragment,
+
+        # Styled Data
+        # -----------
         # KvFragment,
+
+        # Control/UX
+        # ----------
+        # ChoiceFragment,  # Activatable content
         # ControlFragment,
         # GroupFragment,
         # UserEventFragment

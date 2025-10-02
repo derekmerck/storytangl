@@ -10,13 +10,12 @@ from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity, Selectable, is_identifier
 from .job_receipt import JobReceipt
 
-# todo: make this look more like v34 dispatch, with a decorator that infers how to call
-#       the func by inspecting its signature.  May want 1 or more Entities as args, may
-#       want an execution context (namespace, phase, prior results, etc.), may want/admit
-#       kwarg params.
-# todo: infer caller type and result type from function sig?
-# todo: dynamically modify selection criteria based on expected caller type/return type?
-
+# todo: - make this look more like v34 dispatch, with a decorator that infers how to call
+#         the func by inspecting its signature.
+#       - May want 1 or more Entities as args, may want an execution context
+#         (namespace, phase, prior results, etc.), may want/admit kwarg params.
+#       - infer caller type and result type from function sig?
+#       - dynamically modify selection criteria based on expected caller type/return type?
 
 class HandlerPriority(IntEnum):
     """
@@ -43,9 +42,9 @@ class HandlerPriority(IntEnum):
     LAST = 100
 
 
-# Note this is runtime_checkable so Pydantic will allow it as a typehint. It is not actually
-# validated, so this is purely organizational and the function call will actually admit any
-# type *args.
+# Note this is runtime_checkable so Pydantic will allow it as a typehint.
+# It is not actually validated, so this is purely organizational and the function
+# call will actually admit any type *args.
 @runtime_checkable
 class HandlerFunc(Protocol):
     def __call__(self, caller: Entity, *others: Entity, ctx: Optional[dict] = None, **params: Any) -> Any: ...

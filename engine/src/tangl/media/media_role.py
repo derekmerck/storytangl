@@ -5,9 +5,10 @@ from enum import Enum
 class MediaRole(Enum):
 
     IMAGE = "image"
-    # formats: generic raster (png) or vector (svg) and come in
+    # formats: generic raster (png) or vector (svg)
 
     NARRATIVE_IM   = "narrative_im"
+
     # size hints: landscape, portrait, square
     NARRATIVE_IM_L = "narrative_im_landscape"
     NARRATIVE_IM_P = "narrative_im_portrait"
@@ -35,6 +36,9 @@ class MediaRole(Enum):
     # --------------
 
     VIDEO = "video"
+    # formats: mp4
     ANIMATION = "animation"
+
+    # --------------
 
     EXTRA = "extra"                # everything else

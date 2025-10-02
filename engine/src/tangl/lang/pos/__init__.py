@@ -1,3 +1,3 @@
 from .treebank_symbols import TreeBankSymbols
-PartOfSpeach = TreeBankSymbols
+PartOfSpeech = TreeBankSymbols
 PoS = TreeBankSymbols

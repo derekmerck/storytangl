@@ -1,12 +1,12 @@
 import pytest
-from tangl.lang.thesaurus import Synset, Thesaurus, PartOfSpeach
+from tangl.lang.thesaurus import Synset, Thesaurus, PartOfSpeech
 
 # Fixture for sample data
 @pytest.fixture
 def sample_thesaurus():
     # Create sample Synsets
-    swing_synset = Synset(label="swing", pos=PartOfSpeach.VB, synonyms={"flail", "slash"})
-    sword_synset = Synset(label="sword", pos=PartOfSpeach.NN, synonyms={"blade", "saber"})
+    swing_synset = Synset(label="swing", pos=PartOfSpeech.VB, synonyms={"flail", "slash"})
+    sword_synset = Synset(label="sword", pos=PartOfSpeech.NN, synonyms={"blade", "saber"})
 
     # Create a Thesaurus with these Synsets
     thesaurus = Thesaurus(label="test", synsets=[swing_synset, sword_synset])
@@ -40,7 +40,7 @@ def test_thesaurus_loading():
 
 
 # Test for ensuring no repeated synonyms in consecutive calls (if applicable)
-@pytest.mark.skip(reason="Replacement not working yet")
+@pytest.mark.skip(reason="Assumes missing logic to avoid repetition")
 def test_no_repeated_synonyms(sample_thesaurus):
     swing_synset = sample_thesaurus.synsets[0]
     first_replacement = swing_synset.replace("swing")

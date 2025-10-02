@@ -5,12 +5,12 @@ from markdown_it import MarkdownIt
 
 logging.getLogger('markdown_it').setLevel(logging.WARNING)
 
-from tangl.core.dispatch import HandlerRegistry
+from tangl.core.dispatch import DispatchRegistry
 from .content_response import ContentResponse
 
 OutputMode = Literal["html", "ascii"]
 
-on_handle_response = HandlerRegistry(aggregation_strategy="pipeline")
+on_handle_response = DispatchRegistry(aggregation_strategy="pipeline")
 
 class ResponseHandler:
 

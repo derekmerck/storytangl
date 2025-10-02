@@ -5,12 +5,12 @@ import random
 
 from pydantic import ConfigDict, Field
 
-from tangl.core.dispatch import DispatchRegistry as HandlerRegistry
+from tangl.core.dispatch import DispatchRegistry as DispatchRegistry
 from .game_handler import GameHandler, Game
 from .enums import GameResult
 
-# opponent_strategies = HandlerRegistry(label='opponent_strategies')
-# scoring_strategies = HandlerRegistry(label='scoring_strategies')
+# opponent_strategies = DispatchRegistry(label='opponent_strategies')
+# scoring_strategies = DispatchRegistry(label='scoring_strategies')
 
 from .game_handler import opponent_strategies, scoring_strategies
 

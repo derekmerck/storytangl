@@ -2,7 +2,7 @@ Terms:
 -----
 - *MediaResource*: binary or text data representing an actual media object (e.g., png file, svg string)
 
-- *ResourceInventoryTag*: a proxy object for a media resource that can be dereferenced to find the location of a media file on the backend server and create the final JournalMediaItem
+- *ResourceInventoryTag*: a proxy object for a media resource that can be dereferenced to find the location of a media file on the backend server and create the final MediaFragment
 
 - *ResourceRegistry*: a handler that maps MediaRef properties and aliases to ResourceInventoryTags
 
@@ -20,16 +20,16 @@ Terms:
 
 Example paths:
 --------------
-`MediaScript w/data -> JournalMediaItem`
+`MediaScript w/data -> MediaFragment`
 
-The very simplest example.  The data for the media is directly embedded in the script.  On rendering, this is copied into into the journal media item when the rendered data is formatted.  No registry is required.
+The very simplest example.  The data for the media is directly embedded in the script.  On rendering, this is copied into the journal media item when the rendered data is formatted.  No registry is required.
 
-`MediaScript w/name -> Registry -> RIT -> JournalMediaItem`
+`MediaScript w/name -> Registry -> RIT -> MediaFragment`
 
 Another simple example.  In the _script_ we create a media node with a name, that name is found in the file registry on 'render', and the url for the journal media item is created when the rendered data is formatted.
 
 ```
-MediaScript w/MediaSpec (-> Registry?, MediaForge?) -> RIT -> JournalMediaItem`
+MediaScript w/MediaSpec (-> Registry?, MediaForge?) -> RIT -> MediaFragment`
 ```
 
 A complicated example.  A _specification_ is embedded in the script.  On rendering the handler checks whether the resource already exists or not, if it has already been created, that RIT is returned, otherwise it is created, registered, and the new RIT is returned to create the final journal media item.

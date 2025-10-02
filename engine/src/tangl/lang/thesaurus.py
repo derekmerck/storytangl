@@ -12,7 +12,7 @@ import pydantic
 import yaml
 
 from tangl.core.singleton import Singleton
-from .pos import PartOfSpeach
+from .pos import PartOfSpeech
 from .pov import PoV
 from .helpers.pattern import conjugate
 from .helpers.adjective_to_adverb import adjective_to_adverb
@@ -28,7 +28,7 @@ class Synset(Singleton):
 
     # _instances: ClassVar[dict[str, Synset]]
 
-    pos: PartOfSpeach  # in general, this should be NN/S, JJ, or VB
+    pos: PartOfSpeech  # in general, this should be NN/S, JJ, or VB
 
     synonyms: set[str] = pydantic.Field(default_factory=set)
     @pydantic.field_validator('synonyms', mode='before')
@@ -47,7 +47,7 @@ class Synset(Singleton):
                             tense: str = "present",
                             aspect: str = "imperfective"):
 
-        if self.pos is not PartOfSpeach.VB:
+        if self.pos is not PartOfSpeech.VB:
             raise TypeError(f"{self.label} is not a verb!")
 
         return {
@@ -55,8 +55,9 @@ class Synset(Singleton):
             for s in self.synonyms_
         }
 
-    def synonyms_vbp(self):
+    def synonyms_vbn(self):
         # past participles from verbs
+        # do not confuse with vbp, which is present non-3rd
         return self.synonyms_conjugated(tense="past")
 
     def synonyms_vbg(self):
@@ -65,9 +66,9 @@ class Synset(Singleton):
 
     def synonyms_rb(self):
         # adverbs from adjectives
-        if self.pos is PartOfSpeach.RB:
+        if self.pos is PartOfSpeech.RB:
             return self.synonyms_
-        elif self.pos is PartOfSpeach.JJ:
+        elif self.pos is PartOfSpeech.JJ:
             return {adverb for adverb in (adjective_to_adverb(s) for s in self.synonyms_) if adverb is not None}
             # return { adjective_to_adverb(s) for s in self.synonyms_ } - {None}
         raise TypeError(f"{self.label} is not an adjective or adverb")
@@ -75,15 +76,17 @@ class Synset(Singleton):
     @functools.cached_property
     def re_pattern(self) -> re.Pattern:
         # pattern = r"(?<=\W)({k})(?=\W|$)".format( k=k )
-        rex = fr"(?<=\W)({['|'.join(self.synonyms)]})(?=\W|$)"
-        return re.compile(rex)
+        # rex = fr"(?<=\W)({['|'.join(self.synonyms)]})(?=\W|$)"
+        parts = [re.escape(s) for s in self.synonyms_]
+        # word-boundary-ish: allow start, non-word, end
+        rex = r"(?<!\w)(" + "|".join(parts) + r")(?!\w)"
+        return re.compile(rex, re.IGNORECASE)
 
     def substitution(self, match: re.Match):
         return "{{" + f"Synset[{self.label}].replace({match[0]})" + "}}"
 
     def re_sub(self, s: str) -> str:
-        s = self.re_pattern.sub(self.re_sub, s)
-        return str(s)
+        return self.re_pattern.sub(self.substitution, s)
 
     def replace(self, match: str):
         return random.choice(list(self.synonyms_))
@@ -108,7 +111,7 @@ class Thesaurus(Singleton):
         res = []
         for pos, _data in data.items():
             for k, v in _data.items():
-                if k not in Synset._instances:
+                if k not in Synset.all_instance_labels():
                     syn = Synset(label=k, pos=pos, synonyms=v)
                     res.append( syn )
                 else:
@@ -119,27 +122,26 @@ class Thesaurus(Singleton):
 
     def nouns(self):
         for s in self.synsets:
-            if s.pos in [ PartOfSpeach.NN, PartOfSpeach.NNS ]:
+            if s.pos in [ PartOfSpeech.NN, PartOfSpeech.NNS ]:
                 yield s
 
     def verbs(self):
         for s in self.synsets:
-            if s.pos is PartOfSpeach.VB:
+            if s.pos is PartOfSpeech.VB:
                 yield s
 
     def adjectives(self):
         for s in self.synsets:
-            if s.pos is PartOfSpeach.JJ:
+            if s.pos is PartOfSpeech.JJ:
                 yield s
 
     def adverbs(self):
         for s in self.synsets:
-            if s.pos in [PartOfSpeach.RB, PartOfSpeach.JJ]:
+            if s.pos in [PartOfSpeech.RB, PartOfSpeech.JJ]:
                 yield s
 
-    @classmethod
-    def prepare(cls, s: str):
-        for syn in cls.synsets:
+    def prepare(self, s: str):
+        for syn in self.synsets:
             s = syn.re_sub(s)
         print(s)
         return s

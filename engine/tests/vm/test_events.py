@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.graph import Graph, Node
-from tangl.vm.events import ReplayWatcher, WatchedRegistry, WatchedEntityProxy, Event, Patch
+from tangl.vm.replay import ReplayWatcher, WatchedRegistry, WatchedEntityProxy, Event, Patch
 
 
 def test_proxy_sets_wrapped_and_emits(graph):

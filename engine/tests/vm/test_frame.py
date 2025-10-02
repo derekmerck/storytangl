@@ -94,9 +94,10 @@ def test_prereq_redirect_and_journal_line():
 
     nxt = frame.follow_edge(AnonymousEdge(source=start, destination=end))  # first hop returns ChoiceEdge on PREREQS
     # After following, step incremented and JOURNAL should run
-    line = frame.run_phase(P.JOURNAL)
+    fragments = frame.run_phase(P.JOURNAL)
     # line = JobReceipt.last_result(*ns.get('results'))
-    print(line)
+    assert len(fragments) == 1
+    line = fragments[0].content
     assert "[step " in line
     assert "end" in line
 

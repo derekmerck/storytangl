@@ -139,7 +139,7 @@ class PersonalName(BaseModel):
             return s
         elif s := self.get_full_name():                             # Jonathan Smith
             return s
-        return self.familiar_full_name()                            # Jack, Jonathan, Smith
+        return self.familiar_name()                            # Jack, Jonathan, Smith
 
     def formal_full_name(self, gender: Gender = None) -> str:
         # Formal titled full_name in most to least formal order

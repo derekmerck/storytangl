@@ -2,11 +2,11 @@ from typing import Self
 
 from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
-from tangl.core.dispatch import DispatchRegistry as HandlerRegistry, HandlerPriority as Priority
+from tangl.core.dispatch import DispatchRegistry as DispatchRegistry, HandlerPriority as Priority
 from .type_hints import Media
 
-on_adapt_media_spec = HandlerRegistry(label="adapt_media_spec", default_aggregation_strategy="pipeline")
-on_create_media = HandlerRegistry(label="create_media", default_aggregation_strategy="first")
+on_adapt_media_spec = DispatchRegistry(label="adapt_media_spec", default_aggregation_strategy="pipeline")
+on_create_media = DispatchRegistry(label="create_media", default_aggregation_strategy="first")
 
 
 class MediaSpec(Entity):

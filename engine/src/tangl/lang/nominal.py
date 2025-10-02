@@ -18,9 +18,15 @@ class DeterminativeType(Enum):
     def use_an(cls, value: str = None):
         if not value:
             return False
+
+        # test for unusual vowels, a unicorn, a use, etc.
+        if value.startswith(("uni", "use", "urol", "ewe")):  # starts with consonant sound
+            return False
         if value[0] in 'aieouy':
             return True
-        if any( value.startswith(x) for x in ['hour', 'honest', 'honor'] ):
+
+        # test for unusual consonants, mostly starts with 'ho'
+        if value.startswith(('hour', 'honest', 'honor', 'hotel', 'host')):
             return True
         return False
 
@@ -121,7 +127,10 @@ class Nominal(BaseModel):
     @classmethod
     def _determine_plurality(cls, data, info: ValidationInfo):
         if data is None:
-            noun = info.data['nouns'][0]
+            nouns = info.data.get('nouns')
+            if not nouns:
+                raise ValueError("Nominal requires at least one noun to infer plurality")
+            noun = nouns[0]
             return is_plural(noun)
         return data
 
