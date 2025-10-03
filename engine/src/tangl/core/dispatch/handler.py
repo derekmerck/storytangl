@@ -42,18 +42,22 @@ class HandlerPriority(IntEnum):
     LAST = 100
 
 
-# Note this is runtime_checkable so Pydantic will allow it as a typehint.
+# Note this is runtime_checkable so Pydantic will allow it as a type-hint.
 # It is not actually validated, so this is purely organizational and the function
 # call will actually admit any type *args.
 @runtime_checkable
 class HandlerFunc(Protocol):
     def __call__(self, caller: Entity, *others: Entity, ctx: Optional[dict] = None, **params: Any) -> Any: ...
-
+    # Variadic args are entities, to support things like __lt__(self, other) or transaction
+    # type calls
+    # `ctx` is a reserved kw arg for Context objects passed by the resolution frame's phase bus
+    # `ns` is also a reserved kw arg for scoped namespace string maps, ns will be pulled from ctx
+    # if ns is not provided but ctx is
 
 @functools.total_ordering
 class Handler(HasSeq, Selectable, Entity):
     """
-    Handler(func: ~typing.Callable[[Entity, dict], typing.Any], priority: int)
+    Handler(func: ~typing.Callable[[Entity, ...], typing.Any], priority: int)
 
     Wrapper around a callable behavior.
 
@@ -70,8 +74,13 @@ class Handler(HasSeq, Selectable, Entity):
 
     API
     ---
-    - :meth:`__call__(caller, *entities, ctx=None, **params)` – invoke with caller and other participating entities, params, and an optional execution context
+    - :meth:`__call__(caller, *entities, ctx=None, ns=None, **params)` – invoke with caller and other participating entities, params, and an optional execution context and namespace (ns)
     - :meth:`get_label` – derive label from func name
+
+    .. admonition:: Reserved Keywords
+
+       `ns` and `ctx` are reserved keyword arguments on the called function signature.  They may be added or manipulated during handler :meth:`__call__` invocation.
+
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
@@ -86,13 +95,26 @@ class Handler(HasSeq, Selectable, Entity):
     def get_label(self) -> str:
         return self.label or self.func.__name__
 
+    # todo: model validator that confirms user didn't try to bind ctx or ns positionally?
+
     def __call__(self,
                  caller: Entity,
                  *others: Entity,
-                 ctx: Optional[dict] = None,
+                 ctx: Optional[Any] = None,
+                 ns: Optional[dict] = None,
                  **params: Any) -> JobReceipt:
+
+        # todo: could check what's named by the handler sig, otherwise
+        #       just consume unnecessary args in phase handlers.
+
+        # get ns from ctx.get_ns if possible, expose ctx for funcs that want to
+        # access frame step variables see tangl.vm.context and tangl.vm.frame
         if ctx is not None:
             params.setdefault("ctx", ctx)
+        if ns is None and ctx and hasattr(ctx, 'get_ns'):
+            ns = ctx.get_ns()
+        if ns is not None:
+            params.setdefault("ns", ns)
 
         receipt_kwargs = dict()
         if hasattr(caller, 'uid'):
@@ -107,7 +129,8 @@ class Handler(HasSeq, Selectable, Entity):
 
         return JobReceipt(blame_id=self.uid,
                           result=self.func(caller, *others, **params),
-                          result_type=self.result_type)
+                          result_type=self.result_type,
+                          **receipt_kwargs)
 
     def __lt__(self, other) -> bool:
         # order by priority, then seq (uncorrelated if handlers are from classes with

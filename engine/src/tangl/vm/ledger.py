@@ -51,11 +51,13 @@ class Ledger(Entity):
         snapshot = records.last(channel="snapshot")
         if snapshot is None:
             graph = Graph()
+            seq = -1
         else:
             graph = snapshot.data   # type: Graph
+            seq = snapshot.seq
         # Get all patches since the most recent snapshot and apply them
         patches = records.find_all(
-            predicate=lambda x: x.seq > snapshot.seq,
+            predicate=lambda x: x.seq > seq,
             channel="patch")
         for p in patches:
             p.apply(graph)

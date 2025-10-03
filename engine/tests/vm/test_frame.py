@@ -10,7 +10,7 @@ def test_global_handlers_visible_in_scope():
     g = Graph(label="x")
     n = g.add_node(label="n1")
     frame = Frame(graph=g, cursor_id=n.uid)
-    ns = frame.get_ns(P.VALIDATE)
+    ns = frame.context.get_ns()
 
     print("Registered")
     for h in global_domain.handlers.values():
@@ -58,13 +58,14 @@ def test_session_follow_edge_updates_cursor_and_stops():
     assert out is None
     assert frame.cursor.uid == n2.uid
 
-def test_session_context_ns_has_phase_and_results():
-    g = Graph()
-    n = g.add_node(label="A")
-    frame = Frame(graph=g, cursor_id=n.uid)
-    ns = frame.get_ns(P.VALIDATE)
-    assert ns["phase"] is P.VALIDATE
-    assert isinstance(ns["results"], list)
+# This is in context now
+# def test_session_context_ns_has_phase_and_results():
+#     g = Graph()
+#     n = g.add_node(label="A")
+#     frame = Frame(graph=g, cursor_id=n.uid)
+#     ns = frame.get_ns(P.VALIDATE)
+#     assert ns["phase"] is P.VALIDATE
+#     assert isinstance(ns["results"], list)
 
 def test_provisioning_create_policy_assigns_provider():
     g = Graph(label="demo")
@@ -108,11 +109,11 @@ def test_rand_is_deterministic_for_same_context():
     g1 = Graph(uid=guid, label="demo")
     a1 = g1.add_node(uid=nuid, label="A")
     s1 = Frame(graph=g1, cursor_id=a1.uid)
-    r1 = [s1.rand.random() for _ in range(3)]
+    r1 = [s1.context.rand.random() for _ in range(3)]
 
     g2 = Graph(uid=guid, label="demo")
     a2 = g2.add_node(uid=nuid, label="A")
     s2 = Frame(graph=g2, cursor_id=a2.uid)
-    r2 = [s2.rand.random() for _ in range(3)]
+    r2 = [s2.context.rand.random() for _ in range(3)]
 
     assert r1 == r2

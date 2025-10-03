@@ -9,6 +9,7 @@ from typing import Protocol
 
 from tangl.core import Entity, Registry
 from .events import Event, EventType
+from .wrapped_collection import WatchedSet, WatchedDict, WatchedList
 
 
 class EventWatcher(Protocol):
@@ -99,6 +100,23 @@ class WatchedEntityProxy(wrapt.ObjectProxy):
 
     def attach_watchers(self, auditors: Iterable[EventWatcher]) -> None:
         self._watchers.extend(auditors)
+
+    def _wrap_value(self, name: str, value):
+        # wrap mutable builtins so we can observe in-place mutations
+        if isinstance(value, dict):
+            return WatchedDict(self, name, value)
+        if isinstance(value, list):
+            return WatchedList(self, name, value)
+        if isinstance(value, set):
+            return WatchedSet(self, name, value)
+        return value
+
+    def __getattr__(self, name: str):
+        # proxy internals
+        if name in ("_watchers", "__wrapped__", "_self_wrapper__", "_wrap_value", "_emit", "EventType"):
+            return super().__getattr__(name)
+        value = getattr(self.__wrapped__, name)
+        return self._wrap_value(name, value)
 
     # todo: need to provide a wrapped collection proxy if getattr returns a
     #       mutable collection like 'locals', collections need to know to return a

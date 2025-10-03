@@ -22,7 +22,7 @@ class Patch(Record):
     @field_validator("events")
     @classmethod
     def _canonicalize_events(cls, data) -> Iterable[Event]:
-        # may want to skip this, or just sort by seq
+        # may want an option just sort by seq instead
         return Event.canonicalize_events(data)
 
     def apply(self, registry: Registry) -> Registry:

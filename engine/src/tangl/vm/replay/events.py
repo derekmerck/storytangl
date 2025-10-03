@@ -4,10 +4,13 @@ from enum import Enum
 from uuid import UUID
 from typing import Any, Iterable, Optional, Literal, Self
 from copy import deepcopy
+import logging
 
 from pydantic import Field
 
 from tangl.core import Entity, Record, Registry
+
+logger = logging.getLogger(__name__)
 
 
 class EventType(Enum):
@@ -222,6 +225,7 @@ class Event(Record):
             EventType.READ:   3,
         }
         kept.sort(key=lambda ev: (type_rank.get(ev.event_type, 99), orig_index.get(id(ev), 10**9)))
+        logger.debug(f"From {len(enumerated)} source events, kept: {len(kept)} canonical events")
         return kept
 
     @classmethod

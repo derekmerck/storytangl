@@ -3,22 +3,21 @@ from __future__ import annotations
 from typing import Iterator, Any
 from uuid import UUID
 import functools
-from enum import Enum
 from dataclasses import dataclass, field
+from random import Random
 
-# from tangl.core import JobReceipt
 from tangl.core.graph import Graph, Node
 from tangl.core.registry import Registry
 from tangl.core.domain import Scope, NS, AffiliateDomain
-from tangl.core.dispatch import Handler
+from tangl.core.dispatch import Handler, JobReceipt
+from tangl.utils.hashing import hashing_func
 
-# todo: is context unnecessary now?  Or is Frame a subclass of Context, like
-#       a context that does stuff?
 
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)
 class Context:
-    # All the working vars to create the 'scope' for a step on the graph
+    # All the working vars to create the 'scope' for a step on the graph and an
+    # audit attribute for receipts to track handler invocations.
 
     # We don't want to mix context into the handler signature, we give handlers a
     # node or a namespace, they return a result, the Frame's job is to track that
@@ -27,7 +26,16 @@ class Context:
 
     graph: Graph
     cursor_id: UUID
+    step: int = -1
     domain_registries: list[Registry[AffiliateDomain]] = field(default_factory=list)
+    job_receipts: list[JobReceipt] = field(default_factory=list)
+
+    @functools.cached_property
+    def rand(self):
+        # Guarantees the same RNG sequence given the same graph.uid, cursor.uid, and step for deterministic replay
+        h = hashing_func(self.graph.uid, self.cursor.uid, self.step, digest_size=8)
+        seed = int.from_bytes(h[:8], "big")
+        return Random(seed)
 
     @property
     def cursor(self) -> Node:
@@ -47,6 +55,7 @@ class Context:
         for d in self.scope.active_domains:
             lines.append(f" - {d.__class__.__name__}:{d.label or d.short_uid()}")
         lines.append("Handlers by phase:")
+        from .frame import ResolutionPhase as P
         for ph in P:
             names = [h.func.__name__ for h in self.scope.get_handlers(phase=ph)]
             lines.append(f"  {ph.name}: {', '.join(names)}")

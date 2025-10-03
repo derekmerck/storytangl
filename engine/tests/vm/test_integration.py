@@ -22,7 +22,7 @@ def test_tiny_integration():
     sess = Frame(graph=g, cursor_id=start.uid)
 
     # drive
-    ns = sess.get_ns(P.VALIDATE)
+    ns = sess.context.get_ns()
     assert sess.run_phase(P.VALIDATE)  # basic sanity
 
     # follow the choice; the loop runs PREREQS -> UPDATE -> JOURNAL -> FINALIZE -> POSTREQS

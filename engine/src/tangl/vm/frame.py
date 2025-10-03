@@ -4,7 +4,7 @@ import functools
 from enum import IntEnum, Enum
 from uuid import UUID
 from dataclasses import dataclass, field
-from copy import deepcopy
+from copy import deepcopy, copy
 import logging
 from random import Random
 
@@ -111,47 +111,35 @@ class Frame:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph, self.cursor_id, self.domain_registries)
+        return Context(graph, self.cursor_id, self.step, self.domain_registries)
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):
             del self.context
 
-    @functools.cached_property
-    def rand(self):
-        # Guarantees the same RNG sequence given the same context for deterministic replay
-        h = hashing_func(self.graph.uid, self.step, self.cursor.uid, digest_size=8)
-        seed = int.from_bytes(h[:8], "big")
-        return Random(seed)
-
-    def get_ns(self, phase: ResolutionPhase) -> NS:
-        base_ns = self.context.get_ns()
-        # The frame itself also provides a ns domain layer
-        frame_layer = {
-            'cursor': self.cursor,
-            'step': self.step,
-            "phase": phase,         # phase annotation for handlers
-            "rand": self.rand,
-            "results": [],          # type: list[JobReceipt]
-        }
-        return base_ns.new_child(frame_layer)
-
     def run_phase(self, phase: P) -> Any:
-        ns = self.get_ns(phase)  # creates context if necessary, resets results
-        # handlers = list(self.context.get_handlers(phase=phase))
-        # receipts = [h(ns) for h in handlers]
+        logger.debug(f'Running phase {phase}')
 
-        # Do it iteratively in ns so a compositor would have access to previous results for pipe
-        # Fix this so we call directly with caller, ctx=ctx and let the handler/wrapper parse out ns properly
+        self.context.job_receipts.clear()
+
         for h in self.context.get_handlers(phase=phase):
-            ns["results"].append(h(ns))  # add the receipt to the result stack
-        receipts = ns["results"]
+            # Do this iteratively and update ctx, so compositors can access piped results
+            receipt = h(self.cursor, ctx=self.context)
+            self.context.job_receipts.append(receipt)
 
         agg_func, result_type = phase.properties()
-        outcome = agg_func(*receipts)
+        outcome = agg_func(*self.context.job_receipts)
+
+        logger.debug(f'Ran {len(self.context.job_receipts)} handlers with final outcome {outcome} under {agg_func.__name__}')
+
+        # todo: generic result type checking is complicated with list[Fragment]
+        #       we also potentially have the declared handler result type if any in the receipts
+        # if outcome and isinstance(result_type, type) and not isinstance(outcome, result_type):
+        #     raise RuntimeError(f"Phase {phase} generated a bad result type: {type(outcome)} but expected {result_type}")
 
         # stash results on the context for review/compositing
-        self.phase_receipts[phase] = receipts
+        self.phase_receipts[phase] = copy(self.context.job_receipts)
+        # copy or it will be cleared on next phase
         self.phase_outcome[phase] = outcome
 
         return outcome
@@ -165,7 +153,7 @@ class Frame:
         # Set a marker on the record stream
         self.records.set_marker(f"step-{self.step:04d}", "frame")
 
-        # Use the destination, not edge.dest_id in case its an anonymous edge
+        # Use the destination, not edge.dest_id in case it is an anonymous edge
         self._invalidate_context()       # updated the anchor, need to rebuild scope
 
         # Make sure that this cursor is allowed
@@ -179,6 +167,7 @@ class Frame:
         # todo: implement j/r redirect stack
         if nxt := self.run_phase(P.PREREQS):  # may set an edge to next cursor
             if isinstance(nxt, Edge):
+                logger.debug(f'Found prereq edge {nxt!r}')
                 return nxt
             else:
                 raise RuntimeError(f"Proposed prereq jump is not a valid edge {type(nxt)}!")
@@ -213,22 +202,20 @@ class Frame:
         # check for postreq cursor redirects
         if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor
             if isinstance(nxt, Edge):
+                logger.debug(f'Found postreq edge {nxt!r}')
                 return nxt
             else:
                 raise RuntimeError(f"Proposed postreq jump is not a valid edge {type(nxt)}!")
 
         return None
 
-    def resolve_choice(self, choice, post_step_hook = None) -> None:
+    def resolve_choice(self, choice: ChoiceEdge) -> None:
         """
         Follows edges until no next edge is returned.
 
-        Call with Ledger.maybe_push_snapshot as the post_step_hook to take intermediate snapshots during a multi-step resolution.
+        Orchestrator should call ledger.snapshot after resolution is complete.
         """
 
         cur = choice
         while cur:
             cur = self.follow_edge(cur)
-
-            if post_step_hook:
-                post_step_hook(self)

@@ -15,7 +15,6 @@ from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
 from tangl.core.record import Record
 
-# todo: given the richer v34 style Handler, we can include caller (args[0]), participants (*args)
 
 class JobReceipt(Record):
     """
@@ -51,8 +50,8 @@ class JobReceipt(Record):
     # Call introspection
     caller_id: Optional[UUID] = None
     other_ids: list[UUID] = None
-    ctx: Any = Field(None, exclude=True)  # never try to serialize or compare this
-    params: Optional[StringMap] = Field(None, exclude=True)  # never try to serialize or compare this
+    ctx: Any = Field(None, exclude=True)  # _never_ try to serialize or compare this
+    params: Optional[StringMap] = Field(None, exclude=True)  # _never_ try to serialize or compare this
 
     @classmethod
     def first_result(cls, *receipts: Self) -> Any | None:
@@ -61,12 +60,20 @@ class JobReceipt(Record):
             if r and r.result:
                 return r.result
         return None
+        # may want to change this to first non-none result as with last result?
 
     @classmethod
     def last_result(cls, *receipts: Self) -> Any | None:
-        """Return the last truthy `result` among `receipts`, else `None`."""
+        """Return the last non-none `result` among `receipts`, else `None`."""
         # this is a PIPE when the last handler is a composer that yields a comprehensive result
-        return cls.first_result(*reversed(receipts))
+        for r in reversed(receipts):
+            if r is not None and r.result is not None:
+                return r.result
+        return None
+        # Returning the reversed(first-truthy) is more succinct here, but fails if the desired
+        # final result is Falsy, like [] for an empty compositor step would be _skipped_, and
+        # then the most recent Truthy result from the pipe would be returned instead.
+        # return cls.first_result(*reversed(receipts))
 
     @classmethod
     def any_truthy(cls, *receipts: Self) -> bool:
