@@ -11,9 +11,9 @@ from pydantic import Field
 
 from tangl.type_hints import Tags
 from tangl.entity.mixins import HasNamespace
-from tangl.graph import Node
+from tangl.core import Node
 from tangl.graph.mixins import UsesPlugins
-from tangl.lang.has_personal_name import HasPersonalName
+from tangl.lang.personal_name import PersonalName
 from tangl.lang.gens import Gens
 from tangl.entity.mixins import NamespaceHandler
 

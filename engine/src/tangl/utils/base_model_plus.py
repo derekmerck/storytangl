@@ -2,6 +2,7 @@
 from functools import total_ordering
 from typing import Any, Self, Type, Iterator, ClassVar
 import logging
+from uuid import uuid4
 
 from pydantic import BaseModel, field_validator, field_serializer, FieldValidationInfo, model_validator, Field
 
@@ -114,6 +115,18 @@ class BaseModelPlus(BaseModel):
     #     data = self.model_dump()
     #     s = yaml.dump(data, default_flow_style=False)
     #     return s
+
+    def evolve(self, **kwargs) -> Self:
+        """Create an updated copy of this model."""
+        # This does NOT validate the update attribs
+        kwargs['uid'] = uuid4()
+        return self.model_copy(update=kwargs, deep=True)
+
+    def update_attrs(self, **kwargs):
+        """Update attributes of this model in place."""
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
 
 @total_ordering
 class HasSeq(BaseModel):

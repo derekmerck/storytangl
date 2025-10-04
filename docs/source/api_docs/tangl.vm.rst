@@ -8,7 +8,7 @@ tangl.vm
 
 Resolver
 --------
-.. autoclass:: tangl.vm.Phase
+.. autoclass:: tangl.vm.ResolutionPhase
 .. autoclass:: tangl.vm.Frame
 .. autoclass:: tangl.vm.Ledger
 
@@ -21,7 +21,7 @@ Planning
 .. autoclass:: tangl.vm.Affordance
 .. autoclass:: tangl.vm.Provisioner
 
-.. _vm-event:
+.. _vm-events:
 
 Event Sourced
 -------------

@@ -1,7 +1,7 @@
 # tangl/vm/__init__.py
 
 # Event sourced state manager
-from .replay import Event, EventType, EventWatcher
+from .replay import Event, EventType, EventWatcher, Patch
 
 # Provisioning
 from .planning import Requirement, Provisioner, Dependency, Affordance, ProvisioningPolicy

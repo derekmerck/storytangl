@@ -45,7 +45,7 @@ class Provisioner:
         provider = self._resolve_existing(provider_id, provider_criteria)
         if not provider:
             return None
-        provider.update(**update_template)
+        provider.update_attrs(**update_template)
         return provider
 
     def _resolve_clone(self,

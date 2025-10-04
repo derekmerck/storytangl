@@ -153,7 +153,15 @@ class Registry(Entity, Generic[VT]):
     def select_one_for(self, selector: Entity) -> Optional[VT]:
         return next(self.select_for(selector), None)
 
-    # chain select?
+    @classmethod
+    def chain_select_for(cls, *registries: Self, selector: Entity) -> Iterator[VT]:
+        iter_values = itertools.chain.from_iterable(
+            r.select_for(selector) for r in registries)
+        yield from iter_values
+
+    @classmethod
+    def chain_select_one_for(cls, *registries: Self, selector: Entity) -> Optional[VT]:
+        return next(cls.chain_select_for(*registries, selector=selector), None)
 
     # -------- DELEGATE MAPPING METHODS -----------
 

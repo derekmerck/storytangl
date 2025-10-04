@@ -19,7 +19,7 @@ class SingletonNode(Node, Generic[WrappedType]):
     """
     SingletonNode(from_ref: UniqueStr)
 
-    Graph node wrapper that attaches a :class:`Singleton` to a graph with node-local state.
+    Graph node wrapper that attaches a :class:`~tangl.core.Singleton` to a graph with node-local state.
 
     Why
     ----

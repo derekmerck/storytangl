@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.graph import Graph, Node
-from tangl.vm.replay import ReplayWatcher, WatchedRegistry, WatchedEntityProxy, Event, Patch
+from tangl.vm.replay import ReplayWatcher, WatchedRegistry, WatchedEntityProxy, EventType, Patch
 
 
 def test_proxy_sets_wrapped_and_emits(graph):
@@ -77,7 +77,6 @@ def test_event_replay_is_idempotent():
     g2 = p.apply(g)
     assert g1.find_one(label="Z") and g2.find_one(label="Z")
 
-@pytest.mark.xfail(reason="haven't decided where to keep locals yet and need a watched mapping proxy")
 def test_proxy_nested_attribute_update_records():
     # When a Node has a dict-like locals, ensure nested set emits UPDATE
     g = Graph()
@@ -88,5 +87,32 @@ def test_proxy_nested_attribute_update_records():
 
     p.locals["color"] = "red"  # __setitem__ path
     assert w.events[-1].event_type.name == "UPDATE"
-    assert w.events[-1].name == "locals.color"
-    assert w.events[-1].value == "red"
+    assert w.events[-1].name == "locals"
+    assert w.events[-1].value == {"color": "red"}
+
+
+def test_patch_state_hash_mismatch_raises():
+    g = Graph(label="demo"); n = g.add_node(label="A")
+    # wrong baseline hash
+    bad_hash = b'\x00'*32
+    w = ReplayWatcher(); wg = WatchedRegistry(wrapped=g, watchers=[w]); wg.get(n.uid).label = "B"
+
+    # Can apply with correct hash
+    p = Patch(events=w.events, registry_id=g.uid, registry_state_hash=g._state_hash())
+    p.apply(g)
+
+    # Raises with incorrect hash
+    pb = Patch(events=w.events, registry_id=g.uid, registry_state_hash=bad_hash)
+    with pytest.raises(ValueError):
+        pb.apply(g)
+
+def test_entity_proxy_nested_collection_emits_top_level_update(graph):
+    g = graph
+    n = g.add_node(label="X")
+    n.__dict__["locals"] = {"a": {"b": 0}}
+    w = ReplayWatcher()
+    p = WatchedEntityProxy(n, [w])
+    p.locals["a"]["b"] = 1
+    assert w.events[-1].event_type == EventType.UPDATE  # adjust if attribute name
+    assert w.events[-1].name == "locals"
+    assert w.events[-1].value == {"a": {"b": 1}}

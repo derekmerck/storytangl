@@ -37,6 +37,14 @@ class Event(Record):
     old_value: Any | None = None
 
     def apply(self, registry: Registry) -> None:
+        """
+        DELETE is overloaded:
+        - remove node: DELETE(name=None, value=<uid|entity|dict>)
+        - del attribute: DELETE(name="attr", value=None)
+        CREATE is always an 'add'
+        UPDATE is always 'setattr'
+        READ is non-mutating and ignored
+        """
         if not isinstance(registry, Registry):
             raise TypeError("Event.apply should be called directly on a Registry")
         if self.source_id == registry.uid:

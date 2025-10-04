@@ -2,44 +2,53 @@ import yaml
 import re
 from functools import partial
 
+# Some neutrals noted when not the masc form
+# Words with substrings
+# - man/woman -> person, i.e., chairperson
+# - son/daughter -> child, i.e., grandchild
+
 gendered_nominals_ = """
 - [ abbot, abbess ]
 - [ actor, actress ]
 - [ asshole, bitch ]
 - [ bachelor, maiden ]
-- [ barman, barmaid ]
+- [ barman, barmaid ]  # n: bartender
 - [ baron, baroness ]
-- [ boy, girl ]
-- [ brother, sister ]
-- [ bull, cow ]
+- [ boar, sow ]        # n: pig
+- [ boy, girl ]        # n: child
+- [ brother, sister ]  # n: sibling
+- [ buck, doe ]        # n: deer
+- [ bull, cow ]        # n: cow, heifer - young female before breeding
 - [ chairman, chairwoman ]
-- [ cock, hen ]
+- [ cock, hen ]        # n: bird
+- [ colt, filly ]      # n: foal
 - [ count, countess ]
 - [ czar, czarina ]
-- [ dad, mom ]
-- [ daddy, mommy ]
+- [ dad, mom ]       
+- [ daddy, mommy ]     # todo: check if this can match, superset of dad/mom
 - [ dog, bitch ]
-- [ drake, duck ]
+- [ drake, duck ]      # n: duck
 - [ duke, duchess ]
 - [ earl, countess ]
 - [ emperor, empress ]
 - [ enchanter, enchantress ]
-- [ father, mother ]
-- [ father general, mother superior ]
-- [ gander, goose ]
+- [ father, mother ]  # n: parent
+- [ father general, mother superior ]   # todo: check if this can match, superset of father/mother
+- [ gander, goose ]   # n: goose
 - [ gentleman, lady ]
 - [ giant, giantess ]
 - [ god, goddess ]
 - [ grandfather, grandmother ]
+- [ grandson, granddaughter ]
 - [ groom, bride ]
 - [ guy, chick ]
-- [ hart, roe ]
+- [ hart, hind ]      # n: deer
 - [ headmaster, headmistress ]
 - [ hero, heroine ]
 - [ host, hostess ]
 - [ hunter, huntress ]
 - [ husband, wife ]
-- [ incubus, succubus ]
+- [ incubus, succubus ]  # n: succubus
 - [ jew, jewess ]
 - [ king, queen ]
 - [ landlord, landlady ]
@@ -49,8 +58,9 @@ gendered_nominals_ = """
 - [ man, woman ]
 - [ men, women ]
 - [ marquis, marchioness ]
-- [ masculine, feminine ]
+- [ masculine, feminine ]  # n: non-binary?
 - [ master, mistress ]
+- [ patriarch, matriarch ]
 - [ mister, miss ]
 - [ monk, nun ]
 - [ moor, moura ]
@@ -63,18 +73,19 @@ gendered_nominals_ = """
 - [ priest, priestess ]
 - [ prince, princess ]
 - [ samurai, onna-musha ]
+- [ satyr, nymph ]
 - [ signor, signora ]
 - [ sir, miss ]            # wanted to use ma'am, but the apostrophe confuses the system
 - [ son, daughter ]
-- [ stag, hind ]
+- [ stag, hind ]           # n: deer, alternate for hart/hind, todo: check duplicate pair behavior
 - [ steward, maid ]
 - [ sultan, sultana ]
-- [ taikomochi, geisha ]    # masculine is 'jester'
+- [ taikomochi, geisha ]   # n: geisha, masculine means 'jester'
 - [ tempter, temptress ]
 - [ tiger, tigress ]
 - [ uncle, aunt ]
 - [ viscount, viscountess ]
-- [ waiter, waitress ]
+- [ waiter, waitress ]     # n: server
 - [ wallet, purse ]
 - [ widower, widow ]
 - [ wizard, witch ]

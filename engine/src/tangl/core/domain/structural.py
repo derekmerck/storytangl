@@ -6,8 +6,12 @@
 # domains, which are frozen because they may be shared across all stories
 from typing import Iterator
 
-from tangl.core.graph import Subgraph, Node
+from tangl.core.graph import Subgraph, Node, Graph  # Graph for pydantic
 from .domain import Domain
+
+class DomainGraph(Graph, Domain):
+    """A graph that provides a structural domain for registered items"""
+    ...
 
 class DomainSubgraph(Subgraph, Domain):
     """A subgraph that provides a structural domain for member items"""

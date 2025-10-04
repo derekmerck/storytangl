@@ -68,8 +68,8 @@ class Scope(Entity):
                 return True
             return False
 
-        # order as [ anchor -> nearest ancestors ]
-        items = [anchor, *getattr(anchor, "ancestors", lambda: [])()]
+        # order as [ anchor -> nearest ancestors -> graph ]
+        items = [anchor, *getattr(anchor, "ancestors", lambda: [])(), anchor.graph]
 
         for item in items:
             # 1) Include structural domain ancestors
@@ -101,4 +101,4 @@ class Scope(Entity):
         return self.merge_vars(*self.active_domains)
 
     def get_handlers(self, **criteria) -> Iterator[Handler]:
-        return Registry.chain_find_all(*(d.handlers for d in self.active_domains), **criteria)
+        return Registry.chain_find_all(*(d.handlers for d in self.active_domains), **criteria, sort_key=lambda x: (x.priority, x.seq))

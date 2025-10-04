@@ -1,4 +1,5 @@
 # tangl/vm/ledger.py
+from typing import TYPE_CHECKING
 from pydantic import Field
 from copy import deepcopy
 from uuid import UUID
@@ -6,6 +7,9 @@ from uuid import UUID
 from tangl.core import Entity, Graph, Node, Domain
 from tangl.core.record import Record, StreamRegistry
 from .frame import Frame
+
+if TYPE_CHECKING:
+    from .replay import Patch
 
 class Ledger(Entity):
     """
@@ -26,6 +30,8 @@ class Ledger(Entity):
     graph: Graph = None
     cursor_id: UUID = None
     step: int = -1
+    # todo: should consider this and Frame as kinds of explicit structural domains, get
+    #       rid of lists of domains and add explicitly inherited domains to the scope?
     domains: list[Domain] = Field(default_factory=list)
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
@@ -44,23 +50,20 @@ class Ledger(Entity):
 
     @classmethod
     def recover_graph_from_stream(cls, records: StreamRegistry) -> Graph:
-        # If this is event sourced, we aren't persisting the graph attrib and might
-        # point to this with a cached property
 
         # Get the most recent snapshot
         snapshot = records.last(channel="snapshot")
         if snapshot is None:
-            graph = Graph()
-            seq = -1
-        else:
-            graph = snapshot.data   # type: Graph
-            seq = snapshot.seq
+            raise RuntimeError(f"No snapshot found in record stream")
+
+        graph = snapshot.data   # type: Graph
+        seq = snapshot.seq
         # Get all patches since the most recent snapshot and apply them
         patches = records.find_all(
             predicate=lambda x: x.seq > seq,
-            channel="patch")
+            has_channel="patch")  # type: list[Patch]
         for p in patches:
-            p.apply(graph)
+            graph = p.apply(graph)
         return graph
 
     def get_journal(self, marker_name: str):

@@ -102,6 +102,14 @@ def test_prereq_redirect_and_journal_line():
     assert "[step " in line
     assert "end" in line
 
+def test_postreq_redirect():
+    g = Graph(); a = g.add_node(label="A"); b = g.add_node(label="B")
+    ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid, trigger_phase=P.POSTREQS)
+    f = Frame(graph=g, cursor_id=a.uid)
+    nxt = f.follow_edge(AnonymousEdge(source=a, destination=b))
+    assert nxt is None  # but ensure POSTREQS found and would have been returned if available
+    # Or directly assert f.run_phase(P.POSTREQS) returns the ChoiceEdge
+
 def test_rand_is_deterministic_for_same_context():
     guid = uuid.uuid4()
     nuid = uuid.uuid4()
@@ -117,3 +125,27 @@ def test_rand_is_deterministic_for_same_context():
     r2 = [s2.context.rand.random() for _ in range(3)]
 
     assert r1 == r2
+
+def test_local_domain():
+    from tangl.core import Domain
+    g = Graph(); n = g.add_node(label="A", tags="domain:local_domain")
+    f = Frame(graph=g, cursor_id=n.uid)
+    assert isinstance(f.local_domain, Domain)
+
+    lines = f.context.inspect_scope()
+    print(lines)
+
+def test_journal_empty_is_persisted_as_empty_list():
+    g = Graph(); n = g.add_node(label="A", tags="domain:local_domain")
+    f = Frame(graph=g, cursor_id=n.uid)
+    # Add a compositor that returns []
+    def empty_fragments(*args, ctx, **kw): return []
+    # This works, but it will pollute global handlers permanently and we have no reset func
+    # global_domain.handlers.register(phase=P.JOURNAL, priority=999)(empty_fragments)
+    f.local_domain.handlers.register(phase=P.JOURNAL, priority=999)(empty_fragments)
+    f._invalidate_context()
+    import logging
+    logging.debug( f.context.inspect_scope() )
+    frags = f.run_phase(P.JOURNAL)
+    # Decide your policy: if you want to persist empties:
+    assert isinstance(frags, list) and frags == []

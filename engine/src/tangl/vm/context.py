@@ -6,6 +6,7 @@ import functools
 from dataclasses import dataclass, field
 from random import Random
 
+from tangl.type_hints import Hash
 from tangl.core.graph import Graph, Node
 from tangl.core.registry import Registry
 from tangl.core.domain import Scope, NS, AffiliateDomain
@@ -19,7 +20,7 @@ class Context:
     # All the working vars to create the 'scope' for a step on the graph and an
     # audit attribute for receipts to track handler invocations.
 
-    # We don't want to mix context into the handler signature, we give handlers a
+    # We don't want to mix context details into the handler signature, we give handlers a
     # node or a namespace, they return a result, the Frame's job is to track that
     # via a context object, context is persistent across phases, although the graph itself
     # may be mutated or recreated
@@ -29,6 +30,11 @@ class Context:
     step: int = -1
     domain_registries: list[Registry[AffiliateDomain]] = field(default_factory=list)
     job_receipts: list[JobReceipt] = field(default_factory=list)
+    initial_state_hash: Hash = None
+
+    def __post_init__(self):
+        # Set initial hash on frozen object
+        object.__setattr__(self, "initial_state_hash", hashing_func(self.graph._state_hash()))
 
     @functools.cached_property
     def rand(self):
@@ -51,9 +57,14 @@ class Context:
                      domain_registries=self.domain_registries)
 
     def inspect_scope(self) -> str:
-        lines = ["Active domains:"]
+        lines = []
+        lines.append(f"Available domains:")
+        for dr in self.domain_registries:
+            for d in dr.values():
+                lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
+        lines.append("Active domains:")
         for d in self.scope.active_domains:
-            lines.append(f" - {d.__class__.__name__}:{d.label or d.short_uid()}")
+            lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
         lines.append("Handlers by phase:")
         from .frame import ResolutionPhase as P
         for ph in P:

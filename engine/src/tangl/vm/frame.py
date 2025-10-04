@@ -96,6 +96,14 @@ class Frame:
             self.domain_registries = [Registry()]
         return self.domain_registries[0]
 
+    @property
+    def local_domain(self) -> AffiliateDomain:
+        local_domain = self.domain_registry.find_one(label="local_domain")
+        if local_domain is None:
+            local_domain = AffiliateDomain(label="local_domain")
+            self.domain_registry.add(local_domain)
+        return local_domain
+
     def get_preview_graph(self):
         # create a disposable preview graph from the current event buffer
         _graph = deepcopy(self.graph)
@@ -193,7 +201,7 @@ class Frame:
             patch = Patch(
                 events=self.event_watcher.events,
                 registry_id=self.graph.uid,
-                registry_state_hash=self.graph._state_hash()
+                registry_state_hash=self.context.initial_state_hash,
             )
             self.records.add_record(patch)
             # ready for next frame

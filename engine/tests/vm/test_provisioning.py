@@ -3,10 +3,57 @@ import uuid
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.graph import Graph
-from tangl.vm.planning import Provisioner, Requirement
+from tangl.core import Graph, Node
+from tangl.vm.planning import Provisioner, Requirement, ProvisioningPolicy
+from tangl.vm.planning.open_edge import Dependency
+from tangl.vm.frame import Frame, ResolutionPhase as P
+
 
 # ---------- Provisioning orchestration ----------
+
+def _frame_with_cursor():
+    g = Graph(label="demo")
+    n = g.add_node(label="anchor")
+    return g, n
+
+def test_provision_existing_success():
+    g, n = _frame_with_cursor()
+    target = g.add_node(label="T")
+    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.EXISTING, identifier="T")
+    Dependency[Node](graph=g, source_id=n.uid, requirement=req, label="needs_T")
+    frame = Frame(graph=g, cursor_id=n.uid)
+    frame.run_phase(P.PLANNING)
+    assert req.satisfied and req.provider is target
+
+def test_provision_existing_failure_sets_unresolvable():
+    g, n = _frame_with_cursor()
+    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.EXISTING, identifier="missing")
+    Dependency[Node](graph=g, source_id=n.uid, requirement=req)
+    frame = Frame(graph=g, cursor_id=n.uid)
+    frame.run_phase(P.PLANNING)
+    assert req.is_unresolvable and not req.satisfied
+
+def test_provision_update_modifies_existing():
+    g, n = _frame_with_cursor()
+    target = g.add_node(label="T")
+    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.UPDATE,
+                            identifier="T", template={"label": "T2"})
+    Dependency[Node](graph=g, source_id=n.uid, requirement=req)
+    frame = Frame(graph=g, cursor_id=n.uid)
+    frame.run_phase(P.PLANNING)
+    assert req.satisfied and target.label == "T2"
+
+def test_provision_clone_produces_new_uid():
+    g, n = _frame_with_cursor()
+    ref = g.add_node(label="Ref")
+    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.CLONE,
+                            identifier="Ref", template={"label": "RefClone"})
+    Dependency[Node](graph=g, source_id=n.uid, requirement=req)
+    frame = Frame(graph=g, cursor_id=n.uid)
+    frame.run_phase(P.PLANNING)
+    assert req.satisfied and req.provider.label == "RefClone"
+    assert req.provider.uid != ref.uid and req.provider in g
+
 
 @pytest.mark.xfail(reason="not working")
 def test_provisioner_runs_offers_with_ns_and_returns_job_receipts():
