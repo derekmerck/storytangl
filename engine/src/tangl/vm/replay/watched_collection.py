@@ -1,10 +1,10 @@
-# tangl/vm/collections.py
+# tangl/vm/watched_collection.py
 from __future__ import annotations
 from collections.abc import MutableMapping, MutableSequence, MutableSet
 from typing import Any, Iterable
 
 from copy import deepcopy
-from .events import EventType
+from .event import EventType
 
 # Event plumbing is provided by WatchedEntityProxy._emit(EventType.UPDATE, name=attr, value=value)
 # We keep a tiny shared mixin to normalize "emit an UPDATE with a deep snapshot of current value".

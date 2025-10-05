@@ -1,4 +1,14 @@
 # tangl/vm/open_edge.py
+"""
+Open edges: Dependencies and Affordances.
+
+These edge types carry a :class:`~tangl.vm.planning.requirement.Requirement`
+instead of a fixed endpoint, allowing the planner to *provision* structure
+on demand at the frontier.
+
+- :class:`Dependency` has a fixed **source** and an open **destination**.
+- :class:`Affordance` has an open **source** and a fixed **destination**.
+"""
 from typing import Generic
 
 from tangl.core.graph import Edge, Graph
@@ -13,18 +23,30 @@ from .requirement import Requirement, NodeT
 
 class Dependency(Edge, Generic[NodeT]):
     """
-    Dependencies are edges with defined sources and open destinations.  For example, a
-    node might _require_ a green friend node before it can be used.
+    Dependency(source: Node, requirement: Requirement)
 
-    Open/unresolved dependencies at the solution frontier will be provisioned, if possible,
-    by the resolver.
+    Why
+    ----
+    Represents a structural requirement flowing *out of* a node. The planner attempts
+    to bind a provider node (destination) that satisfies the attached
+    :class:`~tangl.vm.planning.requirement.Requirement`.
 
-    Dependencies may be hard (default, node is unsatisfied if they cannot be resolved) or soft
-    (provide if possible), and they may be restricted to only existing nodes, or using indirect
-    providers to create and introduce a new node.
+    Key Features
+    ------------
+    * **Open destination** – :attr:`source` is fixed, :attr:`destination` resolved dynamically.
+    * **Requirement projection** – exposes requirement into the source namespace.
+    * **Hard vs soft** – hard dependencies must be satisfied, soft ones may be waived.
+    * **Provisioning** – unresolved dependencies at the frontier may trigger creation of new nodes.
 
-    Hard dependencies may also carry their own fallback builder or waiver for when no
-    satisfactory pre-existing direct or indirect provider is available.
+    API
+    ---
+    - :attr:`requirement` – :class:`~tangl.vm.planning.requirement.Requirement` for the target node.
+    - :attr:`destination` – bound provider node, or ``None`` until resolved.
+    - :attr:`satisfied` – True if bound or soft.
+
+    Notes
+    -----
+    Hard dependencies may include a fallback builder or waiver when no provider is available.
     """
     # dependencies project into the ns of their **source** as {self.label: self.destination}
     requirement: Requirement[NodeT]
@@ -44,28 +66,32 @@ class Dependency(Edge, Generic[NodeT]):
 
 class Affordance(Edge, Generic[NodeT]):
     """
-    Affordances are edges with defined destinations and open sources.  For example, a node may
-    be available from any other node that has a green friend node available.
+    Affordance(destination: Node, requirement: Requirement)
 
-    Affordances are the inverse of a dependency.  A _satisfied_ dependency of node becomes a
-    _satisfied_ affordance for the destination, and vice versa.
+    Why
+    ----
+    The inverse of :class:`Dependency`. Affordances make a destination node *available*
+    whenever conditions are met, optionally pre‑creating a preferred source provider.
 
-    Affordances represent nodes that become available whenever conditions are met.
+    Key Features
+    ------------
+    * **Open source** – :attr:`destination` is fixed, :attr:`source` resolved dynamically.
+    * **Requirement projection** – exposes requirement into the destination namespace.
+    * **Soft by default** – missing sources do not block resolution unless marked hard.
+    * **Pre‑creation** – hard affordances may pre‑instantiate sources that will later link.
 
-    Like dependencies, they can be marked soft (default, provide if possible) or hard (critical,
-    paths will be unavailable if resources cannot be created or linked).
+    API
+    ---
+    - :attr:`requirement` – :class:`~tangl.vm.planning.requirement.Requirement` describing the provider.
+    - :attr:`source` – bound provider node, or ``None`` until resolved.
+    - :attr:`satisfied` – True if bound or soft.
 
-    _All_ affordances in the scope (i.e., visible to this node) will be tested _against_ the
-    frontier to see if they can be linked. This is usually to present choices or resources that
-    follow an entity, like a character avatar that is always available in that character's dialogs,
-    or choices that become active whenever specific conditions are met.
-
-    Hard affordances in the scope with a satisfied indirect provider (i.e., a new source
-    resource can be immediately linked) may also pre-create a source that will have priority
-    when linked later.  For example, to pre-cast a particular character that will be available
-    everywhere in a scene.
+    Notes
+    -----
+    Affordances are tested against the frontier to reveal available resources or choices
+    (e.g., characters, items, or conditional dialog options).
     """
-    # affordances project into the ns of the **destination** as {self.label: self.source}
+    # affordances project into the ns of the **source** as {self.label: self.destination}
 
     requirement: Requirement[NodeT]
     # note, default `hard_requirement` should be False

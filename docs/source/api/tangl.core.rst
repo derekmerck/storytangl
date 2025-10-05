@@ -33,6 +33,7 @@ Artifacts
 ---------
 .. autoclass:: tangl.core.Record
 .. autoclass:: tangl.core.StreamRegistry
+.. autoclass:: tangl.core.Snapshot
 .. autoclass:: tangl.core.BaseFragment
 
 .. _core-dispatch:

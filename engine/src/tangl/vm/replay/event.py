@@ -1,4 +1,10 @@
-# tangl/vm/replay/events.py
+"""
+Event model and replay utilities
+-------------------------------
+CRUD-typed events capture mutations to registries and entities. Utilities
+canonicalize event streams (drop redundant updates, keep structural endpoints)
+and replay them against a :class:`~tangl.core.Registry`.
+"""
 from __future__ import annotations
 from enum import Enum
 from uuid import UUID
@@ -14,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 
 class EventType(Enum):
+    """
+    CRUD event kinds with a stable application precedence.
+
+    Why
+    ----
+    Provides a deterministic sort order for replay and canonicalization. Lower
+    numbers are applied first; see :meth:`apply_order`.
+
+    Key Features
+    ------------
+    * **Canonical order** – ``DELETE < CREATE < UPDATE < READ``.
+    * **Replay tie-breaker** – combined with causal index to make ordering stable.
+
+    API
+    ---
+    - :meth:`apply_order` – integer rank (lower means earlier apply).
+    """
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -27,7 +50,41 @@ class EventType(Enum):
         return _ORDER[self]
 
 class Event(Record):
-    # Records b/c they are persisted, structured, unstructured
+    """
+    Event(event_type: EventType, source_id: ~uuid.UUID, name: str, value: Any)
+
+    Immutable mutation record for registries and their members.
+
+    Why
+    ----
+    Encodes create/read/update/delete operations in a replayable form. Event
+    streams can be canonicalized to remove redundant updates and then applied to a
+    :class:`~tangl.core.Registry` to reconstruct state.
+
+    Key Features
+    ------------
+    * **Typed** – :attr:`event_type` is one of :class:`EventType` (CRUD).
+    * **Source-aware** – :attr:`source_id` identifies the target registry or entity.
+    * **Attribute ops** – :attr:`name` and :attr:`value` capture setattr/delattr semantics.
+    * **Canonicalization** – :meth:`canonicalize_events` drops superseded updates and
+      preserves structural endpoints.
+    * **Replay** – :meth:`apply` mutates a registry; :meth:`apply_all` replays a stream
+      against a copy, preserving the original.
+
+    API
+    ---
+    - :meth:`apply(registry)<apply>` – apply this event.
+    - :meth:`canonicalize_events(events)<canonicalize_events>` – return a reduced, stable-ordered stream.
+    - :meth:`apply_all(events, registry)<apply_all>` – return a mutated copy after replay.
+
+    Notes
+    -----
+    ``DELETE`` is overloaded:
+      - Node remove: ``DELETE(name=None, value=<uid|entity|dict>)``
+      - Attribute delete: ``DELETE(name='attr', value=None)``
+
+    ``READ`` is non-mutating and ignored during apply.
+    """
     record_type: Literal['event'] = 'event'
     event_type: EventType = Field(...)
 
@@ -75,8 +132,9 @@ class Event(Record):
                 else:
                     raise ValueError("Must have a attrib name or a value-key for remove")
 
-    # todo: this should get pulled out and switched by a flag in patch, perhaps with other
-    #       patch representations, like dict-diff and no wrapped/observed object for comparison.
+    # todo: this works, but it is painfully overengineered and maybe should get pulled
+    #       out and switched on by a flag in patch, perhaps with other patch representations,
+    #       like dict-diff and raw-sorted for comparison.
     @classmethod
     def canonicalize_events(cls, events: Iterable[Event]) -> Iterable[Event]:
         """

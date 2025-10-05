@@ -1,4 +1,14 @@
 # tangl/vm/planning/offer.py
+"""
+Offers and planning receipts.
+
+An :class:`Offer` is an *ephemeral* proposal to satisfy a
+:class:`~tangl.vm.planning.requirement.Requirement`. Accepting an offer calls
+its provisioner, which may mutate the graph. When event-sourcing is enabled,
+those mutations are captured as events and later collapsed into a patch.
+
+This module also defines receipts used to summarize planning outcomes.
+"""
 from typing import Optional, Literal, Self
 from uuid import UUID
 
@@ -12,6 +22,32 @@ from .open_edge import Requirement
 from .provisioning import Provisioner, ProvisioningPolicy
 
 class BuildReceipt(JobReceipt):
+    """
+    BuildReceipt(requirement: Requirement, op_kind: str)
+
+    Receipt returned by :meth:`Offer.accept`.
+
+    Why
+    ----
+    Captures the outcome of attempting to satisfy a single requirement: which
+    provider was bound (if any), what operation was implied, and whether the
+    offer was accepted.
+
+    Key Features
+    ------------
+    * **Typed record** – ``record_type='build_receipt'`` for stream filtering.
+    * **Provider binding** – references both requirement and chosen provider ids.
+    * **Operation summary** – one of ``attach/create/update/clone/noop``.
+    * **Diagnostics** – ``accepted`` flag and optional ``reason`` (e.g. ``'unresolvable'``).
+
+    API
+    ---
+    - :attr:`requirement_id` – requirement satisfied (or attempted).
+    - :attr:`provider_id` – chosen/created/updated/cloned node id.
+    - :attr:`operation` – operation kind string.
+    - :attr:`accepted` – ``False`` when no provider could be produced.
+    - :attr:`reason` – optional diagnostic text.
+    """
     record_type: Literal['build_receipt'] = Field('build_receipt', alias='type')
     requirement_id: UUID | None = None
     provider_id: UUID | None = None
@@ -21,9 +57,30 @@ class BuildReceipt(JobReceipt):
 
 class Offer(Entity, Selectable):
     """
-    An Offer proposes a concrete way to satisfy a Requirement (e.g., attach an
-    existing node, create/clone/update then attach). Accepting the offer performs
-    the mutation (captured by watchers if event-sourced) and returns a BuildReceipt.
+    Offer(requirement, provisioner, *, priority=50, hard=True)
+
+    Why
+    ----
+    Ephemeral proposal to satisfy a :class:`~tangl.vm.planning.requirement.Requirement`
+    via a :class:`~tangl.vm.planning.provisioning.Provisioner`. Offers are compared
+    and selected by priority; acceptance invokes the provisioner and yields a
+    :class:`BuildReceipt`.
+
+    Key Features
+    ------------
+    * **Arbitration** – :attr:`priority` (lower wins) and :attr:`hard` semantics for selectors.
+    * **Selectable** – publishes :attr:`selection_criteria` for inverse matching.
+    * **Provisioning hook** – delegates to :class:`Provisioner.resolve` which may mutate the graph.
+    * **Auditable** – :meth:`accept` returns a :class:`BuildReceipt` with provider/operation.
+
+    API
+    ---
+    - :attr:`requirement` – target requirement being satisfied.
+    - :attr:`provisioner` – default provider logic (domain builders may override).
+    - :attr:`priority` – integer priority; lower numbers run earlier.
+    - :attr:`hard` – mirrors ``requirement.hard_requirement``.
+    - :attr:`selection_criteria` – hints for higher-order selectors.
+    - :meth:`accept(ctx)<accept>` – apply provisioner, bind provider, and return a receipt.
     """
     requirement: Requirement = Field(...)
     provisioner: Provisioner = Field(...)
@@ -67,6 +124,28 @@ class Offer(Entity, Selectable):
 
 
 class PlanningReceipt(JobReceipt):
+    """
+    PlanningReceipt()
+
+    Final consolidated outcome of :data:`~tangl.vm.frame.ResolutionPhase.PLANNING`.
+
+    Why
+    ----
+    Aggregates a set of :class:`BuildReceipt` results to summarize what planning
+    accomplished and which hard requirements remain unresolved.
+
+    Key Features
+    ------------
+    * **Counts by operation** – created/updated/cloned/attached tallies.
+    * **Unresolved tracking** – list of hard requirement ids still unsatisfied.
+    * **Typed record** – ``record_type='planning_receipt'`` for stream filtering.
+
+    API
+    ---
+    - :meth:`summarize(*builds)<summarize>` – collapse multiple build receipts into one summary.
+    - :attr:`created`, :attr:`updated`, :attr:`cloned`, :attr:`attached` – operation counters.
+    - :attr:`unresolved_hard_requirements` – list of requirement ids.
+    """
     record_type: Literal['planning_receipt'] = Field('planning_receipt', alias='type')
     resolved_dependencies: int = 0
     resolved_affordances: int = 0

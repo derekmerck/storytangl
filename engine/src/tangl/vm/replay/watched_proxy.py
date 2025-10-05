@@ -1,4 +1,7 @@
-# tangl/vm/replay/watched_proxy.py
+# tangl/vm/watched_proxy
+"""
+Proxies that watch entity/registry mutations and emit replayable events.
+"""
 from dataclasses import dataclass, field
 from typing import Optional, Iterable, Any
 from uuid import UUID
@@ -7,15 +10,19 @@ import wrapt
 
 from typing import Protocol
 
-from tangl.core import Entity, Registry
-from .events import Event, EventType
-from .wrapped_collection import WatchedSet, WatchedDict, WatchedList
+from tangl.core import Entity, Registry, GraphItem
+from .event import Event, EventType
+from .watched_collection import WatchedSet, WatchedDict, WatchedList
 
 
 class EventWatcher(Protocol):
+    """Protocol for event sinks that accept :class:`~tangl.vm.replay.event.Event`."""
     def submit(self, event: Event) -> None: ...
 
 class PrintWatcher:
+    """
+    Trivial watcher that prints each event (for debugging).
+    """
     @staticmethod
     def submit(event: Event) -> None:
         print(event)
@@ -23,6 +30,20 @@ class PrintWatcher:
 # dataclass for simplified init, not serialized or tracked
 @dataclass
 class ReplayWatcher:
+    """
+    Buffer of emitted events with helpers to canonicalize, replay, and clear.
+
+    Why
+    ----
+    Useful in tests and preview execution to collect mutations before deciding to
+    commit; replay is performed against a copy of a registry.
+
+    Key Features
+    ------------
+    * **Append-only buffer** – :attr:`events` in emission order.
+    * **Canonicalize+replay** – :meth:`replay` collapses redundant updates before applying.
+    * **Reset** – :meth:`clear` empties the buffer.
+    """
     events: list[Event] = field(default_factory=list)
     def submit(self, event: Event) -> None:
         self.events.append(event)
@@ -36,6 +57,33 @@ class ReplayWatcher:
 
 
 class WatchedEntityProxy(wrapt.ObjectProxy):
+    """
+    Proxy that observes attribute mutations on an :class:`~tangl.core.Entity`.
+
+    Why
+    ----
+    Intercepts ``setattr``/``delattr`` and emits typed events so changes can be
+    journaled and replayed. Wraps mutable attributes (dict/list/set) with watched
+    variants to observe in-place edits.
+
+    Key Features
+    ------------
+    * **Attribute interception** – emits UPDATE/DELETE for field changes.
+    * **Deep watching** – wraps dict/list/set values as :class:`WatchedDict`, :class:`WatchedList`, :class:`WatchedSet`.
+    * **Entity-aware values** – values/olds that are :class:`~tangl.core.Entity` are unstructured in events.
+    * **Composable** – multiple watchers may be attached.
+
+    API
+    ---
+    - :meth:`attach_watchers` – add watchers dynamically.
+    - :meth:`__setattr__` / :meth:`__delattr__` – emit events on mutation.
+    - :meth:`__getattr__` – returns wrapped collections for deep watching.
+
+    Notes
+    -----
+    Attributes holding *non-graph* entities are not auto-wrapped yet; consider
+    wrapping them explicitly if you need deep observation.
+    """
     _watchers: list[EventWatcher]
     __wrapped__: Entity
 
@@ -109,6 +157,11 @@ class WatchedEntityProxy(wrapt.ObjectProxy):
             return WatchedList(self, name, value)
         if isinstance(value, set):
             return WatchedSet(self, name, value)
+
+        # NOTE: Attributes that directly hold a non-graph Entity (e.g., a Record) are not
+        # auto-wrapped via registry.get(). If deep observation is required, consider:
+        # if isinstance(value, Entity) and not isinstance(value, GraphItem):
+        #     return WatchedEntityProxy(wrapped=value, watchers=self._watchers)
         return value
 
     def __getattr__(self, name: str):
@@ -118,15 +171,28 @@ class WatchedEntityProxy(wrapt.ObjectProxy):
         value = getattr(self.__wrapped__, name)
         return self._wrap_value(name, value)
 
-    # todo: need to provide a wrapped collection proxy if getattr returns a
-    #       mutable collection like 'locals', collections need to know to return a
-    #       further wrapped object (entity or collection) if necessary
-
-    # todo: attributes that directly hold a non-graph entity like a Record will
-    #       not get wrapped via graph.get(), so we need to check for that as well.
 
 
 class WatchedRegistry(WatchedEntityProxy):
+    """
+    Registry proxy that emits CREATE/DELETE on membership changes and returns watched items.
+
+    Why
+    ----
+    Bridges registry-level CRUD to the event stream and ensures fetched members
+    are proxied for deep observation.
+
+    Key Features
+    ------------
+    * **CREATE/DELETE events** – emitted by :meth:`add` and :meth:`remove`.
+    * **Watched retrieval** – :meth:`get` returns :class:`WatchedEntityProxy` for items.
+
+    API
+    ---
+    - :meth:`add(item)` – emit CREATE then delegate.
+    - :meth:`remove(key)` – emit DELETE then delegate.
+    - :meth:`get(key)` – return a watched proxy or ``None``.
+    """
     # proxy registry
     __wrapped__: Registry
 

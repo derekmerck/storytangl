@@ -1,14 +1,20 @@
 # tangl/vm/replay/patch.py
+"""
+Replay artifacts: Patch and Snapshot.
+
+A :class:`Patch` is a frozen sequence of canonicalized events that can be
+applied to a registry to reproduce mutations. A :class:`Snapshot` materializes
+a registry's state for fast recovery, trading a bit of storage for speed.
+"""
 from __future__ import annotations
 from typing import Optional, Literal, Iterable, TypeVar, Generic
 from uuid import UUID
-from copy import deepcopy
 
 from pydantic import field_validator
 
 from tangl.type_hints import Hash
 from tangl.core import Record, Registry, Entity
-from .events import Event
+from .event import Event
 
 # todo: may want to use different patch formats:
 #       - canonicalized events
@@ -17,7 +23,37 @@ from .events import Event
 
 class Patch(Record):
     """
-    Patch(registry_id: ~uuid.UUID, registry_state_hash: bytes, events: list[Event])
+    Patch(registry_id: UUID | None, registry_state_hash: bytes | None, events: list[Event])
+
+    Frozen record of canonicalized events that can replay mutations on a registry.
+
+    Why
+    ----
+    Captures a minimal, replayable history of state changes for a registry or graph.
+    A patch ensures deterministic reconstruction by verifying that the target
+    registry’s id and base state hash match before applying its events.
+
+    Key Features
+    ------------
+    * **Immutable** – patches are frozen once created; replay is pure and idempotent.
+    * **Guarded apply** – validates target registry id and state hash before mutation.
+    * **Canonical events** – events sorted and deduplicated by
+      :meth:`~tangl.vm.replay.event.Event.canonicalize_events`.
+    * **Integration** – works with :class:`~tangl.core.registry.Registry` and ledger
+      recovery to rebuild current state from snapshots.
+
+    API
+    ---
+    - :attr:`registry_id` – optional UUID guard ensuring patch applies to the right registry.
+    - :attr:`registry_state_hash` – optional guard verifying the base state hash.
+    - :attr:`events` – ordered, canonicalized list of :class:`~tangl.vm.replay.event.Event`.
+    - :meth:`apply(registry)` – validate guards and replay all events, returning the mutated registry.
+
+    Notes
+    -----
+    Patches are typically appended to the ledger between snapshots for efficient
+    incremental recovery.  Use :meth:`Event.canonicalize_events` to build canonical
+    patches suitable for deduplication and audit.
     """
     record_type: Literal['patch'] = 'patch'
     registry_id: Optional[UUID] = None
@@ -37,23 +73,3 @@ class Patch(Record):
             raise ValueError(f"Wrong registry state hash for patch")
 
         return Event.apply_all(self.events, registry)
-
-EntityT = TypeVar('EntityT', bound=Entity)
-
-class Snapshot(Record, Generic[EntityT]):
-    """
-    Snapshot[EntityT]()
-
-    Don't set or get item directly unless you know what you're doing.
-    Use :meth:`from_item` and :meth:`to_item` to create and restore.
-    """
-    record_type: Literal['snapshot'] = 'snapshot'
-    item: EntityT
-    item_state_hash: Hash
-
-    @classmethod
-    def from_item(cls, item: EntityT) -> Snapshot[EntityT]:
-        return cls(item=deepcopy(item), item_state_hash=item._state_hash())
-
-    def restore_item(self) -> EntityT:
-        return deepcopy(self.item)

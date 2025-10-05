@@ -1,4 +1,12 @@
 # tangl/vm/requirement.py
+"""
+Requirements and provisioning policy.
+
+A :class:`Requirement` is a graph item that expresses *what must be linked*
+at the frontier and *how* to obtain it (via :class:`ProvisioningPolicy`).
+Requirements are carried by :class:`~tangl.vm.planning.open_edge.Dependency`
+and :class:`~tangl.vm.planning.open_edge.Affordance` edges.
+"""
 from enum import Enum
 from typing import Optional, Generic, TypeVar
 from uuid import UUID
@@ -12,13 +20,67 @@ NodeT = TypeVar('NodeT', bound=Node)
 
 
 class ProvisioningPolicy(Enum):
+    """
+    Provisioning strategies for satisfying a requirement.
+
+    EXISTING
+        Find a pre-existing provider by identifier and/or match criteria.
+    UPDATE
+        Find a provider and update it using a template (in-place edit).
+    CREATE
+        Create a new provider from a template.
+    CLONE
+        Find a reference provider, make a copy, then evolve via template.
+
+    Notes
+    -----
+    Validation ensures the presence of ``identifier/criteria`` for EXISTING-family
+    policies and a ``template`` for CREATE/UPDATE/CLONE.
+    """
     EXISTING = "existing"  # find by identifier and/or criteria match
     UPDATE = "update"      # find and update from template
     CREATE = "create"      # create from template
     CLONE = "clone"        # find and evolve from template
 
 class Requirement(GraphItem, Generic[NodeT]):
+    """
+    Requirement(identifier | criteria | template, policy: ProvisioningPolicy = EXISTING, *, hard_requirement: bool = True)
 
+    GraphItem placeholder describing a needed provider at the resolution frontier.
+
+    Why
+    ----
+    Encodes *what must be linked* (by identifier/criteria) and *how to obtain it*
+    (via :class:`ProvisioningPolicy`). Requirements are carried on open edges
+    (e.g., :class:`Dependency`, :class:`Affordance`) and
+    are satisfied by binding a provider node.
+
+    Key Features
+    ------------
+    * **Multiple acquisition modes** – find, update, create, or clone via :class:`ProvisioningPolicy`.
+    * **Flexible targeting** – match by :attr:`identifier` or :attr:`criteria` (or both).
+    * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE/CLONE.
+    * **Binding** – :attr:`provider` resolves to a live :class:`~tangl.core.graph.Node`; auto-added to the graph if needed.
+    * **Hard/soft semantics** – :attr:`hard_requirement` gates whether unresolved requirements block progress.
+
+    API
+    ---
+    - :attr:`identifier` – alias/uuid/label for a specific provider.
+    - :attr:`criteria` – dict used with :meth:`~tangl.core.registry.Registry.find_all` to discover candidates.
+    - :attr:`template` – unstructured data used to create/update/clone a provider.
+    - :attr:`policy` – :class:`ProvisioningPolicy` that validates required fields.
+    - :attr:`provider` – get/set bound provider node (backed by :attr:`provider_id`).
+    - :attr:`hard_requirement` – if ``True``, unresolved requirements are reported at planning end.
+    - :attr:`is_unresolvable` – sticky flag when prior attempts failed.
+    - :attr:`satisfied` – ``True`` if a provider is bound or the requirement is soft.
+
+    Notes
+    -----
+    Validation rules:
+
+    - ``EXISTING/UPDATE/CLONE`` require :attr:`identifier` **or** :attr:`criteria`.
+    - ``CREATE/UPDATE/CLONE`` require :attr:`template`.
+    """
     provider_id: Optional[UUID] = None
 
     identifier: Identifier = None
@@ -28,6 +90,9 @@ class Requirement(GraphItem, Generic[NodeT]):
 
     @model_validator(mode="after")
     def _validate_policy(self):
+        # todo: this validates that the req is _independently_ complete.
+        #       But we also want to be able to _search_ for an appropriate
+        #       template based on criteria...
         """
         identifier is for unique EXISTING
         criteria is filter for any EXISTING

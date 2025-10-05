@@ -2,8 +2,8 @@
 import pytest
 from uuid import uuid4
 
-from tangl.vm.replay.wrapped_collection import WatchedDict, WatchedList, WatchedSet
-from tangl.vm.replay.events import Event, EventType
+from tangl.vm.replay.watched_collection import WatchedDict, WatchedList, WatchedSet
+from tangl.vm.replay.event import Event, EventType
 
 
 class FakeOwner:

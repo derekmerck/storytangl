@@ -1,3 +1,7 @@
+# tangl/vm/frame.py
+"""
+Frame drives the phase bus over one *resolution step* over a :class:`~tangl.core.graph.Graph`.
+"""
 from __future__ import annotations
 from typing import Literal, Optional, Any, Callable, Type
 import functools
@@ -17,6 +21,29 @@ from .replay import ReplayWatcher, WatchedRegistry, Patch
 logger = logging.getLogger(__name__)
 
 class ResolutionPhase(IntEnum):
+    """
+    Phases in a single resolution step.
+
+    Why
+    ----
+    Defines the ordered pipeline for one frame and specifies how to **reduce**
+    the list of :class:`~tangl.core.dispatch.job_receipt.JobReceipt` objects
+    produced during each phase into a single outcome.
+
+    Key Features
+    ------------
+    * **Order** – ``INIT → VALIDATE → PLANNING → PREREQS → UPDATE → JOURNAL → FINALIZE → POSTREQS``.
+    * **Aggregation policy** – each phase maps to a reducer and an expected result type.
+    * **Separation of concerns** – planning/journal/finalize have distinct outputs
+      (choices or receipts, fragments, patch), enabling auditing and replay.
+
+    Notes
+    -----
+    * The *planning* phase typically composes to a
+      :class:`~tangl.vm.planning.PlanningReceipt`.
+    * The *journal* phase composes authored output into :class:`list`\\[:class:`~tangl.core.BaseFragment`] (UX).
+    * The *finalize* phase serializes event‑sourced mutations into a :class:`~tangl.vm.replay.Patch`.
+    """
 
     INIT = 0         # Does not run, just indicates not started
     VALIDATE = 10    # check avail new cursor Predicate, return ALL true or None
@@ -50,16 +77,54 @@ class ResolutionPhase(IntEnum):
 P = ResolutionPhase
 
 class ChoiceEdge(Edge, Conditional):
-    # Need to introduce concept of selectable vs. automatically followed edges.
-    # Previously called 'traversable edge', these ONLY link 'structural' nodes.
+    """
+    A selectable or auto-triggering control edge between structural nodes.
+
+    - **trigger_phase**: If set to :data:`ResolutionPhase.PREREQS` or :data:`ResolutionPhase.POSTREQS`, the edge is auto-followed during that phase when its :class:`~tangl.core.entity.Conditional` predicate is satisfied.
+
+    * Presents to the traversal orchestrator as a *choice* (no trigger) or jump automatically (with trigger).
+    * Only links *structural* nodes; use domain handlers to mutate attached data.
+    """
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
-    # If trigger phase is not None, edge will auto-trigger if conditions are met.
-    # Otherwise, it is considered Selectable (overloaded term?) and will be presented
-    # in the frame's session output.
 
 # dataclass for simplified init, not serialized or tracked
 @dataclass
 class Frame:
+    """
+    Frame(graph: ~tangl.core.Graph, cursor_id: ~uuid.UUID)
+
+    Drives one *resolution step* over a :class:`~tangl.core.graph.Graph`.
+
+    Why
+    ----
+    Orchestrates the phase pipeline from the current cursor, collecting receipts,
+    emitting journal fragments, and (optionally) producing a patch from watched
+    mutations. Keeps the *business logic* in domain handlers; Frame just wires
+    context and applies the aggregation contracts of :class:`ResolutionPhase`.
+
+    Key Features
+    ------------
+    * **Context management** – builds :class:`~tangl.vm.context.Context` (and thus
+      :class:`~tangl.core.domain.scope.Scope`) lazily and invalidates it on moves.
+    * **Phase execution** – :meth:`run_phase` discovers handlers via scope and
+      reduces their :class:`~tangl.core.dispatch.job_receipt.JobReceipt` outputs.
+    * **Event sourcing (optional)** – when ``event_sourced=True``, applies changes
+      to a watched preview graph and emits a :class:`~tangl.vm.replay.patch.Patch`.
+    * **Journal output** – pushes fragments/patches to :attr:`records` with step markers.
+
+    API
+    ---
+    - :attr:`graph` – active graph being updated.
+    - :attr:`cursor_id` – node id anchoring scope and traversal.
+    - :attr:`records` – :class:`~tangl.core.record.StreamRegistry` receiving fragments/patches.
+    - :meth:`run_phase(phase)<run_phase>` – execute a single phase; return aggregated outcome.
+    - :meth:`follow_edge(edge)<follow_edge>` – advance the cursor and run the full phase pipeline once.
+    - :meth:`resolve_choice(choice)<resolve_choice>` – keep following returned edges until no next edge.
+
+    Notes
+    -----
+    The orchestrator should snapshot/commit via the ledger after resolution ends.
+    """
     # Frame manages Context (graph, cursor) and the Phase bus
     # Context manages Scope (capabilities over active domain layers)
     # Scope is inferred from Graph, cursor node, latent domains
@@ -215,7 +280,7 @@ class Frame:
         """
         Follows edges until no next edge is returned.
 
-        Orchestrator should call ledger.snapshot after resolution is complete.
+        Orchestrator should call :meth:`Ledger.push_snapshot` after resolution is complete.
         """
 
         cur = choice

@@ -1,4 +1,19 @@
 # tangl.vm.planning.simple_planning_handlers.py
+"""
+Default planning handlers (reference implementation).
+
+The planning phase is wired in three small steps:
+
+1. ``plan_collect_offers`` (EARLY) – enumerate open frontier requirements and
+   publish :class:`~tangl.vm.planning.Offer` objects.
+2. ``plan_select_and_apply`` (LATE) – coalesce offers per requirement, select by
+   lowest priority, accept, and return :class:`~tangl.vm.planning.BuildReceipt`.
+3. ``plan_compose_receipt`` (LAST) – summarize into a
+   :class:`~tangl.vm.planning.PlanningReceipt`.
+
+Domains can register additional builders/selectors at different priorities to
+enrich or override behavior.
+"""
 from uuid import UUID
 
 from tangl.core import Node, Graph, global_domain, JobReceipt
@@ -10,6 +25,7 @@ from .provisioning import Provisioner
 # 1) Collect offers (EARLY)
 @global_domain.handlers.register(phase=P.PLANNING, priority=25)
 def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
+    """Publish offers for open :class:`~tangl.vm.planning.open_edge.Dependency` edges."""
     g: Graph = ctx.graph
     offers: list[Offer] = []
 
@@ -66,7 +82,7 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
 # 3) Compose a PlanningReceipt (LAST)
 @global_domain.handlers.register(phase=P.PLANNING, priority=100)
 def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
-    # Gather BuildReceipts from current ctx
+    """Summarize build receipts into a :class:`~tangl.vm.planning.PlanningReceipt`."""
     builds: list[BuildReceipt] = []
     for r in ctx.job_receipts:
         if isinstance(r.result, list):

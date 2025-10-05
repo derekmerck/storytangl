@@ -16,7 +16,7 @@ from .job_receipt import JobReceipt
 
 class DispatchRegistry(Registry[Handler]):
     """
-    DispatchRegistry(data: dict[UUID, Handler])
+    DispatchRegistry(data: dict[~uuid.UUID, Handler])
 
     Pipeline for invoking handlers in deterministic order.
 

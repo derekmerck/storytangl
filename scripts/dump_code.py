@@ -16,10 +16,15 @@ pkg_root = project_root / "engine/src/tangl"
 tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
 outfile_dir = project_root / "tmp/dumps"
+docs_root = project_root / "docs/source"
 
-def get_tree(root: Path):
+def get_tree(root: Path, include_notes: bool = False):
 
-    result = subprocess.run(["tree", "-P", "*.py", "-I", "__pycache__", "--charset=ascii"],
+    if not include_notes:
+        pattern = "*.py"
+    else:
+        pattern = "*.py|*.md|*.rst"
+    result = subprocess.run(["tree", "-P", pattern, "-I", "__pycache__", "--charset=ascii"],
                             capture_output=True,
                             text=True,
                             cwd=root.absolute()
@@ -28,15 +33,16 @@ def get_tree(root: Path):
 
 def process_directory(root: Path,
                       outfile_name: str,
-                      include_mds: bool = False,
+                      include_notes: bool = False,
                       prepend_files: list[Path] = None,
                       postpend_files: list[Path] = None):
 
     print( root )
     data = {}
     files = list(root.glob("**/*.py"))  # + list(root.glob("**/*.md"))
-    if include_mds:
+    if include_notes:
         files = files + list(root.glob("**/*.md"))
+        files = files + list(root.glob("**/*.rst"))
     if prepend_files is not None:
         files = prepend_files + files
     if postpend_files is not None:
@@ -48,12 +54,12 @@ def process_directory(root: Path,
             except ValueError:
                 name = f.relative_to(pkg_root)
             content = fp.read()
-            if f.suffix in [".md", ".csv", ".txt", ".json"]:
+            if f.suffix in [".md", ".csv", ".txt", ".json", ".rst"]:
                 content = '"""\n' + content + '"""\n'
             if content:
                 data[name] = content
 
-    tree = get_tree(root)
+    tree = get_tree(root, include_notes=include_notes)
 
     content_hash = hashlib.sha224(str(data.values()).encode("utf8")).digest()
     content_hash_b64 = b64encode(content_hash).decode("utf8").strip("=")
@@ -125,13 +131,13 @@ if __name__ == "__main__":
     # current
     process_directory(pkg_root / "core",
                       "tangl37_core_archive.py",
-                      include_mds=True,
+                      include_notes=True,
                       prepend_files= [pkg_root / "type_hints.py",
                                       pkg_root / "info.py"],
                       postpend_files=[pkg_root / "utils/base_model_plus.py"])
     process_directory(pkg_root / "vm",
                       "tangl37_vm_archive.py",
-                      include_mds=True,
+                      include_notes=True,
                       postpend_files=[pkg_root / "utils/hashing.py"])
 
     process_directory(pkg_root / 'lang', "tangl37_lang_archive.py",
@@ -140,9 +146,11 @@ if __name__ == "__main__":
     process_directory(pkg_root / 'persistence', "tangl37_persist_archive.py")
     process_directory(pkg_root / 'utils', "tangl37_utils_archive.py")
 
-    process_directory(pkg_root / 'story', "tangl3x_story_snippits.py", include_mds=True)
-    process_directory(pkg_root / 'mechanics', "tangl3x_mechanics_snippits.py", include_mds=True)
-    process_directory(pkg_root / 'media', "tangl3x_media_snippits.py", include_mds=True)
+    process_directory(pkg_root / 'story', "tangl3x_story_snippits.py", include_notes=True)
+    process_directory(pkg_root / 'mechanics', "tangl3x_mechanics_snippits.py", include_notes=True)
+    process_directory(pkg_root / 'media', "tangl3x_media_snippits.py", include_notes=True)
+
+    process_directory(docs_root, "tangl37_docs_archive.py", include_notes=True)
 
     # testing
     process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")

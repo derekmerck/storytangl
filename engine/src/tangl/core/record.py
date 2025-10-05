@@ -1,14 +1,15 @@
 # tangl.core.record.py
 from __future__ import annotations
 import functools
-from typing import Optional, TypeVar, Self, Iterator
+from typing import Optional, TypeVar, Self, Iterator, Generic, Literal
 import logging
 from enum import Enum
 from uuid import UUID
+from copy import deepcopy
 
 from pydantic import Field, ConfigDict
 
-from tangl.type_hints import UnstructuredData
+from tangl.type_hints import UnstructuredData, Hash
 from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity
 from tangl.core.registry import Registry
@@ -138,13 +139,6 @@ class StreamRegistry(Registry[HasSeq]):
     # todo: anytime you find_all on a record stream, you want to sort it _at_least_ by seq
     #       should just overload find all to do that by default unless flagged not to.
 
-    # def get_slice(self, start_seq: int = 0, end_seq: Optional[int] = None, *, inclusive_start: bool = True) -> list[Record]:
-    #     """Return records with start_seq <= seq < end_seq (default end = max)."""
-    #     end_seq = self._max_seq + 1 if end_seq is None else end_seq
-    #     lo = (lambda x: x.seq >= start_seq) if inclusive_start else (lambda x: x.seq > start_seq)
-    #     hi = (lambda x: x.seq < end_seq)
-    #     return sorted((r for r in self.values() if lo(r) and hi(r)), key=lambda r: r.seq)
-
     def get_slice(self, start_seq: int, end_seq: int, *, predicate=None, **criteria) -> Iterator[RecordT]:
         def _predicate(record: RecordT) -> bool:
             if not start_seq <= record.seq < end_seq:
@@ -152,11 +146,12 @@ class StreamRegistry(Registry[HasSeq]):
             if predicate is not None and not predicate(record):
                 return False
             return True
-        # HasSeq has a built-in __lt__ so a bare sort(values) works, but passing the
+        # HasSeq has a built-in `__lt__` so a bare `sorted(values)` works, but passing a
         # sort_key kwarg explicitly into find_all will also internally sort and yield
         # from the sorted list
         return self.find_all(predicate=_predicate, **criteria, sort_key=lambda x: x.seq)
 
+    # Prior ref - early stop types entry << section << chapter << book, etc.
     # def get_entry(self, which=-1) -> list[Record]:
     #     # early stop types param looks for terminating section edges, as well
     #     items = self.journal.get_slice(which, bookmark_type="entry", early_stop_types=["section"])
@@ -243,3 +238,60 @@ class StreamRegistry(Registry[HasSeq]):
 
     def remove(*args, **kwargs):
         raise NotImplementedError("Cannot remove records from a StreamRegistry.")
+
+
+EntityT = TypeVar('EntityT', bound=Entity)
+
+class Snapshot(Record, Generic[EntityT]):
+    """
+    Snapshot[EntityT]()
+
+    Frozen record capturing a deep copy of an entity for persistence and recovery.
+
+    Why
+    ----
+    Provides a stable, hash-verified baseline for reconstruction or audit. Used by
+    the ledger to persist materialized graph state and restore it deterministically
+    before applying subsequent patches.
+
+    Key Features
+    ------------
+    * **Immutable baseline** – deep copy of an entity at a point in time.
+    * **State hash** – :attr:`item_state_hash` verifies integrity during recovery.
+    * **Generic type parameter** – documents the entity type being snapshotted.
+    * **Integration** – works with :class:`~tangl.vm.ledger.Ledger` and
+      :class:`~tangl.vm.replay.patch.Patch` for replay and restoration.
+
+    API
+    ---
+    - :meth:`from_item(item)` – create a snapshot with a deep copy and computed hash.
+    - :meth:`restore_item()` – return a deep copy of the stored entity.
+    - :attr:`item_state_hash` – hash of the entity’s state for verification.
+
+    Example
+    -------
+    >>> snap = Snapshot.from_item(graph)
+    >>> stream.add_record(snap)
+    >>> restored = stream.last(channel="snapshot").restore_item()
+
+    Notes
+    -----
+    Snapshots are immutable records; they do not serialize data internally but rely
+    on higher-level persistence managers to handle storage. Type parameters exist
+    for documentation only.
+    """
+    record_type: Literal['snapshot'] = 'snapshot'
+    item: EntityT  #: :meta-private:
+    item_state_hash: Hash
+
+    @classmethod
+    def from_item(cls, item: EntityT) -> Snapshot[EntityT]:
+        # No need to unstructure or serialize here, that can be handled by the
+        # general persistence manager like anything else.
+        return cls(item=deepcopy(item), item_state_hash=item._state_hash())
+
+    def restore_item(self, verify: bool = False) -> EntityT:
+        item = deepcopy(self.item)
+        if verify and item._state_hash() != self.item_state_hash:
+            raise RuntimeError("Recovered item state does not match item state hash.")
+        return item

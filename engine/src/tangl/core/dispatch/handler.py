@@ -74,7 +74,7 @@ class Handler(HasSeq, Selectable, Entity):
 
     API
     ---
-    - :meth:`__call__(caller, *entities, ctx=None, ns=None, **params)` – invoke with caller and other participating entities, params, and an optional execution context and namespace (ns)
+    - :meth:`__call__(caller, *entities, ctx=None, ns=None, **params)<__call__>` – invoke with caller and other participating entities, params, and an optional execution context and namespace (ns)
     - :meth:`get_label` – derive label from func name
 
     .. admonition:: Reserved Keywords

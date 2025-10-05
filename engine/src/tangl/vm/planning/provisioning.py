@@ -1,7 +1,31 @@
 # tangl/vm/provisioning.py
+"""
+Provisioning logic
+==================
+
+Why
+----
+Provides the default :class:`Provisioner`, responsible for satisfying a
+:class:`~tangl.vm.planning.requirement.Requirement` by locating or constructing
+a provider node.  It searches across one or more registries, updating or
+cloning existing nodes, or creating a new one from a template when needed.
+
+Key Features
+------------
+* **Multiple acquisition modes** – EXISTING, UPDATE, CLONE, CREATE.
+* **Graph integration** – discovered or built providers are bound to the
+  requirement and inserted into the active graph.
+* **Extensible** – domains may subclass or replace this implementation to
+  add scope‑aware provisioning, aliases, or custom creation pipelines.
+
+API
+---
+- :class:`Provisioner` – default resolver for requirements.
+- :meth:`Provisioner.resolve` – main entry point; dispatches by policy.
+- :meth:`_resolve_existing` / :meth:`_resolve_update` / :meth:`_resolve_clone` / :meth:`_resolve_create` – internal helpers implementing each policy.
+"""
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional, Iterator, Literal, Self
+from typing import Optional
 
 from pydantic import Field
 
@@ -11,23 +35,42 @@ from tangl.core.entity import Selectable
 from .requirement import Requirement, ProvisioningPolicy
 
 class Provisioner(Selectable, Entity):
-    # Default provisioner for Dependency edges
-    # todo: Provisioners need to be implemented like handlers/handler registries, so
-    #       that they can be passed around in domains, I think
-    #       previously they yielded an offer job receipt with an 'accept' function
-    #       for the orchestrator to select
+    """
+    Provisioner(requirement, registries=[graph, ...])
 
-    # def can_satisfy(self, dep: Dependency) -> bool:
-    #     # check sources for satisfiers, return a list of offers?
-    #     return dep.requirement.satisfied_by(self)
-    #
-    # def get_satisfier(self, dep: Dependency) -> Optional[Node]:
-    #     if not self.can_satisfy(dep):
-    #         return None
-    #     return self.resolve(dep.requirement)
+    Default provider resolver for requirements.
 
+    Why
+    ----
+    Attempts to fulfill a :class:`~tangl.vm.planning.requirement.Requirement`
+    by applying the policy specified in its :attr:`Requirement.policy`.  Each
+    policy corresponds to a helper that locates, mutates, clones, or constructs
+    a provider node.
+
+    Key Features
+    ------------
+    * **Policy‑driven** – delegates to helpers matching :class:`ProvisioningPolicy`.
+    * **Registry search** – uses :meth:`~tangl.core.registry.Registry.chain_find_one`
+      across provided registries and the graph.
+    * **Template application** – UPDATE/CLONE/CREATE use the requirement’s
+      :attr:`Requirement.template` to modify or instantiate nodes.
+    * **Failure handling** – marks :attr:`Requirement.is_unresolvable` on failure.
+
+    API
+    ---
+    - :meth:`resolve()` – execute provisioning per policy.
+    - :meth:`_resolve_existing()` – locate existing provider.
+    - :meth:`_resolve_update()` – mutate in place using template.
+    - :meth:`_resolve_clone()` – duplicate and evolve a reference provider.
+    - :meth:`_resolve_create()` – instantiate from template.
+
+    Notes
+    -----
+    On success, the resolved provider is assigned to
+    :attr:`Requirement.provider` and added to the graph if missing.
+    """
     requirement: Requirement
-    registries: list[Registry] = field(default_factory=list)
+    registries: list[Registry] = Field(default_factory=list)
 
     def _resolve_existing(self,
                           provider_id: Optional[Identifier] = None,

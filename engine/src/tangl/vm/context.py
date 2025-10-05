@@ -1,4 +1,8 @@
 # tangl/vm/context.py
+"""
+Execution context for one frame of resolution.
+Thin wrapper around the graph, cursor, and scope providing deterministic RNG.
+"""
 from __future__ import annotations
 from typing import Iterator, Any
 from uuid import UUID
@@ -17,14 +21,44 @@ from tangl.utils.hashing import hashing_func
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)
 class Context:
-    # All the working vars to create the 'scope' for a step on the graph and an
-    # audit attribute for receipts to track handler invocations.
+    """
+    Context(graph: Graph, cursor_id: UUID, step: int = -1)
 
-    # We don't want to mix context details into the handler signature, we give handlers a
-    # node or a namespace, they return a result, the Frame's job is to track that
-    # via a context object, context is persistent across phases, although the graph itself
-    # may be mutated or recreated
+    Immutable container of per‑frame execution state.
 
+    Why
+    ----
+    Centralizes the data needed to resolve one step—graph, cursor, registries,
+    and a deterministic RNG—while caching the derived :class:`~tangl.core.Scope`.
+    Handlers read from context; :class:`~tangl.vm.Frame` is responsible for
+    sequencing phases and writing records.
+
+    Key Features
+    ------------
+    * **Frozen** – safe to pass across phases; graph may be a watched proxy when event‑sourcing.
+    * **Deterministic RNG** – :attr:`rand` is stable per ``(graph, cursor, step)``.
+    * **Cached scope** – computed once from :attr:`graph`, :attr:`cursor_id`, and
+      :attr:`domain_registries`.
+    * **Receipts** – :attr:`job_receipts` buffers per‑phase results for reducers.
+    * **State hash** – :attr:`initial_state_hash` guards patch application.
+
+    API
+    ---
+    - :attr:`graph` – working :class:`~tangl.core.Graph` (may be watched).
+    - :attr:`cursor` – resolved :class:`~tangl.core.Node`.
+    - :attr:`step` – integer step index used in journaling and RNG seed.
+    - :attr:`domain_registries` – registries of :class:`~tangl.core.domain.AffiliateDomain`.
+    - :attr:`scope` – cached :class:`~tangl.core.Scope`.
+    - :attr:`rand` – :class:`random.Random` seeded for replay.
+    - :meth:`get_ns` – return merged namespace.
+    - :meth:`get_handlers` – iterate handlers matching criteria (e.g., ``phase=…``).
+    - :attr:`job_receipts` – LIFO stack of :class:`~tangl.core.JobReceipt`.
+
+    Notes
+    -----
+    Context does not define persistence or commit behavior; the ledger/orchestrator
+    handles snapshot/patch writes after resolution.
+    """
     graph: Graph
     cursor_id: UUID
     step: int = -1

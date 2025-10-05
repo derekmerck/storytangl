@@ -1,8 +1,8 @@
 import pytest
 
-from tangl.core import StreamRegistry, Record, Graph, Node
-from tangl.vm.replay.events import Event, EventType
-from tangl.vm.replay.patch import Patch, Snapshot
+from tangl.core import StreamRegistry, Record, Graph, Node, Snapshot
+from tangl.vm.replay.event import Event, EventType
+from tangl.vm.replay.patch import Patch
 from tangl.vm.replay.watched_proxy import ReplayWatcher, WatchedRegistry
 from tangl.vm.ledger import Ledger
 

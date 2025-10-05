@@ -23,6 +23,7 @@ Conceptual layers
 
    - :class:`Record` captures immutable events, fragments, and notes.
    - :class:`StreamRegistry` sequences records with bookmarks and channels.
+   - :class:`Snapshot` wraps a copy of an entity for record keeping and rematerialization.
    - :class:`Fragment<BaseFragment>` is a record type that encodes narrative/UI output.
 
 4. :ref:`Dispatch<core-dispatch>`
@@ -45,8 +46,11 @@ identity, relationships, and events *without presupposing narrative content*.
 from .entity import Entity
 from .registry import Registry
 
-# Sequential data extensions
-from .record import Record, StreamRegistry
+# Sequential data artifacts
+from .record import Record, StreamRegistry, Snapshot
+
+# Pre-image content records
+from .fragment import BaseFragment, ContentFragment, ControlFragment, GroupFragment, KvFragment, PresentationHints
 
 # Globally reusable objects
 from .singleton import Singleton
@@ -58,24 +62,22 @@ from .graph import GraphItem, Node, Edge, Subgraph, Graph
 from .dispatch import JobReceipt, Handler, DispatchRegistry
 
 # Opt-in and structurally scoped capability resolution
-from .domain import Domain, Scope, global_domain
+from .domain import Domain, Scope, global_domain, NS
 
-# Pre-image content records
-from .fragment import BaseFragment, ContentFragment, ControlFragment, GroupFragment, KvFragment, PresentationHints
 
 __all__ = [
     # Identity & collections
     "Entity", "Registry",
-    # Records/streams
-    "Record", "StreamRegistry",
     # Singleton
     "Singleton",
     # Graph topology
     "GraphItem", "Node", "Edge", "Subgraph", "Graph",
+    # Records/streams
+    "Record", "StreamRegistry", "Snapshot",
+    # Fragments
+    "BaseFragment", "ContentFragment", "ControlFragment", "GroupFragment", "KvFragment", "PresentationHints",
     # Dispatch
     "JobReceipt", "Handler", "DispatchRegistry",
     # Domains & scope
     "Domain", "Scope", "global_domain",
-    # Fragments
-    "BaseFragment", "ContentFragment", "ControlFragment", "GroupFragment", "KvFragment", "PresentationHints",
 ]

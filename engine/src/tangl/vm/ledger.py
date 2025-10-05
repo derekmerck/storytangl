@@ -1,32 +1,56 @@
 # tangl/vm/ledger.py
+"""
+State holder for the live graph, cursor, and record stream (snapshots, patches, journal).
+"""
 from typing import TYPE_CHECKING
 from pydantic import Field
-from copy import deepcopy
 from uuid import UUID
 
-from tangl.core import Entity, Graph, Node, Domain
-from tangl.core.record import Record, StreamRegistry
+from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
 from .frame import Frame
-from .replay import Snapshot
 
 if TYPE_CHECKING:
     from .replay import Patch
 
 class Ledger(Entity):
     """
-    - has graph/state, cursor, record stream/history, meta domains (user)
-    - patches/snapshots are filtered views of event-sourcing items on the record stream
-    - journal (output) is a filtered view of rendered content fragments on the record stream
-    - frame is an ephemeral workspace with a view of the graph and scoped capabilities for
-        resolving a step, it can push records onto the ledger's record stream
+    Ledger(graph: Graph, cursor_id: ~uuid.UUID, records: StreamRegistry, domains: list[~tangl.core.Domain])
 
-    Channel names can be inferred from the record type:
-    - snapshot for Record(type=snapshot)
-    - patch for Record(type=patch)
-    - fragment for Record(type=fragment)
+    Owns the working graph and the append-only record stream.
 
-    Marker types:
-    - frame, named step-xxxx on follow_edge()
+    Why
+    ----
+    Centralizes state for a running narrative: the active :class:`~tangl.core.Graph`,
+    the current cursor, and the :class:`~tangl.core.StreamRegistry` of
+    immutable :class:`~tangl.core.Record` artifacts. Provides helpers to
+    snapshot, recover, and spin up :class:`~tangl.vm.Frame` executions.
+
+    Key Features
+    ------------
+    * **Snapshots** – :meth:`push_snapshot` materializes a :class:`~tangl.core.Snapshot` of the graph.
+    * **Recovery** – :meth:`recover_graph_from_stream` restores state by replaying patches after the last snapshot.
+    * **Journal access** – :meth:`get_journal` returns fragment sections by marker.
+    * **Frame factory** – :meth:`get_frame` constructs a frame bound to this ledger.
+    * **Cadence** – :attr:`snapshot_cadence` hints how often to snapshot.
+
+    API
+    ---
+    - :attr:`graph` – current graph state.
+    - :attr:`cursor_id` – node id used by new frames.
+    - :attr:`records` – append-only stream (snapshots, patches, fragments).
+    - :attr:`step` – external step counter (not mutated by frames).
+    - :attr:`domains` – optional meta domains active at the ledger level.
+    - :attr:`snapshot_cadence` – default snapshot interval.
+    - :meth:`push_snapshot` – append a graph snapshot to the stream.
+    - :meth:`maybe_push_snapshot` – conditional snapshot helper.
+    - :meth:`recover_graph_from_stream` – restore a graph from snapshot+patches.
+    - :meth:`get_journal` – iterate fragments in a named section.
+    - :meth:`get_frame` – create a :class:`~tangl.vm.Frame` bound to this ledger.
+
+    Notes
+    -----
+    Records are not stored on the graph; they live in :attr:`records`. Channels are
+    derived from record type ("snapshot", "patch", "fragment").
     """
     graph: Graph = None
     cursor_id: UUID = None
