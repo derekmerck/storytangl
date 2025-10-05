@@ -8,8 +8,9 @@ import pydantic
 from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
-from ..graph import Node, Graph
-from .singleton import Singleton
+from tangl.core import Singleton
+from .graph import Graph
+from .node import Node
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,11 @@ class SingletonNode(Node, Generic[WrappedType]):
 
     @classmethod
     def _instance_vars(cls, wrapped_cls: Type[WrappedType] = None):
-        wrapped_cls = wrapped_cls or cls.get_wrapped_cls()
-        return {k: (v.annotation, v) for k, v in wrapped_cls.__pydantic_fields__.items()
-                if v.json_schema_extra and v.json_schema_extra.get("instance_var")}
+        inst_fields = list(wrapped_cls._fields(instance_var=(True, False)))
+        return {
+            name: (info.annotation, info)
+            for name, info in wrapped_cls.model_fields.items() if name in inst_fields
+        }
 
     @classmethod
     def _create_wrapper_cls(cls, wrapped_cls: Type[WrappedType], name: str = None) -> Type[Self]:
@@ -101,11 +104,20 @@ class SingletonNode(Node, Generic[WrappedType]):
         instance_vars = cls._instance_vars(wrapped_cls)
         generic_metadata = {'origin': cls, 'args': (wrapped_cls,), 'parameters': ()}
 
+        logger.debug(f"Creating new wrapper class {name} for {wrapped_cls.__name__}")
+
+        # prior pydantic create model allowed directly passing a class dict like type()
+        # new_cls = pydantic.create_model(name,
+        #                                 __base__= cls,
+        #                                 __pydantic_generic_metadata__=generic_metadata,
+        #                                 wrapped_cls = wrapped_cls,
+        #                                 **instance_vars )
         new_cls = pydantic.create_model(name,
-                                        __base__= cls,
-                                        __pydantic_generic_metadata__=generic_metadata,
-                                        wrapped_cls = wrapped_cls,
-                                        **instance_vars )
+                                        __base__=cls,
+                                        __module__=module.__name__,
+                                        **instance_vars)
+        setattr(new_cls, "wrapped_cls", wrapped_cls)
+        setattr(new_cls, "__pydantic_generic_metadata__", generic_metadata)
 
         # Adding the ephemeral class to this module's namespace allows them to be pickled and cached
         setattr(module, name, new_cls)

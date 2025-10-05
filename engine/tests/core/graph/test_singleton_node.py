@@ -2,8 +2,8 @@ import pytest
 
 from pydantic import Field
 
-from tangl.core.singleton import Singleton, SingletonNode
-from tangl.core import Graph
+from tangl.core import Graph, Singleton
+from tangl.core.graph import SingletonNode
 
 
 class TestSingleton(Singleton):
@@ -12,10 +12,10 @@ class TestSingleton(Singleton):
 
 @pytest.fixture(autouse=True)
 def reset_test_singleton():
-    TestSingleton._instances.clear()
+    TestSingleton.clear_instances()
     TestSingleton(label="unique_singleton")
     yield
-    TestSingleton._instances.clear()
+    TestSingleton.clear_instances()
 
 @pytest.fixture
 def ws():
