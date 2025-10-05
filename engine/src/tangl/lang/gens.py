@@ -32,18 +32,18 @@ class ExtGens(EnumPlusMixin, Enum):
     XY = M = Gens.XY.value  # male
     X_ = N = Gens.X_.value  # androgynous/null
 
-    Xx  = SF = AMAB = "Xx"    # surgical/trans female
-    Xy  = SM = AFAB = "Xy"    # surgical/trans male
+    Xx  = SF = AMAB = "Xx"  # surgical/trans female
+    Xy  = SM = AFAB = "Xy"  # surgical/trans male
 
     XXY = H  = "XXY"   # herm
-    # XXy = FH = "XXy"   # female surgical herm
-    # XxY = MH = "XxY"   # male surgical herm
+    # XXy = FH = "XXy"   # bio-female surgical herm
+    # XxY = MH = "XxY"   # bio-male surgical herm
 
     # Castrated
     Xz  = G  = "Xz"    # gelding
     XXz = GH = "XXz"   # herm gelding
-    # Xxz = GMH = "Xxz"  # male surgical herm gelding
-    # XXz = GFH = "XXz"  # female surgical herm gelding
+    # Xxz = GMH = "Xxz"  # bio-male surgical herm gelding
+    # XXz = GFH = "XXz"  # bio-female surgical herm gelding (why?)
 
     @classmethod
     def _missing_(cls, value, *args, **kwargs):
