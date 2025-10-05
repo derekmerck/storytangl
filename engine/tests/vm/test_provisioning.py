@@ -112,3 +112,37 @@ def test_edge_destination_none_branch_does_not_validate():
     n2 = g.add_node(label="D")
     e.destination = n2
     assert e.destination_id == n2.uid
+
+
+# ---------- Planning ----------
+
+def test_planning_resolves_dependency_existing():
+    g = Graph()
+    a = g.add_node(label="A")
+    b = g.add_node(label="B", tags={"green"})
+
+    req = Requirement[Node](graph=g,
+                            identifier="B", criteria={"has_tags": {"green"}},
+                            policy=ProvisioningPolicy.EXISTING)
+    dep = Dependency(source_id=a.uid, requirement=req, graph=g)
+
+    prov = Provisioner(requirement=req, registries=[g])
+    provider = prov.resolve()
+    assert provider is b
+    assert req.satisfied
+    assert dep.destination is b
+
+def test_planning_create_when_missing():
+    g = Graph()
+    a = g.add_node(label="A")
+    req = Requirement[Node](graph=g,
+                            template={"obj_cls": "Node", "label": "B", "tags" :{"green"}},
+                            policy=ProvisioningPolicy.CREATE)
+    dep = Dependency(source_id=a.uid, requirement=req, graph=g)
+
+    prov = Provisioner(requirement=req, registries=[g])
+    provider = prov.resolve()
+    assert provider is not None
+    assert provider in g
+    assert provider.get_label() == "B"
+    assert dep.satisfied

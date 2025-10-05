@@ -7,6 +7,7 @@ from uuid import UUID
 from tangl.core import Entity, Graph, Node, Domain
 from tangl.core.record import Record, StreamRegistry
 from .frame import Frame
+from .replay import Snapshot
 
 if TYPE_CHECKING:
     from .replay import Patch
@@ -32,6 +33,7 @@ class Ledger(Entity):
     step: int = -1
     # todo: should consider this and Frame as kinds of explicit structural domains, get
     #       rid of lists of domains and add explicitly inherited domains to the scope?
+    #       ledger shouldn't hold domains, just references or it won't serialize nicely.
     domains: list[Domain] = Field(default_factory=list)
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
@@ -39,7 +41,7 @@ class Ledger(Entity):
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
         # everything else on the stream
-        snapshot = Record(type='snapshot', data=deepcopy(self.graph))
+        snapshot = Snapshot.from_item(self.graph)
         self.records.add_record(snapshot)
 
     def maybe_push_snapshot(self, snapshot_cadence=None, force=False):
@@ -52,16 +54,17 @@ class Ledger(Entity):
     def recover_graph_from_stream(cls, records: StreamRegistry) -> Graph:
 
         # Get the most recent snapshot
-        snapshot = records.last(channel="snapshot")
+        snapshot = records.last(channel="snapshot")  # type: Snapshot[Graph]
         if snapshot is None:
             raise RuntimeError(f"No snapshot found in record stream")
-
-        graph = snapshot.data   # type: Graph
+        graph = snapshot.restore_item()  # don't access item directly
         seq = snapshot.seq
         # Get all patches since the most recent snapshot and apply them
         patches = records.find_all(
             predicate=lambda x: x.seq > seq,
-            has_channel="patch")  # type: list[Patch]
+            has_channel="patch",
+            sort_key=lambda x: x.seq)  # type: list[Patch]
+        # fine if this is [], just returns graph from snapshot
         for p in patches:
             graph = p.apply(graph)
         return graph

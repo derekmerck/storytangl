@@ -6,6 +6,7 @@ from tangl.media.type_hints import Media
 from tangl.media.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
+# todo: probably want a media requirement subclass, then use that in a dependency and affordance subclass, media affordances are pre-decided media objects that can be attached as appropriate, first time you see a char etc.
 
 class MediaDep(Dependency[MediaRIT]):
     """

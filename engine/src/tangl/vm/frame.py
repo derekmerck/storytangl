@@ -6,17 +6,11 @@ from uuid import UUID
 from dataclasses import dataclass, field
 from copy import deepcopy, copy
 import logging
-from random import Random
 
-from tangl.type_hints import Step, StringMap as NS
-from tangl.utils.hashing import hashing_func
+from tangl.type_hints import Step
+from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, JobReceipt, BaseFragment
 from tangl.core.entity import Conditional
-from tangl.core.registry import Registry
-from tangl.core.record import StreamRegistry
-from tangl.core.graph import Graph, Edge, Node
-from tangl.core.dispatch import JobReceipt
 from tangl.core.domain import AffiliateDomain
-from tangl.core.fragment import BaseFragment
 from .context import Context
 from .replay import ReplayWatcher, WatchedRegistry, Patch
 
@@ -38,7 +32,7 @@ class ResolutionPhase(IntEnum):
         _data = {
             self.INIT: None,
             self.VALIDATE: (JobReceipt.all_truthy,   bool),     # confirm all true
-            self.PLANNING: (JobReceipt.gather,       Any),
+            self.PLANNING: (JobReceipt.last_result,  JobReceipt),  # actually a PlanningReceipt
             self.PREREQS:  (JobReceipt.first_result, Edge),     # check for any available jmp/jr
             self.UPDATE:   (JobReceipt.gather,       Any),
             self.JOURNAL:  (JobReceipt.last_result,  list[BaseFragment]), # pipe and compose a list of Fragments

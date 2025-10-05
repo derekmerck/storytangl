@@ -1,7 +1,7 @@
 # tangl/vm/__init__.py
 
 # Event sourced state manager
-from .replay import Event, EventType, EventWatcher, Patch
+from .replay import Event, EventType, EventWatcher, Patch, Snapshot
 
 # Provisioning
 from .planning import Requirement, Provisioner, Dependency, Affordance, ProvisioningPolicy
@@ -14,4 +14,4 @@ from .ledger import Ledger
 # Simple phase-bus handlers
 import tangl.vm.simple_handlers
 
-__all__ = ["Event", "EventType", "Requirement", "Provisioner", "Dependency", "Affordance", "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger"]
+__all__ = ["Event", "EventType", "Requirement", "Provisioner", "Dependency", "Affordance", "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context", "Snapshot"]

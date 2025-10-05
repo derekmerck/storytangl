@@ -27,3 +27,4 @@ Event Sourced
 -------------
 .. autoclass:: tangl.vm.Event
 .. autoclass:: tangl.vm.Patch
+.. autoclass:: tangl.vm.Snapshot

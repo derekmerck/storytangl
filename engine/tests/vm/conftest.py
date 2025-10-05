@@ -1,4 +1,3 @@
-
 import pytest
 
 from tangl.core.graph import Graph, Node

@@ -9,11 +9,14 @@
 import logging
 
 from tangl.core import Node, global_domain, Graph, BaseFragment
+from tangl.core.domain import NS
 from tangl.vm.context import Context
-from tangl.vm.frame import ResolutionPhase as P, NS, ChoiceEdge, ResolutionPhase
+from tangl.vm.frame import ResolutionPhase as P, ChoiceEdge
 from tangl.vm.planning import Dependency, Provisioner
 
 logger = logging.getLogger(__name__)
+
+# ------- VALIDATION ---------
 
 @global_domain.handlers.register(phase=P.VALIDATE, priority=0)
 def validate_cursor(cursor: Node, **kwargs):
@@ -21,7 +24,13 @@ def validate_cursor(cursor: Node, **kwargs):
     ok = cursor is not None and isinstance(cursor, Node)
     return ok
 
-@global_domain.handlers.register(phase=P.PLANNING, priority=50)
+# ------- PLANNING ---------
+
+# register planning handlers
+from .planning import simple_planning_handlers
+
+# todo: replace with planning.simple_planning_handler
+# @global_domain.handlers.register(phase=P.PLANNING, priority=50)
 def plan_provision(cursor: Node, **kwargs):
     # satisfy open Dependency edges out of the cursor
     g: Graph = cursor.graph
@@ -35,6 +44,8 @@ def plan_provision(cursor: Node, **kwargs):
                 made += 1
     return made
 
+# ------- PRE/POST REDIRECTS ---------
+
 @global_domain.handlers.register(phase=P.PREREQS, priority=50)
 def prereq_redirect(cursor: Node, *, ns: NS, **kwargs):
     # follow the first auto-triggering ChoiceEdge if any
@@ -42,10 +53,26 @@ def prereq_redirect(cursor: Node, *, ns: NS, **kwargs):
         if e.available(ns):
             return e
 
+@global_domain.handlers.register(phase=P.POSTREQS, priority=50)
+def postreq_redirect(cursor: Node, *, ns: NS, **kwargs):
+    for e in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.POSTREQS):
+        if e.available(ns):
+            return e
+
+# ------- UPDATE/FINALIZE ---------
+
 @global_domain.handlers.register(phase=P.UPDATE, priority=50)
 def update_noop(*args, **kwargs):
     pass
 
+@global_domain.handlers.register(phase=P.FINALIZE, priority=50)
+def finalize_noop(*args, **kwargs):
+    # collapse-to-patch can go here later
+    pass
+
+# ------- JOURNAL ---------
+
+# todo: we can move this to journal/io when that gets implemented
 @global_domain.handlers.register(phase=P.JOURNAL, priority=50)
 def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     step = ctx.step
@@ -66,14 +93,3 @@ def coerce_to_fragments(*args, ctx: Context, **kwargs):
             fragments.append(f)
     logger.debug(f"JOURNAL: Outputting fragments: {fragments}")
     return fragments
-
-@global_domain.handlers.register(phase=P.FINALIZE, priority=50)
-def finalize_noop(*args, **kwargs):
-    # collapse-to-patch can go here later
-    pass
-
-@global_domain.handlers.register(phase=P.POSTREQS, priority=50)
-def postreq_redirect(cursor: Node, *, ns: NS, **kwargs):
-    for e in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.POSTREQS):
-        if e.available(ns):
-            return e

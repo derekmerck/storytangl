@@ -43,13 +43,13 @@ class Node(GraphItem):
     def edges(self, **criteria) -> list[Edge]:
         return list(self.edges_in(**criteria)) + list(self.edges_out(**criteria))
 
-    def add_edge_to(self, node: Node, **attrs) -> None:
+    def add_edge_to(self, node: Node, **attrs) -> Edge:
         from .edge import Edge
-        Edge(source_id=self.uid, destination_id=node.uid, graph=self.graph, **attrs)
+        return Edge(source_id=self.uid, destination_id=node.uid, graph=self.graph, **attrs)
 
-    def add_edge_from(self, node: Node, **attrs) -> None:
+    def add_edge_from(self, node: Node, **attrs) -> Edge:
         from .edge import Edge
-        Edge(source_id=node.uid, destination_id=self.uid, graph=self.graph, **attrs)
+        return Edge(source_id=node.uid, destination_id=self.uid, graph=self.graph, **attrs)
 
     def remove_edge_to(self, node: Node) -> None:
         edge = self.graph.find_edge(source=self, destination=node)

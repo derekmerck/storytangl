@@ -1,7 +1,8 @@
 import pytest
 from uuid import uuid4, UUID
 
-from tangl.vm.replay import Event, EventType
+from tangl.core import Registry, Node
+from tangl.vm.replay import Event, EventType, Patch
 
 
 def _mk_create(reg_id: UUID, uid: UUID, *, idx: int):
@@ -156,3 +157,14 @@ def test_delete_create_delete_create_endpoints_kept():
 
     types, out = _canon_types(seq)
     assert types == [EventType.DELETE, EventType.CREATE]
+
+def test_event_canonicalization_coalesces_updates():
+    reg = Registry()
+    n = Node(label="X")
+    reg.add(n)
+
+    e1 = Event(source_id=n.uid, event_type=EventType.UPDATE, name="label", value="Y", old_value="X")
+    e2 = Event(source_id=n.uid, event_type=EventType.UPDATE, name="label", value="Z", old_value="Y")
+    patch = Patch(events=[e1, e2])
+    reg2 = patch.apply(reg)
+    assert reg2.get(n.uid).get_label() == "Z"

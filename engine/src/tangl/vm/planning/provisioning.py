@@ -1,19 +1,30 @@
 # tangl/vm/provisioning.py
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Iterator, Literal, Self
+
+from pydantic import Field
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, Registry
+from tangl.core import Node, Registry, Entity
+from tangl.core.entity import Selectable
 from .requirement import Requirement, ProvisioningPolicy
 
-@dataclass
-class Provisioner:
+class Provisioner(Selectable, Entity):
     # Default provisioner for Dependency edges
     # todo: Provisioners need to be implemented like handlers/handler registries, so
     #       that they can be passed around in domains, I think
     #       previously they yielded an offer job receipt with an 'accept' function
     #       for the orchestrator to select
+
+    # def can_satisfy(self, dep: Dependency) -> bool:
+    #     # check sources for satisfiers, return a list of offers?
+    #     return dep.requirement.satisfied_by(self)
+    #
+    # def get_satisfier(self, dep: Dependency) -> Optional[Node]:
+    #     if not self.can_satisfy(dep):
+    #         return None
+    #     return self.resolve(dep.requirement)
 
     requirement: Requirement
     registries: list[Registry] = field(default_factory=list)

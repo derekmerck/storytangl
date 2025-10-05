@@ -135,6 +135,9 @@ class StreamRegistry(Registry[HasSeq]):
 
     # ---- slicing ----
 
+    # todo: anytime you find_all on a record stream, you want to sort it _at_least_ by seq
+    #       should just overload find all to do that by default unless flagged not to.
+
     # def get_slice(self, start_seq: int = 0, end_seq: Optional[int] = None, *, inclusive_start: bool = True) -> list[Record]:
     #     """Return records with start_seq <= seq < end_seq (default end = max)."""
     #     end_seq = self._max_seq + 1 if end_seq is None else end_seq
