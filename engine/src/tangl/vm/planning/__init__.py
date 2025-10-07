@@ -9,7 +9,7 @@ frontier* during :data:`~tangl.vm.frame.ResolutionPhase.PLANNING`:
   (dependency or affordance) with a provisioning policy.
 - :class:`~tangl.vm.planning.provisioning.Provisioner` is the default provider
   that searches registries, updates or clones, or creates new nodes from templates.
-- :class:`~tangl.vm.planning.offer.Offer` wraps a provisioner call as a proposal.
+- :class:`~tangl.vm.planning.offer.ProvisionOffer` wraps a provisioner call as a proposal.
 - :mod:`~tangl.vm.planning.simple_planning_handlers` wires the phase bus:
   collect offers → select & apply → compose a planning receipt.
 

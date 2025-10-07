@@ -2,15 +2,16 @@
 """
 Offers and planning receipts.
 
-An :class:`Offer` is an *ephemeral* proposal to satisfy a
-:class:`~tangl.vm.planning.requirement.Requirement`. Accepting an offer calls
-its provisioner, which may mutate the graph. When event-sourcing is enabled,
-those mutations are captured as events and later collapsed into a patch.
+A :class:`ProvisionOffer` is an *ephemeral* proposal to satisfy a
+:class:`~tangl.vm.planning.requirement.Requirement`. Accepting an offer now
+returns a provider (or ``None``) without mutating the requirement or graph.
+Selectors are responsible for binding the provider, handling failures, and
+constructing :class:`BuildReceipt` instances that document the outcome.
 
 This module also defines receipts used to summarize planning outcomes.
 """
 from __future__ import annotations
-from typing import Optional, Literal, Self, Callable, Any, TYPE_CHECKING, Type
+from typing import Optional, Literal, Self, Callable, Type
 from uuid import UUID
 
 from pydantic import Field
@@ -26,7 +27,7 @@ class BuildReceipt(JobReceipt):
     """
     BuildReceipt(requirement: Requirement, op_kind: str)
 
-    Receipt returned by :meth:`Offer.accept`.
+    Receipt summarizing how a selector handled a :class:`ProvisionOffer`.
 
     Why
     ----
@@ -76,30 +77,33 @@ class BuildReceipt(JobReceipt):
 
 class ProvisionOffer(Selectable, Entity):
     """
-    Offer(requirement, provisioner, *, priority=50, hard=True)
+    ProvisionOffer(requirement, provisioner, *, priority=50)
 
     Why
     ----
     Ephemeral proposal to satisfy a :class:`~tangl.vm.planning.requirement.Requirement`
     via a :class:`~tangl.vm.planning.provisioning.Provisioner`. Offers are compared
-    and selected by priority; acceptance invokes the provisioner and yields a
-    :class:`BuildReceipt`.
+    and selected by priority; acceptance invokes the provisioner and returns a
+    provider (or ``None``) for selectors to process.
 
     Key Features
     ------------
-    * **Arbitration** – :attr:`priority` (lower wins) and :attr:`hard` semantics for selectors.
+    * **Arbitration** – :attr:`priority` (lower wins); selectors inspect
+      :attr:`Requirement.hard_requirement` directly when needed.
     * **Selectable** – publishes :attr:`selection_criteria` for inverse matching.
-    * **Provisioning hook** – delegates to :class:`Provisioner.resolve` which may mutate the graph.
-    * **Auditable** – :meth:`accept` returns a :class:`BuildReceipt` with provider/operation.
+    * **Provisioning hook** – delegates to :class:`Provisioner.resolve` or a
+      custom callback to compute a provider without side effects.
+    * **Pure resolution** – :meth:`accept` simply returns a provider, leaving
+      binding and receipt construction to selector logic.
 
     API
     ---
     - :attr:`requirement` – target requirement being satisfied.
     - :attr:`provisioner` – default provider logic (domain builders may override).
     - :attr:`priority` – integer priority; lower numbers run earlier.
-    - :attr:`hard` – mirrors ``requirement.hard_requirement``.
     - :attr:`selection_criteria` – hints for higher-order selectors.
-    - :meth:`accept(ctx)<accept>` – apply provisioner, bind provider, and return a receipt.
+    - :meth:`accept(ctx)<accept>` – compute a provider and return it without
+      mutating the requirement or graph.
     """
     requirement: Requirement
     provisioner: Provisioner
@@ -112,52 +116,21 @@ class ProvisionOffer(Selectable, Entity):
     # for inverse filtering, predicates on acceptance
 
     # Will try `prov.resolve(req)` by default
-    accept_func: Callable[..., Entity | None] = None
+    accept_func: Callable[..., Node | None] | None = None
     accept_func_takes_req: bool = False
 
     def describe(self) -> str:
         r = self.requirement
-        return f"Offer[{self.short_uid()}]: policy={r.policy.value}, id={r.identifier}, crit={r.criteria}"
+        return f"ProvisionOffer[{self.short_uid()}]: policy={r.policy.value}, id={r.identifier}, crit={r.criteria}"
 
-    def accept(self, *, ctx: Context) -> BuildReceipt:
-        """
-        Accept via provisioner; watchers will record events if event_sourced.
+    def accept(self, *, ctx: Context) -> Node | None:
+        """Compute a provider for ``requirement`` without side effects."""
 
-        Provisioner.accept creates or finds, provider is linked (or marked unresolvable?) here.
-        """
         if self.accept_func is None:
-            provider = self.provisioner.resolve(self.requirement)
-        elif self.accept_func_takes_req:
-            provider = self.accept_func(self.requirement)
-        else:
-            provider = self.accept_func()
-
-        if provider is None:
-            # todo: This might actually be an error condition, we don't want to create
-            #       an offer that doesn't return a provider, however, it looks like we
-            #       currently use this to flag for unresolvable
-            self.requirement.is_unresolvable = True
-            return BuildReceipt(
-                provisioner_id=self.provisioner.uid,
-                requirement_id=self.requirement.uid,
-                provider_id=None,
-                operation=ProvisioningPolicy.NOOP,
-                accepted=False,
-                hard_req=self.requirement.hard,
-                reason='unresolvable',
-            )
-
-        # todo: guarantee that provider satisfies req as advertised
-
-        # Passed everything! Assign the provider to the req.
-        self.requirement.provider = provider
-        return BuildReceipt(
-            provisioner_id=self.provisioner.uid,
-            requirement_id=self.requirement.uid,
-            result=provider.uid,
-            operation=self.operation,
-            accepted=True
-        )
+            return self.provisioner.resolve(self.requirement)
+        if self.accept_func_takes_req:
+            return self.accept_func(self.requirement)
+        return self.accept_func()
 
 
 class PlanningReceipt(JobReceipt):

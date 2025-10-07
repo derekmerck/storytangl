@@ -7,7 +7,8 @@ Flow (one frame, one cursor):
 
 2.	**Select**: A single “selector” handler merges and de-duplicates offers, applies policy (hard/soft, priority), and decides which to accept.
 
-3.	**Apply**: For each accepted offer, call offer.accept(ctx)—this performs the update.
+3.	**Apply**: For each accepted offer, call ``offer.accept(ctx)`` to compute a provider.
+	    The selector binds the provider and records receipts.
 
       - If Frame.event_sourced=True, your WatchedRegistry captures mutations → Events → a Patch is added in FINALIZE (already implemented).
 

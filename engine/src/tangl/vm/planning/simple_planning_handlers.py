@@ -5,7 +5,7 @@ Default planning handlers (reference implementation).
 The planning phase is wired in three small steps:
 
 1. ``plan_collect_offers`` (EARLY) – enumerate open frontier requirements and
-   publish :class:`~tangl.vm.planning.Offer` objects.
+   publish :class:`~tangl.vm.planning.ProvisionOffer` objects.
 2. ``plan_select_and_apply`` (LATE) – coalesce offers per requirement, select by
    lowest priority, accept, and return :class:`~tangl.vm.planning.BuildReceipt`.
 3. ``plan_compose_receipt`` (LAST) – summarize into a
@@ -59,9 +59,11 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
 # 2) Select + apply (NORMAL/LATE)
 @global_domain.handlers.register(phase=P.PLANNING, priority=75)
 def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
-    """
-    Gather all Offer objects produced earlier this phase, de-duplicate by Requirement,
-    choose one by priority, accept it, and return BuildReceipts.
+    """Select offers, bind providers, and emit :class:`BuildReceipt` records.
+
+    ``ProvisionOffer.accept`` now returns a provider without side effects. This
+    selector performs the binding, updates :attr:`Requirement.is_unresolvable`,
+    and constructs receipts summarizing the outcome for each requirement.
     """
     # Gather offers from earlier receipts
     all_offers: list[ProvisionOffer] = []
@@ -81,8 +83,35 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
         # choose lowest priority; then stable by insertion
         cand.sort(key=lambda o: o.priority)
         chosen = cand[0]
-        br = chosen.accept(ctx=ctx)
-        builds.append(br)
+        provider = chosen.accept(ctx=ctx)
+
+        if provider is None:
+            chosen.requirement.is_unresolvable = True
+            builds.append(
+                BuildReceipt(
+                    provisioner_id=chosen.provisioner.uid,
+                    requirement_id=chosen.requirement.uid,
+                    provider_id=None,
+                    operation=ProvisioningPolicy.NOOP,
+                    accepted=False,
+                    hard_req=chosen.requirement.hard_requirement,
+                    reason='unresolvable',
+                )
+            )
+            continue
+
+        # Successful binding: attach provider and clear prior failures.
+        chosen.requirement.provider = provider
+        chosen.requirement.is_unresolvable = False
+        builds.append(
+            BuildReceipt(
+                provisioner_id=chosen.provisioner.uid,
+                requirement_id=chosen.requirement.uid,
+                result=provider.uid,
+                operation=chosen.operation or ProvisioningPolicy.NOOP,
+                accepted=True,
+            )
+        )
 
     return builds
 
