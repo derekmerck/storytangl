@@ -54,20 +54,17 @@ class Provisioner(Handler):
       across provided registries and the graph.
     * **Template application** – UPDATE/CLONE/CREATE use the requirement’s
       :attr:`Requirement.template` to modify or instantiate nodes.
-    * **Failure handling** – marks :attr:`Requirement.is_unresolvable` on failure.
+    * **Pure resolution** – :meth:`resolve` returns providers without mutating
+      requirements; callers decide how to handle success or failure.
 
     API
     ---
-    - :meth:`resolve()` – execute provisioning per policy.
+    - :meth:`resolve()` – execute provisioning per policy and return a provider or ``None``.
     - :meth:`_resolve_existing()` – locate existing provider.
     - :meth:`_resolve_update()` – mutate in place using template.
     - :meth:`_resolve_clone()` – duplicate and evolve a reference provider.
     - :meth:`_resolve_create()` – instantiate from template.
 
-    Notes
-    -----
-    On success, the resolved provider is assigned to
-    :attr:`Requirement.provider` and added to the graph if missing.
     """
     phase: str = "PLANNING.OFFER"
     result_type: Type = list['ProvisionOffer']
@@ -209,10 +206,7 @@ class Provisioner(Handler):
         )
 
     def resolve(self, requirement: Requirement) -> Optional[Node]:
-        """
-        Attempt to directly resolve a provider for an independently complete
-        requirement with a single policy.
-        """
+        """Return a provider for ``requirement`` or ``None`` without side effects."""
 
         provider = None
 
@@ -243,7 +237,6 @@ class Provisioner(Handler):
                     provider_template=requirement.template
                     )
             case _:
-                raise ValueError(f"Unsupported provisioning policy {self.requirement.policy}")
+                raise ValueError(f"Unsupported provisioning policy {requirement.policy}")
 
-        if provider:
-            return provider
+        return provider
