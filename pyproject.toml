@@ -25,7 +25,7 @@ serve = "tangl.apps.rest.__main__:main"
 docs = "sphinx.cmd.build:main"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.11,<4.0"
 pydantic = "^2.10.6"
 shortuuid = "^1.0.13"
 dynaconf = "^3.2.7"
