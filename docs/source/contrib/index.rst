@@ -6,3 +6,4 @@ Contribution Guide
 
    coding_style
    docstring_style
+   planning_phase_roadmap
