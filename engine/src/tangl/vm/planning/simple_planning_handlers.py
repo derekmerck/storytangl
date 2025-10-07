@@ -21,6 +21,7 @@ from tangl.vm import ResolutionPhase as P, Context, ProvisioningPolicy
 from .open_edge import Dependency, Affordance
 from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
 from .provisioning import Provisioner
+from .requirement import Requirement
 
 # todo: lets introduce a sub-phase here: PLANNING_OFFER
 #       handlers of type provisioner that want phase_offer and
@@ -73,43 +74,95 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
         elif isinstance(r.result, ProvisionOffer):
             all_offers.append(r.result)
 
-    # Coalesce by requirement uid
-    by_req: dict[UUID, list[ProvisionOffer]] = {}
+    # Coalesce by requirement uid and remember requirements on the frontier
+    offers_by_req: dict[UUID, list[ProvisionOffer]] = {}
+    requirements: dict[UUID, Requirement] = {}
+
+    def include_requirement(req: Requirement) -> None:
+        requirements.setdefault(req.uid, req)
+
     for off in all_offers:
-        by_req.setdefault(off.requirement.uid, []).append(off)
+        offers_by_req.setdefault(off.requirement.uid, []).append(off)
+        include_requirement(off.requirement)
+
+    # Include unresolved frontier requirements even when no offers were published
+    for edge in cursor.edges_out(is_instance=Dependency, satisfied=False):
+        include_requirement(edge.requirement)
+    for edge in cursor.edges_in(is_instance=Affordance, satisfied=False):
+        include_requirement(edge.requirement)
+
+    # Evaluate requirements in a deterministic order for testability/debuggability.
+    ordered_requirements = sorted(
+        requirements.values(),
+        key=lambda req: req.uid.int,
+    )
 
     builds: list[BuildReceipt] = []
-    for req_id, cand in by_req.items():
-        # choose lowest priority; then stable by insertion
-        cand.sort(key=lambda o: o.priority)
-        chosen = cand[0]
-        provider = chosen.accept(ctx=ctx)
+    for requirement in ordered_requirements:
+        candidates = offers_by_req.get(requirement.uid, [])
 
-        if provider is None:
-            chosen.requirement.is_unresolvable = True
-            builds.append(
-                BuildReceipt(
-                    provisioner_id=chosen.provisioner.uid,
-                    requirement_id=chosen.requirement.uid,
-                    provider_id=None,
-                    operation=ProvisioningPolicy.NOOP,
-                    accepted=False,
-                    hard_req=chosen.requirement.hard_requirement,
-                    reason='unresolvable',
-                )
-            )
+        if requirement.provider is not None and not candidates:
+            # Already satisfied and no new offers to evaluate.
+            requirement.is_unresolvable = False
             continue
 
-        # Successful binding: attach provider and clear prior failures.
-        chosen.requirement.provider = provider
-        chosen.requirement.is_unresolvable = False
+        if not candidates:
+            if requirement.hard_requirement:
+                requirement.is_unresolvable = True
+                builds.append(
+                    BuildReceipt(
+                        provisioner_id=cursor.uid,
+                        requirement_id=requirement.uid,
+                        provider_id=None,
+                        operation=ProvisioningPolicy.NOOP,
+                        accepted=False,
+                        hard_req=requirement.hard_requirement,
+                        reason='no_offers',
+                    )
+                )
+            continue
+
+        candidates.sort(key=lambda o: (o.priority, o.uid.int))
+
+        chosen_offer: ProvisionOffer | None = None
+        provider: Node | None = None
+        for offer in candidates:
+            candidate_provider = offer.accept(ctx=ctx)
+            if candidate_provider is None:
+                continue
+            chosen_offer = offer
+            provider = candidate_provider
+            break
+
+        if provider is None or chosen_offer is None:
+            if requirement.hard_requirement:
+                requirement.is_unresolvable = True
+                builds.append(
+                    BuildReceipt(
+                        provisioner_id=candidates[0].provisioner.uid,
+                        requirement_id=requirement.uid,
+                        provider_id=None,
+                        operation=ProvisioningPolicy.NOOP,
+                        accepted=False,
+                        hard_req=requirement.hard_requirement,
+                        reason='unresolvable',
+                    )
+                )
+            continue
+
+        # Successful binding: attach provider and clear any prior failures.
+        requirement.provider = provider
+        if requirement.hard_requirement:
+            requirement.is_unresolvable = False
+
         builds.append(
             BuildReceipt(
-                provisioner_id=chosen.provisioner.uid,
-                requirement_id=chosen.requirement.uid,
-                result=provider.uid,
-                operation=chosen.operation or ProvisioningPolicy.NOOP,
+                provisioner_id=chosen_offer.provisioner.uid,
+                requirement_id=requirement.uid,
+                provider_id=provider.uid,
+                operation=chosen_offer.operation or ProvisioningPolicy.NOOP,
                 accepted=True,
+                hard_req=requirement.hard_requirement,
             )
         )
 
