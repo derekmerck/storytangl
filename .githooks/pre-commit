@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Verify the Sphinx documentation builds before allowing the commit.
+# This hook only runs when documentation or source files change so that
+# the build stays fast during unrelated commits.
+
+set -euo pipefail
+
+CHANGED=$(git diff --cached --name-only)
+if [[ -z "${CHANGED}" ]]; then
+  exit 0
+fi
+
+if ! grep -E '^(docs/|engine/src/|pyproject\.toml|README\.md)' <<<"${CHANGED}" >/dev/null; then
+  exit 0
+fi
+
+if command -v poetry >/dev/null 2>&1; then
+  if ! poetry run python - <<'PY' >/dev/null 2>&1; then
+import importlib.util
+import sys
+sys.exit(0 if importlib.util.find_spec("sphinx") else 1)
+PY
+  then
+    cat <<'MSG' >&2
+[storytangl] Sphinx is not available in the Poetry environment.
+Install the docs dependencies with:
+    poetry install --with docs
+MSG
+    exit 1
+  fi
+  SPHINX_CMD=(poetry run python -m sphinx.cmd.build)
+else
+  if ! python - <<'PY' >/dev/null 2>&1; then
+import importlib.util
+import sys
+sys.exit(0 if importlib.util.find_spec("sphinx") else 1)
+PY
+  then
+    cat <<'MSG' >&2
+[storytangl] Sphinx is not available on PATH.
+Install the docs dependencies (e.g. `pip install -r docs/requirements.txt`).
+MSG
+    exit 1
+  fi
+  SPHINX_CMD=(python -m sphinx.cmd.build)
+fi
+
+BUILD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'sphinx-build')
+trap 'rm -rf "${BUILD_DIR}"' EXIT
+
+printf '[storytangl] Building documentation via %s\n' "${SPHINX_CMD[*]}"
+STORYTANGL_OFFLINE=1 \
+"${SPHINX_CMD[@]}" -W --keep-going -n -b html docs/source "${BUILD_DIR}" >/dev/null
+printf '[storytangl] Documentation build succeeded.\n'

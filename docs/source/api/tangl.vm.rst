@@ -22,6 +22,7 @@ Planning
 .. autoclass:: tangl.vm.Affordance
 .. autoclass:: tangl.vm.Provisioner
 .. autoclass:: tangl.vm.Offer
+.. autoclass:: tangl.vm.ProvisionOffer
 .. autoclass:: tangl.vm.planning.BuildReceipt
 .. autoclass:: tangl.vm.planning.PlanningReceipt
 
