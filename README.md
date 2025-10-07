@@ -74,6 +74,19 @@ $ poetry install --only main
 $ tangl-serve
 ```
 
+### Keep the docs green
+
+StoryTangl ships with a pre-commit hook that builds the Sphinx documentation
+whenever you touch files that affect the docs. Enable it once per clone and make
+sure the docs dependencies are available:
+
+```bash
+$ git config core.hooksPath .githooks
+$ poetry install --with docs
+```
+
+You can always trigger the same check manually with `poetry run sphinx-build -b html docs/source docs/_build/html`.
+
 ### Docker
 
 The git repo includes a Dockerfile for the reference app that can be used as

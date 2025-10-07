@@ -24,7 +24,7 @@ Conceptual layers
 
    - :class:`Requirement` expresses needed providers and their provisioning policy.
    - :class:`Provisioner` resolves or creates providers according to policy.
-   - :class:`Offer` represents a proposed way to satisfy a requirement.
+   - :class:`Offer` (alias for :class:`ProvisionOffer`) represents a proposed way to satisfy a requirement.
    - :class:`Dependency` and :class:`Affordance` describe open edges at the frontier.
 
 3. :ref:`Replay<vm-replay>`
@@ -46,12 +46,23 @@ any narrative or domain-specific content. VM code depends only on :mod:`tangl.co
 from .replay import Event, EventType, EventWatcher, Patch
 
 # Provisioning
-from .planning import Requirement, Provisioner, Dependency, Affordance, ProvisioningPolicy
+from .planning import (
+    Requirement,
+    Provisioner,
+    Dependency,
+    Affordance,
+    ProvisioningPolicy,
+    ProvisionOffer,
+    BuildReceipt,
+    PlanningReceipt,
+)
 
 # Resolution step
 from .context import Context
 from .frame import Frame, ChoiceEdge, ResolutionPhase
 from .ledger import Ledger
+
+Offer = ProvisionOffer
 
 # Simple phase-bus handlers
 import tangl.vm.simple_handlers
@@ -60,7 +71,7 @@ __all__ = [
     # events/replay
     "Event", "EventType", "Patch",
     # planning
-    "Requirement", "Provisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer",
+    "Requirement", "Provisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "BuildReceipt", "PlanningReceipt",
     # resolution
     "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context",
     ]
