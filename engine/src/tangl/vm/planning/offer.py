@@ -176,8 +176,9 @@ class PlanningReceipt(JobReceipt):
         unresolved_hard_requirements = []
 
         for b in builds:
-            if not b.accepted and b.reason == 'unresolvable':
-                unresolved_hard_requirements.append(str(b.caller_id))
+            if not b.accepted:
+                if b.hard_req:
+                    unresolved_hard_requirements.append(str(b.caller_id))
                 continue
             match b.operation:
                 case ProvisioningPolicy.EXISTING: attached += 1

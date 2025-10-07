@@ -5,9 +5,17 @@ import pytest
 
 from tangl.core.entity import Entity
 from tangl.core import Graph, Node
-from tangl.vm.planning import Provisioner, Requirement, ProvisioningPolicy, ProvisionOffer
+from tangl.vm.planning import (
+    Provisioner,
+    Requirement,
+    ProvisioningPolicy,
+    ProvisionOffer,
+    BuildReceipt,
+)
 from tangl.vm.planning.open_edge import Dependency, Affordance
 from tangl.vm.frame import Frame, ResolutionPhase as P
+from tangl.vm.planning.simple_planning_handlers import plan_select_and_apply
+from tangl.core.dispatch import JobReceipt
 
 
 # ---------- Provisioning orchestration ----------
@@ -275,6 +283,88 @@ def test_hard_requirement_unresolved_is_reported():
     assert hard_req.satisfied is False
     assert hasattr(receipt, "unresolved_hard_requirements")
     assert hard_req.uid in receipt.unresolved_hard_requirements
+
+
+def test_hard_affordance_without_offers_marks_unresolvable_once():
+    g = Graph(label="demo")
+    destination = g.add_node(label="terminal")
+
+    req = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.EXISTING,
+        identifier="missing",
+        hard_requirement=True,
+    )
+    Affordance[Node](graph=g, destination_id=destination.uid, requirement=req, label="from_nowhere")
+
+    frame = Frame(graph=g, cursor_id=destination.uid)
+    planning_receipt = frame.run_phase(P.PLANNING)
+
+    # Requirement is marked unresolved and appears exactly once in the aggregated receipt.
+    assert req.is_unresolvable is True
+    assert planning_receipt.unresolved_hard_requirements == [req.uid]
+
+    build_receipts: list[BuildReceipt] = []
+    for r in frame.phase_receipts[P.PLANNING]:
+        if isinstance(r.result, list):
+            build_receipts.extend([b for b in r.result if isinstance(b, BuildReceipt)])
+        elif isinstance(r.result, BuildReceipt):
+            build_receipts.append(r.result)
+
+    assert len(build_receipts) == 1
+    failure = build_receipts[0]
+    assert failure.accepted is False
+    assert failure.reason == "no_offers"
+    assert failure.provider_id is None
+    assert failure.caller_id == req.uid
+
+
+def test_selector_skips_failed_offers_and_binds_first_success():
+    g, anchor = _graph_and_anchor()
+
+    req = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.EXISTING,
+        identifier="winner",
+        hard_requirement=True,
+    )
+    Dependency[Node](graph=g, source_id=anchor.uid, requirement=req, label="needs_winner")
+
+    winner = g.add_node(label="winner")
+
+    provisioner = Provisioner()
+
+    failing_offer = ProvisionOffer(
+        label="fail",
+        requirement=req,
+        provisioner=provisioner,
+        priority=1,
+        operation=ProvisioningPolicy.EXISTING,
+        accept_func=lambda: None,
+    )
+
+    succeeding_offer = ProvisionOffer(
+        label="succeed",
+        requirement=req,
+        provisioner=provisioner,
+        priority=2,
+        operation=ProvisioningPolicy.EXISTING,
+        accept_func=lambda: winner,
+    )
+
+    frame = Frame(graph=g, cursor_id=anchor.uid)
+    ctx = frame.context
+    ctx.job_receipts.clear()
+    ctx.job_receipts.append(JobReceipt(result=[failing_offer, succeeding_offer]))
+
+    builds = plan_select_and_apply(anchor, ctx=ctx)
+
+    assert len(builds) == 1
+    success = builds[0]
+    assert success.accepted is True
+    assert success.provider_id == winner.uid
+    assert req.provider is winner
+    assert req.is_unresolvable is False
 
 @pytest.mark.xfail(reason="affordances not materialized and considered yet")
 def test_affordance_creates_or_finds_source():
