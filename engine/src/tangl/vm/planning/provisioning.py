@@ -25,7 +25,7 @@ API
 - :meth:`_resolve_existing` / :meth:`_resolve_update` / :meth:`_resolve_clone` / :meth:`_resolve_create` – internal helpers implementing each policy.
 """
 from __future__ import annotations
-from typing import Optional, Type, TYPE_CHECKING
+from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING
 import functools
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
@@ -71,7 +71,7 @@ class Provisioner(Handler):
     func: None = None
 
     @staticmethod
-    def _resolve_existing(registry: Registry,
+    def _resolve_existing(*registries: Registry,
                           provider_id: Optional[Identifier] = None,
                           provider_criteria: Optional[StringMap] = None) -> Optional[Node]:
         """Find successor by reference and filter by criteria"""
@@ -85,10 +85,13 @@ class Provisioner(Handler):
             provider_criteria['has_identifier'] = provider_id
         if not provider_criteria:
             raise ValueError("Must include some provider id or criteria")
-        return Registry.chain_find_one(registry, **provider_criteria)
+        registries = [r for r in registries if r is not None]
+        if not registries:
+            raise ValueError("Must include at least one registry to search")
+        return Registry.chain_find_one(*registries, **provider_criteria)
 
     @staticmethod
-    def _resolve_update(registry: Registry,
+    def _resolve_update(*registries: Registry,
                         provider_id: Optional[Identifier] = None,
                         provider_criteria: Optional[StringMap] = None,
                         update_template: UnstructuredData = None
@@ -98,14 +101,16 @@ class Provisioner(Handler):
             raise ValueError("UPDATE must include update template")
         if 'graph' in update_template:
             raise KeyError("Update template may not include 'graph' key")
-        provider = Provisioner._resolve_existing(registry, provider_id, provider_criteria)
+        provider = Provisioner._resolve_existing(*registries,
+                                                provider_id=provider_id,
+                                                provider_criteria=provider_criteria)
         if not provider:
             return None
         provider.update_attrs(**update_template)
         return provider
 
     @staticmethod
-    def _resolve_clone(registry: Registry,
+    def _resolve_clone(*registries: Registry,
                        ref_id: Optional[Identifier] = None,
                        ref_criteria: Optional[StringMap] = None,
                        update_template: UnstructuredData = None
@@ -115,7 +120,9 @@ class Provisioner(Handler):
             raise ValueError("CLONE must include update template")
         if 'graph' in update_template:
             raise KeyError("Update template may not include 'graph' key")
-        ref = Provisioner._resolve_existing(registry, ref_id, ref_criteria)
+        ref = Provisioner._resolve_existing(*registries,
+                                            provider_id=ref_id,
+                                            provider_criteria=ref_criteria)
         if not ref:
             return None
         provider = ref.evolve(**update_template)  # todo: ensure NEW uid, graph says the same
@@ -130,69 +137,93 @@ class Provisioner(Handler):
         registry.add(provider)
         return provider
 
+    def _requirement_registries(self, requirement: Requirement) -> tuple[Registry, ...]:
+        registries: list[Registry] = []
+        if isinstance(getattr(requirement, "graph", None), Registry):
+            registries.append(requirement.graph)
+        extra_registry = getattr(requirement, "registry", None)
+        if isinstance(extra_registry, Registry):
+            registries.append(extra_registry)
+        elif isinstance(extra_registry, Iterable):
+            registries.extend([r for r in extra_registry if isinstance(r, Registry)])
+        return tuple(registries)
+
+    @staticmethod
+    def _iter_policies(policy: ProvisioningPolicy) -> Sequence[ProvisioningPolicy]:
+        if policy in (
+            ProvisioningPolicy.EXISTING,
+            ProvisioningPolicy.UPDATE,
+            ProvisioningPolicy.CREATE,
+            ProvisioningPolicy.CLONE,
+        ):
+            return (policy,)
+        policies: list[ProvisioningPolicy] = []
+        for candidate in ProvisioningPolicy:
+            if candidate in (ProvisioningPolicy.NOOP, ProvisioningPolicy.ANY):
+                continue
+            if candidate in policy:
+                policies.append(candidate)
+        return tuple(policies)
+
     def get_offers(self, requirement: Requirement) -> list[ProvisionOffer]:
         from .offer import ProvisionOffer
 
+        registries = self._requirement_registries(requirement)
         offers: list[ProvisionOffer] = []
 
-        # check for extant
-        extant = False
-        if (requirement.policy is not ProvisioningPolicy.CREATE and
-                (requirement.identifier or requirement.criteria)):
-            extant = self._resolve_existing(
-                registry=requirement.registry,
-                provider_id=requirement.identifier,
-                provider_criteria=requirement.criteria,
-            )
+        extant: Optional[Node] = None
+        if requirement.identifier or requirement.criteria:
+            try:
+                extant = self._resolve_existing(
+                    *registries,
+                    provider_id=requirement.identifier,
+                    provider_criteria=requirement.criteria,
+                )
+            except ValueError:
+                extant = None
+
         has_template = requirement.template is not None
 
-        for policy in requirement.policy:
-            offer_cb = None
-            offer_policy = None
+        for policy in self._iter_policies(requirement.policy):
+            accept_cb = None
             match policy:
-                case ProvisioningPolicy.EXISTING if extant:
-                    # doesn't like assigned lambdas?
-                    offer_cb = functools.partial(
+                case ProvisioningPolicy.EXISTING if extant is not None:
+                    accept_cb = functools.partial(
                         self._resolve_existing,
-                        registry=requirement.graph,
-                        provider_id=extant.uid
-                    )
-                    offer_policy = ProvisioningPolicy.EXISTING
-                case ProvisioningPolicy.UPDATE if extant and has_template:
-                    offer_cb = functools.partial(
-                        self._resolve_update,
-                        registry=requirement.graph,
+                        *registries,
                         provider_id=extant.uid,
-                        update_template=requirement.template
                     )
-                    offer_policy = ProvisioningPolicy.UPDATE
-                case ProvisioningPolicy.CLONE if extant and has_template:
-                    offer_cb = functools.partial(
+                case ProvisioningPolicy.UPDATE if extant is not None and has_template:
+                    accept_cb = functools.partial(
+                        self._resolve_update,
+                        *registries,
+                        provider_id=extant.uid,
+                        update_template=requirement.template,
+                    )
+                case ProvisioningPolicy.CLONE if extant is not None and has_template:
+                    accept_cb = functools.partial(
                         self._resolve_clone,
-                        registry=requirement.graph,
+                        *registries,
                         ref_id=extant.uid,
-                        update_template=requirement.template
-                        )
-                    offer_policy = ProvisioningPolicy.CLONE
-                case ProvisioningPolicy.CREATE if has_template:
-                    offer_cb = functools.partial(
+                        update_template=requirement.template,
+                    )
+                case ProvisioningPolicy.CREATE if has_template and registries:
+                    accept_cb = functools.partial(
                         self._resolve_create,
-                        registry = requirement.graph,
-                        provider_template=requirement.template
-                        )
-                    offer_policy = ProvisioningPolicy.CREATE
+                        registries[0],
+                        requirement.template,
+                    )
                 case _:
-                    pass
-                    # raise ValueError(f"Unknown provisioning policy {self.requirement.policy}")
+                    continue
 
-            if offer_cb is not None:
-                offer = ProvisionOffer(
+            offers.append(
+                ProvisionOffer(
                     requirement=requirement,
                     provisioner=self,
-                    accept_func=offer_cb,
-                    operation=offer_policy,
+                    accept_func=accept_cb,
+                    operation=policy,
                 )
-                offers.append(offer)
+            )
 
         return offers
 
@@ -210,31 +241,34 @@ class Provisioner(Handler):
 
         provider = None
 
+        registries = self._requirement_registries(requirement)
+
         match requirement.policy:
             case ProvisioningPolicy.EXISTING:
                 provider = self._resolve_existing(
-                    registry=requirement.graph,
+                    *registries,
                     provider_id=requirement.identifier,
                     provider_criteria=requirement.criteria,
                 )
             case ProvisioningPolicy.UPDATE:
                 provider = self._resolve_update(
-                    registry=requirement.graph,
+                    *registries,
                     provider_id=requirement.identifier,
                     provider_criteria=requirement.criteria,
                     update_template=requirement.template
                     )
             case ProvisioningPolicy.CLONE:
                 provider = self._resolve_clone(
-                    registry=requirement.graph,
+                    *registries,
                     ref_id=requirement.identifier,
                     ref_criteria=requirement.criteria,
                     update_template=requirement.template
                     )
             case ProvisioningPolicy.CREATE:
+                registry = registries[0] if registries else requirement.graph
                 provider = self._resolve_create(
-                    registry=requirement.graph,
-                    provider_template=requirement.template
+                    registry,
+                    requirement.template
                     )
             case _:
                 raise ValueError(f"Unsupported provisioning policy {requirement.policy}")
