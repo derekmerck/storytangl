@@ -1,4 +1,4 @@
-# tangl/vm/provisioning.py
+# tangl/vm/planning/provisioning.py
 """
 Provisioning logic
 ==================
@@ -25,20 +25,20 @@ API
 - :meth:`_resolve_existing` / :meth:`_resolve_update` / :meth:`_resolve_clone` / :meth:`_resolve_create` – internal helpers implementing each policy.
 """
 from __future__ import annotations
-from typing import Optional
-
-from pydantic import Field
+from typing import Optional, Type, TYPE_CHECKING
+import functools
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, Registry, Entity
-from tangl.core.entity import Selectable
+from tangl.core import Node, Registry, Handler, JobReceipt
 from .requirement import Requirement, ProvisioningPolicy
 
-class Provisioner(Selectable, Entity):
-    """
-    Provisioner(requirement, registries=[graph, ...])
+if TYPE_CHECKING:
+    from .offer import ProvisionOffer
 
-    Default provider resolver for requirements.
+
+class Provisioner(Handler):
+    """
+    Default provider resolver for independently satisfiable requirements.
 
     Why
     ----
@@ -69,10 +69,12 @@ class Provisioner(Selectable, Entity):
     On success, the resolved provider is assigned to
     :attr:`Requirement.provider` and added to the graph if missing.
     """
-    requirement: Requirement
-    registries: list[Registry] = Field(default_factory=list)
+    phase: str = "PLANNING.OFFER"
+    result_type: Type = list['ProvisionOffer']
+    func: None = None
 
-    def _resolve_existing(self,
+    @staticmethod
+    def _resolve_existing(registry: Registry,
                           provider_id: Optional[Identifier] = None,
                           provider_criteria: Optional[StringMap] = None) -> Optional[Node]:
         """Find successor by reference and filter by criteria"""
@@ -86,9 +88,10 @@ class Provisioner(Selectable, Entity):
             provider_criteria['has_identifier'] = provider_id
         if not provider_criteria:
             raise ValueError("Must include some provider id or criteria")
-        return Registry.chain_find_one(self.requirement.graph, *self.registries, **provider_criteria)
+        return Registry.chain_find_one(registry, **provider_criteria)
 
-    def _resolve_update(self,
+    @staticmethod
+    def _resolve_update(registry: Registry,
                         provider_id: Optional[Identifier] = None,
                         provider_criteria: Optional[StringMap] = None,
                         update_template: UnstructuredData = None
@@ -96,13 +99,16 @@ class Provisioner(Selectable, Entity):
         """Find successor by reference and filter by criteria, update by template"""
         if update_template is None:
             raise ValueError("UPDATE must include update template")
-        provider = self._resolve_existing(provider_id, provider_criteria)
+        if 'graph' in update_template:
+            raise KeyError("Update template may not include 'graph' key")
+        provider = Provisioner._resolve_existing(registry, provider_id, provider_criteria)
         if not provider:
             return None
         provider.update_attrs(**update_template)
         return provider
 
-    def _resolve_clone(self,
+    @staticmethod
+    def _resolve_clone(registry: Registry,
                        ref_id: Optional[Identifier] = None,
                        ref_criteria: Optional[StringMap] = None,
                        update_template: UnstructuredData = None
@@ -110,56 +116,134 @@ class Provisioner(Selectable, Entity):
         """Find successor by reference and filter by criteria, evolve copy by template"""
         if update_template is None:
             raise ValueError("CLONE must include update template")
-        ref = self._resolve_existing(ref_id, ref_criteria)
+        if 'graph' in update_template:
+            raise KeyError("Update template may not include 'graph' key")
+        ref = Provisioner._resolve_existing(registry, ref_id, ref_criteria)
         if not ref:
             return None
-        provider = ref.evolve(**update_template)  # todo: ensure NEW uid
+        provider = ref.evolve(**update_template)  # todo: ensure NEW uid, graph says the same
         return provider
 
-    def _resolve_create(self, provider_template: UnstructuredData) -> Node:
+    @staticmethod
+    def _resolve_create(registry: Registry, provider_template: UnstructuredData) -> Node:
         """Create successor from template"""
+        if 'graph' in provider_template:
+            raise KeyError("Provider template may not include 'graph' key")
         provider = Node.structure(provider_template)
+        registry.add(provider)
         return provider
 
-    # todo: this is the fallback for "on_provision", it returns if nothing else does first
-    def resolve(self) -> Optional[Node]:
-        """Attempt to resolve a provider for the requirement attribs and given policy"""
+    def get_offers(self, requirement: Requirement) -> list[ProvisionOffer]:
+        from .offer import ProvisionOffer
+
+        offers: list[ProvisionOffer] = []
+
+        # check for extant
+        extant = False
+        if (requirement.policy is not ProvisioningPolicy.CREATE and
+                (requirement.identifier or requirement.criteria)):
+            extant = self._resolve_existing(
+                registry=requirement.registry,
+                provider_id=requirement.identifier,
+                provider_criteria=requirement.criteria,
+            )
+        has_template = requirement.template is not None
+
+        for policy in requirement.policy:
+            offer_cb = None
+            offer_policy = None
+            match policy:
+                case ProvisioningPolicy.EXISTING if extant:
+                    # doesn't like assigned lambdas?
+                    offer_cb = functools.partial(
+                        self._resolve_existing,
+                        registry=requirement.graph,
+                        provider_id=extant.uid
+                    )
+                    offer_policy = ProvisioningPolicy.EXISTING
+                case ProvisioningPolicy.UPDATE if extant and has_template:
+                    offer_cb = functools.partial(
+                        self._resolve_update,
+                        registry=requirement.graph,
+                        provider_id=extant.uid,
+                        update_template=requirement.template
+                    )
+                    offer_policy = ProvisioningPolicy.UPDATE
+                case ProvisioningPolicy.CLONE if extant and has_template:
+                    offer_cb = functools.partial(
+                        self._resolve_clone,
+                        registry=requirement.graph,
+                        ref_id=extant.uid,
+                        update_template=requirement.template
+                        )
+                    offer_policy = ProvisioningPolicy.CLONE
+                case ProvisioningPolicy.CREATE if has_template:
+                    offer_cb = functools.partial(
+                        self._resolve_create,
+                        registry = requirement.graph,
+                        provider_template=requirement.template
+                        )
+                    offer_policy = ProvisioningPolicy.CREATE
+                case _:
+                    pass
+                    # raise ValueError(f"Unknown provisioning policy {self.requirement.policy}")
+
+            if offer_cb is not None:
+                offer = ProvisionOffer(
+                    requirement=requirement,
+                    provisioner=self,
+                    accept_func=offer_cb,
+                    operation=offer_policy,
+                )
+                offers.append(offer)
+
+        return offers
+
+    def __call__(self, requirement: Requirement, *args, **kwargs) -> JobReceipt:
+        offers = self.get_offers(requirement=requirement)
+        return JobReceipt(
+            blame_id=self.uid,
+            caller_id=requirement.uid,
+            result=offers,
+            result_type=self.result_type,
+        )
+
+    def resolve(self, requirement: Requirement) -> Optional[Node]:
+        """
+        Attempt to directly resolve a provider for an independently complete
+        requirement with a single policy.
+        """
 
         provider = None
 
-        match self.requirement.policy:
+        match requirement.policy:
             case ProvisioningPolicy.EXISTING:
                 provider = self._resolve_existing(
-                    provider_id=self.requirement.identifier,
-                    provider_criteria=self.requirement.criteria,
+                    registry=requirement.graph,
+                    provider_id=requirement.identifier,
+                    provider_criteria=requirement.criteria,
                 )
             case ProvisioningPolicy.UPDATE:
                 provider = self._resolve_update(
-                    provider_id=self.requirement.identifier,
-                    provider_criteria=self.requirement.criteria,
-                    update_template=self.requirement.template
+                    registry=requirement.graph,
+                    provider_id=requirement.identifier,
+                    provider_criteria=requirement.criteria,
+                    update_template=requirement.template
                     )
             case ProvisioningPolicy.CLONE:
                 provider = self._resolve_clone(
-                    ref_id=self.requirement.identifier,
-                    ref_criteria=self.requirement.criteria,
-                    update_template=self.requirement.template
+                    registry=requirement.graph,
+                    ref_id=requirement.identifier,
+                    ref_criteria=requirement.criteria,
+                    update_template=requirement.template
                     )
             case ProvisioningPolicy.CREATE:
                 provider = self._resolve_create(
-                    provider_template=self.requirement.template
+                    registry=requirement.graph,
+                    provider_template=requirement.template
                     )
             case _:
-                raise ValueError(f"Unknown provisioning policy {self.requirement.policy}")
+                raise ValueError(f"Unsupported provisioning policy {self.requirement.policy}")
 
-        # todo: If the default provisioner fails, we want to search for role aliases,
-        #  alternative creation mechanisms and templates in the scope/namespace;
-        #  assume we searched those first and just flag it as unresolvable here in the
-        #  ns-free fallback?
-
-        if provider is None:
-            self.requirement.is_unresolvable = True
-            return None
-
-        self.requirement.provider = provider
-        return provider
+        if provider:
+            return provider

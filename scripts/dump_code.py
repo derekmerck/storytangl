@@ -153,6 +153,7 @@ if __name__ == "__main__":
     process_directory(docs_root, "tangl37_docs_archive.py", include_notes=True)
 
     # testing
+    process_directory(tests_root, "tangl37_tests_archive.py")
     process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")
     process_directory(tests_root / 'vm',   "tangl37_vm_tests_archive.py")
     process_directory(tests_root / 'lang',   "tangl37_lang_tests_archive.py")

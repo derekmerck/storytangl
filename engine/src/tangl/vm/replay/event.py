@@ -42,11 +42,15 @@ class EventType(Enum):
     UPDATE = "update"
     DELETE = "delete"
 
+    # Indicate ignored event
+    NOOP = "noop"
+
     def apply_order(self) -> int:
-        _ORDER = {self.DELETE: 0,
-                  self.CREATE: 1,
-                  self.UPDATE: 2,
-                  self.READ: 3}
+        _ORDER = {self.NOOP: 0,
+                  self.DELETE: 1,
+                  self.CREATE: 2,
+                  self.UPDATE: 3,
+                  self.READ: 4}
         return _ORDER[self]
 
 class Event(Record):

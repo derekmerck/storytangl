@@ -1,3 +1,4 @@
+# tangl/core/singleton/singleton_node.py
 from __future__ import annotations
 from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
@@ -54,7 +55,7 @@ class SingletonNode(Node, Generic[WrappedType]):
     #: The singleton entity class that this wrapper is associated with.
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
-    label: UniqueLabel = Field(...)  # required
+    label: UniqueLabel = Field(...)  # required now
 
     # noinspection PyNestedDecorators
     @field_validator("label")

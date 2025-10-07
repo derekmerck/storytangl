@@ -54,8 +54,8 @@ def test_handler_lt_tiebreaker_and_registry_sort():
     def h1(ns): calls.append(("h1", ns)); return "r1"
     def h2(ns): calls.append(("h2", ns)); return "r2"
 
-    reg.add(h1, priority=HandlerPriority.EARLY)
-    reg.add(h2, priority=HandlerPriority.LATE)
+    reg.add_func(h1, priority=HandlerPriority.EARLY)
+    reg.add_func(h2, priority=HandlerPriority.LATE)
 
     ns = {"x": 1}
     receipts = list(reg.run_all(ns))

@@ -1,0 +1,50 @@
+name: Server CI
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Git LFS Pull
+      run: git lfs pull
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.10.11
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Install dependencies
+      run: |
+        poetry install
+
+    - name: set pythonpath
+      run: |
+        echo "PYTHONPATH=${PYTHONPATH}:$(pwd)/worlds" >> $GITHUB_ENV
+
+    - name: Run tests
+      run: |
+        cd tests
+        poetry run pytest
+
+    - name: Build wheel
+      run: |
+        poetry add toml
+        poetry run python ./_poetry_prebuild.py
+        poetry build -f wheel -n
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: tangl-wheel
+        path: dist/*.whl

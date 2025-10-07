@@ -19,4 +19,4 @@ builders without modifying core VM code.
 from .requirement import ProvisioningPolicy, Requirement
 from .provisioning import Provisioner
 from .open_edge import Dependency, Affordance
-from .offer import BuildReceipt, PlanningReceipt, Offer
+from .offer import BuildReceipt, ProvisionOffer, PlanningReceipt

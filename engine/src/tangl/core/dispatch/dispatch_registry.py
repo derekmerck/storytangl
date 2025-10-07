@@ -43,15 +43,15 @@ class DispatchRegistry(Registry[Handler]):
     - :meth:`run_handlers` – classmethod to run an external iterable of handlers.
     """
 
-    def add(self, func: HandlerFunc, **attrs):
+    def add_func(self, func: HandlerFunc, **attrs):
         """Register a function as a :class:`Handler` with optional metadata."""
         h = Handler(func=func, **attrs)
-        super().add(h)
+        self.add(h)
 
     def register(self, **attrs):
         """Decorator form of :meth:`add`; usage: `@registry.register(phase="plan")`."""
         def decorator(func: HandlerFunc):
-            self.add(func, **attrs)
+            self.add_func(func, **attrs)
             return func
         return decorator
 

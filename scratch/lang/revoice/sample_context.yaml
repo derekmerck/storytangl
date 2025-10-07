@@ -1,0 +1,28 @@
+---
+him: # adopt "xy" references in phrase
+  proper: Me
+  pov: 1
+  nominal: [ guy, dude ]
+  gens: XX
+  adjective: [ friendly, handsome ]
+  adverb: [ eagerly, hungrily ]
+  assets:
+    sandwich:  # adopt sandwich noun in phrase
+      nominal: [ pancake, hoagie, breadstick ]
+      adjective: [ firm, meaty, toasty ]
+  verb: [feeds, pushes]
+
+
+her:
+  proper: That Trap
+  nominal: [girl, gal]
+  gens: XX
+  adjective: [ pretty ]
+  assets:
+    mouth:
+      nominal: [ mouth, maw, face-hole ]
+      adjective: [ moist, gaping ]
+    saliva:
+      nominal: vinegar
+      adjective: tart
+  verb: [eats, devours]

@@ -7,7 +7,7 @@ at the frontier and *how* to obtain it (via :class:`ProvisioningPolicy`).
 Requirements are carried by :class:`~tangl.vm.planning.open_edge.Dependency`
 and :class:`~tangl.vm.planning.open_edge.Affordance` edges.
 """
-from enum import Enum
+from enum import Flag, auto
 from typing import Optional, Generic, TypeVar
 from uuid import UUID
 
@@ -18,29 +18,30 @@ from tangl.core.graph import GraphItem, Node, Graph
 
 NodeT = TypeVar('NodeT', bound=Node)
 
-
-class ProvisioningPolicy(Enum):
+class ProvisioningPolicy(Flag):
     """
     Provisioning strategies for satisfying a requirement.
 
-    EXISTING
-        Find a pre-existing provider by identifier and/or match criteria.
-    UPDATE
-        Find a provider and update it using a template (in-place edit).
-    CREATE
-        Create a new provider from a template.
-    CLONE
-        Find a reference provider, make a copy, then evolve via template.
+    - **EXISTING**: Find a pre-existing provider by identifier and/or match criteria.
+    - **UPDATE**: Find a provider and update it using a template (in-place edit).
+    - **CREATE**: Create a new provider from a template.
+    - **CLONE**: Find a reference provider, make a copy, then evolve via template.
+    - **ANY**: Any of Existing, Update, Create
+    - **NOOP**: No-op operation (Unsatisfiable and not allowed on Requirement)
 
     Notes
     -----
     Validation ensures the presence of ``identifier/criteria`` for EXISTING-family
     policies and a ``template`` for CREATE/UPDATE/CLONE.
     """
-    EXISTING = "existing"  # find by identifier and/or criteria match
-    UPDATE = "update"      # find and update from template
-    CREATE = "create"      # create from template
-    CLONE = "clone"        # find and evolve from template
+    EXISTING = auto()    # find by identifier and/or criteria match
+    UPDATE = auto()      # find and update from template
+    CREATE = auto()      # create from template
+    CLONE = auto()       # find and evolve from template
+
+    NOOP = auto()        # not possible
+
+    ANY = EXISTING | UPDATE | CREATE   # No reason to clone unless explicitly indicated
 
 class Requirement(GraphItem, Generic[NodeT]):
     """
@@ -86,7 +87,7 @@ class Requirement(GraphItem, Generic[NodeT]):
     identifier: Identifier = None
     criteria: Optional[StringMap] = Field(default_factory=dict)
     template: UnstructuredData = None
-    policy: ProvisioningPolicy = ProvisioningPolicy.EXISTING
+    policy: ProvisioningPolicy = ProvisioningPolicy.ANY
 
     @model_validator(mode="after")
     def _validate_policy(self):
@@ -104,6 +105,9 @@ class Requirement(GraphItem, Generic[NodeT]):
         template only:       must be satisfied with CREATE
         id/crit, template:   match and UPDATE/CLONE according to template
         """
+        if self.policy is ProvisioningPolicy.NOOP:
+            raise ValueError("Policy cannot be NOOP")
+
         if self.policy in [ProvisioningPolicy.EXISTING,
                            ProvisioningPolicy.UPDATE,
                            ProvisioningPolicy.CLONE ]:
@@ -115,6 +119,10 @@ class Requirement(GraphItem, Generic[NodeT]):
                            ProvisioningPolicy.CLONE]:
             if self.template is None:
                 raise ValueError("CREATE/UPDATE/CLONE requires a template")
+
+        if self.policy in [ProvisioningPolicy.ANY]:
+            if self.identifier is None and self.criteria is None and self.template is None:
+                raise ValueError("ALL requires at least one of identifier, criteria, or template")
 
         return self
 

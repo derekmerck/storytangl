@@ -147,6 +147,9 @@ class Frame:
     def cursor(self) -> Node:
         return self.graph.get(self.cursor_id)
 
+    # todo: make frame into a structural domain that passes itself into
+    #       context, that way we get 'local_domain' for free
+
     @property
     def domain_registry(self) -> Registry[AffiliateDomain]:
         # this is a convenience property that creates a registry

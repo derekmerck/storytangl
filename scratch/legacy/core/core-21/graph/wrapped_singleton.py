@@ -7,9 +7,9 @@ import pydantic
 from pydantic import BaseModel
 
 from tangl.type_hints import UniqueLabel
-from tangl.entity import SingletonEntity
+from tangl.core.singleton import Singleton
 from tangl.entity.smart_new import SmartNewHandler
-from tangl.graph import Node, NodeType
+from tangl.core.graph import Node, NodeType
 
 logger = logging.getLogger("tangl.graph.wrapped")
 logger.setLevel(logging.WARNING)

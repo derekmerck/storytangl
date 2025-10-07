@@ -10,8 +10,8 @@ from logging import getLogger
 
 from pydantic import Field
 
-from tangl.type_hints import UniqueLabel, Tags
-from tangl.entity import Entity
+from tangl.type_hints import UniqueLabel, Tag
+from tangl.core import Entity
 from tangl.utils.is_valid_uuid import is_valid_uuid
 
 if TYPE_CHECKING:
@@ -105,7 +105,7 @@ class Graph(Entity):
                     nodes: Iterable[NodeType],
                     node_cls: Type[NodeType] = None,
                     filt: Callable = None,
-                    has_tags: Tags = None) -> list[NodeType]:
+                    has_tags: list[Tag] = None) -> list[NodeType]:
 
         def filt_(x) -> bool:
             if node_cls and not isinstance(x, node_cls):
@@ -123,7 +123,7 @@ class Graph(Entity):
     def find_nodes(self,
                    node_cls: Type[NodeType] = None,
                    filt: Callable = None,
-                   has_tags: Tags = None) -> list[NodeType]:
+                   has_tags: list[Tag] = None) -> list[NodeType]:
         """
         Filter nodes based on various conditions:
 
@@ -138,7 +138,7 @@ class Graph(Entity):
     def find_node(self,
                   node_cls: Type[NodeType] = None,
                   filt: Callable = None,
-                  has_tags: Tags = None) -> NodeType:
+                  has_tags: list[Tag] = None) -> NodeType:
         res = self._find_nodes(self.nodes.values(), node_cls=node_cls, filt=filt, has_tags=has_tags)
         if res:
             return res[0]

@@ -17,32 +17,39 @@ enrich or override behavior.
 from uuid import UUID
 
 from tangl.core import Node, Graph, global_domain, JobReceipt
-from tangl.vm import ResolutionPhase as P, Context
+from tangl.vm import ResolutionPhase as P, Context, ProvisioningPolicy
 from .open_edge import Dependency, Affordance
-from .offer import Offer, BuildReceipt, PlanningReceipt
+from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
 from .provisioning import Provisioner
+
+# todo: lets introduce a sub-phase here: PLANNING_OFFER
+#       handlers of type provisioner that want phase_offer and
+#       match the selector produce offers, which get processed
+#       in the apply step.
+#       Provisioners need to implement "get_offers" and include a
+#       phase=PLANNING_OFFER selector
 
 # 1) Collect offers (EARLY)
 @global_domain.handlers.register(phase=P.PLANNING, priority=25)
 def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     """Publish offers for open :class:`~tangl.vm.planning.open_edge.Dependency` edges."""
     g: Graph = ctx.graph
-    offers: list[Offer] = []
+    offers: list[ProvisionOffer] = []
 
     # todo: Affordances visible in scope → analogous offers here.
-    #       Should do in two passes?, want to accept affordances before looking
+    #       Should do in two passes?, want to accept affordances _before_ looking
     #       for deps, as closest affordance may satisfy deps without relinking
     #       a more distant resource or creating a new one.
 
     # Dependencies on the frontier
     for e in list(cursor.edges_out(is_instance=Dependency, satisfied=False)):
-        prov = Provisioner(requirement=e.requirement, registries=[g])
-        off = Offer(
+        prov = Provisioner()
+        off = ProvisionOffer(
             label=f"dep:{e.requirement.get_label()}",
             requirement=e.requirement,
             provisioner=prov,
-            hard=e.requirement.hard_requirement,
             priority=50,
+            operation=ProvisioningPolicy.NOOP,
             selection_criteria={},   # let selectors filter if needed
         )
         offers.append(off)
@@ -57,15 +64,15 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
     choose one by priority, accept it, and return BuildReceipts.
     """
     # Gather offers from earlier receipts
-    all_offers: list[Offer] = []
+    all_offers: list[ProvisionOffer] = []
     for r in ctx.job_receipts:
         if isinstance(r.result, list):
-            all_offers.extend([x for x in r.result if isinstance(x, Offer)])
-        elif isinstance(r.result, Offer):
+            all_offers.extend([x for x in r.result if isinstance(x, ProvisionOffer)])
+        elif isinstance(r.result, ProvisionOffer):
             all_offers.append(r.result)
 
     # Coalesce by requirement uid
-    by_req: dict[UUID, list[Offer]] = {}
+    by_req: dict[UUID, list[ProvisionOffer]] = {}
     for off in all_offers:
         by_req.setdefault(off.requirement.uid, []).append(off)
 

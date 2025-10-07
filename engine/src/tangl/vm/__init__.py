@@ -46,7 +46,7 @@ any narrative or domain-specific content. VM code depends only on :mod:`tangl.co
 from .replay import Event, EventType, EventWatcher, Patch
 
 # Provisioning
-from .planning import Requirement, Provisioner, Dependency, Affordance, ProvisioningPolicy, Offer
+from .planning import Requirement, Provisioner, Dependency, Affordance, ProvisioningPolicy
 
 # Resolution step
 from .context import Context
