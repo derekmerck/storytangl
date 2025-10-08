@@ -3,7 +3,7 @@ import pickle
 
 import pytest
 
-from tangl.core.graph import Graph, Node, Edge, Subgraph
+from tangl.core.graph import Graph, Node, Subgraph
 
 
 def test_node_creation():
@@ -79,3 +79,47 @@ def test_node_pickles():
     res = pickle.loads( s )
     print( res )
     assert a == res
+
+
+def test_node_edges_report_connections():
+    graph = Graph()
+    alpha = Node(label="alpha", graph=graph)
+    beta = Node(label="beta", graph=graph)
+
+    forward = alpha.add_edge_to(beta)
+    reverse = alpha.add_edge_from(beta)
+
+    assert {edge.uid for edge in alpha.edges_out()} == {forward.uid}
+    assert {edge.uid for edge in alpha.edges_in()} == {reverse.uid}
+    assert {edge.uid for edge in alpha.edges()} == {forward.uid, reverse.uid}
+
+    assert {edge.uid for edge in beta.edges_in()} == {forward.uid}
+    assert {edge.uid for edge in beta.edges_out()} == {reverse.uid}
+    assert {edge.uid for edge in beta.edges()} == {forward.uid, reverse.uid}
+
+
+def test_node_remove_edge_helpers_are_idempotent():
+    graph = Graph()
+    alpha = Node(label="alpha", graph=graph)
+    beta = Node(label="beta", graph=graph)
+
+    forward = alpha.add_edge_to(beta)
+    reverse = alpha.add_edge_from(beta)
+
+    alpha.remove_edge_to(beta)
+
+    assert list(alpha.edges_out()) == []
+    assert forward.uid not in {edge.uid for edge in beta.edges_in()}
+    assert {edge.uid for edge in beta.edges_in()} == set()
+    assert reverse.uid in {edge.uid for edge in alpha.edges_in()}
+    assert reverse.uid in {edge.uid for edge in beta.edges_out()}
+
+    alpha.remove_edge_to(beta)
+    assert list(alpha.edges_out()) == []
+
+    alpha.remove_edge_from(beta)
+    assert list(alpha.edges_in()) == []
+    assert list(beta.edges_out()) == []
+
+    alpha.remove_edge_from(beta)
+    assert list(alpha.edges_in()) == []
