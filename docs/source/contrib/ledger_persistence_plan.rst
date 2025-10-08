@@ -1,5 +1,4 @@
 Ledger Persistence and Service Integration Plan
-================================================
 
 Overview
 --------
@@ -35,6 +34,38 @@ Building blocks
 * ``Ledger`` instances encapsulate the active ``Graph``, step counter, stream
   registries, and snapshot metadata required to spin up frames via
   ``ledger.get_frame()``.
+
+Legacy reference points
+-----------------------
+
+The pre-annotation controllers under ``scratch/legacy/service`` demonstrate how
+explicit lifecycle hooks kept persistence, response handling, and domain
+linkages aligned.  Key takeaways for v37 include:
+
+* ``service-old/service_manager.py`` enumerated every REST/CLI endpoint and
+  decorated them with ``public_endpoint``/``client_endpoint`` role markers.  The
+  wrapper pattern (``handle_response``) ensured that return values flowed
+  through :mod:`scratch.legacy.service.response_handler-2` so media, markdown,
+  and runtime payloads were normalized for each transport.  Even though the v37
+  controller relies on ``ApiEndpoint`` annotations, we should preserve that
+  adapter-facing indirection—ledger responses ought to be wrapped before they
+  reach FastAPI or the CLI so legacy clients can continue requesting
+  ``JournalEntry``-like payloads when necessary.
+* ``StoryPersistenceManager.open_story`` (see
+  ``scratch/legacy/service/service-old/story_persistence_manager.py``) handled
+  bidirectional user ↔ story reassociation inside a context manager.  The
+  pattern of linking the ``User`` onto the ``Story`` before yielding, then
+  unlinking during teardown, directly maps to the ledger lifecycle we need for
+  v37.  ``open_ledger`` should mirror this behavior: resolve the ledger id from
+  the active user, hydrate the ledger, attach the user to collect receipts, and
+  disassociate on exit so persistence layers can store user and ledger records
+  independently.
+* Legacy ``ServiceManager`` methods such as ``do_story_action`` always opened
+  persistence with ``write_back=True`` for mutating calls.  The v37 annotation
+  layer can infer this intent from endpoint metadata, but we must remember to
+  propagate the flag down to persistence; otherwise, ledgers resolved via the
+  automatic injection hooks may never flush their updated step counters or
+  record streams.
 
 Proposed persistence schema
 ---------------------------

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Header, Body
 
 from tangl.config import settings
 from tangl.type_hints import UniqueLabel
-from tangl.utils.uuid_for_secret import uuid_for_key, key_for_secret
+from tangl.utils.hash_secret import uuid_for_key, key_for_secret
 from tangl.service import ServiceManager
 from tangl.service.service_manager import UserInfo, JournalEntry, RuntimeInfo
 from tangl.rest.app_service_manager import get_service_manager, get_user_locks

@@ -1,7 +1,8 @@
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger("markdown_it").setLevel(logging.ERROR)
+logging.getLogger("markdown_it").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 # from pathlib import Path
 # import pytest
