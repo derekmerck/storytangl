@@ -1,6 +1,7 @@
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("markdown_it").setLevel(logging.ERROR)
 
 # from pathlib import Path
 # import pytest
