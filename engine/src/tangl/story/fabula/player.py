@@ -1,14 +1,11 @@
-from tangl.core import Node, HasContext
-# from tangl.story.asset.simple_assets import HasSimpleAssets
-
-class Player(HasContext, Node):
-    pass
-
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+# from tangl.story.asset.simple_assets import HasSimpleAssets
+
 from pydantic import Field
 
+from tangl.core import Node, HasContext
 from tangl.type_hints import Tags
 from tangl.entity.mixins import HasNamespace
 from tangl.core import Node
@@ -22,6 +19,8 @@ if TYPE_CHECKING:
     from tangl.world import World
     from .story import Story
 
+class Player(HasContext, Node):
+    pass
 
 class Player(HasPersonalName, UsesPlugins, HasNamespace, Node):
     """

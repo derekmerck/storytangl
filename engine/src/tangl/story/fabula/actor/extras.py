@@ -3,12 +3,7 @@ import logging
 
 from pydantic import Field
 
-from pydantic import Field
-
 from tangl.type_hints import StringMap
-from .role import Role
-from .actor import Actor
-
 from tangl.graph.mixins import AssociationHandler
 from tangl.story.story import StoryNode
 from .role import Role, CastingHandler
@@ -20,8 +15,8 @@ class Extras(Role):
     Extra is an extension of role that can generate batches of random generic actors according
     to a template.
 
-    Similar to a :class:\`tangl.actor.Role\`, but requires a template and returns a
-    list of generic/transient :class:\`Actors<tangl.actor.Actor>\` that can be assigned
+    Similar to a :class:`tangl.actor.Role`, but requires a template and returns a
+    list of generic/transient :class:`Actors<tangl.actor.Actor>` that can be assigned
     manually to jobs or roles.
 
     Extras is a subtype of Role for dynamically generated stock actors.
