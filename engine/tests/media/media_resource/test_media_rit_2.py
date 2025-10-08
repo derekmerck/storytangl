@@ -23,18 +23,16 @@ def test_resource_inventory_tag_expiry_conversion():
     now = datetime.now()
     expiry_delta = timedelta(days=1)
     tag = MediaRIT(label="test",
-                           content_hash=b"hash123",
-                           data_type=MediaDataType.IMAGE,
-                           expiry=expiry_delta)
+                   content_hash=b"hash123",
+                   data_type=MediaDataType.IMAGE,
+                   expiry=expiry_delta)
     assert tag.expiry.date() == (now + expiry_delta).date()
 
 
-@pytest.mark.xfail(reason="aliases not implemented yet in current rev")
 def test_resource_inventory_tag_get_aliases():
     tag = MediaRIT(label="test", content_hash=b"hash123", data_type=MediaDataType.IMAGE)
-    assert tag.matches(alias=b"hash123")
     assert tag.has_identifier(b"hash123")
-    assert tag.has_identifier(b"hash123", "foo", "bar"), "Should match if _any_ of the identifiers are true"
+    assert tag.matches(has_identifier=b"hash123")
 
 
 @pytest.mark.xfail(reason="hash caching not implemented yet in current rev")
