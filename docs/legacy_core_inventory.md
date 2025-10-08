@@ -7,6 +7,62 @@ This note surveys the historical `scratch/legacy/core` iterations alongside the 
 context assembly, and graph orchestration so we can recover proven ideas when extending
 the current `core` + `vm` runtime.
 
+## Core/VM architecture map (ported from `notes_v34`)
+
+```mermaid
+flowchart LR
+    subgraph tangl.core
+        subgraph Entities
+            Entity
+            Registry -- manages --> Entity
+        end
+        subgraph Graph
+            Graph -- extends --> Registry
+            Node -- extends --> Entity
+            Edge -- extends --> Entity
+            Graph -- owns --> Node
+            Graph -- owns --> Edge
+        end
+        subgraph Domain
+            Domain -- extends --> Entity
+            StructuralDomain -- extends --> Domain
+            AffiliateDomain -- extends --> Domain
+            Scope -- layers --> Domain
+            Scope -- aggregates --> Handler
+        end
+        subgraph Dispatch
+            Handler -- extends --> Entity
+            DispatchRegistry -- extends --> Registry
+            DispatchRegistry -- yields --> Handler
+            JobReceipt -- extends --> Entity
+            Handler -- produces --> JobReceipt
+        end
+        subgraph Records
+            Record -- extends --> Entity
+            StreamRegistry -- extends --> Registry
+            StreamRegistry -- stores --> Record
+        end
+        subgraph Fragments
+            BaseFragment -- extends --> Entity
+        end
+    end
+
+    subgraph tangl.vm
+        ResolutionPhase --> Frame
+        Frame -- builds --> Context
+        Context -- caches --> Scope
+        Context -- iterates --> Handler
+        PlanningReceipt -- aggregates --> JobReceipt
+    end
+
+    Frame -- writes --> StreamRegistry
+    Frame -- consults --> DispatchRegistry
+    AffiliateDomain -- registers --> DispatchRegistry
+    Scope -- queries --> DispatchRegistry
+```
+
+The diagram updates the `notes_v34` system map to the current packages: entities sit at the core, graphs reuse registries, domains stack into scopes, and the VM’s frame/context pair invokes handlers across the phase bus while journaling to record streams.【F:scratch/overviews/notes_v34.md†L5-L97】【F:engine/src/tangl/core/entity.py†L24-L147】【F:engine/src/tangl/core/graph/node.py†L11-L62】【F:engine/src/tangl/core/domain/domain.py†L14-L47】【F:engine/src/tangl/core/domain/affiliate.py†L1-L41】【F:engine/src/tangl/core/domain/scope.py†L1-L104】【F:engine/src/tangl/core/dispatch/dispatch_registry.py†L1-L84】【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/vm/frame.py†L1-L200】【F:engine/src/tangl/vm/context.py†L1-L114】【F:engine/src/tangl/vm/planning/__init__.py†L1-L15】
+
 ## How handler dispatch evolved
 
 ### Strategy handlers (core-21)
@@ -61,6 +117,12 @@ the current `core` + `vm` runtime.
 - Modern `tangl.core.entity.Entity` preserves the portable-ID mindset while expanding the
   identifier/matching helpers, giving us a compatible foundation for reviving registry-
   driven behaviors.【F:engine/src/tangl/core/entity.py†L1-L115】
+
+## Protocol-driven surfaces worth preserving
+
+- The protocol specs captured expectations for singleton worlds, story factories, traversal nodes, and handler slots, spelling out serialization hooks and cascading namespaces for every object.【F:scratch/protocols/protocols-26.py†L23-L200】 Those same responsibilities now land on `Domain`/`Scope` stacks and VM context helpers instead of bespoke mixins.【F:engine/src/tangl/core/domain/scope.py†L1-L104】【F:engine/src/tangl/vm/context.py†L1-L114】
+- Traversable mixins combined predicate tests, effect execution, and rendering in one method; porting them requires registering separate handlers for VM phases so audit receipts stay granular.【F:scratch/protocols/protocols-26.py†L117-L160】【F:engine/src/tangl/vm/frame.py†L23-L140】
+- Protocol emphasis on templated instantiation and streamable responses aligns with `StreamRegistry` journaling and `DispatchRegistry` pipeline receipts, helping reintroduce service APIs without rebuilding the monolith.【F:scratch/protocols/protocols-26.py†L10-L200】【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/core/dispatch/dispatch_registry.py†L1-L84】
 
 ## Gaps worth resurrecting
 

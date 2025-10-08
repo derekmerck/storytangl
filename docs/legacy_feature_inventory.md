@@ -48,6 +48,17 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 - Reuse the vocabulary and spec interfaces: `MediaDependency` stays a dependency edge with optional template/path/data inputs; `MediaSpec` instances become the forge contracts; provisioners remain dispatch registries hooking into planning.
 - Media controllers in story/world API wrappers can survive as service endpoints once the runtime surface area is finalized.【F:engine/src/tangl/story/story_controller.py†L41-L84】【F:engine/src/tangl/story/story_domain/world_controller.py†L87-L111】
 
+## Protocol and Overview Blueprints
+
+### Service protocols as architecture contracts
+- The protocol dumps from late prototypes defined clean DTO expectations for worlds, stories, traversal nodes, and runtime hooks (locks, predicates, effects).【F:scratch/protocols/protocols-26.py†L10-L200】 They make clear that every structure resource exposes cascading namespaces and serialization helpers—a pattern that maps directly to `core.entity.Entity` + `core.registry.Registry` backed graphs.【F:engine/src/tangl/core/entity.py†L24-L147】【F:engine/src/tangl/core/graph/node.py†L11-L62】
+- Traversable mixins, challenge blocks, and media handler slots in the protocols demonstrate how availability, update, and render behaviors were previously bundled per node.【F:scratch/protocols/protocols-26.py†L117-L160】 Under the current phase bus, those responsibilities should be broken into domain handlers registered for the appropriate VM phase (`VALIDATE`, `PLANNING`, `UPDATE`, `JOURNAL`).【F:engine/src/tangl/vm/frame.py†L23-L140】
+- World/user/story protocols emphasized singleton registries, serialized responses, and templated instantiation.【F:scratch/protocols/protocols-26.py†L23-L200】 Those expectations align with `StreamRegistry` journaling and `vm.Context` namespaces, letting us preserve API ergonomics while modernizing execution.【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/vm/context.py†L1-L114】
+
+### Overview diagrams and technical notes
+- The `notes_v34` overview captured the hierarchical relationships between entities, handler registries, and graph solver loops, and it remains a useful blueprint when aligning old terminology with the modern packages.【F:scratch/overviews/notes_v34.md†L1-L196】 The accompanying text enumerates structure/resource/trace node roles plus dependency/choice/blame edge semantics, which remain intact in today’s graph types.【F:scratch/overviews/notes_v34.md†L145-L167】【F:engine/src/tangl/core/graph/node.py†L11-L62】
+- We ported the master mermaid diagram to a new “Core/VM Architecture Map” in `legacy_core_inventory.md` so the current layering is documented alongside the historical commentary. That updated diagram now references `Scope`, `Context`, the phase bus, and planning receipts to reflect how capabilities are dispatched in the modern runtime.【F:scratch/overviews/notes_v34.md†L5-L97】【F:docs/legacy_core_inventory.md†L12-L96】
+
 ## Mapping Strategy for the Modern Core + VM
 
 1. **Treat legacy data classes as schemas.** Convert story/mechanics/media script models into Pydantic models that populate `core.graph.Graph` nodes and edges. Handlers become domain registrations rather than methods on bespoke subclasses.
