@@ -70,7 +70,10 @@ class Patch(Record):
     def apply(self, registry: Registry) -> Registry:
         if self.registry_id and self.registry_id != registry.uid:
             raise ValueError(f"Wrong registry for patch {registry.uid} != {self.registry_id}")
-        if self.registry_state_hash and self.registry_state_hash != hashing_func(registry._state_hash()):
-            raise ValueError(f"Wrong registry state hash for patch")
+        if self.registry_state_hash:
+            current_hash = registry._state_hash()
+            valid_hashes = {current_hash, hashing_func(current_hash)}
+            if self.registry_state_hash not in valid_hashes:
+                raise ValueError(f"Wrong registry state hash for patch")
 
         return Event.apply_all(self.events, registry)

@@ -53,6 +53,19 @@ def test_add_record_accepts_dict_and_assigns_seq():
     last = rs.last()
     assert last is not None and last.record_type == "patch" and last.seq == 0
 
+def test_add_record_reassigns_duplicate_or_invalid_seq():
+    rs = RecordStream()
+    first = mkrec("journal", label="a")
+    rs.add_record(first)
+
+    duplicate = mkrec("journal", label="b").model_copy(update={"seq": 0})
+    rs.add_record(duplicate)
+
+    ordered = sorted(rs.values(), key=lambda r: r.seq)
+    assert [r.seq for r in ordered] == [0, 1]
+    assert [r.get_label() for r in ordered] == ["a", "b"]
+    assert rs.max_seq == 1
+
 # --- stream  ---------------------------------------
 
 def test_add_single_item():
