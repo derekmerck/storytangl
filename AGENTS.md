@@ -28,11 +28,23 @@ core ideas you should understand before contributing.
 - Use the project logging conventions: acquire module-level loggers with
   `logging.getLogger(__name__)` and prefer structured messages over f-string
   interpolation inside log calls.
+- Align with the architectural and naming guidance in
+  `docs/source/contrib/coding_style.md`. The quick summary: keep mechanisms
+  explicit, respect the layer boundaries (`core` → `vm` → `service` → `app` →
+  `presentation`), favor small nouns and deterministic behavior, and document the
+  curated API surface. Review the doc for deeper rationale, anti-patterns, and
+  testing expectations.
 
 ## Docstrings and comments
 - Write docstrings in **reStructuredText** so Sphinx can build narrative docs.
-  - Begin class/module docstrings with a short summary paragraph, then use
-    underlined section headers (e.g. `Why`, `Key Features`, `API`).
+  - Follow the `Why / Key Features / API / (Notes / See also)` structure for
+    public classes as described in `docs/source/contrib/docstring_style.md`.
+    Include the signature headline, single-sentence summary, and curated API
+    bullets; defer exhaustive method prose to autodoc.
+  - Keep module docstrings terse unless they introduce multiple peer concepts.
+    Subpackage `__init__` files should outline conceptual layers and design
+    intent. See the doc for section header underlines, linking conventions, and
+    guidance on enum or record docstrings.
   - Cross-reference other symbols with `:class:`, `:meth:`, and section anchors to
     match existing docs (`tangl/core/entity.py` is a good model).
 - Use `"""` triple double quotes for docstrings. Keep commentary sentences inside
