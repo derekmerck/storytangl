@@ -85,3 +85,13 @@ def test_recover_from_snapshot_then_multiple_patches():
     g2 = Ledger.recover_graph_from_stream(led.records)
     assert g2.find_one(label="C") is None
     assert g2.find_one(label="D") is not None
+
+
+def test_snapshot_restore_detects_tampering():
+    g = Graph(label="demo")
+    snap = Snapshot.from_item(g)
+
+    snap.item.label = "mutated"
+
+    with pytest.raises(RuntimeError):
+        snap.restore_item(verify=True)
