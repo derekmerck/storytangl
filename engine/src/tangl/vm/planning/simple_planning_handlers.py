@@ -16,7 +16,7 @@ enrich or override behavior.
 """
 from uuid import UUID
 
-from tangl.core import Node, Graph, global_domain, JobReceipt
+from tangl.core import Node, global_domain, JobReceipt
 from tangl.vm import ResolutionPhase as P, Context, ProvisioningPolicy
 from .open_edge import Dependency, Affordance
 from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
@@ -34,20 +34,59 @@ from .requirement import Requirement
 @global_domain.handlers.register(phase=P.PLANNING, priority=25)
 def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     """Publish offers for open :class:`~tangl.vm.planning.open_edge.Dependency` edges."""
-    g: Graph = ctx.graph
     offers: list[ProvisionOffer] = []
 
-    # todo: Affordances visible in scope → analogous offers here.
-    #       Should do in two passes?, want to accept affordances _before_ looking
-    #       for deps, as closest affordance may satisfy deps without relinking
-    #       a more distant resource or creating a new one.
+    def provisioners() -> list[Provisioner]:
+        discovered = [
+            h for h in ctx.get_handlers(is_instance=Provisioner)
+            if isinstance(h, Provisioner)
+        ]
+        has_default = any(isinstance(p, Provisioner) and type(p) is Provisioner for p in discovered)
+        if not has_default:
+            discovered.append(Provisioner())
+        return discovered
+
+    provs = provisioners()
+
+    def _label_for(requirement: Requirement, prefix: str) -> str:
+        base = requirement.get_label()
+        if not base:
+            base = requirement.identifier or requirement.uid.hex[:8]
+        return f"{prefix}:{base}"
+
+    def _collect(requirement: Requirement, *, source: str, prefix: str) -> None:
+        for prov in provs:
+            for offer in prov.get_offers(requirement, ctx=ctx):
+                offer.label = offer.label or _label_for(requirement, prefix)
+                if "source" not in offer.selection_criteria:
+                    offer.selection_criteria = dict(offer.selection_criteria)
+                    offer.selection_criteria["source"] = source
+                offers.append(offer)
+
+    # Affordances visible in scope should be evaluated before dependencies so
+    # existing resources can satisfy requirements without provisioning new ones.
+    affordances = sorted(
+        (
+            edge
+            for edge in cursor.edges_in(is_instance=Affordance)
+            if edge.requirement.provider is None
+        ),
+        key=lambda edge: edge.requirement.uid.int,
+    )
+    for edge in affordances:
+        _collect(edge.requirement, source="affordance", prefix="aff")
 
     # Dependencies on the frontier
-    for e in list(cursor.edges_out(is_instance=Dependency, satisfied=False)):
-        prov = Provisioner()
-        for offer in prov.get_offers(e.requirement):
-            offer.label = offer.label or f"dep:{e.requirement.get_label()}"
-            offers.append(offer)
+    dependencies = sorted(
+        (
+            edge
+            for edge in cursor.edges_out(is_instance=Dependency)
+            if edge.requirement.provider is None
+        ),
+        key=lambda edge: edge.requirement.uid.int,
+    )
+    for edge in dependencies:
+        _collect(edge.requirement, source="dependency", prefix="dep")
 
     return offers
 
@@ -80,9 +119,13 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
         include_requirement(off.requirement)
 
     # Include unresolved frontier requirements even when no offers were published
-    for edge in cursor.edges_out(is_instance=Dependency, satisfied=False):
+    for edge in cursor.edges_out(is_instance=Dependency):
+        if edge.requirement.provider is not None:
+            continue
         include_requirement(edge.requirement)
-    for edge in cursor.edges_in(is_instance=Affordance, satisfied=False):
+    for edge in cursor.edges_in(is_instance=Affordance):
+        if edge.requirement.provider is not None:
+            continue
         include_requirement(edge.requirement)
 
     # Evaluate requirements in a deterministic order for testability/debuggability.
@@ -110,8 +153,20 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
                         provider_id=None,
                         operation=ProvisioningPolicy.NOOP,
                         accepted=False,
-                        hard_req=requirement.hard_requirement,
-                        reason='no_offers',
+                        hard_req=True,
+                        reason="no_offers",
+                    )
+                )
+            else:
+                builds.append(
+                    BuildReceipt(
+                        provisioner_id=cursor.uid,
+                        requirement_id=requirement.uid,
+                        provider_id=None,
+                        operation=ProvisioningPolicy.NOOP,
+                        accepted=False,
+                        hard_req=False,
+                        reason="waived_soft",
                     )
                 )
             continue
@@ -129,17 +184,32 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
             break
 
         if provider is None or chosen_offer is None:
+            provisioner_id = (
+                candidates[0].provisioner.uid if candidates else cursor.uid
+            )
             if requirement.hard_requirement:
                 requirement.is_unresolvable = True
                 builds.append(
                     BuildReceipt(
-                        provisioner_id=candidates[0].provisioner.uid,
+                        provisioner_id=provisioner_id,
                         requirement_id=requirement.uid,
                         provider_id=None,
                         operation=ProvisioningPolicy.NOOP,
                         accepted=False,
-                        hard_req=requirement.hard_requirement,
-                        reason='unresolvable',
+                        hard_req=True,
+                        reason="unresolvable",
+                    )
+                )
+            else:
+                builds.append(
+                    BuildReceipt(
+                        provisioner_id=provisioner_id,
+                        requirement_id=requirement.uid,
+                        provider_id=None,
+                        operation=ProvisioningPolicy.NOOP,
+                        accepted=False,
+                        hard_req=False,
+                        reason="waived_soft",
                     )
                 )
             continue

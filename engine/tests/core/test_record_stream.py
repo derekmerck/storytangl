@@ -53,21 +53,18 @@ def test_add_record_accepts_dict_and_assigns_seq():
     last = rs.last()
     assert last is not None and last.record_type == "patch" and last.seq == 0
 
-
-def test_find_all_defaults_to_seq_sorting_with_manual_seq_values():
+def test_add_record_reassigns_duplicate_or_invalid_seq():
     rs = RecordStream()
-    manual = [
-        mkrec("journal", label="later", seq=10),
-        mkrec("journal", label="first", seq=3),
-        mkrec("journal", label="middle", seq=7),
-    ]
+    first = mkrec("journal", label="a")
+    rs.add_record(first)
 
-    for rec in manual:
-        rs.add_record(rec)
+    duplicate = mkrec("journal", label="b").model_copy(update={"seq": 0})
+    rs.add_record(duplicate)
 
-    ordered = list(rs.find_all())
-    assert [r.seq for r in ordered] == sorted(r.seq for r in manual)
-    assert [r.label for r in ordered] == ["first", "middle", "later"]
+    ordered = sorted(rs.values(), key=lambda r: r.seq)
+    assert [r.seq for r in ordered] == [0, 1]
+    assert [r.get_label() for r in ordered] == ["a", "b"]
+    assert rs.max_seq == 1
 
 # --- stream  ---------------------------------------
 

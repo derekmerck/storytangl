@@ -104,7 +104,7 @@ class StreamRegistry(Registry[HasSeq]):
     """
 
     markers: dict[str, dict[str, int]] = Field(default_factory=dict)
-    max_seq: int = 0
+    max_seq: int = -1
 
     def find_all(self, sort_key: Callable[[RecordT], object] | None = None, **criteria) -> Iterator[RecordT]:
         """Iterate over records matching ``criteria`` sorted by ``seq`` by default."""
@@ -115,7 +115,7 @@ class StreamRegistry(Registry[HasSeq]):
     def _ensure_seq(self, item: RecordT) -> RecordT:
         # If seq is missing or negative, assign next.
         seq = getattr(item, "seq", None)
-        if seq is None or (isinstance(seq, int) and seq < 0):
+        if seq is None or not isinstance(seq, int) or seq <= self.max_seq:
             return item.model_copy(update={"seq": self.max_seq + 1})
         return item
 

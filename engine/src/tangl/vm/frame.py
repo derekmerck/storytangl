@@ -16,6 +16,7 @@ from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, JobReceipt, 
 from tangl.core.entity import Conditional
 from tangl.core.domain import AffiliateDomain
 from .context import Context
+from .planning import PlanningReceipt
 from .replay import ReplayWatcher, WatchedRegistry, Patch
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,12 @@ class ChoiceEdge(Edge, Conditional):
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
 
 # dataclass for simplified init, not serialized or tracked
+class _FrameLocalDomain(AffiliateDomain):
+    """Affiliate domain that is always selected for the current frame."""
+
+    selector_prefix = None
+
+
 @dataclass
 class Frame:
     """
@@ -162,7 +169,7 @@ class Frame:
     def local_domain(self) -> AffiliateDomain:
         local_domain = self.domain_registry.find_one(label="local_domain")
         if local_domain is None:
-            local_domain = AffiliateDomain(label="local_domain")
+            local_domain = _FrameLocalDomain(label="local_domain")
             self.domain_registry.add(local_domain)
         return local_domain
 
@@ -230,8 +237,16 @@ class Frame:
         if not self.run_phase(P.VALIDATE):
             raise RuntimeError(f"Proposed next cursor is not valid!")
 
+        baseline_state_hash = self.context.initial_state_hash
+
         # May mutate graph/data
-        patch = self.run_phase(P.PLANNING)      # No-op for now
+        planning_receipt = self.run_phase(P.PLANNING)
+
+        if isinstance(planning_receipt, PlanningReceipt):
+            self.records.add_record(planning_receipt)
+
+        if self.event_sourced:
+            self._invalidate_context()
 
         # Check for prereq cursor redirects
         # todo: implement j/r redirect stack
@@ -242,7 +257,10 @@ class Frame:
             else:
                 raise RuntimeError(f"Proposed prereq jump is not a valid edge {type(nxt)}!")
 
-        patch = self.run_phase(P.UPDATE)         # No-op for now
+        self.run_phase(P.UPDATE)         # No-op for now
+
+        if self.event_sourced:
+            self._invalidate_context()
 
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
 
@@ -259,15 +277,19 @@ class Frame:
         # Cleanup bookkeeping
         self.run_phase(P.FINALIZE)
 
+        patch: Patch | None = None
         if self.event_sourced and self.event_watcher.events:
             patch = Patch(
                 events=self.event_watcher.events,
                 registry_id=self.graph.uid,
-                registry_state_hash=self.context.initial_state_hash,
+                registry_state_hash=baseline_state_hash,
             )
             self.records.add_record(patch)
             # ready for next frame
             self.event_watcher.clear()
+
+        if patch is not None:
+            self.phase_outcome[P.FINALIZE] = patch
 
         # check for postreq cursor redirects
         if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor

@@ -264,6 +264,8 @@ class Event(Record):
 
             # Attribute-level mutations
             if e.event_type in (EventType.UPDATE, EventType.DELETE) and e.name:
+                if e.name == "__dict__":
+                    continue
                 uid = e.source_id
                 # Drop if node does not exist in the final state
                 if uid in final_exists and not final_exists[uid]:

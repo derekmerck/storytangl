@@ -118,7 +118,7 @@ def test_provisioner_runs_offers_with_ns_and_returns_job_receipts():
 def test_provisioner_blame_tuple_when_requirement_present():
     req = Requirement(dependency_id=uuid.uuid4(), criteria={"k": "v"})
 
-    def get_offers(ns, requirement):
+    def get_offers(ns, requirement, ctx=None):
         def accept(_ns):
             class Dummy(Entity): pass
             return Dummy(label="dep")
@@ -236,7 +236,7 @@ def test_selector_prefers_lowest_priority_and_stable_ordering():
         template: dict[str, Any]
         priority: float
 
-        def get_offers(self, requirement: Requirement) -> Optional[Offer | list[Offer]]:
+        def get_offers(self, requirement: Requirement, *, ctx=None) -> Optional[Offer | list[Offer]]:
             return Offer(
                 requirement=requirement,
                 provisioner=self,
