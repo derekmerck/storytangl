@@ -1,7 +1,7 @@
 # tangl.core.record.py
 from __future__ import annotations
 import functools
-from typing import Optional, TypeVar, Self, Iterator, Generic, Literal
+from typing import Optional, TypeVar, Self, Iterator, Generic, Literal, Callable
 import logging
 from enum import Enum
 from uuid import UUID
@@ -105,6 +105,12 @@ class StreamRegistry(Registry[HasSeq]):
 
     markers: dict[str, dict[str, int]] = Field(default_factory=dict)
     max_seq: int = 0
+
+    def find_all(self, sort_key: Callable[[RecordT], object] | None = None, **criteria) -> Iterator[RecordT]:
+        """Iterate over records matching ``criteria`` sorted by ``seq`` by default."""
+
+        effective_sort_key = sort_key or (lambda record: record.seq)
+        yield from super().find_all(sort_key=effective_sort_key, **criteria)
 
     def _ensure_seq(self, item: RecordT) -> RecordT:
         # If seq is missing or negative, assign next.
@@ -295,3 +301,4 @@ class Snapshot(Record, Generic[EntityT]):
         if verify and item._state_hash() != self.item_state_hash:
             raise RuntimeError("Recovered item state does not match item state hash.")
         return item
+
