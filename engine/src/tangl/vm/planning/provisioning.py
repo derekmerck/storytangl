@@ -34,6 +34,7 @@ from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:
     from .offer import ProvisionOffer
+    from ..context import Context
 
 
 class Provisioner(Handler):
@@ -148,6 +149,20 @@ class Provisioner(Handler):
             registries.extend([r for r in extra_registry if isinstance(r, Registry)])
         return tuple(registries)
 
+    def iter_requirement_registries(
+        self,
+        requirement: Requirement,
+        *,
+        ctx: "Context" | None = None,
+    ) -> tuple[Registry, ...]:
+        """Return registries to search while evaluating ``requirement``.
+
+        Subclasses may override to inject additional registries derived from the
+        active :class:`~tangl.vm.context.Context`.
+        """
+
+        return self._requirement_registries(requirement)
+
     @staticmethod
     def _iter_policies(policy: ProvisioningPolicy) -> Sequence[ProvisioningPolicy]:
         if policy in (
@@ -165,10 +180,15 @@ class Provisioner(Handler):
                 policies.append(candidate)
         return tuple(policies)
 
-    def get_offers(self, requirement: Requirement) -> list[ProvisionOffer]:
+    def get_offers(
+        self,
+        requirement: Requirement,
+        *,
+        ctx: "Context" | None = None,
+    ) -> list[ProvisionOffer]:
         from .offer import ProvisionOffer
 
-        registries = self._requirement_registries(requirement)
+        registries = self.iter_requirement_registries(requirement, ctx=ctx)
         offers: list[ProvisionOffer] = []
 
         extant: Optional[Node] = None
@@ -227,8 +247,14 @@ class Provisioner(Handler):
 
         return offers
 
-    def __call__(self, requirement: Requirement, *args, **kwargs) -> JobReceipt:
-        offers = self.get_offers(requirement=requirement)
+    def __call__(
+        self,
+        requirement: Requirement,
+        *args,
+        **kwargs,
+    ) -> JobReceipt:
+        ctx: "Context" | None = kwargs.get("ctx")
+        offers = self.get_offers(requirement=requirement, ctx=ctx)
         return JobReceipt(
             blame_id=self.uid,
             caller_id=requirement.uid,
@@ -236,12 +262,17 @@ class Provisioner(Handler):
             result_type=self.result_type,
         )
 
-    def resolve(self, requirement: Requirement) -> Optional[Node]:
+    def resolve(
+        self,
+        requirement: Requirement,
+        *,
+        ctx: "Context" | None = None,
+    ) -> Optional[Node]:
         """Return a provider for ``requirement`` or ``None`` without side effects."""
 
         provider = None
 
-        registries = self._requirement_registries(requirement)
+        registries = self.iter_requirement_registries(requirement, ctx=ctx)
 
         match requirement.policy:
             case ProvisioningPolicy.EXISTING:

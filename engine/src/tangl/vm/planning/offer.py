@@ -127,7 +127,7 @@ class ProvisionOffer(Selectable, Entity):
         """Compute a provider for ``requirement`` without side effects."""
 
         if self.accept_func is None:
-            return self.provisioner.resolve(self.requirement)
+            return self.provisioner.resolve(self.requirement, ctx=ctx)
         if self.accept_func_takes_req:
             return self.accept_func(self.requirement)
         return self.accept_func()
@@ -164,6 +164,7 @@ class PlanningReceipt(JobReceipt):
     created: int = 0
     cloned: int = 0
     unresolved_hard_requirements: list[UUID] = Field(default_factory=list)
+    waived_soft_requirements: list[UUID] = Field(default_factory=list)
 
     @classmethod
     def summarize(cls, *builds: BuildReceipt) -> Self:
@@ -174,11 +175,16 @@ class PlanningReceipt(JobReceipt):
         cloned = 0
 
         unresolved_hard_requirements: list[UUID] = []
+        waived_soft_requirements: list[UUID] = []
 
         for b in builds:
             if not b.accepted:
-                if b.caller_id is not None:
+                if b.caller_id is None:
+                    continue
+                if b.hard_req:
                     unresolved_hard_requirements.append(b.caller_id)
+                else:
+                    waived_soft_requirements.append(b.caller_id)
                 continue
             match b.operation:
                 case ProvisioningPolicy.EXISTING: attached += 1
@@ -195,7 +201,8 @@ class PlanningReceipt(JobReceipt):
             created=created,
             cloned=cloned,
             unresolved_hard_requirements=unresolved_hard_requirements,
-            result="ok"
+            waived_soft_requirements=waived_soft_requirements,
+            result="ok",
         )
 
         return pr

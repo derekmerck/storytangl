@@ -30,6 +30,7 @@ def test_planning_receipt_marks_no_offers_unresolved():
     summary = PlanningReceipt.summarize(receipt)
 
     assert summary.unresolved_hard_requirements == [requirement_id]
+    assert summary.waived_soft_requirements == []
 
 
 def test_planning_receipt_counters_preserved_for_positive_receipts():
@@ -55,4 +56,22 @@ def test_planning_receipt_counters_preserved_for_positive_receipts():
     assert summary.created == 1
     assert summary.attached == 0
     assert summary.unresolved_hard_requirements == [unresolved_id]
+    assert summary.waived_soft_requirements == []
     assert isinstance(summary.unresolved_hard_requirements[0], UUID)
+
+
+def test_planning_receipt_tracks_waived_soft_requirements():
+    waived_id = uuid4()
+
+    waived = _build_receipt(
+        caller_id=waived_id,
+        operation=ProvisioningPolicy.CREATE,
+        accepted=False,
+        hard_req=False,
+        reason="waived_soft",
+    )
+
+    summary = PlanningReceipt.summarize(waived)
+
+    assert summary.unresolved_hard_requirements == []
+    assert summary.waived_soft_requirements == [waived_id]
