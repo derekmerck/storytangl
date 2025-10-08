@@ -9,13 +9,16 @@ from typing import Iterator
 from tangl.core.graph import Subgraph, Node, Graph  # Graph for pydantic
 from .domain import Domain
 
+
 class DomainGraph(Graph, Domain):
     """A graph that provides a structural domain for registered items"""
     ...
 
+
 class DomainSubgraph(Subgraph, Domain):
     """A subgraph that provides a structural domain for member items"""
     ...
+
 
 class DomainNode(Node, Subgraph, Domain):
     """A node that anchors a structural domain for its children"""
@@ -30,10 +33,10 @@ class DomainNode(Node, Subgraph, Domain):
 
     def remove_child(self, child: Node) -> None:
         self.remove_edge_to(child)
-        return self.remove_member(child)
+        self.remove_member(child)
 
     def find_children(self, **criteria) -> Iterator[Node]:
-        return self.find_members(**criteria)
+        return self.find_all(**criteria)
 
     def find_child(self, **criteria) -> Node:
-        return self.find_member(**criteria)
+        return self.find_one(**criteria)
