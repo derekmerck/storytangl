@@ -10,7 +10,7 @@ from tangl.vm import (
     Affordance,
     ProvisioningPolicy,
 )
-from tangl.vm.planning import PlanningReceipt
+from tangl.vm.planning import PlanningReceipt, BuildReceipt
 from tangl.utils.hashing import hashing_func
 
 
@@ -18,7 +18,9 @@ def _collect_build_receipts(frame: Frame) -> list:
     receipts = []
     for receipt in frame.phase_receipts.get(P.PLANNING, []):
         if isinstance(receipt.result, list):
-            receipts.extend(receipt.result)
+            receipts.extend(
+                item for item in receipt.result if isinstance(item, BuildReceipt)
+            )
     return receipts
 
 

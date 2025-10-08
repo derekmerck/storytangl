@@ -161,7 +161,12 @@ class Provisioner(Handler):
         active :class:`~tangl.vm.context.Context`.
         """
 
-        return self._requirement_registries(requirement)
+        registries = list(self._requirement_registries(requirement))
+        if ctx is not None:
+            context_graph = getattr(ctx, "graph", None)
+            if context_graph is not None and all(r is not context_graph for r in registries):
+                registries.insert(0, context_graph)
+        return tuple(registries)
 
     @staticmethod
     def _iter_policies(policy: ProvisioningPolicy) -> Sequence[ProvisioningPolicy]:

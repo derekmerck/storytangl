@@ -89,6 +89,12 @@ class ChoiceEdge(Edge, Conditional):
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
 
 # dataclass for simplified init, not serialized or tracked
+class _FrameLocalDomain(AffiliateDomain):
+    """Affiliate domain that is always selected for the current frame."""
+
+    selector_prefix = None
+
+
 @dataclass
 class Frame:
     """
@@ -163,7 +169,7 @@ class Frame:
     def local_domain(self) -> AffiliateDomain:
         local_domain = self.domain_registry.find_one(label="local_domain")
         if local_domain is None:
-            local_domain = AffiliateDomain(label="local_domain")
+            local_domain = _FrameLocalDomain(label="local_domain")
             self.domain_registry.add(local_domain)
         return local_domain
 

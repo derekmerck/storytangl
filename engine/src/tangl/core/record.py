@@ -109,7 +109,7 @@ class StreamRegistry(Registry[HasSeq]):
     def _ensure_seq(self, item: RecordT) -> RecordT:
         # If seq is missing or negative, assign next.
         seq = getattr(item, "seq", None)
-        if seq is None or (isinstance(seq, int) and seq < 0):
+        if seq is None or not isinstance(seq, int) or seq <= self.max_seq:
             return item.model_copy(update={"seq": self.max_seq + 1})
         return item
 

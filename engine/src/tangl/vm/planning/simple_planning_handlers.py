@@ -66,7 +66,11 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     # Affordances visible in scope should be evaluated before dependencies so
     # existing resources can satisfy requirements without provisioning new ones.
     affordances = sorted(
-        cursor.edges_in(is_instance=Affordance, satisfied=False),
+        (
+            edge
+            for edge in cursor.edges_in(is_instance=Affordance)
+            if edge.requirement.provider is None
+        ),
         key=lambda edge: edge.requirement.uid.int,
     )
     for edge in affordances:
@@ -74,7 +78,11 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
 
     # Dependencies on the frontier
     dependencies = sorted(
-        cursor.edges_out(is_instance=Dependency, satisfied=False),
+        (
+            edge
+            for edge in cursor.edges_out(is_instance=Dependency)
+            if edge.requirement.provider is None
+        ),
         key=lambda edge: edge.requirement.uid.int,
     )
     for edge in dependencies:
@@ -111,9 +119,13 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
         include_requirement(off.requirement)
 
     # Include unresolved frontier requirements even when no offers were published
-    for edge in cursor.edges_out(is_instance=Dependency, satisfied=False):
+    for edge in cursor.edges_out(is_instance=Dependency):
+        if edge.requirement.provider is not None:
+            continue
         include_requirement(edge.requirement)
-    for edge in cursor.edges_in(is_instance=Affordance, satisfied=False):
+    for edge in cursor.edges_in(is_instance=Affordance):
+        if edge.requirement.provider is not None:
+            continue
         include_requirement(edge.requirement)
 
     # Evaluate requirements in a deterministic order for testability/debuggability.
