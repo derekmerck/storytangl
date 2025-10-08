@@ -1,6 +1,10 @@
+import logging
+
 import pytest
 
+from tangl.core.entity import Entity
 from tangl.core.record import Record, StreamRegistry as RecordStream
+from tangl.core.registry import Registry
 
 # --- helpers ---------------------------------------------------------------
 
@@ -21,6 +25,17 @@ def test_record_is_frozen_and_immutable():
     r = mkrec("patch", label="p1")
     with pytest.raises((AttributeError, TypeError, ValueError)):
         r.label = "mutate"
+
+def test_record_blame_dereferences_entity():
+    class Dummy(Entity):
+        value: int = 0
+
+    registry: Registry = Registry()
+    blamed = Dummy(label="blamed", value=7)
+    registry.add(blamed)
+
+    record = mkrec("audit", label="audit1", blame_id=blamed.uid)
+    assert record.blame(registry) is blamed
 
 def test_has_channel_matches_type_and_tag():
     r1 = mkrec("patch", tags={"channel:journal"})
@@ -45,6 +60,19 @@ def test_add_record_assigns_monotonic_seq():
     assert len(items) == 2
     assert items[0].seq == 0
     assert items[1].seq == 1
+    assert rs.max_seq == 1
+
+def test_add_record_normalizes_missing_and_negative_seq():
+    rs = RecordStream()
+    negative = mkrec("journal", label="neg").model_copy(update={"seq": -10})
+    missing = mkrec("journal", label="missing").model_copy(update={"seq": None})
+
+    rs.add_record(negative)
+    rs.add_record(missing)
+
+    ordered = list(rs.find_all(sort_key=lambda rec: rec.seq))
+    assert [rec.seq for rec in ordered] == [0, 1]
+    assert [rec.label for rec in ordered] == ["neg", "missing"]
     assert rs.max_seq == 1
 
 def test_add_record_accepts_dict_and_assigns_seq():
@@ -74,6 +102,22 @@ def test_add_single_item():
     rs.add_record(rec)
     assert len(rs) == 1
     assert list(rs.values()) == [rec]
+
+
+def test_add_record_validation_and_push_behaviors(caplog):
+    rs = RecordStream()
+
+    with pytest.raises(ValueError):
+        rs.add_record(object())
+
+    with caplog.at_level(logging.WARNING):
+        start_end = rs.push_records()
+    assert start_end == (-1, -1)
+    assert "No-op push to record stream." in caplog.text
+
+    rs.push_records({"type": "journal", "label": "dict"})
+    last = rs.last()
+    assert last is not None and last.record_type == "journal" and last.label == "dict"
 
 
 # --- markers & sections (half-open) ---------------------------------------
@@ -136,6 +180,17 @@ def test_iter_channel_and_last():
     assert [r.label for r in ch] == ["j1", "j2"]
     last_journal = rs.last(channel="journal")
     assert last_journal.label == "j2"
+
+
+def test_iter_channel_none_and_last_with_no_matches():
+    rs = RecordStream()
+    rs.push_records(mkrec("journal", label="entry"))
+
+    assert list(rs.iter_channel(None, label="missing")) == []
+    assert rs.last(label="missing") is None
+
+    with pytest.raises(NotImplementedError):
+        rs.remove("anything")
 
 
 def test_empty_journal():
