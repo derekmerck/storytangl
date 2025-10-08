@@ -1,4 +1,6 @@
-# StoryTangl
+# StoryTangl v3.7
+
+[![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml)
 
 **TanglDev, Spring 2026**  
 
