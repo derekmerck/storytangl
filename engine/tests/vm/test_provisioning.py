@@ -404,3 +404,37 @@ def test_affordance_creates_or_finds_source():
 
     assert req.satisfied
     assert g.find_nodes(label="origin"), "source should have been created"
+
+def test_iter_requirement_registries_includes_context_graph_and_extras():
+    ctx_graph = Graph(label="ctx")
+    cursor = ctx_graph.add_node(label="cursor")
+    requirement_graph = Graph(label="req")
+    extra_registry = Graph(label="extra")
+
+    requirement = Requirement[Node](
+        graph=requirement_graph,
+        policy=ProvisioningPolicy.EXISTING,
+        identifier="missing",
+    )
+    requirement.__dict__["registry"] = [extra_registry]
+
+    prov = Provisioner()
+    ctx = Context(graph=ctx_graph, cursor_id=cursor.uid)
+
+    registries = prov.iter_requirement_registries(requirement, ctx=ctx)
+
+    assert registries[0] is ctx_graph
+    assert requirement_graph in registries
+    assert extra_registry in registries
+    assert registries.count(ctx_graph) == 1
+
+
+def test_iter_policies_expands_composite_flags():
+    prov = Provisioner()
+    policies = prov._iter_policies(ProvisioningPolicy.ANY | ProvisioningPolicy.CLONE)
+    assert policies == (
+        ProvisioningPolicy.EXISTING,
+        ProvisioningPolicy.UPDATE,
+        ProvisioningPolicy.CREATE,
+        ProvisioningPolicy.CLONE,
+    )

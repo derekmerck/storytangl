@@ -1,16 +1,19 @@
 from __future__ import annotations
+from tangl.core.dispatch import JobReceipt
 
 from tangl.core import Graph, Node
+from tangl.vm.planning.simple_planning_handlers import plan_collect_offers, plan_select_and_apply
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm import (
     Frame,
     ResolutionPhase as P,
+    Context,
     Requirement,
     Dependency,
     Affordance,
     ProvisioningPolicy,
 )
-from tangl.vm.planning import PlanningReceipt, BuildReceipt
+from tangl.vm.planning import PlanningReceipt, BuildReceipt, ProvisionOffer, Provisioner
 from tangl.utils.hashing import hashing_func
 
 
@@ -154,3 +157,68 @@ def test_event_sourced_frame_records_planning_receipt_and_patch():
 
     patched_graph = patch.apply(baseline_graph)
     assert patched_graph.find_one(label="projected") is not None
+
+
+def test_plan_select_and_apply_handles_mixed_requirements():
+    g = Graph(label="demo")
+    cursor = g.add_node(label="cursor")
+    existing = g.add_node(label="existing")
+
+    hard_missing = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.EXISTING,
+        identifier="missing",
+        hard_requirement=True,
+    )
+    Dependency[Node](graph=g, source_id=cursor.uid, requirement=hard_missing, label="needs_missing")
+
+    soft_create = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.CREATE,
+        template={"obj_cls": Node, "label": "created"},
+        hard_requirement=False,
+    )
+    Dependency[Node](graph=g, source_id=cursor.uid, requirement=soft_create, label="needs_created")
+
+    satisfied = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.EXISTING,
+        identifier=existing.uid,
+        hard_requirement=True,
+    )
+    satisfied.provider = existing
+    satisfied.is_unresolvable = True
+    Dependency[Node](graph=g, source_id=cursor.uid, requirement=satisfied, label="already_satisfied")
+
+    ctx = Context(graph=g, cursor_id=cursor.uid)
+
+    offers = plan_collect_offers(cursor, ctx=ctx)
+    prov = Provisioner()
+    offers.append(
+        ProvisionOffer(
+            requirement=satisfied,
+            provisioner=prov,
+            priority=0,
+            operation=ProvisioningPolicy.EXISTING,
+            accept_func=lambda: existing,
+        )
+    )
+    ctx.job_receipts.clear()
+    ctx.job_receipts.append(JobReceipt(result=offers))
+
+    builds = plan_select_and_apply(cursor, ctx=ctx)
+    build_by_req = {b.caller_id: b for b in builds}
+
+    hard_receipt = build_by_req[hard_missing.uid]
+    assert hard_receipt.accepted is False
+    assert hard_receipt.reason == "no_offers"
+    assert hard_missing.is_unresolvable is True
+
+    soft_receipt = build_by_req[soft_create.uid]
+    assert soft_receipt.accepted is True
+    assert soft_create.provider is not None
+    assert g.get(soft_create.provider_id) is soft_create.provider
+    assert soft_create.is_unresolvable is False
+
+    assert satisfied.is_unresolvable is False
+    assert satisfied.provider is existing
