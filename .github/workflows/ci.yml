@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
     branches-ignore:
       # codex usually runs its own tests and only pushes a branch for a p/r
       # so this keeps it from running ci redundantly
