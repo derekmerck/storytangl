@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pydantic import ConfigDict, model_validator, Field
 
 from tangl.type_hints import Identifier
@@ -24,6 +26,8 @@ class MediaDep(Dependency[MediaRIT]):
           - register the returned media and update the node spec if the node is unrepeatable, otherwise leave it as the template so it can be re-rendered when the context is updated
           - link the new rit
     """
+    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
+
     @model_validator(mode="before")
     @classmethod
     def _pre_resolve(cls, data):
