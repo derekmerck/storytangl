@@ -45,7 +45,7 @@ if not OFFLINE_MODE:
         # 'requests': ('https://requests.readthedocs.io/en/latest/', None),
     }
 
-suppress_warnings = ['ref.meth', 'ref.attr', 'ref.class', 'ref.mod', 'ref.data', 'ref.deco']
+suppress_warnings = ['ref.meth', 'ref.attr', 'ref.class', 'ref.mod', 'ref.data', 'ref.deco', 'html.static_path']
 if OFFLINE_MODE:
     suppress_warnings.append('intersphinx.external')
 
@@ -86,7 +86,8 @@ pygments_style = "tango"
 pygments_dark_style = "native"
 
 # html_theme = 'alabaster'
-html_static_path = ['_static']
+if not OFFLINE_MODE:
+    html_static_path = ['_static']
 
 # Pydantic autodoc sigs
 # extensions += ["autodoc_pydantic"]
