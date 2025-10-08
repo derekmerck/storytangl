@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "StoryTangl"
-version = "4.35.0"
+version = "3.7.0"
 description = "The abstract narrative graph lib for interactive stories"
 authors = ["TangleDev <dev@storytan.gl>"]
 readme = "README.md"
@@ -16,8 +16,8 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.urls]
-Documentation = "https://readthedocs.org/story/tangl/docs"
-Repository    = "https://github.com/story/tangl"
+Documentation = "https://readthedocs.org/tangldev/storytangl/docs"
+Repository    = "https://github.com/tangldev/storytangl"
 
 [tool.poetry.scripts]
 cli = "tangl.apps.cli.__main__:main"
