@@ -53,6 +53,22 @@ def test_add_record_accepts_dict_and_assigns_seq():
     last = rs.last()
     assert last is not None and last.record_type == "patch" and last.seq == 0
 
+
+def test_find_all_defaults_to_seq_sorting_with_manual_seq_values():
+    rs = RecordStream()
+    manual = [
+        mkrec("journal", label="later", seq=10),
+        mkrec("journal", label="first", seq=3),
+        mkrec("journal", label="middle", seq=7),
+    ]
+
+    for rec in manual:
+        rs.add_record(rec)
+
+    ordered = list(rs.find_all())
+    assert [r.seq for r in ordered] == sorted(r.seq for r in manual)
+    assert [r.label for r in ordered] == ["first", "middle", "later"]
+
 # --- stream  ---------------------------------------
 
 def test_add_single_item():
