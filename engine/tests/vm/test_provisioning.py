@@ -14,7 +14,8 @@ from tangl.vm.planning import (
 )
 from tangl.vm.planning.open_edge import Dependency, Affordance
 from tangl.vm.frame import Frame, ResolutionPhase as P
-from tangl.vm.planning.simple_planning_handlers import plan_select_and_apply
+from tangl.vm.context import Context
+from tangl.vm.planning.simple_planning_handlers import plan_collect_offers, plan_select_and_apply
 from tangl.core.dispatch import JobReceipt
 
 
@@ -63,6 +64,29 @@ def test_provision_clone_produces_new_uid():
     frame.run_phase(P.PLANNING)
     assert req.satisfied and req.provider.label == "RefClone"
     assert req.provider.uid != ref.uid and req.provider in g
+
+
+def test_plan_collect_offers_emits_multiple_operations_when_available():
+    g, cursor = _frame_with_cursor()
+    g.add_node(label="T")
+    req = Requirement[Node](
+        graph=g,
+        identifier="T",
+        template={"obj_cls": Node, "label": "T"},
+        policy=ProvisioningPolicy.ANY,
+    )
+    Dependency[Node](graph=g, source_id=cursor.uid, requirement=req, label="needs_T")
+
+    ctx = Context(graph=g, cursor_id=cursor.uid)
+    offers = plan_collect_offers(cursor, ctx=ctx)
+
+    ops_for_requirement = {
+        offer.operation for offer in offers if offer.requirement.uid == req.uid
+    }
+
+    assert ProvisioningPolicy.EXISTING in ops_for_requirement
+    assert ProvisioningPolicy.CREATE in ops_for_requirement
+    assert len(ops_for_requirement) >= 2
 
 
 @pytest.mark.xfail(reason="not working")

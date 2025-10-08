@@ -45,15 +45,9 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     # Dependencies on the frontier
     for e in list(cursor.edges_out(is_instance=Dependency, satisfied=False)):
         prov = Provisioner()
-        off = ProvisionOffer(
-            label=f"dep:{e.requirement.get_label()}",
-            requirement=e.requirement,
-            provisioner=prov,
-            priority=50,
-            operation=ProvisioningPolicy.NOOP,
-            selection_criteria={},   # let selectors filter if needed
-        )
-        offers.append(off)
+        for offer in prov.get_offers(e.requirement):
+            offer.label = offer.label or f"dep:{e.requirement.get_label()}"
+            offers.append(offer)
 
     return offers
 

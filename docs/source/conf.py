@@ -1,6 +1,13 @@
-import sys
+from __future__ import annotations
+
 import os
-sys.path.insert(0, os.path.abspath('../../engine/src'))
+from pathlib import Path
+import sys
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENGINE_SRC = PROJECT_ROOT / "engine" / "src"
+sys.path.insert(0, str(ENGINE_SRC))
 
 project = 'StoryTangl'
 copyright = '2025, Derek Merck'
@@ -13,10 +20,12 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',  # for Google or NumPy style docstrings
     'sphinx.ext.viewcode',
-    'sphinx_markdown_builder',
     'sphinx.ext.intersphinx',
+    'sphinx_markdown_builder',
     'myst_parser',
 ]
+
+OFFLINE_MODE = os.environ.get("STORYTANGL_OFFLINE", "").lower() in {"1", "true", "yes"}
 
 # extensions += [
 #     "sphinx.ext.autosectionlabel",
@@ -28,11 +37,17 @@ extensions = [
 # ]
 # html_baseurl = "https://<your-docs-domain>/"   # needed for sitemap & OpenGraph
 
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    # Add other projects here, such as:
-    # 'requests': ('https://requests.readthedocs.io/en/latest/', None),
-}
+intersphinx_mapping = {}
+if not OFFLINE_MODE:
+    intersphinx_mapping = {
+        'python': ('https://docs.python.org/3', None),
+        # Add other projects here, such as:
+        # 'requests': ('https://requests.readthedocs.io/en/latest/', None),
+    }
+
+suppress_warnings = ['ref.meth', 'ref.attr', 'ref.class', 'ref.mod', 'ref.data', 'ref.deco']
+if OFFLINE_MODE:
+    suppress_warnings.append('intersphinx.external')
 
 source_suffix = {
     ".rst": "restructuredtext",
@@ -48,7 +63,7 @@ myst_enable_extensions = [
 ]
 
 templates_path = ['_templates']
-exclude_patterns = []
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 add_module_names = False
 autodoc_typehints = 'none'

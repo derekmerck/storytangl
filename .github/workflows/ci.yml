@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "poetry.lock"
+      - name: Install dependencies
+        env:
+          POETRY_VIRTUALENVS_CREATE: "true"
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry uv
+          uv python install 3.13
+          poetry env use "$(uv python find 3.13)"
+          poetry install --no-interaction --with dev
+      - name: Run tests
+        env:
+          PYTHONPATH: engine/src
+        run: |
+          poetry run pytest engine/tests

@@ -173,12 +173,12 @@ class PlanningReceipt(JobReceipt):
         created = 0
         cloned = 0
 
-        unresolved_hard_requirements = []
+        unresolved_hard_requirements: list[UUID] = []
 
         for b in builds:
             if not b.accepted:
-                if b.hard_req:
-                    unresolved_hard_requirements.append(str(b.caller_id))
+                if b.caller_id is not None:
+                    unresolved_hard_requirements.append(b.caller_id)
                 continue
             match b.operation:
                 case ProvisioningPolicy.EXISTING: attached += 1

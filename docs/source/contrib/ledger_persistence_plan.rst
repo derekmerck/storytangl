@@ -1,5 +1,4 @@
 Ledger Persistence and Service Integration Plan
-==============================================
 
 Overview
 --------

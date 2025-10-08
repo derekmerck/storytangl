@@ -1,62 +1,85 @@
 # Planning Phase Data Path Roadmap
 
-> Reference implementation priorities: **generic contracts**, **deterministic behavior**, **traceable receipts**.
+> Reference priorities: **generic contracts**, **deterministic behavior**, **traceable receipts**.
 >
-> Goal for v3.7: close the loop from frontier requirements → offers → applied updates → receipts so ledger/phase bus deliver a complete audit trail before domain-specific builders arrive.
+> Target for v3.7: deliver an auditable planning cycle that spans frontier requirements → offer discovery → applied mutations → persisted receipts before layering narrative-domain specifics.
 
-## Current Baseline
+## A. Baseline Capabilities (Validated)
 
-- **Phase bus contract** – `Frame.run_phase` already pipelines handlers per `ResolutionPhase`, clearing `Context.job_receipts`, aggregating with the reducer declared by each phase, and caching per-phase outcomes for later reducers.【F:engine/src/tangl/vm/frame.py†L187-L212】
-- **Context plumbing** – `Context` is frozen, exposes the working graph/cursor/scope, carries deterministic RNG, and buffers job receipts for downstream selectors.【F:engine/src/tangl/vm/context.py†L21-L114】
-- **Planning primitives** – Requirements, offers, provisioners, and receipts are in place: requirements validate policy/template pairs, provisioners can locate/update/create/clone providers, offers call provisioners, and receipts summarize accepted work and unresolved hard requirements.【F:engine/src/tangl/vm/planning/requirement.py†L22-L142】【F:engine/src/tangl/vm/planning/provisioning.py†L1-L165】【F:engine/src/tangl/vm/planning/offer.py†L24-L187】
-- **Default handlers** – The reference planning handlers already implement a collect → select/apply → summarize pipeline and register with the global domain so they participate in the planning phase bus.【F:engine/src/tangl/vm/planning/simple_planning_handlers.py†L1-L93】
-- **Ledger integration** – The ledger can spawn frames, push snapshots, and append patches/journal entries, but it expects the planning phase to surface a `PlanningReceipt` so downstream projection/commit can audit the decision trail.【F:engine/src/tangl/vm/ledger.py†L15-L103】
+| Area | Current Status | Key References |
+| --- | --- | --- |
+| Phase execution | `Frame.run_phase` sequences handlers per :class:`ResolutionPhase`, resets :class:`Context.job_receipts`, and caches outcomes for later reducers. | :mod:`tangl.vm.frame`【F:engine/src/tangl/vm/frame.py†L187-L212】 |
+| Context plumbing | :class:`Context` freezes graph/cursor/scope, exposes deterministic RNG, and buffers job receipts. | :mod:`tangl.vm.context`【F:engine/src/tangl/vm/context.py†L21-L114】 |
+| Planning primitives | Requirements, offers, provisioners, and receipts validate inputs, locate providers, and summarise accepted work. | :mod:`tangl.vm.planning.requirement`, :mod:`tangl.vm.planning.provisioning`, :mod:`tangl.vm.planning.offer`【F:engine/src/tangl/vm/planning/requirement.py†L22-L142】【F:engine/src/tangl/vm/planning/provisioning.py†L1-L165】【F:engine/src/tangl/vm/planning/offer.py†L24-L187】 |
+| Default planning handlers | The collect → select/apply → summarise pipeline is registered on the phase bus and delivers deterministic receipts. | :mod:`tangl.vm.planning.simple_planning_handlers`【F:engine/src/tangl/vm/planning/simple_planning_handlers.py†L1-L93】 |
+| Ledger integration | Ledger spawns frames, appends snapshots, patches, and journals; planning receipts only need to be forwarded to complete the audit trail. | :mod:`tangl.vm.ledger`【F:engine/src/tangl/vm/ledger.py†L15-L103】 |
 
-## Gaps & Open Questions
+These pieces already drive an end-to-end planning loop against the existing handler set.
 
-1. **Offer lifecycle & scope awareness**
-   - Affordances are noted as TODOs and currently ignored, so frontier resources are never surfaced before dependency provisioning.【F:engine/src/tangl/vm/planning/simple_planning_handlers.py†L32-L36】
-   - Offers do not yet encode scope-specific selectors (policy, domain ownership, resource availability), which we will need once multiple domains compete to satisfy the same requirement.
+## B. Outstanding Gaps Blocking MVP
 
-2. **Selector policy & arbitration**
-   - Selection currently collapses purely by priority and first-come order; we have no way to flag conflicts on shared provider attributes or to escalate unresolved hard requirements beyond the summary list.
-   - There is no explicit representation of “no viable offer” vs. “waived soft requirement”; the selector relies on offer return flags, but we should log waived soft requirements for diagnostics.
+1. **Affordance coverage & precedence** – Collectors ignore affordances, so in-scope reusable resources never surface before provisioning new providers.【F:engine/src/tangl/vm/planning/simple_planning_handlers.py†L32-L36】
+2. **Scope-aware builders** – `plan_collect_offers` instantiates a bare :class:`Provisioner` instead of discovering provisioners via scope, preventing domain registries or templates from participating.
+3. **Planning audit trail** – The :class:`PlanningReceipt` is cached but not persisted alongside patches/journal fragments, leaving the record stream without the “why” for each step.
+4. **Event-sourced preview refresh** – When `event_sourced=True`, watcher previews survive from PLANNING into UPDATE/JOURNAL, risking stale graph views during projection unless the context resets between phases.
+5. **Finalize contract mismatch** – :class:`ResolutionPhase.FINALIZE` promises a :class:`Patch`, yet handlers return ``None`` and the frame fabricates the patch afterward, so phase outcomes and stream data diverge.
+6. **Receipt semantics** – `PlanningReceipt.summarize()` marks every rejected requirement as “unresolved hard” even when `hard_req=False`; there is no counter for waived soft requirements.
+7. **Provisioner registry injection** – Domains cannot supply extra registries/templates (e.g., world libraries) into the default :class:`Provisioner` search path.
+8. **Developer ergonomics** – :meth:`Context.inspect_scope` exists, but there is no parallel `Frame` inspection hook to dump collected offers, selected providers, and resulting receipts for debugging or doctests.
 
-3. **Builder integration**
-   - Provisioners run directly off the graph registry; domains cannot yet inject additional registries/templates or rewrite requirements before provisioning.
-   - Builders cannot publish additional receipts beyond the `BuildReceipt`, so we lose diagnostics (e.g., which domain satisfied a requirement, what heuristics were applied).
+Items 1–6 are **P0 blockers** for an MVP; 7–8 are **P1 follow-ups** that unlock domain extensibility and developer tooling but can land once the core loop is auditable.
 
-4. **Phase output plumbing**
-   - Planning receipts are returned, but the phase bus/ledger do not yet relay them into the record stream or expose them alongside patches/fragments; projection/commit code will need deterministic access to the summarized plan before journaling.
-   - Event-sourced runs rely on watchers capturing mutations during offer acceptance, yet we do not reset the context between planning and update phases, so patch generation may include “preview” mutations unless we snapshot boundaries explicitly.
+## C. Minimal Implementation Plan (Sequenced)
 
-5. **Testing & diagnostics**
-   - No scenario tests cover the planning triplet; regressions in offer aggregation or receipt composition would go unnoticed.
-   - We also lack developer tooling to inspect per-phase receipts (e.g., a lightweight trace view in `Frame` or `Ledger`).
+### P0 — Close the Planning Loop
 
-## Recommended Next Steps
+1. **Affordance-first collection**
+   - Extend `plan_collect_offers` to enumerate in-scope affordances before unsatisfied dependencies and tag each :class:`ProvisionOffer.selection_criteria` with `{"source": "affordance"|"dependency"}` for downstream traces.
+   - Ensure collectors discovered through scope can opt into earlier priorities without editing the core handler.
 
-1. **Complete offer collection**
-   - Extend `plan_collect_offers` to enumerate visible affordances in scope order, optionally preferring them before dependencies, and emit offers tagged with domain/source metadata so selectors can differentiate provenance.【F:engine/src/tangl/vm/planning/simple_planning_handlers.py†L32-L50】
-   - Allow domains to register additional collectors at different priorities to decorate requirements (e.g., inject fallback templates, clone policies).
+2. **Scope-aware provisioners**
+   - Replace the hard-coded :class:`Provisioner` instantiation with `ctx.get_handlers(is_instance=Provisioner)` to discover domain-specific builders, appending the default provisioner as a fallback.
+   - Allow discovered provisioners to contribute additional registries/templates when evaluating requirements.
 
-2. **Formalize selector arbitration**
-   - Introduce a selector helper (e.g., `OfferSelector`) that groups offers by `(requirement, conflict_key)` and enforces policy (priority, hard vs. soft, conflict resolution). It should produce explicit outcomes: accepted offer, waived soft requirement, or unresolved hard requirement with diagnostics.
-   - Extend `BuildReceipt` or add a companion record so each decision logs the selector that acted, the domain responsible, and the conflict key considered.【F:engine/src/tangl/vm/planning/offer.py†L24-L187】
+3. **Persist planning receipts**
+   - After `run_phase(P.PLANNING)` inside :class:`Frame.follow_edge`, append the `PlanningReceipt` to `Frame.records` (structured fragment or note) before JOURNAL executes so each `step-XXXX` marker contains planning + journal + patch artifacts.
+   - Update ledger tests to assert the planning note appears between journal fragments and patches for event-sourced runs.
 
-3. **Wire builder hooks into scope**
-   - Let the context expose domain-provided registries/templates to provisioners (e.g., via `Scope.get_handlers(is_instance=Provisioner)`), so requirement resolution can search beyond the base graph.【F:engine/src/tangl/vm/context.py†L86-L114】【F:engine/src/tangl/vm/planning/provisioning.py†L37-L165】
-   - Support pre-resolution requirement transforms (policy normalization, criteria enrichment) by letting builders register preprocessors that run before offer creation.
+4. **Refresh event-sourced previews**
+   - When `self.event_sourced` is true, invalidate/rebuild the preview context after PLANNING and UPDATE so JOURNAL/FINALIZE see the post-mutation graph while the watcher still feeds the final patch.
+   - Confirm replay parity by running the event-sourced integration test with `replay()`; expect identical state hashes and matching planning notes.
 
-4. **Surface planning receipts to the ledger**
-   - After `Frame.run_phase(P.PLANNING)`, push the resulting `PlanningReceipt` into `Frame.records` (likely as a note/fragment) so the ledger’s record stream captures the plan alongside patches and journal fragments.【F:engine/src/tangl/vm/frame.py†L187-L212】【F:engine/src/tangl/vm/ledger.py†L15-L103】
-   - When event sourcing is enabled, ensure watchers reset between planning and update so the `Patch` reflects applied offers precisely (or alternatively separate planning mutations from finalization mutations via sub-patches).
+5. **Align FINALIZE contract**
+   - Either (A) keep patch creation in :class:`Frame` but set `phase_outcome[P.FINALIZE]` to the constructed patch (loosening type hints accordingly), or (B) move patch construction into a FINALIZE handler that returns the patch. Option A centralises event logic; Option B makes the phase contract explicit. Choose one path and update reducers/tests to match.
 
-5. **Add regression scaffolding**
-   - Build scenario tests around a toy graph with one dependency and one affordance to assert that collectors, selectors, and receipts behave deterministically (e.g., unresolved hard requirements propagate, soft waivers are logged, accepted offers mutate the graph once).
-   - Provide a developer trace helper (perhaps `Frame.inspect_phase(phase)` or an enriched debug log) that prints collected offers, chosen providers, and resulting receipts to ease future debugging.
+6. **Clarify receipt summarisation**
+   - Modify `PlanningReceipt.summarize()` so unresolved hard requirements only include `hard_req=True` failures and add a `waived_soft_requirements` counter/list for diagnostics.
+   - Ensure `BuildReceipt` instances always record `hard_req` so summarisation cannot misclassify results.
 
-6. **Document handler extension patterns**
-   - Capture the offer/selector lifecycle and extension points in the docs so future domain builders know where to plug in specialized logic (collectors, selectors, provisioners, receipt enrichers). This roadmap can seed a deeper section in the contributor guide once the implementation lands.
+### P1 — Post-MVP Enhancements
 
-Following this order keeps the reference stack generic while delivering the audit trail we need before layering on concrete narrative domains.
+7. **Registry injection hooks**
+   - Extend :class:`Provisioner._requirement_registries` (or equivalent) to include registries supplied via scope so planners can search static content libraries alongside the live graph.
+
+8. **Developer trace helpers**
+   - Add `Frame.inspect_phase(phase)` (or a debug flag) that dumps collected offers, selected providers, and resulting receipts; use it in doctests and regression logs to simplify onboarding.
+
+## D. Testing & Documentation Commitments
+
+1. **Scenario tests in ``engine/tests/vm/planning/``**
+   - Fixture: toy graph with one dependency and one affordance to assert affordance precedence, selection provenance tags, and receipt counters for accepted/waived/unresolved cases.
+   - Event-sourced replay: mutate during planning, run with `event_sourced=True`, ensure JOURNAL/FINALIZE observe refreshed previews and the emitted patch matches watcher events.
+   - Ledger stream: verify each step emits planning, journal, and patch records under the same marker.
+
+2. **Documentation update (post-implementation)**
+   - Expand the contributor guide with an “Extending planning” section covering collector/selector registration, provisioner injection via scope, and interpreting planning receipts during replay.
+
+## E. Acceptance Checklist for the MVP Slice
+
+- Every frame step emits three artifacts under a shared `step-XXXX` marker: planning receipt, journal fragments, and patch (when event-sourced).
+- Running an event-sourced ledger through replay reproduces the same state hash and the planning note explains the applied offers.
+- Affordance-first collection can satisfy dependencies without provisioning new providers when an in-scope resource matches.
+- Swapping in a scope-registered provisioner changes offer sets deterministically with no core code edits.
+- `PlanningReceipt.summarize()` distinguishes unresolved hard requirements from waived soft requirements in its diagnostics.
+
+Following this plan keeps the reference implementation generic, auditable, and ready for domain-specific planners without architectural churn.
