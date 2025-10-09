@@ -61,6 +61,7 @@ from .planning import (
 from .context import Context
 from .frame import Frame, ChoiceEdge, ResolutionPhase
 from .ledger import Ledger
+from .domain import TraversableDomain
 
 Offer = ProvisionOffer
 
@@ -73,5 +74,5 @@ __all__ = [
     # planning
     "Requirement", "Provisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "BuildReceipt", "PlanningReceipt",
     # resolution
-    "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context",
+    "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context", "TraversableDomain",
     ]
