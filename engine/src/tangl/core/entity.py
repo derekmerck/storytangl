@@ -40,6 +40,8 @@ class Entity(BaseModelPlus):
       :meth:`matches(has_identifier='foo')<matches>`.
     * **Serialization** – :meth:`structure` and :meth:`unstructure` provide
       round-trip conversion between entities and dict data.
+    * **Audit tracking** – :attr:`is_dirty` flags non-reproducible mutations
+      for replay validation.
     * **Search** – Entities can be filtered by arbitrary attribute criteria
       (e.g. :meth:`registry.find_all(label="scene1", has_tags={"npc"})<Registry.find_all>`).
 
@@ -145,12 +147,22 @@ class Entity(BaseModelPlus):
     def short_uid(self) -> str:
         return shortuuid.encode(self.uid)
 
-    is_dirty_: bool = Field(default=False, alias="is_dirty")  #: :meta private:
+    is_dirty_: bool = Field(
+        default=False,
+        alias="is_dirty",
+        json_schema_extra={"doc_private": True},
+    )  #: :meta private:
     # audit indicator that the entity has been tampered with, invalidates certain debugging
 
     @property
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         return self.is_dirty_
+
+    def mark_dirty(self, reason: str | None = None) -> None:
+        """Mark this entity as tainted by non-reproducible mutation."""
+        object.__setattr__(self, "is_dirty_", True)
+        if reason:
+            logger.warning("%r marked dirty: %s", self, reason)
 
     def __repr__(self) -> str:
         s = self.get_label()
