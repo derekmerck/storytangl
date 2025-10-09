@@ -7,7 +7,8 @@ from typing import Any
 
 from tangl.core import BaseFragment, Graph, Node, global_domain
 from tangl.core.domain import NS
-from tangl.vm import Context, ResolutionPhase as P
+from tangl.vm.context import Context
+from tangl.vm.frame import ResolutionPhase as P
 
 __all__ = ["SimpleConcept"]
 

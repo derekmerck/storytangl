@@ -12,7 +12,9 @@ examples. Real applications can register additional handlers in their domains.
 
 import logging
 
-from tangl.core import Node, global_domain, BaseFragment
+from collections.abc import Iterable
+
+from tangl.core import BaseFragment, Node, global_domain
 from tangl.core.domain import NS
 from tangl.vm.context import Context
 from tangl.vm.frame import ResolutionPhase as P, ChoiceEdge
@@ -88,15 +90,24 @@ def journal_line(cursor: Node, *, ctx: Context, **kwargs):
 @global_domain.handlers.register(phase=P.JOURNAL, priority=100)
 def coerce_to_fragments(*args, ctx: Context, **kwargs):
     """Coerce mixed handler outputs into a list of :class:`~tangl.core.fragment.BaseFragment`.  Runs LAST."""
-    fragments = []
+    fragments: list[BaseFragment] = []
+
+    def _extend(value: object) -> None:
+        if value is None:
+            return
+        if isinstance(value, BaseFragment):
+            fragments.append(value)
+            return
+        if isinstance(value, str):
+            fragments.append(BaseFragment(content=value))
+            return
+        if isinstance(value, Iterable):
+            for item in value:
+                _extend(item)
+            return
+        fragments.append(BaseFragment(content=str(value)))
+
     for receipt in ctx.job_receipts:
-        result = receipt.result
-        if result is None:
-            continue
-        if isinstance(result, BaseFragment):
-            fragments.append(result)
-        else:
-            f = BaseFragment(content=result)
-            fragments.append(f)
+        _extend(receipt.result)
     logger.debug(f"JOURNAL: Outputting fragments: {fragments}")
     return fragments
