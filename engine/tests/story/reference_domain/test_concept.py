@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 import pytest
 
-from tangl.core import BaseFragment, Graph
+from tangl.core import BaseFragment, Graph, Node
 from tangl.core.domain import global_domain
 from tangl.story.reference_domain import SimpleConcept
 from tangl.vm import Frame, ResolutionPhase as P
@@ -68,6 +68,16 @@ class TestSimpleConcept:
             global_domain.vars.pop("player_name", None)
 
         assert "Hello, Bob!" in fragment.content
+
+    def test_handler_ignores_plain_nodes(self):
+        graph = Graph(label="test")
+        node = Node(graph=graph, label="plain")
+        graph.add(node)
+
+        frame = Frame(graph=graph, cursor_id=node.uid)
+        fragments = frame.run_phase(P.JOURNAL)
+
+        assert any("cursor" in fragment.content for fragment in fragments)
 
 
 @pytest.fixture(autouse=True)

@@ -66,9 +66,12 @@ class SimpleConcept(Node):
             return self.content
 
 
-@global_domain.handlers.register(phase=P.JOURNAL, priority=45, is_instance=SimpleConcept)
-def render_concept_to_fragment(cursor: SimpleConcept, *, ctx: Context, **_: Any) -> BaseFragment:
-    """Emit a :class:`~tangl.core.fragment.BaseFragment` for ``cursor`` content."""
+@global_domain.handlers.register(phase=P.JOURNAL, priority=45)
+def render_concept_to_fragment(cursor: Node, *, ctx: Context, **_: Any) -> BaseFragment | None:
+    """Emit a :class:`~tangl.core.fragment.BaseFragment` when the cursor is a concept."""
+
+    if not isinstance(cursor, SimpleConcept):  # pragma: no cover - defensive guard
+        return None
 
     ns = ctx.get_ns()
     rendered = cursor.render(ns)
