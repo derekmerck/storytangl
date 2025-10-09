@@ -6,13 +6,27 @@ Dereferencing GraphItems
     edge.source          # returns Node via self.graph.get()
     edge.destination     # property, no args
 
-This enables WatchedRegistry to intercept all cross-item access and supports equality by id rather than recursive checks.
-
 **Records** use methods with explicit registry parameter::
 
     record.blame(registry)  # returns Entity via passed registry
 
-This preserves record independence from graph topology and
-maintains immutability (no cached references).
+**Collections & Queries** return fresh iterators::
 
-Both patterns store only UUIDs during serialization.
+    subgraph.members              # Iterator[GraphItem], not cached
+    node.edges_in()               # Iterator[Edge], fresh lookup
+    registry.find_all(label='x')  # Iterator[Entity], filtered
+
+All iterators are **single-use**. Materialize explicitly if multiple
+passes needed::
+
+    # Single iteration: direct use
+    for member in subgraph.members:
+        process(member)
+    
+    # Multiple iterations: materialize first
+    members = list(subgraph.members)
+    first_pass(members)
+    second_pass(members)
+
+This pattern ensures queries always reflect current state and avoids
+hidden cache invalidation complexity.
