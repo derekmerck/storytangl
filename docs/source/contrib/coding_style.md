@@ -51,6 +51,7 @@ presentation (renderers, web/UI)
 - Handlers are entity-centric; dispatch orders by priority → registration → uid.
 - Selection via `Selectable`/criteria; avoid hard-coded switches.
 - Thin handler bodies, rich `JobReceipt`s for aggregation and audit.
+- **Priority ordering**: Use `Priority` enum (not strings) for deterministic sort order.
 
 ## 7) Naming & API surface
 - Canon: `Graph`, `Node`, `Edge`, `Subgraph`; `Record`, `Event`, `Patch`, `Snapshot`, `Fragment`; `Frame`, `Context`, `Ledger`; `Requirement`, `Offer`, `Provisioner`.
@@ -66,6 +67,7 @@ presentation (renderers, web/UI)
 - Fail fast at boundaries (arity/role checks; policy validation).
 - Exceptions include context (ids, labels, policy).
 - No silent coercion.
+- **Duplicate prevention**: `Registry.add()` raises `ValueError` if entity with same UUID already exists (unless same object reference).
 
 ## 10) Determinism & RNG
 - `Context.rand` is seeded from `(graph.uid, cursor.uid, step)`.
@@ -78,6 +80,7 @@ presentation (renderers, web/UI)
 ## 12) Observability
 - Prefer emitting a `Record` to logging when it affects reasoning.
 - Minimal structured logs at orchestration edges.
+- **Audit tracking**: Use `Entity.is_dirty` to flag non-reproducible mutations (forced jumps, direct eval/exec). Check `Registry.any_dirty()` to detect tainted state.
 
 ## 13) Tests (contracts > mechanics)
 - Round-trip `structure/unstructure` for composites.
@@ -85,6 +88,7 @@ presentation (renderers, web/UI)
 - Provisioning policies enforce required fields.
 - Event canonicalization removes redundant updates; replay reproduces state.
 - Deterministic RNG in tests; monkeypatch randomness when needed.
+- **No failing tests in releases**: Fix or remove all `xfail`/`skip` markers before shipping.
 
 ## 14) Anti-patterns
 - Upward imports (lower layer depending on higher).
@@ -92,3 +96,142 @@ presentation (renderers, web/UI)
 - Recursive factories without a base case.
 - Overgrown classes; mix responsibilities → extract helpers.
 - Implicit IO in `core`/`vm`.
+
+## 15) Dereferencing & Resolution Patterns
+
+StoryTangl maintains strict separation between identity (UUIDs) and references (resolved objects). This enables serialization, event sourcing, and watched access patterns.
+
+### GraphItems: Properties with Implicit Graph Access
+
+**Rule**: GraphItems store `*_id: UUID` fields and provide properties that resolve via `.graph`.
+
+**Pattern**:
+```python
+class Edge(GraphItem):
+    source_id: Optional[UUID] = None
+    destination_id: Optional[UUID] = None
+    
+    @property
+    def source(self) -> Optional[Node]:
+        """Resolve source node via graph registry (watched)."""
+        return self.graph.get(self.source_id) if self.source_id else None
+    
+    @source.setter
+    def source(self, node: Optional[Node]):
+        self.source_id = node.uid if node else None
+```
+
+**Why**:
+- Every access goes through `self.graph.get()` → `WatchedRegistry` can intercept
+- Serialization clean: only `*_id` fields in dict
+- Type hints work: property returns concrete type, field stores UUID
+
+### Records: Methods with Explicit Registry Parameter
+
+**Rule**: Records are frozen and graph-independent. They store `*_id: UUID` and require explicit registry for dereferencing.
+
+**Pattern**:
+```python
+class Record:
+    blame_id: Optional[UUID] = None
+    
+    def blame(self, registry: Registry[Entity]) -> Optional[Entity]:
+        """Dereference blame_id via provided registry."""
+        return registry.get(self.blame_id) if self.blame_id else None
+```
+
+**Why**:
+- Explicit: caller must provide registry (matches frozen/independent constraint)
+- No hidden state: can't cache because record is immutable
+- Clear intent: "this requires a registry to resolve"
+
+**Asymmetry is intentional**:
+- GraphItems use properties (no args) because `.graph` is always present
+- Records use methods (registry arg) because they're topology-independent
+
+### Collections & Queries: Fresh Iterators
+
+**Rule**: All query, filter, and resolution methods return **fresh iterators**, never cached collections.
+
+**Pattern**:
+```python
+@property
+def members(self) -> Iterator[GraphItem]:
+    """Yield members by resolving member_ids via graph."""
+    return (self.graph.get(uid) for uid in self.member_ids)
+
+def edges_in(self, **criteria) -> Iterator[Edge]:
+    """Yield incoming edges matching criteria."""
+    return self.graph.find_edges(destination=self, **criteria)
+```
+
+**Why**:
+- Consistency: all queries behave the same way
+- Efficiency: no hidden allocations—caller decides materialization
+- Freshness: always reflects current state (critical for `WatchedRegistry`)
+- Type safety: `Iterator[T]` correctly typed
+
+**Common gotcha**:
+```python
+# Iterator exhausts on first use
+members = subgraph.members
+print(list(members))  # [node1, node2]
+print(list(members))  # [] - exhausted!
+
+# Solution: materialize explicitly if multiple passes needed
+members = list(subgraph.members)  # now reusable
+```
+
+**When to materialize**:
+```python
+# Single iteration: use iterator directly
+for node in subgraph.members:
+    process(node)
+
+# Multiple iterations: materialize first
+members = list(subgraph.members)
+for node in members: ...
+for node in members: ...  # works
+
+# Debug logging: materialize to avoid exhaustion
+members = list(subgraph.members)
+logger.debug(f"Found {len(members)} members: {members}")
+```
+
+**Type hints**:
+- Use `Iterator[T]` for single-use queries
+- Use `Iterable[T]` if the result is reusable (rare in this codebase)
+- Never use `list[T]` unless actually materializing
+
+### No GraphItem → GraphItem Direct Pointers
+
+**Rule**: GraphItems must not hold direct references to other GraphItems.
+
+**Why**:
+- Prevents circular references during serialization
+- Enables `WatchedRegistry` to intercept all cross-item access
+- Simplifies graph traversal and mutation tracking
+
+**Enforcement**:
+- Store only `*_id: UUID` fields
+- Provide properties/methods that resolve via `.graph`
+- Exclude `.graph` itself from serialization (`exclude=True`)
+
+### Summary Table
+
+| Context | Storage | Access Pattern | Registry Source | Caching |
+|---------|---------|---------------|-----------------|---------|
+| **GraphItem** | `other_id: UUID` | `@property other(self) -> T` | `self.graph` | No |
+| **Record** | `other_id: UUID` | `def other(self, reg) -> T` | Explicit param | No (frozen) |
+| **Query** | N/A | `def find_all() -> Iterator[T]` | `self` (registry) | No |
+
+### Related Documentation
+- See [Docstring Conventions](docstring_style.md) for how to document these patterns
+- See `Entity.is_dirty` in Section 12 for audit tracking of non-reproducible state
+
+---
+
+## Related Guides
+- [Docstring & Autodoc Conventions](docstring_style.md)
+- [Planning Phase Roadmap](planning_phase_roadmap.md)
+- [Ledger Persistence Plan](ledger_persistence_plan.rst)

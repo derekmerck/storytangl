@@ -51,6 +51,12 @@ class Record(HasSeq, Entity):
     ---
     - :meth:`blame` – dereference to the originating entity
     - :meth:`has_channel` – check membership in a channel
+
+    Notes
+    -----
+    Records are graph-independent. Use ``.blame(registry)`` to dereference,
+    unlike :class:`GraphItem` properties which use implicit ``.graph`` access.
+    This asymmetry preserves record immutability and topology independence.
     """
     # records are immutable once created
     model_config = ConfigDict(frozen=True, extra="allow")
