@@ -227,11 +227,11 @@ logger.debug(f"Found {len(members)} members: {members}")
 
 ### Related Documentation
 - See [Docstring Conventions](docstring_style.md) for how to document these patterns
-- See `Entity.is_dirty` in [Section 12](#12-observability) for audit tracking of non-reproducible state
+- See `Entity.is_dirty` in Section 12 for audit tracking of non-reproducible state
 
 ---
 
 ## Related Guides
 - [Docstring & Autodoc Conventions](docstring_style.md)
 - [Planning Phase Roadmap](planning_phase_roadmap.md)
-- [Ledger Persistence Plan](ledger_persistence_plan.md)
+- [Ledger Persistence Plan](ledger_persistence_plan.rst)

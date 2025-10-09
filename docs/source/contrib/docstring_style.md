@@ -340,18 +340,7 @@ Type hint ``Iterator[T]`` signals single-use. If materializing, use
 
 ---
 
-## K. Common Cross-References
-
-Use these standard link targets in **See also** sections:
-
-- `:ref:`dereferencing-patterns`` → [Coding Style § 15](coding_style.md#15-dereferencing--resolution-patterns)
-- `:ref:`common-pitfalls-iterators`` → [Common Pitfalls](common_pitfalls.md#iterator-exhaustion)
-- `:ref:`audit-tracking`` → [Coding Style § 12](coding_style.md#12-observability)
-- `:ref:`priority-ordering`` → [Coding Style § 6](coding_style.md#6-handlers--dispatch)
-
----
-
-## L. Documenting `is_dirty` and Audit Flags
+## K. Documenting `is_dirty` and Audit Flags
 
 If a class uses `is_dirty` or similar audit markers:
 
@@ -378,7 +367,7 @@ API
 
 ---
 
-## M. Examples & admonitions
+## L. Examples & admonitions
 
 - Place *short* examples inline (≤5 lines). Longer examples go in narrative docs.
 - Use Sphinx admonitions **sparingly**:
@@ -388,7 +377,7 @@ API
 
 ---
 
-## N. Privacy & surface curation
+## M. Privacy & surface curation
 
 - Use `__all__` in `__init__.py` to curate public surfaces.
 - For fields that are technically public but should be hidden:
@@ -399,7 +388,7 @@ API
 
 ---
 
-## O. Checklists (for PRs)
+## N. Checklists (for PRs)
 
 **For a new class**
 - [ ] Docstring includes: one-line signature, (optional) summary, **Why**, **Key Features**, **API**, (optional) **Notes/See also** in that order.
@@ -420,7 +409,7 @@ API
 
 ---
 
-## P. Sphinx config nudges
+## O. Sphinx config nudges
 
 In `conf.py`, we (recommend):
 ```python
@@ -443,7 +432,7 @@ autodoc_default_options = {
 
 ---
 
-## Q. Quick examples from our codebase (as reference)
+## P. Quick examples from our codebase (as reference)
 
 - **Entity / Registry / Graph / Node / Edge / Subgraph / Record / StreamRegistry / Snapshot / BaseFragment / Handler / DispatchRegistry / JobReceipt / Singleton / InheritingSingleton / SingletonNode** all follow the template above.
 - **Subpackage `tangl.core.__init__`** shows “Conceptual layers” and “Design intent”—copy that pattern for other subpackages (`tangl.lang`, `tangl.resolution`, etc.).
@@ -451,8 +440,7 @@ autodoc_default_options = {
 
 ---
 
-## R. Related Guides
+## Q. Related Guides
 
 - [Coding Style & Architecture](coding_style.md) — layering, patterns, anti-patterns
-- [Common Pitfalls](common_pitfalls.md) — iterator exhaustion, dereferencing traps
 - [Planning Phase Roadmap](planning_phase_roadmap.md) — VM phase execution contracts
