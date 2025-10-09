@@ -390,7 +390,68 @@ def test_selector_skips_failed_offers_and_binds_first_success():
     assert req.provider is winner
     assert req.is_unresolvable is False
 
-@pytest.mark.xfail(reason="affordances not materialized and considered yet")
+
+def test_affordance_offers_are_prioritized_over_dependency_offers():
+    g, anchor = _frame_with_cursor()
+    existing = g.add_node(label="existing")
+
+    req = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.ANY,
+        identifier="existing",
+        template={"obj_cls": Node, "label": "created"},
+        hard_requirement=True,
+    )
+    Dependency[Node](
+        graph=g,
+        source_id=anchor.uid,
+        requirement=req,
+        label="needs_existing",
+    )
+
+    provisioner = Provisioner()
+
+    affordance_offer = ProvisionOffer(
+        label="use_existing",
+        requirement=req,
+        provisioner=provisioner,
+        priority=100,
+        operation=ProvisioningPolicy.EXISTING,
+        selection_criteria={"source": "affordance"},
+        accept_func=lambda: existing,
+    )
+
+    created: list[Node] = []
+
+    def _create() -> Node:
+        node = Node(label="created")
+        created.append(node)
+        return node
+
+    dependency_offer = ProvisionOffer(
+        label="create_new",
+        requirement=req,
+        provisioner=provisioner,
+        priority=0,
+        operation=ProvisioningPolicy.CREATE,
+        selection_criteria={"source": "dependency"},
+        accept_func=_create,
+    )
+
+    frame = Frame(graph=g, cursor_id=anchor.uid)
+    ctx = frame.context
+    ctx.job_receipts.clear()
+    ctx.job_receipts.append(
+        JobReceipt(result=[affordance_offer, dependency_offer])
+    )
+
+    builds = plan_select_and_apply(anchor, ctx=ctx)
+
+    assert req.provider is existing
+    assert created == []
+    assert builds
+    assert builds[0].operation is ProvisioningPolicy.EXISTING
+
 def test_affordance_creates_or_finds_source():
     g = Graph(label="demo")
     dst = g.add_node(label="terminal")
