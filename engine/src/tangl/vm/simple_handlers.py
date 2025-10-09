@@ -91,6 +91,8 @@ def coerce_to_fragments(*args, ctx: Context, **kwargs):
     fragments = []
     for receipt in ctx.job_receipts:
         result = receipt.result
+        if result is None:
+            continue
         if isinstance(result, BaseFragment):
             fragments.append(result)
         else:
