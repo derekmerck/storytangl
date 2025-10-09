@@ -101,4 +101,13 @@ class Scope(Entity):
         return self.merge_vars(*self.active_domains)
 
     def get_handlers(self, **criteria) -> Iterator[Handler]:
-        return Registry.chain_find_all(*(d.handlers for d in self.active_domains), **criteria, sort_key=lambda x: (x.priority, x.seq))
+        return Registry.chain_find_all(
+            *(d.handlers for d in self.active_domains),
+            **criteria,
+            sort_key=lambda x: (x.priority, x.seq),
+        )
+
+    def find_all(self, **criteria) -> Iterator[GraphItem]:
+        """Proxy :meth:`Graph.find_all` through the scope's graph."""
+
+        return self.graph.find_all(**criteria)

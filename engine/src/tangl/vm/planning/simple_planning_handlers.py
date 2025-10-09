@@ -68,7 +68,10 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     affordances = sorted(
         (
             edge
-            for edge in cursor.edges_in(is_instance=Affordance)
+            for edge in ctx.scope.find_all(
+                is_instance=Affordance,
+                destination_id=cursor.uid,
+            )
             if edge.requirement.provider is None
         ),
         key=lambda edge: edge.requirement.uid.int,
@@ -80,7 +83,10 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     dependencies = sorted(
         (
             edge
-            for edge in cursor.edges_out(is_instance=Dependency)
+            for edge in ctx.scope.find_all(
+                is_instance=Dependency,
+                source_id=cursor.uid,
+            )
             if edge.requirement.provider is None
         ),
         key=lambda edge: edge.requirement.uid.int,
@@ -171,7 +177,12 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
                 )
             continue
 
-        candidates.sort(key=lambda o: (o.priority, o.uid.int))
+        def _candidate_sort_key(offer: ProvisionOffer) -> tuple[int, int, int]:
+            source = (offer.selection_criteria or {}).get("source")
+            source_rank = 0 if source == "affordance" else 1
+            return (source_rank, offer.priority, offer.uid.int)
+
+        candidates.sort(key=_candidate_sort_key)
 
         chosen_offer: ProvisionOffer | None = None
         provider: Node | None = None
