@@ -82,7 +82,22 @@ class Registry(Entity, Generic[VT]):
     # don't bother serializing this field b/c we will include it explicitly
     # but do use it for comparison (using `exclude=True` would cover both).
 
-    def add(self, entity: VT):
+    def add(self, entity: VT) -> None:
+        """Add an entity to the registry.
+
+        Raises
+        ------
+        ValueError
+            If a different entity with the same UUID already exists.
+        """
+        if entity.uid in self.data:
+            existing = self.data[entity.uid]
+            if existing is entity:
+                return
+            raise ValueError(
+                f"Entity {entity.uid} already exists in registry. "
+                f"Existing: {existing!r}, attempted: {entity!r}"
+            )
         self.data[entity.uid] = entity
 
     def get(self, key: UUID) -> Optional[VT]:
@@ -100,10 +115,17 @@ class Registry(Entity, Generic[VT]):
         self.data.pop(key)
 
     @property
-    def is_dirty(self):
+    def is_dirty(self) -> bool:
         # One bad apple ruins the barrel
-        return self.is_dirty_ or \
-            any([item.is_dirty for item in self])
+        return self.is_dirty_ or self.any_dirty()
+
+    def any_dirty(self) -> bool:
+        """Check if any entity in this registry is marked dirty."""
+        return any(entity.is_dirty for entity in self.data.values())
+
+    def find_dirty(self) -> Iterator[VT]:
+        """Yield all dirty entities in the registry."""
+        return (entity for entity in self.data.values() if entity.is_dirty)
 
     # -------- FIND IN COLLECTION ----------
 
