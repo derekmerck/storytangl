@@ -12,7 +12,7 @@
 
 ---
 
-## A. Class docstrings: “Why / Key Features / API (+ optional Notes / See also)”
+## A. Class docstrings: "Why / Key Features / API (+ optional Notes / See also)"
 
 These are the *canonical* documentation for single-purpose modules (like `Frame` or `Context`).  
 They should always carry the full `Why / Key Features / API / Notes` structure.
@@ -222,7 +222,163 @@ We maintain an autodoc skip hook to hide fields marked with `json_schema_extra={
 
 ---
 
-## I. Examples & admonitions
+## I. Documenting Dereferencing & Iterator Patterns
+
+### When to add Notes about dereferencing
+
+If a class stores `*_id` fields and provides resolution methods/properties, document the pattern in **Notes**:
+
+**For GraphItems (implicit graph access)**:
+```rst
+Notes
+-----
+Endpoint properties (``source``, ``destination``) resolve via the owning
+graph. Every access goes through ``self.graph.get()`` for watchability.
+```
+
+**For Records (explicit registry parameter)**:
+```rst
+Notes
+-----
+Records are graph-independent. Use ``.blame(registry)`` to dereference,
+unlike :class:`GraphItem` properties which use implicit ``.graph`` access.
+This asymmetry preserves record immutability and topology independence.
+```
+
+**For Collections (fresh iterators)**:
+```rst
+Notes
+-----
+Returns a fresh iterator. Materialize with ``list()`` if multiple
+passes are needed. See :ref:`common-pitfalls-iterators` for examples.
+```
+
+### Linking to architecture docs
+
+When documenting dereferencing patterns, link to the central explanation:
+
+```rst
+See also
+--------
+:ref:`dereferencing-patterns` in [Coding Style](coding_style.md#15-dereferencing--resolution-patterns)
+```
+
+### Example: Comprehensive Edge docstring
+
+```rst
+Edge(source: Node, destination: Node, edge_type: str)
+
+Directed connection between two nodes in the same graph.
+
+Why
+----
+Encodes structure and flow (parent→child, dependency, sequence). Stores
+endpoint ids for serialization, with properties that resolve to live nodes.
+
+Key Features
+------------
+* **Typed** – optional :attr:`edge_type`.
+* **Endpoint conversion** – pre-init validator accepts ``source``/``destination``
+  as :class:`GraphItem` and converts them to ids.
+* **Live accessors** – :attr:`source` / :attr:`destination` resolve via graph.
+
+API
+---
+- :attr:`source_id`, :attr:`destination_id` – UUIDs (nullable for dangling edges).
+- :attr:`source` / :attr:`destination` – properties with validation on set.
+- :meth:`__repr__` – compact label showing endpoints for debugging.
+
+Notes
+-----
+Endpoint properties resolve via ``self.graph.get()`` on every access,
+enabling :class:`WatchedRegistry` interception. Mutation of endpoints
+is allowed but updates only the ``*_id`` fields.
+
+See also
+--------
+:class:`~tangl.core.graph.AnonymousEdge`,
+:ref:`dereferencing-patterns` in [Coding Style](coding_style.md)
+```
+
+---
+
+## J. Documenting Iterator Semantics
+
+### When queries return iterators
+
+Any method/property returning `Iterator[T]` should note the single-use nature:
+
+**Minimal note (for obvious cases)**:
+```rst
+API
+---
+- :meth:`find_all` – yield entities matching criteria (fresh iterator).
+```
+
+**Explicit note (when it might surprise)**:
+```rst
+API
+---
+- :attr:`members` – yield members as `Iterator[GraphItem]`.
+
+Notes
+-----
+Returns a fresh iterator on each access. Materialize with ``list(members)``
+if multiple passes are needed. See :ref:`common-pitfalls-iterators`.
+```
+
+### Type hints in signatures
+
+Document that we prefer `Iterator[T]` over `Iterable[T]`:
+
+```rst
+Notes
+-----
+Type hint ``Iterator[T]`` signals single-use. If materializing, use
+``list()`` or ``tuple()`` explicitly rather than assuming reusability.
+```
+
+---
+
+## K. Common Cross-References
+
+Use these standard link targets in **See also** sections:
+
+- `:ref:`dereferencing-patterns`` → [Coding Style § 15](coding_style.md#15-dereferencing--resolution-patterns)
+- `:ref:`common-pitfalls-iterators`` → [Common Pitfalls](common_pitfalls.md#iterator-exhaustion)
+- `:ref:`audit-tracking`` → [Coding Style § 12](coding_style.md#12-observability)
+- `:ref:`priority-ordering`` → [Coding Style § 6](coding_style.md#6-handlers--dispatch)
+
+---
+
+## L. Documenting `is_dirty` and Audit Flags
+
+If a class uses `is_dirty` or similar audit markers:
+
+**In Entity docstring**:
+```rst
+Key Features
+------------
+* **Audit tracking** – :attr:`is_dirty` flags non-reproducible mutations
+  for replay validation.
+
+API
+---
+- :attr:`is_dirty` – read-only flag indicating tainted state.
+- :meth:`mark_dirty` – mark entity as modified by non-reproducible means.
+```
+
+**In Registry docstring**:
+```rst
+API
+---
+- :meth:`any_dirty` – check if any entity in registry is marked dirty.
+- :meth:`find_dirty` – yield all entities with ``is_dirty=True``.
+```
+
+---
+
+## M. Examples & admonitions
 
 - Place *short* examples inline (≤5 lines). Longer examples go in narrative docs.
 - Use Sphinx admonitions **sparingly**:
@@ -232,7 +388,7 @@ We maintain an autodoc skip hook to hide fields marked with `json_schema_extra={
 
 ---
 
-## J. Privacy & surface curation
+## N. Privacy & surface curation
 
 - Use `__all__` in `__init__.py` to curate public surfaces.
 - For fields that are technically public but should be hidden:
@@ -243,7 +399,7 @@ We maintain an autodoc skip hook to hide fields marked with `json_schema_extra={
 
 ---
 
-## K. Checklists (for PRs)
+## O. Checklists (for PRs)
 
 **For a new class**
 - [ ] Docstring includes: one-line signature, (optional) summary, **Why**, **Key Features**, **API**, (optional) **Notes/See also** in that order.
@@ -264,7 +420,7 @@ We maintain an autodoc skip hook to hide fields marked with `json_schema_extra={
 
 ---
 
-## L. Sphinx config nudges
+## P. Sphinx config nudges
 
 In `conf.py`, we (recommend):
 ```python
@@ -287,7 +443,7 @@ autodoc_default_options = {
 
 ---
 
-## M. Quick examples from our codebase (as reference)
+## Q. Quick examples from our codebase (as reference)
 
 - **Entity / Registry / Graph / Node / Edge / Subgraph / Record / StreamRegistry / Snapshot / BaseFragment / Handler / DispatchRegistry / JobReceipt / Singleton / InheritingSingleton / SingletonNode** all follow the template above.
 - **Subpackage `tangl.core.__init__`** shows “Conceptual layers” and “Design intent”—copy that pattern for other subpackages (`tangl.lang`, `tangl.resolution`, etc.).
@@ -295,6 +451,8 @@ autodoc_default_options = {
 
 ---
 
-## Related guide
+## R. Related Guides
 
-- [Coding Style & Architecture](coding_style.md)
+- [Coding Style & Architecture](coding_style.md) — layering, patterns, anti-patterns
+- [Common Pitfalls](common_pitfalls.md) — iterator exhaustion, dereferencing traps
+- [Planning Phase Roadmap](planning_phase_roadmap.md) — VM phase execution contracts
