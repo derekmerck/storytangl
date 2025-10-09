@@ -33,13 +33,16 @@ def test_registry_add_find():
     assert r.find_one(label="hero") == e
     assert next(r.find_all(label="hero")) == e
 
-@pytest.mark.xfail(reason="allow_overwrite not implemented yet in current rev")
 def test_registry_prevent_duplicate():
     r = Registry()
     e = Entity(label="hero")
     r.add(e)
-    with pytest.raises(ValueError):
-        r.add(e)  # Should raise because allow_overwrite=False by default
+    # re-adding same reference is idempotent
+    r.add(e)
+
+    e_dup = Entity(uid=e.uid, label="villain")
+    with pytest.raises(ValueError, match="already exists"):
+        r.add(e_dup)
 
 def test_registry_unstructure_structure():
     r = Registry()
