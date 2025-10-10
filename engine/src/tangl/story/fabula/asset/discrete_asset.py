@@ -1,6 +1,7 @@
 from typing import TypeVar, Generic, ClassVar, Type
 
-from tangl.core.entity import SingletonNode, Node
+from tangl.core.graph.singleton_node import SingletonNode
+from tangl.core.graph.node import Node
 # from tangl.core import Associating
 from .asset_type import AssetType
 

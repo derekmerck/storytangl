@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import logging
-from typing import Self, Literal, Iterator
-from pathlib import Path
-
+from collections.abc import Iterator
 from copy import deepcopy
+from pathlib import Path
+from typing import Any, Self
 
-from tangl.type_hints import UnstructuredData, StringMap
+from pydantic import ValidationError
+
+from tangl.type_hints import StringMap, UnstructuredData
 from tangl.ir.core_ir import MasterScript
+from tangl.ir.story_ir import StoryScript
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -22,7 +27,10 @@ class ScriptManager():
 
     @classmethod
     def from_data(cls, data: UnstructuredData) -> Self:
-        ms = MasterScript(**data)
+        try:
+            ms: MasterScript = StoryScript(**data)
+        except ValidationError:
+            ms = MasterScript(**data)
         # todo: Want to call "on new script" here too.
         return cls(master_script=ms)
 
@@ -35,20 +43,40 @@ class ScriptManager():
     def get_story_globals(self) -> StringMap:
         if self.master_script.locals:
             return deepcopy(self.master_script.locals)
+        return {}
 
-    def get_unstructured(self, key: Literal['scenes', 'actors']) -> Iterator[UnstructuredData]:
-        if hasattr(self.master_script, key):
-            logger.debug(f"Starting node data {key}")
-            data = getattr( self.master_script, key )
-            if data:
-                if isinstance(data, dict):
-                    data = data.values()
-                for item in data:
-                    logger.debug(item)
-                    yield item.model_dump()
+    def get_unstructured(self, key: str) -> Iterator[UnstructuredData]:
+        if not hasattr(self.master_script, key):
+            return
+
+        logger.debug("Starting node data %s", key)
+        section = getattr(self.master_script, key)
+        if not section:
+            return
+
+        if isinstance(section, dict):
+            for label, item in section.items():
+                payload = self._dump_item(item)
+                payload.setdefault("label", label)
+                logger.debug(payload)
+                yield payload
+            return
+
+        for item in section:
+            payload = self._dump_item(item)
+            logger.debug(payload)
+            yield payload
 
     def get_story_metadata(self) -> UnstructuredData:
         return self.master_script.metadata.model_dump()
+
+    @staticmethod
+    def _dump_item(item: Any) -> dict[str, Any]:
+        if hasattr(item, "model_dump"):
+            return item.model_dump()
+        if isinstance(item, dict):
+            return dict(item)
+        return dict(item)
 
     def get_story_text(self) -> list[tuple[str, str]]:
 
