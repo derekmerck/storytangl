@@ -129,6 +129,41 @@ Snapshot and rebuild strategies
   :mod:`tangl.persistence.factory` so new backends (e.g., object storage, SQL)
   can register custom ledger encoders without modifying controller code.
 
+Implementation Status (v37 MVP)
+-------------------------------
+
+* ✅ ``LedgerEnvelope`` – implemented in :mod:`tangl.persistence.ledger_envelope`
+* ✅ ``ServiceManager.open_ledger`` – context manager with dirty tracking
+* ✅ ``ServiceManager.create_ledger`` – convenience factory for new ledgers
+* ⚠️ Endpoint injection – deferred until endpoint annotation stability
+* ⚠️ User → ledger mapping – explicit ``ledger_id`` required for now
+* ⚠️ ACL enforcement – pending authentication integration
+* 🔮 Event-sourced mode – envelope supports recovery; optimization deferred
+* 🔮 Ledger branching/time-travel – future enhancement
+
+Usage Example
+~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from uuid import uuid4
+
+    from tangl.persistence import PersistenceManagerFactory
+    from tangl.service import ServiceManager
+
+    pm = PersistenceManagerFactory.create_persistence_manager("pickle_file")
+    service = ServiceManager(persistence_manager=pm)
+
+    ledger_id = service.create_ledger()
+
+    with service.open_ledger(user_id=uuid4(), ledger_id=ledger_id, write_back=True) as ledger:
+        frame = ledger.get_frame()
+        # ... execute frame ...
+        ledger.step += 1
+
+    with service.open_ledger(user_id=uuid4(), ledger_id=ledger_id) as ledger:
+        journal = list(ledger.get_journal("latest"))
+
 Multi-client considerations
 ---------------------------
 
