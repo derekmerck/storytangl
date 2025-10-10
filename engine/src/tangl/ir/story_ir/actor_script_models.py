@@ -1,9 +1,9 @@
 from typing import Optional
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
-from tangl.ir import BaseScriptItem
-from ..asset.asset_script_models import AssetsScript
 from tangl.lang.gens import Gens
+from tangl.ir.core_ir import BaseScriptItem
+from .asset_script_models import AssetsScript
 
 MediaItemScript = BaseScriptItem
 

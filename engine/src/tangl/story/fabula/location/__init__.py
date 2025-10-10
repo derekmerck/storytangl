@@ -1,2 +1,2 @@
-# from .location import Location
-# from .setting import Setting
+from .location import Location
+from .setting import Setting

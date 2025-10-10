@@ -3,9 +3,9 @@ from typing import Optional
 from pydantic import Field
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
-from tangl.ir import BaseScriptItem
-from ..actor.actor_script_models import ActorScript
-from ..asset.asset_script_models import AssetsScript
+from tangl.ir.core_ir import BaseScriptItem
+from .actor_script_models import ActorScript
+from .asset_script_models import AssetsScript
 
 
 class LocationScript(BaseScriptItem):

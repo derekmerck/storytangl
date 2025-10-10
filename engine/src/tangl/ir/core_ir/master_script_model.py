@@ -4,6 +4,7 @@ from .base_script_model import BaseScriptItem
 from .script_metadata_model import ScriptMetadata
 
 class MasterScript(BaseScriptItem):
+    # Has metadata and subclass defined sections
 
     metadata: ScriptMetadata
 
@@ -15,6 +16,35 @@ class MasterScript(BaseScriptItem):
         # pprint( schema )
 
         defs = schema['$defs']
+
+        # Clean up Tag definitions everywhere
+        def clean_tags_schema(obj):
+            """Recursively remove verbose Enum descriptions from tags fields."""
+            if isinstance(obj, dict):
+                # If this is a tags field definition
+                if 'title' in obj and obj.get('title') == 'Tags':
+                    if 'anyOf' in obj:
+                        for variant in obj['anyOf']:
+                            if variant.get('type') == 'array' and 'items' in variant:
+                                items = variant['items']
+                                if 'anyOf' in items:
+                                    # Replace the anyOf with a simple string/int schema
+                                    variant['items'] = {
+                                        'anyOf': [
+                                            {'type': 'string'},
+                                            {'type': 'integer'}
+                                        ]
+                                    }
+
+                # Recurse through all nested dicts
+                for key, value in obj.items():
+                    clean_tags_schema(value)
+
+            elif isinstance(obj, list):
+                for item in obj:
+                    clean_tags_schema(item)
+
+        clean_tags_schema(schema)
 
         # Add the IntelliJ injection info to the 'text' and 'comments' fields
 

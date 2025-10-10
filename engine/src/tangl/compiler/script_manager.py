@@ -1,16 +1,11 @@
-from pathlib import Path
-from typing import TYPE_CHECKING, Self, Literal, Iterator
-from copy import deepcopy
 import logging
+from typing import Self, Literal, Iterator
+from pathlib import Path
 
-from tangl.type_hints import StringMap, UnstructuredData
-# from tangl.core.dispatch import DispatchRegistry
-# from tangl.utils.uuid_for_secret import key_for_secret
+from copy import deepcopy
 
-if TYPE_CHECKING:
-    from .master_script_model import MasterScript
-else:
-    MasterScript = UnstructuredData
+from tangl.type_hints import UnstructuredData, StringMap
+from tangl.ir.core_ir import MasterScript
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -27,7 +22,6 @@ class ScriptManager():
 
     @classmethod
     def from_data(cls, data: UnstructuredData) -> Self:
-        from .master_script_model import MasterScript
         ms = MasterScript(**data)
         # todo: Want to call "on new script" here too.
         return cls(master_script=ms)

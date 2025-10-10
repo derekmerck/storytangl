@@ -5,10 +5,10 @@ from uuid import UUID
 from pydantic import Field, model_validator, ConfigDict
 
 from tangl.type_hints import UniqueLabel, Tag, ClassName
-from tangl.ir import BaseScriptItem
-from tangl.story.fabula.actor.actor_script_models import RoleScript
-from tangl.story.fabula.location.location_script_models import SettingScript
-from tangl.story.fabula.asset.asset_script_models import AssetsScript
+from tangl.ir.core_ir import BaseScriptItem
+from .actor_script_models import RoleScript
+from .location_script_models import SettingScript
+from .asset_script_models import AssetsScript
 
 
 class ActionScript(BaseScriptItem):

@@ -1,5 +1,5 @@
 from typing import Optional
-from tangl.journal import JournalItem
+from tangl.core.fragment import ContentFragment
 
-class BlockJournalItem(JournalItem):
-    actions: Optional[list[JournalItem]] = None
+class BlockJournalItem(ContentFragment):
+    actions: Optional[list[ContentFragment]] = None

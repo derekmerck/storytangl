@@ -15,8 +15,8 @@ import json
 from pathlib import Path
 from typing import Type
 
-from tangl.ir.master_script_model import MasterScript, BaseScriptItem, ScriptMetadata
-from tangl.story.story_script_models import ActorScript, LocationScript, SceneScript, StoryScript
+from tangl.ir.core_ir import MasterScript, BaseScriptItem, ScriptMetadata
+from tangl.ir.story_ir import ActorScript, LocationScript, SceneScript, StoryScript
 
 EXTRAS_DIR = Path(__file__).parent.parent / "extras/schemas"
 

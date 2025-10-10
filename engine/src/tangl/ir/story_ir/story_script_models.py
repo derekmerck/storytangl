@@ -14,12 +14,11 @@ from typing import Any, Optional
 from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel, StringMap
-from tangl.ir import BaseScriptItem, MasterScript
-# from tangl.media import MediaItemScript
-from .episodic_process.scene_script_models import SceneScript
-from .fabula.actor.actor_script_models import ActorScript
-from .fabula.location.location_script_models import LocationScript
-from .fabula.asset.asset_script_models import AssetsScript
+from tangl.ir.core_ir import BaseScriptItem, MasterScript
+from .scene_script_models import SceneScript
+from .actor_script_models import ActorScript
+from .location_script_models import LocationScript
+from .asset_script_models import AssetsScript
 
 logger = logging.getLogger(__name__)
 
