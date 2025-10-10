@@ -39,6 +39,14 @@ def test_domain_manager_fallback_to_node():
     assert manager.resolve_class("nonexistent.Class") is Node
 
 
+def test_domain_manager_non_entity_class_falls_back_to_node():
+    manager = DomainManager()
+    from tangl.core.graph.node import Node
+
+    resolved = manager.resolve_class("pathlib.Path")
+    assert resolved is Node
+
+
 def test_domain_manager_load_domain_module_registers_entities():
     manager = DomainManager()
 

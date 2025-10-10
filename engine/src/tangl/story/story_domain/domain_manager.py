@@ -73,7 +73,14 @@ class DomainManager:
             return Node
 
         if inspect.isclass(resolved):
-            return resolved  # type: ignore[return-value]
+            if issubclass(resolved, Entity):
+                return resolved
+
+            logger.warning(
+                "Resolved class %s is not an Entity subclass; using Node fallback.",
+                obj_cls_str,
+            )
+            return Node
 
         logger.warning("Resolved object %s is not a class; using Node fallback.", obj_cls_str)
         return Node
