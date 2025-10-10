@@ -15,15 +15,14 @@ import json
 from pathlib import Path
 from typing import Type
 
-from tangl.compiler.script_metadata_model import ScriptMetadata
-from tangl.compiler.master_script_model import MasterScript
-from tangl.story.story_script_models import ActorScript, PlaceScript, SceneScript
+from tangl.ir.master_script_model import MasterScript, BaseScriptItem, ScriptMetadata
+from tangl.story.story_script_models import ActorScript, LocationScript, SceneScript, StoryScript
 
 EXTRAS_DIR = Path(__file__).parent.parent / "extras/schemas"
 
 def update_schemas():
 
-    with open(EXTRAS_DIR / "tangl_script.json", "w") as f:
+    with open(EXTRAS_DIR / "tangl_story.json", "w") as f:
         schema = MasterScript.model_json_schema()
         json.dump(schema, f)
 
@@ -31,8 +30,8 @@ def update_schemas():
         schema = ActorScript.model_json_schema()
         json.dump(schema, f)
 
-    with open(EXTRAS_DIR / "tangl_place.json", "w") as f:
-        schema = PlaceScript.model_json_schema()
+    with open(EXTRAS_DIR / "tangl_location.json", "w") as f:
+        schema = LocationScript.model_json_schema()
         json.dump(schema, f)
 
     with open(EXTRAS_DIR / "tangl_scene.json", "w") as f:
@@ -58,8 +57,8 @@ def update_subclass_schemas(base_script = MasterScript):
         print( scls )
 
         scls_name = extract_first_word(scls.__name__).lower()
-        if scls_name == "Master":
-            scls_name = "Script"
+        # if scls_name == "Master":
+        #     scls_name = "Script"
 
         fn = f"tangl_{scls_name}.json"
 
@@ -67,9 +66,10 @@ def update_subclass_schemas(base_script = MasterScript):
             schema = scls.model_json_schema()
             json.dump(schema, f)
 
+from pprint import pprint
 
 if __name__ == "__main__":
-    print(MasterScript.model_json_schema())
+    pprint(StoryScript.model_json_schema(), width=130)
 
     if not EXTRAS_DIR.is_dir():
         EXTRAS_DIR.mkdir(exist_ok=True)

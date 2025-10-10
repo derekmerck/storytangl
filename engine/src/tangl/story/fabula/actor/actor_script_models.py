@@ -1,9 +1,11 @@
 from typing import Optional
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
-from tangl.scripting import BaseScriptItem
-from ..asset import AssetScript
-from tangl.narrative.lang.gens import Gens
+from tangl.ir import BaseScriptItem
+from ..asset.asset_script_models import AssetsScript
+from tangl.lang.gens import Gens
+
+MediaItemScript = BaseScriptItem
 
 
 class ActorScript(BaseScriptItem):
@@ -16,7 +18,7 @@ class ActorScript(BaseScriptItem):
 
     # todo: consider how to reserve a look, demographics field for mechanics that may not be used?
 
-    assets: list[AssetScript] = None     # assets associated with the actor
+    assets: list[AssetsScript] = None     # assets associated with the actor
 
     # look: Optional[LookScript] = None
     # wearables: Optional[list[AssetScript]] = Field(None, alias="outfit")
@@ -30,7 +32,7 @@ class RoleScript(BaseScriptItem):
     actor_criteria: Optional[StringMap] = None
     actor_conditions: Optional[list[Expr]] = None
 
-    assets: list[AssetScript] = None     # assets associated with the role, titles, gold badge for sherif
+    assets: list[AssetsScript] = None     # assets associated with the role, titles, gold badge for sherif
 
 # class ExtrasScript ... ?
 

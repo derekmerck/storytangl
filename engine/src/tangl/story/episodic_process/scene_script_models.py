@@ -4,11 +4,11 @@ from uuid import UUID
 
 from pydantic import Field, model_validator, ConfigDict
 
-from tangl.type_hints import UniqueLabel, Tags, ClassName
-from tangl.scripting import BaseScriptItem
-from tangl.story.actor import RoleScript
-from tangl.story.place import LocationScript
-from tangl.story.asset import AssetsScript
+from tangl.type_hints import UniqueLabel, Tag, ClassName
+from tangl.ir import BaseScriptItem
+from tangl.story.fabula.actor.actor_script_models import RoleScript
+from tangl.story.fabula.location.location_script_models import SettingScript
+from tangl.story.fabula.asset.asset_script_models import AssetsScript
 
 
 class ActionScript(BaseScriptItem):
@@ -95,7 +95,7 @@ class BlockScript(BaseScriptItem):
 
 
 class MenuBlockScript(BlockScript):
-    wants_tags: Tags = Field(None, description="Required tags on dynamically assigned menu items.")
+    wants_tags: list[Tag] = Field(None, description="Required tags on dynamically assigned menu items.")
     wants_cls: ClassName = Field(None, description="Required class for dynamically assigned menu items.")
 
     # todo: at least 1 of
@@ -107,10 +107,10 @@ class SceneScript(BaseScriptItem):
     # todo: How do we inject other block types like menus, challenges (games) and activities (task)??  using discriminator fields?
     blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.")
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.")
-    locations: list[LocationScript] | dict[UniqueLabel, LocationScript] = Field(None, description="Locations associated with this scene, provides scene-specific aliases for scouted places, in label-keyed map or list form.")
+    settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.")
     assets: list[AssetsScript] = Field(None, description="A list of asset types and items associated with the scene.")
 
-    @pydantic.field_validator('roles', 'locations', mode='after')
+    @pydantic.field_validator('roles', 'settings', mode='after')
     @classmethod
     def _null_roles_and_locs_reference_their_key(cls, data: dict[UniqueLabel, BaseScriptItem]):
         if isinstance(data, dict):

@@ -3,14 +3,14 @@ from typing import Optional
 from pydantic import Field
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
-from tangl.scripting import BaseScriptItem
-from ..actor import ActorScript
-from ..asset import AssetScript
+from tangl.ir import BaseScriptItem
+from ..actor.actor_script_models import ActorScript
+from ..asset.asset_script_models import AssetsScript
 
 
 class LocationScript(BaseScriptItem):
 
-    assets: list[AssetScript] = None   # assets associated with the loc
+    assets: list[AssetsScript] = None   # assets associated with the loc
     extras: list[ActorScript] = None   # extras associated with the loc
 
 
@@ -20,7 +20,7 @@ class SettingScript(BaseScriptItem):
     location_criteria: Optional[StringMap]
     location_conditions: Optional[list[Expr]] = None
 
-    assets: list[AssetScript] = None   # assets associated with the setting
+    assets: list[AssetsScript] = None   # assets associated with the setting
     extras: list[ActorScript] = None   # extras associated with the setting
 
 

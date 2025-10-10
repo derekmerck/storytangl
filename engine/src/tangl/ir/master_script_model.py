@@ -1,9 +1,9 @@
 from typing import Any
 
-from tangl.story.story_script_models import StoryScript  # be cautious of circular imports here
+from .base_script_model import BaseScriptItem
 from .script_metadata_model import ScriptMetadata
 
-class MasterScript(StoryScript):
+class MasterScript(BaseScriptItem):
 
     metadata: ScriptMetadata
 
@@ -19,7 +19,7 @@ class MasterScript(StoryScript):
         # Add the IntelliJ injection info to the 'text' and 'comments' fields
 
         if 'BlockScript' in defs:
-            defs['BlockScript']['properties']['text']['x-intellij-language-injection'] = "Markdown"
+            defs['BlockScript']['properties']['content']['x-intellij-language-injection'] = "Markdown"
 
         if 'text' in defs['ScriptMetadata']['properties']:
             defs['ScriptMetadata']['properties']['text']['x-intellij-language-injection'] = "Markdown"
