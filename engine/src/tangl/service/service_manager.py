@@ -1,11 +1,15 @@
 from __future__ import annotations
-from typing import Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 from contextlib import contextmanager
 import functools
 import inspect
 from uuid import UUID
 
-from .api_endpoint import HasApiEndpoints, ApiEndpoint, MethodType, AccessLevel
+from tangl.core import Domain, Graph
+from tangl.persistence import LedgerEnvelope
+from tangl.vm.ledger import Ledger
+
+from .api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, MethodType
 
 if TYPE_CHECKING:
     from tangl.story.story import Story
@@ -48,15 +52,19 @@ class ServiceManager:
     :param components:
         Optional list of controller classes (subclassing :class:`HasApiEndpoints`) or their instances.
         The manager automatically scans each for annotated endpoints and registers them.
+    :param persistence_manager:
+        Optional persistence mapping used to create, open, and write back ledgers.
+        If omitted, ledger helpers are unavailable.
     """
-    def __init__(self, context=None, components=None):
+    def __init__(self, context=None, components=None, persistence_manager=None):
         """
-        Initializes the service manager with an optional ``context`` store
-        and a list of components to register.
+        Initializes the service manager with an optional ``context`` store,
+        component list, and persistence manager for ledgers.
         """
         # The "context" might be a dict or a more sophisticated store
         self.context = context or {}
         self.components = components or []
+        self.persistence_manager = persistence_manager
 
         # We'll gather endpoints from each component
         # Each "component" can be either a class or an instance.
@@ -127,6 +135,87 @@ class ServiceManager:
         yield user
         if write_back:
             self.context[user.uid] = user
+
+    @contextmanager
+    def open_ledger(
+        self,
+        user_id: UUID,
+        *,
+        ledger_id: UUID | None = None,
+        write_back: bool = False,
+        acl: AccessLevel = None,
+        event_sourced: bool = False,
+    ) -> Ledger:
+        """Open a ledger with optional persistence write-back."""
+
+        if ledger_id is None:
+            raise ValueError("ledger_id required (user → ledger mapping not implemented)")
+
+        if self.persistence_manager is None:
+            raise RuntimeError("ServiceManager.persistence_manager required for ledger ops")
+
+        envelope_data = self.persistence_manager.get(ledger_id)
+        if envelope_data is None:
+            raise ValueError(f"Ledger {ledger_id} not found in persistence")
+
+        envelope = LedgerEnvelope.model_validate(envelope_data)
+        ledger = envelope.to_ledger(event_sourced=event_sourced)
+
+        initial_step = ledger.step
+        initial_record_count = len(ledger.records)
+
+        try:
+            yield ledger
+        finally:
+            if write_back:
+                is_dirty = (
+                    ledger.step != initial_step
+                    or len(ledger.records) != initial_record_count
+                )
+                if is_dirty:
+                    updated_envelope = LedgerEnvelope.from_ledger(ledger)
+                    self.persistence_manager.save(updated_envelope)
+
+    def create_ledger(
+        self,
+        *,
+        graph: Graph | None = None,
+        cursor_id: UUID | None = None,
+        domains: list[Domain] | None = None,
+        snapshot_cadence: int = 1,
+    ) -> UUID:
+        """Create a new ledger, persist it, and return its UUID."""
+
+        if self.persistence_manager is None:
+            raise RuntimeError("ServiceManager.persistence_manager required for create_ledger")
+
+        if graph is None:
+            graph = Graph()
+
+        if cursor_id is None:
+            existing_nodes = list(graph.find_nodes())
+            if existing_nodes:
+                cursor_id = existing_nodes[0].uid
+            else:
+                start_node = graph.add_node(label="start")
+                cursor_id = start_node.uid
+
+        domain_list = list(domains or [])
+
+        ledger = Ledger(
+            graph=graph,
+            cursor_id=cursor_id,
+            step=0,
+            domains=domain_list,
+            snapshot_cadence=snapshot_cadence,
+        )
+
+        ledger.push_snapshot()
+
+        envelope = LedgerEnvelope.from_ledger(ledger)
+        self.persistence_manager.save(envelope)
+
+        return ledger.uid
 
     def _bind_endpoint(self, api_endpoint: ApiEndpoint, component_instance):
         """
