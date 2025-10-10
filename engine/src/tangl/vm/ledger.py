@@ -51,14 +51,15 @@ class Ledger(Entity):
     -----
     Records are not stored on the graph; they live in :attr:`records`. Channels are
     derived from record type ("snapshot", "patch", "fragment").
+
+    **Domains:** Only singleton domains belong at the ledger level. They are
+    reconstructed by name during persistence replay. Affiliate domains stay on
+    graph items where scoping discovers them dynamically.
     """
     graph: Graph = None
     cursor_id: UUID = None
     step: int = -1
-    # todo: should consider this and Frame as kinds of explicit structural domains, get
-    #       rid of lists of domains and add explicitly inherited domains to the scope?
-    #       ledger shouldn't hold domains, just references or it won't serialize nicely.
-    domains: list[Domain] = Field(default_factory=list)
+    domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
 

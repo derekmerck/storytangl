@@ -78,10 +78,11 @@ Proposed persistence schema
   a ``LedgerEnvelope`` structure so alternative serializers can add metadata
   (e.g., compression hints, timeline identifiers) without changing controller
   code.
-* **Write-back cadence:** When a controller exits a ledger context, perform a
-  diff-aware write-back: only persist when the ledger step counter advanced or a
-  stream mutated.  This mirrors how ``ServiceManager.open_story`` decides when to
-  write objects back into the context store.
+* **Write-back cadence:** When a controller exits a ledger context with
+  ``write_back=True``, persist the ledger unconditionally so metadata changes,
+  domain mutations, and other side effects are never dropped.  We can later
+  introduce an opt-in diff to skip redundant writes once the mutation signals
+  stabilize.
 * **Event-sourced mode:** Allow persistence backends to omit the full ``Graph``
   and reconstruct it from a recent snapshot plus the record stream.  Provide a
   helper in the persistence package (e.g., ``rebuild_ledger(envelope, *, upto)``)
@@ -128,6 +129,41 @@ Snapshot and rebuild strategies
 * **Pluggable serializers:** Keep serializers discoverable via
   :mod:`tangl.persistence.factory` so new backends (e.g., object storage, SQL)
   can register custom ledger encoders without modifying controller code.
+
+Implementation Status (v37 MVP)
+-------------------------------
+
+* ✅ ``LedgerEnvelope`` – implemented in :mod:`tangl.persistence.ledger_envelope`
+* ✅ ``ServiceManager.open_ledger`` – context manager with unconditional write-back
+* ✅ ``ServiceManager.create_ledger`` – convenience factory for new ledgers
+* ⚠️ Endpoint injection – deferred until endpoint annotation stability
+* ⚠️ User → ledger mapping – explicit ``ledger_id`` required for now
+* ⚠️ ACL enforcement – pending authentication integration
+* 🔮 Event-sourced mode – envelope supports recovery; optimization deferred
+* 🔮 Ledger branching/time-travel – future enhancement
+
+Usage Example
+~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from uuid import uuid4
+
+    from tangl.persistence import PersistenceManagerFactory
+    from tangl.service import ServiceManager
+
+    pm = PersistenceManagerFactory.create_persistence_manager("pickle_file")
+    service = ServiceManager(persistence_manager=pm)
+
+    ledger_id = service.create_ledger()
+
+    with service.open_ledger(user_id=uuid4(), ledger_id=ledger_id, write_back=True) as ledger:
+        frame = ledger.get_frame()
+        # ... execute frame ...
+        ledger.step += 1
+
+    with service.open_ledger(user_id=uuid4(), ledger_id=ledger_id) as ledger:
+        journal = list(ledger.get_journal("latest"))
 
 Multi-client considerations
 ---------------------------
