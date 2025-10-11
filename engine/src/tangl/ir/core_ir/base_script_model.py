@@ -11,7 +11,10 @@ class BaseScriptItem(BaseModel):
 
     Includes obj_cls, label, tags, locked, locals, conditions, effects, content, and icon
     """
-    model_config = ConfigDict(frozen=True)   # Once a script is created, it should be immutable
+    model_config = ConfigDict(
+        frozen=True,
+        extra="allow",
+    )   # Once a script is created, it should be immutable
 
     obj_cls: Optional[ClassName] = None      # For structuring/unstructuring
     template_names: Optional[Label] = Field(None, alias='templates')

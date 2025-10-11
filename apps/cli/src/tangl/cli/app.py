@@ -1,70 +1,203 @@
-"""
-Command-line interactive user interface for interacting with
-the StoryTangl narrative engine.
+"""Interactive shell for StoryTangl demo stories."""
 
-`tangl-cli` is built on `cmd2`, a fully-featured interactive shell
-application framework for Python.  See the `cmd2` docs for a
-discussion of the various features, such as command history and
-scripting.
+from __future__ import annotations
 
-Tangl uses `dynaconf` for configuration and can be configured
-through `TANGL_CLIENT` prefix environment variables or with a
-``settings.toml`` file.
-
-Set the user secret and default world.
-``TANGL_CLIENT_SECRET=romAnt1c H0p3``
-``TANGL_CLIENT_WORLD=my_world``
-
-Connect to a remote api service:
-``TANGL_SERVICE_REMOTE_API=https://www.afreet.city/api/v2``
-
-If no ``REMOTE_API`` is set, the app will instantiate a local game
-service and try to load any local worlds it can find on the `worlds`
-path.
-
-Set worlds path:
-``TANGL_SERVICE_PATHS_WORLDS='[ @path ./worlds ]'``
-
-By default, the cli local service runs with an ephemeral,
-in-memory-only storage.  However, you can also specify a
-persistent storage backend.
-
-``TANGL_SERVICE_PERSISTENCE=pickle``
-``TANGL_SERVICE_PATHS_USER__DATA='@path ./data/user'``
-
-It is also possible to specify any of several other storage backend
-adapters (`shelf`, `redis`, `mongodb`), but they are more useful for
-supporting multiple users and non-file-based storage.
-
-See the ``tangl`` package docs for full specs of all api service
-configuration settings.
-"""
-import importlib
-import logging
-from typing import Any
+from pathlib import Path
+import uuid
+from typing import Optional
 
 import cmd2
-import pydantic
+import yaml
 
+from tangl.compiler.script_manager import ScriptManager
+from tangl.core.graph.edge import Edge
+from tangl.core.graph.graph import Graph
+from tangl.core.graph.node import Node
 from tangl.info import __version__
-# from tangl.utils.response_models import BaseResponse
-
-# Don't delete this import, it registers the command sets
-from tangl.cli.controllers import *
-from tangl.cli.app_service_manager import user_id
+from tangl.story.fabula.actor.actor import Actor
+from tangl.story.story_domain.world import World
+from tangl.vm.frame import Frame
 
 banner = f"t4⅁gL-cl1 v{__version__}"
 
+
+class NarrativeBlock(Node):
+    """CLI-friendly block node that preserves inline ``content``."""
+
+    content: str | None = None
+
+
+class NarrativeAction(Edge):
+    """CLI-friendly edge storing ``text`` for presentation."""
+
+    text: str | None = None
+
+
+NarrativeBlock.model_rebuild()
+NarrativeAction.model_rebuild()
+
+
 class TanglShell(cmd2.Cmd):
-    prompt = '⅁$ '
+    """Minimal interactive shell that loads scripts and plays stories."""
 
-    def __init__(self, *args, **kwargs):
+    prompt = "⅁$ "
+
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.poutput(f"Set user to {user_id}")
+        self.current_story: Optional[Graph] = None
+        self.current_frame: Optional[Frame] = None
+        self._current_actions: list[Edge] = []
 
-        # shortcuts = dict(cmd2.DEFAULT_SHORTCUTS)
-        # shortcuts.update({'ss': 'story', 'aa': 'action'})
-        # cmd2.Cmd.__init__(self, shortcuts=shortcuts)
+    def _require_story(self) -> bool:
+        if self.current_frame is None or self.current_story is None:
+            self.poutput("No active story. Load a script first.")
+            return False
+        return True
+
+    def _render_story(self) -> None:
+        if not self._require_story():
+            return
+
+        block = self.current_frame.cursor
+        self.poutput(f"Story: {self.current_story.label}")
+        self.poutput(f"# {block.label}\n")
+
+        text = getattr(block, "content", None) or getattr(block, "text", None)
+        if text:
+            self.poutput(text.strip())
+            self.poutput("")
+
+        actions = list(
+            self.current_story.find_edges(source_id=self.current_frame.cursor_id)
+        )
+        self._current_actions = actions
+
+        if not actions:
+            self.poutput("No available actions.")
+            return
+
+        self.poutput("Choices:")
+        for index, edge in enumerate(actions, start=1):
+            label = getattr(edge, "text", None)
+            if label is None:
+                label = edge.label.replace("_", " ") if edge.label else f"Choice {index}"
+            self.poutput(f"{index}. {label}")
+
+    def do_load_script(self, arg: str) -> None:
+        """Load a story script from YAML and instantiate its world."""
+
+        if not arg:
+            self.poutput("Usage: load_script <path_to_yaml>")
+            return
+
+        script_path = Path(arg).expanduser()
+        if not script_path.exists():
+            self.poutput(f"File not found: {script_path}")
+            return
+
+        with script_path.open("r", encoding="utf-8") as handle:
+            data = yaml.safe_load(handle) or {}
+
+        self._ensure_cli_classes(data)
+
+        script_manager = ScriptManager.from_data(data)
+        world_label = data.get("label", "default_world")
+
+        Actor.model_rebuild()
+        World.clear_instances()
+        world = World(label=world_label, script_manager=script_manager)
+        world.domain_manager.register_class("NarrativeBlock", NarrativeBlock)
+        world.domain_manager.register_class("NarrativeAction", NarrativeAction)
+
+        self.poutput(f"Loaded world: {world_label}")
+        title = script_manager.master_script.metadata.title
+        if title:
+            self.poutput(f"Title: {title}")
+
+        self.do_create_story(world_label)
+
+    def do_create_story(self, arg: str) -> None:
+        """Create a story instance for the given world label."""
+
+        world_label = arg.strip() or "default_world"
+        world = World.find_instance(label=world_label)
+        if world is None:
+            self.poutput(f"World '{world_label}' not found. Load a script first.")
+            return
+
+        story_label = f"story_{uuid.uuid4().hex[:8]}"
+        story = world.create_story(story_label)
+
+        self.current_story = story
+        self.current_frame = story.cursor
+        self._current_actions = []
+
+        self.poutput(f"Created story: {story_label}")
+        self._render_story()
+
+    def do_story(self, arg: str) -> None:  # noqa: ARG002 - cmd2 signature
+        """Display the current narrative block and available actions."""
+
+        self._render_story()
+
+    def do_choose(self, arg: str) -> None:
+        """Select an action by its list index."""
+
+        if not self._require_story():
+            return
+
+        choice_str = arg.strip()
+        if not choice_str:
+            self.poutput("Usage: choose <number>")
+            return
+
+        try:
+            index = int(choice_str)
+        except ValueError:
+            self.poutput("Choice must be a number.")
+            return
+
+        if index < 1 or index > len(self._current_actions):
+            self.poutput("Choice out of range.")
+            return
+
+        edge = self._current_actions[index - 1]
+        next_edge = self.current_frame.follow_edge(edge)
+        while isinstance(next_edge, Edge):
+            next_edge = self.current_frame.follow_edge(next_edge)
+
+        self._render_story()
+
+    def do_do(self, arg: str) -> None:
+        """Alias for :cmd:`choose`."""
+
+        self.do_choose(arg)
+
+    def _ensure_cli_classes(self, data: dict) -> None:
+        scenes = data.get("scenes")
+        if not scenes:
+            return
+
+        if isinstance(scenes, dict):
+            scene_iter = scenes.values()
+        else:
+            scene_iter = scenes
+
+        for scene in scene_iter:
+            blocks = scene.get("blocks")
+            if not blocks:
+                continue
+
+            if isinstance(blocks, dict):
+                block_iter = blocks.values()
+            else:
+                block_iter = blocks
+
+            for block in block_iter:
+                block.setdefault("block_cls", "NarrativeBlock")
+                for key in ("actions", "continues", "redirects"):
+                    for action in block.get(key, []):
+                        action.setdefault("obj_cls", "NarrativeAction")
 
 
 app = TanglShell()

@@ -5,6 +5,8 @@ from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph
 from tangl.core.graph.node import Node
 from tangl.story.story_domain.world import World
+from tangl.story.reference_domain.block import SimpleBlock as ReferenceBlock
+from tangl.vm.frame import ChoiceEdge
 
 
 class SimpleBlock(Node):
@@ -207,3 +209,106 @@ def test_create_story_full_defaults_to_first_block() -> None:
     story_graph = world.create_story("story")
 
     assert story_graph.cursor.cursor.label == "start"
+
+
+def test_story_creation_uses_default_classes_when_obj_cls_missing() -> None:
+    script = {
+        "label": "default_class_script",
+        "metadata": {"title": "Defaults", "author": "Tester"},
+        "actors": {"guide": {"name": "Guide"}},
+        "scenes": {
+            "intro": {
+                "blocks": {
+                    "start": {
+                        "content": "Welcome",
+                        "actions": [
+                            {
+                                "text": "Next",
+                                "successor": "intro.end",
+                            }
+                        ],
+                    },
+                    "end": {
+                        "content": "Goodbye",
+                    },
+                }
+            }
+        },
+    }
+
+    world = _make_world(script)
+    story_graph = world.create_story("story")
+
+    start_block = story_graph.find_one(label="start")
+    assert isinstance(start_block, ReferenceBlock)
+    assert start_block.content == "Welcome"
+
+    edges = list(story_graph.find_edges(source_id=start_block.uid))
+    assert edges
+    assert any(isinstance(edge, ChoiceEdge) for edge in edges)
+
+
+def test_build_blocks_respects_custom_block_class() -> None:
+    class NarrativeBlock(Node):
+        content: str | None = None
+
+    NarrativeBlock.model_rebuild()
+
+    script = _base_script()
+    script["scenes"] = {
+        "intro": {
+            "blocks": {
+                "start": {
+                    "obj_cls": "NarrativeBlock",
+                    "content": "Custom",
+                }
+            }
+        }
+    }
+
+    world = _make_world(script)
+    world.domain_manager.register_class("NarrativeBlock", NarrativeBlock)
+
+    graph = Graph(label="story")
+    block_map, _ = world._build_blocks(graph)
+
+    block_uid = block_map["intro.start"]
+    block = graph.get(block_uid)
+
+    assert isinstance(block, NarrativeBlock)
+    assert block.content == "Custom"
+
+
+def test_action_edges_set_trigger_phase_for_auto_edges() -> None:
+    script = _base_script()
+    script["scenes"] = {
+        "intro": {
+            "blocks": {
+                "start": {
+                    "obj_cls": "SimpleBlock",
+                    "continues": [
+                        {
+                            "successor": "intro.end",
+                        }
+                    ],
+                },
+                "end": {"obj_cls": "SimpleBlock"},
+            }
+        }
+    }
+
+    world = _make_world(script)
+    graph = Graph(label="story")
+
+    block_map, action_scripts = world._build_blocks(graph)
+    world._build_action_edges(graph, block_map, action_scripts)
+
+    start_uid = block_map["intro.start"]
+    edges = list(graph.find_edges(source_id=start_uid))
+
+    assert len(edges) == 1
+    edge = edges[0]
+    assert isinstance(edge, ChoiceEdge)
+    from tangl.vm.frame import ResolutionPhase as P
+
+    assert edge.trigger_phase == P.POSTREQS

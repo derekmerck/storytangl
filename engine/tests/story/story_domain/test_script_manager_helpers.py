@@ -57,3 +57,47 @@ def test_get_story_globals_defaults_to_empty_dict() -> None:
     script["globals"] = {"difficulty": "normal"}
     manager = ScriptManager.from_data(script)
     assert manager.get_story_globals() == {"difficulty": "normal"}
+
+
+def test_get_unstructured_injects_default_obj_classes() -> None:
+    script = _script_with_actors(
+        {
+            "actors": {"alice": {"name": "Alice"}},
+            "scenes": {
+                "intro": {
+                    "blocks": {
+                        "start": {
+                            "content": "Hello",
+                            "actions": [
+                                {
+                                    "text": "Next",
+                                    "successor": "intro.end",
+                                }
+                            ],
+                        },
+                        "end": {
+                            "content": "The end",
+                        },
+                    }
+                }
+            },
+        }
+    )
+
+    manager = ScriptManager.from_data(script)
+
+    actor_payload = next(manager.get_unstructured("actors"))
+    assert actor_payload["obj_cls"] == "tangl.story.fabula.actor.actor.Actor"
+
+    scene_payload = next(manager.get_unstructured("scenes"))
+    assert scene_payload["obj_cls"] == "tangl.story.reference_domain.scene.SimpleScene"
+
+    blocks = scene_payload["blocks"]
+    assert "start" in blocks
+    start_block = blocks["start"]
+    assert start_block["obj_cls"] == "tangl.story.reference_domain.block.SimpleBlock"
+    assert start_block["block_cls"] == "tangl.story.reference_domain.block.SimpleBlock"
+
+    actions = start_block["actions"]
+    assert actions
+    assert actions[0]["obj_cls"] == "tangl.vm.frame.ChoiceEdge"
