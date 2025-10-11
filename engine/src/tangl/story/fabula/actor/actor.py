@@ -6,6 +6,7 @@ from typing import Optional, TYPE_CHECKING
 # from tangl.core.services import Renderable
 
 from tangl.core import Node as Renderable
+from tangl.core.graph.graph import Graph  # noqa: F401  # ensure forward ref availability
 
 if TYPE_CHECKING:
     from .role import Role
