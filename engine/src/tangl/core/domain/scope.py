@@ -50,7 +50,7 @@ class Scope(Entity):
 
     # Can't cache this directly b/c it only iterates once
     @classmethod
-    def _iter_active_domains(cls, anchor: GraphItem, registries: list[Registry[Domain]]) -> Iterator[Domain]:
+    def _iter_active_domains(cls, anchor: GraphItem, registries: list[DomainRegistry]) -> Iterator[Domain]:
         # In general, I'm not sure how this should be organized:
         """
         Yield registered domains whose tags intersect item/ancestor tags or whose selector returns True.

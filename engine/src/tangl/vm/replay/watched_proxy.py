@@ -83,6 +83,9 @@ class WatchedEntityProxy(wrapt.ObjectProxy):
     -----
     Attributes holding *non-graph* entities are not auto-wrapped yet; consider
     wrapping them explicitly if you need deep observation.
+
+    Attributes holding GraphItems or simple collections, specifically `list`,
+    `set`, `dict`, are wrapped on access.
     """
     _watchers: list[EventWatcher]
     __wrapped__: Entity
