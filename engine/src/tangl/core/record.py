@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 #       will be monotonic in creation order, but NOT continuous if any other records
 #       are also being generated.
 
-# •	A RecordStream is append-only; seq is unique and monotonic.
+# •	A StreamRegistry is append-only; seq is unique and monotonic.
 # •	Sections are half-open: get_section(X) yields seq ∈ [marker(X), next_marker); never overlaps.
 # •	Channels are derived—not a separate index: record_type == x or f"channel:{x}" in tags.
 # •	Push returns half-open bounds so callers can pass directly to get_slice.
