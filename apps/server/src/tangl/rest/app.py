@@ -45,13 +45,19 @@ logger = logging.getLogger(__name__)
 def get_user_credentials(orchestrator: Orchestrator) -> UUID:
     secret = settings.client.secret
     user = orchestrator.execute("UserController.create_user", secret=secret)
-    logger.debug(user)
+    logger.debug("Created dev user via orchestrator", extra={"user": user})
     user_id = getattr(user, "uid", None)
     if user_id is None:
         raise RuntimeError("Orchestrator failed to return a user identifier")
 
+    persistence = getattr(orchestrator, "persistence", None)
+    if persistence is not None:
+        persistence.save(user)
+    else:
+        logger.warning("Skipping user persistence: orchestrator missing persistence manager")
+
     info = orchestrator.execute("UserController.get_user_info", user_id=user_id)
-    logger.debug(info)
+    logger.debug("Fetched dev user info", extra={"info": info})
     return user_id
 
 
