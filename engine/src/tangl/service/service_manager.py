@@ -161,20 +161,12 @@ class ServiceManager:
         envelope = LedgerEnvelope.model_validate(envelope_data)
         ledger = envelope.to_ledger(event_sourced=event_sourced)
 
-        initial_step = ledger.step
-        initial_record_count = len(ledger.records)
-
         try:
             yield ledger
         finally:
             if write_back:
-                is_dirty = (
-                    ledger.step != initial_step
-                    or len(ledger.records) != initial_record_count
-                )
-                if is_dirty:
-                    updated_envelope = LedgerEnvelope.from_ledger(ledger)
-                    self.persistence_manager.save(updated_envelope)
+                updated_envelope = LedgerEnvelope.from_ledger(ledger)
+                self.persistence_manager.save(updated_envelope)
 
     def create_ledger(
         self,

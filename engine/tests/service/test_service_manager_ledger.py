@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import pytest
 
+from tangl.core.domain.domain import Domain
 from tangl.persistence import LedgerEnvelope, PersistenceManagerFactory
 from tangl.service import ServiceManager
 
@@ -37,19 +38,47 @@ def test_ledger_mutation_persists(service_manager_with_persistence):
         assert ledger.step == 99
 
 
+def test_ledger_metadata_mutation_persists(service_manager_with_persistence):
+    service_manager = service_manager_with_persistence
+    ledger_id = service_manager.create_ledger()
+
+    with service_manager.open_ledger(user_id=uuid4(), ledger_id=ledger_id, write_back=True) as ledger:
+        ledger.snapshot_cadence = 3
+
+    with service_manager.open_ledger(user_id=uuid4(), ledger_id=ledger_id) as ledger:
+        assert ledger.snapshot_cadence == 3
+
+
+def test_ledger_domain_roundtrip(service_manager_with_persistence):
+    service_manager = service_manager_with_persistence
+    domain = Domain(label="singleton_world")
+
+    ledger_id = service_manager.create_ledger(domains=[domain])
+
+    with service_manager.open_ledger(user_id=uuid4(), ledger_id=ledger_id) as ledger:
+        assert [d.label for d in ledger.domains] == ["singleton_world"]
+
+
 def test_ledger_no_spurious_write(service_manager_with_persistence):
     service_manager = service_manager_with_persistence
     ledger_id = service_manager.create_ledger()
 
     initial_envelope = LedgerEnvelope.model_validate(
         service_manager.persistence_manager.get(ledger_id)
-    ).model_dump()
+    )
+    initial_ledger = initial_envelope.to_ledger()
 
     with service_manager.open_ledger(user_id=uuid4(), ledger_id=ledger_id, write_back=True):
         pass
 
     final_envelope = LedgerEnvelope.model_validate(
         service_manager.persistence_manager.get(ledger_id)
-    ).model_dump()
+    )
+    final_ledger = final_envelope.to_ledger()
 
-    assert final_envelope == initial_envelope
+    assert final_ledger.uid == initial_ledger.uid
+    assert final_ledger.step == initial_ledger.step
+    assert final_ledger.cursor_id == initial_ledger.cursor_id
+    assert final_ledger.snapshot_cadence == initial_ledger.snapshot_cadence
+    assert len(final_ledger.records) == len(initial_ledger.records)
+    assert final_ledger.graph.find_one(label="start") is not None

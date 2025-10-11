@@ -8,6 +8,7 @@ from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
+from tangl.type_hints import StringMap
 from .frame import Frame
 
 if TYPE_CHECKING:
@@ -53,16 +54,16 @@ class Ledger(Entity):
     Records are not stored on the graph; they live in :attr:`records`. Channels are
     derived from record type ("snapshot", "patch", "fragment").
 
-    **Domains:** Only singleton domains belong at the ledger level. They are
-    reconstructed by name during persistence replay. Affiliate domains stay on
-    graph items where scoping discovers them dynamically.
+    **Domains:** Only singleton domains belong at the ledger level. They
+    serialize via the usual :meth:`structure`/:meth:`unstructure` hooks for
+    singletons; other domain styles are not supported here and should live on
+    graph items where scope discovery can rehydrate them dynamically.
     """
     graph: Graph = Field(None, exclude=True)
     cursor_id: UUID = None
     step: int = -1
-    domains: list[Domain] = Field(default_factory=list, exclude=True)
-    #: ledger-level Singleton Domains _only_
-    records: StreamRegistry = Field(default_factory=StreamRegistry, exclude=True)
+    domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
+    records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
 
     def push_snapshot(self):

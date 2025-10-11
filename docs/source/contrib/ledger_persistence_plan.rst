@@ -73,15 +73,18 @@ Proposed persistence schema
 * **Primary identifier:** Persist ledgers under their UUID and store a pointer
   from each ``User`` to their active ledger/story id.  API keys resolve to
   users, which keeps compatibility with existing authentication hooks.
-* **Serialized payload:** Start by serializing the current ``Graph`` snapshot,
-  the ledger step counter, and the current record streams.  Group the data into
-  a ``LedgerEnvelope`` structure so alternative serializers can add metadata
-  (e.g., compression hints, timeline identifiers) without changing controller
-  code.
-* **Write-back cadence:** When a controller exits a ledger context, perform a
-  diff-aware write-back: only persist when the ledger step counter advanced or a
-  stream mutated.  This mirrors how ``ServiceManager.open_story`` decides when to
-  write objects back into the context store.
+* **Serialized payload:** Use :meth:`Ledger.unstructure<tangl.vm.ledger.Ledger.unstructure>`
+  to capture the graph, record stream, domains, and cursor in one payload.
+  The data travels inside a ``LedgerEnvelope`` so persistence backends can add
+  metadata (e.g., compression hints, timeline identifiers) without changing
+  controller code.  Ledger-level domains must be singletons—those serialize via
+  their label-based hooks—while non-singleton domains should remain attached to
+  graph items instead of the ledger.
+* **Write-back cadence:** When a controller exits a ledger context with
+  ``write_back=True``, persist the ledger unconditionally so metadata changes,
+  domain mutations, and other side effects are never dropped.  We can later
+  introduce an opt-in diff to skip redundant writes once the mutation signals
+  stabilize.
 * **Event-sourced mode:** Allow persistence backends to omit the full ``Graph``
   and reconstruct it from a recent snapshot plus the record stream.  Provide a
   helper in the persistence package (e.g., ``rebuild_ledger(envelope, *, upto)``)
@@ -133,7 +136,7 @@ Implementation Status (v37 MVP)
 -------------------------------
 
 * ✅ ``LedgerEnvelope`` – implemented in :mod:`tangl.persistence.ledger_envelope`
-* ✅ ``ServiceManager.open_ledger`` – context manager with dirty tracking
+* ✅ ``ServiceManager.open_ledger`` – context manager with unconditional write-back
 * ✅ ``ServiceManager.create_ledger`` – convenience factory for new ledgers
 * ⚠️ Endpoint injection – deferred until endpoint annotation stability
 * ⚠️ User → ledger mapping – explicit ``ledger_id`` required for now

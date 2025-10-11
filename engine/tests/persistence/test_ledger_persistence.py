@@ -1,13 +1,18 @@
 from tangl.core import Graph
 from tangl.persistence import LedgerEnvelope
+from tangl.core.domain.domain import Domain
 from tangl.vm.ledger import Ledger
 import pytest
 
+# todo: Domain here needs to be a Singleton, this won't work with an 
+#       instance domain with handlers for example.  See 
+#       `tests/vm/test_ledger_structures` for an example.
 
 def test_ledger_envelope_roundtrip_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="test_node")
     ledger = Ledger(graph=graph, cursor_id=node.uid, step=42)
+    ledger.domains.append(Domain(label="demo_domain"))
 
     envelope = LedgerEnvelope.from_ledger(ledger)
     manager.save(envelope)
@@ -20,6 +25,7 @@ def test_ledger_envelope_roundtrip_all_backends(manager):
     assert restored_ledger.step == 42
     assert restored_ledger.cursor_id == node.uid
     assert restored_ledger.graph.find_one(label="test_node") is not None
+    assert [domain.label for domain in restored_ledger.domains] == ["demo_domain"]
 
 
 def test_event_sourced_rebuild_all_backends(manager):
