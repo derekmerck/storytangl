@@ -12,8 +12,7 @@ from random import Random
 
 from tangl.type_hints import Hash
 from tangl.core.graph import Graph, Node
-from tangl.core.registry import Registry
-from tangl.core.domain import Scope, NS, AffiliateDomain
+from tangl.core.domain import Scope, NS, AffiliateRegistry
 from tangl.core.dispatch import Handler, JobReceipt
 from tangl.utils.hashing import hashing_func
 
@@ -62,7 +61,7 @@ class Context:
     graph: Graph
     cursor_id: UUID
     step: int = -1
-    domain_registries: list[Registry[AffiliateDomain]] = field(default_factory=list)
+    domain_registries: list[AffiliateRegistry] = field(default_factory=list)
     job_receipts: list[JobReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
 

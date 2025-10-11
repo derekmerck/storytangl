@@ -2,9 +2,10 @@
 from typing import ClassVar, Type
 
 from tangl.type_hints import StringMap
-from tangl.core.entity import Entity, Selectable, MatchPredicate
-
+from tangl.core import Entity, Registry
+from tangl.core.entity import Selectable, MatchPredicate
 from .domain import global_domain, Domain
+
 
 class AffiliateDomain(Selectable, Domain):
     """
@@ -39,3 +40,5 @@ class AffiliateDomain(Selectable, Domain):
         if self.selector_type is not None:
             criteria.setdefault('is_instance', self.selector_type)
         return criteria
+
+AffiliateRegistry = Registry[AffiliateDomain]

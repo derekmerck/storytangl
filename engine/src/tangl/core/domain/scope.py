@@ -11,14 +11,14 @@ from tangl.core.entity import Entity
 from tangl.core.graph import Graph, Node, GraphItem
 from tangl.core.registry import Registry
 from tangl.core.dispatch import Handler
-from .domain import Domain, global_domain
+from .domain import Domain, global_domain, DomainRegistry
 
 NS: TypeAlias = ChainMap[str, Any]
 
 
 class Scope(Entity):
     """
-    Scope(domains: Registry[Domain], graph: Graph, anchor: Node)
+    Scope(domains: DomainRegistry, graph: Graph, anchor: Node)
 
     Ordered stack of active domains for a node.
 
@@ -42,7 +42,7 @@ class Scope(Entity):
     graph: Graph = Field(..., exclude=True)
     # Has a graph, but Scope is not a graph item, per se
     anchor_id: UUID
-    domain_registries: list[Registry[Domain]] = Field(default_factory=list)
+    domain_registries: list[DomainRegistry] = Field(default_factory=list)
 
     @property
     def anchor(self) -> Node:

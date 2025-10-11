@@ -5,8 +5,8 @@ from pydantic import Field
 
 from tangl.info import __version__
 from tangl.type_hints import StringMap
-from tangl.core.entity import Entity
-from tangl.core.dispatch import DispatchRegistry, DEFAULT_HANDLERS
+from tangl.core import Entity, Registry, DispatchRegistry
+from tangl.core.dispatch import DEFAULT_HANDLERS
 
 # imported from tangl.__info__
 DEFAULT_VARS = {'version': __version__}
@@ -43,6 +43,7 @@ class Domain(Entity):
     def register_handler(self, **attrs: Any) -> None:
         return self.handlers.register(**attrs)
 
+DomainRegistry = Registry[Domain]
 
 global_domain = Domain(label="globals",
                        vars=DEFAULT_VARS,

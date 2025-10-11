@@ -14,7 +14,7 @@ import logging
 from tangl.type_hints import Step
 from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, JobReceipt, BaseFragment
 from tangl.core.entity import Conditional
-from tangl.core.domain import AffiliateDomain
+from tangl.core.domain import AffiliateDomain, AffiliateRegistry
 from .context import Context
 from .planning import PlanningReceipt
 from .replay import ReplayWatcher, WatchedRegistry, Patch
@@ -138,7 +138,7 @@ class Frame:
     graph: Graph
     cursor_id: UUID
     step: Step = 0
-    domain_registries: list[Registry[AffiliateDomain]] = field(default_factory=list)
+    domain_registries: list[AffiliateRegistry] = field(default_factory=list)
 
     event_sourced: bool = False  # track effects on a mutable copy
     event_watcher: ReplayWatcher = field(default_factory=ReplayWatcher)
@@ -158,7 +158,7 @@ class Frame:
     #       context, that way we get 'local_domain' for free
 
     @property
-    def domain_registry(self) -> Registry[AffiliateDomain]:
+    def domain_registry(self) -> AffiliateRegistry:
         # this is a convenience property that creates a registry
         # if self.registries is empty and returns the first.
         if not self.domain_registries:
