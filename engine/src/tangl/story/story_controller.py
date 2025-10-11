@@ -6,7 +6,7 @@ from tangl.service.api_endpoint import ApiEndpoint, MethodType, ResponseType, Ac
 # from tangl.service.response import ContentResponse, InfoResponse
 from tangl.core.graph import Node, AnonymousEdge
 from tangl.core.services import on_gather_context, Predicate, RuntimeEffect
-from tangl.core.solver import ChoiceEdge, ContentFragment
+from tangl.vm import ChoiceEdge, ContentFragment
 from .story import Story
 
 class StoryController(HasApiEndpoints):
