@@ -235,46 +235,32 @@ class Frame:
 
         from .domain.traversable import TraversableDomain
 
-        cursor_target = destination
-        suppress_postreq = False
+        skip_postreq = False
 
         if isinstance(destination, TraversableDomain):
-            cursor_target = destination.source
-            suppress_postreq = True
+            target = destination.source
+            skip_postreq = True
             logger.debug(
                 "Entering traversable domain %s via source node %s",
                 destination.label,
-                cursor_target.uid,
+                target.uid,
             )
         else:
             parent = getattr(destination, "parent", None)
-            if isinstance(parent, TraversableDomain):
-                source_parent = getattr(edge.source, "parent", None)
-                entering_domain = source_parent is not parent
+            source_parent = getattr(edge.source, "parent", None)
 
-                if entering_domain and destination.uid != parent.source.uid:
-                    cursor_target = parent.source
-                    suppress_postreq = True
-                    logger.debug(
-                        "Entering traversable domain %s via source node %s",
-                        parent.label,
-                        cursor_target.uid,
-                    )
-                elif (
-                    entering_domain
-                    and destination.uid == parent.sink.uid
-                    and "sink" in getattr(destination, "tags", ())
-                    and getattr(edge, "trigger_phase", None) is None
-                ):
-                    cursor_target = parent.source
-                    suppress_postreq = True
-                    logger.debug(
-                        "Redirecting from traversable sink %s to source node %s",
-                        destination.label,
-                        cursor_target.uid,
-                    )
+            if isinstance(parent, TraversableDomain) and parent is not source_parent:
+                target = parent.source
+                skip_postreq = True
+                logger.debug(
+                    "Redirecting into traversable domain %s via source node %s",
+                    parent.label,
+                    target.uid,
+                )
+            else:
+                target = destination
 
-        self.cursor_id = cursor_target.uid
+        self.cursor_id = target.uid
 
         # Set a marker on the record stream
         self.records.set_marker(f"step-{self.step:04d}", "frame")
@@ -342,7 +328,7 @@ class Frame:
 
         # check for postreq cursor redirects
         if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor
-            if suppress_postreq or getattr(edge, "trigger_phase", None) is P.PREREQS:
+            if skip_postreq or getattr(edge, "trigger_phase", None) is P.PREREQS:
                 logger.debug(
                     "Suppressing postreq edge %s after entering traversable domain",
                     nxt,

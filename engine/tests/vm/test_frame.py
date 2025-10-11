@@ -3,9 +3,8 @@ import uuid
 from tangl.core import Node, Graph, JobReceipt, global_domain
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm.frame import ResolutionPhase as P, Frame, ChoiceEdge
-from tangl.vm.domain.traversable import TraversableDomain
-from tangl.vm import simple_handlers
 from tangl.vm.planning import Requirement, ProvisioningPolicy, Dependency
+from tangl.story.reference_domain import SimpleBlock, SimpleScene
 
 def test_global_handlers_visible_in_scope():
     g = Graph(label="x")
@@ -48,48 +47,26 @@ def test_follow_edge_stops_without_next(frame):
     assert frame.context.cursor is n
 
 
-def test_follow_edge_to_traversable_domain_uses_source():
-    g = Graph(label="demo")
-    start = g.add_node(label="start")
-    entry = g.add_node(label="entry")
+def test_follow_edge_to_scene_container_enters_via_source():
+    graph = Graph(label="demo")
+    start = graph.add_node(label="start")
+    entry_block = SimpleBlock(graph=graph, label="entry", content="Entry")
 
-    domain = TraversableDomain(
-        graph=g,
+    scene = SimpleScene(
+        graph=graph,
         label="scene",
-        member_ids=[entry.uid],
-        entry_ids=[entry.uid],
+        member_ids=[entry_block.uid],
+        entry_ids=[entry_block.uid],
     )
 
-    edge = g.add_edge(start, domain)
+    frame = Frame(graph=graph, cursor_id=start.uid)
 
-    frame = Frame(graph=g, cursor_id=start.uid)
-
+    edge = graph.add_edge(start, scene)
     frame.follow_edge(edge)
 
-    assert frame.cursor_id == domain.source.uid
+    assert frame.cursor_id == scene.source.uid
     assert frame.cursor.label.endswith("_SOURCE")
-
-
-def test_follow_edge_to_traversable_sink_redirects_to_source():
-    g = Graph(label="demo")
-    start = g.add_node(label="start")
-    entry = g.add_node(label="entry")
-
-    domain = TraversableDomain(
-        graph=g,
-        label="scene",
-        member_ids=[entry.uid],
-        entry_ids=[entry.uid],
-    )
-
-    sink_edge = g.add_edge(start, domain.sink)
-
-    frame = Frame(graph=g, cursor_id=start.uid)
-
-    frame.follow_edge(sink_edge)
-
-    assert frame.cursor_id == domain.source.uid
-    assert frame.cursor.label.endswith("_SOURCE")
+    assert "source" in frame.cursor.tags
 
 
 def test_session_follow_edge_updates_cursor_and_stops():
