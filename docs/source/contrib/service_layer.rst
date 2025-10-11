@@ -27,7 +27,7 @@ Controllers
 -----------
 
 Controllers are small classes that bundle related API endpoints. Each public
-method should be decorated with :func:`~tangl.service.ApiEndpoint.annotate` and
+method should be decorated with :meth:`~tangl.service.ApiEndpoint.annotate` and
 use type hints for automatic resource injection.
 
 - Methods may accept ``ledger: Ledger``, ``frame: Frame`` or ``user: User``

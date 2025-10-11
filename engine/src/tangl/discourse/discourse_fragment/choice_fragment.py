@@ -6,7 +6,7 @@ from tangl.core.solver.journal import ContentFragment
 
 
 class ChoiceFragment(ContentFragment, extra='allow'):
-    fragment_type: Literal['choice'] = Field('choice', alias='type')
+    fragment_type: Literal['choice'] = Field('choice')
     # Indicate if fragment can be "activated", for choices, allow the choice to be selected, etc.
     activatable: Optional[bool] = False
     # For activatable fragments, is this fragment _currently_ active.
