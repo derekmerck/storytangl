@@ -2,10 +2,11 @@
 """
 State holder for the live graph, cursor, and record stream (snapshots, patches, journal).
 """
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 from pydantic import Field
 from uuid import UUID
 
+from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
 from tangl.type_hints import StringMap
 from .frame import Frame
@@ -58,7 +59,7 @@ class Ledger(Entity):
     singletons; other domain styles are not supported here and should live on
     graph items where scope discovery can rehydrate them dynamically.
     """
-    graph: Graph = None
+    graph: Graph = Field(None, exclude=True)
     cursor_id: UUID = None
     step: int = -1
     domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
@@ -105,29 +106,25 @@ class Ledger(Entity):
                      cursor_id = self.cursor_id,
                      records = self.records)
 
+    # todo: should probably add this as a general pattern for structuring/unstructuring
+    #       entity-typed model fields using introspection (see registry)
+
     @classmethod
-    def structure(cls, data: StringMap) -> "Ledger":
-        payload = dict(data)
+    def structure(cls, data) -> Self:
+        _graph = data.pop("_graph")
+        _domains = data.pop("_domains")
+        _records = data.pop("_records")
+        obj = super().structure(data)
+        obj.graph = Graph.structure(_graph)
+        obj.domains = [ Domain.structure(d) for d in _domains ]
+        obj.records = StreamRegistry.structure(_records)
+        return obj
 
-        graph_data = payload.pop("graph", None)
-        if isinstance(graph_data, dict):
-            payload["graph"] = Graph.structure(graph_data)
-
-        records_data = payload.pop("records", None)
-        if isinstance(records_data, dict):
-            payload["records"] = StreamRegistry.structure(records_data)
-
-        domains_data = payload.pop("domains", None)
-        if isinstance(domains_data, list):
-            payload["domains"] = [Domain.structure(item) for item in domains_data]
-
-        return super().structure(payload)
-
-    def unstructure(self) -> StringMap:
+    def unstructure(self) -> UnstructuredData:
         data = super().unstructure()
-        data["graph"] = self.graph.unstructure()
-        data["records"] = self.records.unstructure()
-        data["domains"] = [domain.unstructure() for domain in self.domains]
+        # Only need to save graph if we are event sourced
+        data['_graph'] = self.graph.unstructure()
+        data['_domains'] = [ d.unstructure() for d in self.domains ]
+        data['_records'] = self.records.unstructure()
         return data
-
 

@@ -4,6 +4,9 @@ from tangl.core.domain.domain import Domain
 from tangl.vm.ledger import Ledger
 import pytest
 
+# todo: Domain here needs to be a Singleton, this won't work with an 
+#       instance domain with handlers for example.  See 
+#       `tests/vm/test_ledger_structures` for an example.
 
 def test_ledger_envelope_roundtrip_all_backends(manager):
     graph = Graph()
