@@ -3,7 +3,7 @@
 Frame drives the phase bus over one *resolution step* over a :class:`~tangl.core.graph.Graph`.
 """
 from __future__ import annotations
-from typing import Literal, Optional, Any, Callable, Type
+from typing import Literal, Optional, Any, Callable, Type, TYPE_CHECKING
 import functools
 from enum import IntEnum, Enum
 from uuid import UUID
@@ -15,6 +15,9 @@ from tangl.type_hints import Step
 from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, JobReceipt, BaseFragment
 from tangl.core.entity import Conditional
 from tangl.core.domain import AffiliateDomain, AffiliateRegistry
+
+if TYPE_CHECKING:
+    from .domain.traversable import TraversableDomain
 from .context import Context
 from .planning import PlanningReceipt
 from .replay import ReplayWatcher, WatchedRegistry, Patch
@@ -225,7 +228,53 @@ class Frame:
         logger.debug(f'Following edge {edge!r}')
 
         self.step += 1
-        self.cursor_id = edge.destination.uid
+
+        destination = edge.destination
+        if destination is None:
+            raise RuntimeError("Edge destination is missing")
+
+        from .domain.traversable import TraversableDomain
+
+        cursor_target = destination
+        suppress_postreq = False
+
+        if isinstance(destination, TraversableDomain):
+            cursor_target = destination.source
+            suppress_postreq = True
+            logger.debug(
+                "Entering traversable domain %s via source node %s",
+                destination.label,
+                cursor_target.uid,
+            )
+        else:
+            parent = getattr(destination, "parent", None)
+            if isinstance(parent, TraversableDomain):
+                source_parent = getattr(edge.source, "parent", None)
+                entering_domain = source_parent is not parent
+
+                if entering_domain and destination.uid != parent.source.uid:
+                    cursor_target = parent.source
+                    suppress_postreq = True
+                    logger.debug(
+                        "Entering traversable domain %s via source node %s",
+                        parent.label,
+                        cursor_target.uid,
+                    )
+                elif (
+                    entering_domain
+                    and destination.uid == parent.sink.uid
+                    and "sink" in getattr(destination, "tags", ())
+                    and getattr(edge, "trigger_phase", None) is None
+                ):
+                    cursor_target = parent.source
+                    suppress_postreq = True
+                    logger.debug(
+                        "Redirecting from traversable sink %s to source node %s",
+                        destination.label,
+                        cursor_target.uid,
+                    )
+
+        self.cursor_id = cursor_target.uid
 
         # Set a marker on the record stream
         self.records.set_marker(f"step-{self.step:04d}", "frame")
@@ -293,7 +342,12 @@ class Frame:
 
         # check for postreq cursor redirects
         if nxt := self.run_phase(P.POSTREQS):   # may set an edge to next cursor
-            if isinstance(nxt, Edge):
+            if suppress_postreq or getattr(edge, "trigger_phase", None) is P.PREREQS:
+                logger.debug(
+                    "Suppressing postreq edge %s after entering traversable domain",
+                    nxt,
+                )
+            elif isinstance(nxt, Edge):
                 logger.debug(f'Found postreq edge {nxt!r}')
                 return nxt
             else:

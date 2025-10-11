@@ -3,6 +3,7 @@ import uuid
 from tangl.core import Node, Graph, JobReceipt, global_domain
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm.frame import ResolutionPhase as P, Frame, ChoiceEdge
+from tangl.vm.domain.traversable import TraversableDomain
 from tangl.vm import simple_handlers
 from tangl.vm.planning import Requirement, ProvisioningPolicy, Dependency
 
@@ -45,6 +46,50 @@ def test_follow_edge_stops_without_next(frame):
     assert frame.cursor_id == n.uid
     assert frame.cursor is n, f'cursor should be {n!r}, not {frame.cursor!r}'
     assert frame.context.cursor is n
+
+
+def test_follow_edge_to_traversable_domain_uses_source():
+    g = Graph(label="demo")
+    start = g.add_node(label="start")
+    entry = g.add_node(label="entry")
+
+    domain = TraversableDomain(
+        graph=g,
+        label="scene",
+        member_ids=[entry.uid],
+        entry_ids=[entry.uid],
+    )
+
+    edge = g.add_edge(start, domain)
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+
+    frame.follow_edge(edge)
+
+    assert frame.cursor_id == domain.source.uid
+    assert frame.cursor.label.endswith("_SOURCE")
+
+
+def test_follow_edge_to_traversable_sink_redirects_to_source():
+    g = Graph(label="demo")
+    start = g.add_node(label="start")
+    entry = g.add_node(label="entry")
+
+    domain = TraversableDomain(
+        graph=g,
+        label="scene",
+        member_ids=[entry.uid],
+        entry_ids=[entry.uid],
+    )
+
+    sink_edge = g.add_edge(start, domain.sink)
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+
+    frame.follow_edge(sink_edge)
+
+    assert frame.cursor_id == domain.source.uid
+    assert frame.cursor.label.endswith("_SOURCE")
 
 
 def test_session_follow_edge_updates_cursor_and_stops():

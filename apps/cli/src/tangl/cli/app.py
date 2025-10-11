@@ -69,9 +69,11 @@ class TanglShell(cmd2.Cmd):
             self.poutput(text.strip())
             self.poutput("")
 
-        actions = list(
-            self.current_story.find_edges(source_id=self.current_frame.cursor_id)
-        )
+        actions = [
+            edge
+            for edge in self.current_story.find_edges(source_id=self.current_frame.cursor_id)
+            if getattr(edge, "trigger_phase", None) is None
+        ]
         self._current_actions = actions
 
         if not actions:

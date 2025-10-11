@@ -49,7 +49,6 @@ def test_load_script_and_show_story() -> None:
     assert "Take the left path" in output
     assert "Take the right path" in output
 
-@pytest.mark.xfail(reason="todo: Bug in the tested features")
 def test_choose_advances_story() -> None:
     app = TanglShell()
     app.stdout = io.StringIO()
