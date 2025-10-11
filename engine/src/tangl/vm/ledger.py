@@ -7,6 +7,7 @@ from pydantic import Field
 from uuid import UUID
 
 from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
+from tangl.type_hints import StringMap
 from .frame import Frame
 
 if TYPE_CHECKING:
@@ -51,14 +52,16 @@ class Ledger(Entity):
     -----
     Records are not stored on the graph; they live in :attr:`records`. Channels are
     derived from record type ("snapshot", "patch", "fragment").
+
+    **Domains:** Only singleton domains belong at the ledger level. They
+    serialize via the usual :meth:`structure`/:meth:`unstructure` hooks for
+    singletons; other domain styles are not supported here and should live on
+    graph items where scope discovery can rehydrate them dynamically.
     """
     graph: Graph = None
     cursor_id: UUID = None
     step: int = -1
-    # todo: should consider this and Frame as kinds of explicit structural domains, get
-    #       rid of lists of domains and add explicitly inherited domains to the scope?
-    #       ledger shouldn't hold domains, just references or it won't serialize nicely.
-    domains: list[Domain] = Field(default_factory=list)
+    domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
 
@@ -101,5 +104,30 @@ class Ledger(Entity):
         return Frame(graph = self.graph,
                      cursor_id = self.cursor_id,
                      records = self.records)
+
+    @classmethod
+    def structure(cls, data: StringMap) -> "Ledger":
+        payload = dict(data)
+
+        graph_data = payload.pop("graph", None)
+        if isinstance(graph_data, dict):
+            payload["graph"] = Graph.structure(graph_data)
+
+        records_data = payload.pop("records", None)
+        if isinstance(records_data, dict):
+            payload["records"] = StreamRegistry.structure(records_data)
+
+        domains_data = payload.pop("domains", None)
+        if isinstance(domains_data, list):
+            payload["domains"] = [Domain.structure(item) for item in domains_data]
+
+        return super().structure(payload)
+
+    def unstructure(self) -> StringMap:
+        data = super().unstructure()
+        data["graph"] = self.graph.unstructure()
+        data["records"] = self.records.unstructure()
+        data["domains"] = [domain.unstructure() for domain in self.domains]
+        return data
 
 
