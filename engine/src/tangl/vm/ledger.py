@@ -2,11 +2,13 @@
 """
 State holder for the live graph, cursor, and record stream (snapshots, patches, journal).
 """
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 from pydantic import Field
 from uuid import UUID
 
+from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
+from tangl.type_hints import StringMap
 from .frame import Frame
 
 if TYPE_CHECKING:
@@ -51,14 +53,16 @@ class Ledger(Entity):
     -----
     Records are not stored on the graph; they live in :attr:`records`. Channels are
     derived from record type ("snapshot", "patch", "fragment").
+
+    **Domains:** Only singleton domains belong at the ledger level. They
+    serialize via the usual :meth:`structure`/:meth:`unstructure` hooks for
+    singletons; other domain styles are not supported here and should live on
+    graph items where scope discovery can rehydrate them dynamically.
     """
-    graph: Graph = None
+    graph: Graph = Field(None, exclude=True)
     cursor_id: UUID = None
     step: int = -1
-    # todo: should consider this and Frame as kinds of explicit structural domains, get
-    #       rid of lists of domains and add explicitly inherited domains to the scope?
-    #       ledger shouldn't hold domains, just references or it won't serialize nicely.
-    domains: list[Domain] = Field(default_factory=list)
+    domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
 
@@ -102,4 +106,25 @@ class Ledger(Entity):
                      cursor_id = self.cursor_id,
                      records = self.records)
 
+    # todo: should probably add this as a general pattern for structuring/unstructuring
+    #       entity-typed model fields using introspection (see registry)
+
+    @classmethod
+    def structure(cls, data) -> Self:
+        _graph = data.pop("_graph")
+        _domains = data.pop("_domains")
+        _records = data.pop("_records")
+        obj = super().structure(data)
+        obj.graph = Graph.structure(_graph)
+        obj.domains = [ Domain.structure(d) for d in _domains ]
+        obj.records = StreamRegistry.structure(_records)
+        return obj
+
+    def unstructure(self) -> UnstructuredData:
+        data = super().unstructure()
+        # Only need to save graph if we are event sourced
+        data['_graph'] = self.graph.unstructure()
+        data['_domains'] = [ d.unstructure() for d in self.domains ]
+        data['_records'] = self.records.unstructure()
+        return data
 
