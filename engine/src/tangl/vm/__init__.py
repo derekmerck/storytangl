@@ -40,6 +40,10 @@ Design intent
 execution semantics—phases, handlers, planning, and event replay—without imposing
 any narrative or domain-specific content. VM code depends only on :mod:`tangl.core`
 (and lightweight utils).
+
+Notes
+-----
+*Design note:* `vm` uses dataclasses for ephemeral execution (`Frame`, `Context`) and Pydantic models for persisted artifacts (`Ledger`, `Event`, `Patch`, Receipts).
 """
 
 # Event sourced state manager
