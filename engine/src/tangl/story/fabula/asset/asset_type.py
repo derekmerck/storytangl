@@ -20,7 +20,7 @@ are associated, so they require a node/graph structure.  Simple assets require n
 nor graph, they are tracked via a set attribute "inv" on the host entity.
 """
 
-from tangl.core.entity import InheritingSingleton
+from tangl.core.singleton import InheritingSingleton
 from tangl.core.services import Renderable, HasContext  # Associating
 
 class AssetType(Renderable, HasContext, InheritingSingleton):
