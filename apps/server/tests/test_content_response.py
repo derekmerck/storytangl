@@ -7,7 +7,7 @@ import pytest
 pytest.skip(allow_module_level=True)
 
 import tangl.info  # Mock this if needed for tests
-from tangl.story.journal.content_fragment_models import ContentFragment, TextFragment, KvFragment, MediaFragment, GroupFragment, UserEventFragment
+from tangl.core.fragment import ContentFragment, TextFragment, KvFragment, MediaFragment, GroupFragment, UserEventFragment
 from tangl.rest.content_response import ContentResponse
 
 

@@ -1,18 +1,23 @@
-import asyncio
+from tangl.service.api_endpoint import ServiceManager
+from tangl.story.story_controller import StoryController
+from tangl.story.world.world_controller import WorldController
+from tangl.service.user.user_controller import UserController
+from tangl.system.system_controller import SystemController
 
-from uvicorn import Config, Server
-
-from tangl.config import settings
-from tangl.rest.app import app
-
-async def async_main():
-    config = Config(app=app, host="0.0.0.0", port=8000, log_level="info")
-    server = Server(config)
-    await server.serve()
+from tangl.rest.fastapi_adapter import FastApiAdapter
 
 def main():
-    # have to wrap the async main method with a normal method
-    asyncio.run(async_main())
+    # todo: context-type should be based on config
+    context = dict()
+    service_manager = ServiceManager(context=context,
+                                     components=[SystemController,
+                                                 WorldController,
+                                                 UserController,
+                                                 StoryController])
+    app = FastApiAdapter(service_manager)
+    # todo: add a media server and middleware to link rits to media urls
+    app.run()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()

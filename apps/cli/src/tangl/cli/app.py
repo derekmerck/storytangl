@@ -1,5 +1,7 @@
 """Interactive shell for StoryTangl demo stories."""
 
+# todo: Note this currently bypasses the entire 'controller' layer and accesses the graph directly
+
 from __future__ import annotations
 
 from pathlib import Path

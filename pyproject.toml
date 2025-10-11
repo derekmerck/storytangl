@@ -6,8 +6,8 @@ authors = ["TangleDev <dev@storytan.gl>"]
 readme = "README.md"
 packages = [
     { include = "tangl", from = "engine/src" },
-#    { include = "*", from = "apps/cli/src" },
-#    { include = "*", from = "server" },
+    { include = "*", from = "apps/cli/src" },
+#    { include = "*", from = "apps/server/src" },
 #    { include = "sample_world", as = "tangle.worlds.sample_world" }
 ]
 
@@ -113,6 +113,7 @@ log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [
     "engine/tests",               # base tests
+    "apps/cli/tests",             # cli tests
 #    "apps/*/tests"                # app tests
 #    "worlds/*/tests"       # sample world tests
 ]

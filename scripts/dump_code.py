@@ -13,10 +13,12 @@ ignore_imports = True
 
 project_root = Path(__file__).parent.parent
 pkg_root = project_root / "engine/src/tangl"
+docs_root = project_root / "docs/source"
+apps_root = project_root / "apps"
 tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
+
 outfile_dir = project_root / "tmp/dumps"
-docs_root = project_root / "docs/source"
 
 def get_tree(root: Path, include_notes: bool = False):
 
@@ -52,9 +54,12 @@ def process_directory(root: Path,
             try:
                 name = f.relative_to(root)
             except ValueError:
-                name = f.relative_to(pkg_root)
+                try:
+                    name = f.relative_to(pkg_root)
+                except ValueError:
+                    name = f.relative_to(project_root)
             content = fp.read()
-            if f.suffix in [".md", ".csv", ".txt", ".json", ".rst"]:
+            if f.suffix in [".md", ".csv", ".txt", ".json", ".rst", ".yaml"]:
                 content = '"""\n' + content + '"""\n'
             if content:
                 data[name] = content
@@ -140,9 +145,17 @@ if __name__ == "__main__":
                       include_notes=True,
                       postpend_files=[pkg_root / "utils/hashing.py"])
 
+    process_directory(apps_root / "cli/src/tangl/cli",
+                      "tangl37_cli_archive.py",
+                      include_notes=True,
+                      postpend_files=[
+                          tests_root / "resources/demo_script.yaml",
+                          apps_root / "cli/tests/test_story_cli_integration.py"])
+
     process_directory(pkg_root / 'lang', "tangl37_lang_archive.py",
                       postpend_files=[pkg_root / "lang/pos/treebank-symbols.csv",
                                       pkg_root / "lang/pos/treebank_symbols.pyi"])
+    process_directory(pkg_root / 'service', "tangl37_service_archive.py")
     process_directory(pkg_root / 'persistence', "tangl37_persist_archive.py")
     process_directory(pkg_root / 'utils', "tangl37_utils_archive.py")
 

@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tangl.config import settings
-from tangl.utils.uuid_for_secret import uuid_for_secret
+from tangl.utils.hash_secret import uuid_for_secret
 
 
 def test_system_get_info(client: TestClient):
