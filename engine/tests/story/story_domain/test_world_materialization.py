@@ -5,6 +5,8 @@ from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph
 from tangl.core.graph.node import Node
 from tangl.story.story_domain.world import World
+from tangl.story.reference_domain.block import SimpleBlock as ReferenceBlock
+from tangl.vm.frame import ChoiceEdge
 
 
 class SimpleBlock(Node):
@@ -207,3 +209,40 @@ def test_create_story_full_defaults_to_first_block() -> None:
     story_graph = world.create_story("story")
 
     assert story_graph.cursor.cursor.label == "start"
+
+
+def test_story_creation_uses_default_classes_when_obj_cls_missing() -> None:
+    script = {
+        "label": "default_class_script",
+        "metadata": {"title": "Defaults", "author": "Tester"},
+        "actors": {"guide": {"name": "Guide"}},
+        "scenes": {
+            "intro": {
+                "blocks": {
+                    "start": {
+                        "content": "Welcome",
+                        "actions": [
+                            {
+                                "text": "Next",
+                                "successor": "intro.end",
+                            }
+                        ],
+                    },
+                    "end": {
+                        "content": "Goodbye",
+                    },
+                }
+            }
+        },
+    }
+
+    world = _make_world(script)
+    story_graph = world.create_story("story")
+
+    start_block = story_graph.find_one(label="start")
+    assert isinstance(start_block, ReferenceBlock)
+    assert start_block.content == "Welcome"
+
+    edges = list(story_graph.find_edges(source_id=start_block.uid))
+    assert edges
+    assert any(isinstance(edge, ChoiceEdge) for edge in edges)

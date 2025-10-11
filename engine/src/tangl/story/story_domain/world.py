@@ -320,8 +320,18 @@ class World(Singleton):
         return scene_label, block_label
 
     def _get_scenes_dict(self) -> dict[str, dict[str, Any]]:
-        scenes = getattr(self.script_manager.master_script, "scenes", None)
-        return self._normalize_section(scenes)
+        scenes_iter = self.script_manager.get_unstructured("scenes") or ()
+        scenes: dict[str, dict[str, Any]] = {}
+        for scene in scenes_iter:
+            label = scene.get("label")
+            if not label:
+                continue
+            scenes[label] = scene
+        if scenes:
+            return scenes
+
+        raw_scenes = getattr(self.script_manager.master_script, "scenes", None)
+        return self._normalize_section(raw_scenes)
 
     def _normalize_section(self, section: Any) -> dict[str, dict[str, Any]]:
         """Normalize script sections into a label-indexed mapping."""
