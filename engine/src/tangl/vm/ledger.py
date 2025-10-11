@@ -2,10 +2,11 @@
 """
 State holder for the live graph, cursor, and record stream (snapshots, patches, journal).
 """
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 from pydantic import Field
 from uuid import UUID
 
+from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
 from .frame import Frame
 
@@ -56,11 +57,12 @@ class Ledger(Entity):
     reconstructed by name during persistence replay. Affiliate domains stay on
     graph items where scoping discovers them dynamically.
     """
-    graph: Graph = None
+    graph: Graph = Field(None, exclude=True)
     cursor_id: UUID = None
     step: int = -1
-    domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
-    records: StreamRegistry = Field(default_factory=StreamRegistry)
+    domains: list[Domain] = Field(default_factory=list, exclude=True)
+    #: ledger-level Singleton Domains _only_
+    records: StreamRegistry = Field(default_factory=StreamRegistry, exclude=True)
     snapshot_cadence: int = 1
 
     def push_snapshot(self):
@@ -103,4 +105,25 @@ class Ledger(Entity):
                      cursor_id = self.cursor_id,
                      records = self.records)
 
+    # todo: should probably add this as a general pattern for structuring/unstructuring
+    #       entity-typed model fields using introspection (see registry)
+
+    @classmethod
+    def structure(cls, data) -> Self:
+        _graph = data.pop("_graph")
+        _domains = data.pop("_domains")
+        _records = data.pop("_records")
+        obj = super().structure(data)
+        obj.graph = Graph.structure(_graph)
+        obj.domains = [ Domain.structure(d) for d in _domains ]
+        obj.records = StreamRegistry.structure(_records)
+        return obj
+
+    def unstructure(self) -> UnstructuredData:
+        data = super().unstructure()
+        # Only need to save graph if we are event sourced
+        data['_graph'] = self.graph.unstructure()
+        data['_domains'] = [ d.unstructure() for d in self.domains ]
+        data['_records'] = self.records.unstructure()
+        return data
 
