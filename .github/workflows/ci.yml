@@ -37,5 +37,5 @@ jobs:
         env:
           PYTHONPATH: engine/src
         run: |
-          poetry run pytest engine/tests -W ignore::DeprecationWarning
+          poetry run pytest -W ignore::DeprecationWarning
 #          poetry run pytest engine/tests
