@@ -7,7 +7,7 @@ Provides convenience helpers to register callables and execute matching
 handlers as a pipeline, yielding :class:`~tangl.core.dispatch.job_receipt.JobReceipt`.
 """
 from __future__ import annotations
-from typing import Iterator, Optional, Iterable
+from typing import Iterator, Optional, Iterable, Any
 
 from tangl.type_hints import StringMap
 from tangl.core.registry import Registry
@@ -80,6 +80,27 @@ class DispatchRegistry(Registry[Handler]):
         _handlers = sorted(handlers)
         for h in _handlers:
             yield h(ns)
+
+    def execute_all_for(
+        self,
+        item: Any,
+        *,
+        ctx: StringMap | None = None,
+        extra_handlers: Iterable[Handler] | None = None,
+    ) -> list[JobReceipt]:
+        """Compatibility shim that runs registry handlers for ``item``.
+
+        The legacy API expected a ``record`` positional argument plus optional
+        ``ctx`` and ``extra_handlers`` keyword arguments. We consolidate the
+        record and context into a namespace dictionary and execute registry
+        handlers followed by any explicit ``extra_handlers``.
+        """
+
+        namespace: StringMap = {"item": item, "ctx": ctx}
+        receipts = list(self.run_all(namespace))
+        if extra_handlers:
+            receipts.extend(self.run_handlers(namespace, extra_handlers))
+        return receipts
 
 # Default process-wide registry for ad-hoc handlers
 DEFAULT_HANDLERS = DispatchRegistry(label='default_handlers')
