@@ -33,6 +33,7 @@ AnyContentFragment = Annotated[
 ]
 
 class ContentResponse(BaseResponse):
-    content: list[AnyContentFragment] = Field(...)
+    pass
+    # content: list[AnyContentFragment] = Field(...)
     # This _should_ automatically cast to proper model based on declared fragment type
 

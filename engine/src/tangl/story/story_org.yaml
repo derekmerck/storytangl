@@ -18,7 +18,7 @@ classes:
   - StoryGraph(TraversableGraph[StoryNode], HasContext):
       has:
         - player   # Dedicated story node for player/reader scoped variables
-      friends: [StoryController]
+      friends: [RuntimeController]
 
   - StoryNode(Node, HasContext):
       has:

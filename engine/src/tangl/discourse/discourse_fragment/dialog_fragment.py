@@ -19,5 +19,5 @@ class AttributedFragment(ContentFragment, extra='allow'):
 
 
 class DialogFragment(GroupFragment, extra='allow'):
-    fragment_type: Literal['dialog'] = Field('dialog', alias='type')
+    fragment_type: Literal['dialog'] = Field('dialog')
     content: list[AttributedFragment]

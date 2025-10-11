@@ -9,7 +9,7 @@ from tangl.service.response import BaseResponse
 from .user import User
 
 class UserInfo(BaseResponse):
-    fragment_type: Literal["user_info"] = Field("user_info", alias="type")
+    fragment_type: Literal["user_info"] = Field("user_info")
     user_id: UUID
     user_secret: str
     created_dt: datetime

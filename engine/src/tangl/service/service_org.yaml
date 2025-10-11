@@ -1,10 +1,10 @@
 # Service Subpackage
 # ------------------
-deps: [core, story.*Controller, MediaController, utils]
+deps: [core, service.controllers.RuntimeController, MediaController, utils]
 classes:
 
   - API:
-    friends: [WorldController, StoryController, UserController, SystemController, PersistenceManager, SystemManager]
+    friends: [WorldController, RuntimeController, UserController, SystemController, PersistenceManager, SystemManager]
 
   - User:  # Scoped context for owner of multiple stories, track turns, achievements, etc
     friends: [UserController]

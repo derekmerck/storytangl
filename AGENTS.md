@@ -65,6 +65,20 @@ core ideas you should understand before contributing.
   wraps and sequences callable actions while auditing results.
 - **Domain & Scope** (`tangl.core.domain`): capability layering and namespace
   resolution for story nodes.
+- **Orchestrator** (`tangl.service.Orchestrator`): registers controller endpoints
+  and hydrates `User`, `Ledger`, and `Frame` dependencies based on type hints.
+  Applications should invoke controller logic via the orchestrator instead of the
+  deprecated `ServiceManager`.
+
+## Service layer workflow (v3.7+)
+- Controllers live in `tangl.service.controllers` and expose orchestrated
+  endpoints via `@ApiEndpoint.annotate`.
+- Applications call `Orchestrator.execute("Controller.method", user_id=..., **params)`
+  and receive raw engine objects or dictionaries; transport layers handle
+  serialization.
+- The legacy `tangl.story.story_controller` path now proxies to
+  `RuntimeController` for backward compatibility—prefer importing controllers
+  from `tangl.service.controllers` directly.
 
 When introducing new engine features, align them with these primitives instead of
 creating parallel abstractions. Favor composition over inheritance unless extending

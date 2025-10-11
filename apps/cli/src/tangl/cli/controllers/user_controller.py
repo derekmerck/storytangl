@@ -1,82 +1,109 @@
-from typing import TYPE_CHECKING
-from cmd2 import CommandSet, with_argparser, with_default_category
-import argparse
+from __future__ import annotations
 
-import tangl.cli.app_service_manager
-from tangl.cli.app_service_manager import service_manager, user_id
+import argparse
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
+
+from cmd2 import CommandSet, with_argparser, with_default_category
 
 if TYPE_CHECKING:
-    from ..app import TanglShell
+    from ..app import StoryTanglCLI
 
-@with_default_category('User')
+
+@with_default_category("User")
 class UserController(CommandSet):
+    """User management commands backed by the orchestrated service layer."""
 
-    _cmd: 'TanglShell'
+    _cmd: StoryTanglCLI
 
-    def poutput(self, *args):
-        self._cmd.poutput(*args)
+    create_user_parser = argparse.ArgumentParser()
+    create_user_parser.add_argument("secret", type=str, help="Secret used to seed the user key")
 
-    # Public
+    @with_argparser(create_user_parser)
+    def do_create_user(self, args: argparse.Namespace) -> None:
+        user = self._cmd.call_endpoint("UserController.create_user", secret=args.secret)
+        if hasattr(user, "uid"):
+            self._cmd.set_user(user.uid)
+        if self._cmd.persistence is not None:
+            self._cmd.persistence.save(user)
+        self._cmd.poutput(f"User created with secret '{args.secret}'.")
+        if hasattr(user, "uid"):
+            self._cmd.poutput(f"Active user id: {user.uid}")
 
-    get_secret_parser = argparse.ArgumentParser()
-    get_secret_parser.add_argument('secret', type=str, help='Secret for the user')
+    use_user_parser = argparse.ArgumentParser()
+    use_user_parser.add_argument("user_id", type=str, help="Existing user identifier")
 
-    @with_argparser(get_secret_parser)
-    def create_user(self, args):
-        """
-        Create a new user and set the current user's ID.
-        """
-        secret = args.secret
-        new_user_id, secret = service_manager.create_user(secret)
-        tangl.cli.app_service_manager.user_id = new_user_id
-        self.poutput(f'User created with ID: {user_id} and secret: {secret}')
+    @with_argparser(use_user_parser)
+    def do_use_user(self, args: argparse.Namespace) -> None:
+        try:
+            user_id = UUID(args.user_id)
+        except ValueError:
+            self._cmd.poutput("Invalid user id.")
+            return
+        self._cmd.set_user(user_id)
+        self._cmd.poutput(f"Active user set to {user_id}.")
 
-    @with_argparser(get_secret_parser)
-    def key(self, args):
-        secret = args.secret
-        response = service_manager.key_for_secret(secret)
-        self.poutput(response)
+    ledger_parser = argparse.ArgumentParser()
+    ledger_parser.add_argument("ledger_id", type=str, help="Ledger identifier to bind")
 
-    # Client
+    @with_argparser(ledger_parser)
+    def do_set_ledger(self, args: argparse.Namespace) -> None:
+        try:
+            ledger_id = UUID(args.ledger_id)
+        except ValueError:
+            self._cmd.poutput("Invalid ledger id.")
+            return
+        self._cmd.set_ledger(ledger_id)
+        self._cmd.poutput(f"Active ledger set to {ledger_id}.")
 
-    @with_argparser(get_secret_parser)
-    def do_change_secret(self, args):
-        """
-        Change the current user's secret and get a new ID.
-        """
-        secret = args.secret
-        new_user_id, secret = service_manager.update_user_secret(user_id, secret)
-        tangl.cli.app_service_manager.user_id = new_user_id
-        self.poutput(f'User secret changed to: {secret}\nNew user ID: {self.user_id}')
+    secret_parser = argparse.ArgumentParser()
+    secret_parser.add_argument("secret", type=str, help="New secret for the active user")
 
-    def do_drop_user(self, line):
-        """
-        Drop this user and all of their stories.
-        """
-        service_manager.remove_user(user_id)
-        tangl.cli.app_service_manager.user_id = None
-        self.poutput('User dropped.')
+    @with_argparser(secret_parser)
+    def do_change_secret(self, args: argparse.Namespace) -> None:
+        if self._cmd.user_id is None:
+            self._cmd.poutput("No active user. Use `user use_user` first.")
+            return
+        info = self._cmd.call_endpoint("UserController.update_user", secret=args.secret)
+        self._cmd.poutput(f"Secret updated. API key: {getattr(info, 'api_key', info)}")
 
-    get_world_id_parser = argparse.ArgumentParser()
-    get_world_id_parser.add_argument('world_id', type=str, help='World Id')
+    def do_user_info(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
+        if self._cmd.user_id is None:
+            self._cmd.poutput("No active user.")
+            return
+        info = self._cmd.call_endpoint("UserController.get_user_info")
+        self._render_info(info)
 
-    @with_argparser(get_world_id_parser)
-    def do_set_story(self, args):
-        """
-        Change to the specified story world for the current user.
-        """
-        world_id = args.world_id
-        service_manager.set_current_story_id(user_id, world_id=world_id)
-        self.poutput(f'Story world set to: {world_id}')
+    key_parser = argparse.ArgumentParser()
+    key_parser.add_argument("secret", type=str, help="Secret to encode as API key")
 
-    @with_argparser(get_world_id_parser)
-    def do_create_story(self, args):
-        """
-        Create a new story from the specified world for the current user.
-        """
-        service_manager.create_story(user_id, world_id=args.world_id)
-        # service_manager.set_current_story_id(user_id, args.world_id)
-        from .story_controller import StoryController
-        # self._cmd._current_story_update = service_manager.get_story_update(user_id)
-        # self._cmd._render_current_story_update()
-        self._cmd.do_story()
+    @with_argparser(key_parser)
+    def do_key(self, args: argparse.Namespace) -> None:
+        info = self._cmd.call_endpoint("UserController.get_key_for_secret", secret=args.secret)
+        api_key = getattr(info, "api_key", None) or info
+        self._cmd.poutput(f"API key: {api_key}")
+
+    def do_drop_user(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
+        if self._cmd.user_id is None:
+            self._cmd.poutput("No active user.")
+            return
+        identifiers = self._cmd.call_endpoint("UserController.drop_user")
+        if isinstance(identifiers, tuple):
+            self._cmd.remove_resources(identifier for identifier in identifiers if isinstance(identifier, UUID))
+        self._cmd.poutput("User removed. Active user cleared.")
+        self._cmd.set_user(None)
+        self._cmd.set_ledger(None)
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+    def _render_info(self, info: Any) -> None:
+        if isinstance(info, dict):
+            for key, value in info.items():
+                self._cmd.poutput(f"{key}: {value}")
+            return
+        if hasattr(info, "model_dump"):
+            for key, value in info.model_dump().items():
+                self._cmd.poutput(f"{key}: {value}")
+            return
+        self._cmd.poutput(info)

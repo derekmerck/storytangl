@@ -1,25 +1,25 @@
-from fastapi import APIRouter, HTTPException, Depends, Path
+from __future__ import annotations
 
-from tangl.service import ServiceManager
-from tangl.service.service_manager import WorldInfo
-from tangl.rest.app_service_manager import get_service_manager
+from __future__ import annotations
 
-router = APIRouter(tags=['World'])
+from fastapi import APIRouter, Depends, HTTPException, Path
+
+from tangl.rest.dependencies import get_orchestrator
+from tangl.service import Orchestrator
 
 
-@router.get("/{world_id}/info", response_model=WorldInfo, response_model_exclude_none=True)
+router = APIRouter(tags=["World"])
+
+
+@router.get("/{world_id}/info")
 async def get_world_info(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        world_id: str = Path(example="my_world")):
-    """
-    Retrieve info about the specified world.
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    world_id: str = Path(example="my_world"),
+):
+    """Return metadata describing ``world_id``."""
 
-    This endpoint provides a mapping of world-specific metadata like description, title,
-    authors, banner media, etc.
-    """
     try:
-        info = service_manager.get_world_info(world_id)
-        return info
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"World {world_id} not found")
+        return orchestrator.execute("WorldController.get_world_info", world_id=world_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=f"World {world_id} not found") from exc
 
