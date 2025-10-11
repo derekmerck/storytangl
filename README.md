@@ -23,6 +23,70 @@ StoryTangl aims to **separate** the concerns of narrative structure, story conte
 
 ---
 
+## Quick Start
+
+### 1. Create a Story Script
+
+```yaml
+# my_story.yaml
+label: my_first_story
+metadata:
+  title: "My First Story"
+  author: "Your Name"
+
+scenes:
+  intro:
+    blocks:
+      start:
+        content: "Your adventure begins..."
+        actions:
+          - text: "Continue"
+            successor: next
+      next:
+        content: "The end!"
+```
+
+### 2. Load and Play
+
+```python
+from tangl.compiler.script_manager import ScriptManager
+from tangl.story.story_domain.world import World
+import yaml
+
+# Load script
+with open("my_story.yaml") as f:
+    data = yaml.safe_load(f)
+
+# Create world
+sm = ScriptManager.from_data(data)
+world = World(label="my_world", script_manager=sm)
+
+# Create story instance
+story = world.create_story("player_story")
+
+# Navigate
+frame = story.cursor
+print(frame.journal())
+
+actions = frame.get_available_actions()
+for i, action in enumerate(actions):
+    print(f"{i}. {action.text}")
+
+# Make choice
+frame.traverse_to(0)
+```
+
+### 3. CLI Usage
+
+```bash
+$ tangl-cli
+> load_script my_story.yaml
+> story
+> do 0
+```
+
+---
+
 ## Usage
 
 ### Single Story App
