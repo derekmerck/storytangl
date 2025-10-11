@@ -19,6 +19,8 @@ class ScriptMetadata(BaseModel):
     publisher: Optional[str] = None
     comments: Optional[str] = None
 
+    start_at: Optional[str] = None
+
     # media: Optional[list[MediaItemScript]] = None
     ui_config: Optional[UiConfig] = None
 
