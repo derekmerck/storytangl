@@ -1,20 +1,14 @@
-"""
-Invoke with:
+"""CLI entry point for ``python -m tangl.cli``."""
 
-```
-$ python -m tangl.cli
-```
-"""
-import logging
+from __future__ import annotations
 
-from tangl.cli.app import app
+from .app import create_cli_app
 
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(level=logging.DEBUG)
 
-def main():
+def main() -> None:
+    app = create_cli_app()
     app.cmdloop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

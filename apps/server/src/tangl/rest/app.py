@@ -35,24 +35,27 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 
 from tangl.config import settings
-from tangl.service import ServiceManager
-from tangl.rest.app_service_manager import get_service_manager
+from tangl.rest.dependencies import get_orchestrator
+from tangl.service import Orchestrator
 
 logger = logging.getLogger(__name__)
 
 
 # todo: this is a placeholder that creates a default user for testing
-def get_user_credentials(service_manager: ServiceManager) -> UUID:
+def get_user_credentials(orchestrator: Orchestrator) -> UUID:
     secret = settings.client.secret
-    response = service_manager.create_user(secret=secret)
-    logger.debug(response)
-    user_id = response.user_id
+    user = orchestrator.execute("UserController.create_user", secret=secret)
+    logger.debug(user)
+    user_id = getattr(user, "uid", None)
+    if user_id is None:
+        raise RuntimeError("Orchestrator failed to return a user identifier")
 
-    response = service_manager.get_user_info(user_id)
-    logger.debug(response)
+    info = orchestrator.execute("UserController.get_user_info", user_id=user_id)
+    logger.debug(info)
+    return user_id
 
 
-get_user_credentials( get_service_manager() )
+get_user_credentials(get_orchestrator())
 
 app = FastAPI(
     docs_url=None,

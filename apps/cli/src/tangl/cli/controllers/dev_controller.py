@@ -1,55 +1,50 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
 import argparse
+from typing import TYPE_CHECKING
+from uuid import UUID
 
-from cmd2 import CommandSet, with_default_category, with_argparser
-
-from tangl.cli.app_service_manager import service_manager, user_id
+from cmd2 import CommandSet, with_argparser, with_default_category
 
 if TYPE_CHECKING:
-    from ..app import TanglShell
+    from ..app import StoryTanglCLI
 
-@with_default_category('Restricted')
+
+@with_default_category("Restricted")
 class DevController(CommandSet):
+    """Development utilities that lean on runtime endpoints."""
 
-    _cmd: 'TanglShell'
+    _cmd: StoryTanglCLI
 
-    def poutput(self, *args):
-        self._cmd.poutput(*args)
+    node_parser = argparse.ArgumentParser()
+    node_parser.add_argument("node_id", type=str, help="Node identifier")
 
-    # ----------
-    # Story
-    # ----------
+    @with_argparser(node_parser)
+    def do_goto_node(self, args: argparse.Namespace) -> None:
+        if self._cmd.ledger_id is None:
+            self._cmd.poutput("No active ledger.")
+            return
+        try:
+            node_id = UUID(args.node_id)
+        except ValueError:
+            self._cmd.poutput("Invalid node id.")
+            return
+        result = self._cmd.call_endpoint("RuntimeController.jump_to_node", node_id=node_id)
+        fragments = result.get("fragments", []) if isinstance(result, dict) else result
+        for fragment in fragments:
+            self._cmd.poutput(getattr(fragment, "content", fragment))
 
-    get_node_id = argparse.ArgumentParser()
-    get_node_id.add_argument('node_id', type=str, help='Node id')
+    @with_argparser(node_parser)
+    def do_inspect(self, _: argparse.Namespace) -> None:
+        self._cmd.poutput("Node inspection not yet supported in the orchestrated CLI.")
 
-    @with_argparser(get_node_id)
-    def do_inspect(self, args):
-        node_id = args.node_id
-        response = service_manager.get_node_info(user_id, node_id)
-        self.poutput(f"Node Info {node_id}\n-----------")
-        self.poutput(response)
+    expr_parser = argparse.ArgumentParser()
+    expr_parser.add_argument("expr", type=str, help="Expression to evaluate")
 
-    @with_argparser(get_node_id)
-    def do_goto_node(self, args):
-        node_id = args.node_id
-        response = service_manager.goto_story_node(user_id, node_id)
-        from tangl.cli.controllers import StoryController
-        StoryController._render_current_story_update( self, response )
+    @with_argparser(expr_parser)
+    def do_check(self, _: argparse.Namespace) -> None:
+        self._cmd.poutput("Expression checks are not yet supported.")
 
-    get_expr_parser = argparse.ArgumentParser()
-    get_expr_parser.add_argument('expr', type=str, help='Expression to check or apply')
-
-    @with_argparser(get_expr_parser)
-    def do_check(self, args):
-        expr = args.expr
-        response = service_manager.check_story_expr(user_id, expr=expr)
-        self.poutput("Check expr\n-----------")
-        self.poutput(response)
-
-    @with_argparser(get_expr_parser)
-    def do_apply(self, args):
-        expr = args.expr
-        response = service_manager.apply_story_expr(user_id, expr=expr)
-        self.poutput("Apply effect\n-----------")
-        self.poutput(response)
+    @with_argparser(expr_parser)
+    def do_apply(self, _: argparse.Namespace) -> None:
+        self._cmd.poutput("Expression effects are not yet supported.")

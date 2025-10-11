@@ -1,94 +1,95 @@
-from fastapi import APIRouter, Header, Body, Query, Depends
+from __future__ import annotations
+
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from pydantic import BaseModel
 
 from tangl.config import settings
+from tangl.rest.dependencies import get_orchestrator, get_user_locks
+from tangl.service import Orchestrator
 from tangl.type_hints import UniqueLabel
-from tangl.utils.uuid_for_secret import uuid_for_key, key_for_secret
-from tangl.service.request_models import ActionRequest
-from tangl.service.service_manager import JournalEntry, StoryInfo
-from tangl.rest.app_service_manager import get_service_manager, get_user_locks
+from tangl.utils.uuid_for_secret import key_for_secret, uuid_for_key
 
-router = APIRouter(tags=['Story'])
 
-@router.get("/update", response_model=JournalEntry, response_model_exclude_none=True)
+class ChoiceRequest(BaseModel):
+    """Request payload for resolving a player choice."""
+
+    choice_id: UUID | None = None
+    uid: UUID | None = None
+
+    def resolve_choice_id(self) -> UUID:
+        if self.choice_id is not None:
+            return self.choice_id
+        if self.uid is not None:
+            return self.uid
+        raise ValueError("choice_id or uid must be provided")
+
+
+router = APIRouter(tags=["Story"])
+
+
+def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
+    return orchestrator.execute(endpoint, **params)
+
+
+@router.get("/update")
 async def get_story_update(
-        service_manager = Depends(get_service_manager),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None)):
-    """
-    Retrieve the current story update for this user.
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    limit: int = Query(default=10, ge=0),
+):
+    """Return journal fragments and available choices for the active user."""
 
-    This endpoint provides the current status of the story, including the
-    block of text currently being displayed, any actions available to the
-    user, and any media associated with the current state of the story.
-    """
     user_id = uuid_for_key(api_key)
-    update = service_manager.get_story_update(user_id)
-    return update
+    fragments = _call(
+        orchestrator,
+        "RuntimeController.get_journal_entries",
+        user_id=user_id,
+        limit=limit,
+    )
+    choices = _call(orchestrator, "RuntimeController.get_available_choices", user_id=user_id)
+    return {"fragments": fragments, "choices": choices}
 
-@router.post("/do", response_model=JournalEntry, response_model_exclude_none=True)
+
+@router.post("/do")
 async def do_story_action(
-        service_manager = Depends(get_service_manager),
-        user_locks = Depends(get_user_locks),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        action: ActionRequest = Body() ):
-    """
-    Do a story action and retrieve the current story update for this user.
+    request: ChoiceRequest = Body(...),
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    user_locks = Depends(get_user_locks),
+    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+):
+    """Resolve a player choice and return the resulting journal fragments."""
 
-    This endpoint allows a client to submit a story action, then generates an
-    update and provides the current status of the story, including the
-    block of text currently being displayed, any actions available to the
-    user, and any media associated with the current state of the story.
-    """
     user_id = uuid_for_key(api_key)
+    try:
+        choice_id = request.resolve_choice_id()
+    except ValueError as exc:  # pragma: no cover - FastAPI handles validation
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     async with user_locks[user_id]:
-        payload = action.payload or {}
-        service_manager.do_story_action(action_id=action.uid, **payload)
-        update = service_manager.get_story_update(user_id)
-        return update
-
-# todo: add and test support for timeout
-# from asyncio.exceptions import TimeoutError
-#
-# async def do_story_action(user_id: Uid = Header(default=None), action: ActionRequest = Body()):
-#     try:
-#         async with asyncio.wait_for(locks[user_id].acquire(), timeout=5): # 5 seconds timeout
-#             payload = action.payload or {}
-#             story_manager_api.do_story_action(action_id=action.uid, **payload)
-#             update = story_manager_api.get_story_update(user_id)
-#             update = deep_md(update)
-#             return update
-#     except TimeoutError:
-#         # Handle the timeout exception as needed (e.g., return an error response)
-#         ...
-#     finally:
-#         if locks[user_id].locked():
-#             locks[user_id].release()
+        return _call(
+            orchestrator,
+            "RuntimeController.resolve_choice",
+            user_id=user_id,
+            choice_id=choice_id,
+        )
 
 
-@router.get("/status", response_model=StoryInfo, response_model_exclude_none=True)
+@router.get("/status")
 async def get_story_status(
-        service_manager = Depends(get_service_manager),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        features: UniqueLabel = Query(default=None)):
-    """
-    This endpoint retrieves general features describing the overall story
-    progression, such as the story name, scene, player stats, maps, inventory,
-    etc.
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+):
+    """Return a lightweight summary of the current story state."""
 
-    The features that can be requested vary by story-world and according to client
-    UI capabilities.
-    """
     user_id = uuid_for_key(api_key)
-    status = service_manager.get_story_status(user_id, features)
-    return status
+    return _call(orchestrator, "RuntimeController.get_story_info", user_id=user_id)
 
 
-@router.delete("/drop", response_model=JournalEntry, response_model_exclude_none=True)
-async def reset_story(
-        service_manager=Depends(get_service_manager),
-        user_locks=Depends(get_user_locks),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None)):
-    user_id = uuid_for_key(api_key)
-    async with user_locks[user_id]:
-        current_world_id = service_manager.get_current_world_id(user_id)
-        service_manager.remove_story(user_id, current_world_id)
-        return service_manager.create_story(user_id, current_world_id)
+@router.delete("/drop")
+async def reset_story():
+    """Resetting stories is not yet supported in the orchestrated REST API."""
+
+    raise HTTPException(status_code=501, detail="Story reset is not yet supported")

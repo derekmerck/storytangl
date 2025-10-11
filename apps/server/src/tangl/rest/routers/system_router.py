@@ -1,54 +1,52 @@
-from fastapi import APIRouter, Query, Depends
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Depends, Query
 
 from tangl.config import settings
+from tangl.rest.dependencies import get_orchestrator
+from tangl.service import Orchestrator
 from tangl.utils.uuid_for_secret import key_for_secret
-from tangl.service import ServiceManager
-from tangl.service.service_manager import SystemInfo, WorldInfo, WorldList
-from tangl.rest.app_service_manager import get_service_manager
+
 from .response_models import UserSecret
 
-router = APIRouter(tags=['System'])
 
-@router.get("/info", response_model=SystemInfo)
-async def get_system_info(
-        service_manager: ServiceManager = Depends(get_service_manager) ):
-    """
-    Retrieve the current status of the system.
+router = APIRouter(tags=["System"])
 
-    This endpoint provides information about the system status, including the
-    uptime, a media url for info, and the url for the guide, if applicable.
-    """
-    status = service_manager.get_system_info()
-    status.guide_url = "/guide"
+
+def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
+    return orchestrator.execute(endpoint, **params)
+
+
+@router.get("/info")
+async def get_system_info(orchestrator: Orchestrator = Depends(get_orchestrator)):
+    """Return high-level information about the running service."""
+
+    status = _call(orchestrator, "SystemController.get_system_info")
+    if hasattr(status, "guide_url"):
+        setattr(status, "guide_url", "/guide")
+    elif isinstance(status, dict):
+        status.setdefault("guide_url", "/guide")
     return status
 
-@router.get("/worlds", response_model=WorldList)
-async def get_worlds(
-        service_manager: ServiceManager = Depends(get_service_manager)):
-    """
-    Retrieve a list of the available worlds.
 
-    This is a public endpoint that gives the ids for all the playable
-    worlds that this server knows about.
-    """
-    worlds = service_manager.get_world_list()
-    # print( worlds )
-    return worlds
+@router.get("/worlds")
+async def get_worlds(orchestrator: Orchestrator = Depends(get_orchestrator)):
+    """List the available worlds registered with the service."""
 
-@router.get("/secret", response_model=UserSecret)
+    return _call(orchestrator, "WorldController.list_worlds")
+
+
+@router.get("/secret")
 async def get_key_for_secret(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        secret: str = Query(example=settings.client.secret, default=None)):
-    """
-    Retrieve a user key based on a secret.
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    secret: str = Query(example=settings.client.secret, default=None),
+):
+    """Encode ``secret`` as an API key for clients."""
 
-    This is a public endpoint that enables users to restore credentials.
-    """
-    # todo: this should set an auth cookie, too
-    response = service_manager.get_uuid_for_secret(secret)
-    api_key = key_for_secret(response.user_secret)
-    # a new secret may have been generated if none was passed
-    return UserSecret(
-        user_secret=response.user_secret,
-        api_key=api_key,
-        user_id=response.user_id)
+    info = _call(orchestrator, "UserController.get_key_for_secret", secret=secret)
+    api_key = getattr(info, "api_key", None) or key_for_secret(secret)
+    secret_value = getattr(info, "secret", secret)
+    user_id = getattr(info, "user_id", None)
+    return UserSecret(user_secret=secret_value, api_key=api_key, user_id=user_id)

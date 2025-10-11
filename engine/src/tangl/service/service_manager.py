@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Type
 from contextlib import contextmanager
 import functools
 import inspect
+import warnings
 from uuid import UUID
 
 from tangl.core import Domain, Graph
@@ -19,6 +20,9 @@ class ServiceManager:
     """
     Central class for injecting context and enforcing access levels
     across multiple controllers.
+
+    .. deprecated:: 3.7
+       Use :class:`~tangl.service.Orchestrator` for new integrations.
 
     The ServiceManager aggregates endpoints from one or more
     :class:`HasApiEndpoints` components, then wraps those methods in
@@ -38,10 +42,10 @@ class ServiceManager:
 
     .. code-block:: python
 
-        sm = ServiceManager(context=my_data_store, components=[UserController, StoryController])
+        sm = ServiceManager(context=my_data_store, components=[UserController, RuntimeController])
 
-        # Suppose we have an endpoint named "StoryController.get_story_info"
-        endpoint = sm.endpoints["StoryController.get_story_info"]
+        # Suppose we have an endpoint named "RuntimeController.get_story_info"
+        endpoint = sm.endpoints["RuntimeController.get_story_info"]
         result = endpoint(user_id=some_user_id)
 
         # The manager opens the user+story from context, checks ACL, calls the underlying method.
@@ -61,6 +65,11 @@ class ServiceManager:
         Initializes the service manager with an optional ``context`` store,
         component list, and persistence manager for ledgers.
         """
+        warnings.warn(
+            "ServiceManager is deprecated. Use Orchestrator instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # The "context" might be a dict or a more sophisticated store
         self.context = context or {}
         self.components = components or []
