@@ -18,6 +18,8 @@ from tangl.media.resource_manager import ResourceManager
 from tangl.compiler.script_manager import ScriptManager
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
+    from tangl.vm.frame import ResolutionPhase
+
     StoryGraph = Graph
 else:  # pragma: no cover - runtime alias
     StoryGraph = Graph
@@ -164,11 +166,14 @@ class World(Singleton):
             for block_label, block_data in blocks.items():
                 qualified_label = f"{scene_label}.{block_label}"
                 cls = self.domain_manager.resolve_class(
-                    block_data.get("block_cls") or block_data.get("obj_cls")
+                    block_data.get("obj_cls") or block_data.get("block_cls")
                 )
 
                 scripts = {
-                    key: [self._to_dict(entry) for entry in block_data.get(key, [])]
+                    key: [
+                        self._normalize_action_entry(self._to_dict(entry))
+                        for entry in block_data.get(key, [])
+                    ]
                     for key in ("actions", "continues", "redirects")
                 }
                 action_scripts[qualified_label] = scripts
@@ -375,6 +380,8 @@ class World(Singleton):
         payload = {key: value for key, value in data.items() if key not in drop_keys}
         payload.pop("obj_cls", None)
         payload.pop("block_cls", None)
+        payload.pop("activation", None)
+        payload.pop("trigger", None)
 
         if self._is_graph_item(cls):
             payload["graph"] = graph
@@ -395,8 +402,43 @@ class World(Singleton):
             if issubclass(cls, Edge):
                 return cls
         except TypeError:  # pragma: no cover - defensive fallback
-            return Edge
-        return Edge
+            from tangl.vm.frame import ChoiceEdge  # local import to avoid heavy dependency at module scope
+
+            return ChoiceEdge
+
+        if cls is Edge:
+            from tangl.vm.frame import ChoiceEdge
+
+            return ChoiceEdge
+
+        return cls
+
+    @staticmethod
+    def _map_activation_to_phase(value: str | None) -> "ResolutionPhase | None":
+        if value is None:
+            return None
+
+        try:
+            activation = value.lower()
+        except AttributeError:  # pragma: no cover - defensive guard
+            return None
+
+        from tangl.vm.frame import ResolutionPhase as P
+
+        if activation in {"first", "redirect"}:
+            return P.PREREQS
+        if activation in {"last", "continue"}:
+            return P.POSTREQS
+        return None
+
+    def _normalize_action_entry(self, data: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(data)
+        if "trigger_phase" not in payload:
+            phase = self._map_activation_to_phase(payload.get("activation") or payload.get("trigger"))
+            if phase is not None:
+                payload["trigger_phase"] = phase
+        payload.pop("activation", None)
+        return payload
 
     @staticmethod
     def _is_graph_item(cls: type[Any]) -> bool:

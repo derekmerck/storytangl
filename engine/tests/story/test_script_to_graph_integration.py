@@ -90,7 +90,11 @@ def test_complete_story_creation() -> None:
     assert isinstance(frame.cursor, NarrativeBlock)
     assert frame.cursor.content == "You stand at a crossroads."
 
-    actions = list(story.find_edges(source_id=frame.cursor_id))
+    actions = [
+        edge
+        for edge in story.find_edges(source_id=frame.cursor_id)
+        if getattr(edge, "text", None)
+    ]
     assert {action.text for action in actions} == {
         "Take the left path",
         "Take the right path",

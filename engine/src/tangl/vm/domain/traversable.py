@@ -11,7 +11,7 @@ from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from tangl.core import Graph, Node
 from tangl.core.domain import DomainSubgraph
-from tangl.vm.frame import ChoiceEdge
+from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
 
 __all__ = ["TraversableDomain"]
 
@@ -173,6 +173,7 @@ class TraversableDomain(DomainSubgraph):
                     source_id=source.uid,
                     destination_id=entry.uid,
                     label=f"enter_{self.label}",
+                    trigger_phase=P.PREREQS,
                 )
 
         for exit_id in self.exit_node_ids:
@@ -189,6 +190,7 @@ class TraversableDomain(DomainSubgraph):
                     source_id=exit_node.uid,
                     destination_id=sink.uid,
                     label=f"exit_{self.label}",
+                    trigger_phase=P.POSTREQS,
                 )
 
 

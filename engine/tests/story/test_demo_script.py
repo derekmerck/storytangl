@@ -28,7 +28,9 @@ def test_load_demo_script() -> None:
     frame = story.cursor
     assert frame.cursor.label == "start"
 
-    outgoing = list(story.find_edges(source_id=frame.cursor_id))
+    outgoing = list(
+        story.find_edges(source_id=frame.cursor_id, trigger_phase=None)
+    )
     labels = {edge.label for edge in outgoing}
     expected_labels = {text.replace(" ", "_") for text in ("Take the left path", "Take the right path")}
     assert labels == expected_labels

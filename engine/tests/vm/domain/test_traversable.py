@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tangl.core import Graph
 from tangl.vm.domain import TraversableDomain
-from tangl.vm.frame import ChoiceEdge
+from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
 
 
 class TestTraversableDomain:
@@ -50,6 +50,12 @@ class TestTraversableDomain:
         assert entry_b.uid in destinations
         assert middle.uid not in destinations
 
+        phases = {
+            edge.trigger_phase
+            for edge in domain.source.edges_out(is_instance=ChoiceEdge)
+        }
+        assert phases == {P.PREREQS}
+
     def test_exit_nodes_link_to_sink(self) -> None:
         graph = Graph(label="test")
         middle = graph.add_node(label="middle")
@@ -70,6 +76,12 @@ class TestTraversableDomain:
                 if edge.destination is not None
             }
             assert domain.sink.uid in destinations
+
+            triggers = {
+                edge.trigger_phase
+                for edge in node.edges_out(is_instance=ChoiceEdge)
+            }
+            assert triggers == {P.POSTREQS}
 
     def test_defaults_entry_and_exit_nodes(self) -> None:
         graph = Graph(label="test")

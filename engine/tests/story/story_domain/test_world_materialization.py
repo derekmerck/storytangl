@@ -246,3 +246,69 @@ def test_story_creation_uses_default_classes_when_obj_cls_missing() -> None:
     edges = list(story_graph.find_edges(source_id=start_block.uid))
     assert edges
     assert any(isinstance(edge, ChoiceEdge) for edge in edges)
+
+
+def test_build_blocks_respects_custom_block_class() -> None:
+    class NarrativeBlock(Node):
+        content: str | None = None
+
+    NarrativeBlock.model_rebuild()
+
+    script = _base_script()
+    script["scenes"] = {
+        "intro": {
+            "blocks": {
+                "start": {
+                    "obj_cls": "NarrativeBlock",
+                    "content": "Custom",
+                }
+            }
+        }
+    }
+
+    world = _make_world(script)
+    world.domain_manager.register_class("NarrativeBlock", NarrativeBlock)
+
+    graph = Graph(label="story")
+    block_map, _ = world._build_blocks(graph)
+
+    block_uid = block_map["intro.start"]
+    block = graph.get(block_uid)
+
+    assert isinstance(block, NarrativeBlock)
+    assert block.content == "Custom"
+
+
+def test_action_edges_set_trigger_phase_for_auto_edges() -> None:
+    script = _base_script()
+    script["scenes"] = {
+        "intro": {
+            "blocks": {
+                "start": {
+                    "obj_cls": "SimpleBlock",
+                    "continues": [
+                        {
+                            "successor": "intro.end",
+                        }
+                    ],
+                },
+                "end": {"obj_cls": "SimpleBlock"},
+            }
+        }
+    }
+
+    world = _make_world(script)
+    graph = Graph(label="story")
+
+    block_map, action_scripts = world._build_blocks(graph)
+    world._build_action_edges(graph, block_map, action_scripts)
+
+    start_uid = block_map["intro.start"]
+    edges = list(graph.find_edges(source_id=start_uid))
+
+    assert len(edges) == 1
+    edge = edges[0]
+    assert isinstance(edge, ChoiceEdge)
+    from tangl.vm.frame import ResolutionPhase as P
+
+    assert edge.trigger_phase == P.POSTREQS
