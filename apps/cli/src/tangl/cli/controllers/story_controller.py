@@ -16,7 +16,7 @@ def _fragment_text(fragment: Any) -> str:
     for attr in ("content", "text", "label"):
         value = getattr(fragment, attr, None)
         if isinstance(value, str) and value.strip():
-            return value.strip()
+            return value.strip().replace("_", " ")
     return str(fragment)
 
 
@@ -74,7 +74,7 @@ class StoryController(CommandSet):
                 label = getattr(choice, "label", "") or getattr(choice, "text", "")
             if uid is None:
                 continue
-            parsed.append(SimpleNamespace(uid=UUID(str(uid)), label=label))
+            parsed.append(SimpleNamespace(uid=UUID(str(uid)), label=label.replace("_", " ")))
         return parsed
 
     # ------------------------------------------------------------------
@@ -97,14 +97,38 @@ class StoryController(CommandSet):
         result = self._cmd.call_endpoint("RuntimeController.create_story", **kwargs)
 
         ledger_obj = result.get("ledger")
-        self._cmd.persistence.save(ledger_obj)
+        if ledger_obj is not None and self._cmd.persistence is not None:
+            self._cmd.persistence.save(ledger_obj)
 
         ledger_id = UUID(result["ledger_id"])
         self._cmd.set_ledger(ledger_id)
-        self._cmd.poutput(f"Created story from world '{result['world_id']}'")
+
+        self._cmd.poutput(f"\nCreated story: {result['title']}")
         self._cmd.poutput(f"Starting at: {result['cursor_label']}")
-        self._cmd.poutput(f"Ledger ID: {ledger_id}")
-        self._cmd.poutput("Use 'story' to view current state.")
+        self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
+
+        fragments = self._cmd.call_endpoint(
+            "RuntimeController.get_journal_entries",
+            limit=10,
+        )
+        self._current_story_update = list(fragments)
+
+        if self._current_story_update:
+            self._cmd.poutput("--- Story Begins ---")
+            for fragment in self._current_story_update:
+                self._cmd.poutput(_fragment_text(fragment))
+            self._cmd.poutput()
+
+        self._current_choices = self._load_choices()
+        if self._current_choices:
+            self._cmd.poutput("Choices:")
+            for idx, choice in enumerate(self._current_choices, start=1):
+                label = choice.label or str(choice.uid)
+                self._cmd.poutput(f"{idx}. {label}")
+        else:
+            self._cmd.poutput("(No choices available)")
+
+        self._cmd.poutput("\nUse 'do <number>' to make a choice.")
 
     def do_story(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if not self._require_story_context():
@@ -133,11 +157,14 @@ class StoryController(CommandSet):
             return
 
         choice = self._current_choices[index - 1]
-        result = self._cmd.call_endpoint(
+        self._cmd.call_endpoint(
             "RuntimeController.resolve_choice",
             choice_id=choice.uid,
         )
-        fragments = result.get("fragments", []) if isinstance(result, dict) else result
+        fragments = self._cmd.call_endpoint(
+            "RuntimeController.get_journal_entries",
+            limit=10,
+        )
         self._current_story_update = list(fragments)
         self._current_choices = self._load_choices()
         self._render_current_story_update()

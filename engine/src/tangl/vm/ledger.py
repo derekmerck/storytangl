@@ -65,7 +65,7 @@ class Ledger(Entity):
     """
     graph: Graph
     cursor_id: UUID = None
-    step: int = -1
+    step: int = 0
     domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
@@ -108,9 +108,35 @@ class Ledger(Entity):
         return self.records.get_section(marker_name, has_channel="fragment")
 
     def get_frame(self) -> Frame:
-        return Frame(graph = self.graph,
-                     cursor_id = self.cursor_id,
-                     records = self.records)
+        return Frame(
+            graph=self.graph,
+            cursor_id=self.cursor_id,
+            step=self.step,
+            records=self.records,
+        )
+
+    def init_cursor(self) -> None:
+        """Enter the current cursor to bootstrap the ledger journal."""
+
+        from tangl.core.graph.edge import AnonymousEdge
+        from tangl.vm.frame import ChoiceEdge, ResolutionPhase
+
+        start_node = self.graph.get(self.cursor_id)
+        if start_node is None:
+            raise RuntimeError(f"Initial cursor {self.cursor_id} not found in graph")
+
+        bootstrap_edge = AnonymousEdge(source=start_node, destination=start_node)
+        frame = self.get_frame()
+
+        next_edge = frame.follow_edge(bootstrap_edge)
+        while (
+            isinstance(next_edge, ChoiceEdge)
+            and getattr(next_edge, "trigger_phase", None) == ResolutionPhase.PREREQS
+        ):
+            next_edge = frame.follow_edge(next_edge)
+
+        self.cursor_id = frame.cursor_id
+        self.step = frame.step
 
     # todo: should probably add this as a general pattern for structuring/unstructuring
     #       entity-typed model fields using introspection (see registry)
