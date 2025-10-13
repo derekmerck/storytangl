@@ -7,6 +7,8 @@ from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
+from tangl.persistence import LedgerEnvelope
+
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
 
@@ -79,6 +81,33 @@ class StoryController(CommandSet):
     # ------------------------------------------------------------------
     # commands
     # ------------------------------------------------------------------
+    create_story_parser = argparse.ArgumentParser()
+    create_story_parser.add_argument("world_id", help="World to instantiate")
+    create_story_parser.add_argument("--label", help="Story label", default=None)
+
+    @with_argparser(create_story_parser)
+    def do_create_story(self, args: argparse.Namespace) -> None:
+        if self._cmd.user_id is None:
+            self._cmd.poutput("No active user. Create a user first with 'create_user'.")
+            return
+
+        kwargs = {"world_id": args.world_id}
+        if args.label:
+            kwargs["story_label"] = args.label
+
+        result = self._cmd.call_endpoint("RuntimeController.create_story", **kwargs)
+
+        ledger_obj = result.get("ledger")
+        if ledger_obj is not None and self._cmd.persistence is not None:
+            self._cmd.persistence.save(LedgerEnvelope.from_ledger(ledger_obj))
+
+        ledger_id = UUID(result["ledger_id"])
+        self._cmd.set_ledger(ledger_id)
+        self._cmd.poutput(f"Created story from world '{result['world_id']}'")
+        self._cmd.poutput(f"Starting at: {result['cursor_label']}")
+        self._cmd.poutput(f"Ledger ID: {ledger_id}")
+        self._cmd.poutput("Use 'story' to view current state.")
+
     def do_story(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if not self._require_story_context():
             return
