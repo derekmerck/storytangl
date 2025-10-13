@@ -7,7 +7,6 @@ from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
-from tangl.persistence import LedgerEnvelope
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
@@ -98,8 +97,7 @@ class StoryController(CommandSet):
         result = self._cmd.call_endpoint("RuntimeController.create_story", **kwargs)
 
         ledger_obj = result.get("ledger")
-        if ledger_obj is not None and self._cmd.persistence is not None:
-            self._cmd.persistence.save(LedgerEnvelope.from_ledger(ledger_obj))
+        self._cmd.persistence.save(ledger_obj)
 
         ledger_id = UUID(result["ledger_id"])
         self._cmd.set_ledger(ledger_id)

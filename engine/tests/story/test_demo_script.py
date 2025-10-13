@@ -28,6 +28,8 @@ def test_load_demo_script() -> None:
     frame = story.cursor
     assert frame.cursor.label == "start"
 
+    # todo: this does _not_ test that an initial journal entry was created at the cursor
+
     outgoing = list(
         story.find_edges(source_id=frame.cursor_id, trigger_phase=None)
     )

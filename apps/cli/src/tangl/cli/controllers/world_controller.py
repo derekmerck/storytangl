@@ -44,6 +44,6 @@ class WorldController(CommandSet):
     create_story_parser = argparse.ArgumentParser()
     create_story_parser.add_argument("world_id", type=str, help="World id to create")
 
-    def do_create_story(self, world_id: str):
-        result = self._cmd.call_endpoint("WorldController.create_story", world_id=world_id)
-        self._cmd.poutput(pformat(result))
+    # def do_create_story(self, world_id: str):
+    #     result = self._cmd.call_endpoint("WorldController.create_story", world_id=world_id)
+    #     self._cmd.poutput(pformat(result))
