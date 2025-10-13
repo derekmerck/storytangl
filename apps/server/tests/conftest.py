@@ -3,8 +3,8 @@ import pytest
 
 from tangl.rest.app import app
 
-from tests.conftest import my_script_data
-from tests.story.conftest import world
+# from tests.conftest import my_script_data
+# from tests.story.conftest import world
 
 @pytest.fixture
 def client():

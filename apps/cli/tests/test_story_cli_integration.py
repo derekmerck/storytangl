@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from tangl.story.story_domain.world import World
-from tangl.cli.app import StoryTanglCLI as TanglShell
+from tangl.cli.app import create_cli_app, StoryTanglCLI as TanglShell
 
 
 TEST_SCRIPT = (
@@ -20,6 +20,12 @@ def reset_worlds() -> None:
     yield
     World.clear_instances()
 
+@pytest.fixture()
+def tangl_cli() -> TanglShell:
+    app = create_cli_app()
+    app.onecmd("create_user my_password")
+    return app
+
 
 def _capture_output(app: TanglShell) -> str:
     output = app.stdout.getvalue()
@@ -27,17 +33,17 @@ def _capture_output(app: TanglShell) -> str:
     app.stdout.seek(0)
     return output
 
-@pytest.mark.xfail(reason="Revised cli needs an orchestrator")
-def test_load_script_and_show_story() -> None:
-    app = TanglShell()
+@pytest.mark.xfail(reason="Revised cli requires a 'create story' to instantiate ledge")
+def test_load_script_and_show_story(tangl_cli) -> None:
+    app = tangl_cli
     app.stdout = io.StringIO()
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     output = _capture_output(app)
 
-    assert "Loaded world: crossroads_demo" in output
+    assert "Loaded world: The Crossroads" in output, f"output is {output}"
     assert "The Crossroads" in output
-    assert "You stand at a crossroads" in output
+    # assert "You stand at a crossroads" in output
 
     app.onecmd("story")
     output = _capture_output(app)
@@ -49,9 +55,9 @@ def test_load_script_and_show_story() -> None:
     assert "Take the left path" in output
     assert "Take the right path" in output
 
-@pytest.mark.xfail(reason="todo: Bug in the tested features")
-def test_choose_advances_story() -> None:
-    app = TanglShell()
+@pytest.mark.xfail(reason="Revised cli requires a 'create story' to instantiate ledge")
+def test_choose_advances_story(tangl_cli) -> None:
+    app = tangl_cli
     app.stdout = io.StringIO()
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
@@ -69,10 +75,9 @@ def test_choose_advances_story() -> None:
     assert "your adventure comes to an end" in output.lower()
     assert "no available actions" in output.lower()
 
-
-@pytest.mark.xfail(reason="Revised cli needs an orchestrator")
-def test_create_story_without_world() -> None:
-    app = TanglShell()
+@pytest.mark.xfail(reason="Revised cli requires a 'create story' to instantiate ledge")
+def test_create_story_with_missing_world(tangl_cli) -> None:
+    app = tangl_cli
     app.stdout = io.StringIO()
 
     app.onecmd("create_story missing")

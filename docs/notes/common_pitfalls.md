@@ -268,8 +268,10 @@ record2 = Record(type="event", tags={"chan:journal"})  # Typo breaks filtering
 # ✅ Correct: centralized
 from tangl.core.record import CHANNEL_TAG_PREFIX
 
+
 def channel_tag(name: str) -> str:
     return f"{CHANNEL_TAG_PREFIX}{name}"
+
 
 record = Record(type="event", tags={channel_tag("journal")})
 ```

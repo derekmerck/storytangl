@@ -106,3 +106,9 @@ Every story node "class" needs a few things:
 - **utils**
 
 It is orthogonal to `tangl.vm` and should not have overlapping responsibilities other than providing feature handlers with appropriate phase names and return types.
+
+---
+
+episodic metrics:
+- velocity (chronology per discourse)
+- tangents, directness

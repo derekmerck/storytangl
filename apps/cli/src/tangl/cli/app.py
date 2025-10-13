@@ -29,18 +29,30 @@ class StoryTanglCLI(cmd2.Cmd):
     prompt = "⅁$ "
 
     def __init__(
-        self,
-        orchestrator: Orchestrator,
-        *,
-        user_id: UUID | None = None,
-        ledger_id: UUID | None = None,
+            self,
+            orchestrator: Orchestrator,
+            *,
+            user_id: UUID | None = None,
+            ledger_id: UUID | None = None,
     ) -> None:
-        super().__init__(allow_cli_args=False)
+        # Pass command_sets to parent, let cmd2 handle registration
+        # command_sets = [
+        #     StoryController(),
+        #     UserController(),
+        #     WorldController(),
+        #     SystemController(),
+        #     DevController(),
+        # ]
+
+        super().__init__(
+            allow_cli_args=False,
+            # command_sets=command_sets  # cmd2 will register these
+        )
+
         self.orchestrator = orchestrator
         self.persistence = orchestrator.persistence
         self.user_id = user_id
         self.ledger_id = ledger_id
-        self._register_command_sets()
 
     # ------------------------------------------------------------------
     # Context helpers
@@ -75,18 +87,6 @@ class StoryTanglCLI(cmd2.Cmd):
                 self.persistence.remove(identifier)
             except KeyError:
                 continue
-
-    # ------------------------------------------------------------------
-    # Command set wiring
-    # ------------------------------------------------------------------
-    def _register_command_sets(self) -> None:
-        """Attach the CLI command sets."""
-
-        self.add_command_set(StoryController())
-        self.add_command_set(UserController())
-        self.add_command_set(WorldController())
-        self.add_command_set(SystemController())
-        self.add_command_set(DevController())
 
 
 def create_cli_app() -> StoryTanglCLI:

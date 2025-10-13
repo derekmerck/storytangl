@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator
 from tangl.service import Orchestrator
-from tangl.utils.uuid_for_secret import key_for_secret
+from tangl.utils.hash_secret import key_for_secret
 
 from .response_models import UserSecret
 

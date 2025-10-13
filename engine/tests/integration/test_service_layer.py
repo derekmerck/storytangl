@@ -7,7 +7,8 @@ from uuid import UUID, uuid4
 
 from unittest.mock import Mock
 
-from tangl.core import ContentFragment, Graph, StreamRegistry
+from tangl.core import Graph, StreamRegistry
+from tangl.journal.content import ContentFragment
 from tangl.persistence import LedgerEnvelope
 from tangl.service import Orchestrator
 from tangl.service.controllers import RuntimeController

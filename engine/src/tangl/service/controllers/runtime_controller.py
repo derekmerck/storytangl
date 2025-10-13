@@ -1,12 +1,13 @@
-from __future__ import annotations
-
+# tangl/service/controllers/runtime_controller.py
 """Runtime controller bridging orchestrator calls to the VM layer."""
 
+from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
-from tangl.core.fragment import BaseFragment, ContentFragment
+from tangl.core import BaseFragment
+from tangl.journal.content import ContentFragment
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,

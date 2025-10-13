@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from tangl.type_hints import Label, StringMap, ClassName, Tag, Expr
 
+# todo: these might be records, in parallel with fragments, kept in a 'template manager'
+#       registry with extended indexing and materialization powers.
+
 class BaseScriptItem(BaseModel):
     """
     Basic intermedia representation model for describing any Entity-type object.

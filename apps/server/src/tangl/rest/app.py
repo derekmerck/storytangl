@@ -68,6 +68,9 @@ app = FastAPI(
     redoc_url=None
 )
 
+DEFAULT_APP_URL = "localhost:8000"
+__app_url__ = settings.get("app.url", "localhost:8000")
+
 origins = [
     "http://localhost:5173",    # Vue dev app
     "http://127.0.0.1:5173",

@@ -1,7 +1,7 @@
 import functools
 
 from tangl.utils.bookmarked_list import BookmarkedList, BName, BType
-from tangl.core.fragment import ContentFragment
+from tangl.journal import ContentFragment
 
 class HasLinearContent():
     # todo: want to tie together with linear history layer updates

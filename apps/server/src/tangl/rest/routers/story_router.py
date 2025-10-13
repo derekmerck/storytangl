@@ -10,7 +10,7 @@ from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
 from tangl.type_hints import UniqueLabel
-from tangl.utils.uuid_for_secret import key_for_secret, uuid_for_key
+from tangl.utils.hash_secret import key_for_secret, uuid_for_key
 
 
 class ChoiceRequest(BaseModel):

@@ -15,7 +15,7 @@ def patch_world(monkeypatch):
     This fixture can be used for tests that need to intercept calls
     to 'World.get_instance' etc.
     """
-    from tangl.story.story_domain import world_controller
+    from tangl.service.controllers import world_controller
     monkeypatch.setattr(world_controller, "World", FakeWorld)
     # Optionally ensure no leftover state
     FakeWorld._instances.clear()
@@ -38,7 +38,7 @@ def world_service_manager(world_context):
     """
     Build a service manager that includes WorldController as a component.
     """
-    from tangl.story.story_domain.world_controller import WorldController  # Adjust import
+    from tangl.service.controllers.world_controller import WorldController  # Adjust import
     mgr = ServiceManager(context=world_context, components=[WorldController])
     return mgr
 

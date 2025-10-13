@@ -1,7 +1,7 @@
-from __future__ import annotations
-
+# tangl/service/controllers/user_controller.py
 """User controller exposing account-oriented endpoints."""
 
+from __future__ import annotations
 import base64
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -14,7 +14,7 @@ from tangl.type_hints import Hash, Identifier
 
 if TYPE_CHECKING:
     from tangl.service.user.user import User
-    from tangl.service.user.user_info import UserInfo
+    from tangl.service.response.info_response import UserInfo
 else:  # pragma: no cover - runtime imports to avoid circulars
     class User:  # type: ignore[dead-code]
         ...
@@ -59,7 +59,7 @@ class UserController(HasApiEndpoints):
     def get_user_info(self, user: User, **kwargs: Hash) -> "UserInfo":
         """Build a :class:`UserInfo` snapshot from the provided user."""
 
-        from tangl.service.user.user_info import UserInfo  # lazy import to avoid cycles
+        from tangl.service.response.info_response import UserInfo  # lazy import to avoid cycles
 
         return UserInfo.from_user(user, **kwargs)
 

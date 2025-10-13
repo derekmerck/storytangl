@@ -4,7 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core import ContentFragment, Graph, StreamRegistry
+from tangl.core import Graph, StreamRegistry
+from tangl.journal.content import ContentFragment
 from tangl.service.controllers import RuntimeController
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase
 from tangl.vm.ledger import Ledger
