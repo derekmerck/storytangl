@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tangl.core import Graph
 from tangl.vm.domain import TraversableDomain
-from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
+from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase as P
 
 
 class TestTraversableDomain:
@@ -213,3 +213,50 @@ class TestTraversableDomain:
             pass
         else:  # pragma: no cover - defensive assertion
             raise AssertionError("Expected ValueError for node outside domain")
+
+    def test_cursor_transitions_through_domain_portals(self) -> None:
+        graph = Graph(label="story")
+
+        scene1_block = graph.add_node(label="scene1_block")
+        scene2_block = graph.add_node(label="scene2_block")
+
+        scene1 = TraversableDomain(
+            graph=graph,
+            label="scene1",
+            member_ids=[scene1_block.uid],
+            entry_ids=[scene1_block.uid],
+            exit_ids=[scene1_block.uid],
+        )
+
+        scene2 = TraversableDomain(
+            graph=graph,
+            label="scene2",
+            member_ids=[scene2_block.uid],
+            entry_ids=[scene2_block.uid],
+        )
+
+        ChoiceEdge(
+            graph=graph,
+            source_id=scene1.sink.uid,
+            destination_id=scene2.source.uid,
+            trigger_phase=P.PREREQS,
+        )
+
+        frame = Frame(graph=graph, cursor_id=scene1_block.uid)
+
+        exit_edge = frame.run_phase(P.POSTREQS)
+        assert exit_edge is not None
+        assert exit_edge.destination.uid == scene1.sink.uid
+
+        portal_edge = frame.follow_edge(exit_edge)
+        assert portal_edge is not None
+        assert portal_edge.destination.uid == scene2.source.uid
+
+        entry_edge = frame.follow_edge(portal_edge)
+        assert entry_edge is not None
+        assert entry_edge.destination.uid == scene2_block.uid
+
+        final_edge = frame.follow_edge(entry_edge)
+        assert frame.cursor.uid == scene2_block.uid
+        assert final_edge is not None
+        assert final_edge.destination.uid == scene2.sink.uid
