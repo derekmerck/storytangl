@@ -7,8 +7,6 @@ import inspect
 from typing import Any, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
 from uuid import UUID
 
-from tangl.persistence import LedgerEnvelope
-
 from .api_endpoint import ApiEndpoint, HasApiEndpoints, MethodType
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
@@ -109,13 +107,11 @@ class Orchestrator:
 
     def _infer_ledger_id(self, user_id: UUID | None) -> UUID:
         if user_id is None:
-            raise ValueError("ledger_id is required when no user context is provided")
+            raise ValueError("ledger_id required when no user context")
         user = self._get_or_load_user(user_id)
         ledger_id = getattr(user, "current_ledger_id", None)
         if ledger_id is None:
-            ledger_id = getattr(user, "current_story_id", None)
-        if ledger_id is None:
-            raise ValueError("Unable to infer ledger_id from user context")
+            raise ValueError("User has no active ledger")
         return ledger_id
 
     def _get_or_load_user(self, user_id: UUID) -> Any:
@@ -145,11 +141,10 @@ class Orchestrator:
     def _build_ledger(self, data: Any) -> Any:
         if hasattr(data, "get_frame") and hasattr(data, "unstructure"):
             return data
-        if isinstance(data, LedgerEnvelope):
-            return data.to_ledger()
         if isinstance(data, Mapping):
-            envelope = LedgerEnvelope.model_validate(data)
-            return envelope.to_ledger()
+            from tangl.vm.ledger import Ledger
+
+            return Ledger.structure(dict(data))
         raise TypeError("Unsupported ledger payload")
 
     def _write_back_resources(self) -> None:
@@ -160,11 +155,6 @@ class Orchestrator:
 
     def _persist_resource(self, resource: Any) -> None:
         if self.persistence is None:
-            return
-
-        if hasattr(resource, "get_frame") and hasattr(resource, "unstructure"):
-            envelope = LedgerEnvelope.from_ledger(resource)
-            self._call_persistence_save(envelope)
             return
 
         self._call_persistence_save(resource)

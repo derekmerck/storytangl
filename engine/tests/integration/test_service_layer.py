@@ -9,7 +9,6 @@ from unittest.mock import Mock
 
 from tangl.core import Graph, StreamRegistry
 from tangl.journal.content import ContentFragment
-from tangl.persistence import LedgerEnvelope
 from tangl.service import Orchestrator
 from tangl.service.controllers import RuntimeController
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase
@@ -45,8 +44,14 @@ class _InMemoryPersistence(dict[UUID, Any]):
 class _ReadOnlyPersistence:
     """Minimal mapping that mimics :class:`~tangl.persistence.PersistenceManager`."""
 
-    def __init__(self, user: _StubUser, envelope: LedgerEnvelope) -> None:
-        self._store: dict[UUID, Any] = {user.uid: user, envelope.ledger_uid: envelope}
+    def __init__(self, user: _StubUser, ledger_payload: Any) -> None:
+        self._store: dict[UUID, Any] = {user.uid: user}
+        if hasattr(ledger_payload, "uid"):
+            self._store[ledger_payload.uid] = ledger_payload
+        elif isinstance(ledger_payload, dict):
+            self._store[ledger_payload.get("uid")] = ledger_payload
+        else:
+            raise TypeError("Unsupported ledger payload for read-only persistence")
         self.save = Mock()
 
     def __getitem__(self, key: UUID) -> Any:
@@ -96,22 +101,23 @@ def test_full_choice_resolution_flow() -> None:
     assert result["cursor_id"] != initial_cursor
 
     saved_payload = persistence.saved_payloads[-1]
-    if isinstance(saved_payload, LedgerEnvelope):
-        saved_envelope = saved_payload
+    if isinstance(saved_payload, Ledger):
+        saved_ledger = saved_payload
+    elif isinstance(saved_payload, dict):
+        saved_ledger = Ledger.structure(dict(saved_payload))
     else:
-        saved_envelope = LedgerEnvelope.model_validate(saved_payload)
-    saved_ledger = saved_envelope.to_ledger()
+        raise TypeError(f"Unexpected payload type {type(saved_payload)!r}")
 
-    assert saved_envelope.ledger_uid == ledger.uid
+    assert saved_ledger.uid == ledger.uid
     assert saved_ledger.records.max_seq > baseline_seq
 
 
 def test_read_only_endpoint_does_not_persist() -> None:
     ledger, _ = _build_ledger_with_choice()
     user = _StubUser(uid=uuid4(), current_ledger_id=ledger.uid)
-    envelope = LedgerEnvelope.from_ledger(ledger)
+    ledger_payload = ledger.unstructure()
 
-    persistence = _ReadOnlyPersistence(user, envelope)
+    persistence = _ReadOnlyPersistence(user, ledger_payload)
 
     orchestrator = Orchestrator(persistence)
     orchestrator.register_controller(RuntimeController)

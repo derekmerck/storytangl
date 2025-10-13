@@ -1,32 +1,49 @@
-from tangl.core import Graph
-from tangl.persistence import LedgerEnvelope
-from tangl.core.domain.domain import Domain
-from tangl.vm.ledger import Ledger
+from collections.abc import Mapping
+
 import pytest
 
-# todo: Domain here needs to be a Singleton, this won't work with an 
-#       instance domain with handlers for example.  See 
-#       `tests/vm/test_ledger_structures` for an example.
+from tangl.core import Graph
+from tangl.core.domain.domain import Domain
+from tangl.vm.ledger import Ledger
 
-def test_ledger_envelope_roundtrip_all_backends(manager):
+
+def _load_ledger(payload):
+    if isinstance(payload, Ledger):
+        return payload
+    if isinstance(payload, Mapping):
+        return Ledger.structure(dict(payload))
+    raise TypeError(f"Unexpected payload type {type(payload)!r}")
+
+
+def test_ledger_roundtrip_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="test_node")
     ledger = Ledger(graph=graph, cursor_id=node.uid, step=42)
     ledger.domains.append(Domain(label="demo_domain"))
+    ledger.push_snapshot()
 
-    envelope = LedgerEnvelope.from_ledger(ledger)
-    manager.save(envelope)
+    manager.save(ledger)
 
     retrieved = manager.get(ledger.uid)
-    restored_envelope = LedgerEnvelope.model_validate(retrieved)
-    restored_ledger = restored_envelope.to_ledger()
+    restored = _load_ledger(retrieved)
 
-    assert restored_ledger.uid == ledger.uid
-    assert restored_ledger.step == 42
-    assert restored_ledger.cursor_id == node.uid
-    assert restored_ledger.graph.find_one(label="test_node") is not None
-    assert [domain.label for domain in restored_ledger.domains] == ["demo_domain"]
+    assert restored.uid == ledger.uid
+    assert restored.step == 42
+    assert restored.cursor_id == node.uid
+    assert restored.graph.find_one(label="test_node") is not None
+    assert [domain.label for domain in restored.domains] == ["demo_domain"]
 
 
 def test_event_sourced_rebuild_all_backends(manager):
-    pytest.skip("Event-sourced replay requires snapshot patch hydration; pending upstream fix")
+    graph = Graph()
+    node = graph.add_node(label="event_node")
+    ledger = Ledger(graph=graph, cursor_id=node.uid, event_sourced=True)
+    ledger.push_snapshot()
+
+    manager.save(ledger)
+
+    retrieved = manager.get(ledger.uid)
+    restored = _load_ledger(retrieved)
+
+    assert restored.event_sourced is True
+    assert restored.graph.find_one(label="event_node") is not None

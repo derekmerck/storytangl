@@ -5,7 +5,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from tangl.core import Graph, StreamRegistry
-from tangl.persistence import LedgerEnvelope
 from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator, ResponseType
 from tangl.vm.frame import Frame
 from tangl.vm.ledger import Ledger
@@ -100,13 +99,12 @@ def test_orchestrator_hydrates_user_and_ledger(
     fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
     ledger = minimal_ledger
-    ledger_envelope = LedgerEnvelope.from_ledger(ledger).model_dump()
     ledger_id = ledger.uid
     user_id = uuid4()
     user = StubUser(user_id, ledger_id)
 
     fake_persistence[user_id] = user
-    fake_persistence[ledger_id] = ledger_envelope
+    fake_persistence[ledger_id] = ledger.unstructure()
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(LedgerController)
@@ -127,9 +125,8 @@ def test_orchestrator_hydrates_user_and_ledger(
 def test_orchestrator_requires_user_id_for_user_hydration(
     fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
-    ledger_envelope = LedgerEnvelope.from_ledger(minimal_ledger).model_dump()
     ledger_id = minimal_ledger.uid
-    fake_persistence[ledger_id] = ledger_envelope
+    fake_persistence[ledger_id] = minimal_ledger.unstructure()
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(LedgerController)
@@ -141,9 +138,8 @@ def test_orchestrator_requires_user_id_for_user_hydration(
 def test_orchestrator_reuses_cached_ledger_for_frame(
     fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
-    ledger_envelope = LedgerEnvelope.from_ledger(minimal_ledger).model_dump()
     ledger_id = minimal_ledger.uid
-    fake_persistence[ledger_id] = ledger_envelope
+    fake_persistence[ledger_id] = minimal_ledger.unstructure()
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(FrameController)
@@ -160,9 +156,8 @@ def test_orchestrator_reuses_cached_ledger_for_frame(
 def test_orchestrator_persists_mutations(
     fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
-    ledger_envelope = LedgerEnvelope.from_ledger(minimal_ledger).model_dump()
     ledger_id = minimal_ledger.uid
-    fake_persistence[ledger_id] = ledger_envelope
+    fake_persistence[ledger_id] = minimal_ledger.unstructure()
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(UpdateController)
@@ -178,9 +173,8 @@ def test_orchestrator_persists_mutations(
 def test_read_endpoint_does_not_write_back(
     fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
-    ledger_envelope = LedgerEnvelope.from_ledger(minimal_ledger).model_dump()
     ledger_id = minimal_ledger.uid
-    fake_persistence[ledger_id] = ledger_envelope
+    fake_persistence[ledger_id] = minimal_ledger.unstructure()
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(ReadController)
