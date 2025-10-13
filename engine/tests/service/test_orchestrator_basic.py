@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+import yaml
 
 from tangl.core import Graph, StreamRegistry
 from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator, ResponseType
+from tangl.service.controllers import RuntimeController
+from tangl.service.user.user import User
+from tangl.compiler.script_manager import ScriptManager
+from tangl.story.story_domain.world import World
 from tangl.vm.frame import Frame
 from tangl.vm.ledger import Ledger
 
@@ -182,3 +188,45 @@ def test_read_endpoint_does_not_write_back(
     fake_persistence.saved.clear()
     orchestrator.execute("ReadController.get_cursor", ledger_id=ledger_id)
     assert not fake_persistence.saved
+
+
+def test_create_story_via_orchestrator_persists_ledger(
+    fake_persistence: FakePersistence,
+) -> None:
+    World.clear_instances()
+    script_path = Path(__file__).resolve().parents[1] / "resources" / "demo_script.yaml"
+    data = yaml.safe_load(script_path.read_text())
+    script_manager = ScriptManager.from_data(data)
+    world = World(label="demo_world", script_manager=script_manager)
+
+    user = User(label="player")
+    fake_persistence.save(user)
+    fake_persistence.saved.clear()
+
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(RuntimeController)
+
+    result = orchestrator.execute(
+        "RuntimeController.create_story",
+        user_id=user.uid,
+        world_id=world.label,
+    )
+
+    ledger_id = UUID(result["ledger_id"])
+    current_ledger_id = user.current_ledger_id
+    assert current_ledger_id == ledger_id
+    ledger_obj = result["ledger"]
+
+    fake_persistence.save(ledger_obj)
+
+    assert ledger_id in fake_persistence
+    saved_payload = fake_persistence[ledger_id]
+    stored_id = getattr(saved_payload, "uid", getattr(saved_payload, "ledger_uid", None))
+    assert stored_id == ledger_id
+    assert any(getattr(item, "uid", None) == user.uid for item in fake_persistence.saved)
+    assert any(
+        getattr(item, "uid", getattr(item, "ledger_uid", None)) == ledger_id
+        for item in fake_persistence.saved
+    )
+
+    World.clear_instances()

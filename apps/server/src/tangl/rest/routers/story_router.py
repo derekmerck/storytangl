@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
+from tangl.persistence import LedgerEnvelope
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
 from tangl.type_hints import UniqueLabel
@@ -32,6 +33,29 @@ router = APIRouter(tags=["Story"])
 
 def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
     return orchestrator.execute(endpoint, **params)
+
+
+@router.post("/story/create")
+async def create_story(
+    world_id: str = Query(..., description="World template to instantiate"),
+    story_label: str | None = Query(None, description="Optional story label"),
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: str = Header(..., alias="X-API-Key"),
+):
+    """Create a new story instance for the authenticated user."""
+
+    user_id = uuid_for_key(api_key)
+    kwargs: dict[str, Any] = {"world_id": world_id}
+    if story_label:
+        kwargs["story_label"] = story_label
+    result = _call(orchestrator, "RuntimeController.create_story", user_id=user_id, **kwargs)
+    ledger_obj = result.get("ledger") if isinstance(result, dict) else None
+    if ledger_obj is not None:
+        if orchestrator.persistence is not None:
+            orchestrator.persistence.save(LedgerEnvelope.from_ledger(ledger_obj))
+        result = dict(result)
+        result.pop("ledger", None)
+    return result
 
 
 @router.get("/update")
