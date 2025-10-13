@@ -16,13 +16,6 @@ from tangl.service.controllers import (
     WorldController as WorldServiceController,
 )
 
-from .controllers.dev_controller import DevController
-from .controllers.story_controller import StoryController
-from .controllers.system_controller import SystemController
-from .controllers.user_controller import UserController
-from .controllers.world_controller import WorldController
-
-
 class StoryTanglCLI(cmd2.Cmd):
     """Cmd2 shell that delegates all operations to the orchestrator."""
 
@@ -34,25 +27,38 @@ class StoryTanglCLI(cmd2.Cmd):
             *,
             user_id: UUID | None = None,
             ledger_id: UUID | None = None,
+            register_controllers: bool = True,
     ) -> None:
-        # Pass command_sets to parent, let cmd2 handle registration
-        # command_sets = [
-        #     StoryController(),
-        #     UserController(),
-        #     WorldController(),
-        #     SystemController(),
-        #     DevController(),
-        # ]
-
         super().__init__(
             allow_cli_args=False,
-            # command_sets=command_sets  # cmd2 will register these
+            auto_load_commands=False,
         )
 
         self.orchestrator = orchestrator
         self.persistence = orchestrator.persistence
         self.user_id = user_id
         self.ledger_id = ledger_id
+
+        if register_controllers:
+            self._register_controllers()
+
+    def _register_controllers(self) -> None:
+        """Register all available CLI command sets explicitly."""
+
+        from .controllers.dev_controller import DevController
+        from .controllers.story_controller import StoryController
+        from .controllers.system_controller import SystemController
+        from .controllers.user_controller import UserController
+        from .controllers.world_controller import WorldController
+
+        for controller_cls in (
+            StoryController,
+            UserController,
+            WorldController,
+            SystemController,
+            DevController,
+        ):
+            self.register_command_set(controller_cls())
 
     # ------------------------------------------------------------------
     # Context helpers
