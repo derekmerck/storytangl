@@ -5,9 +5,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from tangl.service.response.info_response.world_info import WorldList
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
-from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
+# from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 from tangl.story.story_domain.world import World
 from tangl.service.response.info_response import WorldInfo
 
@@ -21,8 +22,6 @@ else:
 
 logger = logging.getLogger(__name__)
 
-class ContentFragment(BaseModel):
-    ...
 
 class WorldInfo(BaseModel):
     # revision, license, etc. should probably just inherit this data from
@@ -79,7 +78,7 @@ class WorldController(HasApiEndpoints):
         method_type=MethodType.READ,
         response_type=ResponseType.CONTENT,
         group="system")
-    def list_worlds(self) -> list[ContentFragment]:
+    def list_worlds(self) -> list[WorldList]:
         # The world list is formatted as content fragments and can be interpreted
         # as an ordered, styled list
         # It is not strictly necessary, as the available worlds can be learned from

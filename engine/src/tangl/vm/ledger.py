@@ -15,6 +15,8 @@ from .frame import Frame
 if TYPE_CHECKING:
     from tangl.service.user.user import User
     from .replay import Patch
+else:
+    User = Entity
 
 class Ledger(Entity):
     """
@@ -68,7 +70,7 @@ class Ledger(Entity):
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
     event_sourced: bool = False
-    user: Optional["User"] = Field(None, exclude=True)
+    user: Optional[User] = Field(None, exclude=True)
 
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
@@ -178,8 +180,7 @@ class Ledger(Entity):
 
         return data
 
-
-from tangl.service.user.user import User as _LedgerUser
-
-Ledger.model_rebuild(_types_namespace={"User": _LedgerUser})
-
+#
+# from tangl.service.user.user import User as _LedgerUser
+#
+# Ledger.model_rebuild(_types_namespace={"User": _LedgerUser})
