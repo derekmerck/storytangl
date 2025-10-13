@@ -105,7 +105,7 @@ async def do_story_action(
             orchestrator,
             "RuntimeController.get_journal_entries",
             user_id=user_id,
-            limit=1,
+            limit=0,
         )
 
     payload = dict(status) if isinstance(status, dict) else {"status": status}

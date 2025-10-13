@@ -33,9 +33,7 @@ class RuntimeController(HasApiEndpoints):
             raise ValueError("limit must be non-negative")
 
         fragments = list(ledger.records.iter_channel("fragment"))
-        if limit == 0:
-            return []
-        if limit >= len(fragments):
+        if limit == 0 or limit >= len(fragments):
             return fragments
         return fragments[-limit:]
 

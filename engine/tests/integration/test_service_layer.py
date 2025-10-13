@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from unittest.mock import Mock
 
-from tangl.core import Graph, StreamRegistry
+from tangl.core import BaseFragment, Graph, StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service import Orchestrator
 from tangl.service.controllers import RuntimeController
@@ -96,9 +96,9 @@ def test_full_choice_resolution_flow() -> None:
         choice_id=choice_id,
     )
 
-    assert "fragments" in result
-    assert result["fragments"], "resolve_choice should journal fragments"
     assert result["cursor_id"] != initial_cursor
+    assert "fragments" not in result
+    assert result["status"] == "resolved"
 
     saved_payload = persistence.saved_payloads[-1]
     if isinstance(saved_payload, Ledger):
@@ -110,6 +110,15 @@ def test_full_choice_resolution_flow() -> None:
 
     assert saved_ledger.uid == ledger.uid
     assert saved_ledger.records.max_seq > baseline_seq
+
+    fragments = orchestrator.execute(
+        "RuntimeController.get_journal_entries",
+        user_id=user.uid,
+        limit=0,
+    )
+    assert fragments, "journal fragments should be available via get_journal_entries"
+    for fragment in fragments:
+        assert isinstance(fragment, BaseFragment)
 
 
 def test_read_only_endpoint_does_not_persist() -> None:
