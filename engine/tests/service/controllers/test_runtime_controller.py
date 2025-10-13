@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from uuid import uuid4
+from pathlib import Path
+from uuid import UUID, uuid4
 
 import pytest
+import yaml
 
 from tangl.core import Graph, StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service.controllers import RuntimeController
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase
 from tangl.vm.ledger import Ledger
+from tangl.compiler.script_manager import ScriptManager
+from tangl.story.story_domain.world import World
+from tangl.service.user.user import User
 
 
 @pytest.fixture()
@@ -21,6 +26,19 @@ def ledger() -> Ledger:
     graph = Graph(label="demo")
     start = graph.add_node(label="start")
     return Ledger(graph=graph, cursor_id=start.uid, records=StreamRegistry())
+
+
+@pytest.fixture()
+def demo_world() -> World:
+    World.clear_instances()
+    script_path = (
+        Path(__file__).resolve().parents[2] / "resources" / "demo_script.yaml"
+    )
+    data = yaml.safe_load(script_path.read_text())
+    script_manager = ScriptManager.from_data(data)
+    world = World(label="demo_world", script_manager=script_manager)
+    yield world
+    World.clear_instances()
 
 
 def test_get_journal_entries_limits_results(runtime_controller: RuntimeController, ledger: Ledger) -> None:
@@ -107,3 +125,23 @@ def test_resolve_choice_requires_choice(runtime_controller: RuntimeController, l
     bogus_choice_id = uuid4()
     with pytest.raises(ValueError, match="Choice"):
         runtime_controller.resolve_choice(frame, bogus_choice_id)
+
+
+def test_create_story_materializes_ledger(
+    runtime_controller: RuntimeController, demo_world: World
+) -> None:
+    user = User(label="player")
+
+    result = runtime_controller.create_story(user=user, world_id=demo_world.label)
+
+    ledger_id = UUID(result["ledger_id"])
+    current_ledger_id = getattr(user, "current_ledger_id", None)
+    if current_ledger_id is not None:
+        assert current_ledger_id == ledger_id
+    assert user.current_story_id == ledger_id
+    assert result["world_id"] == demo_world.label
+    assert result["title"].startswith("story_")
+    assert result["cursor_label"] == "start"
+    ledger_obj = result.get("ledger")
+    assert isinstance(ledger_obj, Ledger)
+    assert ledger_obj.uid == ledger_id

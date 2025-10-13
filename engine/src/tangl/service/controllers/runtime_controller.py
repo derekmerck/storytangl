@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
-from tangl.core import BaseFragment
+from tangl.core import BaseFragment, StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service.api_endpoint import (
     AccessLevel,
@@ -17,6 +17,7 @@ from tangl.service.api_endpoint import (
 )
 from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase
 from tangl.vm.ledger import Ledger
+from tangl.service.user.user import User
 
 
 class RuntimeController(HasApiEndpoints):
@@ -121,4 +122,48 @@ class RuntimeController(HasApiEndpoints):
         return {
             "fragments": fragments_list,
             "cursor_id": frame.cursor_id,
+        }
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.PUBLIC,
+        method_type=MethodType.CREATE,
+    )
+    def create_story(self, user: User, world_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Create a fully-materialized story ledger for ``user``."""
+
+        from tangl.story.story_domain.world import World
+
+        world = World.get_instance(world_id)
+        if world is None:
+            raise ValueError(f"World '{world_id}' not found. Load it first.")
+
+        story_label = kwargs.get("story_label") or f"story_{user.uid}"
+        story_graph = world.create_story(story_label, mode="full")
+        start_cursor_id = story_graph.cursor.cursor_id
+
+        ledger = Ledger(
+            graph=story_graph,
+            cursor_id=start_cursor_id,
+            records=StreamRegistry(),
+            label=story_label,
+        )
+        ledger.push_snapshot()
+
+        try:
+            user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            user.current_story_id = ledger.uid
+        else:
+            user.current_story_id = ledger.uid
+
+        start_node = story_graph.get(start_cursor_id)
+        cursor_label = start_node.label if start_node is not None else "unknown"
+
+        return {
+            "ledger_id": str(ledger.uid),
+            "world_id": world_id,
+            "title": story_graph.label,
+            "cursor_id": str(start_cursor_id),
+            "cursor_label": cursor_label,
+            "ledger": ledger,
         }
