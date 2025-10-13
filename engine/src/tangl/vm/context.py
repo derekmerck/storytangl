@@ -111,3 +111,13 @@ class Context:
     def get_handlers(self, **criteria) -> Iterator[Handler]:
         # can pass phase in filter criteria if useful
         return self.scope.get_handlers(**criteria)
+
+    def get_traversable_domain_for_node(self, node: Node) -> "TraversableDomain" | None:
+        """Return the :class:`TraversableDomain` that contains ``node`` if available."""
+
+        from tangl.vm.domain import TraversableDomain  # Local import to avoid cycle
+
+        for domain in self.scope.active_domains:
+            if isinstance(domain, TraversableDomain) and node.uid in domain.member_ids:
+                return domain
+        return None

@@ -51,12 +51,39 @@ from .planning import simple_planning_handlers
 # ------- PRE/POST REDIRECTS ---------
 
 @global_domain.handlers.register(phase=P.PREREQS, priority=50)
-def prereq_redirect(cursor: Node, *, ns: NS, **kwargs):
-    """Follow the first auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` in PREREQS."""
-    # follow the first auto-triggering ChoiceEdge if any
-    for e in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
-        if e.available(ns):
-            return e
+def prereq_redirect(cursor: Node, *, ns: NS, ctx: Context, **kwargs):
+    """Follow auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` redirects for PREREQS."""
+
+    current_domain = ctx.get_traversable_domain_for_node(cursor)
+
+    if current_domain is not None:
+        if cursor.uid == current_domain.source.uid:
+            for edge in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+                destination = edge.destination
+                if destination is None:
+                    continue
+                if edge.available(ns):
+                    logger.debug(
+                        "Domain entry: %s source -> %s", current_domain.label, destination.label
+                    )
+                    return edge
+
+        if cursor.uid == current_domain.sink.uid:
+            for edge in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+                destination = edge.destination
+                if destination is None:
+                    continue
+                if destination.uid in current_domain.member_ids:
+                    continue
+                if edge.available(ns):
+                    logger.debug(
+                        "Domain exit: %s sink -> %s", current_domain.label, destination.label
+                    )
+                    return edge
+
+    for edge in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+        if edge.available(ns):
+            return edge
 
 @global_domain.handlers.register(phase=P.POSTREQS, priority=50)
 def postreq_redirect(cursor: Node, *, ns: NS, **kwargs):
