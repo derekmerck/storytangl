@@ -12,12 +12,14 @@ from tangl.cli.controllers.story_controller import StoryController
 
 class RecordingCLI(cmd2.Cmd):
     def __init__(self) -> None:
-        super().__init__(allow_cli_args=False)
+        super().__init__(allow_cli_args=False, auto_load_commands=False)
         self.user_id = uuid4()
         self.ledger_id = uuid4()
         self.outputs: list[str] = []
         self.calls: list[tuple[str, dict[str, object]]] = []
         self.choice_id = uuid4()
+        self.story_controller = StoryController()
+        self.register_command_set(self.story_controller)
 
     def poutput(self, message: object, *, end: str = "\n", **_: object) -> None:
         self.outputs.append(str(message))
@@ -38,9 +40,7 @@ class RecordingCLI(cmd2.Cmd):
 @pytest.fixture()
 def story_controller() -> StoryController:
     cli = RecordingCLI()
-    controller = StoryController()
-    controller.on_register(cli)
-    return controller
+    return cli.story_controller
 
 def test_story_command_fetches_journal_and_choices(story_controller: StoryController) -> None:
     story_controller.do_story()
