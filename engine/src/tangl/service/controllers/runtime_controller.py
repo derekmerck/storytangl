@@ -2,12 +2,11 @@
 """Runtime controller bridging orchestrator calls to the VM layer."""
 
 from __future__ import annotations
-from collections.abc import Iterable
+
 from typing import Any
 from uuid import UUID
 
 from tangl.core import BaseFragment, StreamRegistry
-from tangl.journal.content import ContentFragment
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,
@@ -15,7 +14,7 @@ from tangl.service.api_endpoint import (
     MethodType,
     ResponseType,
 )
-from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase
+from tangl.vm.frame import ChoiceEdge, Frame
 from tangl.vm.ledger import Ledger
 from tangl.service.user.user import User
 
@@ -34,36 +33,36 @@ class RuntimeController(HasApiEndpoints):
             raise ValueError("limit must be non-negative")
 
         fragments = list(ledger.records.iter_channel("fragment"))
-        if limit == 0:
-            return []
-        if limit >= len(fragments):
+        if limit == 0 or limit >= len(fragments):
             return fragments
         return fragments[-limit:]
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.UPDATE,
-        response_type=ResponseType.CONTENT,
+        response_type=ResponseType.RUNTIME,
     )
-    def resolve_choice(self, frame: Frame, choice_id: UUID) -> dict[str, Any]:
-        """Resolve a player choice and return journal fragments for the step."""
+    def resolve_choice(
+        self,
+        ledger: Ledger,
+        frame: Frame,
+        choice_id: UUID,
+    ) -> dict[str, Any]:
+        """Resolve a player choice and update the ledger cursor."""
 
         choice = frame.graph.get(choice_id)
         if not isinstance(choice, ChoiceEdge):
             raise ValueError(f"Choice {choice_id} not found")
 
-        baseline_seq = frame.records.max_seq
         frame.resolve_choice(choice)
-        fragments = list(
-            frame.records.iter_channel(
-                "fragment",
-                predicate=lambda record: record.seq > baseline_seq,
-            )
-        )
+
+        ledger.cursor_id = frame.cursor_id
+        ledger.step = frame.step
+
         return {
-            "fragments": fragments,
-            "cursor_id": frame.cursor_id,
-            "step": frame.step,
+            "status": "resolved",
+            "cursor_id": str(ledger.cursor_id),
+            "step": ledger.step,
         }
 
     @ApiEndpoint.annotate(
@@ -100,28 +99,39 @@ class RuntimeController(HasApiEndpoints):
         return choices
 
     @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
+        access_level=AccessLevel.RESTRICTED,
         method_type=MethodType.UPDATE,
-        response_type=ResponseType.CONTENT,
+        response_type=ResponseType.RUNTIME,
     )
-    def jump_to_node(self, frame: Frame, node_id: UUID) -> dict[str, Any]:
-        """Set the frame cursor to ``node_id`` and journal the new context."""
+    def jump_to_node(self, ledger: Ledger, node_id: UUID) -> dict[str, Any]:
+        """Teleport the ledger cursor to ``node_id`` for debugging purposes."""
 
-        node = frame.graph.get(node_id)
-        if node is None:
-            raise ValueError(f"Node {node_id} not found")
+        from tangl.core.graph.edge import AnonymousEdge
 
-        frame.cursor_id = node.uid
-        frame._invalidate_context()  # rebuild context for new cursor
-        frame.run_phase(ResolutionPhase.VALIDATE)
-        fragments = frame.run_phase(ResolutionPhase.JOURNAL)
-        if isinstance(fragments, Iterable):
-            fragments_list = list(fragments)
-        else:
-            fragments_list = [ContentFragment(content=str(fragments))]
+        destination = ledger.graph.get(node_id)
+        if destination is None:
+            raise ValueError(f"Node {node_id} not found in graph")
+
+        if not destination.has_tags("dirty"):
+            destination.tags = set(destination.tags) | {"dirty"}
+
+        source = ledger.graph.get(ledger.cursor_id)
+        if source is None:
+            raise RuntimeError(f"Ledger cursor {ledger.cursor_id} not found in graph")
+
+        jump_edge = AnonymousEdge(source=source, destination=destination)
+
+        frame = ledger.get_frame()
+        frame.resolve_choice(jump_edge)
+
+        ledger.cursor_id = frame.cursor_id
+        ledger.step = frame.step
+
         return {
-            "fragments": fragments_list,
-            "cursor_id": frame.cursor_id,
+            "status": "jumped",
+            "cursor_id": str(ledger.cursor_id),
+            "step": ledger.step,
+            "dirty": True,
         }
 
     @ApiEndpoint.annotate(
@@ -148,17 +158,20 @@ class RuntimeController(HasApiEndpoints):
             label=story_label,
         )
         ledger.push_snapshot()
+        ledger.init_cursor()
 
         user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
 
-        start_node = story_graph.get(start_cursor_id)
-        cursor_label = start_node.label if start_node is not None else "unknown"
+        cursor_node = story_graph.get(ledger.cursor_id)
+        cursor_label = cursor_node.label if cursor_node is not None else "unknown"
 
         return {
+            "status": "created",
             "ledger_id": str(ledger.uid),
             "world_id": world_id,
             "title": story_graph.label,
-            "cursor_id": str(start_cursor_id),
+            "cursor_id": str(ledger.cursor_id),
             "cursor_label": cursor_label,
+            "step": ledger.step,
             "ledger": ledger,
         }

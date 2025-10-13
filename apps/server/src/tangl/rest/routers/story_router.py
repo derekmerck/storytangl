@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from typing import Any
+from uuid import UUID
+
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
-from tangl.persistence import LedgerEnvelope
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
 from tangl.type_hints import UniqueLabel
@@ -50,9 +52,8 @@ async def create_story(
         kwargs["story_label"] = story_label
     result = _call(orchestrator, "RuntimeController.create_story", user_id=user_id, **kwargs)
     ledger_obj = result.get("ledger") if isinstance(result, dict) else None
-    if ledger_obj is not None:
-        if orchestrator.persistence is not None:
-            orchestrator.persistence.save(LedgerEnvelope.from_ledger(ledger_obj))
+    if ledger_obj is not None and orchestrator.persistence is not None:
+        orchestrator.persistence.save(ledger_obj)
         result = dict(result)
         result.pop("ledger", None)
     return result
@@ -93,12 +94,23 @@ async def do_story_action(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     async with user_locks[user_id]:
-        return _call(
+        status = _call(
             orchestrator,
             "RuntimeController.resolve_choice",
             user_id=user_id,
             choice_id=choice_id,
         )
+
+        fragments = _call(
+            orchestrator,
+            "RuntimeController.get_journal_entries",
+            user_id=user_id,
+            limit=0,
+        )
+
+    payload = dict(status) if isinstance(status, dict) else {"status": status}
+    payload["fragments"] = fragments
+    return payload
 
 
 @router.get("/status")
