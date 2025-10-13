@@ -2,16 +2,18 @@
 """
 State holder for the live graph, cursor, and record stream (snapshots, patches, journal).
 """
-from typing import TYPE_CHECKING, Self
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 from pydantic import Field
 from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
-from tangl.type_hints import StringMap
 from .frame import Frame
 
 if TYPE_CHECKING:
+    from tangl.service.user.user import User
     from .replay import Patch
 
 class Ledger(Entity):
@@ -59,12 +61,14 @@ class Ledger(Entity):
     singletons; other domain styles are not supported here and should live on
     graph items where scope discovery can rehydrate them dynamically.
     """
-    graph: Graph = Field(None, exclude=True)
+    graph: Graph
     cursor_id: UUID = None
     step: int = -1
     domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
+    event_sourced: bool = False
+    user: Optional["User"] = Field(None, exclude=True)
 
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
@@ -110,21 +114,72 @@ class Ledger(Entity):
     #       entity-typed model fields using introspection (see registry)
 
     @classmethod
-    def structure(cls, data) -> Self:
-        _graph = data.pop("_graph")
-        _domains = data.pop("_domains")
-        _records = data.pop("_records")
-        obj = super().structure(data)
-        obj.graph = Graph.structure(_graph)
-        obj.domains = [ Domain.structure(d) for d in _domains ]
-        obj.records = StreamRegistry.structure(_records)
-        return obj
+    def structure(cls, data: Mapping[str, Any], **kwargs) -> "Ledger":
+        payload = dict(data)
+        graph_data = payload.pop("graph", None)
+        domain_data = payload.pop("domains", None)
+        record_data = payload.pop("records", None)
+        if "graph" not in payload:
+            payload["graph"] = Graph()
+        ledger = super().structure(payload, **kwargs)
+
+        if graph_data is not None:
+            ledger.graph = Graph.structure(graph_data)
+
+        if domain_data is not None:
+            ledger.domains = [Domain.structure(item) for item in domain_data]
+        else:
+            ledger.domains = []
+
+        if record_data is not None:
+            raw_records = list(record_data.get("_data", []))
+            for entry in raw_records:
+                item_payload = entry.get("item") if isinstance(entry, Mapping) else None
+                if isinstance(item_payload, Mapping):
+                    obj_cls = item_payload.get("obj_cls")
+                    if obj_cls in {Graph, Graph.__name__, Graph.__qualname__}:
+                        entry["item"] = Graph.structure(dict(item_payload))
+            ledger.records = StreamRegistry.structure(record_data)
+        else:
+            ledger.records = StreamRegistry()
+
+        if ledger.event_sourced and (graph_data is None or not getattr(ledger.graph, "data", {})):
+            ledger.graph = cls.recover_graph_from_stream(ledger.records)
+
+        return ledger
 
     def unstructure(self) -> UnstructuredData:
         data = super().unstructure()
-        # Only need to save graph if we are event sourced
-        data['_graph'] = self.graph.unstructure()
-        data['_domains'] = [ d.unstructure() for d in self.domains ]
-        data['_records'] = self.records.unstructure()
+        graph_payload = self.graph.unstructure()
+        graph_payload.pop("data", None)
+        data["graph"] = graph_payload
+
+        data["domains"] = [domain.unstructure() for domain in self.domains]
+
+        records_payload = self.records.unstructure()
+        sanitized_records: list[UnstructuredData] = []
+        for record in self.records.data.values():
+            record_payload = record.unstructure()
+            item = getattr(record, "item", None)
+            if hasattr(item, "unstructure"):
+                item_payload = item.unstructure()
+                if isinstance(item_payload, dict):
+                    item_payload.pop("data", None)
+                record_payload["item"] = item_payload
+            sanitized_records.append(record_payload)
+        records_payload["_data"] = sanitized_records
+        data["records"] = records_payload
+
+        if self.event_sourced:
+            data["graph"] = {
+                "uid": self.graph.uid,
+                "label": self.graph.label,
+            }
+
         return data
+
+
+from tangl.service.user.user import User as _LedgerUser
+
+Ledger.model_rebuild(_types_namespace={"User": _LedgerUser})
 

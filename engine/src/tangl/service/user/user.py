@@ -63,7 +63,7 @@ class User(Entity):
 
     privileged: bool = False  # User is authorized to use dev controllers
 
-    current_story_id: StoryId = None
+    current_ledger_id: UUID | None = None
 
     # @property
     # def current_story(self):
