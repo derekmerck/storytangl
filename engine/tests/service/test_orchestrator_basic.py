@@ -213,12 +213,11 @@ def test_create_story_via_orchestrator_persists_ledger(
     )
 
     ledger_id = UUID(result["ledger_id"])
-    current_ledger_id = getattr(user, "current_ledger_id", None)
-    if current_ledger_id is not None:
-        assert current_ledger_id == ledger_id
-    assert user.current_story_id == ledger_id
+    current_ledger_id = user.current_ledger_id
+    assert current_ledger_id == ledger_id
     ledger_obj = result["ledger"]
-    fake_persistence.save(LedgerEnvelope.from_ledger(ledger_obj))
+
+    fake_persistence.save(ledger_obj)
 
     assert ledger_id in fake_persistence
     saved_payload = fake_persistence[ledger_id]

@@ -135,10 +135,7 @@ def test_create_story_materializes_ledger(
     result = runtime_controller.create_story(user=user, world_id=demo_world.label)
 
     ledger_id = UUID(result["ledger_id"])
-    current_ledger_id = getattr(user, "current_ledger_id", None)
-    if current_ledger_id is not None:
-        assert current_ledger_id == ledger_id
-    assert user.current_story_id == ledger_id
+    assert user.current_ledger_id == ledger_id
     assert result["world_id"] == demo_world.label
     assert result["title"].startswith("story_")
     assert result["cursor_label"] == "start"

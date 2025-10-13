@@ -149,12 +149,7 @@ class RuntimeController(HasApiEndpoints):
         )
         ledger.push_snapshot()
 
-        try:
-            user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
-        except (AttributeError, ValueError):
-            user.current_story_id = ledger.uid
-        else:
-            user.current_story_id = ledger.uid
+        user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
 
         start_node = story_graph.get(start_cursor_id)
         cursor_label = start_node.label if start_node is not None else "unknown"
