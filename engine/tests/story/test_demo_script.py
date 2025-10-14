@@ -6,8 +6,8 @@ import yaml
 
 from tangl.compiler.script_manager import ScriptManager
 from tangl.core.graph.graph import Graph as StoryGraph
-from tangl.story.fabula.actor.actor import Actor
-from tangl.story.story_domain.world import World
+from tangl.story.concepts.actor import Actor
+from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
 
 
@@ -27,6 +27,8 @@ def test_load_demo_script() -> None:
     assert isinstance(story.cursor, Frame)
     frame = story.cursor
     assert frame.cursor.label == "start"
+
+    # todo: this does _not_ test that an initial journal entry was created at the cursor
 
     outgoing = list(
         story.find_edges(source_id=frame.cursor_id, trigger_phase=None)

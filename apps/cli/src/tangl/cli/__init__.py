@@ -1,5 +1,5 @@
 """Public entry points for the StoryTangl CLI."""
 
-from .app import TanglShell
+from .app import StoryTanglCLI, create_cli_app
 
-__all__ = ["TanglShell"]
+__all__ = ["StoryTanglCLI", "create_cli_app"]

@@ -1,43 +1,49 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
 import argparse
 from pprint import pformat
+from typing import TYPE_CHECKING
+from pathlib import Path
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 
-from tangl.cli.app_service_manager import service_manager
-
 if TYPE_CHECKING:
-    from ..app import TanglShell
+    from ..app import StoryTanglCLI
 
-@with_default_category('World')
+
+@with_default_category("World")
 class WorldController(CommandSet):
+    """World inspection commands powered by the orchestrator."""
 
-    _cmd: 'TanglShell'
+    _cmd: StoryTanglCLI
 
-    def poutput(self, *args):
-        self._cmd.poutput(*args)
+    def do_worlds(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
+        worlds = self._cmd.call_endpoint("WorldController.list_worlds")
+        self._cmd.poutput(pformat(worlds))
 
-    def do_worlds(self, line):
-        response = service_manager.get_world_list()
-        response = pformat(response)
-        self.poutput("World List\n-----------")
-        self.poutput( response )
+    world_parser = argparse.ArgumentParser()
+    world_parser.add_argument("world", type=str, help="World identifier")
 
-    get_world_id_parser = argparse.ArgumentParser()
-    get_world_id_parser.add_argument('world', type=str, help='World Id', default=None)
+    @with_argparser(world_parser)
+    def do_world_info(self, args: argparse.Namespace) -> None:
+        info = self._cmd.call_endpoint("WorldController.get_world_info", world_id=args.world)
+        self._cmd.poutput(pformat(info))
 
-    @with_argparser(get_world_id_parser)
-    def do_world_info(self, args):
-        """
-        Display the public info for the specified world.
-        """
-        response = service_manager.get_world_info(args.world)
-        self.poutput("World Info\n-----------")
-        response = pformat(response)
-        self.poutput( response )
+    script_path_parser = argparse.ArgumentParser()
+    script_path_parser.add_argument("script_path", type=Path, help="World path")
 
-    @with_argparser(get_world_id_parser)
-    def do_scenes(self, args):
-        self.poutput("Scene List\n-----------")
-        response = service_manager.get_scene_list(world_id=args.world)
-        self.poutput(response)
+    @with_argparser(script_path_parser)
+    def do_load_script(self, args: argparse.Namespace) -> None:
+        import yaml
+        script_data = yaml.safe_load(args.script_path.read_text())
+        from tangl.story.fabula.world import World
+        world: World = self._cmd.call_endpoint("WorldController.load_world", script_data=script_data)
+        out = f"Loaded world: {world.script_manager.get_story_metadata().get('title')}"
+        self._cmd.poutput(pformat(out))
+
+    create_story_parser = argparse.ArgumentParser()
+    create_story_parser.add_argument("world_id", type=str, help="World id to create")
+
+    # def do_create_story(self, world_id: str):
+    #     result = self._cmd.call_endpoint("WorldController.create_story", world_id=world_id)
+    #     self._cmd.poutput(pformat(result))

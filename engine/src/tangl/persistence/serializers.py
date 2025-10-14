@@ -91,7 +91,7 @@ class JsonSerializationHandler:
             except (TypeError, ValueError):
                 try:
                     obj[key] = UUID(value)
-                except (ValueError, AttributeError):
+                except (ValueError, AttributeError, TypeError):
                     pass
         return obj
 

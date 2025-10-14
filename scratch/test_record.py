@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4
 
-from tangl.core.fragment import ContentFragment as JournalFragment
+from tangl.journal import ContentFragment as JournalFragment
 
 @pytest.skip(allow_module_level=True)
 

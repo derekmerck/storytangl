@@ -39,15 +39,15 @@ class FakeWorld:
         return FakeStory(uid=f"story-{self.label}", user=user)
 
 class FakeUser:
-    def __init__(self, uid, access_level=AccessLevel.USER, current_story_id=None):
+    def __init__(self, uid, access_level=AccessLevel.USER, current_ledger_id=None):
         self.uid = uid
         self.access_level = access_level
-        self.current_story_id = current_story_id
+        self.current_ledger_id = current_ledger_id
         self.story_ids = []
 
     def add_story(self, story_id):
         self.story_ids.append(story_id)
-        self.current_story_id = story_id
+        self.current_ledger_id = story_id
 
 
 class FakeJournal(list):

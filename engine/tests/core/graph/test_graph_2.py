@@ -21,7 +21,6 @@ def test_graph_contains():
     assert n in g
     assert n.uid in g
 
-@pytest.mark.skip(reason="deprecated behavior")
 def test_graph_prevents_duplicates():
     g = Graph()
     n = Node(label="root")
@@ -29,15 +28,13 @@ def test_graph_prevents_duplicates():
     assert n.graph == g
 
     n.graph = None
+    g.add(n)  # Should NOT raise because already in graph but graph is not set properly
+
+    nn = Node(uid=n.uid, label="imposter")
+
     with pytest.raises(ValueError):
-        g.add(n)  # Should raise because already in graph but graph is not set properly
+        g.add(nn)  # Should raise because it would clobber existing node
 
-@pytest.mark.skip(reason="deprecated behavior")
-def test_graph_missing_node_raises_key_err():
-    g = Graph()
-
-    with pytest.raises(KeyError):
-        assert g.get("nonexistent") is None
 
 def test_graph_unstructure_structure():
     g = Graph()
@@ -84,8 +81,6 @@ def test_get_node_by_label():
 class TestNodeByCls(Node):
     ...
 
-# todo: revisit find by tags
-@pytest.mark.xfail(reason="find by tags not working correctly yet, need to revisit tags")
 def test_find_nodes():
     registry = Graph()
 
@@ -97,16 +92,16 @@ def test_find_nodes():
     registry.add(node2)
     registry.add(node3)
 
-    assert registry.all() == [node1, node2, node3]
+    assert list(registry.values()) == [node1, node2, node3]
 
     # Test finding nodes by type
-    assert list(registry.find_all(has_cls=TestNodeByCls)) == [node3]
+    assert list(registry.find_all(is_instance=TestNodeByCls)) == [node3]
 
     # Test finding nodes by filter
-    assert list(registry.find_all(tags={"red"})) == [node1, node3]
+    assert list(registry.find_all(has_tags={"red"})) == [node1, node3]
 
     # Test finding nodes by tags
-    assert list(registry.find_all(tags=node1.tags)) == [node1, node3]
+    assert list(registry.find_all(has_tags=node1.tags)) == [node1, node3]
 
 
 

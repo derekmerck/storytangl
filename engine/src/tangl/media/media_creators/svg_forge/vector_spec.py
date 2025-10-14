@@ -1,5 +1,4 @@
 from __future__ import annotations
-import abc
 from typing import Self
 
 from pydantic import Field, model_validator, BaseModel
@@ -8,7 +7,7 @@ from pydantic import Field, model_validator, BaseModel
 # from tangl.media.media_spec import MediaSpecification
 # from tangl.script.script_models import BaseScriptItem
 # from tangl.utils.response_models import StyleHints
-from tangl.type_hints import StyleDict, UniqueLabel
+from tangl.type_hints import UniqueLabel
 # from tangl.core import Node, PresentationHints
 # from ...media_spec import MediaSpec
 from .svg_source_manager import SvgSourceManager
@@ -16,7 +15,7 @@ from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
 from tangl.media.media_spec import MediaSpec
-from tangl.media.media_fragment import StagingHints
+from tangl.journal.media import StagingHints
 
 class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
     """

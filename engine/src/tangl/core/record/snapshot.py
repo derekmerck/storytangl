@@ -1,0 +1,67 @@
+from __future__ import annotations
+from typing import TypeVar, Generic, Literal
+import logging
+from copy import deepcopy
+
+from tangl.type_hints import Hash
+from tangl.core.entity import Entity
+from .record import Record
+
+logger = logging.getLogger(__name__)
+
+EntityT = TypeVar('EntityT', bound=Entity)
+
+class Snapshot(Record, Generic[EntityT]):
+    """
+    Snapshot[EntityT]()
+
+    Frozen record capturing a deep copy of an entity for persistence and recovery.
+
+    Why
+    ----
+    Provides a stable, hash-verified baseline for reconstruction or audit. Used by
+    the ledger to persist materialized graph state and restore it deterministically
+    before applying subsequent patches.
+
+    Key Features
+    ------------
+    * **Immutable baseline** – deep copy of an entity at a point in time.
+    * **State hash** – :attr:`item_state_hash` verifies integrity during recovery.
+    * **Generic type parameter** – documents the entity type being snapshotted.
+    * **Integration** – works with :class:`~tangl.vm.ledger.Ledger` and
+      :class:`~tangl.vm.replay.patch.Patch` for replay and restoration.
+
+    API
+    ---
+    - :meth:`from_item(item)` – create a snapshot with a deep copy and computed hash.
+    - :meth:`restore_item()` – return a deep copy of the stored entity.
+    - :attr:`item_state_hash` – hash of the entity’s state for verification.
+
+    Example
+    -------
+    >>> snap = Snapshot.from_item(graph)
+    >>> stream.add_record(snap)
+    >>> restored = stream.last(channel="snapshot").restore_item()
+
+    Notes
+    -----
+    Snapshots are immutable records; they do not serialize data internally but rely
+    on higher-level persistence managers to handle storage. Type parameters exist
+    for documentation only.
+    """
+    record_type: Literal['snapshot'] = 'snapshot'
+    item: EntityT  #: :meta-private:
+    item_state_hash: Hash
+
+    @classmethod
+    def from_item(cls, item: EntityT) -> Snapshot[EntityT]:
+        # No need to unstructure or serialize here, that can be handled by the
+        # general persistence manager like anything else.
+        return cls(item=deepcopy(item), item_state_hash=item._state_hash())
+
+    def restore_item(self, verify: bool = False) -> EntityT:
+        item = deepcopy(self.item)
+        if verify and item._state_hash() != self.item_state_hash:
+            raise RuntimeError("Recovered item state does not match item state hash.")
+        return item
+

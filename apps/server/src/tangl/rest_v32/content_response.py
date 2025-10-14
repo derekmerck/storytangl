@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator, field_serializer
 
 import tangl.info
 from tangl.type_hints import Identifier
-from tangl.core.fragment import ContentFragment, UpdateFragment, MediaFragment, MediaUpdateFragment, TextFragment, KvFragment, GroupFragment, UserEventFragment
+from tangl.journal import ContentFragment, UpdateFragment, MediaFragment, MediaUpdateFragment, TextFragment, KvFragment, GroupFragment, UserEventFragment
 
 # schema version can be tied to library minor version
 minor_version = ".".join(tangl.info.__version__.split(".")[0:1])  # i.e "3.2"

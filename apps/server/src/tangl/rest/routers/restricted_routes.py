@@ -1,99 +1,77 @@
-from fastapi import Depends, Query, Header, Body, Path
+from __future__ import annotations
+
+from __future__ import annotations
+
+from fastapi import Depends, Header, HTTPException, Path, Query
 
 from tangl.config import settings
+from tangl.rest.dependencies import get_orchestrator, get_user_locks
+from tangl.service import Orchestrator
 from tangl.type_hints import UniqueLabel
-from tangl.utils.uuid_for_secret import uuid_for_key, key_for_secret
-from tangl.service import ServiceManager
-from tangl.service.service_manager import RuntimeInfo, JournalEntry
-from tangl.rest.app_service_manager import get_service_manager, get_user_locks
+from tangl.utils.hash_secret import key_for_secret, uuid_for_key
+
 from .story_router import router as story_router
 from .system_router import router as system_router
 from .world_router import router as world_router
 
 
-@story_router.put("/go", response_model=JournalEntry, response_model_exclude_none=True, tags=['Restricted'])
+def _call(orchestrator: Orchestrator, endpoint: str, /, **params):
+    return orchestrator.execute(endpoint, **params)
+
+
+@story_router.put("/go", tags=["Restricted"])
 async def goto_story_block(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        user_locks: dict = Depends(get_user_locks),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        block_id: UniqueLabel = Query(example="scene_1/block_1")):
-    """
-    Navigate directly to a specific block in the story (restricted)
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    user_locks = Depends(get_user_locks),
+    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    block_id: UniqueLabel = Query(example="scene_1/block_1"),
+):
+    """Jump the active frame to ``block_id``."""
 
-    This endpoint updates the current story bookmark to the specified block.
-    Forcing a block open will mark the story as 'dirty'.
-    """
     user_id = uuid_for_key(api_key)
-    # todo: need to verify user privilege level
     async with user_locks[user_id]:
-        update = service_manager.goto_story_node(user_id, block_id)
-        return update
+        return _call(
+            orchestrator,
+            "RuntimeController.jump_to_node",
+            user_id=user_id,
+            node_id=block_id,
+        )
 
-@story_router.get("/info", response_model=RuntimeInfo, response_model_exclude_none=True, tags=['Restricted'])
+
+@story_router.get("/info", tags=["Restricted"])
 async def inspect_story_node(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        node_id: UniqueLabel = Query(example="scene_1/block_1") ):
-    """
-    Retrieve information about a specific node in the story (restricted)
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+):
+    """Return diagnostic story information for the active user."""
 
-    This endpoint provides information about the specified node.
-    """
     user_id = uuid_for_key(api_key)
-    # todo: need to verify user privilege level
-    return service_manager.get_node_info(user_id, node_id)
+    return _call(orchestrator, "RuntimeController.get_story_info", user_id=user_id)
 
-@story_router.post("/check", response_model=RuntimeInfo, response_model_exclude_none=True, tags=['Restricted'])
-async def check_expression(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        expr: str = Body()):
-    """
-    Dynamically evaluate a expression in the current story (restricted)
-    """
-    user_id = uuid_for_key(api_key)
-    # todo: need to verify user privilege level
-    return service_manager.check_story_expr(user_id=user_id, condition=expr)
 
-@story_router.post("/apply", response_model=dict, response_model_exclude_none=True, tags=['Restricted'])
-def apply_effect(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        user_locks: dict = Depends(get_user_locks),
-        api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        expr: str = Body()) -> RuntimeInfo:
-    """
-    Apply an effect expression in the current story (restricted)
+@story_router.post("/check", tags=["Restricted"])
+async def check_expression():
+    """Expression inspection is not yet supported."""
 
-    Directly manipulating the game state will mark the story as 'dirty'.
-    """
-    user_id = uuid_for_key(api_key)
-    # todo: need to verify user privilege level
-    with user_locks[user_id]:
-        return service_manager.apply_story_expr(user_id, expr=expr)
+    raise HTTPException(status_code=501, detail="Expression inspection is not available")
+
+
+@story_router.post("/apply", tags=["Restricted"])
+async def apply_effect():
+    """Direct state mutation is not supported in the orchestrated REST API."""
+
+    raise HTTPException(status_code=501, detail="Direct story mutation is not available")
+
 
 @system_router.put("/reset", tags=["Restricted"])
-async def reset_system(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        # api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        hard=False):
-    """
-    Reset the system (restricted)
+async def reset_system():
+    """System resets are not wired through the orchestrator yet."""
 
-    This endpoint drops all worlds and reloads them. If the 'hard' parameter is set
-    to True, it also discards all users and story data.
-    """
-    # user_id = uuid_for_key(api_key)
-    # todo: need to verify user privilege level
-    service_manager.reset_system(hard)
+    raise HTTPException(status_code=501, detail="System reset is not available")
 
-@world_router.get("/{world_id}/scenes", tags=['Restricted'])
-def get_scene_list(
-        service_manager: ServiceManager = Depends(get_service_manager),
-        # api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-        world_id: UniqueLabel = Path()) -> list:
-    """
-    List scenes in a world (restricted)
-    """
-    # user_id = uuid_for_key(api_key)
-    # todo: need to verify user privilege level
-    return service_manager.get_scene_list(world_id)
+
+@world_router.get("/{world_id}/scenes", tags=["Restricted"])
+async def get_scene_list(world_id: UniqueLabel = Path()):
+    """Scene listing is not yet exposed through the orchestrated REST API."""
+
+    raise HTTPException(status_code=501, detail="Scene listings are not available")

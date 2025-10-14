@@ -92,7 +92,10 @@ class Singleton(Entity):
 
     @classmethod
     def structure(cls, data: dict) -> Self:
-        obj_cls, label = data['obj_cls'], data['label']
+        label = data.pop("label")
+        # obj_cls may have already been popped off by Entity.structure()
+        # and redirected here under proper cls
+        obj_cls = data.get("obj_cls", cls)
         return obj_cls.get_instance(label)
 
     def unstructure(self) -> StringMap:

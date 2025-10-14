@@ -233,5 +233,3 @@ logger.debug(f"Found {len(members)} members: {members}")
 
 ## Related Guides
 - [Docstring & Autodoc Conventions](docstring_style.md)
-- [Planning Phase Roadmap](planning_phase_roadmap.md)
-- [Ledger Persistence Plan](ledger_persistence_plan.rst)

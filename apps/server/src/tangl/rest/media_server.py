@@ -11,10 +11,14 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from tangl.config import settings
 from tangl.info import __title__, __version__, __author__, __author_email__, __url__, __desc__
-from tangl.story.world import World
+from tangl.story.fabula.world import World
 
 description = f"Media server for {__desc__.lower()}"
+
+DEFAULT_APP_URL = "localhost:8000"
+__app_url__ = settings.get("app.url", "localhost:8000")
 
 app = FastAPI(
     title=f"{__title__} Media Server",

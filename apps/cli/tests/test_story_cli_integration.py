@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from tangl.story.story_domain.world import World
-from tangl.cli.app import TanglShell
+from tangl.story.fabula.world import World
+from tangl.cli.app import create_cli_app, StoryTanglCLI as TanglShell
 
 
 TEST_SCRIPT = (
@@ -21,6 +21,13 @@ def reset_worlds() -> None:
     World.clear_instances()
 
 
+@pytest.fixture()
+def tangl_cli() -> TanglShell:
+    app = create_cli_app()
+    app.onecmd("create_user my_password")
+    return app
+
+
 def _capture_output(app: TanglShell) -> str:
     output = app.stdout.getvalue()
     app.stdout.truncate(0)
@@ -28,58 +35,66 @@ def _capture_output(app: TanglShell) -> str:
     return output
 
 
-def test_load_script_and_show_story() -> None:
-    app = TanglShell()
+def test_load_script_and_show_story(tangl_cli: TanglShell) -> None:
+    app = tangl_cli
     app.stdout = io.StringIO()
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     output = _capture_output(app)
+    assert "Loaded world: The Crossroads" in output
 
-    assert "Loaded world: crossroads_demo" in output
-    assert "The Crossroads" in output
-    assert "You stand at a crossroads" in output
-
-    app.onecmd("story")
+    app.onecmd("create_story the_crossroads")
     output = _capture_output(app)
 
-    assert "Story: story_" in output
-    assert "# start" in output
+    assert "Created story:" in output
+    assert "Story Begins" in output
     assert "You stand at a crossroads" in output
-    # todo: Choice numbering is inconsistent?  Should be 1, 2
+    assert "Choices:" in output
     assert "Take the left path" in output
     assert "Take the right path" in output
 
-@pytest.mark.xfail(reason="todo: Bug in the tested features")
-def test_choose_advances_story() -> None:
-    app = TanglShell()
+    app.onecmd("story")
+    output = _capture_output(app)
+    assert "Story Update:" in output
+    assert "Choices:" in output
+
+
+def test_create_story_bundles_journal_and_choices(tangl_cli: TanglShell) -> None:
+    app = tangl_cli
     app.stdout = io.StringIO()
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     _capture_output(app)
 
-    app.onecmd("choose 1")
+    app.onecmd("create_story the_crossroads")
     output = _capture_output(app)
 
-    assert "garden" in output.lower()
-    assert "choices:" in output.lower()
-
-    app.onecmd("do 1")
-    output = _capture_output(app)
-
-    assert "your adventure comes to an end" in output.lower()
-    assert "no available actions" in output.lower()
+    assert "Created story:" in output
+    assert "Story Begins" in output
+    assert "Choices:" in output
+    assert "Use 'do <number>' to make a choice." in output
 
 
-def test_create_story_without_world() -> None:
-    app = TanglShell()
+def test_choose_advances_story(tangl_cli: TanglShell) -> None:
+    app = tangl_cli
     app.stdout = io.StringIO()
 
-    app.onecmd("create_story missing")
+    app.onecmd(f"load_script {TEST_SCRIPT}")
+    _capture_output(app)
+
+    app.onecmd("create_story the_crossroads")
+    _capture_output(app)
+
+    app.onecmd("do 2")
     output = _capture_output(app)
+    assert "Story Update:" in output
+    assert "garden" in output.lower()
+    assert "No available choices" in output
 
-    assert "World 'missing' not found" in output
 
-    app.onecmd("story")
-    output = _capture_output(app)
+def test_create_story_with_missing_world(tangl_cli: TanglShell) -> None:
+    app = tangl_cli
+    app.stdout = io.StringIO()
 
-    assert "No active story" in output
+    with pytest.raises(ValueError):
+        app.onecmd("create_story missing")

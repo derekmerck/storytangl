@@ -23,7 +23,7 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 
 ### Salvageable pieces
 - Keep the taxonomy (books/acts/scenes, events, roles/settings/props, narrative contracts, tension/emotional beats) as domain-specific registries layered onto the generic graph. They become data schemas + handler bundles rather than bespoke base classes.
-- Legacy world and controller APIs hint at service endpoints for listing worlds, creating stories, and retrieving media.【F:engine/src/tangl/story/story_controller.py†L1-L88】【F:engine/src/tangl/story/story_domain/world_controller.py†L1-L117】 These remain relevant for `service` integration once story orchestration stabilizes on the VM contracts.
+- Legacy world and controller APIs hint at service endpoints for listing worlds, creating stories, and retrieving media.【F:engine/src/tangl/service/controllers/runtime_controller.py†L1-L116】【F:engine/src/tangl/story/story_domain/world_controller.py†L1-L117】 These remain relevant for `service` integration once story orchestration stabilizes on the VM contracts.
 
 ## Mechanics Layer Concepts
 
@@ -46,7 +46,7 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 
 ### Salvageable pieces
 - Reuse the vocabulary and spec interfaces: `MediaDependency` stays a dependency edge with optional template/path/data inputs; `MediaSpec` instances become the forge contracts; provisioners remain dispatch registries hooking into planning.
-- Media controllers in story/world API wrappers can survive as service endpoints once the runtime surface area is finalized.【F:engine/src/tangl/story/story_controller.py†L41-L84】【F:engine/src/tangl/story/story_domain/world_controller.py†L87-L111】
+- Media controllers in story/world API wrappers can survive as service endpoints once the runtime surface area is finalized.【F:engine/src/tangl/service/controllers/runtime_controller.py†L1-L116】【F:engine/src/tangl/story/story_domain/world_controller.py†L87-L111】
 
 ## Protocol and Overview Blueprints
 

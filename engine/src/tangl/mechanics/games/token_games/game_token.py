@@ -5,7 +5,7 @@ from collections import Counter
 
 from pydantic import Field
 
-from tangl.story.fabula.asset import CountableAsset as Fungible, AssetWallet as Wallet
+from tangl.story.concepts.asset import CountableAsset as Fungible, AssetWallet as Wallet
 
 WalletHandler = object
 HasWallet = object

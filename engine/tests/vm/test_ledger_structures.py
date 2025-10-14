@@ -1,12 +1,20 @@
 import pytest
 
-from tangl.core import Graph, StreamRegistry, Domain
+from tangl.core import Graph, StreamRegistry, Domain, Singleton
 from tangl.vm.ledger import Ledger
 
-class SingletonDomain(Domain):
+class SingletonDomain(Singleton, Domain):
     ...
 
 my_test_domain = SingletonDomain(label="my_test_domain")
+
+def test_singleton_domain_structures():
+
+    data = my_test_domain.unstructure()
+    print( data )
+
+    assert Domain.structure(data) is my_test_domain
+
 
 def _make_minimal_ledger():
     g = Graph()
@@ -18,33 +26,42 @@ def _make_minimal_ledger():
 
 
 def test_ledger_unstructure_shape():
-    """unstructure() returns a dict with private payloads (_graph/_domains/_records)
-    plus the standard Entity fields."""
+    """unstructure() returns a dict with graph/domains/records payloads."""
     ld, _ = _make_minimal_ledger()
 
     data = ld.unstructure()
 
     assert isinstance(data, dict)
-    # Entity-level metadata
     assert "uid" in data
     assert "obj_cls" in data
-    # Ledger private payloads
-    assert "_graph" in data
-    assert "_domains" in data
-    assert len(data["_domains"]) == 1 and data["_domains"][0] == my_test_domain.unstructure()
-    assert "_records" in data
 
-    # Graph payload should look like a Registry payload with _data
-    gdata = data["_graph"]
-    assert isinstance(gdata, dict)
-    assert "_data" in gdata
-    assert len(gdata["_data"]) >= 1  # at least our 'start' node
+    assert "graph" in data
+    graph_payload = data["graph"]
+    assert isinstance(graph_payload, dict)
+    assert "_data" in graph_payload
+    assert len(graph_payload["_data"]) >= 1
 
-    # Records payload should look like a StreamRegistry payload with _data
-    rdata = data["_records"]
-    assert isinstance(rdata, dict)
-    assert "_data" in rdata
-    assert len(rdata["_data"]) >= 1  # at least the snapshot we pushed
+    assert "domains" in data
+    assert len(data["domains"]) == 1
+    assert data["domains"][0] == my_test_domain.unstructure()
+
+    assert "records" in data
+    records_payload = data["records"]
+    assert isinstance(records_payload, dict)
+    assert "_data" in records_payload
+    assert len(records_payload["_data"]) >= 1
+
+
+def test_ledger_unstructure_event_sourced_stubs_graph():
+    ld, _ = _make_minimal_ledger()
+    ld.event_sourced = True
+
+    data = ld.unstructure()
+
+    assert data["graph"] == {"uid": ld.graph.uid, "label": ld.graph.label}
+
+    rebuilt = Ledger.structure(dict(data))
+    assert rebuilt.graph.find_one(label="start") is not None
 
 
 def test_ledger_structure_round_trip():

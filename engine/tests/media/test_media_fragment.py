@@ -1,8 +1,6 @@
-import pytest
-
 # pytest.skip("deprecated", allow_module_level=True)
 
-from tangl.media.media_fragment import MediaFragment, StagingHints
+from tangl.journal.media import MediaFragment, StagingHints
 
 def test_media_fragment_with_url():
     # Test media fragment with URL
