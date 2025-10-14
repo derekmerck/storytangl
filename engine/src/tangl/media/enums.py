@@ -6,6 +6,7 @@ from pathlib import Path
 from tangl.utils.enum_plus import EnumPlusMixin
 
 class MediaDataType(EnumPlusMixin, Enum):
+    UNKNOWN = "unknown"
     MEDIA  = "media"   # generic default
     IMAGE  = "image"   # a PIL image
     VECTOR = "vector"  # an lxml document
@@ -21,10 +22,13 @@ class MediaDataType(EnumPlusMixin, Enum):
 
     @classmethod
     def extension_map(cls):
-        return {cls.IMAGE:  ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
-                cls.VECTOR: ["svg", "ai"],
-                cls.AUDIO:  ["mp3"],
-                cls.VIDEO:  ["mp4", "mkv", "webm"]}
+        return {
+            cls.UNKNOWN: ["bin"],
+            cls.IMAGE:  ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
+            cls.VECTOR: ["svg", "ai"],
+            cls.AUDIO:  ["mp3"],
+            cls.VIDEO:  ["mp4", "mkv", "webm"],
+        }
 
     @classmethod
     def inv_ext_map(cls):
@@ -36,6 +40,7 @@ class MediaDataType(EnumPlusMixin, Enum):
             value = value.strip('.')
         if value in cls.inv_ext_map():
             return cls.inv_ext_map()[value]
+        return cls.UNKNOWN
 
     @classmethod
     def from_path(cls, path: str | Path) -> Self:
