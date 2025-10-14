@@ -41,6 +41,8 @@ class SimpleConcept(Node):
 
     content: str = ""
 
+    # concepts render with 'describe()'
+
     def render(self, ns: NS | Mapping[str, Any]) -> str:
         """Return :attr:`content` with namespace variables substituted.
 

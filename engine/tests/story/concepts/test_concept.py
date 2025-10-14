@@ -8,7 +8,7 @@ import pytest
 
 from tangl.core import BaseFragment, Graph, Node
 from tangl.core.domain import global_domain
-from tangl.story.episode import SimpleConcept
+from tangl.story.concepts import Concept as SimpleConcept
 from tangl.vm import Frame, ResolutionPhase as P
 
 

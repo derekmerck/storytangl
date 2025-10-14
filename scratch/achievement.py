@@ -5,7 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from tangl.type_hints import UniqueLabel
-from tangl.core.entity import Singleton, SingletonNode
+from tangl.core import Singleton, Entity
+from tangl.core.graph import SingletonNode
 
 StoryId = UUID
 WorldId = UniqueLabel
@@ -21,7 +22,7 @@ class UserAchievementRecord(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
 
 
-class UserWorldMetadata(HasContext):
+class UserWorldMetadata(Entity):
     # Aggregate info from all stories in a given world
 
     world_id: WorldId = Field(..., alias='world')

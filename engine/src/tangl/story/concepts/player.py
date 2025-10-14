@@ -5,24 +5,17 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from tangl.core import Node, HasContext
-from tangl.type_hints import Tags
-from tangl.entity.mixins import HasNamespace
 from tangl.core import Node
-from tangl.graph.mixins import UsesPlugins
+from tangl.type_hints import Tag
+from tangl.core import Node
 from tangl.lang.personal_name import PersonalName
 from tangl.lang.gens import Gens
-from tangl.entity.mixins import NamespaceHandler
 
 if TYPE_CHECKING:
-    from tangl.user import User
-    from tangl.world import World
-    from .story import Story
+    from tangl.service.user import User
+    from tangl.story.fabula import World
 
-class Player(HasContext, Node):
-    pass
-
-class Player(HasPersonalName, UsesPlugins, HasNamespace, Node):
+class Player(PersonalName, Node):
     """
     This is Node that looks like a StoryNode but doesn't include the inherited namespace
     mixin b/c graph calls it specifically
@@ -32,14 +25,14 @@ class Player(HasPersonalName, UsesPlugins, HasNamespace, Node):
     def label(self):
         return "player"
 
-    full_name: str = "Zmobie Monster"
+    full_name: str = "T. Angld Ev"
     gens: Gens = Gens.XY
 
     @property
     def is_xx(self) -> bool:
         return self.gens is Gens.XX
 
-    @NamespaceHandler.strategy
+    # @NamespaceHandler.strategy
     def _include_player_in_ns(self):
         # just expose the entire player object, author can keep whatever
         # they like in player attributes
@@ -47,21 +40,21 @@ class Player(HasPersonalName, UsesPlugins, HasNamespace, Node):
 
     cash: int = 0
 
-    inv: Tags = Field(default_factory=set)
+    inv: set[Tag] = Field(default_factory=set)
 
-    def has_inv(self, *items: Tags) -> bool:
+    def has_inv(self, *items: Tag) -> bool:
         return set(items).issubset(self.inv)
 
-    achievements_: Tags = Field(default_factory=set, alias="achievements")
+    achievements_: set[Tag] = Field(default_factory=set, alias="achievements")
 
     @property
-    def achievements(self) -> Tags:
+    def achievements(self) -> list[Tag]:
         # include game (local) _and_ user (global) achievements
         if self.user:
             return self.user.achievements()
         return self.achievements_
 
-    def has_achievement(self, *items: Tags) -> bool:
+    def has_achievement(self, *items: Tag) -> bool:
         return set(items).issubset(self.achievements)
 
     def has(self, *items) -> bool:
@@ -93,8 +86,3 @@ class Player(HasPersonalName, UsesPlugins, HasNamespace, Node):
     def world(self) -> 'World':
         if self.graph and hasattr(self.graph, "world"):
             return self.graph.world
-
-    @property
-    def pm(self):
-        if hasattr(self.story, "pm"):
-            return self.story.pm

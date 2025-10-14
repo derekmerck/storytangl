@@ -21,11 +21,12 @@ Prop Concepts
 .. autoclass:: tangl.story.concepts.asset.AssetType
 .. autoclass:: tangl.story.concepts.asset.DiscreteAsset
 .. autoclass:: tangl.story.concepts.asset.CountableAsset
+.. autoclass:: tangl.story.concepts.asset.AssetWallet
 
 Setting Concepts
 ^^^^^^^^^^^^^^^^
-#.. autoclass:: tangl.story.concepts.setting.Location
-#.. autoclass:: tangl.story.concepts.setting.Setting
+.. autoclass:: tangl.story.concepts.location.Location
+.. autoclass:: tangl.story.concepts.location.Setting
 
 
 .. _story-episode:

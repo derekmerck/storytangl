@@ -5,7 +5,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from tangl.core import Graph, Node
-from tangl.story.episode import SimpleBlock, SimpleConcept, SimpleScene
+from tangl.story.episode import Block as SimpleBlock, Scene as SimpleScene
+from tangl.story.concepts import Concept as SimpleConcept
 from tangl.vm import (
     Affordance,
     ChoiceEdge,
