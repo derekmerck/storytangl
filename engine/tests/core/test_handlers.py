@@ -111,6 +111,35 @@ def test_handler_run_one_picks_first():
     assert r.result == "first"
 
 
+def test_dispatch_registry_deterministic_order():
+    registry = DispatchRegistry()
+    call_order: list[str] = []
+
+    def register(name: str, priority: HandlerPriority | int) -> None:
+        def func(ns):
+            call_order.append(name)
+            return name
+
+        registry.add_func(func, priority=priority, label=name)
+
+    register("late", HandlerPriority.LATE)
+    register("first", HandlerPriority.FIRST)
+    register("early", HandlerPriority.EARLY)
+    register("normal", HandlerPriority.NORMAL)
+
+    call_order.clear()
+    first_run = [receipt.result for receipt in registry.run_all({"run": 0})]
+    expected = call_order.copy()
+
+    assert first_run == expected
+
+    for run in range(1, 4):
+        call_order.clear()
+        rerun = [receipt.result for receipt in registry.run_all({"run": run})]
+        assert rerun == expected
+        assert call_order == expected
+
+
 def test_handler_priority_ordering():
     h1 = Handler(func=lambda x, y: 1, priority=1, label="h1")
     h2 = Handler(func=lambda x, y: 2, priority=10, label="h2")

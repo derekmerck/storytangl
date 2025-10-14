@@ -49,3 +49,33 @@ def test_domain_node_find_helpers_filter_children_by_criteria():
 
     assert parent.find_child(label="beta") is beta
     assert parent.find_child(label="missing") is None
+
+
+def test_domain_node_reparenting_is_exclusive_and_invalidation_occurs():
+    graph = Graph(label="graph")
+    parent_a = DomainNode(label="parent-a", graph=graph)
+    parent_b = DomainNode(label="parent-b", graph=graph)
+    child = DomainNode(label="child", graph=graph)
+
+    parent_a.add_child(child)
+    assert child.parent is parent_a
+
+    # Cache the parent property then reparent to ensure invalidation occurs.
+    cached_parent = child.parent
+    assert cached_parent is parent_a
+
+    parent_b.add_child(child)
+
+    assert child.parent is parent_b
+    assert child not in list(parent_a.children())
+    assert parent_a.has_member(child) is False
+    assert parent_b.has_member(child) is True
+
+    edges_to_child = list(graph.find_edges(source=parent_b, destination=child, edge_type="child"))
+    assert len(edges_to_child) == 1
+    assert graph.find_edge(source=parent_a, destination=child, edge_type="child") is None
+
+    # Adding the same child again should be idempotent.
+    parent_b.add_child(child)
+    edges_after = list(graph.find_edges(source=parent_b, destination=child, edge_type="child"))
+    assert len(edges_after) == 1

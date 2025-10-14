@@ -2,9 +2,13 @@ import logging
 
 import pytest
 
+from tangl.core import BaseFragment, Graph
+from tangl.core.dispatch import JobReceipt
 from tangl.core.entity import Entity
-from tangl.core.record import Record, StreamRegistry as RecordStream
+from tangl.core.record import Record, Snapshot, StreamRegistry as RecordStream
 from tangl.core.registry import Registry
+from tangl.vm.replay.event import Event, EventType
+from tangl.vm.replay.patch import Patch
 
 # --- helpers ---------------------------------------------------------------
 
@@ -198,7 +202,54 @@ def test_empty_journal():
 
     assert len(stream) == 0
     assert list(stream.values()) == []
-    assert stream.markers == {}
+
+
+def test_channel_sections_iterate_independently():
+    stream = RecordStream()
+    graph = Graph(label="channels")
+    node = graph.add_node(label="anchor")
+
+    snapshot = Snapshot.from_item(graph)
+    stream.push_records(snapshot, marker_type="snapshot", marker_name="snap-0")
+
+    base_hash = graph._state_hash()
+    patch = Patch(
+        events=[
+            Event(
+                event_type=EventType.UPDATE,
+                source_id=node.uid,
+                name="label",
+                value="patched",
+            )
+        ],
+        registry_id=graph.uid,
+        registry_state_hash=base_hash,
+    )
+    stream.push_records(patch, marker_type="patch", marker_name="patch-0")
+
+    fragment = BaseFragment(fragment_type="text", content="hello")
+    stream.push_records(fragment, marker_type="fragment", marker_name="frag-0")
+
+    receipt = JobReceipt(blame_id=node.uid, result="ok")
+    stream.push_records(receipt, marker_type="job_receipt", marker_name="job-0")
+
+    snap_section = list(stream.get_section("snap-0", "snapshot", has_channel="snapshot"))
+    assert [record.record_type for record in snap_section] == ["snapshot"]
+
+    patch_section = list(stream.get_section("patch-0", "patch", has_channel="patch"))
+    assert [record.record_type for record in patch_section] == ["patch"]
+
+    fragment_section = list(stream.get_section("frag-0", "fragment", has_channel="fragment"))
+    assert [record.record_type for record in fragment_section] == ["fragment"]
+
+    receipt_section = list(stream.get_section("job-0", "job_receipt", has_channel="job_receipt"))
+    assert [record.record_type for record in receipt_section] == ["job_receipt"]
+    assert stream.markers == {
+        "snapshot": {"snap-0": snap_section[0].seq},
+        "patch": {"patch-0": patch_section[0].seq},
+        "fragment": {"frag-0": fragment_section[0].seq},
+        "job_receipt": {"job-0": receipt_section[0].seq},
+    }
 
     with pytest.raises(KeyError):
         stream.get_section("notfound")
