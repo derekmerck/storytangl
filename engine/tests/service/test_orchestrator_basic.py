@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,7 +13,7 @@ from tangl.service.controllers import RuntimeController
 from tangl.service.user.user import User
 from tangl.compiler.script_manager import ScriptManager
 from tangl.story.fabula.world import World
-from tangl.vm.frame import Frame
+from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase
 from tangl.vm.ledger import Ledger
 
 
@@ -157,6 +158,86 @@ def test_orchestrator_reuses_cached_ledger_for_frame(
     assert len(ledger_gets) == 1
     controller_instance = orchestrator._endpoints["FrameController.get_frame_data"][0]
     assert controller_instance.frames
+
+
+def test_orchestrator_pipeline_smoke(
+    fake_persistence: FakePersistence, minimal_ledger: Ledger
+) -> None:
+    ledger = minimal_ledger
+    start_node = ledger.graph.get(ledger.cursor_id)
+    destination = ledger.graph.add_node(label="dest")
+    ChoiceEdge(
+        graph=ledger.graph,
+        source_id=start_node.uid if start_node else None,
+        destination_id=destination.uid,
+    )
+
+    calls: list[tuple[str, int]] = []
+
+    def pre_one(args, kwargs):
+        calls.append(("pre", 1))
+        return args, kwargs
+
+    def pre_two(args, kwargs):
+        calls.append(("pre", 2))
+        return args, kwargs
+
+    def post_one(result):
+        calls.append(("post", 1))
+        payload = dict(result)
+        payload["post1"] = True
+        return payload
+
+    def post_two(result):
+        calls.append(("post", 2))
+        payload = dict(result)
+        payload["post2"] = True
+        return payload
+
+    class PipelineController(HasApiEndpoints):
+        def __init__(self) -> None:
+            self.last_frame: Frame | None = None
+
+        @ApiEndpoint.annotate(
+            preprocessors=[pre_one, pre_two],
+            postprocessors=[post_one, post_two],
+            method_type=MethodType.UPDATE,
+            response_type=ResponseType.RUNTIME,
+        )
+        def resolve(self, ledger: Ledger, frame: Frame) -> dict[str, Any]:
+            self.last_frame = frame
+            edge = ledger.graph.find_edge(source=ledger.graph.get(ledger.cursor_id), destination=destination)
+            frame.resolve_choice(edge or ChoiceEdge(
+                graph=ledger.graph,
+                source_id=ledger.cursor_id,
+                destination_id=destination.uid,
+            ))
+            ledger.cursor_id = frame.cursor_id
+            ledger.step = frame.step
+            return {"cursor": str(ledger.cursor_id), "step": ledger.step}
+
+    controller = PipelineController()
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(controller)
+
+    fake_persistence[ledger.uid] = ledger.unstructure()
+
+    result = orchestrator.execute("PipelineController.resolve", ledger_id=ledger.uid)
+
+    assert calls == [("pre", 1), ("pre", 2), ("post", 1), ("post", 2)]
+    assert result["cursor"] == str(destination.uid)
+    assert result["post1"] is True and result["post2"] is True
+    persisted_ledger = fake_persistence[ledger.uid]
+    assert getattr(persisted_ledger, "cursor_id") == destination.uid
+    assert getattr(persisted_ledger, "step") > 0
+
+    assert "frame" in persisted_ledger.records.markers
+    assert any(
+        name.startswith("step-") for name in persisted_ledger.records.markers["frame"]
+    )
+
+    assert controller.last_frame is not None
+    assert ResolutionPhase.VALIDATE in controller.last_frame.phase_receipts
 
 
 def test_orchestrator_persists_mutations(
