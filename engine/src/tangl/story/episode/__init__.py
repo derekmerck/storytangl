@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from .block import SimpleBlock
-from tangl.story.concepts.concept import SimpleConcept
-from .scene import SimpleScene
+from .block import SimpleBlock as Block
+from .scene import SimpleScene as Scene
 
 __all__ = [
-    "SimpleBlock",
-    "SimpleConcept",
-    "SimpleScene",
+    "Block",
+    "Scene",
 ]

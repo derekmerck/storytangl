@@ -6,3 +6,5 @@ tangl package
 
    tangl.core
    tangl.vm
+   tangl.story
+   tangl.service

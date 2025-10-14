@@ -18,6 +18,7 @@ class Role(Dependency[Actor]):
     is a placeholder for a dynamically assigned Traversable.
 
     Actors may be assigned in several ways:
+
     - By referring to an existing Actor using `actor_ref`
     - By creating a new Actor from a template using `actor_template`
     - By searching for an Actor in the registry that matches `actor_conditions`
