@@ -9,17 +9,17 @@ from tangl.compiler.script_manager import ScriptManager
 from tangl.core.entity import Entity
 from tangl.core.graph.graph import Graph
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
-from tangl.story.fabula.actor.actor import Actor
-from tangl.story.fabula.asset.asset_manager import AssetManager
-from tangl.story.fabula.asset.asset_type import AssetType
-from tangl.story.story_domain.domain_manager import DomainManager
-from tangl.story.story_domain.world import World
+from tangl.story.concepts.actor import Actor
+from tangl.story.concepts.asset.asset_manager import AssetManager
+from tangl.story.concepts.asset import AssetType
+from tangl.story.fabula.domain_manager import DomainManager
+from tangl.story.fabula.world import World
 from tangl.media.resource_manager import ResourceManager
 
 
 def test_domain_manager_resolve_builtin_class():
     manager = DomainManager()
-    resolved = manager.resolve_class("tangl.story.fabula.actor.actor.Actor")
+    resolved = manager.resolve_class("tangl.story.concepts.actor.actor.Actor")
     assert resolved is Actor
 
 

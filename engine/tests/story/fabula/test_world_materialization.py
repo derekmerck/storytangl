@@ -4,8 +4,8 @@ from tangl.compiler.script_manager import ScriptManager
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph
 from tangl.core.graph.node import Node
-from tangl.story.story_domain.world import World
-from tangl.story.reference_domain.block import SimpleBlock as ReferenceBlock
+from tangl.story.fabula.world import World
+from tangl.story.episode.block import SimpleBlock as ReferenceBlock
 from tangl.vm.frame import ChoiceEdge
 
 

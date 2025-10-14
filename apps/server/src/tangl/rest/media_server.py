@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from tangl.config import settings
 from tangl.info import __title__, __version__, __author__, __author_email__, __url__, __desc__
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 
 description = f"Media server for {__desc__.lower()}"
 

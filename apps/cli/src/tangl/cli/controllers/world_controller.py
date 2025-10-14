@@ -36,7 +36,7 @@ class WorldController(CommandSet):
     def do_load_script(self, args: argparse.Namespace) -> None:
         import yaml
         script_data = yaml.safe_load(args.script_path.read_text())
-        from tangl.story.story_domain.world import World
+        from tangl.story.fabula.world import World
         world: World = self._cmd.call_endpoint("WorldController.load_world", script_data=script_data)
         out = f"Loaded world: {world.script_manager.get_story_metadata().get('title')}"
         self._cmd.poutput(pformat(out))

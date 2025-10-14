@@ -21,9 +21,9 @@ nor graph, they are tracked via a set attribute "inv" on the host entity.
 """
 
 from tangl.core.singleton import InheritingSingleton
-from tangl.core.services import Renderable, HasContext  # Associating
+# from tangl.core.services import Renderable, HasContext  # Associating
 
-class AssetType(Renderable, HasContext, InheritingSingleton):
+class AssetType(InheritingSingleton):
     """
     An AssetType is a singleton entity node that represents a specific
     noun within the narrative, such as a sword, a bag of money, or a shirt.

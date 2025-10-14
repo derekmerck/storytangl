@@ -75,6 +75,7 @@ class Ledger(Entity):
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
         # everything else on the stream
+        # todo: if event sourced, we need to update the graph before snapshot
         snapshot = Snapshot.from_item(self.graph)
         self.records.add_record(snapshot)
 
@@ -95,6 +96,7 @@ class Ledger(Entity):
         seq = snapshot.seq
         # Get all patches since the most recent snapshot and apply them
         patches = records.find_all(
+            # is_instance=Patch,
             predicate=lambda x: x.seq > seq,
             has_channel="patch",
             sort_key=lambda x: x.seq)  # type: list[Patch]
@@ -113,6 +115,7 @@ class Ledger(Entity):
             cursor_id=self.cursor_id,
             step=self.step,
             records=self.records,
+            event_sourced=self.event_sourced
         )
 
     def init_cursor(self) -> None:

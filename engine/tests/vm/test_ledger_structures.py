@@ -1,12 +1,20 @@
 import pytest
 
-from tangl.core import Graph, StreamRegistry, Domain
+from tangl.core import Graph, StreamRegistry, Domain, Singleton
 from tangl.vm.ledger import Ledger
 
-class SingletonDomain(Domain):
+class SingletonDomain(Singleton, Domain):
     ...
 
 my_test_domain = SingletonDomain(label="my_test_domain")
+
+def test_singleton_domain_structures():
+
+    data = my_test_domain.unstructure()
+    print( data )
+
+    assert Domain.structure(data) is my_test_domain
+
 
 def _make_minimal_ledger():
     g = Graph()

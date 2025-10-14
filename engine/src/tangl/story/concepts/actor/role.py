@@ -6,14 +6,13 @@ from pydantic import Field, model_validator, field_validator
 
 from tangl.exceptions import AssociationHandlerError
 from tangl.type_hints import UniqueLabel, StringMap, Identifier
-from tangl.core.solver import DependencyEdge  #, on_associate, on_disassociate, on_can_associate, on_can_disassociate
-# from tangl.story.story_node import StoryNode
+from tangl.vm import Dependency
 from .actor import Actor
 
 logger = logging.getLogger(__name__)
 
 
-class Role(DependencyEdge[Actor]):
+class Role(Dependency[Actor]):
     """
     A Role is a placeholder for a dynamically assigned Actor, similar to how an Edge
     is a placeholder for a dynamically assigned Traversable.
@@ -72,9 +71,9 @@ class Role(DependencyEdge[Actor]):
         if self.actor:
             return self.disassociate_from(self.actor)
 
-    @on_can_associate.register()
-    def _already_cast(self, **kwargs):
-        if self.actor is not None:
-            logger.warning(f"Already cast role {self!r}, must uncast before recasting")
-        return True
+    # @on_can_associate.register()
+    # def _already_cast(self, **kwargs):
+    #     if self.actor is not None:
+    #         logger.warning(f"Already cast role {self!r}, must uncast before recasting")
+    #     return True
 

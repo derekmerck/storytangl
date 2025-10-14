@@ -50,7 +50,7 @@ scenes:
 
 ```python
 from tangl.compiler.script_manager import ScriptManager
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 import yaml
 
 # Load script

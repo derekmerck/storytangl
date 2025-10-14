@@ -1,16 +1,15 @@
 from __future__ import annotations
 import functools
-import pydantic
 from enum import Enum
 from typing import ClassVar, Optional
 import logging
 
-from pydantic import Field, model_validator, field_validator, ValidationInfo, field_serializer
+from pydantic import Field, field_validator, ValidationInfo, field_serializer
 
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.lang.helpers.pattern import is_plural
 from tangl.core.entity import SingletonNode
-from tangl.story.fabula.asset import AssetType
+from tangl.story.concepts.asset import AssetType
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)

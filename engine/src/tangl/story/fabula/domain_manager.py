@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 """Helpers for resolving domain-specific classes within a story world."""
-
+from __future__ import annotations
 from typing import Optional, Type
 import importlib
 import inspect

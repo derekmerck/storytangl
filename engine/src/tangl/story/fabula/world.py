@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 """World singleton coordinating managers for story construction."""
 
+from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
@@ -12,8 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.singleton import Singleton
-from tangl.story.story_domain.domain_manager import DomainManager
-from tangl.story.fabula.asset.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
+from tangl.story.concepts.asset.asset_manager import AssetManager
 from tangl.media.resource_manager import ResourceManager
 from tangl.compiler.script_manager import ScriptManager
 
@@ -85,7 +84,7 @@ class World(Singleton):
         if "countable" in self.asset_manager.asset_classes:
             return
         try:
-            from tangl.story.fabula.asset import CountableAsset
+            from tangl.story.concepts.asset import CountableAsset
         except ModuleNotFoundError:  # pragma: no cover - optional dependency gap
             return
         self.asset_manager.register_asset_class("countable", CountableAsset)

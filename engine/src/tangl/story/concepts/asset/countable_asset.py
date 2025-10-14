@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
 from tangl.core.entity import Entity
-from tangl.core.services import on_gather_context, on_render_content
+# from tangl.core.services import on_gather_context, on_render_content
 from .asset_type import AssetType
 
 class CountableAsset(AssetType):
@@ -171,9 +171,9 @@ class HasAssetWallet(Entity):
             return x
         return super().__getattr__(item)
 
-    @on_gather_context.register()
-    def _include_wallet_items(self, **kwargs):
-        return self.wallet
+    # @on_gather_context.register()
+    # def _include_wallet_items(self, **kwargs):
+    #     return self.wallet
 
     # # todo: should be "on describe" or something?
     # @on_render_content.register()

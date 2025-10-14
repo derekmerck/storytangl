@@ -74,7 +74,7 @@ scenes:
 
 actors:
   guide:
-    obj_cls: tangl.story.fabula.actor.actor.Actor
+    obj_cls: tangl.story.concepts.actor.actor.Actor
     name: "The Guide"
     content: "A mysterious figure who appears at crossroads."
     tags: [npc, helpful]

@@ -141,7 +141,7 @@ class RuntimeController(HasApiEndpoints):
     def create_story(self, user: User, world_id: str, **kwargs: Any) -> dict[str, Any]:
         """Create a fully-materialized story ledger for ``user``."""
 
-        from tangl.story.story_domain.world import World
+        from tangl.story.fabula.world import World
 
         world = World.get_instance(world_id)
         if world is None:

@@ -4,10 +4,12 @@ import logging
 from pydantic import Field
 
 from tangl.type_hints import StringMap
-from tangl.graph.mixins import AssociationHandler
-from tangl.story.story import StoryNode
-from .role import Role, CastingHandler
+# from tangl.graph.mixins import AssociationHandler
+# from tangl.story.story import StoryNode
+from .role import Role
 from .actor import Actor
+
+logger = logging.getLogger(__name__)
 
 
 class Extras(Role):
@@ -69,10 +71,10 @@ class Extras(Role):
             CastingHandler.uncast(self)  # disassociate
         return res
 
-    @AssociationHandler.associate_with_strategy
-    def _finalize_actor(self, extra: Actor, **kwargs):
-        extra.label_ += f"-{str(extra.uid)[0:3]}"
-        extra.tags.add('generic')
-        logger.debug( str(extra) )
-        # actor.locals['generic'] = True  # alternative tagging
+    # @AssociationHandler.associate_with_strategy
+    # def _finalize_actor(self, extra: Actor, **kwargs):
+    #     extra.label_ += f"-{str(extra.uid)[0:3]}"
+    #     extra.tags.add('generic')
+    #     logger.debug( str(extra) )
+    #     # actor.locals['generic'] = True  # alternative tagging
 

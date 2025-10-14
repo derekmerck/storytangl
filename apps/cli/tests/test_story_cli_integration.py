@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 from tangl.cli.app import create_cli_app, StoryTanglCLI as TanglShell
 
 

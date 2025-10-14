@@ -241,30 +241,31 @@ def test_index_and_lookup(tmp_path):
 **Why**: World needs to coordinate all managers for story creation.
 
 **How**:
+
 ```python
 class World(Singleton):
     """Story world containing templates, handlers, and resources."""
-    
+
     def __init__(
-        self,
-        label: str,
-        script_manager: ScriptManager,
-        domain_manager: Optional[DomainManager] = None,
-        asset_manager: Optional[AssetManager] = None,
-        resource_manager: Optional[ResourceManager] = None
+            self,
+            label: str,
+            script_manager: ScriptManager,
+            domain_manager: Optional[DomainManager] = None,
+            asset_manager: Optional[AssetManager] = None,
+            resource_manager: Optional[ResourceManager] = None
     ):
         super().__init__(label=label)
         self.script_manager = script_manager
         self.domain_manager = domain_manager or DomainManager()
         self.asset_manager = asset_manager or AssetManager()
         self.resource_manager = resource_manager or ResourceManager(Path('.'))
-        
+
         # Setup default asset classes
         self._setup_default_assets()
-    
+
     def _setup_default_assets(self):
         """Register built-in asset types."""
-        from tangl.story.fabula.asset import (
+        from tangl.story.concepts.asset import (
             CountableAsset,
             DiscreteAsset,
         )
@@ -274,18 +275,18 @@ class World(Singleton):
                 'countable',
                 CountableAsset
             )
-    
+
     def create_story(
-        self,
-        story_label: str,
-        mode: str = 'full'
+            self,
+            story_label: str,
+            mode: str = 'full'
     ) -> StoryGraph:
         """Create new story instance."""
         if mode == 'full':
             return self._create_story_full(story_label)
         else:
             raise NotImplementedError(f"Mode {mode} not yet implemented")
-    
+
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """MVP: Full materialization (implemented in Phase 2)."""
         raise NotImplementedError("To be implemented in Phase 2")

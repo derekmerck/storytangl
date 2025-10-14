@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tangl.core import BaseFragment, Graph
-from tangl.story.reference_domain import SimpleBlock, SimpleConcept
+from tangl.story.episode import SimpleBlock, SimpleConcept
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase as P
 
 

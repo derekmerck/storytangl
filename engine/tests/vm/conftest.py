@@ -1,6 +1,8 @@
 import pytest
 
 from tangl.core.graph import Graph, Node
+from tangl.core.record import StreamRegistry
+from tangl.vm import Ledger
 from tangl.vm.context import Context
 from tangl.vm.frame import Frame
 
@@ -19,3 +21,8 @@ def context(graph):
 def frame(graph):
     abc = next( graph.find_nodes(label="abc") )
     return Frame(graph=graph, cursor_id=abc.uid)
+
+@pytest.fixture
+def ledger(graph):
+    abc = next( graph.find_nodes(label="abc") )
+    return Ledger(graph=graph, cursor_id=abc.uid, records=StreamRegistry())

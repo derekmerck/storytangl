@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .block import SimpleBlock
-from .concept import SimpleConcept
+from tangl.story.concepts.concept import SimpleConcept
 from .scene import SimpleScene
 
 __all__ = [

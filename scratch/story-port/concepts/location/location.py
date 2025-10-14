@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import Optional, Iterable, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from tangl.core.entity import Node
 from tangl.core.services import Renderable
 # Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate
-from ..actor import Extras
+from tangl.story.concepts.actor import Extras
 
 if TYPE_CHECKING:
     from .setting import Setting

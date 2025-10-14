@@ -11,7 +11,7 @@ from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator
 from tangl.service.controllers import RuntimeController
 from tangl.service.user.user import User
 from tangl.compiler.script_manager import ScriptManager
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
 from tangl.vm.ledger import Ledger
 

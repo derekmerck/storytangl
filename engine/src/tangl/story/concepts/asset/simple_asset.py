@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from tangl.type_hints import Tag
 from tangl.core.entity import Entity
-from tangl.core.services import on_gather_context, on_render_content
+# from tangl.core.services import on_gather_context, on_render_content
 
 class HasSimpleAssets(Entity):
     """
@@ -22,6 +22,6 @@ class HasSimpleAssets(Entity):
     def has_inv(self, *items: Tag) -> bool:
         return self._attrib_is_superset_of("inv", *items)
 
-    @on_gather_context.register()
-    def _include_inv_items(self, **kwargs):
-        return {"inv": self.inv}
+    # @on_gather_context.register()
+    # def _include_inv_items(self, **kwargs):
+    #     return {"inv": self.inv}

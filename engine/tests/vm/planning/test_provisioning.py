@@ -35,7 +35,6 @@ def test_provision_existing_success():
     frame.run_phase(P.PLANNING)
     assert req.satisfied and req.provider is target
 
-# @pytest.mark.xfail(reason="Needs orchestrator to link or mark unresolvable, previously in provisioner")
 def test_provision_existing_failure_sets_unresolvable():
     g, n = _frame_with_cursor()
     req = Requirement[Node](graph=g, policy=ProvisioningPolicy.EXISTING, identifier="missing")
@@ -236,14 +235,14 @@ def test_selector_prefers_lowest_priority_and_stable_ordering():
         template: dict[str, Any]
         priority: float
 
-        def get_offers(self, requirement: Requirement, *, ctx=None) -> Optional[Offer | list[Offer]]:
-            return Offer(
+        def get_offers(self, requirement: Requirement, *, ctx=None) -> Optional[ProvisionOffer | list[ProvisionOffer]]:
+            return ProvisionOffer(
                 requirement=requirement,
                 provisioner=self,
                 priority=self.priority
             )
 
-        def accept_offer(self, offer: Offer) -> Entity:
+        def accept_offer(self, offer: ProvisionOffer) -> Entity:
             return Entity.structure(self.template)
 
     frame = Frame(graph=g, cursor_id=n.uid)
@@ -262,7 +261,7 @@ def test_selector_prefers_lowest_priority_and_stable_ordering():
         nonlocal offers
 
         prov = TemplateProvisioner(requirement=None, template={"obj_cls": Node, "label": f"X_{suffix}"})
-        offer = Offer(requirement=req, provisioner=prov, priority=priority)
+        offer = ProvisionOffer(requirement=req, provisioner=prov, priority=priority)
         offers.append(offer)
         return offer
 

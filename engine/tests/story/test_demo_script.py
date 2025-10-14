@@ -6,8 +6,8 @@ import yaml
 
 from tangl.compiler.script_manager import ScriptManager
 from tangl.core.graph.graph import Graph as StoryGraph
-from tangl.story.fabula.actor.actor import Actor
-from tangl.story.story_domain.world import World
+from tangl.story.concepts.actor import Actor
+from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
 
 

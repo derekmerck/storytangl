@@ -2,9 +2,8 @@ Service Layer Architecture
 ==========================
 
 The service layer provides a stable API between StoryTangl applications and the
-engine core objects such as :class:`tangl.vm.Ledger` and
-:class:`tangl.vm.Frame`. This document captures the modern orchestrator-based
-approach that replaces the legacy ``ServiceManager`` pattern.
+engine virtual machine objects such as :class:`tangl.vm.Ledger` and
+:class:`tangl.vm.Frame`.
 
 
 Orchestrator
@@ -68,10 +67,3 @@ Example::
             return {"world_id": world_id, "title": world.label}
 
 
-Legacy ServiceManager
----------------------
-
-``ServiceManager`` is still available for backwards compatibility but is now
-deprecated. New integrations should rely on the orchestrator, and existing
-callers should plan migrations to benefit from type-hint-driven resource
-hydration and simplified controller logic.

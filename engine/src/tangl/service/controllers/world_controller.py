@@ -9,7 +9,7 @@ from tangl.service.response.info_response.world_info import WorldList
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
 # from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 from tangl.service.response.info_response import WorldInfo
 
 if TYPE_CHECKING:

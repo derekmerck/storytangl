@@ -8,7 +8,7 @@ The `World` class is a singleton that manages story templates, custom classes, a
 
 ```python
 from tangl.compiler.script_manager import ScriptManager
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 
 # From YAML file
 sm = ScriptManager.from_file("story.yaml")

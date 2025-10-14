@@ -14,7 +14,7 @@ from tangl.service.user.user import User
 from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase
 from tangl.vm.ledger import Ledger
 from tangl.compiler.script_manager import ScriptManager
-from tangl.story.story_domain.world import World
+from tangl.story.fabula.world import World
 
 
 @pytest.fixture()

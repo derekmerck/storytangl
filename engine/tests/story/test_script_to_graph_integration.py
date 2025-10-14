@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from tangl.compiler.script_manager import ScriptManager
-from tangl.core.graph.edge import Edge
-from tangl.core.graph.graph import Graph
-from tangl.core.graph.node import Node
-from tangl.story.fabula.actor.actor import Actor
-from tangl.story.story_domain.world import World
+from tangl.core.graph import Edge, Node, Graph
+from tangl.story.concepts.actor import Actor
+from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
 
 
@@ -114,11 +112,11 @@ def test_with_actors() -> None:
     script_data = _make_crossroads_script()
     script_data["actors"] = {
         "alice": {
-            "obj_cls": "tangl.story.fabula.actor.actor.Actor",
+            "obj_cls": "tangl.story.concepts.actor.actor.Actor",
             "name": "Alice",
         },
         "bob": {
-            "obj_cls": "tangl.story.fabula.actor.actor.Actor",
+            "obj_cls": "tangl.story.concepts.actor.actor.Actor",
             "name": "Bob",
         },
     }

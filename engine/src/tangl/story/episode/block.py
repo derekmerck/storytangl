@@ -9,7 +9,7 @@ from tangl.core import BaseFragment, Graph, Node, global_domain
 from tangl.vm.context import Context
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
 
-from .concept import SimpleConcept
+from tangl.story.concepts.concept import SimpleConcept
 
 __all__ = ["SimpleBlock"]
 
