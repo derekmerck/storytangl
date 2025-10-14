@@ -1,5 +1,6 @@
 import json
 from hashlib import sha224, blake2b
+from uuid import UUID
 from pathlib import Path
 import io
 import logging
@@ -62,3 +63,20 @@ def compute_data_hash(data: bytes | str | Path | io.IOBase, digest_size = None) 
         data = data.encode('utf-8')
 
     return hashing_func(data, digest_size=digest_size)
+
+
+def uuid_from_secret(secret: bytes | str) -> UUID:
+    """Derive a deterministic :class:`~uuid.UUID` from ``secret``.
+
+    The helper normalizes ``secret`` to bytes and feeds it through
+    :func:`hashing_func` with a 16-byte digest.  The resulting digest is used to
+    construct a UUID, ensuring stable identifiers for identical secrets while
+    respecting the project's hashing salt.
+    """
+
+    if isinstance(secret, str):
+        secret_bytes = secret.encode("utf-8")
+    else:
+        secret_bytes = secret
+    digest = hashing_func(secret_bytes, digest_size=16)
+    return UUID(bytes=digest)
