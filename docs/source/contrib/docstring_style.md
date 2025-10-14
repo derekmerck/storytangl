@@ -443,4 +443,4 @@ autodoc_default_options = {
 ## Q. Related Guides
 
 - [Coding Style & Architecture](coding_style.md) — layering, patterns, anti-patterns
-- [Planning Phase Roadmap](planning_phase_roadmap.md) — VM phase execution contracts
+

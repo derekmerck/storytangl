@@ -144,6 +144,10 @@ if __name__ == "__main__":
                       "tangl37_vm_archive.py",
                       include_notes=True,
                       postpend_files=[pkg_root / "utils/hashing.py"])
+    process_directory(pkg_root / 'service', "tangl37_service_archive.py")
+    process_directory(pkg_root / 'story',
+                      "tangl37_story_archive.py",
+                      include_notes=True)
 
     process_directory(apps_root / "cli/src/tangl/cli",
                       "tangl37_cli_archive.py",
@@ -155,11 +159,9 @@ if __name__ == "__main__":
     process_directory(pkg_root / 'lang', "tangl37_lang_archive.py",
                       postpend_files=[pkg_root / "lang/pos/treebank-symbols.csv",
                                       pkg_root / "lang/pos/treebank_symbols.pyi"])
-    process_directory(pkg_root / 'service', "tangl37_service_archive.py")
     process_directory(pkg_root / 'persistence', "tangl37_persist_archive.py")
     process_directory(pkg_root / 'utils', "tangl37_utils_archive.py")
 
-    process_directory(pkg_root / 'story', "tangl3x_story_snippits.py", include_notes=True)
     process_directory(pkg_root / 'mechanics', "tangl3x_mechanics_snippits.py", include_notes=True)
     process_directory(pkg_root / 'media', "tangl3x_media_snippits.py", include_notes=True)
 
@@ -169,6 +171,9 @@ if __name__ == "__main__":
     process_directory(tests_root, "tangl37_tests_archive.py")
     process_directory(tests_root / 'core', "tangl37_core_tests_archive.py")
     process_directory(tests_root / 'vm',   "tangl37_vm_tests_archive.py")
+    process_directory(tests_root / 'service',   "tangl37_service_tests_archive.py")
+    process_directory(tests_root / 'story',   "tangl37_story_tests_archive.py")
+
     process_directory(tests_root / 'lang',   "tangl37_lang_tests_archive.py")
     process_directory(tests_root / 'persistence',   "tangl37_persist_tests_archive.py")
     process_directory(tests_root / 'utils',   "tangl37_utils_tests_archive.py")
