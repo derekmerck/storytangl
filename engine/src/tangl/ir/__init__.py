@@ -9,4 +9,4 @@ and uses the same rules.  core <- vm <- story and other higher order structures.
 """
 
 # Similar in purpose to `tangl.journal`, deps only on `tangl.core`, but collects
-# input models that may imply features from various higher order domains.
+# input models that imply features from various higher order domains.

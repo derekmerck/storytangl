@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from tangl.compiler.script_manager import ScriptManager
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph
 from tangl.core.graph.node import Node
 from tangl.story.fabula.world import World
+from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.episode.block import SimpleBlock as ReferenceBlock
 from tangl.vm.frame import ChoiceEdge
 

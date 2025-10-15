@@ -68,7 +68,7 @@ class SimpleConcept(Node):
         except (KeyError, ValueError):
             return self.content
 
-# todo: this should _very_ obviously be added to the 'reference domain' domain rather than the global domain...
+# todo: this should _very_ obviously be added to the 'story domain' domain rather than the global domain...
 @global_domain.handlers.register(phase=P.JOURNAL, priority=45)
 def render_concept_to_fragment(cursor: Node, *, ctx: Context, **_: Any) -> BaseFragment | None:
     """Emit a :class:`~tangl.core.fragment.BaseFragment` when the cursor is a concept."""

@@ -17,15 +17,16 @@ if TYPE_CHECKING:
 
 class Player(PersonalName, Node):
     """
-    This is Node that looks like a StoryNode but doesn't include the inherited namespace
-    mixin b/c graph calls it specifically
+    This is Node that looks like a Story Concept, but doesn't include a structural
+    domain b/c it's part of the graph's domain and gets added to all contexts.
+    Should be unique per story graph.
     """
 
     @property
     def label(self):
         return "player"
 
-    full_name: str = "T. Angld Ev"
+    full_name: str = "Story Tangl, Dv."
     gens: Gens = Gens.XY
 
     @property

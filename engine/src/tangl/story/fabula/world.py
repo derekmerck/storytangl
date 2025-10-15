@@ -11,10 +11,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.singleton import Singleton
-from tangl.story.fabula.domain_manager import DomainManager
-from tangl.story.concepts.asset.asset_manager import AssetManager
-from tangl.media.resource_manager import ResourceManager
-from tangl.compiler.script_manager import ScriptManager
+
+# Integrated Story Domains
+from .domain_manager import DomainManager  # behaviors and classes
+from .script_manager import ScriptManager  # concept templates
+from .asset_manager import AssetManager    # platonic objects
+
+# Optional Story Domains
+from tangl.media.resource_manager import ResourceManager   # media/data resources
+# from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
     from tangl.vm.frame import ResolutionPhase

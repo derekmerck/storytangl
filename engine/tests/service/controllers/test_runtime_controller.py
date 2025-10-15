@@ -13,7 +13,7 @@ from tangl.service.controllers import RuntimeController
 from tangl.service.user.user import User
 from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase
 from tangl.vm.ledger import Ledger
-from tangl.compiler.script_manager import ScriptManager
+from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 
 

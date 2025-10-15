@@ -13,7 +13,7 @@ journal fragment stream:
     - ux signal fragment
   - info fragment (hinted kv)
 
-response:
+response:  (service level)
 
 - content response
   - slice of post-processed fragments

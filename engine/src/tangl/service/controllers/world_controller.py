@@ -139,7 +139,7 @@ class WorldController(HasApiEndpoints):
             with open(path, 'r') as f:
                 script_data = yaml.safe_load(f)
 
-        from tangl.compiler.script_manager import ScriptManager
+        from tangl.story.fabula.script_manager import ScriptManager
         script_manager = ScriptManager.from_data(script_data)
         from tangl.utils.sanitize_str import sanitise_str
         title = script_manager.get_story_metadata().get('title')

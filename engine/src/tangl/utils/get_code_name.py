@@ -48,7 +48,7 @@ MORPHEME_SWAPS = (
     (re.compile(r"\B(th)\b"), ["z"]),
     (re.compile(r"\B(ed)\b"), ["t", "et"]),
     (re.compile(r"(?=[^q])(o?u)(?=[^eu])"), ["oo"]),
-    (re.compile(r"(w)"), ["uu", "2u"]),
+    # (re.compile(r"(w)"), ["uu", "2u"]),  # moved to alphabetic swaps
 )
 
 def morphology(text: str, morph_prob = MORPH_SWAP_PROBABILITY) -> str:

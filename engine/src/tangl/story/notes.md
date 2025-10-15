@@ -110,5 +110,5 @@ It is orthogonal to `tangl.vm` and should not have overlapping responsibilities 
 ---
 
 episodic metrics:
-- velocity (chronology per discourse)
+- velocity (chronology per discourse entry or step)
 - tangents, directness

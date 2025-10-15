@@ -7,8 +7,7 @@ from pathlib import Path
 
 from tangl.core.graph.graph import Graph
 
-from .asset_type import AssetType
-from .discrete_asset import DiscreteAsset
+from tangl.story.concepts.asset import AssetType, DiscreteAsset
 
 
 class AssetManager:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tangl.compiler.script_manager import ScriptManager
+from tangl.story.fabula.script_manager import ScriptManager
 
 
 def _script_with_actors(data):

@@ -1,7 +1,7 @@
 `tangl.mechanics`
 =================
 
-`tangl.mechanics` is a _namespace_ package for story-related concepts that _extend_ or _combine_ concept and structure nodes.
+`tangl.mechanics` is a _namespace_ package for story-related concepts that _extend_ or _combine_ concept and episode nodes along with media and discourse controllers.
 
 - **Sandbox**: a Scene wrapper for map-based choices and scheduled events, and an Actor wrapper for peripatetic mob's
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tangl.compiler.script_manager import ScriptManager
+from tangl.story.fabula.script_manager import ScriptManager
 from tangl.core.graph import Edge, Node, Graph
 from tangl.story.concepts.actor import Actor
 from tangl.story.fabula.world import World
