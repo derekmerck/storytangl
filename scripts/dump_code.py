@@ -148,6 +148,8 @@ if __name__ == "__main__":
     process_directory(pkg_root / 'story',
                       "tangl37_story_archive.py",
                       include_notes=True)
+    process_directory(pkg_root / 'ir', "tangl37_ir_archive.py")
+    process_directory(pkg_root / 'journal', "tangl37_journal_archive.py")
 
     process_directory(apps_root / "cli/src/tangl/cli",
                       "tangl37_cli_archive.py",

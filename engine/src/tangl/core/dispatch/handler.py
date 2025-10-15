@@ -127,8 +127,14 @@ class Handler(HasSeq, Selectable, Entity):
         if params:
             receipt_kwargs["params"] = params
 
+        result = self.func(caller, *others, **params)
+
+        # if isinstance(result, JobReceipt):
+        #     raise ValueError(f"Handler funcs should not return their own JobReceipt, just the raw result ({result!r})")
+        #     # todo: or do we want to pass it through and assume they know what they are doing?  Planning receipts are results that get wrapped?
+
         return JobReceipt(blame_id=self.uid,
-                          result=self.func(caller, *others, **params),
+                          result=result,
                           result_type=self.result_type,
                           **receipt_kwargs)
 

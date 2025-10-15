@@ -15,6 +15,13 @@ from tangl.type_hints import StringMap
 from tangl.core.entity import Entity
 from tangl.core.record import Record
 
+# core/dispatch/job_receipt.py (near JobReceipt)
+class ResultCode(str, Enum):
+    OK = "ok"
+    SKIP = "skip"        # handler matched but chose not to act
+    INVALID = "invalid"  # handler matched but input invalid
+    NONE = "none"        # nothing applicable (for aggregations)
+    ERROR = "error"
 
 class JobReceipt(Record):
     """
@@ -44,8 +51,11 @@ class JobReceipt(Record):
     """
     record_type: Literal['job_receipt'] = Field("job_receipt", alias='type')
 
+    # Result data
+    result_code: ResultCode = ResultCode.OK
     result: Any
     result_type: Optional[Enum | str | Type[Entity]] = None  # use for validation
+    message: str | None = None
 
     # Call introspection
     caller_id: Optional[UUID] = None
@@ -53,11 +63,31 @@ class JobReceipt(Record):
     ctx: Any = Field(None, exclude=True)  # _never_ try to serialize or compare this
     params: Optional[StringMap] = Field(None, exclude=True)  # _never_ try to serialize or compare this
 
+    # Result-type helpers, only call these directly if NOT using a Handler
+
+    @classmethod
+    def ok(cls, blame, result, **kw):
+        return cls(blame_id=blame.uid, result=result, result_code=ResultCode.OK, **kw)
+
+    @classmethod
+    def skip(cls, blame, msg=None, **kw):
+        return cls(blame_id=blame.uid, result=None, result_code=ResultCode.SKIP, message=msg, **kw)
+
+    @classmethod
+    def invalid(cls, blame, msg=None, **kw):
+        return cls(blame_id=blame.uid, result=None, result_code=ResultCode.INVALID, message=msg, **kw)
+
+    @classmethod
+    def error(cls, blame, msg, **kw):
+        return cls(blame_id=blame.uid, result=None, result_code=ResultCode.ERROR, message=msg, **kw)
+
+    # Result Aggregators
+
     @classmethod
     def first_result(cls, *receipts: Self) -> Any | None:
         """Return the first truthy `result` among `receipts`, else `None`."""
         for r in receipts:
-            if r and r.result:
+            if r is not None:
                 return r.result
         return None
         # may want to change this to first non-none result as with last result?
@@ -84,7 +114,7 @@ class JobReceipt(Record):
     def all_truthy(cls, *receipts: Self) -> bool:
         """True if all non-`None` receipts have truthy `result`."""
         # could early exit on this in dispatch
-        return all([bool(r.result) for r in receipts if r is not None])
+        return all([bool(r.result) for r in receipts if r.result is not None])
 
     @classmethod
     def gather(cls, *receipts: Self) -> list[Any]:

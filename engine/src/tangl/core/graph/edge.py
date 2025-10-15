@@ -108,11 +108,12 @@ class AnonymousEdge(Entity):
 
     API
     ---
-    - :attr:`source` / :attr:`destination` – required node references.
+    - :attr:`source` – optional node reference.
+    - :attr:`destination` – required node reference.
     - :meth:`__repr__` – mirrors :class:`Edge` formatting for consistency.
     """
     # Minimal Edge that does not require a graph, so it can be garbage collected
-    source: Node
+    source: Optional[Node] = None
     destination: Node
 
     __repr__ = Edge.__repr__

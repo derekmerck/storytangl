@@ -1,10 +1,40 @@
 import uuid
 
 from tangl.core import Node, Graph, JobReceipt, global_domain
+from tangl.core.dispatch.job_receipt import ResultCode
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm.frame import ResolutionPhase as P, Frame, ChoiceEdge
 from tangl.vm import simple_handlers
 from tangl.vm.planning import Requirement, ProvisioningPolicy, Dependency
+
+
+def test_phase_order_is_total_and_strict(frame: Frame):
+    """Phases execute in defined order with no gaps."""
+    phases = P.ordered_phases()
+    assert len(phases) == 9
+    assert len(P) == 9
+    assert phases[0] == P.INIT
+    assert phases[-1] == P.POSTREQS
+
+    # Mock handler that records execution order
+    executed = []
+
+    frame.cursor.tags = { "domain:local_domain" }
+
+    def tracking_handler(phase):
+        def handler(cursor, *, ctx, ns):
+            print("executing phase {}".format(phase))
+            executed.append(phase)
+            return None
+
+        return handler
+
+    for phase in phases:
+        frame.local_domain.register_handler(phase=phase, priority=-1)(tracking_handler(phase))
+    frame._invalidate_context()
+
+    frame.follow_edge(AnonymousEdge(destination=frame.cursor))
+    assert executed == phases[2:]  # P.INIT and P.DISCOVER doen't count currently
 
 def test_global_handlers_visible_in_scope():
     g = Graph(label="x")
