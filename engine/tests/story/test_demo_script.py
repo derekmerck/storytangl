@@ -4,7 +4,6 @@ from pathlib import Path
 
 import yaml
 
-from tangl.core.graph.graph import Graph as StoryGraph
 from tangl.story.concepts.actor import Actor
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World

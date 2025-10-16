@@ -24,7 +24,7 @@ app = FastAPI(
     }
 )
 
-# Create first router
+# Create api routers
 app.include_router(story_router,  prefix="/story")
 app.include_router(user_router,   prefix="/user")
 app.include_router(world_router,  prefix="/world")
