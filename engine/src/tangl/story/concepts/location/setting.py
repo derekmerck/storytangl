@@ -3,6 +3,7 @@ import logging
 from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap, Identifier
+from tangl.core import Graph
 from tangl.vm.planning import Dependency
 from tangl.vm import ProvisioningPolicy
 from .location import Location
@@ -21,9 +22,9 @@ class Setting(Dependency[Location]):
         self.requirement.provider = value
 
     # init helpers
-    loc_ref: Identifier = Field(None, init_var=True)
-    loc_criteria: StringMap = Field(None, init_var=True)
-    loc_template: StringMap = Field(None, init_var=True)
+    location_ref: Identifier = Field(None, init_var=True)
+    location_criteria: StringMap = Field(None, init_var=True)
+    location_template: StringMap = Field(None, init_var=True)
     requirement_policy: ProvisioningPolicy = Field(None, init_var=True)
 
     @model_validator(mode="before")
@@ -31,15 +32,17 @@ class Setting(Dependency[Location]):
     def _validate_req(cls, data):
         if 'requirement' not in data:
             req = {
-                'identifier': data.pop('loc_ref', None),
-                'criteria': data.pop('loc_criteria', {}),
-                'template': data.pop('loc_template', None),
+                'identifier': data.pop('location_ref', None),
+                'criteria': data.pop('location_criteria', {}),
+                'template': data.pop('location_template', None),
                 'policy': data.pop('requirement_policy', ProvisioningPolicy.ANY),
                 'graph': data['graph']
             }
             if req['template'] is not None:
                 # we can infer the object cls of the template
                 req['template'].setdefault('obj_cls', Location)
+            if req['criteria'] is not None:
+                req['criteria'].setdefault('is_instance', Location)
             data['requirement'] = req
         return data
 

@@ -66,6 +66,8 @@ class Role(Dependency[Actor]):
             if req['template'] is not None:
                 # we can infer the object cls of the template
                 req['template'].setdefault('obj_cls', Actor)
+            if req['criteria'] is not None:
+                req['criteria'].setdefault('is_instance', Actor)
             data['requirement'] = req
         return data
 

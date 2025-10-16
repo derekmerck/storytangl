@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING, Iterator
 
+from tangl.core import Graph
 from tangl.story.concepts import Concept
 from tangl.story.concepts.actor import Extras
 
