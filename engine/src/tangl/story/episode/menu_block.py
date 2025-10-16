@@ -3,16 +3,23 @@ import logging
 
 from pydantic import Field, field_validator
 
-from tangl.type_hints import Tags, ClassName, Typelike
-from tangl.core.services import BaseHandler
+from tangl.type_hints import Tag, ClassName, Typelike
 from tangl.core.entity import Entity
 from .block import Block
 from .action import Action
 
 logger = logging.getLogger(__name__)
 
+# Menu blocks work by creating a set of local affordances for future possibilities
+# these affordances attach opportunistically and can be turned off by updating
+# availability (like "lambda self: not self.visited").  Then menu node can then be
+# re-entered repeatedly and always provides only currently open choices.
 
-class MenuActionHandler(BaseHandler):
+# Prior version uses an ad-hoc selector.  Probably should leverage functions from the
+# 'Selectable' class.
+
+# class domain behaviors for menu blocks
+class MenuActionHandler():
 
     @classmethod
     def _unlink_dynamic_actions(cls, node: Block):
@@ -41,7 +48,7 @@ class MenuBlock(Block):
     """
 
     with_cls: Typelike = Block
-    with_tags: Tags = Field(default_factory=set)
+    with_tags: set[Tag] = Field(default_factory=set)
     # within_scene_only: bool = True  # limit search to children of the same root
     # or use special tag like <scene.label>
 
@@ -62,7 +69,7 @@ class MenuBlock(Block):
         dynamic_actions = MenuActionHandler.get_menu_actions(self)
         return super().actions + dynamic_actions
 
-    @MenuActionHandler.strategy('on_get_actions')
+    # @MenuActionHandler.strategy('on_get_actions')
     def _get_tagged_blocks(self):
         logger.debug( f"Searching for actions {self.with_cls} and {self.with_tags}")
         return list( self.story.find_nodes(self.with_cls, with_tags=self.with_tags) )

@@ -40,10 +40,10 @@ class ScriptManager:
                 class_path="tangl.story.fabula.location.location.Location",
             ),
             "scenes": _DefaultClassConfig(
-                class_path="tangl.story.episode.scene.SimpleScene",
+                class_path="tangl.story.episode.scene.Scene",
                 children={
                     "blocks": _DefaultClassConfig(
-                        class_path="tangl.story.episode.block.SimpleBlock",
+                        class_path="tangl.story.episode.block.Block",
                         alias="block_cls",
                         children={
                             key: _DefaultClassConfig(

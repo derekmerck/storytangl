@@ -10,11 +10,11 @@ from tangl.core.domain import NS
 from tangl.vm.context import Context
 from tangl.vm.frame import ResolutionPhase as P
 
-__all__ = ["SimpleConcept"]
+__all__ = ["Concept"]
 
 
-class SimpleConcept(Node):
-    """SimpleConcept(label: str, content: str = "")
+class Concept(Node):
+    """Concept(label: str, content: str = "")
 
     Minimal narrative node that stores textual content and renders it into the
     journal.
@@ -22,7 +22,7 @@ class SimpleConcept(Node):
     Why
     ----
     Story graphs need a lightweight primitive for emitting prose without pulling
-    in application-specific abstractions. ``SimpleConcept`` keeps the behavior
+    in application-specific abstractions. ``Concept`` keeps the behavior
     focused on formatting text during the JOURNAL phase.
 
     Key Features
@@ -77,7 +77,7 @@ class SimpleConcept(Node):
 def render_concept_to_fragment(cursor: Node, *, ctx: Context, **_: Any) -> BaseFragment | None:
     """Emit a :class:`~tangl.core.fragment.BaseFragment` when the cursor is a concept."""
 
-    if not isinstance(cursor, SimpleConcept):  # pragma: no cover - defensive guard
+    if not isinstance(cursor, Concept):  # pragma: no cover - defensive guard
         return None
 
     ns = ctx.get_ns()
@@ -90,4 +90,4 @@ def render_concept_to_fragment(cursor: Node, *, ctx: Context, **_: Any) -> BaseF
     )
 
 
-SimpleConcept.model_rebuild(_types_namespace={"Graph": Graph})
+Concept.model_rebuild(_types_namespace={"Graph": Graph})

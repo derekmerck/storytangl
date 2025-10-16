@@ -8,7 +8,7 @@ tangl.story
 
 Concepts
 --------
-.. autoclass:: tangl.story.concepts.Concept
+.. autoclass:: tangl.story.concepts.concept.Concept
 
 Character Concepts
 ^^^^^^^^^^^^^^^^^^
@@ -33,11 +33,16 @@ Setting Concepts
 
 Episodic Process
 ----------------
-.. autoclass:: tangl.story.episode.Block
-.. autoclass:: tangl.story.episode.Scene
+.. autoclass:: tangl.story.episode.block.Block
+.. autoclass:: tangl.story.episode.action.Action
+.. autoclass:: tangl.story.episode.scene.Scene
+.. autoclass:: tangl.story.episode.block.MenuBlock
 
 .. _story-fabula:
 
 Fabula
 ------
 .. autoclass:: tangl.story.fabula.World
+.. autoclass:: tangl.story.fabula.script_manager.ScriptManager
+.. autoclass:: tangl.story.fabula.domain_manager.DomainManager
+.. autoclass:: tangl.story.fabula.asset_manager.AssetManager

@@ -63,7 +63,8 @@ class JobReceipt(Record):
     ctx: Any = Field(None, exclude=True)  # _never_ try to serialize or compare this
     params: Optional[StringMap] = Field(None, exclude=True)  # _never_ try to serialize or compare this
 
-    # Result-type helpers, only call these directly if NOT using a Handler
+    # Result-type helpers, only call these directly when NOT using a Handler to
+    # simulate a handler-like response.
 
     @classmethod
     def ok(cls, blame, result, **kw):

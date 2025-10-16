@@ -1,1 +1,1 @@
-from .concept import SimpleConcept as Concept
+from .concept import Concept

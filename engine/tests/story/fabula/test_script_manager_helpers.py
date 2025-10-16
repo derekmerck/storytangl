@@ -90,13 +90,13 @@ def test_get_unstructured_injects_default_obj_classes() -> None:
     assert actor_payload["obj_cls"] == "tangl.story.fabula.actor.actor.Actor"
 
     scene_payload = next(manager.get_unstructured("scenes"))
-    assert scene_payload["obj_cls"] == "tangl.story.episode.scene.SimpleScene"
+    assert scene_payload["obj_cls"] == "tangl.story.episode.scene.Scene"
 
     blocks = scene_payload["blocks"]
     assert "start" in blocks
     start_block = blocks["start"]
-    assert start_block["obj_cls"] == "tangl.story.episode.block.SimpleBlock"
-    assert start_block["block_cls"] == "tangl.story.episode.block.SimpleBlock"
+    assert start_block["obj_cls"] == "tangl.story.episode.block.Block"
+    assert start_block["block_cls"] == "tangl.story.episode.block.Block"
 
     actions = start_block["actions"]
     assert actions

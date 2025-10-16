@@ -129,9 +129,8 @@ class Handler(HasSeq, Selectable, Entity):
 
         result = self.func(caller, *others, **params)
 
-        # if isinstance(result, JobReceipt):
-        #     raise ValueError(f"Handler funcs should not return their own JobReceipt, just the raw result ({result!r})")
-        #     # todo: or do we want to pass it through and assume they know what they are doing?  Planning receipts are results that get wrapped?
+        # todo: type check that receipts aren't returned and re-wrapped?  What
+        #       if a handler invokes another dispatch as a subroutine?
 
         return JobReceipt(blame_id=self.uid,
                           result=result,

@@ -10,15 +10,20 @@ from tangl.core import Graph, Node
 from tangl.vm.domain import TraversableDomain
 from tangl.vm.planning import Affordance, Dependency
 
-from .block import SimpleBlock
+from .block import Block
 
-__all__ = ["SimpleScene"]
+__all__ = ["Scene"]
 
+# todo: templates for member blocks should be included at the domain level
+#       here, so we can ask for a block named "start" and get the one that
+#       belongs to _this_ scene and not some other unrelated scene.
+#       Need to consider how global domain templates can be restricted to
+#       instance structural domains by name or origin or something.
 
-class SimpleScene(TraversableDomain):
-    """SimpleScene(label: str, member_ids: list[Node], entry_ids: list[Node] | None = None, exit_ids: list[Node] | None = None)
+class Scene(TraversableDomain):
+    """Scene(label: str, member_ids: list[Node], entry_ids: list[Node] | None = None, exit_ids: list[Node] | None = None)
 
-    Structural domain that groups :class:`SimpleBlock` members and projects
+    Structural domain that groups :class:`Block` members and projects
     satisfied edges into the namespace.
 
     Why
@@ -39,7 +44,7 @@ class SimpleScene(TraversableDomain):
 
     API
     ---
-    - :meth:`get_member_blocks` – list the :class:`SimpleBlock` members.
+    - :meth:`get_member_blocks` – list the :class:`Block` members.
     - :attr:`entry_blocks` / :attr:`exit_blocks` – resolve entry/exit members.
     - :meth:`refresh_edge_projections` – update namespace mirrors for edges.
     """
@@ -47,35 +52,40 @@ class SimpleScene(TraversableDomain):
     _base_vars: dict[str, Any] | None = PrivateAttr(default=None)
     _projected_keys: set[str] = PrivateAttr(default_factory=set)
 
-    def get_member_blocks(self) -> list[SimpleBlock]:
-        """Return all member nodes that are :class:`SimpleBlock` instances."""
+    def get_member_blocks(self) -> list[Block]:
+        """Return all member nodes that are :class:`Block` instances."""
 
-        blocks: list[SimpleBlock] = []
+        blocks: list[Block] = []
         for member_id in self.member_ids:
             node = self.graph.get(member_id)
-            if isinstance(node, SimpleBlock):
+            if isinstance(node, Block):
                 blocks.append(node)
         return blocks
 
-    @property
-    def entry_blocks(self) -> list[SimpleBlock]:
-        """Return entry nodes filtered to :class:`SimpleBlock` instances."""
+    # todo: can't we just overload 'get vars' directly here instead
+    #       of adding stuff into the locals and then getting the
+    #       locals, don't deps/affs automatically project into the
+    #       source's namespace?
 
-        blocks: list[SimpleBlock] = []
+    @property
+    def entry_blocks(self) -> list[Block]:
+        """Return entry nodes filtered to :class:`Block` instances."""
+
+        blocks: list[Block] = []
         for uid in self.entry_node_ids:
             node = self.graph.get(uid)
-            if isinstance(node, SimpleBlock):
+            if isinstance(node, Block):
                 blocks.append(node)
         return blocks
 
     @property
-    def exit_blocks(self) -> list[SimpleBlock]:
-        """Return exit nodes filtered to :class:`SimpleBlock` instances."""
+    def exit_blocks(self) -> list[Block]:
+        """Return exit nodes filtered to :class:`Block` instances."""
 
-        blocks: list[SimpleBlock] = []
+        blocks: list[Block] = []
         for uid in self.exit_node_ids:
             node = self.graph.get(uid)
-            if isinstance(node, SimpleBlock):
+            if isinstance(node, Block):
                 blocks.append(node)
         return blocks
 
@@ -137,4 +147,4 @@ class SimpleScene(TraversableDomain):
         self._projected_keys = projected_keys
 
 
-SimpleScene.model_rebuild(_types_namespace={"Graph": Graph, "Node": Node})
+Scene.model_rebuild(_types_namespace={"Graph": Graph, "Node": Node})

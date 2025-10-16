@@ -1,16 +1,11 @@
 from __future__ import annotations
-import functools
-from typing import Optional, TypeVar, Self, Iterator, Generic, Literal, Callable
+from typing import Optional, TypeVar, Iterator, Callable
 import logging
-from enum import Enum
-from uuid import UUID
-from copy import deepcopy
 
-from pydantic import Field, ConfigDict
+from pydantic import Field
 
-from tangl.type_hints import UnstructuredData, Hash
+from tangl.type_hints import UnstructuredData
 from tangl.utils.base_model_plus import HasSeq
-from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 from .record import Record
 
@@ -18,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 RecordT = TypeVar('RecordT', bound=Record)
 
+# todo: type should be Entity with HasSeq?
 
 class StreamRegistry(Registry[HasSeq]):
     """

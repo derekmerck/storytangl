@@ -5,7 +5,7 @@ from tangl.core.graph.graph import Graph
 from tangl.core.graph.node import Node
 from tangl.story.fabula.world import World
 from tangl.story.fabula.script_manager import ScriptManager
-from tangl.story.episode.block import SimpleBlock as ReferenceBlock
+from tangl.story.episode.block import Block as ReferenceBlock
 from tangl.vm.frame import ChoiceEdge
 
 
@@ -21,7 +21,7 @@ def _make_world(script_data: dict) -> World:
     World.clear_instances()
     script_manager = ScriptManager.from_data(script_data)
     world = World(label="test_world", script_manager=script_manager)
-    world.domain_manager.register_class("SimpleBlock", SimpleBlock)
+    world.domain_manager.register_class("Block", SimpleBlock)
     world.domain_manager.register_class("SimpleAction", SimpleAction)
     return world
 
@@ -58,7 +58,7 @@ def test_build_blocks_collects_action_scripts() -> None:
         "intro": {
             "blocks": {
                 "start": {
-                    "obj_cls": "SimpleBlock",
+                    "obj_cls": "Block",
                     "content": "Hello",
                     "actions": [
                         {
@@ -68,7 +68,7 @@ def test_build_blocks_collects_action_scripts() -> None:
                         }
                     ],
                 },
-                "next": {"obj_cls": "SimpleBlock"},
+                "next": {"obj_cls": "Block"},
             }
         }
     }
@@ -89,7 +89,7 @@ def test_build_action_edges_wires_successors() -> None:
         "intro": {
             "blocks": {
                 "start": {
-                    "obj_cls": "SimpleBlock",
+                    "obj_cls": "Block",
                     "actions": [
                         {
                             "obj_cls": "SimpleAction",
@@ -103,12 +103,12 @@ def test_build_action_edges_wires_successors() -> None:
                         },
                     ],
                 },
-                "next": {"obj_cls": "SimpleBlock"},
+                "next": {"obj_cls": "Block"},
             }
         },
         "outro": {
             "blocks": {
-                "end": {"obj_cls": "SimpleBlock"},
+                "end": {"obj_cls": "Block"},
             }
         },
     }
@@ -139,7 +139,7 @@ def test_create_story_full_returns_populated_graph() -> None:
         "intro": {
             "blocks": {
                 "start": {
-                    "obj_cls": "SimpleBlock",
+                    "obj_cls": "Block",
                     "actions": [
                         {
                             "obj_cls": "SimpleAction",
@@ -148,7 +148,7 @@ def test_create_story_full_returns_populated_graph() -> None:
                         }
                     ],
                 },
-                "next": {"obj_cls": "SimpleBlock"},
+                "next": {"obj_cls": "Block"},
             }
         }
     }
@@ -173,7 +173,7 @@ def test_create_story_full_uses_metadata_start_at() -> None:
         "intro": {
             "blocks": {
                 "start": {
-                    "obj_cls": "SimpleBlock",
+                    "obj_cls": "Block",
                     "actions": [
                         {
                             "obj_cls": "SimpleAction",
@@ -182,7 +182,7 @@ def test_create_story_full_uses_metadata_start_at() -> None:
                         }
                     ],
                 },
-                "next": {"obj_cls": "SimpleBlock"},
+                "next": {"obj_cls": "Block"},
             }
         }
     }
@@ -199,8 +199,8 @@ def test_create_story_full_defaults_to_first_block() -> None:
     script["scenes"] = {
         "intro": {
             "blocks": [
-                {"label": "start", "obj_cls": "SimpleBlock"},
-                {"label": "next", "obj_cls": "SimpleBlock"},
+                {"label": "start", "obj_cls": "Block"},
+                {"label": "next", "obj_cls": "Block"},
             ]
         }
     }
@@ -285,14 +285,14 @@ def test_action_edges_set_trigger_phase_for_auto_edges() -> None:
         "intro": {
             "blocks": {
                 "start": {
-                    "obj_cls": "SimpleBlock",
+                    "obj_cls": "Block",
                     "continues": [
                         {
                             "successor": "intro.end",
                         }
                     ],
                 },
-                "end": {"obj_cls": "SimpleBlock"},
+                "end": {"obj_cls": "Block"},
             }
         }
     }

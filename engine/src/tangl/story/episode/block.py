@@ -9,9 +9,9 @@ from tangl.core import BaseFragment, Graph, Node, global_domain
 from tangl.vm.context import Context
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
 
-from tangl.story.concepts.concept import SimpleConcept
+from tangl.story.concepts.concept import Concept
 
-__all__ = ["SimpleBlock"]
+__all__ = ["Block"]
 
 
 def _normalize_ns(ns: Any) -> Mapping[str, Any] | None:
@@ -27,10 +27,10 @@ def _normalize_ns(ns: Any) -> Mapping[str, Any] | None:
         return None
 
 
-class SimpleBlock(Node):
-    """SimpleBlock(label: str, content: str = "")
+class Block(Node):
+    """Block(label: str, content: str = "")
 
-    Structural node that groups :class:`SimpleConcept` children and presents
+    Structural node that groups :class:`Concept` children and presents
     player choices.
 
     Why
@@ -42,7 +42,7 @@ class SimpleBlock(Node):
     ------------
     * **Inline prose** – optional :attr:`content` rendered before child concepts.
     * **Concept aggregation** – :meth:`get_concepts` yields child
-      :class:`SimpleConcept` nodes in creation order.
+      :class:`Concept` nodes in creation order.
     * **Choice presentation** – :meth:`get_choices` filters available
       :class:`~tangl.vm.frame.ChoiceEdge` options using the active namespace.
 
@@ -55,13 +55,13 @@ class SimpleBlock(Node):
 
     content: str = ""
 
-    def get_concepts(self) -> list[SimpleConcept]:
-        """Return child :class:`SimpleConcept` nodes in stable order."""
+    def get_concepts(self) -> list[Concept]:
+        """Return child :class:`Concept` nodes in stable order."""
 
-        concepts: list[SimpleConcept] = []
+        concepts: list[Concept] = []
         for edge in self.edges_out():
             destination = edge.destination
-            if isinstance(destination, SimpleConcept):
+            if isinstance(destination, Concept):
                 concepts.append(destination)
         return concepts
 
@@ -79,16 +79,16 @@ class SimpleBlock(Node):
 @global_domain.handlers.register(
     phase=P.JOURNAL,
     priority=40,
-    selection_criteria={"is_instance": SimpleBlock},
+    selection_criteria={"is_instance": Block},
 )
-def render_block(cursor: SimpleBlock, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
     """Render inline content, child concepts, and choice menu for a block."""
 
     ns_raw = ctx.get_ns()
     ns = _normalize_ns(ns_raw)
     fragments: list[BaseFragment] = []
 
-    if not isinstance(cursor, SimpleBlock):  # pragma: no cover - defensive guard
+    if not isinstance(cursor, Block):  # pragma: no cover - defensive guard
         return None
 
     if cursor.content:
@@ -138,4 +138,4 @@ def render_block(cursor: SimpleBlock, *, ctx: Context, **_: Any) -> list[BaseFra
     return fragments or None
 
 
-SimpleBlock.model_rebuild(_types_namespace={"Graph": Graph})
+Block.model_rebuild(_types_namespace={"Graph": Graph})

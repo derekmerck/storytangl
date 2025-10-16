@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from tangl.core import Node
 from tangl.type_hints import Tag
 from tangl.core import Node
 from tangl.lang.personal_name import PersonalName
@@ -15,7 +14,7 @@ if TYPE_CHECKING:
     from tangl.service.user import User
     from tangl.story.fabula import World
 
-class Player(PersonalName, Node):
+class Player(Node):
     """
     This is Node that looks like a Story Concept, but doesn't include a structural
     domain b/c it's part of the graph's domain and gets added to all contexts.
@@ -26,7 +25,8 @@ class Player(PersonalName, Node):
     def label(self):
         return "player"
 
-    full_name: str = "Story Tangl, Dv."
+    # this is a lang.personal_name
+    full_name: str = "St. Oryt Angld, EV."
     gens: Gens = Gens.XY
 
     @property

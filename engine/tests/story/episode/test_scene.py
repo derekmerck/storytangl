@@ -5,8 +5,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from tangl.core import Graph, Node
-from tangl.story.episode import Block as SimpleBlock, Scene as SimpleScene
-from tangl.story.concepts import Concept as SimpleConcept
+from tangl.story.episode import Block, Scene
+from tangl.story.concepts import Concept
 from tangl.vm import (
     Affordance,
     ChoiceEdge,
@@ -28,10 +28,10 @@ def _destination_ids(node: Node) -> set[UUID]:
 
 def test_scene_creates_source_and_sink() -> None:
     g = Graph(label="test")
-    first = SimpleBlock(graph=g, label="first")
-    second = SimpleBlock(graph=g, label="second")
+    first = Block(graph=g, label="first")
+    second = Block(graph=g, label="second")
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[first.uid, second.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[first.uid, second.uid])
 
     assert scene.source in g
     assert scene.sink in g
@@ -41,11 +41,11 @@ def test_scene_creates_source_and_sink() -> None:
 
 def test_scene_links_source_to_entry_blocks() -> None:
     g = Graph(label="test")
-    entry_one = SimpleBlock(graph=g, label="entry_one")
-    entry_two = SimpleBlock(graph=g, label="entry_two")
-    middle = SimpleBlock(graph=g, label="middle")
+    entry_one = Block(graph=g, label="entry_one")
+    entry_two = Block(graph=g, label="entry_two")
+    middle = Block(graph=g, label="middle")
 
-    scene = SimpleScene(
+    scene = Scene(
         graph=g,
         label="scene",
         member_ids=[entry_one.uid, entry_two.uid, middle.uid],
@@ -61,11 +61,11 @@ def test_scene_links_source_to_entry_blocks() -> None:
 
 def test_scene_links_exit_blocks_to_sink() -> None:
     g = Graph(label="test")
-    middle = SimpleBlock(graph=g, label="middle")
-    exit_one = SimpleBlock(graph=g, label="exit_one")
-    exit_two = SimpleBlock(graph=g, label="exit_two")
+    middle = Block(graph=g, label="middle")
+    exit_one = Block(graph=g, label="exit_one")
+    exit_two = Block(graph=g, label="exit_two")
 
-    scene = SimpleScene(
+    scene = Scene(
         graph=g,
         label="scene",
         member_ids=[middle.uid, exit_one.uid, exit_two.uid],
@@ -78,11 +78,11 @@ def test_scene_links_exit_blocks_to_sink() -> None:
 
 def test_scene_defaults_entry_exit_to_first_last() -> None:
     g = Graph(label="test")
-    first = SimpleBlock(graph=g, label="first")
-    middle = SimpleBlock(graph=g, label="middle")
-    last = SimpleBlock(graph=g, label="last")
+    first = Block(graph=g, label="first")
+    middle = Block(graph=g, label="middle")
+    last = Block(graph=g, label="last")
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[first.uid, middle.uid, last.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[first.uid, middle.uid, last.uid])
 
     assert scene.entry_node_ids == [first.uid]
     assert scene.exit_node_ids == [last.uid]
@@ -92,11 +92,11 @@ def test_scene_defaults_entry_exit_to_first_last() -> None:
 
 def test_get_member_blocks_returns_only_blocks() -> None:
     g = Graph(label="test")
-    block_one = SimpleBlock(graph=g, label="block_one")
-    block_two = SimpleBlock(graph=g, label="block_two")
-    concept = SimpleConcept(graph=g, label="concept", content="text")
+    block_one = Block(graph=g, label="block_one")
+    block_two = Block(graph=g, label="block_two")
+    concept = Concept(graph=g, label="concept", content="text")
 
-    scene = SimpleScene(
+    scene = Scene(
         graph=g,
         label="scene",
         member_ids=[block_one.uid, concept.uid, block_two.uid],
@@ -109,7 +109,7 @@ def test_get_member_blocks_returns_only_blocks() -> None:
 
 def test_refresh_edge_projections_for_dependencies() -> None:
     g = Graph(label="test")
-    block = SimpleBlock(graph=g, label="block")
+    block = Block(graph=g, label="block")
     companion = Node(graph=g, label="companion")
 
     requirement = Requirement[Node](
@@ -125,7 +125,7 @@ def test_refresh_edge_projections_for_dependencies() -> None:
     )
     dependency.requirement.provider = companion
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[block.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
     scene.refresh_edge_projections()
 
     assert scene.vars["companion"] is companion
@@ -134,7 +134,7 @@ def test_refresh_edge_projections_for_dependencies() -> None:
 
 def test_refresh_edge_projections_for_affordances() -> None:
     g = Graph(label="test")
-    block = SimpleBlock(graph=g, label="block")
+    block = Block(graph=g, label="block")
     provider = Node(graph=g, label="provider")
 
     requirement = Requirement[Node](
@@ -151,7 +151,7 @@ def test_refresh_edge_projections_for_affordances() -> None:
     )
     affordance.requirement.provider = provider
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[block.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
     scene.refresh_edge_projections()
 
     assert scene.vars["service"] is provider
@@ -160,7 +160,7 @@ def test_refresh_edge_projections_for_affordances() -> None:
 
 def test_refresh_edge_projections_marks_unsatisfied() -> None:
     g = Graph(label="test")
-    block = SimpleBlock(graph=g, label="block")
+    block = Block(graph=g, label="block")
 
     requirement = Requirement[Node](
         graph=g,
@@ -170,7 +170,7 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
     )
     Dependency[Node](graph=g, source_id=block.uid, requirement=requirement, label="missing")
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[block.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
     scene.refresh_edge_projections()
 
     assert "missing" not in scene.vars
@@ -179,7 +179,7 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
 
 def test_refresh_edge_projections_preserves_existing_vars() -> None:
     g = Graph(label="test")
-    block = SimpleBlock(graph=g, label="block")
+    block = Block(graph=g, label="block")
     requirement = Requirement[Node](
         graph=g,
         identifier="prop",
@@ -187,7 +187,7 @@ def test_refresh_edge_projections_preserves_existing_vars() -> None:
     )
     Dependency[Node](graph=g, source_id=block.uid, requirement=requirement, label="prop")
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[block.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
     scene.vars["region"] = "Tavern"
 
     scene.refresh_edge_projections()
@@ -198,14 +198,14 @@ def test_refresh_edge_projections_preserves_existing_vars() -> None:
 
 def test_has_forward_progress_reachable() -> None:
     g = Graph(label="test")
-    start = SimpleBlock(graph=g, label="start")
-    middle = SimpleBlock(graph=g, label="middle")
-    end = SimpleBlock(graph=g, label="end")
+    start = Block(graph=g, label="start")
+    middle = Block(graph=g, label="middle")
+    end = Block(graph=g, label="end")
 
     ChoiceEdge(graph=g, source_id=start.uid, destination_id=middle.uid)
     ChoiceEdge(graph=g, source_id=middle.uid, destination_id=end.uid)
 
-    scene = SimpleScene(
+    scene = Scene(
         graph=g,
         label="scene",
         member_ids=[start.uid, middle.uid, end.uid],
@@ -219,13 +219,13 @@ def test_has_forward_progress_reachable() -> None:
 
 def test_has_forward_progress_softlock() -> None:
     g = Graph(label="test")
-    start = SimpleBlock(graph=g, label="start")
-    dead_end = SimpleBlock(graph=g, label="dead_end")
-    exit_block = SimpleBlock(graph=g, label="exit")
+    start = Block(graph=g, label="start")
+    dead_end = Block(graph=g, label="dead_end")
+    exit_block = Block(graph=g, label="exit")
 
     ChoiceEdge(graph=g, source_id=start.uid, destination_id=dead_end.uid)
 
-    scene = SimpleScene(
+    scene = Scene(
         graph=g,
         label="scene",
         member_ids=[start.uid, dead_end.uid, exit_block.uid],
@@ -238,8 +238,8 @@ def test_has_forward_progress_softlock() -> None:
 
 def test_scene_namespace_available_during_journal() -> None:
     g = Graph(label="test")
-    block = SimpleBlock(graph=g, label="block", content="Hello {npc_name}!")
-    scene = SimpleScene(graph=g, label="tavern", member_ids=[block.uid])
+    block = Block(graph=g, label="block", content="Hello {npc_name}!")
+    scene = Scene(graph=g, label="tavern", member_ids=[block.uid])
     scene.vars["npc_name"] = "Bartender Bob"
     scene.refresh_edge_projections()
 
@@ -252,7 +252,7 @@ def test_scene_namespace_available_during_journal() -> None:
 
 def test_refresh_edge_projections_updates_namespace_in_place() -> None:
     g = Graph(label="test")
-    block = SimpleBlock(graph=g, label="block")
+    block = Block(graph=g, label="block")
     actor = Node(graph=g, label="villain")
 
     requirement = Requirement[Node](
@@ -267,7 +267,7 @@ def test_refresh_edge_projections_updates_namespace_in_place() -> None:
         label="npc",
     )
 
-    scene = SimpleScene(graph=g, label="scene", member_ids=[block.uid])
+    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
 
     frame = Frame(graph=g, cursor_id=block.uid)
     namespace = frame.context.scope.namespace

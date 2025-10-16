@@ -8,7 +8,7 @@ import pytest
 
 from tangl.core import BaseFragment, Graph, Node
 from tangl.core.domain import global_domain
-from tangl.story.concepts import Concept as SimpleConcept
+from tangl.story.concepts import Concept
 from tangl.vm import Frame, ResolutionPhase as P
 
 
@@ -21,32 +21,32 @@ def collect_fragment(fragments: Iterable[BaseFragment], *, source_id) -> BaseFra
 
 class TestSimpleConcept:
     def test_stores_content(self):
-        concept = SimpleConcept(label="test", content="Hello world")
+        concept = Concept(label="test", content="Hello world")
 
         assert concept.content == "Hello world"
         assert concept.label == "test"
 
     def test_render_with_namespace(self):
-        concept = SimpleConcept(label="greeting", content="Hello, {name}!")
+        concept = Concept(label="greeting", content="Hello, {name}!")
         rendered = concept.render({"name": "Alice"})
 
         assert rendered == "Hello, Alice!"
 
     def test_render_without_variables(self):
-        concept = SimpleConcept(label="plain", content="This is plain text.")
+        concept = Concept(label="plain", content="This is plain text.")
 
         rendered = concept.render({})
         assert rendered == "This is plain text."
 
     def test_render_missing_variables_returns_raw_content(self):
-        concept = SimpleConcept(label="incomplete", content="Hello, {name}!")
+        concept = Concept(label="incomplete", content="Hello, {name}!")
 
         rendered = concept.render({})
         assert rendered == "Hello, {name}!"
 
     def test_journal_handler_emits_fragment(self):
         graph = Graph(label="test")
-        concept = SimpleConcept(graph=graph, label="greeting", content="Welcome to the story.")
+        concept = Concept(graph=graph, label="greeting", content="Welcome to the story.")
 
         frame = Frame(graph=graph, cursor_id=concept.uid)
         fragments = frame.run_phase(P.JOURNAL)
@@ -57,7 +57,7 @@ class TestSimpleConcept:
 
     def test_render_uses_frame_namespace(self):
         graph = Graph(label="test")
-        concept = SimpleConcept(graph=graph, label="greeting", content="Hello, {player_name}!")
+        concept = Concept(graph=graph, label="greeting", content="Hello, {player_name}!")
 
         global_domain.vars.setdefault("player_name", "Bob")
         try:
