@@ -56,7 +56,7 @@ cash = Fungible(label='cash',
 #       How do we handle different sets of assets in each world?
 
 FungibleLike = Fungible | str  # Must dereference the string for the key
-FungibleT = TypeVar("FungibleType", bound=Fungible)
+FungibleT = TypeVar("FungibleT", bound=Fungible)
 
 
 class AssetWallet(Counter[CountableAsset]):

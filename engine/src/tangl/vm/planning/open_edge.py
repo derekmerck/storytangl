@@ -11,8 +11,12 @@ on demand at the frontier.
 """
 from typing import Generic
 
+from pydantic import Field, model_validator
+
+from tangl.type_hints import StringMap, Identifier
 from tangl.core.graph import Edge, Graph
-from .requirement import Requirement, NodeT
+from .requirement import Requirement, NodeT, ProvisioningPolicy
+
 
 # Provides the carrier mechanism to map requirements into the graph-topology.
 # Alternatively, they could be represented as control-Nodes that weld together
@@ -63,6 +67,13 @@ class Dependency(Edge, Generic[NodeT]):
     def satisfied(self):
         return self.requirement.satisfied
 
+    def get_selection_criteria(self):
+        return self.requirement.get_selection_criteria()
+
+    def satisfied_by(self, other: NodeT) -> bool:
+        return self.requirement.satisfied_by(other)
+
+
 
 class Affordance(Edge, Generic[NodeT]):
     """
@@ -107,3 +118,9 @@ class Affordance(Edge, Generic[NodeT]):
     @property
     def satisfied(self):
         return self.requirement.satisfied
+
+    def get_selection_criteria(self):
+        return self.requirement.get_selection_criteria()
+
+    def satisfied_by(self, other: NodeT) -> bool:
+        return self.requirement.satisfied_by(other)

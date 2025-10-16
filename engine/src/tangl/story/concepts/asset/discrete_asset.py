@@ -10,7 +10,7 @@ Associating = object
 
 AssetT = TypeVar('AssetT', bound=AssetType)
 
-class DiscreteAsset(SingletonNode[AssetT], Generic[AssetT]):
+class DiscreteAsset(SingletonNode, Generic[AssetT]):
     """
     Assets are singleton "wrappers", derived from AssetTypes.  They are proper
     story nodes with instance variables that can be linked into a story graph through

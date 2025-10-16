@@ -41,7 +41,11 @@ class SimpleConcept(Node):
 
     content: str = ""
 
-    # concepts render with 'describe()'
+    # concepts render pre-fragments with 'describe()'?
+    # render is for episodes to assemble a fragment stream with any required describe() pre-fragments
+
+    def describe(self):
+        ...
 
     def render(self, ns: NS | Mapping[str, Any]) -> str:
         """Return :attr:`content` with namespace variables substituted.

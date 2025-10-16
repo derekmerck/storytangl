@@ -10,6 +10,7 @@ and :class:`~tangl.vm.planning.open_edge.Affordance` edges.
 from enum import Flag, auto
 from typing import Optional, Generic, TypeVar
 from uuid import UUID
+from copy import deepcopy
 
 from pydantic import Field, model_validator
 
@@ -84,9 +85,9 @@ class Requirement(GraphItem, Generic[NodeT]):
     """
     provider_id: Optional[UUID] = None
 
-    identifier: Identifier = None
+    identifier: Optional[Identifier] = None  # aka 'ref' or 'alias'
     criteria: Optional[StringMap] = Field(default_factory=dict)
-    template: UnstructuredData = None
+    template: Optional[UnstructuredData] = None
     policy: ProvisioningPolicy = ProvisioningPolicy.ANY
 
     @model_validator(mode="after")
@@ -149,3 +150,13 @@ class Requirement(GraphItem, Generic[NodeT]):
     @property
     def satisfied(self):
         return self.provider is not None or not self.hard_requirement
+
+    def get_selection_criteria(self) -> StringMap:
+        criteria = deepcopy(self.criteria)
+        if self.identifier:
+            criteria.setdefault("has_identifier", self.identifier)
+        return criteria
+
+    def satisfied_by(self, other: NodeT) -> bool:
+        # Another inverted case of Match/Selected
+        return other.matches(**self.get_selection_criteria())

@@ -121,7 +121,7 @@ class ProvisionOffer(Selectable, Entity):
 
     def describe(self) -> str:
         r = self.requirement
-        return f"ProvisionOffer[{self.short_uid()}]: policy={r.policy.value}, id={r.identifier}, crit={r.criteria}"
+        return f"ProvisionOffer[{self.short_uid()}]: policy={self.operation.name}, id={r.identifier}, crit={self.selection_criteria}"
 
     def accept(self, *, ctx: Context) -> Node | None:
         """Compute a provider for ``requirement`` without side effects."""

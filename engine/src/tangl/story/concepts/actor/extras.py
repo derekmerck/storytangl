@@ -48,7 +48,6 @@ class Extras(Role):
         # No need to associate or disassociate with extras roles?
         pass
 
-
     @property
     def label(self):
         super_label = StoryNode.label.fget(self)
