@@ -11,9 +11,6 @@ from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
 
 
-Actor.model_rebuild(_types_namespace={"Graph": StoryGraph})
-
-
 def test_load_demo_script() -> None:
     World.clear_instances()
     script_path = Path(__file__).resolve().parent.parent / "resources" / "demo_script.yaml"
@@ -24,6 +21,7 @@ def test_load_demo_script() -> None:
 
     story = world.create_story("demo_story")
 
+    # todo: _why_ is the story.cursor a Frame?
     assert isinstance(story.cursor, Frame)
     frame = story.cursor
     assert frame.cursor.label == "start"

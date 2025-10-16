@@ -3,9 +3,9 @@ import logging
 from tangl.core import HasEffects, HasConditions, TraversableNode, on_gather_context, on_avail
 
 from ..story_node import StoryNode
-from ..concept.actor import Role
-from ..concept.location import Setting
-from .block import Block
+from tangl.story.concepts.actor import Role
+from tangl.story.concepts.location import Setting
+from tangl.story.episode.block import Block
 
 logger = logging.getLogger(__name__)
 
