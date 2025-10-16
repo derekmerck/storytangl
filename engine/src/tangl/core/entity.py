@@ -137,7 +137,7 @@ class Entity(BaseModelPlus):
         else:
             tags = set(tags)
         match_logger.debug(f"Comparing query tags {tags} against {self.tags}")
-        return self._attrib_is_superset_of("tags", *tags)
+        # return self._attrib_is_superset_of("tags", *tags)
         return tags.issubset(self.tags)
 
     def is_instance(self, obj_cls: Type[Self]) -> bool:

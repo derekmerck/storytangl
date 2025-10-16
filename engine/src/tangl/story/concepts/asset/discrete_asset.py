@@ -8,9 +8,10 @@ from .asset_type import AssetType
 # todo: how do we handle owned nodes?  These are resources associated with another resource
 Associating = object
 
-AssetT = TypeVar('AssetT', bound=AssetType)
+# AssetT = TypeVar('AssetT', bound=AssetType)
 
-class DiscreteAsset(SingletonNode, Generic[AssetT]):
+# todo: this has a tighter bound on the generic, it's of AssetType, not any Singleton...?
+class DiscreteAsset(SingletonNode):
     """
     Assets are singleton "wrappers", derived from AssetTypes.  They are proper
     story nodes with instance variables that can be linked into a story graph through
@@ -21,7 +22,8 @@ class DiscreteAsset(SingletonNode, Generic[AssetT]):
 
     Assets are ownable and tradeable via the TradeHandler and Tradeable mixin.
     """
-    wrapped_cls: ClassVar[Type[AssetT]] = None
+    # wrapped_cls: ClassVar[Type[AssetT]] = None
+    ...
 
 
 
