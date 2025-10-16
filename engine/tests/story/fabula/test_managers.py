@@ -14,7 +14,7 @@ from tangl.story.fabula.world import World
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.asset_manager import AssetManager
-from tangl.media.resource_manager import ResourceManager
+from tangl.media.media_resource.resource_manager import ResourceManager
 
 
 def test_domain_manager_resolve_builtin_class():

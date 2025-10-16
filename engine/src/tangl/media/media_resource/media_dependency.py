@@ -5,7 +5,7 @@ from pydantic import ConfigDict, model_validator, Field
 from tangl.type_hints import Identifier
 from tangl.vm.planning import Dependency, Requirement
 from tangl.media.type_hints import Media
-from tangl.media.media_spec import MediaSpec
+from tangl.media.media_creators.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 # todo: probably want a media requirement subclass, then use that in a dependency and affordance subclass, media affordances are pre-decided media objects that can be attached as appropriate, first time you see a char etc.

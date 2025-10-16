@@ -14,7 +14,7 @@ from .svg_source_manager import SvgSourceManager
 from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
-from tangl.media.media_spec import MediaSpec
+from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.journal.media import StagingHints
 
 class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):

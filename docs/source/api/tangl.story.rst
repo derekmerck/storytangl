@@ -36,7 +36,7 @@ Episodic Process
 .. autoclass:: tangl.story.episode.block.Block
 .. autoclass:: tangl.story.episode.action.Action
 .. autoclass:: tangl.story.episode.scene.Scene
-.. autoclass:: tangl.story.episode.block.MenuBlock
+.. autoclass:: tangl.story.episode.menu_block.MenuBlock
 
 .. _story-fabula:
 

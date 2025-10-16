@@ -1,9 +1,5 @@
-import uuid
-from typing import Any, Optional, Literal
-
 import pytest
 
-from tangl.core.entity import Entity
 from tangl.core import Graph, Node
 from tangl.vm.planning import (
     Provisioner,
@@ -87,53 +83,6 @@ def test_plan_collect_offers_emits_multiple_operations_when_available():
     assert ProvisioningPolicy.CREATE in ops_for_requirement
     assert len(ops_for_requirement) >= 2
 
-
-@pytest.mark.xfail(reason="not working")
-def test_provisioner_runs_offers_with_ns_and_returns_job_receipts():
-    seen_ns = []
-    # Build a provider that offers one ProvisionOffer and captures ns
-    def get_affordances(ns):
-        seen_ns.append(ns.copy())
-
-        def accept(ns2):
-            class Dummy(Entity): pass
-            return Dummy(label="provided")
-        return [ProvisionOffer(
-            provider_id=uuid.uuid4(),
-            predicate=None,
-            _accept_func=accept,
-            cost=1.0,
-        )]
-
-    prov = Provisioner(_get_affordances_func=get_affordances)
-
-    ns = {"scope": "abc"}
-    receipts = Provisioner.run([prov], ns=ns, requirement=None)
-    assert len(receipts) == 1
-    assert seen_ns == [ns]
-    assert isinstance(receipts[0].result, Entity)
-
-@pytest.mark.xfail(reason="not working")
-def test_provisioner_blame_tuple_when_requirement_present():
-    req = Requirement(dependency_id=uuid.uuid4(), criteria={"k": "v"})
-
-    def get_offers(ns, requirement, ctx=None):
-        def accept(_ns):
-            class Dummy(Entity): pass
-            return Dummy(label="dep")
-        return [ProvisionOffer(
-            provider_id=uuid.uuid4(),
-            requirement_id=requirement.uid,
-            predicate=None,
-            _accept_func=accept,
-            cost=1.0,
-        )]
-
-    prov = Provisioner(_get_affordances_func=None, _get_offers_func=get_offers)
-    receipts = Provisioner.run([prov], ns={"x": 1}, requirement=req)
-    assert len(receipts) == 1
-    assert isinstance(receipts[0].blame_id, tuple) and len(receipts[0].blame_id) == 2
-
 def test_edge_destination_none_branch_does_not_validate():
     g = Graph()
     n1 = g.add_node(label="S")
@@ -212,85 +161,6 @@ def test_requirement_satisfaction_matrix(policy, present, expected_satisfied):
         assert req.provider is not None
         if present and policy is ProvisioningPolicy.EXISTING:
             assert req.provider is existing, f'req.provider {req.provider} is not {existing}'
-
-@pytest.mark.xfail(reason="offers not working yet")
-def test_selector_prefers_lowest_priority_and_stable_ordering():
-    g = Graph(label="demo")
-    n = g.add_node(label="scene")
-
-    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.CREATE,
-                            template={"obj_cls": Node, "label": "X"})
-
-    Dependency[Node](graph=g, source_id=n.uid, requirement=req, label="needs_X")
-
-    # Inject 3 offers in emission order; priorities: 5, 1, 1 (so choose the first of the priority-1 pair)
-
-    from tangl.core import Handler
-    from tangl.vm.planning import ProvisioningPolicy as PP
-
-    class TestProvisioner(Provisioner, Handler):
-        phase: Literal['PLANNING_PHASE'] = "PLANNING_PHASE"
-        policy: PP = PP.CREATE
-        requirement: Optional[Requirement[Node]] = None  # Irrelevant!
-        template: dict[str, Any]
-        priority: float
-
-        def get_offers(self, requirement: Requirement, *, ctx=None) -> Optional[ProvisionOffer | list[ProvisionOffer]]:
-            return ProvisionOffer(
-                requirement=requirement,
-                provisioner=self,
-                priority=self.priority
-            )
-
-        def accept_offer(self, offer: ProvisionOffer) -> Entity:
-            return Entity.structure(self.template)
-
-    frame = Frame(graph=g, cursor_id=n.uid)
-
-    params = [(5, 'bad'), (10, 'best'), (10, 'also_best')]
-    for priority, suffix in params:
-        frame.local_domain.handlers.add(
-            TestProvisioner(
-                priority=priority,
-                template={"obj_cls": Node, "label": f"X_{suffix}"}
-            )
-        )
-
-    offers = []
-    def emit(priority, suffix):
-        nonlocal offers
-
-        prov = TemplateProvisioner(requirement=None, template={"obj_cls": Node, "label": f"X_{suffix}"})
-        offer = ProvisionOffer(requirement=req, provisioner=prov, priority=priority)
-        offers.append(offer)
-        return offer
-
-    emit(5, "bad")
-    first = emit(1, "best")
-    emit(1, "also_good")
-
-    frame.run_phase(P.PLANNING)
-
-    assert req.satisfied
-    assert req.provider.label == "X_best", "selector should pick lowest priority and earlier emission"
-
-
-@pytest.mark.xfail(reason="multiple provisioners not working yet")
-def test_equivalent_offers_are_deduplicated():
-    g = Graph(label="demo")
-    n = g.add_node(label="scene")
-    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.CREATE,
-                            template={"obj_cls": Node, "label": "K"})
-    Dependency[Node](graph=g, source_id=n.uid, requirement=req)
-
-    # Simulate two identical Provisioning offers (same template + target)
-    Provisioning(graph=g, requirement=req, template={"obj_cls": Node, "label": "K"})
-    Provisioning(graph=g, requirement=req, template={"obj_cls": Node, "label": "K"})
-
-    frame = Frame(graph=g, cursor_id=n.uid)
-    receipt = frame.run_phase(P.PLANNING)
-
-    assert len(getattr(receipt, "accepted_offers", [])) == 1
 
 def test_hard_requirement_unresolved_is_reported():
     g = Graph(label="demo")

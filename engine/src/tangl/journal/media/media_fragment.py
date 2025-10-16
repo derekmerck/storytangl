@@ -10,7 +10,7 @@ from tangl.core.dispatch import DispatchRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
 # from tangl.media.enums import MediaRole
-from tangl.media.enums import MediaDataType
+from tangl.media.media_data_type import MediaDataType
 from .staging_hints import StagingHints
 
 ContentFormatType = Literal['url', 'data', 'xml', 'json', 'rit']

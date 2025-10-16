@@ -11,7 +11,7 @@ from tangl.type_hints import Hash
 from tangl.utils.shelved2 import shelved, clear_shelf
 from tangl.utils.hashing import compute_data_hash
 from tangl.core.entity import Entity
-from ..enums import MediaDataType
+from tangl.media.media_data_type import MediaDataType
 
 # todo: these are Records now
 

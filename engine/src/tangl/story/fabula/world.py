@@ -18,7 +18,7 @@ from .script_manager import ScriptManager  # concept templates
 from .asset_manager import AssetManager    # platonic objects
 
 # Optional Story Domains
-from tangl.media.resource_manager import ResourceManager   # media/data resources
+from tangl.media.media_resource.resource_manager import ResourceManager   # media/data resources
 # from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
