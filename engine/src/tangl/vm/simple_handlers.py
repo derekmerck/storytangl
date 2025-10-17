@@ -7,15 +7,15 @@ examples. Real applications can register additional handlers in their domains.
 """
 # - the `register` decorator wraps the output in a JobReceipt
 # - the phase runner appends the job receipt to the receipt stack in ctx
-# - the full call sig currently is `h(cursor: Node, *, ns: NS, ctx: Context)`,
-#   be sure to use the correct sig or ignore/consume unnecessary args/kwargs
+# - the full call sig currently is `h(cursor: Node, *, ctx: Context)`;
+#   handlers that need a namespace can call ``ctx.get_ns()`` directly
 
 import logging
 
 from collections.abc import Iterable
+from typing import Any
 
 from tangl.core import BaseFragment, Node, global_domain
-from tangl.core.domain import NS
 from tangl.vm.context import Context
 from tangl.vm.frame import ResolutionPhase as P, ChoiceEdge
 
@@ -51,8 +51,10 @@ from .planning import simple_planning_handlers
 # ------- PRE/POST REDIRECTS ---------
 
 @global_domain.handlers.register(phase=P.PREREQS, priority=50)
-def prereq_redirect(cursor: Node, *, ns: NS, ctx: Context, **kwargs):
+def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` redirects for PREREQS."""
+
+    ns = ctx.get_ns()
 
     current_domain = ctx.get_traversable_domain_for_node(cursor)
 
@@ -86,8 +88,10 @@ def prereq_redirect(cursor: Node, *, ns: NS, ctx: Context, **kwargs):
             return edge
 
 @global_domain.handlers.register(phase=P.POSTREQS, priority=50)
-def postreq_redirect(cursor: Node, *, ns: NS, **kwargs):
+def postreq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow the first auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` in POSTREQS."""
+    ns = ctx.get_ns()
+
     for e in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.POSTREQS):
         if e.available(ns):
             return e

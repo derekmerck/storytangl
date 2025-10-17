@@ -25,16 +25,29 @@ API
 - :meth:`_resolve_existing` / :meth:`_resolve_update` / :meth:`_resolve_clone` / :meth:`_resolve_create` – internal helpers implementing each policy.
 """
 from __future__ import annotations
-from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING
+from typing import Any, Iterable, Optional, Sequence, Type, TYPE_CHECKING
 import functools
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
 from tangl.core import Node, Registry, Handler, JobReceipt
+from tangl.core.dispatch import HandlerFunc
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:
     from .offer import ProvisionOffer
     from ..context import Context
+
+
+def _provisioner_stub(
+    requirement: "Requirement",
+    *,
+    ctx: "Context" | None = None,
+    other: Any | None = None,
+    result: Any | None = None,
+) -> list["ProvisionOffer"]:
+    """Placeholder callable satisfying :class:`Handler`'s signature contract."""
+
+    raise NotImplementedError("Provisioner delegates execution via get_offers/resolve")
 
 
 class Provisioner(Handler):
@@ -69,7 +82,7 @@ class Provisioner(Handler):
     """
     phase: str = "PLANNING.OFFER"
     result_type: Type = list['ProvisionOffer']
-    func: None = None
+    func: HandlerFunc = _provisioner_stub
 
     @staticmethod
     def _resolve_existing(*registries: Registry,

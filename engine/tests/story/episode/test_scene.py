@@ -270,7 +270,7 @@ def test_refresh_edge_projections_updates_namespace_in_place() -> None:
     scene = Scene(graph=g, label="scene", member_ids=[block.uid])
 
     frame = Frame(graph=g, cursor_id=block.uid)
-    namespace = frame.context.scope.namespace
+    namespace = frame.context.get_ns()
 
     assert "npc" not in namespace
 
