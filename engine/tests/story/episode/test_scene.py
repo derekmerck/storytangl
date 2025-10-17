@@ -238,7 +238,7 @@ def test_has_forward_progress_softlock() -> None:
 
 def test_scene_namespace_available_during_journal() -> None:
     g = Graph(label="test")
-    block = Block(graph=g, label="block", content="Hello {npc_name}!")
+    block = Block(graph=g, label="block", content="Hello {{npc_name}}!")
     scene = Scene(graph=g, label="tavern", member_ids=[block.uid])
     scene.vars["npc_name"] = "Bartender Bob"
     scene.refresh_edge_projections()

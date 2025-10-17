@@ -4,17 +4,21 @@ Execution context for one frame of resolution.
 Thin wrapper around the graph, cursor, and scope providing deterministic RNG.
 """
 from __future__ import annotations
-from typing import Iterator, Any
+from typing import Iterator, TYPE_CHECKING
 from uuid import UUID
 import functools
 from dataclasses import dataclass, field
 from random import Random
+from collections import ChainMap
 
 from tangl.type_hints import Hash
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, AffiliateRegistry
 from tangl.core.dispatch import Handler, JobReceipt
 from tangl.utils.hashing import hashing_func
+
+if TYPE_CHECKING:
+    from .domain import TraversableDomain
 
 
 # dataclass for simplified init and frozen, not serialized or tracked
@@ -103,16 +107,32 @@ class Context:
         for ph in P:
             names = [h.func.__name__ for h in self.scope.get_handlers(phase=ph)]
             lines.append(f"  {ph.name}: {', '.join(names)}")
+        lines.append("Handlers for ns:")
+        names = [h.func.__name__ for h in self.scope.get_handlers(job="namespace")]
+        lines.append(f"  ns: {', '.join(names)}")
         return "\n".join(lines)
 
     def get_ns(self) -> NS:
         return self.scope.namespace
 
+    def _get_ns(self) -> NS:
+        """Bootstrap ctx by calling get_vars on every domain in active
+        domains and creating."""
+        maps = []
+        for d in self.scope.active_domains:
+            if hasattr(d, "get_vars"):
+                maps.append(d.get_vars())
+        # handlers = self.scope.get_handlers_by_layer(job="namespace")
+        # receipts = [h(self.cursor, ctx=self) for h in handlers]
+        # # could inject self vars here but frame vars are already included I think
+        # maps = JobReceipt.gather(*receipts)
+        return ChainMap(*maps)  # grabs non-None result fields
+
     def get_handlers(self, **criteria) -> Iterator[Handler]:
         # can pass phase in filter criteria if useful
         return self.scope.get_handlers(**criteria)
 
-    def get_traversable_domain_for_node(self, node: Node) -> "TraversableDomain" | None:
+    def get_traversable_domain_for_node(self, node: Node) -> TraversableDomain | None:
         """Return the :class:`TraversableDomain` that contains ``node`` if available."""
 
         from tangl.vm.domain import TraversableDomain  # Local import to avoid cycle

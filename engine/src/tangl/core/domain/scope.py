@@ -93,7 +93,7 @@ class Scope(Entity):
     @classmethod
     def merge_vars(cls, *members: Domain, **criteria) -> NS:
         # closest to farthest
-        maps = ( m.vars for m in members if m.matches(**criteria) )
+        maps = ( m.get_vars() for m in members if m.matches(**criteria) )
         return ChainMap(*maps)
 
     @cached_property
@@ -101,12 +101,18 @@ class Scope(Entity):
         return self.merge_vars(*self.active_domains)
 
     def get_handlers(self, **criteria) -> Iterator[Handler]:
+        """Sorts over all layers"""
         return Registry.chain_find_all(
             *(d.handlers for d in self.active_domains),
             **criteria,
             sort_key=lambda x: (x.priority, x.seq),
         )
 
+    def get_handlers_by_layer(self, **criteria) -> Iterator[Handler]:
+        """Sorted within each layer to preserve proximity priority"""
+        for d in self.active_domains:
+            yield from d.handlers.find_all(**criteria, sort_key=lambda x: (x.priority, x.seq)
+)
     def find_all(self, **criteria) -> Iterator[GraphItem]:
         """Proxy :meth:`Graph.find_all` through the scope's graph."""
 

@@ -36,6 +36,9 @@ class Domain(Entity):
     def add_vars(self, vars: dict[str, Any]) -> None:
         self.vars.update(vars)
 
+    def get_vars(self) -> StringMap:
+        return self.vars
+
     def add_handler(self, func, **attrs) -> None:
         self.handlers.add(func, **attrs)
 
@@ -43,9 +46,18 @@ class Domain(Entity):
     def register_handler(self, **attrs: Any) -> None:
         return self.handlers.register(**attrs)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 DomainRegistry = Registry[Domain]
 
 global_domain = Domain(label="globals",
                        vars=DEFAULT_VARS,
                        handlers=DEFAULT_HANDLERS,
                        )
+
+# @global_domain.handlers.register(priority=100, job="namespace", is_instance=Domain)
+# def _include_vars_in_ns(inst: Domain, *_, **__) -> StringMap:
+#     if inst.vars:
+#         return inst.vars
+

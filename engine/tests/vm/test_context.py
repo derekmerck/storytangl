@@ -23,6 +23,23 @@ def test_context_namespace_has_top_layer_and_is_not_polluting_domains():
     for m in ns.maps[1:]:
         assert "foo" not in m
 
+from tangl.core.domain import DomainNode
+def test_ns_gather():
+    g = Graph()
+    n = g.add_node(label="here", vars={"foo": 1}, obj_cls=DomainNode)
+    assert n.vars["foo"] == 1
+    ctx = Context(graph=g, cursor_id=n.uid)
+
+    print( ctx.inspect_scope() )
+
+    ns = ctx.get_ns()
+    _ns = ctx._get_ns()
+
+    print(ns)
+    print(_ns)
+
+    assert dict(ns) == dict(_ns)
+
 # Doesn't work like this anymore?  Alternate test?
 # def test_get_ns_returns_fresh_top_layer_per_phase(frame):
 #     from tangl.vm.frame import ResolutionPhase as P

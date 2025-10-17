@@ -5,9 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import jinja2
+
 from tangl.core import BaseFragment, Graph, Node, global_domain
 from tangl.vm.context import Context
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
+from tangl.vm.domain import TraversableDomain
 
 from tangl.story.concepts.concept import Concept
 
@@ -27,7 +30,7 @@ def _normalize_ns(ns: Any) -> Mapping[str, Any] | None:
         return None
 
 
-class Block(Node):
+class Block(TraversableDomain, Node):
     """Block(label: str, content: str = "")
 
     Structural node that groups :class:`Concept` children and presents
@@ -95,10 +98,12 @@ def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
         if ns is None:
             inline_text = cursor.content
         else:
-            try:
-                inline_text = cursor.content.format_map(ns)
-            except (KeyError, ValueError):
-                inline_text = cursor.content
+            tmpl = jinja2.Template(cursor.content)
+            inline_text = tmpl.render(**ns)
+            # try:
+            #     inline_text = cursor.content.format_map(ns)
+            # except (KeyError, ValueError):
+            #     inline_text = cursor.content
         fragments.append(
             BaseFragment(
                 content=inline_text,
@@ -119,6 +124,7 @@ def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
             )
         )
 
+    # todo: Choices are themselves fragments, so we need to call render on each of our choices and add them to the stream
     choices = cursor.get_choices(ns=ns)
     if choices:
         lines = [""]

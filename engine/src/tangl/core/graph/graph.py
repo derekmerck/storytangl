@@ -131,14 +131,14 @@ class Graph(Registry[GraphItem]):
         item.graph = self
         super().add(item)
 
-    def add_node(self, **attrs) -> Node:
+    def add_node(self, *, obj_cls=None, **attrs) -> Node:
         from .node import Node
-        n = Node(**attrs)
+        obj_cls = obj_cls or Node
+        n = obj_cls(**attrs)
         self.add(n)
         return n
 
-    def add_edge(self, source: GraphItem, destination: GraphItem, **attrs) -> Edge:
-        from .edge import Edge
+    def add_edge(self, source: GraphItem, destination: GraphItem, *, obj_cls=None, **attrs) -> Edge:
         if source is not None:
             self._validate_linkable(source)
             source_id = source.uid
@@ -151,13 +151,17 @@ class Graph(Registry[GraphItem]):
         else:
             destination_id = None
 
-        e = Edge(source_id=source_id, destination_id=destination_id, **attrs)
+        from .edge import Edge
+        obj_cls = obj_cls or Edge
+
+        e = obj_cls(source_id=source_id, destination_id=destination_id, **attrs)
         self.add(e)
         return e
 
-    def add_subgraph(self, *, members: Iterable[GraphItem] = None, **attrs) -> Subgraph:
+    def add_subgraph(self, *, obj_cls=None, members: Iterable[GraphItem] = None, **attrs) -> Subgraph:
         from .subgraph import Subgraph
-        sg = Subgraph(**attrs)
+        obj_cls = obj_cls or Subgraph
+        sg = obj_cls(**attrs)
         self.add(sg)
         for item in members or ():
             sg.add_member(item)  # validates internally
