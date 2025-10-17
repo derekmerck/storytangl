@@ -71,11 +71,10 @@ class MenuBlock(Block):
 
     # @MenuActionHandler.strategy('on_get_actions')
     def _get_tagged_blocks(self):
-        logger.debug( f"Searching for actions {self.with_cls} and {self.with_tags}")
+        logger.debug(f"Searching for actions {self.with_cls} and {self.with_tags}")
         return list( self.story.find_nodes(self.with_cls, with_tags=self.with_tags) )
 
     # todo: if no actions available, return redirect on enter if possible (skip)
     # def enter(self):
     #     if not self.actions or not any([ a.available() for a in self.actions ]):
     #         # trigger any available continue ...
-

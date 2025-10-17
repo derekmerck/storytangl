@@ -1,3 +1,4 @@
+# v34 handler with signature introspection
 from __future__ import annotations
 from typing import Generic, Callable, TypeVar, Type, Self, ClassVar, Optional, Union, TYPE_CHECKING, overload, Literal, Any
 import inspect

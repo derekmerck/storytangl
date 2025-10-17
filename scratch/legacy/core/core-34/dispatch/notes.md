@@ -7,9 +7,9 @@ Each handler is registered with a _criteria_ for triggering; usually at least th
 
 There are several possible signatures for a handler:
 
-`f(self/caller, *, ctx, other = None, result = None )`, mro instance methods, static methods
-`f(self/owner, caller, *, ctx, result = None )`, instance methods on other nodes
-`f(cls, caller, *, ctx, other = None, result = None )`, cls methods
+- `f(self/caller, *, ctx, other = None, result = None )`, mro instance methods, static methods
+- `f(self/owner, caller, *, ctx, result = None )`, instance methods on other nodes
+- `f(cls, caller, *, ctx, other = None, result = None )`, cls methods
 
 Each type takes a variant of the register decorator and is added to a registry at different points.
 

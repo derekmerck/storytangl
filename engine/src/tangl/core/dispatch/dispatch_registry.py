@@ -5,6 +5,8 @@ Dispatch registry
 Ordered, queryable collection of :class:`~tangl.core.dispatch.handler.Handler`.
 Provides convenience helpers to register callables and execute matching
 handlers as a pipeline, yielding :class:`~tangl.core.dispatch.job_receipt.JobReceipt`.
+
+"It's like CSS specificity, but for narrative mechanics."
 """
 from __future__ import annotations
 from typing import Iterator, Optional, Iterable, Any
