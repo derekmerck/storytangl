@@ -128,6 +128,17 @@ class BaseModelPlus(BaseModel):
             if hasattr(self, k):
                 setattr(self, k, v)
 
+    @classmethod
+    def dereference_cls_name(cls, name: str) -> Type[Self]:
+        # Call on upper bound
+        # todo: Should memo-ize this
+        if name == cls.__qualname__:
+            return cls
+        for _cls in cls.__subclasses__():
+            if x := _cls.dereference_cls_name(name):
+                return x
+
+
 @total_ordering
 class HasSeq(BaseModel):
     # This is a helper mixin for total orderings
@@ -164,4 +175,3 @@ class HasSeq(BaseModel):
         # Default __lt__ sorts non-seq to the front without raising
         # Override as necessary in subclasses that want a custom ordering
         return self.seq < getattr(other, 'seq', -1)
-

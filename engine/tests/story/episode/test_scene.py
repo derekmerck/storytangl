@@ -270,12 +270,15 @@ def test_refresh_edge_projections_updates_namespace_in_place() -> None:
     scene = Scene(graph=g, label="scene", member_ids=[block.uid])
 
     frame = Frame(graph=g, cursor_id=block.uid)
-    namespace = frame.context.scope.namespace
 
-    assert "npc" not in namespace
+    ns = frame.context.get_ns()
+
+    assert "npc" not in ns
 
     dependency.destination = actor
     scene.refresh_edge_projections()
+    assert scene.vars["npc"] is actor
 
-    assert namespace["npc"] is actor
-    assert namespace["npc_satisfied"] is True
+    ns = frame.context.get_ns()
+    assert ns["npc"] is actor
+    assert ns["npc_satisfied"] is True

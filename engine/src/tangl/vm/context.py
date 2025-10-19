@@ -112,21 +112,24 @@ class Context:
         lines.append(f"  ns: {', '.join(names)}")
         return "\n".join(lines)
 
-    def get_ns(self) -> NS:
-        return self.scope.namespace
-
-    def _get_ns(self) -> NS:
-        """Bootstrap ctx by calling get_vars on every domain in active
-        domains and creating."""
+    @staticmethod
+    def _get_ns(scope: Scope) -> NS:
         maps = []
-        for d in self.scope.active_domains:
+        for d in scope.active_domains:
             if hasattr(d, "get_vars"):
-                maps.append(d.get_vars())
+                if x := d.get_vars():
+                    maps.append(x) # grabs non-None result fields
+        return ChainMap(*maps)
         # handlers = self.scope.get_handlers_by_layer(job="namespace")
         # receipts = [h(self.cursor, ctx=self) for h in handlers]
         # # could inject self vars here but frame vars are already included I think
-        # maps = JobReceipt.gather(*receipts)
-        return ChainMap(*maps)  # grabs non-None result fields
+        # maps = JobReceipt.gather(*receipts)  # grabs non-None result fields
+        return ChainMap(*maps)
+
+    def get_ns(self) -> NS:
+        """Bootstrap ctx by calling get_vars on every domain in active
+        domains and creating."""
+        return self._get_ns(self.scope)
 
     def get_handlers(self, **criteria) -> Iterator[Handler]:
         # can pass phase in filter criteria if useful

@@ -47,14 +47,14 @@ def test_registry_select_for_and_chain_find():
     seeker = Consumer(label="wizard", kind="wand", tier=2)
 
     # select_for searches a single registry
-    got1 = list(reg1.select_for(seeker))
+    got1 = list(reg1.select_all_for(seeker))
     assert got1 == [], 'only c satisfies seeker, c not in r1'
 
-    got2 = list(reg2.select_for(seeker))
+    got2 = list(reg2.select_all_for(seeker))
     assert got2 == [c], 'only c satisfies seeker, c in r2'
 
     # chain across registries
-    got = list(Registry.chain_select_for(reg1, reg2, selector=seeker))
+    got = list(Registry.chain_select_all_for(reg1, reg2, selector=seeker))
     assert got == [c]
 
     # chain_find_one yields the first in the chained ordering

@@ -35,18 +35,17 @@ def test_resource_inventory_tag_get_aliases():
     assert tag.matches(has_identifier=b"hash123")
 
 
-@pytest.mark.xfail(reason="hash caching not implemented yet in current rev")
 def test_compute_hash_caching(temp_image_fp):
     import tangl.utils.shelved2 as shelved
     starting_hits, starting_misses = shelved.hit_count, shelved.miss_count
-    MediaRIT(path=temp_image_fp)
+    MediaRIT.from_source(temp_image_fp)
     # should be no initial cache entry
     assert shelved.miss_count == starting_misses + 1
-    MediaRIT(path=temp_image_fp)
+    MediaRIT.from_source(temp_image_fp)
     # should have gotten a cache hit
     assert shelved.hit_count == starting_hits + 1
     # by touching the file, we should invalidate the cache entry ...
     temp_image_fp.touch(exist_ok=True)
-    MediaRIT(path=temp_image_fp)
+    MediaRIT.from_source(temp_image_fp)
     # ... so we should register a miss
     assert shelved.miss_count == starting_misses + 2

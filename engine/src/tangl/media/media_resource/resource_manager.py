@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 """Utilities for indexing and serving media resources within a world."""
-
+from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 import logging

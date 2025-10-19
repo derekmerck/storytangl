@@ -72,6 +72,8 @@ class MediaResourceInventoryTag(Entity):
         # for matching `find(expired=True)`
         return self.expiry < datetime.now()
 
+    # this is to avoid recomputing hash values for static inventories
+    # todo: should change it to cache the value keyed on (fn, mdate, size)
     @shelved(fn="rits")
     @staticmethod
     def _from_path(cls, path: Path) -> MediaResourceInventoryTag:

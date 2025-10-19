@@ -1,20 +1,9 @@
-import tempfile
 from datetime import datetime
-from pathlib import Path
-
-import pytest
-from PIL import Image
 
 from tangl.utils.hashing import compute_data_hash
 from tangl.utils.get_file_mtime import get_file_mtime
 from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 
-@pytest.fixture
-def temp_fp():
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-    yield tmp_path
-    tmp_path.unlink()  # Cleanup after the test
 
 def test_compute_file_hash(temp_fp):
     # Mock the file content
@@ -37,20 +26,6 @@ def test_file_rit_initialization(temp_fp):
     resource_tag = MediaRIT(path=temp_fp, label='test', data_type=MediaDataType.IMAGE)
     assert resource_tag.label == "test"
     assert resource_tag.data_type == MediaDataType.IMAGE
-
-
-@pytest.fixture
-def temp_image_fp():
-    # solid red test image
-    width, height = 100, 100
-    image = Image.new('RGB', (width, height), color=(255, 0, 0))
-
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-        image.save(tmp_path)
-
-    yield tmp_path
-    tmp_path.unlink()  # Cleanup after the test
 
 
 def test_resource_type_inference(temp_image_fp):

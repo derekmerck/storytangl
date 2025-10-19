@@ -196,20 +196,11 @@ class Entity(BaseModelPlus):
         # This key _should_ be unflattened by the serializer when necessary, but if not,
         # we can try to unflatten it as the qualified name against Entity
         if isinstance(obj_cls, str):
-            obj_cls = Entity.dereference_cls_name(obj_cls)
+            obj_cls = cls.dereference_cls_name(obj_cls)
         if obj_cls is not cls:
             # Call the correct class's structure() method without an obj_cls override
             return obj_cls.structure(_data)
         return cls(**_data)
-
-    @classmethod
-    def dereference_cls_name(cls, name: str) -> Type[Self]:
-        # todo: Should memo-ize this, move into utils mixin, StructuredModel protocol?
-        if name == cls.__qualname__:
-            return cls
-        for _cls in cls.__subclasses__():
-            if x := _cls.dereference_cls_name(name):
-                return x
 
     def unstructure(self) -> StringMap:
         """
@@ -269,13 +260,24 @@ class Selectable(BaseModel):
         # override this to create dynamic selections
         return copy(self.selection_criteria)
 
-    @classmethod
-    def filter_for_selector(cls, values: Iterable[Self], *, selector: Entity) -> Iterator[Self]:
-        # or could use the symmetric helper `lambda x: helper x.satisfies(selector)`
-        return filter(lambda x: hasattr(x, 'get_selection_criteria') and selector.matches(**x.get_selection_criteria()), values)
-
-    def satisfies(self, selector: Entity) -> bool:
+    def satisfies(self, selector: Entity, **inline_criteria) -> bool:
+        if not self.matches(**inline_criteria):
+            return False
         return selector.matches(**self.get_selection_criteria())
+
+    @classmethod
+    def filter_for_selector(cls, values: Iterable[Self], *, selector: Entity, **inline_criteria) -> Iterator[Self]:
+
+        return filter(lambda x: hasattr(x, 'get_selection_criteria') and
+                      x.matches(**inline_criteria) and
+                      selector.matches(**x.get_selection_criteria()), values)
+
+        # or could use the symmetric helper `lambda x: helper x.satisfies(selector)`
+        # def filt_(self: Self) -> Self:
+        #     if not hasattr(self, 'get_selection_criteria'): return False
+        #     if not self.matches(**inline_criteria: return False
+        #     return self.satisfies(selector)
+        # return filter(filt_, values)
 
 
 class Conditional(BaseModel):

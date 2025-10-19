@@ -2,18 +2,21 @@
 from __future__ import annotations
 import functools
 from enum import IntEnum, Enum
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable, Type
+import logging
+import inspect
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator, Field, ValidationInfo
 
+from tangl.type_hints import Typelike
 from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity, Selectable, is_identifier
 from .job_receipt import JobReceipt
 
+logger = logging.getLogger(__name__)
+
 # todo: - make this look more like v34 dispatch, with a decorator that infers how to call
 #         the func by inspecting its signature.
-#       - May want 1 or more Entities as args, may want an execution context
-#         (namespace, phase, prior results, etc.), may want/admit kwarg params.
 #       - infer caller type and result type from function sig?
 #       - dynamically modify selection criteria based on expected caller type/return type?
 
@@ -47,7 +50,7 @@ class HandlerPriority(IntEnum):
 # call will actually admit any type *args.
 @runtime_checkable
 class HandlerFunc(Protocol):
-    def __call__(self, caller: Entity, *others: Entity, ctx: Optional[dict] = None, **params: Any) -> Any: ...
+    def __call__(self, caller: Entity, *others: Entity, ctx: Optional[Any] = None, **params: Any) -> Any: ...
     # Variadic args are entities, to support things like __lt__(self, other) or transaction
     # type calls
     # `ctx` is a reserved kw arg for Context objects passed by the resolution frame's phase bus
@@ -89,6 +92,7 @@ class Handler(HasSeq, Selectable, Entity):
     result_type: Optional[Enum | str] = None  # No need to enumerate this yet
 
     def has_func_name(self, value: str) -> bool:
+        # for matching
         return self.func.__name__ == value
 
     @is_identifier
@@ -122,8 +126,6 @@ class Handler(HasSeq, Selectable, Entity):
         other_ids = [o.uid for o in others if hasattr(o, 'uid')]
         if other_ids:
             receipt_kwargs["other_ids"] = other_ids
-        if ctx is not None:
-            receipt_kwargs["ctx"] = ctx
         if params:
             receipt_kwargs["params"] = params
 
@@ -139,5 +141,17 @@ class Handler(HasSeq, Selectable, Entity):
 
     def __lt__(self, other) -> bool:
         # order by priority, then seq (uncorrelated if handlers are from classes with
-        # their own seq), then uid as a final deterministic tie-breaker
+        # their own seq), then uid as a final (non-deterministic) tie-breaker
         return (self.priority, self.seq, self.uid) < (other.priority, other.seq, other.uid)
+
+    def get_func_sig(self):
+        return self._get_func_sig(self.func)
+
+    @staticmethod
+    def _get_func_sig(func):
+        if func is None:
+            raise ValueError("func cannot be None")
+        while hasattr(func, '__func__'):
+            # May be a wrapped object
+            func = func.__func__
+        return inspect.signature(func)

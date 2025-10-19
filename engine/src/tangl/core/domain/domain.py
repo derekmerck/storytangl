@@ -11,6 +11,8 @@ from tangl.core.dispatch import DEFAULT_HANDLERS
 # imported from tangl.__info__
 DEFAULT_VARS = {'version': __version__}
 
+# todo: demote vars to objects that work with vm and are collected by registered ns handlers
+
 class Domain(Entity):
     """
     Domain(vars: dict[str, ~typing.Any], handlers: DispatchRegistry)

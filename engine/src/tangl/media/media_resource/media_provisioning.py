@@ -2,7 +2,7 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, DispatchRegistry as DispatchRegistry
+from tangl.core import Node, DispatchRegistry
 from tangl.vm.planning import Provisioner
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec

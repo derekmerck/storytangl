@@ -42,6 +42,7 @@ from .entity import Entity, Selectable
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
+ST = TypeVar("ST", bound=Selectable)
 
 # todo: registries _should_ have a hook for a local 'on_index' dispatch
 #       registry that runs on every add(item), but this becomes a recursive
@@ -168,22 +169,23 @@ class Registry(Entity, Generic[VT]):
 
     # -------- FIND SATISFIERS -----------
 
-    def select_for(self, selector: Entity) -> Iterator[VT]:
+    # todo: probably want to include sort_key as a param to match the api of find
+    def select_all_for(self, selector: Entity, **inline_criteria) -> Iterator[ST]:
         # filter will gracefully fail if VT is not a Selectable
-        return Selectable.filter_for_selector(self.values(), selector=selector)
+        return Selectable.filter_for_selector(self.values(), selector=selector, **inline_criteria)
 
-    def select_one_for(self, selector: Entity) -> Optional[VT]:
-        return next(self.select_for(selector), None)
+    def select_one_for(self, selector: Entity, **inline_criteria) -> Optional[ST]:
+        return next(self.select_for(selector, **inline_criteria), None)
 
     @classmethod
-    def chain_select_for(cls, *registries: Self, selector: Entity) -> Iterator[VT]:
+    def chain_select_all_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Iterator[ST]:
         iter_values = itertools.chain.from_iterable(
-            r.select_for(selector) for r in registries)
+            r.select_all_for(selector, **inline_criteria) for r in registries)
         yield from iter_values
 
     @classmethod
-    def chain_select_one_for(cls, *registries: Self, selector: Entity) -> Optional[VT]:
-        return next(cls.chain_select_for(*registries, selector=selector), None)
+    def chain_select_one_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Optional[ST]:
+        return next(cls.chain_select_all_for(*registries, selector=selector, **inline_criteria), None)
 
     # -------- DELEGATE MAPPING METHODS -----------
 

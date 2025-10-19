@@ -29,13 +29,11 @@ class Scope(Entity):
 
     Key Features
     ------------
-    * **Namespace** – merge of all domain vars, nearest-first.
     * **Handlers** – aggregate handler registries into a unified pipeline.
 
     API
     ---
     - :attr:`active_domains` – list of active domains given the anchor, graph, and domain registries available
-    - :attr:`namespace` – merged :class:`~python:collections.ChainMap`
     - :meth:`get_handlers` – yield applicable handlers
     """
 
@@ -78,7 +76,7 @@ class Scope(Entity):
                 yield item
             # 2) Include affiliates of the anchor and each ancestor
             for registry in registries:
-                for domain in registry.select_for(item):
+                for domain in registry.select_all_for(item):
                     if new_domain(domain):
                         yield domain
 
@@ -89,16 +87,6 @@ class Scope(Entity):
     @cached_property
     def active_domains(self) -> list[Domain]:
         return list(self._iter_active_domains(self.anchor, self.domain_registries))
-
-    @classmethod
-    def merge_vars(cls, *members: Domain, **criteria) -> NS:
-        # closest to farthest
-        maps = ( m.get_vars() for m in members if m.matches(**criteria) )
-        return ChainMap(*maps)
-
-    @cached_property
-    def namespace(self) -> NS:
-        return self.merge_vars(*self.active_domains)
 
     def get_handlers(self, **criteria) -> Iterator[Handler]:
         """Sorts over all layers"""
