@@ -2,7 +2,22 @@ from typing import Generic, Callable, ClassVar
 from uuid import UUID
 
 from tangl.core.registry import Registry, VT
-from tangl.core.dispatch.dispatch_v37 import BehaviorRegistry, HasBehaviors
+from .dispatch_v37 import BehaviorRegistry, HasBehaviors
+
+# --- Hook decorator markers -----------------------------------------------
+# We can't reliably call a classmethod decorator from the class body being defined.
+# Instead, these factories just *tag* functions, and __init_subclass__ will
+# discover the tags and register the behaviors on the concrete subclass.
+def _make_hook_decorator(task: str, **default_attrs):
+    def factory(**attrs):
+        merged = {**default_attrs, **attrs}
+        def decorator(func):
+            marks = getattr(func, "_st_hook_marks_", [])
+            marks.append({"task": task, **merged})
+            setattr(func, "_st_hook_marks_", marks)
+            return func
+        return decorator
+    return factory
 
 class HookedRegistry(Registry, HasBehaviors, Generic[VT]):
     # This can quickly become a recursive issue, but let's allow registries
@@ -12,35 +27,31 @@ class HookedRegistry(Registry, HasBehaviors, Generic[VT]):
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
+        # fresh registry per subclass
         cls.behavior_hooks = BehaviorRegistry()
+        # discover hook-marked callables declared on this subclass
+        for name, obj in list(vars(cls).items()):
+            # unwrap descriptors to raw function for tag lookup
+            func = obj.__func__ if isinstance(obj, (staticmethod, classmethod)) else obj
+            marks = getattr(func, "_st_hook_marks_", None)
+            if not marks:
+                continue
+            for mark in marks:
+                task = mark.get("task")
+                attrs = {k: v for k, v in mark.items() if k != "task"}
+                # fill placeholders now that we have the concrete subclass
+                if attrs.get("owner_cls") == "__CLASS__":
+                    attrs["owner_cls"] = cls
+                # delegate to behavior registry; it will infer handler_type/owner/caller_cls as needed
+                cls.behavior_hooks.add_behavior(func, task=task, **attrs)
 
-    @classmethod
-    def on_add(cls, **attrs):
-        # decorator alias for register(task=on_add)
-        # @HookedRegistry.on_add(**attrs)(cls_method)
-        attrs['task'] = "on_add"
-        attrs['owner_cls'] = cls
-        attrs['caller_cls'] = VT
-        attrs['handler_type'] = "instance_on_owner"
-        return cls.behavior_hooks.register(**attrs)
-
-    @classmethod
-    def on_remove(cls, **attrs):
-        # decorator alias for register(task=on_remove)
-        attrs['task'] = "on_remove"
-        attrs['owner_cls'] = cls
-        attrs['caller_cls'] = VT
-        attrs['handler_type'] = "instance_on_owner"
-        cls.behavior_hooks.register_behavior(**attrs)
-
-    @classmethod
-    def on_get(cls, **attrs):
-        # decorator alias for register(task=on_get)
-        attrs['task'] = "on_get"
-        attrs['owner_cls'] = cls
-        attrs['caller_cls'] = VT
-        attrs['handler_type'] = "instance_on_owner"
-        cls.behavior_hooks.register_behavior(**attrs)
+    # Class-level aliases usable inside subclass bodies:
+    #   class MyReg(HookedRegistry[Foo]):
+    #       @HookedRegistry.on_add()     # or just @on_add() if imported at module scope
+    #       def handle_add(self, caller: Foo, ctx=None): ...
+    on_add   = _make_hook_decorator("on_add",   handler_type="instance_on_owner", owner_cls="__CLASS__")
+    on_remove= _make_hook_decorator("on_remove",handler_type="instance_on_owner", owner_cls="__CLASS__")
+    on_get   = _make_hook_decorator("on_get",   handler_type="instance_on_owner", owner_cls="__CLASS__")
 
     def add(self, item: VT, extra_handlers: list[Callable] = None):
         self.behavior_hooks.dispatch_for(item, task="on_add", extra_handlers=extra_handlers)
@@ -55,3 +66,4 @@ class HookedRegistry(Registry, HasBehaviors, Generic[VT]):
     def get(self, key: UUID, extra_handlers: list[Callable] = None):
         item = super().get(key)
         self.behavior_hooks.dispatch_for(item, task="on_get", extra_handlers=extra_handlers)
+        return item

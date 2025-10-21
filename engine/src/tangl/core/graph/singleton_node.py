@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
 from tangl.core import Singleton
-from .graph import Graph
+from .graph import Graph  # for pydantic model schema
 from .node import Node
 
 logger = logging.getLogger(__name__)

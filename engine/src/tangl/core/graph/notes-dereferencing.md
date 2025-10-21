@@ -1,12 +1,12 @@
 Dereferencing GraphItems
 ------------------------
 
-**GraphItems** use properties with implicit registry access::
+**GraphItems** use _properties_ with implicit registry access::
 
     edge.source          # returns Node via self.graph.get()
     edge.destination     # property, no args
 
-**Records** use methods with explicit registry parameter::
+**Records** don't have `self.graph`, so they use _methods_ with explicit registry parameter::
 
     record.blame(registry)  # returns Entity via passed registry
 
