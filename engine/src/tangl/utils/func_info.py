@@ -227,6 +227,7 @@ class FuncInfo:
                     # owner_cls = bound_self
                 elif has_self_first and has_caller:
                     # Manager instance method pattern
+                    normalized_func = f_unwrapped
                     owner = owner or bound_self
                     owner_cls = owner_cls or bound_self.__class__
                     handler_type = HandlerType.INSTANCE_ON_OWNER
@@ -261,6 +262,11 @@ class FuncInfo:
         if not explicit_caller_cls:
             if isinstance(ann_caller, type):
                 caller_cls = ann_caller
+            elif ann_caller is TypingSelf:
+                # caller: Self → prefer the bound class (for bound classmethods on local classes),
+                # then the declaring class, then any provided owner_cls.
+                bound_cls = bound_self if isinstance(bound_self, type) else None
+                caller_cls = bound_cls or decl_cls or owner_cls or caller_cls
             elif handler_type == HandlerType.INSTANCE_ON_CALLER:
                 # self-method; use declaring class if we can find it
                 caller_cls = decl_cls or caller_cls
@@ -291,7 +297,14 @@ class FuncInfo:
 
         # Compatibility check for explicit caller_cls (compare explicit vs inferred)
         if explicit_caller_cls and ann_caller is not None and exp_caller_cls is not None:
-            inferred_cls = ann_caller if isinstance(ann_caller, type) else (decl_cls if handler_type == HandlerType.INSTANCE_ON_CALLER else None)
+            if isinstance(ann_caller, type):
+                inferred_cls = ann_caller
+            elif ann_caller is TypingSelf:
+                inferred_cls = (bound_self if isinstance(bound_self, type) else decl_cls or owner_cls)
+            elif handler_type == HandlerType.INSTANCE_ON_CALLER:
+                inferred_cls = decl_cls
+            else:
+                inferred_cls = None
             if not (issubclass(exp_caller_cls, inferred_cls) or issubclass(inferred_cls, exp_caller_cls)):
                 raise RuntimeError("Incompatible caller_cls override")
         # If explicit was provided, keep it rather than any inferred value

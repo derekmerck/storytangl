@@ -2,7 +2,7 @@
 """Behavior - dispatch version 37.2"""
 from __future__ import annotations
 from enum import IntEnum
-from typing import Type, Callable, TypeVar, Generic
+from typing import Type, Callable, TypeVar, Generic, Optional
 from functools import total_ordering
 import inspect
 import weakref
@@ -91,10 +91,10 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
         return self.label or self.func.__name__
 
     # classification is inferred in _populate_from_funcinfo unless explicitly provided
-    handler_type: HandlerType = HandlerType.STATIC
+    handler_type: HandlerType
+    caller_cls: Type[CT] = None   # for selection and dist; can infer on bind/call
     owner: OT | weakref.ReferenceType[OT] | None = None
     owner_cls: Type[OT] = None
-    caller_cls: Type[CT] = None   # for selection and dist; can infer on bind/call
 
     @model_validator(mode="before")
     @classmethod
@@ -139,15 +139,28 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
         if not explicit_caller_cls and getattr(info, "caller_cls", None) is not None:
             values["caller_cls"] = info.caller_cls
 
-        # owner: fill if missing, in the shape Behavior expects
-        # - INSTANCE_ON_OWNER: store the instance (field validator will weakref it)
-        # - CLASS_ON_OWNER: store the owner class
+        # owner / owner_cls merging:
+        # - If owner was NOT explicit: use FuncInfo to fill both owner and owner_cls as appropriate.
+        # - If owner WAS explicit: keep the given owner, but still backfill owner_cls if missing.
         if not explicit_owner:
-            if info.handler_type == HandlerType.INSTANCE_ON_OWNER and getattr(info, "owner", None) is not None:
-                values["owner"] = info.owner
-                values["owner_cls"] = info.owner_cls
-            elif info.handler_type == HandlerType.CLASS_ON_OWNER and getattr(info, "owner_cls", None) is not None:
-                values["owner_cls"] = info.owner_cls
+            if info.handler_type == HandlerType.INSTANCE_ON_OWNER:
+                # Backfill owner_cls even for unbound manager methods; set owner if available
+                if getattr(info, "owner_cls", None) is not None:
+                    values["owner_cls"] = info.owner_cls
+                if getattr(info, "owner", None) is not None:
+                    values["owner"] = info.owner
+            elif info.handler_type == HandlerType.CLASS_ON_OWNER:
+                if getattr(info, "owner_cls", None) is not None:
+                    values["owner_cls"] = info.owner_cls
+        else:
+            # explicit owner provided; ensure owner_cls is populated if missing
+            if values.get("owner_cls") is None:
+                if isinstance(owner_val, Entity):
+                    values["owner_cls"] = owner_val.__class__
+                elif isinstance(owner_val, type):
+                    values["owner_cls"] = owner_val
+                elif getattr(info, "owner_cls", None) is not None:
+                    values["owner_cls"] = info.owner_cls
 
         return values
 
@@ -161,12 +174,12 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
         # Classes and None pass through
         return data
 
-    def mro_dist(self, caller: Type[Entity] = None) -> int:
+    def mro_dist(self, caller: Entity = None) -> int:
         if caller is None:
             return -1
         return _mro_dist(caller.__class__, self.caller_cls)
 
-    priority: HandlerPriority = HandlerPriority.NORMAL
+    priority: HandlerPriority | int = HandlerPriority.NORMAL
 
     # todo: we used to have a 'registry aware' object type that knew
     #       to self-register.  Moved it to GraphItem, maybe should re-generalize?
@@ -196,7 +209,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
             return self.origin.handler_layer
         return HandlerLayer.INLINE
 
-    task: str = None   # "@validate", "@render", etc.
+    task: Optional[str] = None   # "@validate", "@render", etc.
 
     def has_task(self, task: str) -> bool:
         # when filtered by behavior.matches(has_task=x)
@@ -204,14 +217,14 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
             # No task given, always match
             return True
         if self.handler_layer() is HandlerLayer.INLINE:
-            # I may not have a task, but I am inline
+            # I may not have a task, but I am inline, loose handlers will _always_ match
             return True
-        if self.task is not None:
+        if self.task is not None and self.task == task:
             # I might match some non-None task
-            return self.task == task
-        if self.origin is not None and self.origin.task is not None:
+            return True
+        if self.origin is not None and self.origin.task is not None and self.origin.task == task:
             # I might inherit my origin's non-None task
-            return self.origin.task == task
+            return True
         return False
 
     def get_selection_criteria(self) -> StringMap:
@@ -242,12 +255,12 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
     def sort_key(self, caller: CT = None, by_origin: bool = False):
         """
         -  priority early < late   # late can clobber
-        - -origin dist             # closer registry can clobber (needs caller)
+        - -origin dist             # closer registry can clobber (if chained)
         -  global < inline         # inline can clobber
         - -mro dist                # closer func def can clobber (needs caller)
         - *fewer selectors < more  # more selectors can clobber
         -  static < class < inst   # most specific (inst) can clobber
-        -  late def < early        # first created wins
+        -  early < late            # earlier runs before later (later can clobber)
 
         `by_origin` flag -> flips priority and origin dist/layer ~ origin dist !important
         This is critical for ensuring that ancestor order is preserved and values shadowed
@@ -261,7 +274,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
                     -self.mro_dist(caller),     # subclass meth > superclass meth
                     *self.specificity,          # match specificity
                      self.handler_type,         # instance > class > static
-                    -self.seq)                  # registration order
+                     self.seq)                  # registration order
 
         # by priority first
         return ( self.priority,                 # explicit
@@ -270,7 +283,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
                 -self.mro_dist(caller),         # subclass meth > superclass meth
                 *self.specificity,              # match specificity
                  self.handler_type,             # instance > class > static
-                -self.seq)                      # registration order
+                 self.seq)                      # registration order
 
     def __lt__(self, other: Behavior):
         return self.sort_key() < other.sort_key()

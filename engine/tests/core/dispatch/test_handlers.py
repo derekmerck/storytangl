@@ -1,9 +1,11 @@
+# Tests from v37.1 dispatch, modernized to match v37.2 api
 import uuid
 
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import Handler, HandlerPriority, DispatchRegistry, CallReceipt
+from tangl.core.dispatch import Behavior as Handler, HandlerPriority, BehaviorRegistry as DispatchRegistry, CallReceipt
+
 
 class DummyEntity(Entity):
     foo: int = None
@@ -51,28 +53,33 @@ def test_handler_lt_tiebreaker_and_registry_sort():
     reg = DispatchRegistry()
     calls = []
 
-    def h1(ns): calls.append(("h1", ns)); return "r1"
-    def h2(ns): calls.append(("h2", ns)); return "r2"
+    def h1(c, ctx=None): calls.append(("h1", ctx)); return "r1"
+    def h2(c, ctx=None): calls.append(("h2", ctx)); return "r2"
 
-    reg.add_func(h1, priority=HandlerPriority.EARLY)
-    reg.add_func(h2, priority=HandlerPriority.LATE)
+    reg.add_behavior(h1, priority=HandlerPriority.EARLY)
+    reg.add_behavior(h2, priority=HandlerPriority.LATE)
 
-    ns = {"x": 1}
-    receipts = list(reg.run_all(ns))
+    ctx = {"x": 1}
+    c = Entity()
+    receipts = list(reg.dispatch(c, ctx=ctx))
     assert [r.result for r in receipts] == ["r1", "r2"]
     assert [c[0] for c in calls] == ["h1", "h2"]
 
 def test_run_handlers_utility_orders_input():
     # Manually construct handlers to check ordering
-    def mk(func, prio, reg_no):
-        return Handler(func=func, priority=prio, reg_number=reg_no)
+    def mk(func, prio):
+        return Handler(func=func, priority=prio)
 
     order = []
-    hA = mk(lambda ns: order.append("A"), HandlerPriority.NORMAL, 2)
-    hB = mk(lambda ns: order.append("B"), HandlerPriority.LAST,   1)
-    hC = mk(lambda ns: order.append("C"), HandlerPriority.EARLY,  0)
+    hA = mk(lambda c, ctx=None: order.append("A"), HandlerPriority.NORMAL)
+    hB = mk(lambda c, ctx=None: order.append("B"), HandlerPriority.LAST)
+    hC = mk(lambda c, ctx=None: order.append("C"), HandlerPriority.EARLY)
 
-    list(DispatchRegistry.run_handlers({"ok": True}, [hA, hB, hC]))
+    assert hC.priority is HandlerPriority.EARLY
+    print( hC.sort_key() )
+
+    # short sort and run, class method
+    list(DispatchRegistry().dispatch(Entity(), ctx={"ok": True}, extra_handlers=[hA, hB, hC]))
     assert order == ["C", "A", "B"]
 
 def test_call_receipt_seq_monotonic():
@@ -86,13 +93,14 @@ def test_handler_ordering_and_receipts():
     calls = []
 
     @regs.register(priority=HandlerPriority.FIRST)
-    def a(ns): calls.append(("a", ns["phase"])); return "A"
+    def a(c, ctx=None): calls.append(("a", ctx["phase"])); return "A"
 
     @regs.register(priority=HandlerPriority.NORMAL)
-    def b(ns): calls.append(("b", ns["phase"])); return "B"
+    def b(c, ctx=None): calls.append(("b", ctx["phase"])); return "B"
 
     ns = {"phase": P.VALIDATE, "results": []}
-    receipts = list(regs.run_all(ns))
+    c = Entity()
+    receipts = list(regs.dispatch(c, ctx=ns))
     assert [r.result for r in receipts] == ["A", "B"]
     assert isinstance(receipts[0], CallReceipt)
     assert receipts[0].seq < receipts[1].seq  # monotonically increasing
@@ -102,13 +110,13 @@ def test_handler_run_one_picks_first():
     regs = DispatchRegistry()
 
     @regs.register(priority=HandlerPriority.LATE)
-    def late(ns): return "late"
+    def late(c, ctx=None): return "late"
 
     @regs.register(priority=HandlerPriority.FIRST)
-    def first(ns): return "first"
+    def first(c, ctx=None): return "first"
 
-    r = regs.run_one({"phase": P.VALIDATE, "results": []})
-    assert r.result == "first"
+    r = regs.dispatch(Entity(), ctx={"phase": P.VALIDATE, "results": []})
+    assert next(r).result == "first"
 
 
 def test_dispatch_registry_deterministic_order():
@@ -116,11 +124,11 @@ def test_dispatch_registry_deterministic_order():
     call_order: list[str] = []
 
     def register(name: str, priority: HandlerPriority | int) -> None:
-        def func(ns):
+        def func(c, ctx=None):
             call_order.append(name)
             return name
 
-        registry.add_func(func, priority=priority, label=name)
+        registry.add_behavior(func, priority=priority, label=name)
 
     register("late", HandlerPriority.LATE)
     register("first", HandlerPriority.FIRST)
@@ -128,14 +136,14 @@ def test_dispatch_registry_deterministic_order():
     register("normal", HandlerPriority.NORMAL)
 
     call_order.clear()
-    first_run = [receipt.result for receipt in registry.run_all({"run": 0})]
+    first_run = [receipt.result for receipt in registry.dispatch(Entity(), ctx={"run": 0})]
     expected = call_order.copy()
 
     assert first_run == expected
 
     for run in range(1, 4):
         call_order.clear()
-        rerun = [receipt.result for receipt in registry.run_all({"run": run})]
+        rerun = [receipt.result for receipt in registry.dispatch(Entity(), ctx={"run": run})]
         assert rerun == expected
         assert call_order == expected
 
@@ -193,14 +201,13 @@ def test_handlers_run_in_priority_order():
     calls = []
 
     @reg.register(priority=HandlerPriority.LATE)
-    def h3(ns): calls.append("LATE"); return True
+    def h3(c, ctx=None): calls.append("LATE"); return True
 
     @reg.register(priority=HandlerPriority.FIRST)
-    def h1(ns): calls.append("FIRST"); return True
+    def h1(c, ctx=None): calls.append("FIRST"); return True
 
     @reg.register(priority=HandlerPriority.EARLY)
-    def h2(ns): calls.append("EARLY"); return True
+    def h2(c, ctx=None): calls.append("EARLY"); return True
 
-    ns = {}
-    list(reg.run_all(ns))
+    list(reg.dispatch(Entity(), ctx=None))
     assert calls == ["FIRST", "EARLY", "LATE"]

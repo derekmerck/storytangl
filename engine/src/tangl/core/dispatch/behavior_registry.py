@@ -1,8 +1,9 @@
 # tangl/core/dispatch/behavior_registry.py
 """Behavior Registry - dispatch version 37.2"""
 from __future__ import annotations
-from typing import Type, Callable, Iterator
+from typing import Type, Callable, Iterator, Iterable
 import itertools
+import logging
 
 from pydantic import model_validator
 
@@ -11,6 +12,8 @@ from tangl.core.entity import Selectable
 from tangl.core.registry import _chained_registries
 from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority
 from .call_receipt import CallReceipt
+
+logger = logging.getLogger(__name__)
 
 # ----------------------------
 # Registry/Dispatch
@@ -39,7 +42,8 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
 
     def add_behavior(self, item, *,
                      priority: HandlerPriority = HandlerPriority.NORMAL,
-                     handler_type: HandlerType = HandlerType.STATIC,
+                     # These params are optional hints for FuncInfo, don't set defaults
+                     handler_type: HandlerType = None,
                      owner: Entity | None = None,
                      owner_cls: Type[Entity] | None = None,
                      caller_cls: Type[Entity] | None = None,
@@ -87,6 +91,14 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             return func
         return deco
 
+    @staticmethod
+    def _iter_normalize_handlers(handlers: Iterable[Behavior | Callable]) -> Iterator[Behavior]:
+        for h in handlers or []:
+            if isinstance(h, Behavior):
+                yield h
+            elif isinstance(h, Callable):
+                yield Behavior(func=h, task=None)
+
     def dispatch(self, caller: Entity, *, task: str = None, ctx: dict = None, extra_handlers: list[Callable] = None, by_origin=False, **inline_criteria) -> Iterator[CallReceipt]:
         # explicit 'task' param is an alias for `inline_criteria['has_task'] = '@foo'`
         if task is not None:
@@ -96,14 +108,14 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             else:
                 inline_criteria['has_task'] = task
         behaviors = self.select_all_for(selector=caller, **inline_criteria)
-        if extra_handlers:  # inlines
-            # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
-            # todo: is there a reason to support lists of unregistered handlers as extra?
-            #       I assume you would just put them in a registry and call `chain_dispatch`?
-            extra_behaviors = (Behavior(func=f, task=None) for f in extra_handlers or [])
-            behaviors = itertools.chain(behaviors, extra_behaviors)
+
+        # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
+        if extra_handlers:
+            behaviors = itertools.chain(behaviors, self._iter_normalize_handlers(extra_handlers))
+
         behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller, by_origin=by_origin))
-        return (b(caller, ctx) for b in behaviors)
+        logger.debug(f"Behaviors: {[b.sort_key() for b in behaviors]}")
+        return (b(caller, ctx=ctx) for b in behaviors)
 
     @classmethod
     def chain_dispatch(cls, *registries: BehaviorRegistry, caller, task: str = None, ctx: dict = None, extra_handlers: list[Callable] = None, by_origin=False, **inline_criteria) -> Iterator[CallReceipt]:
@@ -119,13 +131,11 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         # could also treat this as an ephemeral registry and add it onto the registry
         # stack and sort while filtering, but it seems clearer to copy the
         # single-registry-dispatch code.
-        if extra_handlers:  # inlines
-            # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
-            extra_behaviors = (Behavior(func=f, task=None) for f in extra_handlers or [])
-            behaviors = itertools.chain(behaviors, extra_behaviors)
+        if extra_handlers:
+            behaviors = itertools.chain(behaviors, cls._iter_normalize_handlers(extra_handlers))
         with _chained_registries(registries):  # provide registries for origin_dist sort key
             behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller, by_origin=by_origin))
-        return (b(caller, ctx) for b in behaviors)
+        return (b(caller, ctx=ctx) for b in behaviors)
 
     def iter_dispatch(self, *args, **kwargs) -> Iterator[CallReceipt]:
         raise NotImplementedError()
@@ -134,6 +144,9 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         # Or we could return an iterator of job receipts with lambda functions as result
         return (b.partial_receipt(caller, ctx) for b in behaviors)
         # Probably want a iter_chain_dispatch() as well for symmetry
+
+    def all_tasks(self) -> list[str]:
+        return [x.task for x in self.data.values() if x.task is not None]
 
 
 # ----------------------------

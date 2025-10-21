@@ -169,20 +169,26 @@ class Registry(Entity, Generic[VT]):
 
     # -------- FIND SATISFIERS -----------
 
-    # todo: probably want to include sort_key as a param to match the api of find
-    def select_all_for(self, selector: Entity, **inline_criteria) -> Iterator[ST]:
+    def select_all_for(self, selector: Entity, sort_key = None, **inline_criteria) -> Iterator[ST]:
         # filter will gracefully fail if VT is not a Selectable
-        return Selectable.filter_for_selector(self.values(), selector=selector, **inline_criteria)
+        iter_values = Selectable.filter_for_selector(self.values(), selector=selector, **inline_criteria)
+        if sort_key is None:
+            yield from iter_values
+        else:
+            yield from sorted(iter_values, key=sort_key)
 
     def select_one_for(self, selector: Entity, **inline_criteria) -> Optional[ST]:
         return next(self.select_for(selector, **inline_criteria), None)
 
     @classmethod
-    def chain_select_all_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Iterator[ST]:
+    def chain_select_all_for(cls, *registries: Self, selector: Entity, sort_key = None, **inline_criteria) -> Iterator[ST]:
         with _chained_registries(*registries):  # make registries available to inner calls
             iter_values = itertools.chain.from_iterable(
                 r.select_all_for(selector, **inline_criteria) for r in registries)
-            yield from iter_values
+            if sort_key is None:
+                yield from iter_values
+            else:
+                yield from sorted(iter_values, key=sort_key)
 
     @classmethod
     def chain_select_one_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Optional[ST]:

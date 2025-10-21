@@ -1,4 +1,5 @@
 import pytest
+import logging
 from tangl.core import Entity
 from tangl.utils.func_info import FuncInfo, HandlerType
 
@@ -267,3 +268,15 @@ def test_local_class_instance_lambda_self_only():
 
     assert info.handler_type is HandlerType.INSTANCE_ON_CALLER
     assert info.caller_cls is N
+
+from typing import Self
+def test_classmethod_caller_self_maps_to_declaring_class():
+    class C(Entity):
+        @classmethod
+        def f(cls, caller: Self, ctx=None): ...
+    info = FuncInfo.from_func(C.f)
+
+    logging.debug(FuncInfo.debug_func(C.f))
+
+    assert info.handler_type is HandlerType.CLASS_ON_CALLER
+    assert info.caller_cls is C
