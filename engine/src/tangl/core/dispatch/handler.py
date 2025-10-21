@@ -1,61 +1,20 @@
 # tangl/core/dispatch/handler.py
+"""Dispatch version 37.1 - deprecated"""
 from __future__ import annotations
 import functools
-from enum import IntEnum, Enum
-from typing import Any, Optional, Protocol, runtime_checkable, Type
+from enum import Enum
+from typing import Any, Optional
 import logging
-import inspect
 
-from pydantic import ConfigDict, field_validator, Field, ValidationInfo
+from pydantic import ConfigDict
 
-from tangl.type_hints import Typelike
+from tangl.utils.func_info import HandlerFunc
 from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity, Selectable, is_identifier
 from .call_receipt import CallReceipt
+from .behavior import HandlerPriority
 
 logger = logging.getLogger(__name__)
-
-# todo: - make this look more like v34 dispatch, with a decorator that infers how to call
-#         the func by inspecting its signature.
-#       - infer caller type and result type from function sig?
-#       - dynamically modify selection criteria based on expected caller type/return type?
-
-class HandlerPriority(IntEnum):
-    """
-    Execution priorities for handlers.
-
-    Each Handler is assigned a priority to control high-level ordering.
-    The pipeline sorts handlers by these priorities first, with the
-    following semantics:
-
-    - :attr:`FIRST` (0) – Runs before all other handlers.
-    - :attr:`EARLY` (25) – Runs after FIRST, but before NORMAL.
-    - :attr:`NORMAL` (50) – Default middle priority.
-    - :attr:`LATE` (75) – Runs after NORMAL, before LAST.
-    - :attr:`LAST` (100) – Runs very last in the sequence.
-
-    Users are also free to use any int as a priority. Values lower than 0 will
-    run before FIRST, greater than 100 will run after LAST, and other values will
-    sort as expected.
-    """
-    FIRST = 0
-    EARLY = 25
-    NORMAL = 50
-    LATE = 75
-    LAST = 100
-
-
-# Note this is runtime_checkable so Pydantic will allow it as a type-hint.
-# It is not actually validated, so this is purely organizational and the function
-# call will actually admit any type *args.
-@runtime_checkable
-class HandlerFunc(Protocol):
-    def __call__(self, caller: Entity, *others: Entity, ctx: Optional[Any] = None, **params: Any) -> Any: ...
-    # Variadic args are entities, to support things like __lt__(self, other) or transaction
-    # type calls
-    # `ctx` is a reserved kw arg for Context objects passed by the resolution frame's phase bus
-    # `ns` is also a reserved kw arg for scoped namespace string maps, ns will be pulled from ctx
-    # if ns is not provided but ctx is
 
 @functools.total_ordering
 class Handler(HasSeq, Selectable, Entity):
@@ -143,15 +102,3 @@ class Handler(HasSeq, Selectable, Entity):
         # order by priority, then seq (uncorrelated if handlers are from classes with
         # their own seq), then uid as a final (non-deterministic) tie-breaker
         return (self.priority, self.seq, self.uid) < (other.priority, other.seq, other.uid)
-
-    def get_func_sig(self):
-        return self._get_func_sig(self.func)
-
-    @staticmethod
-    def _get_func_sig(func):
-        if func is None:
-            raise ValueError("func cannot be None")
-        while hasattr(func, '__func__'):
-            # May be a wrapped object
-            func = func.__func__
-        return inspect.signature(func)

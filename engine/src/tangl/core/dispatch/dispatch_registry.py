@@ -1,5 +1,5 @@
 # tangl/dispatch/dispatch_registry.py
-
+"""Dispatch version 37.1 - deprecated"""
 from __future__ import annotations
 from typing import Iterator, Optional, Iterable, Any
 

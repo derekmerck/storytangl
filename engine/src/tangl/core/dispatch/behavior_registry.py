@@ -1,20 +1,19 @@
 # tangl/core/dispatch/behavior_registry.py
 """Behavior Registry - dispatch version 37.2"""
 from __future__ import annotations
-from typing import Type, Callable, TypeVar, Iterator, Any, Self
+from typing import Type, Callable, Iterator
 import itertools
 
-from pydantic import field_validator, model_validator
+from pydantic import model_validator
 
 from tangl.core import Entity, Registry
-from tangl.core.entity import Selectable, is_identifier
-from tangl.core.registry import _chained_registries, VT
+from tangl.core.entity import Selectable
+from tangl.core.registry import _chained_registries
 from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority
 from .call_receipt import CallReceipt
 
 # ----------------------------
 # Registry/Dispatch
-
 
 class BehaviorRegistry(Selectable, Registry[Behavior]):
     """
@@ -99,6 +98,8 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         behaviors = self.select_all_for(selector=caller, **inline_criteria)
         if extra_handlers:  # inlines
             # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
+            # todo: is there a reason to support lists of unregistered handlers as extra?
+            #       I assume you would just put them in a registry and call `chain_dispatch`?
             extra_behaviors = (Behavior(func=f, task=None) for f in extra_handlers or [])
             behaviors = itertools.chain(behaviors, extra_behaviors)
         behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller, by_origin=by_origin))
@@ -158,6 +159,7 @@ class HasBehaviors(Entity):
 
     @model_validator(mode="after")
     def _annotate_inst_behaviors(self):
-        # want to annotate a _copy_ of the instance (self, caller) but not
-        # class (cls, caller) behaviors with owner = self instead of owner = cls
+        # want to annotate and register a _copy_ of the instance (self, caller)
+        # but _not_ class (cls, caller) behaviors with owner = self instead
+        # of owner = cls
         ...
