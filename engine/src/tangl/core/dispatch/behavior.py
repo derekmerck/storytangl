@@ -1,5 +1,47 @@
 # /tangl/core/dispatch/behavior.py
-"""Behavior - dispatch version 37.2"""
+"""
+Dispatch – Behavior model (v3.7.2)
+
+This module defines :class:`Behavior` and related enums used by the
+:class:`~tangl.core.dispatch.behavior_registry.BehaviorRegistry`.
+Behaviors wrap callables (functions, instance methods, class methods)
+and carry metadata for selection, ordering, and auditing.
+
+Why
+----
+Unify all dispatchable routines behind a single, inspectable wrapper
+that can be filtered and stably ordered across multiple registries
+("inline → local → author → application → global"), while remaining
+agnostic about how the underlying callable is defined (free function,
+instance/class method, manager-owned method). The goal is deterministic,
+testable pipelines with receipts for each invocation.
+
+Key Features
+------------
+* **Flexible binding** — Binding is inferred from signature and hints
+  (:class:`HandlerType`), so Behaviors can wrap free functions, owner
+  instance methods, or class methods without boilerplate.
+* **Layer-aware** — Behaviors remember which :class:`Registry` they came
+  from; when registries are chained, origin distance and
+  :class:`HandlerLayer` provide stable "CSS-like" precedence.
+* **Prioritized & specific** — First sort by :class:`HandlerPriority`,
+  then by origin, layer, MRO distance, selector specificity, handler type,
+  and registration order.
+* **Selectable** — Behaviors are :class:`~tangl.core.entity.Selectable`,
+  exposing structured criteria (task, caller class, tags) used by
+  :class:`BehaviorRegistry.dispatch`.
+* **Audited** — Every call returns a :class:`CallReceipt`.
+
+API
+---
+- :class:`Behavior` — wrapper with sorting/binding/selection helpers.
+- :class:`HandlerPriority`, :class:`HandlerLayer`, :class:`HandlerType` —
+  ordering, layering, and binding modes.
+- :meth:`Behavior.sort_key` — stable ordering tuple (supports ``by_origin``).
+- :meth:`Behavior.__call__` — invoke and receive a :class:`CallReceipt`.
+- See :class:`BehaviorRegistry` for filtering and iteration
+  (:meth:`dispatch`, :meth:`chain_dispatch`).
+"""
 from __future__ import annotations
 from enum import IntEnum
 from typing import Type, Callable, TypeVar, Generic, Optional
@@ -20,6 +62,18 @@ from .call_receipt import CallReceipt
 # Kind Enums
 
 class HandlerLayer(IntEnum):
+    """
+    Logical origin of a behavior used during chained registry sorting.
+
+    Lower numeric values are considered more specific and sort earlier
+    when combining registries:
+
+    - :attr:`INLINE` (1) – behavior injected for a single task call.
+    - :attr:`LOCAL` (2) – registered on the caller (node/graph) or its ancestors.
+    - :attr:`AUTHOR` (3) – world/domain-provided mixins.
+    - :attr:`APPLICATION` (4) – app/vm-provided behaviors.
+    - :attr:`GLOBAL` (5) – core defaults available everywhere.
+    """
     # Reverse sort inline > global
     INLINE = 1       # injected for task (ignore missing @task)
     LOCAL = 2        # defined on a node, ancestors, or graph
@@ -52,6 +106,19 @@ class HandlerPriority(IntEnum):
     LAST = 100
 
 class HandlerType(IntEnum):
+    """
+    Binding mode inferred from the wrapped callable’s signature and hints.
+
+    - :attr:`INSTANCE_ON_CALLER` – unbound instance method declared on the caller’s class;
+      bound to the runtime caller at invocation.
+    - :attr:`CLASS_ON_CALLER` – ``@classmethod`` defined on the caller’s class.
+    - :attr:`INSTANCE_ON_OWNER` – unbound instance method defined on a *manager/owner*
+      instance held via weakref; bound to that owner at invocation.
+    - :attr:`CLASS_ON_OWNER` – ``@classmethod`` defined on a foreign manager/owner class.
+    - :attr:`STATIC` – free function; receives ``caller`` as its first argument.
+
+    The :meth:`Behavior.bind_func` helper uses this value to compute the bound callable.
+    """
     # Most specific
     INSTANCE_ON_CALLER = 5  # unbound def on caller class, we bind to runtime caller
     CLASS_ON_CALLER = 4     # classmethod on caller.__class__
@@ -79,7 +146,49 @@ CT = TypeVar("CT", bound=Entity)
 
 @total_ordering
 class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
+    """
+    Behavior(func: ~typing.Callable[[Entity, ...], typing.Any], priority: int = NORMAL)
 
+    Wrapper around a dispatchable callable with deterministic ordering,
+    selection, and auditing. Behaviors can wrap free functions, instance
+    methods, and class methods; binding is inferred and applied at call time.
+
+    Why
+    ----
+    Provide a single abstraction for all dispatchable routines so the
+    :class:`BehaviorRegistry` can filter, sort, and invoke them uniformly,
+    even when they originate from different registries (inline/local/author/
+    application/global). Each call yields a :class:`CallReceipt` for audit.
+
+    Key Features
+    ------------
+    * **Flexible binding** – uses :class:`HandlerType` plus runtime hints to
+      bind correctly to the caller, a foreign owner, or a class object.
+    * **Prioritized & stable** – ordered by priority, origin distance,
+      layer, MRO distance, selector specificity, handler type, and
+      registration sequence.
+    * **Selectable** – exposes criteria (e.g., ``task``, ``caller_cls``)
+      merged with the origin registry’s criteria for CSS-like matching.
+    * **Layer-aware** – remembers the :class:`Registry` of origin to compute
+      chain order and shadowing during ``chain_dispatch``.
+    * **Auditable** – invocation returns a :class:`CallReceipt` capturing
+      parameters, context, and results.
+
+    API
+    ---
+    - :meth:`__call__(caller, *args, ctx=None, **params) <__call__>` – bind,
+      invoke, and return a :class:`CallReceipt`.
+    - :meth:`bind_func` – resolve a bound callable from :attr:`handler_type`.
+    - :meth:`sort_key` – stable tuple used by registries for ordering.
+    - :meth:`get_selection_criteria` – behavior+registry criteria for matching.
+    - :attr:`priority`, :attr:`handler_type`, :attr:`task`, :attr:`origin` –
+      key metadata influencing selection and order.
+
+    .. admonition:: Reserved Keywords
+
+       ``ns`` and ``ctx`` are reserved keyword arguments on the called function
+       signature. They may be added or manipulated during :meth:`__call__`.
+    """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
     # arbitrary types allowed for possible WeakRef owner
@@ -101,7 +210,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     @model_validator(mode="before")
     @classmethod
-    def _populate_from_funcinfo(cls, values: dict):
+    def _populate_from_func_info(cls, values: dict):
         """
         Hydrate Behavior from FuncInfo in one deterministic pass.
         Explicit kwargs win; inferred values fill gaps.
@@ -189,6 +298,12 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
     origin: Registry = None
 
     def origin_dist(self) -> int:
+        """
+        Compute distance from the current chained registries to :attr:`origin`.
+
+        Returns ``-1`` for inline, ``0`` for the local registry, ``1..n`` for
+        ancestors, and a large sentinel when called outside a chained context.
+        """
         # how far away is this behavior's origin from the caller by discovery
         # -1 = inline
         #  0 = self layer
@@ -215,6 +330,12 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
     task: Optional[str] = None   # "@validate", "@render", etc.
 
     def has_task(self, task: str) -> bool:
+        """
+        Return True if this behavior participates in the given ``task``.
+
+        Inline behaviors always match. Otherwise, compares the explicit
+        behavior :attr:`task` or the origin registry’s ``task`` (if set).
+        """
         # when filtered by behavior.matches(has_task=x)
         if task is None:
             # No task given, always match
@@ -231,6 +352,11 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         return False
 
     def get_selection_criteria(self) -> StringMap:
+        """
+        Compose selection criteria for this behavior, merged with its origin
+        registry’s criteria. Includes ``is_instance`` when :attr:`caller_cls`
+        is known; origin registry keys win on conflict.
+        """
         criteria = dict(self.selection_criteria)
         # We will get the registries task and caller_cls if any from the registry criteria merge
         if self.caller_cls is not None:
@@ -257,17 +383,21 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     def sort_key(self, caller: CT = None, by_origin: bool = False):
         """
-        -  priority early < late   # late can clobber
-        - -origin dist             # closer registry can clobber (if chained)
-        -  global < inline         # inline can clobber
-        - -mro dist                # closer func def can clobber (needs caller)
-        - *fewer selectors < more  # more selectors can clobber
-        -  static < class < inst   # most specific (inst) can clobber
-        -  early < late            # earlier runs before later (later can clobber)
+        Return the stable ordering tuple used by Behavior registries.
 
-        `by_origin` flag -> flips priority and origin dist/layer ~ origin dist !important
-        This is critical for ensuring that ancestor order is preserved and values shadowed
-        by layer, not by priority when accumulating a namespace.
+        Default order (most significant → least):
+
+        1. ``priority`` (lower runs first; later handlers can clobber)
+        2. ``-origin_dist()`` (closer registry shadows farther ones)
+        3. ``-handler_layer()`` (INLINE > GLOBAL)
+        4. ``-mro_dist(caller)`` (subclass beats superclass)
+        5. selector ``specificity`` (fewer → more → most)
+        6. ``handler_type`` (STATIC < CLASS < INSTANCE)
+        7. ``seq`` (registration order, for tie-breaking)
+
+        If ``by_origin`` is True, origin/layer take precedence over priority to
+        preserve ancestor order when building namespaces (i.e., origin distance
+        becomes the primary key).
         """
         if by_origin:
             # by priority within registry/layer
@@ -293,10 +423,19 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     def bind_func(self, caller: CT) -> Callable:
         """
-        There are several possible signatures for a handler:
-        - `f(self/caller, *, ctx, other = None, result = None )`, mro instance methods, static methods
-        - `f(self/owner, caller, *, ctx, result = None )`, instance methods on other nodes
-        - `f(cls, caller, *, ctx, other = None, result = None )`, cls methods (on any cls)
+        Return a callable with the correct binding for ``self.handler_type``.
+
+        Mapping
+        -------
+        - :data:`STATIC` / :data:`INSTANCE_ON_CALLER` → return ``func``
+          (expects ``caller`` as first positional argument).
+        - :data:`CLASS_ON_CALLER` → bind to ``caller.__class__``.
+        - :data:`CLASS_ON_OWNER` → bind to :attr:`owner_cls`.
+        - :data:`INSTANCE_ON_OWNER` → dereference :attr:`owner` (weakref) and
+          bind to that instance; raises ``RuntimeError`` if missing.
+
+        The returned callable is always invoked as
+        ``bound(caller, *args, ctx=..., **params)`` by :meth:`__call__`.
         """
         match self.handler_type:
             # The instance case is not actually necessary as we always include _caller_
@@ -331,6 +470,17 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
                 raise RuntimeError("Unknown call mode")
 
     def __call__(self, caller: CT, *args, ctx = None, **params) -> CallReceipt:
+        """
+        Invoke the wrapped behavior and return a :class:`CallReceipt`.
+
+        Parameters
+        ----------
+        caller:
+            The runtime caller (usually a :class:`~tangl.core.Entity`).
+        *args, **params:
+            Forwarded to the underlying function. ``ctx`` is a reserved kwarg
+            propagated by the dispatch pipeline.
+        """
         # bind func, call func, wrap in receipt
         bound = self.bind_func(caller)
         result = bound(caller, *args, ctx=ctx, **params)
@@ -344,6 +494,10 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         )
 
     def unstructure(self) -> StringMap:
+        """
+        Behaviors intentionally do not serialize because they capture callables
+        and weak references. Persist references to registries/owners instead.
+        """
         raise RuntimeError(f"Do _not_ try to serialize {self!r}; contains Callable, WeakRef.")
 
     def get_func_sig(self):
@@ -351,6 +505,10 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     @staticmethod
     def _get_func_sig(func):
+        """
+        Return the ``inspect.Signature`` for the underlying function, unwrapping
+        descriptors (e.g., bound methods) to a raw function as needed.
+        """
         if func is None:
             raise ValueError("func cannot be None")
         while hasattr(func, '__func__'):
