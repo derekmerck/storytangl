@@ -134,7 +134,7 @@ class Handler(HasSeq, Selectable, Entity):
         # todo: type check that receipts aren't returned and re-wrapped?  What
         #       if a handler invokes another dispatch as a subroutine?
 
-        return CallReceipt(blame_id=self.uid,
+        return CallReceipt(behavior_id=self.uid,
                           result=result,
                           result_type=self.result_type,
                           **receipt_kwargs)

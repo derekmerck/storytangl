@@ -76,8 +76,8 @@ def test_run_handlers_utility_orders_input():
     assert order == ["C", "A", "B"]
 
 def test_call_receipt_seq_monotonic():
-    r1 = CallReceipt(blame_id=uuid.uuid4(), result="x")
-    r2 = CallReceipt(blame_id=uuid.uuid4(), result="y")
+    r1 = CallReceipt(behavior_id=uuid.uuid4(), result="x")
+    r2 = CallReceipt(behavior_id=uuid.uuid4(), result="y")
     assert r2.seq == r1.seq + 1
 
 def test_handler_ordering_and_receipts():

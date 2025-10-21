@@ -248,7 +248,9 @@ def test_selector_skips_failed_offers_and_binds_first_success():
     frame = Frame(graph=g, cursor_id=anchor.uid)
     ctx = frame.context
     ctx.call_receipts.clear()
-    ctx.call_receipts.append(CallReceipt(result=[failing_offer, succeeding_offer]))
+    ctx.call_receipts.append(CallReceipt(
+        behavior_id=provisioner.uid,
+        result=[failing_offer, succeeding_offer]))
 
     builds = plan_select_and_apply(anchor, ctx=ctx)
 
@@ -311,7 +313,9 @@ def test_affordance_offers_are_prioritized_over_dependency_offers():
     ctx = frame.context
     ctx.call_receipts.clear()
     ctx.call_receipts.append(
-        CallReceipt(result=[affordance_offer, dependency_offer])
+        CallReceipt(
+            behavior_id=provisioner.uid,
+            result=[affordance_offer, dependency_offer])
     )
 
     builds = plan_select_and_apply(anchor, ctx=ctx)

@@ -17,6 +17,7 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.type_hints import StringMap
+from tangl.core import Record
 from tangl.core import CallReceipt, Entity, Registry, Node
 from tangl.core.entity import Selectable
 from tangl.vm.context import Context
@@ -133,7 +134,7 @@ class ProvisionOffer(Selectable, Entity):
         return self.accept_func()
 
 
-class PlanningReceipt(CallReceipt):
+class PlanningReceipt(Record):
     """
     PlanningReceipt()
 
@@ -196,6 +197,7 @@ class PlanningReceipt(CallReceipt):
         pr = cls(
             # resolved_dependencies=0,
             # resolved_affordances=0,
+            behavior_id=[r.blame_id for r in builds],
             attached=attached,
             updated=updated,
             created=created,

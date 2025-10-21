@@ -230,7 +230,7 @@ def test_channel_sections_iterate_independently():
     fragment = BaseFragment(fragment_type="text", content="hello")
     stream.push_records(fragment, marker_type="fragment", marker_name="frag-0")
 
-    receipt = CallReceipt(blame_id=node.uid, result="ok")
+    receipt = CallReceipt(behavior_id=node.uid, result="ok")
     stream.push_records(receipt, marker_type="call_receipt", marker_name="job-0")
 
     snap_section = list(stream.get_section("snap-0", "snapshot", has_channel="snapshot"))
