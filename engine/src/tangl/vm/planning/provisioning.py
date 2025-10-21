@@ -29,7 +29,8 @@ from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING
 import functools
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, Registry, Handler, CallReceipt
+from tangl.core import Node, Registry, Behavior, CallReceipt
+from tangl.core.dispatch.behavior import HandlerType
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from ..context import Context
 
 
-class Provisioner(Handler):
+class Provisioner(Behavior):
     """
     Default provider resolver for independently satisfiable requirements.
 
@@ -70,6 +71,7 @@ class Provisioner(Handler):
     phase: str = "PLANNING.OFFER"
     result_type: Type = list['ProvisionOffer']
     func: None = None
+    handler_type: HandlerType = HandlerType.INSTANCE_ON_OWNER
 
     @staticmethod
     def _resolve_existing(*registries: Registry,

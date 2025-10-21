@@ -360,7 +360,7 @@ class TestBehaviorRegistryConstruction:
         assert registry.handler_layer == HandlerLayer.GLOBAL
 
     def test_custom_layer(self):
-        """Handler layer can be set."""
+        """Behavior layer can be set."""
         registry = BehaviorRegistry(handler_layer=HandlerLayer.APPLICATION)
         assert registry.handler_layer == HandlerLayer.APPLICATION
 
@@ -412,7 +412,7 @@ class TestBehaviorRegistryAddBehavior:
         assert b.priority == HandlerPriority.FIRST
 
     def test_add_with_handler_type(self):
-        """Handler type hint is respected."""
+        """Behavior type hint is respected."""
         registry = BehaviorRegistry()
         registry.add_behavior(
             static_handler,
@@ -897,7 +897,7 @@ class TestErrorConditions:
 
 
 # ============================================================================
-# Handler Layer and Origin Distance Tests
+# Behavior Layer and Origin Distance Tests
 # ============================================================================
 
 class TestOriginTracking:

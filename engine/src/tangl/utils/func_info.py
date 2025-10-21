@@ -314,7 +314,7 @@ class FuncInfo:
         # === STEP 5: Diagnostics for partials ===
         if isinstance(func, functools.partial) and func.args:
             warnings.warn(
-                "Handler is a functools.partial with bound positional args; "
+                "Behavior is a functools.partial with bound positional args; "
                 "inference may be unreliable if 'caller' was pre-bound.",
                 RuntimeWarning,
             )

@@ -40,8 +40,8 @@ Artifacts
 
 Dispatch
 ---------
-.. autoclass:: tangl.core.Handler
-.. autoclass:: tangl.core.DispatchRegistry
+.. autoclass:: tangl.core.Behavior
+.. autoclass:: tangl.core.BehaviorRegistry
 .. autoclass:: tangl.core.CallReceipt
 
 .. _core-capability:
@@ -49,4 +49,6 @@ Dispatch
 Capability
 ----------
 .. autoclass:: tangl.core.Domain
+.. autoclass:: tangl.core.domain.AffiliateDomain
+.. autoclass:: tangl.core.domain.DomainSubgraph
 .. autoclass:: tangl.core.Scope

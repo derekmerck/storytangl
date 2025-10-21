@@ -32,7 +32,7 @@ def static_handler(caller: Node, ctx=None):
     return "static"
 
 
-# ==================== Basic Handler Type Detection ====================
+# ==================== Basic Behavior Type Detection ====================
 
 def test_static_handler_from_free_function():
     """Static handler inferred from free function with caller param."""
@@ -173,7 +173,7 @@ def test_conflicting_caller_cls_raises_error():
 # ==================== Type Annotation Edge Cases ====================
 
 def test_handler_without_type_annotations():
-    """Handler without annotations still works."""
+    """Behavior without annotations still works."""
 
     def untyped_handler(caller, ctx=None):
         return "works"

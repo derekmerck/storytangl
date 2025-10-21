@@ -35,7 +35,7 @@ flowchart RL
         Entity
         JournalFragment
         Registry
-        DispatchRegistry
+        BehaviorRegistry
     end
     
     subgraph .vm
@@ -49,7 +49,7 @@ flowchart RL
         MediaRegistry -- has --> MediaRIT
         MediaDependency -- is --> DependencyEdge
         MediaDependency -- wants --> MediaRIT
-        MediaProvisioner -- is --> DispatchRegistry
+        MediaProvisioner -- is --> BehaviorRegistry
         MediaProvisioner -- discovers --> MediaRIT
         MediaProvisioner -- resolves --> MediaDependency
         media_handler -- is --> MediaProvisioner

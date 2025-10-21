@@ -258,7 +258,7 @@ def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
 
 # Prior automatic-accept-first version
 
-# class FrontierPlanner(Handler):
+# class FrontierPlanner(Behavior):
 #
 #     def provision_frontier(self, context) -> None:
 #         graph = context.graph    # type: Graph

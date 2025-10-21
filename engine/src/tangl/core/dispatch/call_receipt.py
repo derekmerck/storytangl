@@ -36,7 +36,7 @@ class AggregatorType(Enum):
 
 class CallReceipt(Record):
     """
-    CallReceipt(blame: Handler, result: Any)
+    CallReceipt(blame: Behavior, result: Any)
 
     Immutable result record from a handler invocation.
 

@@ -10,7 +10,7 @@ from pydantic import Field
 from tangl.core.entity import Entity
 from tangl.core.graph import Graph, Node, GraphItem
 from tangl.core.registry import Registry
-from tangl.core.dispatch import Handler
+from tangl.core.dispatch import Behavior
 from .domain import Domain, global_domain, DomainRegistry
 
 NS: TypeAlias = ChainMap[str, Any]
@@ -88,7 +88,7 @@ class Scope(Entity):
     def active_domains(self) -> list[Domain]:
         return list(self._iter_active_domains(self.anchor, self.domain_registries))
 
-    def get_handlers(self, **criteria) -> Iterator[Handler]:
+    def get_handlers(self, **criteria) -> Iterator[Behavior]:
         """Sorts over all layers"""
         return Registry.chain_find_all(
             *(d.handlers for d in self.active_domains),
@@ -96,7 +96,7 @@ class Scope(Entity):
             sort_key=lambda x: (x.priority, x.seq),
         )
 
-    def get_handlers_by_layer(self, **criteria) -> Iterator[Handler]:
+    def get_handlers_by_layer(self, **criteria) -> Iterator[Behavior]:
         """Sorted within each layer to preserve proximity priority"""
         for d in self.active_domains:
             yield from d.handlers.find_all(**criteria, sort_key=lambda x: (x.priority, x.seq)

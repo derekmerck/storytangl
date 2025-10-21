@@ -14,7 +14,7 @@ from collections import ChainMap
 from tangl.type_hints import Hash
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, AffiliateRegistry
-from tangl.core.dispatch import Handler, CallReceipt
+from tangl.core.dispatch import Behavior, CallReceipt
 from tangl.utils.hashing import hashing_func
 
 if TYPE_CHECKING:
@@ -131,7 +131,7 @@ class Context:
         domains and creating."""
         return self._get_ns(self.scope)
 
-    def get_handlers(self, **criteria) -> Iterator[Handler]:
+    def get_handlers(self, **criteria) -> Iterator[Behavior]:
         # can pass phase in filter criteria if useful
         return self.scope.get_handlers(**criteria)
 

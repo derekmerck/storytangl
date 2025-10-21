@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import Behavior as Handler, HandlerPriority, BehaviorRegistry as DispatchRegistry, CallReceipt
+from tangl.core.dispatch import Behavior as Behavior, HandlerPriority, BehaviorRegistry as BehaviorRegistry, CallReceipt
 
 
 class DummyEntity(Entity):
@@ -18,7 +18,7 @@ def always_false(ctx): return False
 
 
 def test_handler_registry_register_and_iter_handlers():
-    registry = DispatchRegistry(label="test_handlers")
+    registry = BehaviorRegistry(label="test_handlers")
     called = []
 
     @registry.register(priority=5)
@@ -50,7 +50,7 @@ def test_handler_registry_register_and_iter_handlers():
     assert called == ["B", "A"]
 
 def test_handler_lt_tiebreaker_and_registry_sort():
-    reg = DispatchRegistry()
+    reg = BehaviorRegistry()
     calls = []
 
     def h1(c, ctx=None): calls.append(("h1", ctx)); return "r1"
@@ -68,7 +68,7 @@ def test_handler_lt_tiebreaker_and_registry_sort():
 def test_run_handlers_utility_orders_input():
     # Manually construct handlers to check ordering
     def mk(func, prio):
-        return Handler(func=func, priority=prio)
+        return Behavior(func=func, priority=prio)
 
     order = []
     hA = mk(lambda c, ctx=None: order.append("A"), HandlerPriority.NORMAL)
@@ -79,7 +79,7 @@ def test_run_handlers_utility_orders_input():
     print( hC.sort_key() )
 
     # short sort and run, class method
-    list(DispatchRegistry().dispatch(Entity(), ctx={"ok": True}, extra_handlers=[hA, hB, hC]))
+    list(BehaviorRegistry().dispatch(Entity(), ctx={"ok": True}, extra_handlers=[hA, hB, hC]))
     assert order == ["C", "A", "B"]
 
 def test_call_receipt_seq_monotonic():
@@ -89,7 +89,7 @@ def test_call_receipt_seq_monotonic():
 
 def test_handler_ordering_and_receipts():
     from tangl.vm.frame import ResolutionPhase as P
-    regs = DispatchRegistry()
+    regs = BehaviorRegistry()
     calls = []
 
     @regs.register(priority=HandlerPriority.FIRST)
@@ -107,7 +107,7 @@ def test_handler_ordering_and_receipts():
 
 def test_handler_run_one_picks_first():
     from tangl.vm.frame import ResolutionPhase as P
-    regs = DispatchRegistry()
+    regs = BehaviorRegistry()
 
     @regs.register(priority=HandlerPriority.LATE)
     def late(c, ctx=None): return "late"
@@ -120,7 +120,7 @@ def test_handler_run_one_picks_first():
 
 
 def test_dispatch_registry_deterministic_order():
-    registry = DispatchRegistry()
+    registry = BehaviorRegistry()
     call_order: list[str] = []
 
     def register(name: str, priority: HandlerPriority | int) -> None:
@@ -149,8 +149,8 @@ def test_dispatch_registry_deterministic_order():
 
 
 def test_handler_priority_ordering():
-    h1 = Handler(func=lambda x, y: 1, priority=1, label="h1")
-    h2 = Handler(func=lambda x, y: 2, priority=10, label="h2")
+    h1 = Behavior(func=lambda x, y: 1, priority=1, label="h1")
+    h2 = Behavior(func=lambda x, y: 2, priority=10, label="h2")
     assert h1 < h2
     assert sorted([h2, h1]) == [h1, h2]
 
@@ -159,8 +159,8 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
     # caller matches only if foo=1
     caller = DummyEntity(foo=1)
     ctx = {"x": 42}
-    # Handler with caller_criteria foo=1, predicate always_true
-    h = Handler(
+    # Behavior with caller_criteria foo=1, predicate always_true
+    h = Behavior(
         func=lambda x, y: 1,
         priority=0,
         caller_criteria={"foo": 1},
@@ -168,8 +168,8 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
         predicate=always_true,
     )
     assert h.is_satisfied(caller=caller, ctx=ctx)
-    # Handler with caller_criteria foo=2, will NOT match
-    h2 = Handler(
+    # Behavior with caller_criteria foo=2, will NOT match
+    h2 = Behavior(
         func=lambda x, y: 1,
         priority=0,
         caller_criteria={"foo": 2},
@@ -177,8 +177,8 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
         predicate=always_true,
     )
     assert not h2.is_satisfied(caller=caller, ctx=ctx)
-    # Handler with predicate always_false
-    h3 = Handler(
+    # Behavior with predicate always_false
+    h3 = Behavior(
         func=lambda x, y: 1,
         priority=0,
         caller_criteria={"foo": 1},
@@ -189,7 +189,7 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
 
 
 def test_handler_registry_register_returns_function():
-    registry = DispatchRegistry(label="test_handlers")
+    registry = BehaviorRegistry(label="test_handlers")
     @registry.register(priority=1, caller_criteria={"foo": 1})
     def handler_e(ent, ctx): return "E"
     # Should be callable as original function
@@ -197,7 +197,7 @@ def test_handler_registry_register_returns_function():
     assert callable(handler_e)
 
 def test_handlers_run_in_priority_order():
-    reg = DispatchRegistry()
+    reg = BehaviorRegistry()
     calls = []
 
     @reg.register(priority=HandlerPriority.LATE)

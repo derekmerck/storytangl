@@ -5,7 +5,7 @@ import importlib
 import inspect
 import logging
 
-from tangl.core.dispatch import DispatchRegistry
+from tangl.core.dispatch import BehaviorRegistry
 from tangl.core.entity import Entity
 from tangl.core.graph.node import Node
 
@@ -37,13 +37,13 @@ class DomainManager:
     - :meth:`register_class` – register aliases.
     - :meth:`resolve_class` – resolve script values.
     - :meth:`load_domain_module` – bulk-register subclasses from a module.
-    - :attr:`dispatch_registry` – :class:`~tangl.core.dispatch.DispatchRegistry`
+    - :attr:`dispatch_registry` – :class:`~tangl.core.dispatch.BehaviorRegistry`
       for domain handlers.
     """
 
     def __init__(self) -> None:
         self.class_registry: dict[str, Type[Entity]] = {}
-        self.dispatch_registry = DispatchRegistry(label="domain_handlers")
+        self.dispatch_registry = BehaviorRegistry(label="domain_handlers")
 
     def register_class(self, name: str, cls: Type[Entity]) -> None:
         """Register ``name`` as an alias for ``cls``."""

@@ -51,10 +51,11 @@ from .planning import simple_planning_handlers
 # ------- PRE/POST REDIRECTS ---------
 
 @global_domain.handlers.register(phase=P.PREREQS, priority=50)
-def prereq_redirect(cursor: Node, *, ns: NS, ctx: Context, **kwargs):
+def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` redirects for PREREQS."""
 
     current_domain = ctx.get_traversable_domain_for_node(cursor)
+    ns = ctx.get_ns()
 
     if current_domain is not None:
         if cursor.uid == current_domain.source.uid:
@@ -86,8 +87,9 @@ def prereq_redirect(cursor: Node, *, ns: NS, ctx: Context, **kwargs):
             return edge
 
 @global_domain.handlers.register(phase=P.POSTREQS, priority=50)
-def postreq_redirect(cursor: Node, *, ns: NS, **kwargs):
+def postreq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow the first auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` in POSTREQS."""
+    ns = ctx.get_ns()
     for e in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.POSTREQS):
         if e.available(ns):
             return e

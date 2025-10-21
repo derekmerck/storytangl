@@ -7,7 +7,7 @@ from functools import total_ordering
 import inspect
 import weakref
 
-from pydantic import field_validator, model_validator
+from pydantic import field_validator, model_validator, ConfigDict
 
 from tangl.type_hints import StringMap
 from tangl.utils.base_model_plus import HasSeq
@@ -31,7 +31,7 @@ class HandlerPriority(IntEnum):
     """
     Execution priorities for handlers.
 
-    Each Handler is assigned a priority to control high-level ordering.
+    Each Behavior is assigned a priority to control high-level ordering.
     The pipeline sorts handlers by these priorities first, with the
     following semantics:
 
@@ -78,7 +78,10 @@ OT = TypeVar("OT", bound=Entity)
 CT = TypeVar("CT", bound=Entity)
 
 @total_ordering
-class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allowed=True):
+class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
     # arbitrary types allowed for possible WeakRef owner
     func: HandlerFunc
 
@@ -321,7 +324,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT], arbitrary_types_allo
             case HandlerType.INSTANCE_ON_OWNER:
                 owner_inst = self.owner() if self.owner else None
                 if owner_inst is None:  # owner GC'd or otherwise missing
-                    raise RuntimeError("Handler owner is not defined")
+                    raise RuntimeError("Behavior owner is not defined")
                 return self.func.__get__(owner_inst, owner_inst.__class__)
 
             case _:

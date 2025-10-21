@@ -5,7 +5,7 @@ from pydantic import Field
 
 from tangl.info import __version__
 from tangl.type_hints import StringMap
-from tangl.core import Entity, Registry, DispatchRegistry
+from tangl.core import Entity, Registry, BehaviorRegistry
 from tangl.core.dispatch import DEFAULT_HANDLERS
 
 # imported from tangl.__info__
@@ -15,7 +15,7 @@ DEFAULT_VARS = {'version': __version__}
 
 class Domain(Entity):
     """
-    Domain(vars: dict[str, ~typing.Any], handlers: DispatchRegistry)
+    Domain(vars: dict[str, ~typing.Any], handlers: BehaviorRegistry)
 
     Bundle of capabilities: variables + handlers.
 
@@ -33,7 +33,7 @@ class Domain(Entity):
     - :meth:`add_vars`, :meth:`add_handler`, :meth:`register_handler`
     """
     vars: StringMap = Field(default_factory=dict)
-    handlers: DispatchRegistry = Field(default_factory=DispatchRegistry)
+    handlers: BehaviorRegistry = Field(default_factory=BehaviorRegistry)
 
     def add_vars(self, vars: dict[str, Any]) -> None:
         self.vars.update(vars)

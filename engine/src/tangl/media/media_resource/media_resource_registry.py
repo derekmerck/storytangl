@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import model_validator
 
 from tangl.core.registry import Registry
-from tangl.core.dispatch import DispatchRegistry as DispatchRegistry, Handler
+from tangl.core.dispatch import BehaviorRegistry, Behavior
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 class MediaResourceRegistry(Registry[MediaRIT]):
@@ -13,13 +13,13 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
     """
-    on_index: DispatchRegistry = None
+    on_index: BehaviorRegistry = None
     mrt_cls: Type[MediaRIT] = MediaRIT
 
     @model_validator(mode="after")
     def _default_on_index(self):
         if not self.on_index:
-            self.on_index = DispatchRegistry (
+            self.on_index = BehaviorRegistry (
             label=f"{self.label}_indexer",
             aggregation_strategy="gather"
         )
@@ -28,7 +28,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     def index(self,
               items: Iterable,
               mrt_cls: Type[MediaRIT] = None,
-              extra_handlers: list[Handler] = None) -> list[MediaRIT]:
+              extra_handlers: list[Behavior] = None) -> list[MediaRIT]:
         """
         Index a collection of data resources, deduplicating by content hash
         and running through the indexing pipeline.
@@ -46,7 +46,7 @@ class MediaResourceRegistry(Registry[MediaRIT]):
                 continue
 
             # Run through indexing pipeline
-            self.on_index.execute_all_for(record, ctx=None, extra_handlers=extra_handlers)
+            self.on_index.dispatch(record, ctx=None, extra_handlers=extra_handlers)
 
             # Add to registry
             self.add(record)

@@ -2,7 +2,7 @@
 from typing import ClassVar, Type
 
 from tangl.type_hints import StringMap
-from tangl.core import Entity, Registry
+from tangl.core import Entity, Registry, Singleton
 from tangl.core.entity import Selectable, MatchPredicate
 from .domain import global_domain, Domain
 
@@ -42,3 +42,8 @@ class AffiliateDomain(Selectable, Domain):
         return criteria
 
 AffiliateRegistry = Registry[AffiliateDomain]
+
+
+class SingletonDomain(Singleton, AffiliateDomain):
+    # ONLY use singleton domains in anything that needs to be serialized
+    ...

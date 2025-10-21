@@ -22,7 +22,7 @@ def test_phase_order_is_total_and_strict(frame: Frame):
     frame.cursor.tags = { "domain:local_domain" }
 
     def tracking_handler(phase):
-        def handler(cursor, *, ctx, ns):
+        def handler(cursor, *, ctx):
             print("executing phase {}".format(phase))
             executed.append(phase)
             return None

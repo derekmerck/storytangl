@@ -22,7 +22,7 @@ find requirements and vice versa without direct references.
 Registry is subclassed for multiple different applications.
 - **StreamRegistry** indexes sequential records with built-in sorting, slicing,
   and channel filtering
-- **DispatchRegistry** indexes handlers and has built-in execution pipelines
+- **BehaviorRegistry** indexes handlers and has built-in execution pipelines
   and job receipts
 - **MediaRegistry** indexes external resources into singleton MediaRecords,
   which can be dereferenced in the service layer to retrieve the original

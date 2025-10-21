@@ -37,7 +37,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
     and are run _last_ so they can inspect or clobber prior results.
     """
     # defaults
-    handler_layer: HandlerLayer = HandlerLayer.GLOBAL
+    handler_layer: HandlerLayer | int = HandlerLayer.GLOBAL
     task: str = None
 
     def add_behavior(self, item, *,
@@ -123,7 +123,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         if task is not None:
             if 'has_task' in inline_criteria:
                 # could check if they are the same, but very edge case, so just raise
-                raise ValueError("Found 'task' and 'has_task' in inline_criteria")
+                raise ValueError("Found both 'task' and 'has_task' in inline_criteria")
             else:
                 inline_criteria['has_task'] = task
 
