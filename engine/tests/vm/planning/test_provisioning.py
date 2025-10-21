@@ -12,7 +12,7 @@ from tangl.vm.planning.open_edge import Dependency, Affordance
 from tangl.vm.frame import Frame, ResolutionPhase as P
 from tangl.vm.context import Context
 from tangl.vm.planning.simple_planning_handlers import plan_collect_offers, plan_select_and_apply
-from tangl.core.dispatch import JobReceipt
+from tangl.core.dispatch import CallReceipt
 
 
 # ---------- Provisioning orchestration ----------
@@ -247,8 +247,8 @@ def test_selector_skips_failed_offers_and_binds_first_success():
 
     frame = Frame(graph=g, cursor_id=anchor.uid)
     ctx = frame.context
-    ctx.job_receipts.clear()
-    ctx.job_receipts.append(JobReceipt(result=[failing_offer, succeeding_offer]))
+    ctx.call_receipts.clear()
+    ctx.call_receipts.append(CallReceipt(result=[failing_offer, succeeding_offer]))
 
     builds = plan_select_and_apply(anchor, ctx=ctx)
 
@@ -309,9 +309,9 @@ def test_affordance_offers_are_prioritized_over_dependency_offers():
 
     frame = Frame(graph=g, cursor_id=anchor.uid)
     ctx = frame.context
-    ctx.job_receipts.clear()
-    ctx.job_receipts.append(
-        JobReceipt(result=[affordance_offer, dependency_offer])
+    ctx.call_receipts.clear()
+    ctx.call_receipts.append(
+        CallReceipt(result=[affordance_offer, dependency_offer])
     )
 
     builds = plan_select_and_apply(anchor, ctx=ctx)

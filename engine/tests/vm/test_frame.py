@@ -1,7 +1,7 @@
 import uuid
 
-from tangl.core import Node, Graph, JobReceipt, global_domain
-from tangl.core.dispatch.job_receipt import ResultCode
+from tangl.core import Node, Graph, CallReceipt, global_domain
+from tangl.core.dispatch.call_receipt import ResultCode
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm.frame import ResolutionPhase as P, Frame, ChoiceEdge
 from tangl.vm import simple_handlers
@@ -56,7 +56,7 @@ def test_global_handlers_visible_in_scope():
     # validate_cursor should have produced a receipt
     receipts = frame.phase_receipts[P.VALIDATE]
     assert len(receipts) >= 1
-    assert isinstance(receipts[0], JobReceipt)
+    assert isinstance(receipts[0], CallReceipt)
 
 # def test_ns_contract(session):
 #     ns = session.run_phase(P.VALIDATE)
@@ -126,7 +126,7 @@ def test_prereq_redirect_and_journal_line():
     nxt = frame.follow_edge(AnonymousEdge(source=start, destination=end))  # first hop returns ChoiceEdge on PREREQS
     # After following, step incremented and JOURNAL should run
     fragments = frame.run_phase(P.JOURNAL)
-    # line = JobReceipt.last_result(*ns.get('results'))
+    # line = CallReceipt.last_result(*ns.get('results'))
     assert len(fragments) == 1
     line = fragments[0].content
     assert "[step " in line

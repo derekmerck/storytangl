@@ -1,20 +1,12 @@
 # tangl/dispatch/dispatch_registry.py
-"""
-Dispatch registry
------------------
-Ordered, queryable collection of :class:`~tangl.core.dispatch.handler.Handler`.
-Provides convenience helpers to register callables and execute matching
-handlers as a pipeline, yielding :class:`~tangl.core.dispatch.job_receipt.JobReceipt`.
 
-"It's like CSS specificity, but for narrative mechanics."
-"""
 from __future__ import annotations
 from typing import Iterator, Optional, Iterable, Any
 
 from tangl.type_hints import StringMap
 from tangl.core.registry import Registry
 from .handler import Handler, HandlerFunc
-from .job_receipt import JobReceipt
+from .call_receipt import CallReceipt
 
 class DispatchRegistry(Registry[Handler]):
     """
@@ -33,7 +25,7 @@ class DispatchRegistry(Registry[Handler]):
     * **Registration** – :meth:`add` and :deco:`register` for concise handler setup.
     * **Selection** – :meth:`find_all(**criteria)<find_all>` filters by handler attributes.
     * **Execution** – :meth:`run_one` and :meth:`run_all` apply handlers to a namespace and
-      return :class:`JobReceipt` objects.
+      return :class:`CallReceipt` objects.
 
     API
     ---
@@ -62,20 +54,20 @@ class DispatchRegistry(Registry[Handler]):
         """Yield handlers matching `**criteria`, sorted FIRST→LAST, reg#, uid."""
         yield from sorted(super().find_all(**criteria))
 
-    def run_one(self, ns: StringMap, **criteria) -> Optional[JobReceipt]:
-        """Run the first matching handler against `ns`; return its :class:`JobReceipt` or `None`."""
+    def run_one(self, ns: StringMap, **criteria) -> Optional[CallReceipt]:
+        """Run the first matching handler against `ns`; return its :class:`CallReceipt` or `None`."""
         _handlers = self.find_all(**criteria)
         h = next(_handlers, None)
         return h(ns) if h else None
 
-    def run_all(self, ns: StringMap, **criteria) -> Iterator[JobReceipt]:
-        """Run all matching handlers against `ns`; yield :class:`JobReceipt` objects in order."""
+    def run_all(self, ns: StringMap, **criteria) -> Iterator[CallReceipt]:
+        """Run all matching handlers against `ns`; yield :class:`CallReceipt` objects in order."""
         _handlers = self.find_all(**criteria)
         for h in _handlers:
             yield h(ns)
 
     @classmethod
-    def run_handlers(cls, ns: StringMap, handlers: Iterable[Handler]) -> Iterator[JobReceipt]:
+    def run_handlers(cls, ns: StringMap, handlers: Iterable[Handler]) -> Iterator[CallReceipt]:
         """Run an explicit iterable of handlers deterministically; yield receipts."""
         # useful when merging handlers from multiple sources
         # deterministic ascending order: FIRST→LAST, reg_number, uid
@@ -89,7 +81,7 @@ class DispatchRegistry(Registry[Handler]):
         *,
         ctx: StringMap | None = None,
         extra_handlers: Iterable[Handler] | None = None,
-    ) -> list[JobReceipt]:
+    ) -> list[CallReceipt]:
         """Compatibility shim that runs registry handlers for ``item``.
 
         The legacy API expected a ``record`` positional argument plus optional

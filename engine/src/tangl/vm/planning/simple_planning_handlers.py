@@ -16,7 +16,7 @@ enrich or override behavior.
 """
 from uuid import UUID
 
-from tangl.core import Node, global_domain, JobReceipt
+from tangl.core import Node, global_domain, CallReceipt
 from tangl.vm import ResolutionPhase as P, Context, ProvisioningPolicy
 from .open_edge import Dependency, Affordance
 from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
@@ -107,7 +107,7 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
     """
     # Gather offers from earlier receipts
     all_offers: list[ProvisionOffer] = []
-    for r in ctx.job_receipts:
+    for r in ctx.call_receipts:
         if isinstance(r.result, list):
             all_offers.extend([x for x in r.result if isinstance(x, ProvisionOffer)])
         elif isinstance(r.result, ProvisionOffer):
@@ -248,7 +248,7 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
 def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
     """Summarize build receipts into a :class:`~tangl.vm.planning.PlanningReceipt`."""
     builds: list[BuildReceipt] = []
-    for r in ctx.job_receipts:
+    for r in ctx.call_receipts:
         if isinstance(r.result, list):
             builds.extend([x for x in r.result if isinstance(x, BuildReceipt)])
         elif isinstance(r.result, BuildReceipt):

@@ -17,13 +17,13 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.type_hints import StringMap
-from tangl.core import JobReceipt, Entity, Registry, Node
+from tangl.core import CallReceipt, Entity, Registry, Node
 from tangl.core.entity import Selectable
 from tangl.vm.context import Context
 from .requirement import Requirement, ProvisioningPolicy
 from .provisioning import Provisioner
 
-class BuildReceipt(JobReceipt):
+class BuildReceipt(CallReceipt):
     """
     BuildReceipt(requirement: Requirement, op_kind: str)
 
@@ -133,7 +133,7 @@ class ProvisionOffer(Selectable, Entity):
         return self.accept_func()
 
 
-class PlanningReceipt(JobReceipt):
+class PlanningReceipt(CallReceipt):
     """
     PlanningReceipt()
 

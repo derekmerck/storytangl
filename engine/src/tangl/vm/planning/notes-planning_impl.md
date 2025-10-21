@@ -14,7 +14,7 @@ Flow (one frame, one cursor):
 
       - If not event-sourced, we still mutate the live graph.
 
-4.	**Receipt**: The selector returns a summarized PlanningReceipt (counts + unresolved hard requirements). That goes into the PLANNING phase outcome and into ctx.job_receipts.
+4.	**Receipt**: The selector returns a summarized PlanningReceipt (counts + unresolved hard requirements). That goes into the PLANNING phase outcome and into ctx.call_receipts.
 
 Offer resolution policy
 -----------------------

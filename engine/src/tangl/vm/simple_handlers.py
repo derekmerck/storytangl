@@ -5,7 +5,7 @@ Reference phase handlers for validation, redirects, and journaling.
 These handlers provide a minimal end-to-end pipeline suitable for tests and
 examples. Real applications can register additional handlers in their domains.
 """
-# - the `register` decorator wraps the output in a JobReceipt
+# - the `register` decorator wraps the output in a CallReceipt
 # - the phase runner appends the job receipt to the receipt stack in ctx
 # - the full call sig currently is `h(cursor: Node, *, ns: NS, ctx: Context)`,
 #   be sure to use the correct sig or ignore/consume unnecessary args/kwargs
@@ -134,7 +134,7 @@ def coerce_to_fragments(*args, ctx: Context, **kwargs):
             return
         fragments.append(BaseFragment(content=str(value)))
 
-    for receipt in ctx.job_receipts:
+    for receipt in ctx.call_receipts:
         _extend(receipt.result)
     logger.debug(f"JOURNAL: Outputting fragments: {fragments}")
     return fragments

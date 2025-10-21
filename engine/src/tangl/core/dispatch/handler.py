@@ -11,7 +11,7 @@ from pydantic import ConfigDict, field_validator, Field, ValidationInfo
 from tangl.type_hints import Typelike
 from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity, Selectable, is_identifier
-from .job_receipt import JobReceipt
+from .call_receipt import CallReceipt
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class Handler(HasSeq, Selectable, Entity):
     Why
     ----
     Encapsulates a function and metadata so it can be ordered, filtered, and
-    invoked within a resolution context. Every call yields a :class:`JobReceipt`.
+    invoked within a resolution context. Every call yields a :class:`CallReceipt`.
 
     Key Features
     ------------
@@ -106,7 +106,7 @@ class Handler(HasSeq, Selectable, Entity):
                  *others: Entity,
                  ctx: Optional[Any] = None,
                  ns: Optional[dict] = None,
-                 **params: Any) -> JobReceipt:
+                 **params: Any) -> CallReceipt:
 
         # todo: could check what's named by the handler sig, otherwise
         #       just consume unnecessary args in phase handlers.
@@ -134,7 +134,7 @@ class Handler(HasSeq, Selectable, Entity):
         # todo: type check that receipts aren't returned and re-wrapped?  What
         #       if a handler invokes another dispatch as a subroutine?
 
-        return JobReceipt(blame_id=self.uid,
+        return CallReceipt(blame_id=self.uid,
                           result=result,
                           result_type=self.result_type,
                           **receipt_kwargs)

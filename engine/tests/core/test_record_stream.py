@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from tangl.core import BaseFragment, Graph
-from tangl.core.dispatch import JobReceipt
+from tangl.core.dispatch import CallReceipt
 from tangl.core.entity import Entity
 from tangl.core.record import Record, Snapshot, StreamRegistry as RecordStream
 from tangl.core.registry import Registry
@@ -230,8 +230,8 @@ def test_channel_sections_iterate_independently():
     fragment = BaseFragment(fragment_type="text", content="hello")
     stream.push_records(fragment, marker_type="fragment", marker_name="frag-0")
 
-    receipt = JobReceipt(blame_id=node.uid, result="ok")
-    stream.push_records(receipt, marker_type="job_receipt", marker_name="job-0")
+    receipt = CallReceipt(blame_id=node.uid, result="ok")
+    stream.push_records(receipt, marker_type="call_receipt", marker_name="job-0")
 
     snap_section = list(stream.get_section("snap-0", "snapshot", has_channel="snapshot"))
     assert [record.record_type for record in snap_section] == ["snapshot"]
@@ -242,13 +242,13 @@ def test_channel_sections_iterate_independently():
     fragment_section = list(stream.get_section("frag-0", "fragment", has_channel="fragment"))
     assert [record.record_type for record in fragment_section] == ["fragment"]
 
-    receipt_section = list(stream.get_section("job-0", "job_receipt", has_channel="job_receipt"))
-    assert [record.record_type for record in receipt_section] == ["job_receipt"]
+    receipt_section = list(stream.get_section("job-0", "call_receipt", has_channel="call_receipt"))
+    assert [record.record_type for record in receipt_section] == ["call_receipt"]
     assert stream.markers == {
         "snapshot": {"snap-0": snap_section[0].seq},
         "patch": {"patch-0": patch_section[0].seq},
         "fragment": {"frag-0": fragment_section[0].seq},
-        "job_receipt": {"job-0": receipt_section[0].seq},
+        "call_receipt": {"job-0": receipt_section[0].seq},
     }
 
     with pytest.raises(KeyError):

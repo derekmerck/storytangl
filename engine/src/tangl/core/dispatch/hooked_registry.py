@@ -2,7 +2,7 @@ from typing import Generic, Callable, ClassVar
 from uuid import UUID
 
 from tangl.core.registry import Registry, VT
-from .dispatch_v37 import BehaviorRegistry, HasBehaviors
+from .behavior_registry import BehaviorRegistry, HasBehaviors
 
 # --- Hook decorator markers -----------------------------------------------
 # We can't reliably call a classmethod decorator from the class body being defined.

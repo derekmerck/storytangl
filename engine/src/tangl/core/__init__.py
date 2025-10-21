@@ -28,7 +28,7 @@ Conceptual layers
 
 4. :ref:`Dispatch<core-dispatch>`
 
-   - :class:`Handler` wraps callable behaviors, returning a :class:`JobReceipt` record.
+   - :class:`Handler` wraps callable behaviors, returning a :class:`CallReceipt` record.
    - :class:`DispatchRegistry` executes handlers in ordered pipelines.
 
 5. :ref:`Capabilities<core-capability>`
@@ -56,7 +56,7 @@ from .singleton import Singleton
 from .graph import GraphItem, Node, Edge, Subgraph, Graph
 
 # Function dispatch, chaining, auditing
-from .dispatch import JobReceipt, Handler, DispatchRegistry
+from .dispatch import CallReceipt, Handler, DispatchRegistry
 
 # Opt-in and structurally scoped capability resolution
 from .domain import Domain, Scope, global_domain, NS
@@ -72,7 +72,7 @@ __all__ = [
     # Records/streams
     "Record", "StreamRegistry", "Snapshot", "BaseFragment",
     # Dispatch
-    "JobReceipt", "Handler", "DispatchRegistry",
+    "CallReceipt", "Handler", "DispatchRegistry",
     # Domains & scope
     "Domain", "Scope", "global_domain",
 ]

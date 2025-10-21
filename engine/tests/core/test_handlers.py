@@ -3,7 +3,7 @@ import uuid
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import Handler, HandlerPriority, DispatchRegistry, JobReceipt
+from tangl.core.dispatch import Handler, HandlerPriority, DispatchRegistry, CallReceipt
 
 class DummyEntity(Entity):
     foo: int = None
@@ -75,9 +75,9 @@ def test_run_handlers_utility_orders_input():
     list(DispatchRegistry.run_handlers({"ok": True}, [hA, hB, hC]))
     assert order == ["C", "A", "B"]
 
-def test_job_receipt_seq_monotonic():
-    r1 = JobReceipt(blame_id=uuid.uuid4(), result="x")
-    r2 = JobReceipt(blame_id=uuid.uuid4(), result="y")
+def test_call_receipt_seq_monotonic():
+    r1 = CallReceipt(blame_id=uuid.uuid4(), result="x")
+    r2 = CallReceipt(blame_id=uuid.uuid4(), result="y")
     assert r2.seq == r1.seq + 1
 
 def test_handler_ordering_and_receipts():
@@ -94,7 +94,7 @@ def test_handler_ordering_and_receipts():
     ns = {"phase": P.VALIDATE, "results": []}
     receipts = list(regs.run_all(ns))
     assert [r.result for r in receipts] == ["A", "B"]
-    assert isinstance(receipts[0], JobReceipt)
+    assert isinstance(receipts[0], CallReceipt)
     assert receipts[0].seq < receipts[1].seq  # monotonically increasing
 
 def test_handler_run_one_picks_first():

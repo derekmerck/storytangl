@@ -14,7 +14,7 @@ from collections import ChainMap
 from tangl.type_hints import Hash
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, AffiliateRegistry
-from tangl.core.dispatch import Handler, JobReceipt
+from tangl.core.dispatch import Handler, CallReceipt
 from tangl.utils.hashing import hashing_func
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class Context:
     * **Deterministic RNG** – :attr:`rand` is stable per ``(graph, cursor, step)``.
     * **Cached scope** – computed once from :attr:`graph`, :attr:`cursor_id`, and
       :attr:`domain_registries`.
-    * **Receipts** – :attr:`job_receipts` buffers per‑phase results for reducers.
+    * **Receipts** – :attr:`call_receipts` buffers per‑phase results for reducers.
     * **State hash** – :attr:`initial_state_hash` guards patch application.
 
     API
@@ -55,7 +55,7 @@ class Context:
     - :attr:`rand` – :class:`random.Random` seeded for replay.
     - :meth:`get_ns` – return merged namespace.
     - :meth:`get_handlers` – iterate handlers matching criteria (e.g., ``phase=…``).
-    - :attr:`job_receipts` – LIFO stack of :class:`~tangl.core.JobReceipt`.
+    - :attr:`call_receipts` – LIFO stack of :class:`~tangl.core.CallReceipt`.
 
     Notes
     -----
@@ -66,7 +66,7 @@ class Context:
     cursor_id: UUID
     step: int = -1
     domain_registries: list[AffiliateRegistry] = field(default_factory=list)
-    job_receipts: list[JobReceipt] = field(default_factory=list)
+    call_receipts: list[CallReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
 
     def __post_init__(self):
@@ -123,7 +123,7 @@ class Context:
         # handlers = self.scope.get_handlers_by_layer(job="namespace")
         # receipts = [h(self.cursor, ctx=self) for h in handlers]
         # # could inject self vars here but frame vars are already included I think
-        # maps = JobReceipt.gather(*receipts)  # grabs non-None result fields
+        # maps = CallReceipt.gather(*receipts)  # grabs non-None result fields
         return ChainMap(*maps)
 
     def get_ns(self) -> NS:

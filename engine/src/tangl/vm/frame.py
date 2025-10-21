@@ -12,7 +12,7 @@ from copy import deepcopy, copy
 import logging
 
 from tangl.type_hints import Step
-from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, JobReceipt, BaseFragment
+from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, CallReceipt, BaseFragment
 from tangl.core.entity import Conditional
 from tangl.core.domain import AffiliateDomain, AffiliateRegistry
 from .context import Context
@@ -28,7 +28,7 @@ class ResolutionPhase(IntEnum):
     Why
     ----
     Defines the ordered pipeline for one frame and specifies how to **reduce**
-    the list of :class:`~tangl.core.dispatch.job_receipt.JobReceipt` objects
+    the list of :class:`~tangl.core.dispatch.call_receipt.CallReceipt` objects
     produced during each phase into a single outcome.
 
     Key Features
@@ -65,13 +65,13 @@ class ResolutionPhase(IntEnum):
         """Aggregation func and expected final result type by phase"""
         _data = {
             self.INIT: None,
-            self.VALIDATE: (JobReceipt.all_truthy,   bool),     # confirm all true
-            self.PLANNING: (JobReceipt.last_result,  JobReceipt),  # actually a PlanningReceipt
-            self.PREREQS:  (JobReceipt.first_result, Edge),     # check for any available jmp/jr
-            self.UPDATE:   (JobReceipt.gather,       Any),
-            self.JOURNAL:  (JobReceipt.last_result,  list[BaseFragment]), # pipe and compose a list of Fragments
-            self.FINALIZE: (JobReceipt.last_result,  Patch),    # pipe and compose a Patch (if event sourced)
-            self.POSTREQS: (JobReceipt.first_result, Edge)      # check for any available jmp/jr
+            self.VALIDATE: (CallReceipt.all_truthy,   bool),     # confirm all true
+            self.PLANNING: (CallReceipt.last_result,  CallReceipt),  # actually a PlanningReceipt
+            self.PREREQS:  (CallReceipt.first_result, Edge),     # check for any available jmp/jr
+            self.UPDATE:   (CallReceipt.gather_results, Any),
+            self.JOURNAL:  (CallReceipt.last_result,  list[BaseFragment]), # pipe and compose a list of Fragments
+            self.FINALIZE: (CallReceipt.last_result,  Patch),    # pipe and compose a Patch (if event sourced)
+            self.POSTREQS: (CallReceipt.first_result, Edge)      # check for any available jmp/jr
         }
         return _data[self]
 
@@ -120,7 +120,7 @@ class Frame:
     * **Context management** – builds :class:`~tangl.vm.context.Context` (and thus
       :class:`~tangl.core.domain.scope.Scope`) lazily and invalidates it on moves.
     * **Phase execution** – :meth:`run_phase` discovers handlers via scope and
-      reduces their :class:`~tangl.core.dispatch.job_receipt.JobReceipt` outputs.
+      reduces their :class:`~tangl.core.dispatch.call_receipt.CallReceipt` outputs.
     * **Event sourcing (optional)** – when ``event_sourced=True``, applies changes
       to a watched preview graph and emits a :class:`~tangl.vm.replay.patch.Patch`.
     * **Journal output** – pushes fragments/patches to :attr:`records` with step markers.
@@ -149,7 +149,7 @@ class Frame:
     event_sourced: bool = False  # track effects on a mutable copy
     event_watcher: ReplayWatcher = field(default_factory=ReplayWatcher)
 
-    phase_receipts: dict[Enum, list[JobReceipt]] = field(default_factory=dict)
+    phase_receipts: dict[Enum, list[CallReceipt]] = field(default_factory=dict)
     phase_outcome:  dict[Enum, Any] = field(default_factory=dict)
 
     # Practically, this is the output buffer for the step, so someone else needs
@@ -203,17 +203,17 @@ class Frame:
     def run_phase(self, phase: P) -> Any:
         logger.debug(f'Running phase {phase}')
 
-        self.context.job_receipts.clear()
+        self.context.call_receipts.clear()
 
         for h in self.context.get_handlers(phase=phase):
             # Do this iteratively and update ctx, so compositors can access piped results
             receipt = h(self.cursor, ctx=self.context)
-            self.context.job_receipts.append(receipt)
+            self.context.call_receipts.append(receipt)
 
         agg_func, result_type = phase.properties()
-        outcome = agg_func(*self.context.job_receipts)
+        outcome = agg_func(*self.context.call_receipts)
 
-        logger.debug(f'Ran {len(self.context.job_receipts)} handlers with final outcome {outcome} under {agg_func.__name__}')
+        logger.debug(f'Ran {len(self.context.call_receipts)} handlers with final outcome {outcome} under {agg_func.__name__}')
 
         # todo: generic result type checking is complicated with list[Fragment]
         #       we also potentially have the declared handler result type if any in the receipts
@@ -221,7 +221,7 @@ class Frame:
         #     raise RuntimeError(f"Phase {phase} generated a bad result type: {type(outcome)} but expected {result_type}")
 
         # stash results on the context for review/compositing
-        self.phase_receipts[phase] = copy(self.context.job_receipts)
+        self.phase_receipts[phase] = copy(self.context.call_receipts)
         # copy or it will be cleared on next phase
         self.phase_outcome[phase] = outcome
 
@@ -241,6 +241,10 @@ class Frame:
 
         # Make sure that this cursor is allowed
         if not self.run_phase(P.VALIDATE):
+            logger.debug(f'receipt results: {[r.result for r in self.phase_receipts[P.VALIDATE]]}')
+            logger.debug(f'receipt agg: {list(CallReceipt.gather_results(*self.phase_receipts[P.VALIDATE]))}')
+            # for r in self.phase_receipts[P.VALIDATE]:
+            #     logger.debug(f'  {r}')
             raise RuntimeError(f"Proposed next cursor is not valid!")
 
         baseline_state_hash = self.context.initial_state_hash

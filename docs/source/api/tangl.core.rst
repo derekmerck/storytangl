@@ -42,7 +42,7 @@ Dispatch
 ---------
 .. autoclass:: tangl.core.Handler
 .. autoclass:: tangl.core.DispatchRegistry
-.. autoclass:: tangl.core.JobReceipt
+.. autoclass:: tangl.core.CallReceipt
 
 .. _core-capability:
 

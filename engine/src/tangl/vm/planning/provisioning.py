@@ -29,7 +29,7 @@ from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING
 import functools
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, Registry, Handler, JobReceipt
+from tangl.core import Node, Registry, Handler, CallReceipt
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:
@@ -257,10 +257,10 @@ class Provisioner(Handler):
         requirement: Requirement,
         *args,
         **kwargs,
-    ) -> JobReceipt:
+    ) -> CallReceipt:
         ctx: "Context" | None = kwargs.get("ctx")
         offers = self.get_offers(requirement=requirement, ctx=ctx)
-        return JobReceipt(
+        return CallReceipt(
             blame_id=self.uid,
             caller_id=requirement.uid,
             result=offers,
