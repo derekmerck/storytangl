@@ -34,6 +34,8 @@ from uuid import UUID
 from collections import Counter
 import itertools
 import warnings
+from contextvars import ContextVar
+from contextlib import contextmanager
 
 from pydantic import Field
 
@@ -44,9 +46,6 @@ VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
 ST = TypeVar("ST", bound=Selectable)
 
-# todo: registries _should_ have a hook for a local 'on_index' dispatch
-#       registry that runs on every add(item), but this becomes a recursive
-#       definition
 
 class Registry(Entity, Generic[VT]):
     """
@@ -154,12 +153,13 @@ class Registry(Entity, Generic[VT]):
 
     @classmethod
     def chain_find_all(cls, *registries: Self, sort_key = None, **criteria) -> Iterator[VT]:
-        iter_values = itertools.chain.from_iterable(
-            r.find_all(**criteria) for r in registries)
-        if sort_key is None:
-            yield from iter_values
-        else:
-            yield from sorted(iter_values, key=sort_key)
+        with _chained_registries(*registries):  # make registries available to inner calls
+            iter_values = itertools.chain.from_iterable(
+                r.find_all(**criteria) for r in registries)
+            if sort_key is None:
+                yield from iter_values
+            else:
+                yield from sorted(iter_values, key=sort_key)
 
     @classmethod
     def chain_find_one(cls, *registries: Self, sort_key = None, **criteria) -> Optional[VT]:
@@ -179,9 +179,10 @@ class Registry(Entity, Generic[VT]):
 
     @classmethod
     def chain_select_all_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Iterator[ST]:
-        iter_values = itertools.chain.from_iterable(
-            r.select_all_for(selector, **inline_criteria) for r in registries)
-        yield from iter_values
+        with _chained_registries(*registries):  # make registries available to inner calls
+            iter_values = itertools.chain.from_iterable(
+                r.select_all_for(selector, **inline_criteria) for r in registries)
+            yield from iter_values
 
     @classmethod
     def chain_select_one_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Optional[ST]:
@@ -258,3 +259,19 @@ class Registry(Entity, Generic[VT]):
         for v in self.data.values():
             data['_data'].append(v.unstructure())
         return data
+
+# For chain-find/select, provide the entire list of participating registries
+# in the call stack.  Enables chain-order sort keys for items that know what registry they came from.
+
+_CHAINED_REGISTRIES: ContextVar[list[Registry] | None] = ContextVar(
+    "_CHAINED_REGISTRIES", default=None
+)
+
+@contextmanager
+def _chained_registries(*registries: Registry) -> list[Registry] | None:
+    token = _CHAINED_REGISTRIES.set(list(registries))
+    try:
+        yield
+    finally:
+        _CHAINED_REGISTRIES.reset(token)
+
