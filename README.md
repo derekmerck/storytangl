@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml)
 
-**TanglDev, Spring 2026**  
+**TanglDev, Winter 2025**  
 
 ## Overview
 

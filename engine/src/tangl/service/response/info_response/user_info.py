@@ -25,4 +25,4 @@ class UserInfo(BaseResponse):
 
 # todo: should probably just return a full user info object for consistency
 import collections
-UserSecret = collections.namedtuple("UserSecret", ["user_id", "user_secret"])
+UserSecret = collections.namedtuple("UserSecret", ["api_key", "user_secret"])

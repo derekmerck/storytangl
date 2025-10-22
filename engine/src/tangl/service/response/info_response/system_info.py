@@ -10,7 +10,7 @@ class SystemInfo(BaseResponse):
     engine: str
     version: str
     uptime: str
-    worlds: list[str]
+    worlds: list[str] | int
     num_users: int
     homepage_url: AnyUrl = __url__
     # media: Optional[list[MediaRecord | JournalMediaFragment]] = None

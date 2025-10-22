@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tangl.config import settings
-from tangl.utils.hash_secret import uuid_for_secret
+from tangl.utils.hash_secret import uuid_for_secret, key_for_secret
 
 
 def test_system_get_info(client: TestClient):
@@ -19,8 +19,9 @@ def test_system_get_key(client):
     assert response.status_code == 200
     update = response.json()
     print( update )
-    assert update['user_secret'] == settings.client.secret
-    assert update['user_id'] == str( uuid_for_secret( settings.client.secret) )
+    # todo: namedtuple response doesn't preserve attrib names, json is a list
+    assert update[0] == key_for_secret(settings.client.secret)
+    assert update[1] == settings.client.secret
 
 def test_system_list_worlds(client, world):
     response = client.get(f"system/worlds")

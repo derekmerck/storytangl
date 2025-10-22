@@ -11,6 +11,7 @@ from pydantic import BaseModel, computed_field
 from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints
 from tangl.type_hints import Hash, Identifier
+from tangl.utils.hash_secret import key_for_secret
 
 if TYPE_CHECKING:
     from tangl.service.user.user import User
@@ -32,6 +33,7 @@ class ApiKeyInfo(BaseModel):
     @property
     def api_key(self) -> str:
         """Return the URL-safe base64 encoded secret."""
+        return key_for_secret(self.secret)
 
         raw = self.secret.encode("utf-8")
         return base64.urlsafe_b64encode(raw).decode("utf-8")
