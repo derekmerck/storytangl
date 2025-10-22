@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
 from fastapi import Depends, Header, HTTPException, Path, Query
 
+from tangl.service.response.info_response import RuntimeInfo
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
@@ -42,7 +41,7 @@ async def goto_story_block(
 async def inspect_story_node(
     orchestrator: Orchestrator = Depends(get_orchestrator),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-):
+) -> RuntimeInfo:
     """Return diagnostic story information for the active user."""
 
     user_id = uuid_for_key(api_key)
@@ -50,14 +49,14 @@ async def inspect_story_node(
 
 
 @story_router.post("/check", tags=["Restricted"])
-async def check_expression():
+async def check_expression() -> RuntimeInfo:
     """Expression inspection is not yet supported."""
 
     raise HTTPException(status_code=501, detail="Expression inspection is not available")
 
 
 @story_router.post("/apply", tags=["Restricted"])
-async def apply_effect():
+async def apply_effect() -> RuntimeInfo:
     """Direct state mutation is not supported in the orchestrated REST API."""
 
     raise HTTPException(status_code=501, detail="Direct story mutation is not available")

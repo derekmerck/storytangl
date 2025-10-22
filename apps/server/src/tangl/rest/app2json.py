@@ -3,6 +3,8 @@ Dump the openapi spec from a fastapi app
 https://github.com/tiangolo/fastapi/issues/1490
 """
 
+# todo: irrelevant, replaced by scripts/export_openapi3 ??
+
 import json
 from fastapi.openapi.utils import get_openapi
 

@@ -23,22 +23,8 @@ else:
 logger = logging.getLogger(__name__)
 
 
-class WorldInfo(BaseModel):
-    # revision, license, etc. should probably just inherit this data from
-    # the script manager metadata...
-    label: str
-    name: str
-    # author: str
-    # copyright_date: str
-
-    @classmethod
-    def from_world(cls, world: World, **kwargs) -> WorldInfo:
-        return cls(
-            label=world.label,
-            name=world.name
-        )
-
 def _dereference_world_id(args, kwargs):
+    logger.debug(f"dereferencing world: args={args} kwargs={kwargs}")
     if world_id := kwargs.pop("world_id", None):
         world = World.get_instance(world_id)
         if not world:

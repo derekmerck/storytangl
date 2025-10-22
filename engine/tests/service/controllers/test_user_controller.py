@@ -4,6 +4,7 @@ import base64
 from uuid import UUID, uuid4
 
 from tangl.service.controllers import ApiKeyInfo, UserController
+from tangl.utils.hash_secret import key_for_secret
 
 
 class _StubMedia:
@@ -54,7 +55,7 @@ def test_update_user_returns_api_key_info() -> None:
     result = controller.update_user(user, display_name="Player")
     assert isinstance(result, ApiKeyInfo)
     assert user.updated_kwargs == {"display_name": "Player"}
-    expected = base64.urlsafe_b64encode(user.secret.encode("utf-8")).decode("utf-8")
+    expected = key_for_secret(user.secret)
     assert result.api_key == expected
 
 

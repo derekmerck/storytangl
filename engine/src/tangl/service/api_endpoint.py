@@ -7,6 +7,10 @@ import inspect
 
 from pydantic import BaseModel, model_validator, Field
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AccessLevel(IntEnum):
     """
     Defines the access level for an API endpoint or user.
@@ -199,6 +203,7 @@ class ApiEndpoint(BaseModel):
         :param kwargs: Keyword arguments for the target function.
         :return: The result of the target function, optionally modified by postprocessors.
         """
+        logger.debug(f"calling target function: args={args} kwargs={kwargs}")
 
         # Optionally run preprocessors:
         for pre in self.preprocessors:

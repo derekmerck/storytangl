@@ -9,10 +9,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
+from tangl.service.response.info_response import UserInfo
+from tangl.service.response.info_response.user_info import UserSecret
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret, uuid_for_key
-
-from .response_models import UserSecret
 
 
 router = APIRouter(tags=["User"])
@@ -25,8 +25,8 @@ def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
 @router.get("/info")
 async def get_user_info(
     orchestrator: Orchestrator = Depends(get_orchestrator),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
-):
+    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None)
+) -> UserInfo:
     """Return profile information for the authenticated user."""
 
     user_id = uuid_for_key(api_key)
@@ -48,7 +48,7 @@ async def create_user(
         orchestrator.persistence.save(user)
     api_info = _call(orchestrator, "UserController.get_key_for_secret", secret=secret)
     api_key = getattr(api_info, "api_key", None) or key_for_secret(secret)
-    return UserSecret(user_secret=secret, user_id=user_id, api_key=api_key)
+    return UserSecret(user_secret=secret, api_key=api_key)
 
 
 @router.put("/world")

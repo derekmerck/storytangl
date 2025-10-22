@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
+from tangl.service.response import ContentResponse
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret, uuid_for_key
 
@@ -59,12 +60,13 @@ async def create_story(
     return result
 
 
+# todo: maybe "journal" since update is used as a phase?
 @router.get("/update")
 async def get_story_update(
     orchestrator: Orchestrator = Depends(get_orchestrator),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     limit: int = Query(default=10, ge=0),
-):
+) -> ContentResponse:
     """Return journal fragments and available choices for the active user."""
 
     user_id = uuid_for_key(api_key)

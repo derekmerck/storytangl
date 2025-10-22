@@ -8,7 +8,11 @@ from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator
 from tangl.service import Orchestrator
 from tangl.service.response.info_response.user_info import UserSecret
+from tangl.service.response.info_response.world_info import WorldList
+from tangl.service.response.info_response import SystemInfo
 from tangl.utils.hash_secret import key_for_secret
+
+WorldList = dict
 
 
 router = APIRouter(tags=["System"])
@@ -19,7 +23,7 @@ def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
 
 
 @router.get("/info")
-async def get_system_info(orchestrator: Orchestrator = Depends(get_orchestrator)):
+async def get_system_info(orchestrator: Orchestrator = Depends(get_orchestrator)) -> SystemInfo:
     """Return high-level information about the running service."""
 
     status = _call(orchestrator, "SystemController.get_system_info")
@@ -31,7 +35,7 @@ async def get_system_info(orchestrator: Orchestrator = Depends(get_orchestrator)
 
 
 @router.get("/worlds")
-async def get_worlds(orchestrator: Orchestrator = Depends(get_orchestrator)):
+async def get_worlds(orchestrator: Orchestrator = Depends(get_orchestrator)) -> WorldList:
     """List the available worlds registered with the service."""
 
     return _call(orchestrator, "WorldController.list_worlds")
