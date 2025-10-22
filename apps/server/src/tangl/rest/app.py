@@ -1,7 +1,7 @@
 """
 FastAPI_ api, media, and docs server for StoryTangl narrative engine.
 
-_fastapi: https://https://fastapi.tiangolo.com/
+_fastapi: https://fastapi.tiangolo.com/
 
 ```bash
 $ tangl-serve
@@ -105,11 +105,11 @@ try:
     # This captures the case where the path is accessed without a slash,
     # which fails to route to the mount otherwise.
     sphinx_docs_files = StaticFiles(directory=docs_dir, html=True)
-    app.mount("/guide", sphinx_docs_files, name="sphinx-docs")
+    app.mount("/docs", sphinx_docs_files, name="sphinx-docs")
 
-    @app.get("/guide")
-    async def redirect_to_guide_with_slash():
-        return RedirectResponse(url="/guide/")
+    @app.get("/docs")
+    async def redirect_to_docs_with_slash():
+        return RedirectResponse(url="/docs/")
 
 except (AssertionError, RuntimeError):
     logger.warning(f"Could not find sphinx docs at {docs_dir}")
