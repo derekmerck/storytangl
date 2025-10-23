@@ -43,7 +43,8 @@ class AffiliateDomain(Selectable, Domain):
 
 AffiliateRegistry = Registry[AffiliateDomain]
 
-
+# singleton domains are inline-able, they can be attached directly to a node
+# or selected.
 class SingletonDomain(Singleton, AffiliateDomain):
     # ONLY use singleton domains in anything that needs to be serialized
     ...

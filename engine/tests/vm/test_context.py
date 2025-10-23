@@ -27,8 +27,8 @@ from tangl.core.domain import DomainNode
 def test_ns_gather():
     # check that ctx collects ns same as scope
     g = Graph()
-    n = g.add_node(label="here", vars={"foo": 1}, obj_cls=DomainNode)
-    assert n.vars["foo"] == 1
+    n = g.add_node(label="here", locals={"foo": 1}, obj_cls=DomainNode)
+    assert n.locals["foo"] == 1
     ctx = Context(graph=g, cursor_id=n.uid)
 
     print( ctx.inspect_scope() )

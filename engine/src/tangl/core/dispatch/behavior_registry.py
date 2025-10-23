@@ -187,7 +187,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             elif isinstance(h, Callable):
                 yield Behavior(func=h, task=None)
 
-    def dispatch(self, caller: Entity, *, task: str = None, ctx: dict = None, extra_handlers: list[Callable] = None, by_origin=False, **inline_criteria) -> Iterator[CallReceipt]:
+    def dispatch(self, caller: Entity, *, task: str = None, ctx: dict = None, extra_handlers: list[Callable] = None, by_origin=False, dry_run=False, **inline_criteria) -> Iterator[CallReceipt]:
         """
         Select, sort, and invoke matching behaviors from this registry.
 
@@ -226,7 +226,9 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             behaviors = itertools.chain(behaviors, self._iter_normalize_handlers(extra_handlers))
 
         behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller, by_origin=by_origin))
-        logger.debug(f"Behaviors: {[b.sort_key() for b in behaviors]}")
+        logger.debug(f"Behaviors invoked: {[b.get_label() for b in behaviors]}")
+        if dry_run:
+            return
         return (b(caller, ctx=ctx) for b in behaviors)
 
     @classmethod
@@ -294,14 +296,19 @@ class HasBehaviors(Entity):
     @classmethod
     def _annotate_behaviors(cls):
         """
-        Attach ``owner_cls=cls`` to behaviors declared on this class.
+        Attach ``owner_cls=cls`` to behaviors declared on this class and
+        ``caller_cls=cls`` to inst or cls on caller  handler types.
         """
+        logger.debug(f"Behaviors annotated on class {cls.__name__}")
         # annotate handlers defined in this cls with the owner_cls
-        for item in cls.__dict__:
-            h = getattr(item, "_behavior", None)
+        for name, obj in cls.__dict__.items():
+            h = getattr(obj, "_behavior", None)  # type: Behavior
             if h is not None:
+                logger.debug(f"Handler owner set for {h}")
                 h.owner_cls = cls
-                # cls is either class_on_caller or class_on_owner
+                if h.handler_type in [HandlerType.INSTANCE_ON_CALLER, HandlerType.CLASS_ON_CALLER]:
+                    logger.debug(f"Handler caller cls set for {h}")
+                    h.caller_cls = cls
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -311,14 +318,14 @@ class HasBehaviors(Entity):
         super().__init_subclass__(**kwargs)
         cls._annotate_behaviors()
 
-    @model_validator(mode="after")
-    def _annotate_inst_behaviors(self):
-        """
-        (Planned) Annotate a *copy* of class behaviors for this instance, setting
-        ``owner=self`` where appropriate. Left unimplemented pending a concrete
-        registration strategy for instance‑bound behaviors.
-        """
-        # want to annotate and register a _copy_ of the instance (self, caller)
-        # but _not_ class (cls, caller) behaviors with owner = self instead
-        # of owner = cls
-        ...
+    # @model_validator(mode="after")
+    # def _annotate_inst_behaviors(self):
+    #     """
+    #     (Planned) Annotate a *copy* of class behaviors for this instance, setting
+    #     ``owner=self`` where appropriate. Left unimplemented pending a concrete
+    #     registration strategy for instance‑bound behaviors.
+    #     """
+    #     # want to annotate and register a _copy_ of the instance (self, caller)
+    #     # but _not_ class (cls, caller) behaviors with owner = self instead
+    #     # of owner = cls
+    #     return self

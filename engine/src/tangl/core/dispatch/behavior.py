@@ -49,9 +49,10 @@ from functools import total_ordering
 import inspect
 import weakref
 
-from pydantic import field_validator, model_validator, ConfigDict
+from pydantic import field_validator, model_validator, ConfigDict, Field
 
 from tangl.type_hints import StringMap
+from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.utils.base_model_plus import HasSeq
 from tangl.utils.func_info import FuncInfo, HandlerFunc
 from tangl.core import Entity, Registry
@@ -81,7 +82,7 @@ class HandlerLayer(IntEnum):
     APPLICATION = 4  # included by application (i.e., vm jobs)
     GLOBAL = 5       # available everywhere (i.e., core jobs)
 
-class HandlerPriority(IntEnum):
+class HandlerPriority(EnumPlusMixin, IntEnum):
     """
     Execution priorities for handlers.
 
@@ -105,7 +106,7 @@ class HandlerPriority(IntEnum):
     LATE = 75
     LAST = 100
 
-class HandlerType(IntEnum):
+class HandlerType(EnumPlusMixin, IntEnum):
     """
     Binding mode inferred from the wrapped callable’s signature and hints.
 
@@ -190,8 +191,8 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
        signature. They may be added or manipulated during :meth:`__call__`.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
-
     # arbitrary types allowed for possible WeakRef owner
+
     func: HandlerFunc
 
     def has_func_name(self, value: str) -> bool:
@@ -295,7 +296,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     # todo: we used to have a 'registry aware' object type that knew
     #       to self-register.  Moved it to GraphItem, maybe should re-generalize?
-    origin: Registry = None
+    origin: Registry = Field(None, exclude=True)
 
     def origin_dist(self) -> int:
         """

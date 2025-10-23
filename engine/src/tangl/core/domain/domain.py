@@ -32,24 +32,15 @@ class Domain(Entity):
     - :attr:`handlers` – registry of callable behaviors
     - :meth:`add_vars`, :meth:`add_handler`, :meth:`register_handler`
     """
-    vars: StringMap = Field(default_factory=dict)
+    locals: StringMap = Field(default_factory=dict)
     handlers: BehaviorRegistry = Field(default_factory=BehaviorRegistry)
-
-    def add_vars(self, vars: dict[str, Any]) -> None:
-        self.vars.update(vars)
-
-    def get_vars(self) -> StringMap:
-        return self.vars
-
-    def add_handler(self, func, **attrs) -> None:
-        self.handlers.add(func, **attrs)
 
     # delegated decorator
     def register_handler(self, **attrs: Any) -> None:
         return self.handlers.register(**attrs)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
 
 DomainRegistry = Registry[Domain]
 

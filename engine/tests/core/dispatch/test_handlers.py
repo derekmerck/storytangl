@@ -16,6 +16,12 @@ def always_false(ctx): return False
 
 # ---------- Handlers & registry ----------
 
+def test_handler_coerces_priority_from_str():
+
+    for p in ["first", "FIRST", "0"]:
+        h = Behavior(func=lambda c, ctx=None: True, priority=p)
+        assert h.priority is HandlerPriority.FIRST
+
 
 def test_handler_registry_register_and_iter_handlers():
     registry = BehaviorRegistry(label="test_handlers")

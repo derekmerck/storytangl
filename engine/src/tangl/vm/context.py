@@ -12,10 +12,11 @@ from random import Random
 from collections import ChainMap
 
 from tangl.type_hints import Hash
+from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, AffiliateRegistry
 from tangl.core.dispatch import Behavior, CallReceipt
-from tangl.utils.hashing import hashing_func
+from .on_get_ns import on_get_ns
 
 if TYPE_CHECKING:
     from .domain import TraversableDomain
@@ -116,14 +117,11 @@ class Context:
     def _get_ns(scope: Scope) -> NS:
         maps = []
         for d in scope.active_domains:
-            if hasattr(d, "get_vars"):
-                if x := d.get_vars():
-                    maps.append(x) # grabs non-None result fields
-        return ChainMap(*maps)
-        # handlers = self.scope.get_handlers_by_layer(job="namespace")
-        # receipts = [h(self.cursor, ctx=self) for h in handlers]
-        # # could inject self vars here but frame vars are already included I think
-        # maps = CallReceipt.gather(*receipts)  # grabs non-None result fields
+            # todo: how do we include other registry layers?
+            #       we always do global/app/author and don't worry about d's ancestors?
+            #       this is bootstrapping, so we have to accept some constraints...
+            domain_maps = on_get_ns.dispatch(caller=d, ctx=None)
+            maps.extend(CallReceipt.gather_results(*domain_maps))
         return ChainMap(*maps)
 
     def get_ns(self) -> NS:

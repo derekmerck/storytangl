@@ -15,6 +15,7 @@ Domains can register additional builders/selectors at different priorities to
 enrich or override behavior.
 """
 from uuid import UUID
+import logging
 
 from tangl.core import Node, global_domain, CallReceipt
 from tangl.vm import ResolutionPhase as P, Context, ProvisioningPolicy
@@ -22,6 +23,8 @@ from .open_edge import Dependency, Affordance
 from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
 from .provisioning import Provisioner
 from .requirement import Requirement
+
+logger = logging.getLogger(__name__)
 
 # todo: lets introduce a sub-phase here: PLANNING_OFFER
 #       handlers of type provisioner that want phase_offer and
@@ -255,6 +258,22 @@ def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
             builds.append(r.result)
     return PlanningReceipt.summarize(*builds)
 
+
+from tangl.vm.context import NS
+from tangl.vm.on_get_ns import on_get_ns
+from tangl.vm.planning import Dependency, Affordance
+
+@on_get_ns.register()
+def _contribute_deps_to_ns(caller: Node, ctx=None) -> NS:
+    """Build namespace including base vars and satisfied dependencies."""
+    # Automatically include satisfied dependencies/affordances
+    logger.debug(f"Checking deps on caller {caller!r}")
+    dep_names = {}
+    for edge in caller.graph.find_edges(source=caller, is_instance=(Affordance, Dependency)):
+        logger.debug(f"Checking edge sat on edge {edge!r}")
+        if edge.satisfied:
+            dep_names[edge.get_label()] = edge.destination
+    return dep_names
 
 # Prior automatic-accept-first version
 

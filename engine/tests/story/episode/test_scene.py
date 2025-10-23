@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tangl.core import Graph, Node
+from pip._internal.resolution.resolvelib import provider
+
+from tangl.core import Graph, Node, CallReceipt
 from tangl.story.episode import Block, Scene
 from tangl.story.concepts import Concept
 from tangl.vm import (
@@ -16,6 +18,7 @@ from tangl.vm import (
     Requirement,
     ResolutionPhase as P,
 )
+from tangl.vm.on_get_ns import on_get_ns
 
 
 def _destination_ids(node: Node) -> set[UUID]:
@@ -107,15 +110,13 @@ def test_get_member_blocks_returns_only_blocks() -> None:
     assert members == [block_one, block_two]
 
 
-def test_refresh_edge_projections_for_dependencies() -> None:
+def test_refresh_ns_for_dependencies() -> None:
     g = Graph(label="test")
     block = Block(graph=g, label="block")
     companion = Node(graph=g, label="companion")
 
     requirement = Requirement[Node](
         graph=g,
-        identifier="companion",
-        policy=ProvisioningPolicy.EXISTING,
     )
     dependency = Dependency[Node](
         graph=g,
@@ -124,12 +125,8 @@ def test_refresh_edge_projections_for_dependencies() -> None:
         label="companion",
     )
     dependency.requirement.provider = companion
-
-    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
-    scene.refresh_edge_projections()
-
-    assert scene.vars["companion"] is companion
-    assert scene.vars["companion_satisfied"] is True
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    assert ns["companion"] is companion
 
 
 def test_refresh_edge_projections_for_affordances() -> None:
@@ -139,23 +136,17 @@ def test_refresh_edge_projections_for_affordances() -> None:
 
     requirement = Requirement[Node](
         graph=g,
-        identifier="service",
-        policy=ProvisioningPolicy.EXISTING,
     )
     affordance = Affordance[Node](
         graph=g,
-        source_id=provider.uid,
-        destination_id=block.uid,
+        destination_id=provider.uid,
         requirement=requirement,
         label="service",
     )
-    affordance.requirement.provider = provider
+    affordance.requirement.provider = block
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
 
-    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
-    scene.refresh_edge_projections()
-
-    assert scene.vars["service"] is provider
-    assert scene.vars["service_satisfied"] is True
+    assert ns["service"] is provider
 
 
 def test_refresh_edge_projections_marks_unsatisfied() -> None:
@@ -164,36 +155,45 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
 
     requirement = Requirement[Node](
         graph=g,
-        identifier="missing",
-        policy=ProvisioningPolicy.EXISTING,
         hard_requirement=True,
     )
     Dependency[Node](graph=g, source_id=block.uid, requirement=requirement, label="missing")
 
     scene = Scene(graph=g, label="scene", member_ids=[block.uid])
-    scene.refresh_edge_projections()
 
-    assert "missing" not in scene.vars
-    assert scene.vars["missing_satisfied"] is False
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    assert "missing" not in ns
+
+    requirement.provider = Block(graph=g, label="provider")
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    assert "missing" in ns
+    assert ns["missing"].get_label() == "provider"
 
 
 def test_refresh_edge_projections_preserves_existing_vars() -> None:
     g = Graph(label="test")
+
+    scene = Scene(graph=g, label="scene")
+    scene.locals["region"] = "Tavern"
     block = Block(graph=g, label="block")
+    scene.add_member(block)
+    provider = Block(graph=g, label="provider")
+
     requirement = Requirement[Node](
         graph=g,
-        identifier="prop",
-        policy=ProvisioningPolicy.EXISTING,
     )
     Dependency[Node](graph=g, source_id=block.uid, requirement=requirement, label="prop")
 
-    scene = Scene(graph=g, label="scene", member_ids=[block.uid])
-    scene.vars["region"] = "Tavern"
+    from tangl.vm.context import Context
+    ctx = Context(cursor_id=block.uid, graph=g)
+    ns = ctx.get_ns()
 
-    scene.refresh_edge_projections()
+    assert ns["region"] == "Tavern"
+    assert "prop" not in ns
 
-    assert scene.vars["region"] == "Tavern"
-    assert scene.vars["prop_satisfied"] is False
+    requirement.provider = provider
+    ns = ctx.get_ns()
+    assert ns["prop"] is provider
 
 
 def test_has_forward_progress_reachable() -> None:
@@ -240,8 +240,7 @@ def test_scene_namespace_available_during_journal() -> None:
     g = Graph(label="test")
     block = Block(graph=g, label="block", content="Hello {{npc_name}}!")
     scene = Scene(graph=g, label="tavern", member_ids=[block.uid])
-    scene.vars["npc_name"] = "Bartender Bob"
-    scene.refresh_edge_projections()
+    scene.locals["npc_name"] = "Bartender Bob"
 
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
@@ -276,9 +275,9 @@ def test_refresh_edge_projections_updates_namespace_in_place() -> None:
     assert "npc" not in ns
 
     dependency.destination = actor
-    scene.refresh_edge_projections()
-    assert scene.vars["npc"] is actor
+    # scene.refresh_edge_projections()
+    # assert scene.vars["npc"] is actor
 
+    # frame._invalidate_context()
     ns = frame.context.get_ns()
     assert ns["npc"] is actor
-    assert ns["npc_satisfied"] is True

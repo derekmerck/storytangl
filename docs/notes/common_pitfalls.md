@@ -192,45 +192,20 @@ class MyEntity(Entity):
         return obj
 ```
 
-**Correct pattern**: Use `_structure_post` hook instead.
+**Correct pattern**: Just call super().structure(data) first to dereference the correct entity class. 
 
 ```python
 # ✅ Correct: hook pattern
 class MyEntity(Entity):
     @classmethod
-    def _structure_post(cls, obj):
-        # Customize structured object
-        obj.custom_init()
+    def structure(cls, data):
+        foo = data.pop('foo', 0) + 1
+        obj = super().structure(data)
+        assert object.foo == foo
         return obj
 ```
 
 **Applies to**: `_structure_post`, `_unstructure_post` hooks (see [Section 3](coding_style.md#3-class-design)).
-
----
-
-## Priority as String
-
-**Problem** (pre-fix): Handler priority was a string (`"FIRST"`, `"LAST"`), which sorts alphabetically.
-
-```python
-# ❌ Bug: string comparison
-handler1 = Handler(func=f1, priority="FIRST")
-handler2 = Handler(func=f2, priority="LAST")
-# Sorted: ["FIRST", "LAST"] works by accident
-# But "MEDIUM" sorts before "FIRST" alphabetically!
-```
-
-**Solution**: Use `Priority` enum with integer values.
-
-```python
-# ✅ Correct: enum with int values
-class Priority(IntEnum):
-    FIRST = 0
-    NORMAL = 50
-    LAST = 100
-
-handler = Handler(func=f, priority=Priority.FIRST)
-```
 
 ---
 
@@ -291,15 +266,7 @@ data = entity.unstructure()
 json.dumps(data)  # TypeError: not JSON serializable
 ```
 
-**Workaround**: Use custom JSON encoder or flatten `obj_cls` to qualified name.
-
-```python
-# In serialization handler
-if isinstance(data['obj_cls'], type):
-    data['obj_cls'] = f"{data['obj_cls'].__module__}.{data['obj_cls'].__qualname__}"
-```
-
-**Future**: Consider standardizing on qualified name string in `unstructure()`.
+**Workaround**: Use a proper 2-phase serialization layer that clearly distinguishes between structure/unstructure and flatten/unflatten for the target protocol.  Flatteners for various types (date-time, uuid, types) and backends (pickle, json, yaml, bson) are included in the `tangl.persistence` library.  For json in particular, you can just grab the serialize/deserialize hook classes from there if you insist on using your own data controller.
 
 ---
 

@@ -192,22 +192,3 @@ class TraversableDomain(DomainSubgraph):
                     label=f"exit_{self.label}",
                     trigger_phase=P.POSTREQS,
                 )
-
-    # todo: This should maybe be it's own class mixin, it's not about traversal,
-    #       its about inheritance
-
-    def get_vars(self) -> dict[str, Any]:
-        """Build namespace including base vars and satisfied dependencies."""
-        # Start with explicit vars
-        namespace = super().get_vars()
-
-        # Automatically include satisfied dependencies/affordances
-        from tangl.vm.planning import Dependency, Affordance
-        for edge in self.graph.find_edges(source=self, is_instance=(Affordance, Dependency)):
-            if edge.requirement and edge.requirement.satisfied:
-                namespace[edge.get_label()] = edge.requirement.provider
-
-        return namespace
-
-
-# TraversableDomain.model_rebuild(_types_namespace={"Graph": Graph})

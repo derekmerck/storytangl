@@ -1,8 +1,6 @@
 Core.Dispatch
 =============
 
-
-
 Each handler is registered with a _criteria_ for triggering; usually at least the caller's expected base class.  Scopes can be implemented by matching parts of the element's "path", i.e., "domain.graph.subgraph.node.element...".
 
 

@@ -59,13 +59,13 @@ class TestSimpleConcept:
         graph = Graph(label="test")
         concept = Concept(graph=graph, label="greeting", content="Hello, {player_name}!")
 
-        global_domain.vars.setdefault("player_name", "Bob")
+        global_domain.locals.setdefault("player_name", "Bob")
         try:
             frame = Frame(graph=graph, cursor_id=concept.uid)
             fragments = frame.run_phase(P.JOURNAL)
             fragment = collect_fragment(fragments, source_id=concept.uid)
         finally:
-            global_domain.vars.pop("player_name", None)
+            global_domain.locals.pop("player_name", None)
 
         assert "Hello, Bob!" in fragment.content
 
@@ -82,7 +82,7 @@ class TestSimpleConcept:
 
 @pytest.fixture(autouse=True)
 def _reset_global_domain_vars():
-    original = dict(global_domain.vars)
+    original = dict(global_domain.locals)
     yield
-    global_domain.vars.clear()
-    global_domain.vars.update(original)
+    global_domain.locals.clear()
+    global_domain.locals.update(original)

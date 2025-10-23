@@ -7,8 +7,12 @@ from typing import Any
 from pydantic import PrivateAttr
 
 from tangl.core import Graph, Node
+from tangl.core.dispatch.behavior_registry import HasBehaviors
+from tangl.vm.on_get_ns import on_get_ns
 from tangl.vm.domain import TraversableDomain
 from tangl.vm.planning import Affordance, Dependency
+from ..concepts.actor import Role
+from ..concepts.location import Setting
 
 from .block import Block
 
@@ -20,7 +24,7 @@ __all__ = ["Scene"]
 #       Need to consider how global domain templates can be restricted to
 #       instance structural domains by name or origin or something.
 
-class Scene(TraversableDomain):
+class Scene(TraversableDomain, HasBehaviors):
     """Scene(label: str, member_ids: list[Node], entry_ids: list[Node] | None = None, exit_ids: list[Node] | None = None)
 
     Structural domain that groups :class:`Block` members and projects
@@ -52,15 +56,20 @@ class Scene(TraversableDomain):
     _base_vars: dict[str, Any] | None = PrivateAttr(default=None)
     _projected_keys: set[str] = PrivateAttr(default_factory=set)
 
-    def get_member_blocks(self) -> list[Block]:
+    @property
+    def blocks(self) -> list[Block]:
         """Return all member nodes that are :class:`Block` instances."""
+        return list(self.find_all(is_instance=Block))
 
-        blocks: list[Block] = []
-        for member_id in self.member_ids:
-            node = self.graph.get(member_id)
-            if isinstance(node, Block):
-                blocks.append(node)
-        return blocks
+        # blocks: list[Block] = []
+        # for member_id in self.member_ids:
+        #     node = self.graph.get(member_id)
+        #     if isinstance(node, Block):
+        #         blocks.append(node)
+        # return blocks
+
+    def get_member_blocks(self):
+        return self.blocks
 
     # todo: can't we just overload 'get vars' directly here instead
     #       of adding stuff into the locals and then getting the
@@ -88,6 +97,26 @@ class Scene(TraversableDomain):
             if isinstance(node, Block):
                 blocks.append(node)
         return blocks
+
+    @property
+    def settings(self) -> list[Setting]:
+        """Return all locations assigned to this :class:`Scene`."""
+        return list(self.graph.find_edges(source=self, is_instance=Setting))
+
+    @on_get_ns.register()
+    def _contribute_settings_to_ns(self, ctx=None):
+        if self.settings:
+            return { 'settings': { s.get_label(): s.location for s in self.settings } }
+
+    @property
+    def roles(self) -> list[Role]:
+        """Return all roles assigned to this :class:`Scene`."""
+        return list(self.graph.find_edges(source=self, is_instance=Role))
+
+    @on_get_ns.register()
+    def _contribute_roles_to_ns(self, ctx=None):
+        if self.roles:
+            return { 'roles': { r.get_label(): r.actor for r in self.roles }}
 
     def refresh_edge_projections(self) -> None:
         """Project satisfied dependency and affordance edges into ``vars``."""
