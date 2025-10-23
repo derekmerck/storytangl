@@ -1,0 +1,14 @@
+// Vuetify SCSS Variables
+// Override Vuetify defaults here
+
+// Example customizations:
+// $body-font-family: 'Inter', sans-serif;
+// $border-radius-root: 8px;
+// $spacer: 4px;
+
+// Import Vuetify styles after variable overrides
+@forward 'vuetify/settings';
+//with (
+  // You can override Vuetify SASS variables here
+  // $color-pack: false
+//);
