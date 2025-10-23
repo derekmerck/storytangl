@@ -10,7 +10,7 @@ Set these in `.env.local` or pass as build-args.
 # Should def ask api for this
 VITE_DEFAULT_API_URL=https://app.storytan.gl/api/v2
 VITE_DEFAULT_WORLD=tangl_world
-VITE_DEFAULT_USER_SECRET="webtangl"
+VITE_DEFAULT_USER_SECRET="<--webtangl-->"
 
 # Default is client served off root
 VITE_CLIENT_APP_PATH=/
@@ -37,7 +37,7 @@ If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has a
 
 Use the [pydantic-to-typescript](https://github.com/phillipdupuis/pydantic-to-typescript) python package.
 
-`pydantic2ts --module tangl.service.remote_api --afc_types.ts`
+`pydantic2ts --module tangl.service.remote_api --tangl_types.ts`
 
 `pydantic-to-typescript` requires a minor fix to recurse into GenericAliases
 like `<list[MyModel]>`
