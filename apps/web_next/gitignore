@@ -7,6 +7,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+coverage
+
 # Dependencies
 node_modules
 .pnp

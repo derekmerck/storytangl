@@ -1,3 +1,4 @@
+/// <reference types="vitest"/>
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
@@ -46,11 +47,17 @@ export default defineConfig({
     },
   },
   test: {
+    server: {
+      deps: {
+        inline: ['vuetify'],
+      }
+    },
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./src/tests/setup.ts'],
+    css: true, // Process CSS files instead of stubbing them
     coverage: {
-      provider: 'c8',
+      provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: [
         'node_modules/',
