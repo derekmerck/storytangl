@@ -260,7 +260,7 @@ def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
 
 
 from tangl.vm.context import NS
-from tangl.vm.on_get_ns import on_get_ns
+from tangl.vm.vm_dispatch import on_get_ns
 from tangl.vm.planning import Dependency, Affordance
 
 @on_get_ns.register()

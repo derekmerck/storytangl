@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Self
+from typing import Self, TYPE_CHECKING
 
 from pydantic import Field
 
@@ -7,7 +7,9 @@ from tangl.type_hints import Expr
 from tangl.utils.safe_builtins import safe_builtins
 from tangl.core.dispatch import BehaviorRegistry, HasBehaviors
 from tangl.core.dispatch.behavior import HandlerLayer
-from tangl.vm.context import Context, NS
+
+if TYPE_CHECKING:
+    from tangl.vm.context import Context, NS
 
 on_check_conditions = BehaviorRegistry(
     label="on_check_conditions",

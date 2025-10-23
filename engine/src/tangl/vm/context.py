@@ -16,7 +16,7 @@ from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, AffiliateRegistry
 from tangl.core.dispatch import Behavior, CallReceipt
-from .on_get_ns import on_get_ns
+from .vm_dispatch.on_get_ns import on_get_ns
 
 if TYPE_CHECKING:
     from .domain import TraversableDomain

@@ -6,7 +6,7 @@ from pydantic import PrivateAttr
 
 from tangl.core import Graph, Node
 from tangl.core.dispatch.behavior_registry import HasBehaviors
-from tangl.vm.on_get_ns import on_get_ns
+from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
 from tangl.vm.domain import TraversableDomain
 from tangl.vm.planning import Affordance, Dependency
 from ..concepts.actor import Role

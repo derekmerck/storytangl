@@ -18,7 +18,7 @@ from tangl.vm import (
     Requirement,
     ResolutionPhase as P,
 )
-from tangl.vm.on_get_ns import on_get_ns
+from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
 
 
 def _destination_ids(node: Node) -> set[UUID]:

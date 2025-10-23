@@ -1,7 +1,7 @@
 from tangl.core import Node, Graph, CallReceipt
 from tangl.core.domain import DomainNode
 from tangl.vm import Requirement
-from tangl.vm.on_get_ns import on_get_ns
+from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
 from tangl.vm.planning import Affordance, Dependency
 
 
