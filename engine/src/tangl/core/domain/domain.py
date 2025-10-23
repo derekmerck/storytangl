@@ -28,7 +28,7 @@ class Domain(Entity):
 
     API
     ---
-    - :attr:`vars` – shared identifiers/values
+    - :attr:`locals` – shared identifiers/values
     - :attr:`handlers` – registry of callable behaviors
     - :meth:`add_vars`, :meth:`add_handler`, :meth:`register_handler`
     """
@@ -39,18 +39,10 @@ class Domain(Entity):
     def register_handler(self, **attrs: Any) -> None:
         return self.handlers.register(**attrs)
 
-    # def __init__(self, **kwargs):
-    #     super().__init__(**kwargs)
-
+# Type Alias
 DomainRegistry = Registry[Domain]
 
 global_domain = Domain(label="globals",
-                       vars=DEFAULT_VARS,
+                       locals=DEFAULT_VARS,
                        handlers=DEFAULT_HANDLERS,
                        )
-
-# @global_domain.handlers.register(priority=100, job="namespace", is_instance=Domain)
-# def _include_vars_in_ns(inst: Domain, *_, **__) -> StringMap:
-#     if inst.vars:
-#         return inst.vars
-

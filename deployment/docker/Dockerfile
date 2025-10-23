@@ -31,7 +31,7 @@ RUN poetry run python -m sphinx.cmd.build -b html docs docs/html
 
 ## Stage 4: Build the web app
 #FROM node:lts-alpine as app_builder
-##
+#
 #CMD echo $VITE_API_ENDPOINT
 #
 #WORKDIR /app
@@ -45,12 +45,12 @@ RUN poetry run python -m sphinx.cmd.build -b html docs docs/html
 
 # Stage 5: Create the runtime image, image is much smaller than builder
 FROM python:slim as runtime
-LABEL maintainer="story-tangl"
-LABEL version="3.2"
+LABEL maintainer="tangldev"
+LABEL version="3.7"
 
 # StoryTangl game engine runtime image
-# $ docker run -p 8000:8000 story-tangl:3.2 server      # default entry point
-# $ docker run -it story-tangl:3.2 cli              # interactive CLI entry point
+# $ docker run -p 8000:8000 story-tangl:3.7 serve    # default entry point
+# $ docker run -it story-tangl cli               # interactive CLI entry point
 
 # Set the working directory to /app
 WORKDIR /app

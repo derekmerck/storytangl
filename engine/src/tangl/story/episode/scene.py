@@ -1,7 +1,5 @@
 """Scene primitive for the reference narrative domain."""
-
 from __future__ import annotations
-
 from typing import Any
 
 from pydantic import PrivateAttr
@@ -61,20 +59,8 @@ class Scene(TraversableDomain, HasBehaviors):
         """Return all member nodes that are :class:`Block` instances."""
         return list(self.find_all(is_instance=Block))
 
-        # blocks: list[Block] = []
-        # for member_id in self.member_ids:
-        #     node = self.graph.get(member_id)
-        #     if isinstance(node, Block):
-        #         blocks.append(node)
-        # return blocks
-
     def get_member_blocks(self):
         return self.blocks
-
-    # todo: can't we just overload 'get vars' directly here instead
-    #       of adding stuff into the locals and then getting the
-    #       locals, don't deps/affs automatically project into the
-    #       source's namespace?
 
     @property
     def entry_blocks(self) -> list[Block]:

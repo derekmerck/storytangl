@@ -1,8 +1,5 @@
-Redesign idea -- move ns from scope -> ctx, discover ns using handlers like any other task.
-
-Issue: non-singleton domains should _not_ carry handlers, they will try to serialize them if they get attached to a graph, so we need a place for class instance handlers to live.
-
----
+Domains and Namespaces
+----------------------
 
 **Domains** are capability layers.  They have a `get_handlers(**criteria)` function and that's all.
 
@@ -10,7 +7,7 @@ Domains come in 3 (or more) flavors:
 
 - Affiliate, opt-in explicitly noted by tag or other identifier on the anchor
 - Structural, implicitly in the node's ancestor stack, ancestors are all structural domains
-- Type-based, this is basically the same as explicit, but it is derived from the class mro, where handlers can be inferred from class or instance methods.  These are only considered if the class implements a `__get_handlers()` class method.
+- Type-based, this is basically the same as explicit, but it is derived from the class mro, where handlers can be inferred from class or instance methods.
 
 Domains plus an anchor node on a graph imply a *Scope*, the order and range of domains currently visible to the anchor.
 
@@ -18,10 +15,10 @@ Domains plus an anchor node on a graph imply a *Scope*, the order and range of d
 
 A **Context** is a graph, anchor, scope, namespace, along with some bookkeeping about jobs and results.
 
-A context can compute the namespace at a given anchor by invoking `get_handlers(job=namespace)`, assembling the registered handlers across all domains, calling them, and aggregating the non-none results to a chain map.
+A context can compute the namespace at a given anchor by invoking `domain.get_handlers(task=get_ns)` across all active domains and aggregating the results.
 
-Domains can participate in the namespace by defining a get_vars() func, which will be automatically discovered, or simply registering any other method on themselves with the job "namespace".
+Domains will participate in the namespace by contributing their locals  by default, by registering any other method on their class with the job "get_ns".
 
-I like the idea of keeping namespace directly as a scope responsibility, but when you look at it this way, it seems clear that it should be in vm instead.  Scope -> discover and aggregate domain behaviors.  vm -> create a namespace by using scope to discover the domain behaviors for assembling a namespace and invoking them like any other phase.
+This technique extends to discovering domain-local templates, provisioners, anything else.  It only requires a single piece of bootstrap 'magic', which is knowing to the name of the job in the relevant handler registration.
 
-This extends trivially to discovering domain-local templates, provisioners, anything else.  It only requires a single piece of bootstrap 'magic', which is knowing to use job="namespace" in the relevant handler registration.  No overloading `get_vars` or whatever.
+Issue: non-singleton domains should _not_ carry handlers, they _will_ try to serialize them if they get attached to a graph.

@@ -32,22 +32,9 @@ class Action(ChoiceEdge):
         #       should available() be based on the target node or the current
         #       node's availability or both?
         return cls(
-            content = node.locals.get("action_text", node.label),
-            successor = node,
+            content = node.locals.get("action_text", node.get_label()),
+            destination_id = node.uid,
             graph = node.graph,
             tags={'dynamic'}
         )
 
-    # before find by alias was standardized
-    # @property
-    # def successor(self):
-    #     if self.successor_ref:
-    #         key_candidates = [ self.successor_ref ]
-    #         if self.root:
-    #             key_candidates.append( f"{self.root.label}/{self.successor_ref}" )
-    #         for key in key_candidates:
-    #             try:
-    #                 return self.graph.get_node( key )
-    #             except KeyError:
-    #                 pass
-    #         raise KeyError(f"Can't find successor called {key_candidates}")
