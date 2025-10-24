@@ -54,7 +54,7 @@ export default defineConfig({
     },
     globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./src/tests/setup.ts'],
+    setupFiles: ['./tests/setup.ts'],
     css: true, // Process CSS files instead of stubbing them
     coverage: {
       provider: 'v8',
