@@ -3,8 +3,6 @@
 
 echo "🧹 Cleaning web client environment..."
 
-cd apps/web
-
 # Remove all generated/cached files
 echo "  Removing node_modules..."
 rm -rf node_modules
@@ -24,6 +22,5 @@ rm -rf .idea .vscode
 echo "✅ Environment reset complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Update package.json dependencies"
-echo "  2. Run: yarn install"
-echo "  3. Run: yarn dev"
+echo "  1. Run: yarn install"
+echo "  2. Run: yarn dev"

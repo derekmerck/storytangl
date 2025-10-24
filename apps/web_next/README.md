@@ -1,8 +1,4 @@
-# StoryTangl Web Client - Clean Development Setup
-
-## 📦 What You've Got
-
-All files are ready in `/home/claude/`. This is a **complete, test-driven, TypeScript-strict** development environment for your Vue 3 + Vuetify 3 web client.
+# StoryTangl Web Client - Development Setup
 
 ### File Manifest
 
@@ -18,20 +14,20 @@ All files are ready in `/home/claude/`. This is a **complete, test-driven, TypeS
 ├── .prettierrc              💅 Code formatting
 ├── .gitignore               🚫 Git exclusions
 ├── index.html               🌐 Entry HTML
-└── src/
-    ├── main.ts              🎯 App entry point
-    ├── App.vue              👋 Hello World component
-    ├── App.test.ts          ✅ Example test
-    ├── vite-env.d.ts        📝 Environment types
-    ├── plugins/
-    │   └── vuetify.ts       🎨 Vuetify configuration (FIXED!)
-    ├── styles/
-    │   └── settings.scss    🎨 Vuetify SCSS customization
-    └── tests/
-        ├── setup.ts         🔧 Vitest + MSW setup
-        └── mocks/
-            ├── handlers.ts  🎭 MSW API handlers
-            └── mockData.ts  📊 Mock API responses
+├── src/
+│   ├── main.ts              🎯 App entry point
+│   ├── App.vue              👋 Hello World component
+│   ├── App.test.ts          ✅ Example test
+│   ├── vite-env.d.ts        📝 Environment types
+│   ├── plugins/
+│   │   └── vuetify.ts       🎨 Vuetify configuration (FIXED!)
+│   └── styles/
+│       └── settings.scss    🎨 Vuetify SCSS customization
+└── tests/
+    ├── setup.ts         🔧 Vitest + MSW setup
+    └── mocks/
+        ├── handlers.ts  🎭 MSW API handlers
+        └── mockData.ts  📊 Mock API responses
 ```
 
 ## 🎯 Key Improvements Over Old Code
@@ -50,26 +46,14 @@ All files are ready in `/home/claude/`. This is a **complete, test-driven, TypeS
 4. ✅ **ESLint + Prettier** (code quality from day 1)
 5. ✅ **Coverage reporting** (track test coverage)
 
-## 🚀 Quick Start (5 Minutes)
+## 🚀 Quick Start
 
-### Step 1: Copy Files
-```bash
-# From your project root
-cd apps/web
-
-# Copy all config files
-cp /home/claude/{package.json,tsconfig.json,vite.config.ts,.eslintrc.cjs,.prettierrc,.gitignore,index.html} .
-
-# Copy source files
-cp -r /home/claude/src/* src/
-```
-
-### Step 2: Install
+### Step 1: Install
 ```bash
 yarn install
 ```
 
-### Step 3: Verify
+### Step 2: Verify
 ```bash
 # Type check (should pass)
 yarn type-check
@@ -81,7 +65,7 @@ yarn test
 yarn dev
 ```
 
-### Step 4: Check Browser
+### Step 3: Check Browser
 Open `http://localhost:5173` - you should see the Hello World page!
 
 ## 📖 Read Next
@@ -297,12 +281,12 @@ If you're rusty on any of these:
 
 Before you start building features:
 
-- [ ] All files copied from `/home/claude/` to `apps/web/`
-- [ ] `yarn install` completed successfully
-- [ ] `yarn type-check` passes with no errors
-- [ ] `yarn test` passes (3/3 tests)
-- [ ] `yarn dev` starts and shows Hello World at localhost:5173
-- [ ] Hot reload works (edit App.vue, see instant update)
+- [x] New base project
+- [x] `yarn install` completed successfully
+- [x] `yarn type-check` passes with no errors
+- [x] `yarn test` passes (3/3 tests)
+- [x] `yarn dev` starts and shows Hello World at localhost:5173
+- [x] Hot reload works (edit App.vue, see instant update)
 - [ ] PyCharm recognizes TypeScript types in .vue files
 - [ ] You can run tests from PyCharm UI
 - [ ] You've read SETUP_GUIDE.md and TESTING_PATTERNS.md
