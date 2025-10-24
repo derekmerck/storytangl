@@ -8,7 +8,7 @@ pytest.importorskip("sphinx")
 from sphinx.cmd.build import build_main
 
 
-DOCS_SOURCE = Path(__file__).resolve().parents[3] / "docs" / "source"
+DOCS_SOURCE = Path(__file__).resolve().parents[2] / "docs" / "src"
 
 
 def test_sphinx_docs_build_html(tmp_path, monkeypatch) -> None:
