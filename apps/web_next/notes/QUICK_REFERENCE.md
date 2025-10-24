@@ -131,7 +131,7 @@ it('handles custom response', async () => {
 
 ## 📊 Type Definitions Quick Ref
 
-```typescript
+```
 // Story types
 JournalStoryUpdate {
   uid: string
@@ -164,7 +164,7 @@ JournalMediaItem {
 
 ## 🌐 API Endpoints
 
-```typescript
+```
 // Story
 GET  /story/update           → JournalStoryUpdate[]
 POST /story/do               → JournalStoryUpdate[]
