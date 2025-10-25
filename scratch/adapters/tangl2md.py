@@ -9,10 +9,10 @@ from pathlib import Path
 import pypandoc
 import jinja2
 
-from tangl.world.world import World
+from tangl.story.fabula import World
 from tangl.story.story_graph import Story
 from tangl.utils.deep_md import deep_md
-from tangl.narrative.lang.helpers import oxford_join
+from tangl.lang.helpers import oxford_join
 
 IMAGE_FORMAT = "png"
 
