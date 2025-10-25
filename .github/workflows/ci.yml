@@ -11,7 +11,7 @@ on:
     branches: ["**"]
 
 jobs:
-  tests:
+  engine-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -39,3 +39,30 @@ jobs:
         run: |
           poetry run pytest -W ignore::DeprecationWarning -W ignore::pytest.PytestCollectionWarning
 #          poetry run pytest engine/tests
+
+  web-client-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: 'apps/web/yarn.lock'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Type check
+        run: yarn type-check
+
+      - name: Run tests
+        run: yarn test --run
+
+      - name: Build
+        run: yarn build

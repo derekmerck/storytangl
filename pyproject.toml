@@ -1,15 +1,17 @@
 [tool.poetry]
 name = "StoryTangl"
-version = "3.7.1"
+version = "3.7.2"
 description = "The abstract narrative graph lib for interactive stories"
 authors = ["TangleDev <dev@storytan.gl>"]
 readme = "README.md"
 packages = [
     { include = "tangl", from = "engine/src" },
-    { include = "*", from = "apps/cli/src" },
-    { include = "*", from = "apps/server/src" },
+    { include = "tangl", from = "apps/cli/src" },
+    { include = "tangl", from = "apps/server/src" },
 #    { include = "sample_world", as = "tangle.worlds.sample_world" }
 ]
+
+# todo: build web client and include it as static files with app/server dist
 
 [build-system]
 requires = ["poetry-core"]
@@ -113,8 +115,10 @@ log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [
     "engine/tests",               # base tests
+    "docs/tests",                 # docs tests
+#    "apps/**/tests",             # all apps tests
     "apps/cli/tests",             # cli tests
-    "apps/*/tests"                # app tests
+    "apps/server/tests"           # rest server tests
 #    "worlds/*/tests"       # sample world tests
 ]
 #pythonpath = [
@@ -131,7 +135,7 @@ norecursedirs = [
 #addopts = [
 #    "--cov",
 #    "--cov-config=pyproject.toml",
-##    "--cov-report=term",
+#    "--cov-report=term",
 #    "--cov-report=html"
 #]
 
