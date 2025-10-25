@@ -11,8 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_DEFAULT_WORLD: string
   readonly VITE_DEFAULT_USER_SECRET: string
   readonly VITE_DEBUG: string
+  readonly VITE_VERBOSE: string
   readonly VITE_MOCK_RESPONSES: string
-  readonly VITE_SHOW_RESPONSES: string
 }
 
 interface ImportMeta {
