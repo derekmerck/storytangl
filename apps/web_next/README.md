@@ -163,7 +163,7 @@ it('renders story text', () => {
 - Let TypeScript catch bugs before runtime
 
 ### MSW Mock Strategy
-- Keep mocks in `src/tests/mocks/`
+- Keep mocks in `/tests/mocks/`
 - One mock per API endpoint
 - Use realistic data that matches your types
 - Override mocks in individual tests when needed
