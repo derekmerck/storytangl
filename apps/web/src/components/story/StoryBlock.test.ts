@@ -27,10 +27,18 @@ describe('StoryBlock', () => {
   let simpleBlock: JournalStoryUpdate
 
   beforeEach(() => {
+    // Ensure tests run in non-verbose mode, otherwise 'notContains'
+    // will pick up debug info
+    vi.stubEnv('VITE_DEBUG', 'false')
+    vi.stubEnv('VITE_VERBOSE', 'false')
     simpleBlock = {
       uid: 'block_1',
       text: 'You enter a dark room.',
     }
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('renders block text', () => {

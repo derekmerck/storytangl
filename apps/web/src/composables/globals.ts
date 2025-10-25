@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from 'axios'
-import { ref, type Ref } from 'vue'
+import { ref, type Ref, computed } from 'vue'
 
 import type { JournalMediaDict, JournalMediaItems, MediaRole } from '@/types'
 
@@ -140,8 +140,10 @@ const createGlobalState = () => {
 
   return {
     $http,
-    $debug,
-    $verbose,
+    // $debug,
+    // $verbose,
+    $debug: computed(() => import.meta.env.VITE_DEBUG === 'true'),
+    $verbose: computed(() => import.meta.env.VITE_VERBOSE === 'true'),
     remapURL,
     makeMediaDict,
   }
