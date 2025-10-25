@@ -11,7 +11,7 @@ on:
     branches: ["**"]
 
 jobs:
-  tests:
+  engine-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/web_next
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'yarn'
-          cache-dependency-path: 'apps/web_next/yarn.lock'
+          cache-dependency-path: 'apps/web/yarn.lock'
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile

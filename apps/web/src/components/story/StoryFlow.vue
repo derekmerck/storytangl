@@ -1,103 +1,170 @@
-// Note, we could also use a "v-virtual-scroll" component here.
-
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
-import StoryBlock from './StoryBlock.vue'
-import { JournalEntry } from "@/types";
+import { computed, nextTick, onMounted, ref } from 'vue'
 
-import { useGlobal } from "@/globals";
+import StoryBlock from './StoryBlock.vue'
+import type { DialogBlock, JournalAction, JournalStoryUpdate } from '@/types'
+import { useGlobal } from '@/composables/globals'
+
 const { $http, $debug, $verbose, remapURL, makeMediaDict } = useGlobal()
 
-const blocks = ref<JournalEntry>([])
-const block_refs = ref([])
-const block_counter = ref(0)
+const blocks = ref<JournalStoryUpdate[]>([])
+const blockRefs = ref<InstanceType<typeof StoryBlock>[]>([])
+const blockCounter = ref(0)
+const loading = ref(false)
+const error = ref<string | null>(null)
 
-const handleResponse = async (response) => {
-  // if response.data[0]?.label exists, set blocks.value to an empty array
-  if (response.data[0]?.label) {
-    blocks.value = []
+const debugEnabled = computed(() => $debug.value && $verbose.value)
+
+const remapMediaArray = (media?: JournalStoryUpdate['media']) => {
+  if (!Array.isArray(media)) {
+    return media
   }
 
-  // loop through the response data
-  response.data.forEach(block => {
-    // increment blockCounter
-    block_counter.value++
-    console.log(block_counter)
-    // add a new field 'key' to the block
-    block.key = `${block.uid}-${block_counter.value}`
+  return media.map((item) => ({
+    ...item,
+    url: item.url ? remapURL(item.url) : item.url,
+  }))
+}
 
-    // Function to remap image URLs
-    const remapMediaURL = (media) => {
-      media.url = remapURL(media.url)
+const cloneActions = (actions?: JournalAction[]) =>
+  actions?.map((action) => ({ ...action })) ?? []
+
+const processDialog = (dialog?: DialogBlock[]): DialogBlock[] => {
+  if (!Array.isArray(dialog)) {
+    return []
+  }
+
+  return dialog.map((item) => {
+    const processed: DialogBlock = {
+      ...item,
+      media: remapMediaArray(item.media),
     }
 
-    if (block.media) {
-      Object.values(block.media).forEach(remapMediaURL),
-      block.media_dict = makeMediaDict(block);
+    if (processed.media) {
+      processed.media_dict = makeMediaDict(processed)
     }
 
-    // Check and remap URLs in dialog block media
-    if (block?.dialog) {
-      block.dialog.forEach(dialogBlock => {
-        if (dialogBlock.media) {
-          Object.values(dialogBlock.media).forEach(remapMediaURL)
-          dialogBlock.media_dict = makeMediaDict(dialogBlock)
-        }
-      })
-    }
+    return processed
   })
+}
 
-  const current_block_index = blocks.value.length
-  // add new blocks to existing blocks
-  blocks.value.push(...response.data)
+const processBlock = (incoming: JournalStoryUpdate): JournalStoryUpdate => {
+  blockCounter.value += 1
+
+  const processed: JournalStoryUpdate = {
+    ...incoming,
+    key: `${incoming.uid}-${blockCounter.value}`,
+    media: remapMediaArray(incoming.media),
+    actions: cloneActions(incoming.actions),
+  }
+
+  if (processed.media) {
+    processed.media_dict = makeMediaDict(processed)
+  }
+
+  if (incoming.dialog) {
+    processed.dialog = processDialog(incoming.dialog)
+  }
+
+  return processed
+}
+
+const handleResponse = async (payload: JournalStoryUpdate[]) => {
+  if (!Array.isArray(payload) || payload.length === 0) {
+    return
+  }
+
+  if (payload[0]?.label) {
+    blocks.value = []
+    blockCounter.value = 0
+  }
+
+  const processedBlocks = payload.map((block) => processBlock(block))
+  const startingIndex = blocks.value.length
+
+  blocks.value.push(...processedBlocks)
 
   await nextTick(() => {
-    const top_block = block_refs.value[current_block_index]
-    top_block.$el.scrollIntoView({behavior: current_block_index ? 'smooth' : 'auto'});
-  });
+    const target = blockRefs.value[startingIndex]
+    const element = target?.$el as HTMLElement | undefined
 
+    element?.scrollIntoView({ behavior: startingIndex ? 'smooth' : 'auto' })
+  })
 }
 
-onMounted(async () => {
+const fetchInitialBlocks = async () => {
   try {
-    const response = await $http.value.get('/story/update')
-    handleResponse(response)
-  } catch (error) {
-    console.error(error)
-  }
-})
-
-const doAction = async (action_uid, passback) => {
-  try {
-    const response = await $http.value.post(
-      '/story/do',
-      {uid: action_uid, passback: passback }
-      )
-    handleResponse(response)
-  } catch(error) {
-    console.error(error)
+    loading.value = true
+    error.value = null
+    const response = await $http.value.get<JournalStoryUpdate[]>('/story/update')
+    await handleResponse(response.data)
+  } catch (err) {
+    console.error('Failed to fetch initial story.', err)
+    error.value = 'Failed to load story. Please refresh the page.'
+  } finally {
+    loading.value = false
   }
 }
 
+onMounted(fetchInitialBlocks)
+
+const doAction = async (
+  _block: JournalStoryUpdate,
+  actionUid: string,
+  passback?: unknown,
+) => {
+  try {
+    loading.value = true
+    error.value = null
+    const response = await $http.value.post<JournalStoryUpdate[]>('/story/do', {
+      uid: actionUid,
+      passback,
+    })
+    await handleResponse(response.data)
+  } catch (err) {
+    console.error('Failed to execute action.', err)
+    error.value = 'Failed to execute action. Please try again.'
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
+  <div>
+    <v-progress-linear
+      v-if="loading"
+      class="mb-4"
+      color="primary"
+      indeterminate
+      data-testid="storyflow-progress"
+    />
 
-  <StoryBlock
-    v-for="block in blocks"
-    :key="block.key"
-    ref="block_refs"
-    :block="block"
-    @doAction="doAction" />
+    <v-alert
+      v-if="error"
+      class="mb-4"
+      type="error"
+      variant="tonal"
+      closable
+      @click:close="error = null"
+    >
+      {{ error }}
+    </v-alert>
 
-  <v-card v-if="false && $debug && $verbose">
-    <v-card-item>
-      <v-card border>
-        <v-card-text class="text-caption" >
-          Blocks: {{ blocks }}
-        </v-card-text>
-      </v-card>
-    </v-card-item>
-  </v-card>
+    <StoryBlock
+      v-for="block in blocks"
+      :key="block.key"
+      ref="blockRefs"
+      :block="block"
+      @doAction="doAction"
+    />
 
+    <v-card v-if="debugEnabled" class="mt-4">
+      <v-card-item>
+        <v-card border>
+          <v-card-text class="text-caption">Blocks: {{ blocks }}</v-card-text>
+        </v-card>
+      </v-card-item>
+    </v-card>
+  </div>
 </template>

@@ -1,31 +1,13 @@
-import { useGlobal } from "@/globals";
-const { $http, $debug } = useGlobal()
-
-// App
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
+import { vuetify } from './plugins/vuetify'
+import './styles/main.scss'
+
 const app = createApp(App)
+const pinia = createPinia()
 
-// Plugins
-import { registerPlugins } from '@/plugins'
-registerPlugins(app)
+app.use(pinia)
+app.use(vuetify)
 
-// msw mock endpoints
-import { worker } from '../mocks/msw/worker'
-console.log($debug.value)
-console.log(import.meta.env.VITE_MOCK_RESPONSES)
-if ($debug.value && import.meta.env.VITE_MOCK_RESPONSES === 'true' ) {
-    console.log('starting msw')
-    // leave the base path alone and mock with msw
-    worker.start({
-        onUnhandledRequest: 'bypass',
-    })
-} else {
-    // todo: set basepath from url _or_ from localstorage if changed
-    $http.value.defaults.baseURL = import.meta.env.VITE_DEFAULT_API_URL
-}
-
-// Mount
 app.mount('#app')
-
-
