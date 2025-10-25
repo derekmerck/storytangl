@@ -129,20 +129,32 @@ export type StyleHints = Record<string, unknown>
 export interface StyledJournalItem {
   uid: string
   text?: string
+  label?: string
   icon?: string
+  key?: string
   media?: JournalMediaItems
   media_dict?: JournalMediaDict
   style_id?: string
   style_cls?: string
   style_dict?: StyleHints
+  style?: StyleHints
+  [key: string]: unknown
+}
+
+/**
+ * Individual dialog line rendered within a story block.
+ */
+export interface DialogBlock extends StyledJournalItem {
+  label?: string
 }
 
 /**
  * Core story fragment delivered to the client when the narrative advances.
  */
 export interface JournalStoryUpdate extends StyledJournalItem {
+  title?: string
   actions?: JournalAction[]
-  dialog?: StyledJournalItem[]
+  dialog?: DialogBlock[]
 }
 
 /**
@@ -151,6 +163,7 @@ export interface JournalStoryUpdate extends StyledJournalItem {
 export interface JournalAction extends StyledJournalItem {
   text: string
   payload?: string
+  passback?: unknown
 }
 
 /**

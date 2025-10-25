@@ -4,6 +4,7 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import App from '@/App.vue'
+import StoryFlow from '@/components/story/StoryFlow.vue'
 
 // Create Vuetify instance for testing
 const vuetify = createVuetify({
@@ -12,40 +13,35 @@ const vuetify = createVuetify({
 })
 
 describe('App.vue', () => {
-  it('renders hello message', () => {
+  it('renders the application shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [vuetify],
       },
     })
 
-    expect(wrapper.text()).toContain('Hello StoryTangl!')
+    expect(wrapper.text()).toContain('WebTangl v3.7')
   })
 
-  it('increments counter when button is clicked', async () => {
+  it('provides a container for the story flow', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [vuetify],
       },
     })
 
-    const button = wrapper.find('button')
-    expect(wrapper.text()).toContain('Counter: 0')
-
-    await button.trigger('click')
-    expect(wrapper.text()).toContain('Counter: 1')
-
-    await button.trigger('click')
-    expect(wrapper.text()).toContain('Counter: 2')
+    expect(wrapper.findComponent(StoryFlow).exists()).toBe(true)
   })
 
-  it('displays success alert', () => {
+  it('wraps StoryFlow inside a Vuetify layout', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [vuetify],
       },
     })
 
-    expect(wrapper.text()).toContain('Vue 3, Vuetify 3, TypeScript, and Vite are all configured!')
+    const container = wrapper.find('.v-container')
+    expect(container.exists()).toBe(true)
+    expect(container.findComponent(StoryFlow).exists()).toBe(true)
   })
 })
