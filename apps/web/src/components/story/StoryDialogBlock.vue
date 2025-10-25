@@ -1,52 +1,47 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 
-import {StyledJournalItem, JournalMediaItems} from "@/types";
+import type { DialogBlock } from '@/types'
 
-const props = defineProps({
-  dialog_block: {
-    type: Object as () => StyledJournalItem,
-    required: true,
+/**
+ * StoryDialogBlock - renders an individual dialog entry with optional speaker metadata.
+ */
+const props = defineProps<{
+  dialog_block: DialogBlock
+}>()
+
+const avatarUrl = computed(() => props.dialog_block.media_dict?.avatar_im?.url)
+const hasAvatar = computed(() => Boolean(avatarUrl.value))
+
+const textStyle = computed<Record<string, string | number> | undefined>(() => {
+  const styleSource = props.dialog_block.style ?? props.dialog_block.style_dict
+  if (!styleSource) {
+    return undefined
   }
+
+  const entries = Object.entries(styleSource).filter(([, value]) => {
+    return typeof value === 'string' || typeof value === 'number'
+  }) as Array<[string, string | number]>
+
+  return entries.length ? Object.fromEntries(entries) : undefined
 })
-
-const getDialogStyle = (dialog_block: StyledJournalItem) => {
-  if (dialog_block?.label) {
-    const bg = {'background-color': "rgb(0,0,0,0.2)"}
-    if (dialog_block?.style_dict) {
-      return { ... dialog_block.style_dict, ... bg }
-    }
-    return bg }
-  else {
-    return dialog_block.style_dict
-  }
-}
-
 </script>
 
 <template>
   <v-col cols="12" class="py-1">
-    <v-card-text v-if="!dialog_block?.label" v-html="dialog_block.text"/>
+    <v-row align="center" class="gap-3 flex-nowrap">
+      <v-col v-if="hasAvatar" cols="auto" class="flex-grow-0">
+        <v-avatar size="56">
+          <img :src="avatarUrl" alt="" class="w-100 h-100 object-cover" />
+        </v-avatar>
+      </v-col>
 
-    <v-card v-if="dialog_block?.label"
-            class="pa-0 d-flex overflow-visible"
-            :style="getDialogStyle(dialog_block)"
-    >
-      <v-avatar v-if="dialog_block.media_dict?.avatar_im"
-                  rounded="0"
-                  size="64"
-                  class="mr-2">
-          <v-img :src="dialog_block.media_dict.avatar_im.url"/>
-      </v-avatar>
-      <v-card-text
-            v-html="dialog_block.text"
-            class="py-1 rounded-lg d-flex align-center"/>
-<!--      <v-badge v-if="dialog_block?.label"-->
-<!--               size="small"-->
-<!--               class="mr-10"-->
-<!--               color="red"-->
-<!--               :content="dialog_block.label" floating="true"></v-badge>-->
-
-    </v-card>
-
+      <v-col class="py-0">
+        <div v-if="dialog_block.label" class="text-body-2 font-weight-medium mb-1">
+          {{ dialog_block.label }}
+        </div>
+        <div class="text-body-2" :style="textStyle" v-html="dialog_block.text" />
+      </v-col>
+    </v-row>
   </v-col>
 </template>
