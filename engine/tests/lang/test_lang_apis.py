@@ -1,12 +1,12 @@
-from tangl.narrative.lang.apis import MeriamWebsterApi
-from tangl.narrative.lang.apis import VerbixApi
-from tangl.narrative.lang.apis import LanguageToolApi
-from tangl.narrative.lang.apis import ReversoApi
+from tangl.lang.apis import MeriamWebsterApi
+from tangl.lang.apis import VerbixApi
+from tangl.lang.apis import LanguageToolApi
+from tangl.lang.apis import ReversoApi
 from tangl.config import settings
 
 import pytest
 
-from tangl.narrative.lang.conjugates import Conjugates
+from tangl.lang.conjugates import Conjugates
 from tangl.exceptions import RemoteApiUnavailable
 
 
@@ -52,7 +52,7 @@ def test_verbix_get():
 
 @pytest.mark.skip(reason="No ref-lex yet")
 def test_lexref_conjugate():
-    from tangl.narrative.lang.ref_lex import RefLex
+    from tangl.lang.ref_lex import RefLex
     res = RefLex.conjugate( "eat", "_1s")
     print( res )
     assert res == "eat"

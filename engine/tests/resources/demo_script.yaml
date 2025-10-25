@@ -1,0 +1,80 @@
+label: crossroads_demo
+version: "1.0.0"
+
+metadata:
+  title: "The Crossroads"
+  author: "Demo Author"
+  date: "2025-10-10"
+  summary: "A simple branching story"
+
+globals:
+  player_name: "Hero"
+  visited_garden: false
+
+scenes:
+  crossroads:
+    title: "The Crossroads"
+    blocks:
+      start:
+        content: |
+          You stand at a crossroads in the forest.
+          Two paths stretch before you.
+
+        actions:
+          - text: "Take the left path"
+            successor: garden.entrance
+
+          - text: "Take the right path"
+            successor: cave.entrance
+
+  garden:
+    title: "The Peaceful Garden"
+    blocks:
+      entrance:
+        content: |
+          The left path opens into a peaceful garden.
+          Flowers bloom everywhere.
+
+        effects:
+          - "visited_garden = True"
+
+        continues:
+          - successor: end
+            trigger: last
+
+  cave:
+    title: "The Dark Cave"
+    blocks:
+      entrance:
+        content: |
+          The right path leads to a dark cave.
+          You hear strange sounds within.
+
+        actions:
+          - text: "Enter the cave"
+            successor: interior
+
+          - text: "Go back"
+            successor: crossroads.start
+
+      interior:
+        content: |
+          The cave is deeper than you thought...
+
+        continues:
+          - successor: end
+            trigger: last
+
+  end:
+    title: "The End"
+    blocks:
+      finale:
+        content: |
+          Your adventure comes to an end.
+
+actors:
+  guide:
+    obj_cls: tangl.story.concepts.actor.actor.Actor
+    name: "The Guide"
+    content: "A mysterious figure who appears at crossroads."
+    tags: [npc, helpful]

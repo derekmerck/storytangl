@@ -1,1 +1,0 @@
-# a conditionally self-assigning/unassigning singleton asset

@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      # codex usually runs its own tests and only pushes a branch for a p/r
+      # so this keeps it from running ci redundantly
+      - "codex*"
+      - "codex/**"
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  engine-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "poetry.lock"
+      - name: Install dependencies
+        env:
+          POETRY_VIRTUALENVS_CREATE: "true"
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry uv
+          uv python install 3.13
+          poetry env use "$(uv python find 3.13)"
+          poetry install --no-interaction --with dev
+      - name: Run tests
+        env:
+          PYTHONPATH: engine/src
+        run: |
+          poetry run pytest -W ignore::DeprecationWarning -W ignore::pytest.PytestCollectionWarning
+#          poetry run pytest engine/tests
+
+  web-client-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: 'apps/web/yarn.lock'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Type check
+        run: yarn type-check
+
+      - name: Run tests
+        run: yarn test --run
+
+      - name: Build
+        run: yarn build

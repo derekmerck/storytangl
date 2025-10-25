@@ -1,114 +1,210 @@
 from __future__ import annotations
-from typing import Generic, TypeVar
 from uuid import UUID
+from typing import Optional, Iterator, Iterable, TYPE_CHECKING
 import functools
-import logging
-import re
 
-from tangl.utils.is_valid_uuid import is_valid_uuid
-from tangl.type_hints import UniqueLabel
-from tangl.core import Entity, Registry
-# from .node import Node
+from pydantic import Field, model_validator
 
-logger = logging.getLogger(__name__)
+from tangl.type_hints import Identifier
+from tangl.utils.hashing import hashing_func
+from tangl.core.entity import Entity
+from tangl.core.registry import Registry
 
-NodeT = TypeVar('NodeT', bound='Node')
+if TYPE_CHECKING:
+    from .subgraph import Subgraph
+    from .node import Node
+    from .edge import Edge
 
-# Side note, the 'Graph' class was originally called 'Context' and was derived from
-# Python's context manager directly.  This functionality was factored out into the service
-# layer after 2.3.
-
-class Graph(Registry[NodeT], Generic[NodeT]):
+class GraphItem(Entity):
     """
-    The Graph class serves as a central repository for all :class:`Nodes<tangl.core.graph.node.Node>`
-    within a story. It manages the relationships between nodes and provides methods for efficient
-    node retrieval and traversal.
+    GraphItem(graph: Graph)
+
+    Base abstraction for graph elements that are self-aware of their container graph.
+
+    Why
+    ----
+    Centralizes membership/parentage logic so :class:`Node`, :class:`Edge`, and
+    :class:`Subgraph` behave consistently. Instances auto-register with their
+    :attr:`graph` and expose ancestry utilities used throughout planning and scope.
 
     Key Features
     ------------
-    * **Node Registry**: The Graph maintains a flat dictionary of nodes and has methods for adding, removing, and retrieving items.  Nodes added to the graph must have unique UUIDs and paths.
-    * **Efficient Lookup**: Supports lookup by UUID, label, or path.
-    * **Filtering**: Ability to find nodes based on various criteria like class type or tags.
-    * **Traversal Support**: Provides the foundation for story traversal mechanics.
+    * **Auto-registration** – post-init validator calls ``graph.add(self)``.
+    * **Hierarchy helpers** – :meth:`parent`, :meth:`ancestors`, :meth:`root`, :meth:`path`.
+    * **Stable identity** – :meth:`_id_hash` includes the graph uid when present.
 
-    Usage
-    -----
-    .. code-block:: python
+    API
+    ---
+    - :attr:`graph` – back-reference to the owning :class:`Graph` (not serialized).
+    - :meth:`parent` – nearest containing :class:`Subgraph` (cached).
+    - :meth:`ancestors` – iterator of containing subgraphs (nearest → farthest).
+    - :meth:`root` – top-most containing subgraph or ``None``.
+    - :meth:`path` – dotted label path from root to self.
+    - :meth:`_invalidate_parent_attr` – clear cached parent on re-parenting.
+    """
+    graph: Graph = Field(default=None, exclude=True)
+    # graph is for local dereferencing only, do not serialize to prevent recursions
+    # hold id only for peer graph items to prevent recursions, see edge
 
-        from tangl.core.graph import Graph, Node
+    @model_validator(mode='after')
+    def _register_with_graph(self):
+        if self.graph is not None:
+            self.graph.add(self)
+        return self
 
-        # Create a graph
-        graph = Graph()
+    # use cached-property and invalidate if re-parented
+    @functools.cached_property
+    def parent(self) -> Optional[Subgraph]:
+        return next(self.graph.find_subgraphs(has_member=self), None)
 
-        # Add nodes to the graph
-        root = Node(label="root", graph=graph)
-        child1 = Node(label="child1")
-        child2 = Node(label="child2")
+    def _invalidate_parent_attr(self):
+        # On reparent
+        if hasattr(self, "parent"):
+            delattr(self, "parent")
 
-        root.add_child(child1)
-        root.add_child(child2)
+    def ancestors(self) -> Iterator[Subgraph]:
+        current = self.parent
+        while current:
+            yield current
+            current = current.parent
 
-        # Retrieve nodes
-        retrieved_node = graph.get(child1.uid)
-        print(retrieved_node == child1)  # True
+    def has_ancestor(self, ancestor: Subgraph) -> bool:
+        return ancestor in self.ancestors()
 
-        # Find nodes
-        special_nodes = graph.find(tags={"special"})
+    @property
+    def root(self) -> Optional[Subgraph]:
+        # return the most distant subgraph membership (top-most ancestor)
+        last = None
+        for anc in self.ancestors():
+            last = anc
+        return last
 
-    Mixin Classes
-    -------------
-    The Graph class is designed to be extended for specific story management needs.
+    @property
+    def path(self):
+        # Include self in path
+        reversed_ancestors = reversed([self] + list(self.ancestors()))
+        return '.'.join([a.get_label() for a in reversed_ancestors])
 
-    * :class:`Traversable<tangl.core.graph.handlers.TraversableGraph>`: Adds graph traversal functionality.
+    def _id_hash(self) -> bytes:
+        # Include the graph id if assigned (should always be)
+        if self.graph is not None:
+            return hashing_func(self.uid, self.__class__, self.graph.uid)
+        else:
+            return super()._id_hash()
+
+
+class Graph(Registry[GraphItem]):
+    """
+    Graph(data: dict[~uuid.UUID, GraphItem])
+
+    Linked registry of :class:`GraphItem` objects (nodes, edges, subgraphs).
+
+    Why
+    ----
+    Treats the whole topology as a searchable registry while providing typed
+    helpers for construction and queries. Enforces link integrity so items always
+    belong to the same graph.
+
+    Key Features
+    ------------
+    * **Special adds** – :meth:`add_node`, :meth:`add_edge`, :meth:`add_subgraph`.
+    * **Typed finds** – :meth:`find_nodes`, :meth:`find_edges`, :meth:`find_subgraphs`.
+    * **Convenient get** – :meth:`get` by ``UUID`` or by ``label``/``path``.
+    * **Integrity checks** – :meth:`_validate_linkable` before wiring edges/groups.
+
+    API
+    ---
+    - :meth:`add` – attach any :class:`GraphItem` (sets ``item.graph`` then registers).
+    - :meth:`add_node` – create/register a node.
+    - :meth:`add_edge` – create/register an edge between items (accepts ``None`` endpoints).
+    - :meth:`add_subgraph` – create/register a subgraph and populate members.
+    - :meth:`find_nodes` / :meth:`find_edges` / :meth:`find_subgraphs` – filtered iterators.
+    - :meth:`get` – lookup by id or by label/path.
     """
 
-    def add(self, node: NodeT, **kwargs):
-        if getattr(node, 'anon', False):
-            # Skip registration for anonymous nodes
-            logger.debug(f'Declining to register anonymous node {node!r}')
-            return
+    # Stub out mutators
+    # def add(self, *args) -> None:
+    #     raise NotImplementedError("Graph is read-only")
 
-        node.graph = self
-        super().add(node, **kwargs)
-        self.invalidate_by_path_cache()
-        # this will throw an exception if trying to re-add but node.graph is not already set to self
+    # special adds
+    def add(self, item: GraphItem) -> None:
+        item.graph = self
+        super().add(item)
 
-    def remove(self, value: NodeT):
-        """
-        This is _not_ guaranteed to find all references nor to preserve references
-        to children with multiple associations.
+    def add_node(self, *, obj_cls=None, **attrs) -> Node:
+        from .node import Node
+        obj_cls = obj_cls or Node
+        n = obj_cls(**attrs)
+        self.add(n)
+        return n
 
-        It is provided purely for completeness and testing purposes.
-        """
-        # recursively unlink children
-        for child in value.children:
-            value.remove_child(child, unlink=True)
-        # unlink from parent node
-        if value.parent is not None:
-            value.parent.remove_child(value)
-        # unlink from self
-        super().remove(value)
-        self.invalidate_by_path_cache()
+    def add_edge(self, source: GraphItem, destination: GraphItem, *, obj_cls=None, **attrs) -> Edge:
+        if source is not None:
+            self._validate_linkable(source)
+            source_id = source.uid
+        else:
+            source_id = None
 
-    def __getitem__(self, key: UUID | UniqueLabel):
-        if isinstance(key, UniqueLabel):
-            if x := self.find_one(path=key):
-                return x
-            # We don't want to fallback on search by label in super(), as label is not guaranteed unique
-            raise KeyError(f"Key {key} is not a registered unique path in {self}")
-        return super().__getitem__(key)
+        if destination is not None:
+            self._validate_linkable(destination)
+            destination_id = destination.uid
+        else:
+            destination_id = None
 
-    def __contains__(self, item: Entity | UUID | UniqueLabel) -> bool:
-        if isinstance(item, str) and is_valid_uuid(item):
-            item = UUID(item)
-        if isinstance(item, UniqueLabel):
-            return item in self.nodes_by_path
-        return super().__contains__(item)
+        from .edge import Edge
+        obj_cls = obj_cls or Edge
 
-    @functools.cached_property
-    def nodes_by_path(self) -> dict[str, NodeT]:
-        return { v.path: v for v in self.values() }
+        e = obj_cls(source_id=source_id, destination_id=destination_id, **attrs)
+        self.add(e)
+        return e
 
-    def invalidate_by_path_cache(self):
-        if hasattr(self, "nodes_by_path"):
-            delattr(self, "nodes_by_path")
+    def add_subgraph(self, *, obj_cls=None, members: Iterable[GraphItem] = None, **attrs) -> Subgraph:
+        from .subgraph import Subgraph
+        obj_cls = obj_cls or Subgraph
+        sg = obj_cls(**attrs)
+        self.add(sg)
+        for item in members or ():
+            sg.add_member(item)  # validates internally
+        return sg
+
+    # special finds
+    def find_nodes(self, **criteria) -> Iterator[Node]:
+        from .node import Node
+        criteria.setdefault("is_instance", Node)
+        return self.find_all(**criteria)
+
+    def find_node(self, **criteria) -> Optional[Node]:
+        return next(self.find_nodes(**criteria), None)
+
+    def find_edges(self, **criteria) -> Iterator[Edge]:
+        from .edge import Edge
+        # find edges in = find_edges(destination=node)
+        # find edges out = find_edges(source=node)
+        criteria.setdefault("is_instance", Edge)
+        return self.find_all(**criteria)
+
+    def find_edge(self, **criteria) -> Optional[Edge]:
+        return next(self.find_edges(**criteria), None)
+
+    def find_subgraphs(self, **criteria) -> Iterator[Subgraph]:
+        from .subgraph import Subgraph
+        criteria.setdefault("is_instance", Subgraph)
+        return self.find_all(**criteria)
+
+    def find_subgraph(self, **criteria) -> Optional[Subgraph]:
+        return next(self.find_subgraphs(**criteria), None)
+
+    def get(self, key: Identifier):
+        if isinstance(key, UUID):
+            return super().get(key)
+        elif isinstance(key, str):
+            return self.find_one(label=key) or self.find_one(path=key)
+
+    def _validate_linkable(self, item: GraphItem):
+        if not isinstance(item, GraphItem):
+            raise TypeError(f"Expected GraphItem, got {type(item)}")
+        if item.graph != self:
+            raise ValueError(f"Link item must belong to the same graph")
+        if item.uid not in self.data:
+            raise ValueError(f"Link item must be added to graph first")
+        return True

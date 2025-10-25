@@ -1,5 +1,5 @@
 
-from tangl.narrative.lang.pos import TreeBankSymbols
+from tangl.lang.pos import TreeBankSymbols
 
 def test_treebank_helper_funcs():
 

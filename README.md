@@ -1,10 +1,89 @@
-# StoryTangl
+# StoryTangl v3.7
 
-**TanglDev, Spring 2025**  
+[![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml)
 
-**The Abstract Narrative Graph Library for Interactive Stories**, inspired by morphological shape models, compiler theory, superposition, Kantian categoricals, and a weaving metaphor.
+**TanglDev, Winter 2025**  
+
+## Overview
+
+StoryTangl is an interactive storytelling engine for creating, hosting, and playing
+dynamic, interactive narrative experiences. It is designed to support a wide range 
+of storytelling styles, from simple branching narratives to complex, state-driven
+worlds with dynamically generated content. It is capable of concurrently handling
+multiple story worlds and multiple users.
+
+The framework is thoroughly documented with `Sphinx`, and documentation is
+accessible on [ReadTheDocs](https://readthedocs.org/projects/StoryTangl). This
+includes both story-author and developer guides, as well as the OpenApi specification
+for the REST API server.
+
+**The Tangl Abstract Narrative Graph Library for Interactive Stories**, inspired by morphological shape models, compiler theory, superposition, Kantian categoricals, and a weaving metaphor.
 
 StoryTangl aims to **separate** the concerns of narrative structure, story content, stateful navigation, and final presentation. By **representing stories** as an abstract graph that “collapses” into a linear narrative under user or system choices, it supports traditional linear novels, branching CYOAs, sandbox RPGs, and more.
+
+---
+
+## Quick Start
+
+### 1. Create a Story Script
+
+```yaml
+# my_story.yaml
+label: my_first_story
+metadata:
+  title: "My First Story"
+  author: "Your Name"
+
+scenes:
+  intro:
+    blocks:
+      start:
+        content: "Your adventure begins..."
+        actions:
+          - text: "Continue"
+            successor: next
+      next:
+        content: "The end!"
+```
+
+### 2. Load and Play
+
+```python
+from tangl.compiler.script_manager import ScriptManager
+from tangl.story.fabula.world import World
+import yaml
+
+# Load script
+with open("my_story.yaml") as f:
+    data = yaml.safe_load(f)
+
+# Create world
+sm = ScriptManager.from_data(data)
+world = World(label="my_world", script_manager=sm)
+
+# Create story instance
+story = world.create_story("player_story")
+
+# Navigate
+frame = story.cursor
+print(frame.journal())
+
+actions = frame.get_available_actions()
+for i, action in enumerate(actions):
+    print(f"{i}. {action.text}")
+
+# Make choice
+frame.traverse_to(0)
+```
+
+### 3. CLI Usage
+
+```bash
+$ tangl-cli
+> load_script my_story.yaml
+> story
+> do 0
+```
 
 ---
 
@@ -14,7 +93,7 @@ StoryTangl aims to **separate** the concerns of narrative structure, story conte
 
 Use Tangl to:
 
-1. **Load** a single story definition from a Storydown (Markdown+YAML) or other source.  
+1. **Load** a single story definition from a `tangldown` script (Markdown+YAML) or other source.  
 2. **Compile** a story definition into an intermediate representation or “story world.”  
 3. **Create** a story instance (graph) from that world to track reader navigation and state.  
 4. **Navigate** or "play" a story line as a user, by picking branches or letting the system auto-select algorithmically.  
@@ -28,6 +107,62 @@ At scale, Tangl can be hosted as a **multi-world server**:
 2. **Manage** multiple user sessions, each with its own story instance.  
 3. **Coordinate** real-time branching or updates if desired (cooperative narratives, analytics on user paths, etc.).  
 4. **Expose** a REST or GraphQL API for remote clients, from web front-ends to game engines like Unity or Ren’Py.
+
+---
+
+
+## Usage
+
+### Install with `pip`
+
+Install and run a tangl story server on port 8000.
+```bash
+$ pip install storytangl
+$ tangl-serve
+```
+or run a story from the command-line interface (CLI).
+```bash
+$ tangl-cli
+```
+
+(Currently distributing on PyPI-testing.)
+
+### From source
+
+Requires `git+lfs` and `poetry`.
+
+```bash
+$ git clone https://github.com/tangldev/storytangl
+$ cd storytangl
+$ git lfs pull
+$ pip install poetry
+$ poetry install --only main
+$ tangl-serve
+```
+
+### Keep the docs green
+
+StoryTangl ships with a pre-commit hook that builds the Sphinx documentation
+whenever you touch files that affect the docs. Enable it once per clone and make
+sure the docs dependencies are available:
+
+```bash
+$ git config core.hooksPath .githooks
+$ poetry install --with docs
+```
+
+You can always trigger the same check manually with `poetry run sphinx-build -b html docs/source docs/_build/html`.
+
+### Docker
+
+The git repo includes a Dockerfile for the reference app that can be used as
+a quick-start on a PAAS environment.
+
+```bash
+$ docker build . -t storytangl:4
+$ docker run -p 8000:8000 storytangl:4
+```
+
 
 ---
 
@@ -140,10 +275,10 @@ By **keeping these layers distinct**, we can ingest a single “semantic core”
 
 ---
 
-## Writing in Storydown
+## Writing in tangldown
 
 *(Placeholder for future examples)*  
-Tangl supports a **Markdown+YAML** hybrid DSL called **Storydown**, allowing authors to mix normal prose with embedded metadata. Example:
+Tangl supports a **Markdown+YAML** hybrid DSL called **tangldown**, allowing authors to mix normal prose with embedded metadata. Example:
 
 `````markdown
 # Scene: The Tavern
@@ -158,7 +293,7 @@ constraints:
 Aria steps into the dimly lit tavern...
 `````
 
-The parser turns this into a **story world** definition, which you can compile, instantiate, and navigate.  A smart parser will even make simple inferences, like the scene ids, characters, and settings directly from the text content.
+The parser turns this into a **story world** definition, which you can compile, instantiate, and navigate.  A smart parser will even make simple inferences, like the scene ids, characters, and settings directly from a content block's tags and text content.
 
 ---
 
@@ -204,8 +339,32 @@ The parser turns this into a **story world** definition, which you can compile, 
 
 ## Contributing
 
-We welcome feedback, bug reports, and feature requests. For more advanced usage details and code examples, see our [Documentation](#) (placeholder link). 
+We welcome feedback, bug reports, and feature requests. For more advanced usage details and code examples, see our [Documentation](#). 
 
 ---
 
 **Tangl** strives to offer a **unifying framework** for interactive fiction—where authors can craft intricate branching worlds, and readers can explore or shape them in multiple formats. By **weaving** the threads of structure, semantics, state navigation, and final presentation, Tangl aspires to push narrative design into new dimensions.
+
+
+## Modding
+
+Any game world can be 'modded' by registering new plugins or media locations
+with the game world manager.  
+
+Media that follows the world's default naming convention will be selected 
+preferentially.  The main game engine includes hooks to various key features 
+like game initialization and turn advancement.  Each game-world has its own
+sandboxed plugin-manager.
+
+## Development
+
+We use Git and Git-LFS for source and basic media version control and 
+collaboration.
+
+The unit-test-suite targets 85% coverage.  We utilize `pytest` as our testing
+framework, and tests run automatically on every commit to the main branch.
+
+## License
+
+MIT except BSD on the Demographics module name-banks, which includes content
+directly lifted from a BSD-licensed project, see that subpackage for details.

@@ -20,7 +20,7 @@ version: "3.3"
 services:
 
   api:
-    image: story-tangl:3.2
+    image: story-tangl:${TANGLE_VERSION}
     build:
       context: .
       args:
@@ -55,7 +55,7 @@ services:
       - traefik.enable=true
       - traefik.http.routers.tangl_app.rule=Host(`app.${TANGL_BASE_URL}`)
       - traefik.http.routers.tangl_app.entrypoints=websecure
-      # change to prodresolver for signed cert
+      # change to 'prodresolver' for signed cert
       - traefik.http.routers.tangl_app.tls.certresolver=stagingresolver
       - traefik.http.services.tangl_app.loadbalancer.server.port=80
     networks:

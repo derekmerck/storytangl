@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 
-from tangl.narrative.lang.personal_name import PersonalName
+from tangl.lang.personal_name import PersonalName
+from tangl.lang.gens import Gens as Gender
+from tangl.lang.age_range import AgeRange
 from .data_models import Subtype, Country, Region, NameBank
-from tangl.narrative.lang.gens import Gens as Gender
-from tangl.narrative.lang.age_range import AgeRange
 
 
 class DemographicData(PersonalName):

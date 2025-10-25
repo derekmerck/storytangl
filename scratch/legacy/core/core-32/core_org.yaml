@@ -1,0 +1,140 @@
+# Core Subpackage
+# ---------------
+deps: [utils]
+classes:
+  - Entity:  # All managed objects are derived from this
+
+      has:
+        - uid
+        - label
+        - tags
+        - matches(**criteria)
+        - structure/unstructure()
+
+      mixins:
+        - HasInitHook:
+        - ExpandsTemplates:
+        - HasContext:
+            has: [locals, gather_context()]
+        - Satisfiable:  # Runtime eval
+            has: [predicates, is_satisfied()]
+            friends: [HasContext]
+        - HasEffects:     # Runtime exec
+            has: [effects, apply_effects()]
+            friends: [HasContext]
+        - Available:
+            has: [lock/unlock(), is_avail()]
+            friends: [HasContext, HasConditions]
+        - Renderable:
+            has: [content, render_content->ContentFragment]
+            friends: [HasContext]
+
+      subclasses:
+
+        - ContentFragment:
+            has:
+              - fragment_type       # simple, group, control, kv
+              - content
+              - content_format      # primitive, markdown/html, binary, path/url, FragmentT, collection[FragmentT], control code
+              - presentation_hints  # style id, classes, and/or dict
+
+        - ResourceInventoryTag:     # 'RIT', primarily for media
+            has:
+              - resource_type       # FILE_PATH or inline DATA
+              - data_format         # xml, json, image, video, audio
+              - data_hash           # immutable alias for content, these are cached
+              - get_resource()      # loads if it is a FP and returns data
+              - create_resource() 
+
+              - creation_time
+              - modified_time
+              - expiry_time         # dt to load and reindex/rehash content even if size and mtime appear to be consistent
+
+              # if inline data type:
+              - data
+
+              # if file data type:
+              - file_path
+              - file_size
+              - file_hash
+
+        - Singleton:
+            has: [_unique_ label, get_instance()]
+            subclasses:
+              - InheritingSingleton:  # instance inheritance
+                  has: [from_ref]
+        
+        - TaskHandler:
+            has: [func(), match_features, execute(), priority]
+
+        - Node:
+            has:
+              - graph                 # all nodes belong to a graph unless marked anon
+              - parent                # one
+              - associates            # many
+              - add_associate(Node)
+              - children              # associates with self as parent
+              - add_child(Node)
+              - anon
+
+            friends: [Graph]
+
+            subclasses:
+              - Edge(Generic[SuccessorT]):
+                  has: [predecessor, successor]  # predecessor is parent
+                  subclasses:
+                    - DynamicEdge:  # lazy successor assignment
+                        has:
+                          - successor_ref         # name of existing node in graph
+                          - successor_features    # find existing node in graph by features
+                          - successor_conditions  # find existing node in graph by runtime eval
+                          - successor_template    # create/structure new node and add to graph
+                          - lazy_get_successor()
+              - HasLeafFragments:
+                  has: [fragments]
+                  friends: [HasContext]
+
+            mixins:
+              - HasScopedContext:  # includes parent or registry context
+                  friends: [HasContext]
+              - Traversable:
+                  has: [enter()]
+                  friends: [Edge, Runtime, HasContext, HasContent]
+              - HasFragments:  # leafs from traversed structure/plot nodes, organized linearly
+                has:
+                  fragments: list[ContentFragment]
+                friends: [TraversableGraph.journal]
+
+        - Registry(Generic[EntityT]):
+
+            implements:
+              - Mapping[UUID, EntityT]
+
+            has:
+              - add(EntityT)           # no direct `__set_item__`, always indexes by Entity.uid
+              - @register()(EntityT)   # decorator to add an entity from where it is defined
+              - find_one(features) -> EntityT
+              - find_all(features) -> list[EntityT]
+
+            non-generics:
+              - Registry[TaskHandler] => TaskManager, HandlerPipeline:
+              - Registry[Singleton] => Singleton._instances:
+              - Registry[Node] => Graph:
+              - Registry[ResourceInventoryTag] => ResourceManager:
+
+            mixins:
+              - TraversableGraph[Node|TraversableNode]:    # Includes traversable nodes
+                  has:
+                    - traversal_cursor -> TraversableT
+                    # todo: not sure about syntax here, like find/find_one?
+                    - follow_one(EdgeT) -> Node or None  # update cursor, graph state, render_content
+                    - follow(EdgeT) -> None              # follow edges until no new node is returned
+
+                    # could have multiple journals (projection surfaces) for a single traversal
+                    - content_journal -> BookmarkedList[HasFragments]
+                    - start_journal_section()  # entering new subgraph
+                    - add_journal_entry()      # resolve step
+                    - get_journal_entry()
+                    - get_journal_section()
+
+                    # in principle, could have multiple sync'd traversals, as well, like multi-reader

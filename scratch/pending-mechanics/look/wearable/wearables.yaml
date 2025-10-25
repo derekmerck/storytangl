@@ -1,0 +1,49 @@
+---
+# Sample Wearables
+
+coat:
+  covers: [upper]
+  layer: over
+
+shirt:
+#  noun: shirt
+  covers: [upper]
+  layer: outer
+
+pants:
+  plural: True
+  noun: pants
+  covers: [lower]
+  layer: outer
+
+skirt:
+  noun: skirt
+  covers: [lower]
+  layer: outer
+
+socks:
+  plural: True
+  covers: [feet]
+  layer: inner
+
+shoes:
+  plural: True
+  covers: [feet]
+#  noun: shoes
+
+dress:
+  covers: [upper, lower]
+#  noun: dress
+
+exclusive_dress:
+  from: dress
+  tags: [ exclusive ]
+
+undershirt:
+  covers: [upper]
+  layer: inner
+
+underpants:
+  plural: True
+  covers: [lower]
+  layer: inner

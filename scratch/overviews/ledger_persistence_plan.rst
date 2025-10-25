@@ -1,0 +1,194 @@
+Ledger Persistence and Service Integration Plan
+
+Overview
+--------
+
+The v37 runtime needs a controller that orchestrates users, ledgers, and frames
+while remaining compatible with multiple transports (FastAPI, CLI, and future
+SDKs).  This note records how the persistence layer, service manager, and
+account lookup should collaborate so runtime choices always flow through the
+ledger-backed phase bus.
+
+Goals
+-----
+
+* Keep persistence adapters generic—every backend should look like a
+  ``dict[UUID, Any]`` to the service layer while storing ledgers efficiently.
+* Reuse the existing user-domain relationship (API key → user → story/ledger)
+  so controllers never guess which ledger belongs to a caller.
+* Ensure ledger sessions participate in the same open/link/write-back lifecycle
+  already used for ``User`` and ``Story`` objects.
+* Support both direct snapshot persistence and event-sourced replay when
+  reconstructing a ledger from storage.
+
+Building blocks
+---------------
+
+* :mod:`tangl.persistence` already provides factories, serializers, and storage
+  helpers so controllers can treat a backend as a mutable mapping.  The v37
+  controller should receive a persistence manager capable of opening ledger
+  documents by UUID.
+* :class:`tangl.service.service_manager.ServiceManager` opens users and stories
+  with ACL checks and can be extended to open ledgers/frames using similar
+  context managers.
+* ``Ledger`` instances encapsulate the active ``Graph``, step counter, stream
+  registries, and snapshot metadata required to spin up frames via
+  ``ledger.get_frame()``.
+
+Legacy reference points
+-----------------------
+
+The pre-annotation controllers under ``scratch/legacy/service`` demonstrate how
+explicit lifecycle hooks kept persistence, response handling, and domain
+linkages aligned.  Key takeaways for v37 include:
+
+* ``service-old/service_manager.py`` enumerated every REST/CLI endpoint and
+  decorated them with ``public_endpoint``/``client_endpoint`` role markers.  The
+  wrapper pattern (``handle_response``) ensured that return values flowed
+  through :mod:`scratch.legacy.service.response_handler-2` so media, markdown,
+  and runtime payloads were normalized for each transport.  Even though the v37
+  controller relies on ``ApiEndpoint`` annotations, we should preserve that
+  adapter-facing indirection—ledger responses ought to be wrapped before they
+  reach FastAPI or the CLI so legacy clients can continue requesting
+  ``JournalEntry``-like payloads when necessary.
+* ``StoryPersistenceManager.open_story`` (see
+  ``scratch/legacy/service/service-old/story_persistence_manager.py``) handled
+  bidirectional user ↔ story reassociation inside a context manager.  The
+  pattern of linking the ``User`` onto the ``Story`` before yielding, then
+  unlinking during teardown, directly maps to the ledger lifecycle we need for
+  v37.  ``open_ledger`` should mirror this behavior: resolve the ledger id from
+  the active user, hydrate the ledger, attach the user to collect receipts, and
+  disassociate on exit so persistence layers can store user and ledger records
+  independently.
+* Legacy ``ServiceManager`` methods such as ``do_story_action`` always opened
+  persistence with ``write_back=True`` for mutating calls.  The v37 annotation
+  layer can infer this intent from endpoint metadata, but we must remember to
+  propagate the flag down to persistence; otherwise, ledgers resolved via the
+  automatic injection hooks may never flush their updated step counters or
+  record streams.
+
+Proposed persistence schema
+---------------------------
+
+* **Primary identifier:** Persist ledgers under their UUID and store a pointer
+  from each ``User`` to their active ledger/story id.  API keys resolve to
+  users, which keeps compatibility with existing authentication hooks.
+* **Serialized payload:** Use :meth:`Ledger.unstructure<tangl.vm.ledger.Ledger.unstructure>`
+  to capture the graph, record stream, domains, and cursor in one payload.
+  The data travels inside a ``LedgerEnvelope`` so persistence backends can add
+  metadata (e.g., compression hints, timeline identifiers) without changing
+  controller code.  Ledger-level domains must be singletons—those serialize via
+  their label-based hooks—while non-singleton domains should remain attached to
+  graph items instead of the ledger.
+* **Write-back cadence:** When a controller exits a ledger context with
+  ``write_back=True``, persist the ledger unconditionally so metadata changes,
+  domain mutations, and other side effects are never dropped.  We can later
+  introduce an opt-in diff to skip redundant writes once the mutation signals
+  stabilize.
+* **Event-sourced mode:** Allow persistence backends to omit the full ``Graph``
+  and reconstruct it from a recent snapshot plus the record stream.  Provide a
+  helper in the persistence package (e.g., ``rebuild_ledger(envelope, *, upto)``)
+  that the service manager can invoke before yielding the ledger to callers.
+
+User and ledger domain flow
+---------------------------
+
+1. Resolve the incoming API key or authentication token to a ``User`` record
+   using the persistence manager.
+2. Read the user's active ledger/story UUID from the user domain document.
+3. Load the ledger envelope from persistence and hydrate a ``Ledger`` instance.
+4. Link the ledger's ``user`` attribute (if present) to the resolved ``User`` so
+   downstream code can emit receipts tagged with the caller.
+5. Yield the ledger/frame to the controller endpoint.  The controller runs
+   ``ledger.get_frame()`` or similar operations to process choices.
+6. After the endpoint returns, unlink the user reference and decide whether to
+   write back the ledger and/or user documents based on mutation flags.
+
+Controller lifecycle integration
+--------------------------------
+
+* Extend :class:`ServiceManager` with ``open_ledger`` and ``open_frame`` context
+  managers that mirror ``open_story``.  Both helpers should accept ``write_back``
+  and ``acl`` parameters so callers can request persisted updates explicitly.
+* Update endpoint binding to inject ledger/frame parameters when an endpoint
+  type-hints them.  Ledger-aware endpoints automatically gain persistence
+  lifecycle management without duplicating boilerplate.
+* When both ``story`` and ``ledger`` are requested, ensure the context managers
+  open the story first (to locate the ledger id) and then hydrate the ledger.
+  Controllers can then combine story metadata (title, tags) with ledger runtime
+  receipts before responding to the client.
+
+Snapshot and rebuild strategies
+-------------------------------
+
+* **Immediate snapshot:** For short-lived ledgers, persist the full graph and
+  streams on every write-back.  This favors simplicity and deterministic reloads.
+* **Incremental snapshot:** For longer sessions, capture a full graph snapshot
+  every ``N`` steps (configured via the persistence manager) and rely on the
+  event stream for intermediate steps.  Store the snapshot index inside the
+  ledger envelope so the service manager knows how far to replay events during
+  hydration.
+* **Pluggable serializers:** Keep serializers discoverable via
+  :mod:`tangl.persistence.factory` so new backends (e.g., object storage, SQL)
+  can register custom ledger encoders without modifying controller code.
+
+Implementation Status (v37 MVP)
+-------------------------------
+
+* ✅ ``LedgerEnvelope`` – implemented in :mod:`tangl.persistence.ledger_envelope`
+* ✅ ``ServiceManager.open_ledger`` – context manager with unconditional write-back
+* ✅ ``ServiceManager.create_ledger`` – convenience factory for new ledgers
+* ⚠️ Endpoint injection – deferred until endpoint annotation stability
+* ⚠️ User → ledger mapping – explicit ``ledger_id`` required for now
+* ⚠️ ACL enforcement – pending authentication integration
+* 🔮 Event-sourced mode – envelope supports recovery; optimization deferred
+* 🔮 Ledger branching/time-travel – future enhancement
+
+Usage Example
+~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from uuid import uuid4
+
+    from tangl.persistence import PersistenceManagerFactory
+    from tangl.service import ServiceManager
+
+    pm = PersistenceManagerFactory.create_persistence_manager("pickle_file")
+    service = ServiceManager(persistence_manager=pm)
+
+    ledger_id = service.create_ledger()
+
+    with service.open_ledger(user_id=uuid4(), ledger_id=ledger_id, write_back=True) as ledger:
+        frame = ledger.get_frame()
+        # ... execute frame ...
+        ledger.step += 1
+
+    with service.open_ledger(user_id=uuid4(), ledger_id=ledger_id) as ledger:
+        journal = list(ledger.get_journal("latest"))
+
+Multi-client considerations
+---------------------------
+
+* REST, CLI, and other adapters should treat the controller as the single source
+  of truth for ledger mutations.  Each adapter passes the ``user_id`` (or API
+  token) into the service manager, which ensures the correct ledger is opened
+  and persisted.
+* When adapters need read-only access (e.g., polling ledger streams), they can
+  request a ``MethodType.READ`` endpoint so ``open_ledger`` avoids unnecessary
+  write-backs.
+* Batch operations (e.g., multi-choice submissions) should reuse the same ledger
+  context to guarantee consistent snapshots and avoid interleaved write-backs.
+
+Next steps
+----------
+
+* Prototype ``ServiceManager.open_ledger`` using the existing context store and
+  inject it into a new ledger-centric controller.
+* Define ``LedgerEnvelope`` (or similar) inside :mod:`tangl.persistence` with
+  serializer hooks for the graph, counter, and streams.
+* Update persistence adapters to understand the envelope contract and opt into
+  event-sourced rebuilds.
+* Document how API keys map to user ids and ledger ids so future transports can
+  authenticate without hard-coding controller details.
+

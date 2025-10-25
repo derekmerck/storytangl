@@ -1,3 +1,6 @@
+# tangl/config.py
+# See 'tangl/defaults.toml' for config usage
+
 from pprint import pprint
 from pathlib import Path
 import os

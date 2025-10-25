@@ -1,5 +1,5 @@
 
-from tangl.narrative.lang.helpers import oxford_join, adjective_to_adverb
+from tangl.lang.helpers import oxford_join, adjective_to_adverb
 
 def test_adjective_to_adverb():
     # Test cases

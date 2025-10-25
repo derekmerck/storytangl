@@ -1,6 +1,8 @@
 # anything secret or local
 *secret*
 .secrets.*
+!hash_secret.py
+!test_hash_secret.py
 *.local*
 
 # temporary
@@ -8,7 +10,7 @@ dump*
 tmp*
 **/old
 **/old_*
-# schemas
+#schemas
 #extras*
 
 # source
@@ -68,6 +70,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+.benchmarks/
 
 # Node/Yarn
 node_modules

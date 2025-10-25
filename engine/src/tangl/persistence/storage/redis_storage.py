@@ -1,7 +1,10 @@
 import logging
 from uuid import UUID
 
-from tangl.config import settings
+try:
+    from tangl.config import settings
+except ImportError:
+    settings = {}
 
 try:
     from redis import Redis

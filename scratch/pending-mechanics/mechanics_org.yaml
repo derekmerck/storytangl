@@ -1,0 +1,45 @@
+# Mechanics Subpackage
+# --------------------
+namespace: True
+deps: [story, core, media, discourse, utils]
+classes:
+
+  # Complex Concepts
+  - Game:
+    concepts:
+      - Game:
+        subclasses:
+          - TokenGame:
+            friends: [AssetType[CountableToken]]
+          - CardGame:
+            friends: [AssetType[RankedTokens]]  # cards are basically just named and ordered tokens
+          - BoardGame:
+            friends: [AssetType[CountableToken], AssetType[RankedToken], LinkedLocations]
+
+    structure:
+      - GameBlock:  # mini-loop that re-evaluates the same block over multiple 'move' actions until win/lose state
+
+  - Stats:
+    concepts:
+      - StatDomains:
+      - QuantitativeValue: # float <-> quant like good/ok/bad
+      - QVDelta:
+      - StatDifficulty:
+    structure:
+      - StatChallenge:     # -cost => player stat ?> difficulty + mods + chance => result => +payout
+
+  # Actor Extensions
+  - PersonalName:
+    friends: [Actor]
+
+  - Look:
+    friends: [Actor]  # actors have a 'look'
+    has:
+      - describe
+      - MediaAdapter
+
+  - Outfit:
+    friends: [AssetType[Wearable], Actor.look]
+    has:
+      - describe
+      - MediaAdapter

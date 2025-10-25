@@ -1,0 +1,12 @@
+from typing import Callable
+from functools import lru_cache
+
+from .context import Context
+
+@lru_cache(maxsize=1024)
+def compile_pred(expr: str) -> Callable[[Context], bool]:
+    if expr.strip().lower() in {"true", ""}:
+        return lambda ctx: True
+    if expr.strip().lower() == "false":
+        return lambda ctx: False
+    raise ValueError(f"Unsupported predicate: {expr!r}")

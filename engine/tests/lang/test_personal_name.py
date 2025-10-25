@@ -2,7 +2,7 @@ from enum import Enum
 
 import pytest
 
-from tangl.narrative.lang.personal_name import PersonalName, Gender
+from tangl.lang.personal_name import PersonalName, Gender
 
 @pytest.fixture
 def full_name():

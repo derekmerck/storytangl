@@ -1,0 +1,45 @@
+---
+
+sememes:
+
+  fancy:
+    fancy:
+      - expensive
+      - decorated
+
+    cheap:
+      - cheap
+
+  pen:
+    fancy:
+      - pen
+      - mechanical pencil
+
+    cheap:
+      - pencil
+      - crayon
+      - chalk
+
+paradigms:
+
+  a_fancy_pen:
+    templ_: "{{ r['pen'].d('IND') }} {{ r['pen'].w('fancy') }} {{ r['pen'].nom }}"
+
+  his_ink_pen:
+    templ_: "{{ r.p(PT.PA) }} {{ r['pen'].w(adj) }} {{ r['pen'].w(noun) }}"
+    words:
+      adj:
+        _: [ink]
+      noun:
+        _: [pen]
+
+  she_hugs_her_teddy_bear:
+    templ_: "{{ r.p(PT.S) }} {{ r.v('hug') }} {{ r.p(PT.PA) }} {{ r['toy'].w(adj) }} {{ r['toy'].w(noun) }}"
+    pattern:  [ (subject), (verb, lemma in HUGS), (possessive), (adj, lemma in TOYLIKE), (noun, lemma in TOYS) ]
+    words:
+      verb:
+        _: [hugs]
+      adj:   # toylike
+        _: [teddy]
+      noun:  # toy
+        _: [bear]

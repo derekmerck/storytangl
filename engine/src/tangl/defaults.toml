@@ -1,3 +1,4 @@
+# tangl/defaults.toml
 # Default settings config
 # =======================
 
@@ -78,7 +79,7 @@ enabled = false                         # AI narrative content
 url = "http://localhost:11434"
 
 [content.apis.elevenlabs]
-enabled = false                         # AI voice over generator
+enabled = false                         # AI voice-over generator
 token = "<tok>"
 
 # Config for structured language services

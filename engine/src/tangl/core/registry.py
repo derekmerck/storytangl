@@ -1,248 +1,283 @@
+# tangl/core/registry.py
 """
-registry.py
+tangl.core.registry
+===================
 
-This module provides the :class:`Registry` class, which is both a Tangl
-:class:`~tangl.entity.Entity` and a :class:`~collections.abc.MutableMapping`
-of UUID -> Entity. It allows for flexible, criteria-based searching and
-serialization/deserialization of the contained entities.
+Collection management for entities with robust search capabilities.
 
-**Separation of Concerns**:
-  - **Collection Management**: By conforming to the MutableMapping interface,
-    developers can treat a Registry almost like a normal dictionary (with some
-    constraints).
-  - **Entity Integration**: Inheriting from :class:`~tangl.entity.Entity` lets
-    the registry itself have a domain, tags, or other metadata. This unifies
-    the "bookkeeping container" concept with the same identification and
-    serialization rules used across all Tangl objects.
-  - **Search & Filter**: Built-in methods like :meth:`find` and :meth:`find_one`
-    leverage the :meth:`~tangl.entity.Entity.matches_criteria` logic, so the
-    registry can seamlessly search across multiple entity subtypes.
+The Registry provides a generic dictionary-like container for Entity
+objects with enhanced retrieval options:
 
-Usage:
-  >>> my_registry = Registry()
-  >>> my_registry.add(Entity(domain="sci-fi"))
-  >>> results = my_registry.find(domain="fantasy.*")
+- UUID-based direct access for performance-critical operations
+- Criteria-based flexible search for dynamic discovery
+- Type safety via generic parameters
+- Composition over inheritance for extensibility
+
+The Registry underpins the core StoryTangl graph management.
+
+This component is foundational as it enables decoupling between
+storage patterns and retrieval logic, letting capabilities
+find requirements and vice versa without direct references.
+
+Registry is subclassed for multiple different applications.
+- **StreamRegistry** indexes sequential records with built-in sorting, slicing,
+  and channel filtering
+- **BehaviorRegistry** indexes handlers and has built-in execution pipelines
+  and job receipts
+- **MediaRegistry** indexes external resources into singleton MediaRecords,
+  which can be dereferenced in the service layer to retrieve the original
+  data or client-relative path to it
 """
 
-from __future__ import annotations
-from typing import TypeVar, Generic, Self, Optional, Any, MutableMapping, Iterator, Iterable, Mapping
+from typing import TypeVar, Generic, Optional, Iterator, overload, Self
 from uuid import UUID
-import functools
-import logging
 from collections import Counter
-from copy import deepcopy
+import itertools
+import warnings
+from contextvars import ContextVar
+from contextlib import contextmanager
 
-from pydantic import BaseModel, PrivateAttr
+from pydantic import Field
 
-from tangl.type_hints import UniqueLabel, UnstructuredData
-from tangl.utils.dereference_obj_cls import dereference_obj_cls
-from .entity import Entity
+from tangl.type_hints import StringMap, Tag
+from .entity import Entity, Selectable
 
-logger = logging.getLogger(__name__)
+VT = TypeVar("VT", bound=Entity)  # registry value type
+FT = TypeVar("FT", bound=Entity)  # find type within registry
+ST = TypeVar("ST", bound=Selectable)
 
-VT = TypeVar('VT', bound=Entity)
 
-class Registry(Entity, MutableMapping[UUID, VT], Generic[VT]):
+class Registry(Entity, Generic[VT]):
     """
-    A specialized :class:`~tangl.entity.Entity` that implements a
-    :class:`~collections.abc.MutableMapping` of UUID to another Tangl
-    :class:`~tangl.entity.Entity`. This allows easy storage, lookup, and
-    filtering of child entities.
+    Registry(data: dict[~uuid.UUID, Entity])
 
-    **Behavior & Constraints**:
-      - Although this class implements ``MutableMapping``, direct assignment
-        via ``__setitem__`` is disallowed to ensure consistent usage of
-        :meth:`add`.
-      - The registry itself is an Entity, so it can carry its own
-        :attr:`uid`, :attr:`label`, :attr:`tags`, etc.
-      - Each contained entity must have a unique UUID; overwriting an existing
-        key requires an explicit ``allow_overwrite=True`` flag.
+    Generic searchable collection of :class:`Entity`.
 
-    :param _data: A private dictionary that actually stores the entities.
-    :type _data: dict[UUID, VT]
+    Why
+    ----
+    Provides a flexible alternative to raw dicts: lookup by UUID, label, tags,
+    or arbitrary predicates. Serves as the foundation for higher-level managers
+    like graphs, record streams, and handler registries.
+
+    Key Features
+    ------------
+    * **UUID-based access** for fast, deterministic retrieval.
+    * **Criteria-based search** (:meth:`find_all`, :meth:`find_one`) for
+      flexible queries.
+    * **Chaining** across multiple registries via
+      :meth:`chain_find_all` / :meth:`chain_find_one`.
+    * **Selection** logic (:meth:`select_for`) for inverse-matching entities.
+
+    API
+    ---
+    - :meth:`add` / :meth:`remove` – manage membership
+    - :meth:`find_all(**criteria)<find_all>` – yield all matches
+    - :meth:`find_one(**criteria)<find_one>` – yield first match
+    - :meth:`chain_find_all` – search across registries
+    - :meth:`all_labels`, :meth:`all_tags` – summarization helpers
     """
-    _data: dict[UUID, VT] = PrivateAttr(default_factory=dict)
 
-    def __getitem__(self, key: UUID | UniqueLabel) -> VT:
+    data: dict[UUID, VT] = Field(default_factory=dict,
+                                 json_schema_extra={'serialize': False})
+    # don't bother serializing this field b/c we will include it explicitly
+    # but do use it for comparison (using `exclude=True` would cover both).
+
+    def add(self, entity: VT) -> None:
+        """Add an entity to the registry.
+
+        Raises
+        ------
+        ValueError
+            If a different entity with the same UUID already exists.
         """
-        Retrieve an entity by UUID or by a label that matches ``entity.label``.
+        if entity.uid in self.data:
+            existing = self.data[entity.uid]
+            if existing is entity:
+                return
+            raise ValueError(
+                f"Entity {entity.uid} already exists in registry. "
+                f"Existing: {existing!r}, attempted: {entity!r}"
+            )
+        self.data[entity.uid] = entity
 
-        :param key: The UUID or label of the desired entity.
-        :type key: Union[UUID, UniqueLabel]
-        :return: The matching entity.
-        :rtype: VT
-        :raises KeyError: If the key is a UUID not found in the Registry, or
-                          if it is a label that doesn't match any entity.
-        """
-        if isinstance(key, UniqueLabel):
-            if x := self.find_one(label=key):
-                return x
-        return self._data[key]
+    def get(self, key: UUID) -> Optional[VT]:
+        if isinstance(key, str):
+            raise ValueError(
+                f"Use find_one(label='{key}') instead of get('{key}') to get-by-label"
+            )
+        return self.data.get(key)
 
-    def __setitem__(self, key: UUID, value: VT) -> None:
-        """
-        Prohibited direct assignment. Raises :exc:`NotImplementedError`.
+    def remove(self, key: VT | UUID):
+        if isinstance(key, Entity):
+            key = key.uid
+        if not isinstance(key, UUID):
+            raise ValueError(f"Wrong type for remove key {key}")
+        self.data.pop(key)
 
-        :raises NotImplementedError: Always, since the registry requires
-                                     :meth:`add` for controlled insertion.
-        """
-        raise NotImplementedError(f"{self.__class__.__name__} is not setable by key, use `add(entity)`.")
+    @property
+    def is_dirty(self) -> bool:
+        # One bad apple ruins the barrel
+        return self.is_dirty_ or self.any_dirty()
 
-    def __delitem__(self, key: UUID) -> None:
-        """
-        Delete an entity from the Registry.
+    def any_dirty(self) -> bool:
+        """Check if any entity in this registry is marked dirty."""
+        return any(entity.is_dirty for entity in self.data.values())
 
-        :param key: The UUID of the item to remove.
-        :type key: UUID
+    def find_dirty(self) -> Iterator[VT]:
+        """Yield all dirty entities in the registry."""
+        return (entity for entity in self.data.values() if entity.is_dirty)
 
-        :raises KeyError: If the key is not found in the Registry.
-        """
-        del self._data[key]
+    # -------- FIND IN COLLECTION ----------
 
-    def __iter__(self) -> Iterator[UUID]:
-        """
-        Iterate over the UUIDs of the contained entities.
+    @overload
+    def find_all(self, *, is_instance: FT, **criteria) -> Iterator[FT]:
+        ...
 
-        :return: An iterator of UUIDs.
-        :rtype: Iterator[UUID]
-        """
-        return iter(self._data)
+    @overload
+    def find_all(self, **criteria) -> Iterator[VT]:
+        ...
 
-    def __len__(self) -> int:
-        """
-        Get the count of entities in this Registry.
-
-        :return: Number of contained entities.
-        :rtype: int
-        """
-        return len(self._data)
-
-    def __contains__(self, item: Entity | UUID) -> bool:
-        if isinstance(item, Entity):
-            item = item.uid
-        return item in self._data
-
-    def __bool__(self) -> bool:
-        return bool(self._data)
-
-    def add(self, value: VT, allow_overwrite: bool = False) -> None:
-        """
-        Add a new entity to the Registry. The entity's UUID is used as
-        the map key. By default, duplicates are disallowed.
-
-        :param value: The entity to add.
-        :type value: VT
-        :param allow_overwrite: Whether to overwrite an existing entity with
-                                the same UUID, defaults to False.
-        :type allow_overwrite: bool
-        :raises ValueError: If an entity with the same UUID already exists
-                            and ``allow_overwrite`` is False.
-        """
-        if not allow_overwrite and value.uid in self._data:
-            raise ValueError(f"Cannot overwrite {value.uid} in registry. Pass `allow_overwrite=True` to force overwrite.")
-        self._data[value.uid] = value
-
-    def remove(self, value: VT) -> None:
-        """
-        Remove an entity from the Registry by its UUID, ignoring if not found.
-
-        :param value: The entity to remove (searched by its ``uid``).
-        :type value: VT
-        """
-        self._data.pop(value.uid, None)
-
-    def find(self, **criteria) -> list[VT]:
-        """
-        Retrieve all entities that match the given criteria. Criteria
-        matching is delegated to :meth:`~tangl.entity.Entity.matches_criteria`.
-
-        :param criteria: Key-value pairs to filter on (e.g. ``domain="foo"``,
-                         ``label="bar"``).
-        :return: All entities that match the criteria.
-        :rtype: list[VT]
-        """
-        return self.filter_by_criteria(self._data.values(), **criteria)
+    def find_all(self, sort_key = None, **criteria):
+        iter_values = Entity.filter_by_criteria(self.values(), **criteria)
+        if sort_key is None:
+            yield from iter_values
+        else:
+            yield from sorted(iter_values, key=sort_key)
 
     def find_one(self, **criteria) -> Optional[VT]:
-        """
-         Retrieve the first entity that matches the given criteria, or
-         ``None`` if no match is found.
+        if "uid" in criteria:
+            return self.get(criteria["uid"])
+        return next(self.find_all(**criteria), None)
 
-         :param criteria: Key-value pairs to filter on.
-         :return: The first matching entity or ``None``.
-         :rtype: Optional[VT]
-         """
-        return self.filter_by_criteria(self._data.values(), return_first=True, **criteria)
-
-    # ? these get implemented automatically by mapping given iter? like _clear_ does?
-    # def keys(self) -> Iterable[UUID]:
-    #     return self.data_.keys()
-    #
-    # def values(self) -> Iterable[VT]:
-    #     return self._data.values()
-
-    def update(self, other: Mapping[UUID, VT] | Iterable[VT] | VT) -> None:
-        if isinstance(other, Mapping):
-            for v in other.values():
-                self.add(v)
-        elif isinstance(other, Iterable):
-            for v in other:
-                self.add(v)
-        elif hasattr(other, 'uid'):
-            self.add(other)
-
-    # def __repr__(self) -> str:
-    #     return f"<{self.__class__.__name__}:{self.label} {dict(self.data_)}>"
-
-    def all_tags(self) -> Counter:
-        res = Counter()
-        for c in self.values():
-            for t in c.tags:
-                res[t] += 1
-        return res
-
-    def all_labels(self) -> list[str]:
-        return [ v.label for v in self.values() ]
-
-    @functools.wraps(BaseModel.model_dump)
-    def model_dump(self, *args, **kwargs) -> dict[str, Any]:
-        """
-        Extended dump that includes all contained entities under ``data``
-        in unstructured form. Leverages the parent :meth:`tangl.entity.Entity.model_dump`
-        for base fields.
-
-        :param args: Forwarded to Pydantic's ``model_dump``.
-        :param kwargs: Forwarded to Pydantic's ``model_dump``.
-        :return: A dictionary with the Registry's fields plus a ``data`` key
-                 listing each contained entity's unstructured representation.
-        :rtype: dict[str, Any]
-        """
-        data = super().model_dump(**kwargs)
-        data['data'] = []
-        for v in self.values():
-            data['data'].append(v.unstructure())
-        return data
+    # -------- CHAINED FIND ----------
 
     @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
-        """
-        Reconstruct a Registry (and its contained entities) from a
-        previously dumped data structure. Identifies the correct Registry
-        subclass via ``obj_cls``, then iterates over each item in ``data``
-        to rebuild contained entities.
+    def chain_find_all(cls, *registries: Self, sort_key = None, **criteria) -> Iterator[VT]:
+        with _chained_registries(*registries):  # make registries available to inner calls
+            iter_values = itertools.chain.from_iterable(
+                r.find_all(**criteria) for r in registries)
+            if sort_key is None:
+                yield from iter_values
+            else:
+                yield from sorted(iter_values, key=sort_key)
 
-        :param data: The unstructured data produced by :meth:`model_dump`.
-        :type data: dict
-        :return: A rehydrated Registry containing entity objects.
-        :rtype: Self
-        :raises ValueError: If the stated ``obj_cls`` cannot be resolved, or
-                            if individual entities fail to structure.
-        """
-        obj_cls = data.pop("obj_cls")
-        obj_cls = dereference_obj_cls(cls, obj_cls)
-        this = obj_cls()
-        data = data.pop('data', [])
-        for v in data:
-            item = Entity.structure(v)
-            this.add(item)
-        return this
+    @classmethod
+    def chain_find_one(cls, *registries: Self, sort_key = None, **criteria) -> Optional[VT]:
+        if sort_key is None:
+            warnings.warn("chain_find_one with no sort key is legal, but it may not be what you want, it is just reg[0].find_one()")
+        return next(cls.chain_find_all(*registries, sort_key=sort_key, **criteria), None)
+
+    # -------- FIND SATISFIERS -----------
+
+    def select_all_for(self, selector: Entity, sort_key = None, **inline_criteria) -> Iterator[ST]:
+        # filter will gracefully fail if VT is not a Selectable
+        iter_values = Selectable.filter_for_selector(self.values(), selector=selector, **inline_criteria)
+        if sort_key is None:
+            yield from iter_values
+        else:
+            yield from sorted(iter_values, key=sort_key)
+
+    def select_one_for(self, selector: Entity, **inline_criteria) -> Optional[ST]:
+        return next(self.select_for(selector, **inline_criteria), None)
+
+    @classmethod
+    def chain_select_all_for(cls, *registries: Self, selector: Entity, sort_key = None, **inline_criteria) -> Iterator[ST]:
+        with _chained_registries(*registries):  # make registries available to inner calls
+            iter_values = itertools.chain.from_iterable(
+                r.select_all_for(selector, **inline_criteria) for r in registries)
+            if sort_key is None:
+                yield from iter_values
+            else:
+                yield from sorted(iter_values, key=sort_key)
+
+    @classmethod
+    def chain_select_one_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Optional[ST]:
+        return next(cls.chain_select_all_for(*registries, selector=selector, **inline_criteria), None)
+
+    # -------- DELEGATE MAPPING METHODS -----------
+
+    def keys(self) -> Iterator[UUID]:
+        return iter(self.data.keys())
+
+    def values(self) -> Iterator[VT]:
+        return iter(self.data.values())
+
+    def __bool__(self) -> bool:
+        return bool(self.data)
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __iter__(self) -> Iterator[VT]:
+        return iter(self.data.values())
+
+    def clear(self) -> None:
+        self.data.clear()
+
+    def __contains__(self, key: UUID | str | VT) -> bool:
+        if isinstance(key, UUID):
+            return key in self.data
+        elif isinstance(key, Entity):
+            return key in self.data.values()
+        elif isinstance(key, str):
+            return key in self.all_labels()
+        raise ValueError(f"Unexpected key type for contains {type(key)}")
+
+    # -------- SUMMARY HELPERS ----------
+
+    def all_labels(self) -> list[str]:
+        return [x.get_label() for x in self.data.values() if x.get_label() is not None]
+
+    def all_tags(self) -> set[Tag]:
+        return set(itertools.chain.from_iterable(i.tags for i in self))
+
+    def all_tags_frequency(self) -> Counter[Tag]:
+        return Counter(itertools.chain.from_iterable(i.tags for i in self))
+
+    # -------- EVENT SOURCED REPLAY ----------
+
+    def _add_silent(self, entity: VT):
+        self.data[entity.uid] = entity
+
+    def _get_silent(self, key: UUID) -> Optional[VT]:
+        return self.data.get(key)
+
+    def _remove_silent(self, key: VT | UUID):
+        if isinstance(key, Entity):
+            key = key.uid
+        self.data.pop(key)
+
+    # -------- STRUCTURING AND UNSTRUCTURING ----------
+
+    @classmethod
+    def structure(cls, data: StringMap) -> Self:
+        # Be careful of nested delegation here
+        _data = data.pop("_data", {})  # local copy
+        obj = super().structure(data)  # type: Self
+        for v in _data:
+            _obj = Entity.structure(v)
+            obj.add(_obj)
+        return obj
+
+    def unstructure(self) -> StringMap:
+        data = super().unstructure()
+        data["_data"] = []
+        for v in self.data.values():
+            data['_data'].append(v.unstructure())
+        return data
+
+# For chain-find/select, provide the entire list of participating registries
+# in the call stack.  Enables chain-order sort keys for items that know what registry they came from.
+
+_CHAINED_REGISTRIES: ContextVar[list[Registry] | None] = ContextVar(
+    "_CHAINED_REGISTRIES", default=None
+)
+
+@contextmanager
+def _chained_registries(*registries: Registry) -> list[Registry] | None:
+    token = _CHAINED_REGISTRIES.set(list(registries))
+    try:
+        yield
+    finally:
+        _CHAINED_REGISTRIES.reset(token)
+

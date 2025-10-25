@@ -1,5 +1,5 @@
 
-from tangl.narrative.lang.gendered_nominals import gn, gendered_nominals, normalize_gn, is_xx_patterns
+from tangl.lang.gendered_nominals import gn, gendered_nominals, normalize_gn, is_xx_patterns
 
 def test_gn():
 

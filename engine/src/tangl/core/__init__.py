@@ -1,21 +1,78 @@
-# Note, this subpackage has lots of interdependencies and requires careful
-# import ordering.
+"""
+.. currentmodule:: tangl.core
 
+Foundational abstractions for self-realizing narrative graphs. These classes
+define the *vocabulary* (nouns) and *capabilities* (verbs) for higher-level
+story resolution.
+
+Conceptual layers
+-----------------
+
+1. :ref:`Identity and Collection<core-identity>`
+
+   - :class:`Entity` provides a universal base for all managed objects.
+   - :class:`Registry` organizes entities with robust search and chaining.
+   - :class:`Singleton` shared entities that are discoverable by a unique label.
+
+2. :ref:`Graph Topology<core-topology>`
+
+   - :class:`Graph`, and :class:`GraphItems<GraphItem>` like :class:`Node`,
+     :class:`Edge`, :class:`Subgraph` describe linked structures and hierarchy.
+
+3. :ref:`Runtime Artifacts<core-artifacts>`
+
+   - :class:`Record` captures immutable events, fragments, and notes.
+   - :class:`StreamRegistry` sequences records with bookmarks and channels.
+   - :class:`Snapshot` wraps a copy of an entity for record keeping and rematerialization.
+   - :class:`Fragment<BaseFragment>` is a record type that encodes narrative/UI output.
+
+4. :ref:`Dispatch<core-dispatch>`
+
+   - :class:`Behavior` wraps callable behaviors, returning a :class:`CallReceipt` record.
+   - :class:`BehaviorRegistry` executes handlers in ordered pipelines.
+
+5. :ref:`Capabilities<core-capability>`
+
+   - :class:`Domain` publishes a namespace (vars + handlers).
+   - :class:`Scope` layers implicit (topological) and explicit (affiliated) domains around a node.
+
+Design intent
+-------------
+`tangl.core` isolates minimal abstractions so that story engines can reason about
+identity, relationships, and events *without presupposing narrative content*.
+"""
+
+# Base classes for all objects and collections
 from .entity import Entity
-
-# deps entity only
 from .registry import Registry
-from .fragment import ContentFragment, ControlFragment, GroupFragment, KvFragment, PresentationHints
-from .task_handler import TaskHandler, HandlerPriority
 
-# deps registry
-from .singleton import Singleton, InheritingSingleton
-from .graph import Node, Graph, SingletonNode, Edge, DynamicEdge
+# Sequential data artifacts
+from .record import Record, StreamRegistry, Snapshot, BaseFragment
 
-# deps singleton, task_handler, registry
-from .handler_pipeline import PipelineStrategy, HandlerPipeline, HandlerRegistry
-from .data_resources import ResourceDataType, ResourceInventoryTag, ResourceRegistry
-from .entity_handlers import HasContext, on_gather_context, HasConditions, on_check_conditions, HasEffects, on_apply_effects, Renderable, on_render, Available, on_avail  # deps task_handler
+# Globally reusable objects
+from .singleton import Singleton
 
-# deps graph, entity_handlers, singleton, task_handler, registry
-from .graph_handlers import Associating, on_associate, on_disassociate, on_can_associate, on_can_disassociate, TraversableGraph, TraversableEdge, TraversableNode, on_enter, HasScopedContext
+# Topology and membership related extensions
+from .graph import GraphItem, Node, Edge, Subgraph, Graph
+
+# Function dispatch, chaining, auditing
+from .dispatch import CallReceipt, Behavior, BehaviorRegistry
+
+# Opt-in and structurally scoped capability resolution
+from .domain import Domain, Scope, global_domain, NS
+
+
+__all__ = [
+    # Identity & collections
+    "Entity", "Registry",
+    # Singleton
+    "Singleton",
+    # Graph topology
+    "GraphItem", "Node", "Edge", "Subgraph", "Graph",
+    # Records/streams
+    "Record", "StreamRegistry", "Snapshot", "BaseFragment",
+    # Dispatch
+    "CallReceipt", "Behavior", "BehaviorRegistry",
+    # Domains & scope
+    "Domain", "Scope", "global_domain",
+]

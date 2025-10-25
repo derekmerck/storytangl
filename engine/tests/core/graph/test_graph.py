@@ -1,219 +1,114 @@
 import pytest
-from uuid import uuid4
-import pickle
 
-from tangl.core import Node, Graph
+from tangl.core.graph import Graph
 
+# ---------- Graph topology ----------
 
-def test_graph_add_and_retrieve():
+def test_graph_add_and_link_and_path_root():
     g = Graph()
-    n = Node(label="root")
-    g.add(n)
+    a = g.add_node(label="A")
+    b = g.add_node(label="B")
+    e = g.add_edge(a, b)  # no type semantics tested here
 
-    assert g[n.uid] == n
-    assert g["root"] == n
+    sg = g.add_subgraph(label="Top")
+    sg.add_member(a)
+    sg2 = g.add_subgraph(label="Mid")
+    sg2.add_member(b)
+    sg.add_member(sg2)  # nesting subgraph; parent chain: b -> sg2 -> sg
 
-def test_graph_prevents_duplicates():
+    # parent/ancestors
+    assert b.parent == sg2
+    assert list(b.ancestors()) == [sg2, sg]  # nearest -> farthest
+
+    # root must be the farthest
+    assert b.root == sg
+
+    # path should print root..self
+    assert b.path == "Top.Mid.B"
+
+def test_subgraph_remove_member_by_uuid_no_attr_error():
     g = Graph()
-    n = Node(label="root")
-    g.add(n)
-    assert n.graph == g
+    n = g.add_node(label="X")
+    sg = g.add_subgraph(label="G", members=[n])
 
-    n.graph = None
-    with pytest.raises(ValueError):
-        g.add(n)  # Should raise because already in graph but graph is not set properly
+    # remove by UUID should not try to touch GraphItem methods
+    sg.remove_member(n.uid)
+    assert n.uid not in sg.member_ids
 
-def test_graph_lookup_by_label():
+
+def test_graph_add_find_and_path():
     g = Graph()
-    n1 = Node(label="root")
-    n2 = Node(label="child")
+    n1 = g.add_node(label="root")
+    n2 = g.add_node(label="scene")
+    e  = g.add_edge(n1, n2)
+    sg = g.add_subgraph(label="book", members=[n1, n2])
 
-    g.add(n1)
-    n1.add_child(n2)
+    assert n2.parent == sg
+    assert list(n2.ancestors()) == [sg]
+    assert n2.path.endswith(".scene") or n2.path == "book.scene"
 
-    assert g["root/child"] == n2
+    # get by label and by uid
+    assert g.get("root") == n1
+    assert g.get(n2.uid) == n2
 
-def test_graph_missing_node_raises_key_err():
+    # edges API
+    assert list(n1.edges_out()) == [e]
+    assert list(n2.edges_in()) == [e]
+
+
+def test_graph_duplicate_labels_resolve_first_match_and_uid_lookup_unambiguous():
     g = Graph()
+    a = g.add_node(label="X")
+    b = g.add_node(label="X")
+    assert g.get("X") in (a, b)
+    assert g.get(a.uid) is a and g.get(b.uid) is b
 
-    with pytest.raises(KeyError):
-        assert g["nonexistent"] is None
-
-def test_graph_unstructure_structure():
+@pytest.mark.xfail(reason="haven't decided how to handle or restrict membership in multiple subgraphs")
+def test_subgraph_reparent_member_updates_parent_chain():
     g = Graph()
-    root = Node(label="root")
-    mid = Node(label="mid")
-    leaf = Node(label="leaf")
+    a = g.add_node(label="A")
+    s1 = g.add_subgraph(label="S1", members=[a])
+    s2 = g.add_subgraph(label="S2")
+    s2.add_member(a)
+    assert a.parent == s2
+    assert list(a.ancestors())[0] == s2
+    assert s1 is not a.parent
 
-    g.add(root)
-    root.add_child(mid)
-    mid.add_child(leaf)
+# structuring and eq
 
-    assert leaf.root == root
+def test_unstructure_and_eq_on_data_attr():
 
-    structured = g.unstructure()
-    restored = Graph.structure(structured)
+    from tangl.core import Entity
 
-    restored_leaf = restored[leaf.uid]
-    assert restored_leaf == leaf
-    restored_root = restored[root.uid]
-    assert restored_leaf.root == restored_root
+    g = Graph()
+    a = g.add_node(label="A")
+    b = g.add_node(label="B")
+    e = g.add_edge(a, b)  # no type semantics tested here
 
-def test_add_node():
-    graph = Graph()
-    node = Node()
-    graph.add(node)
+    ud = g.model_dump()
+    assert 'data' in ud
+    assert '_data' not in ud
 
-    assert node in graph
+    ud3 = Entity.unstructure(g)
+    assert 'data' not in ud3
+    assert '_data' not in ud3
 
-def test_get_node_by_uuid():
-    graph = Graph()
-    node = Node()
-    graph.add(node)
+    ud2 = g.unstructure()
+    assert 'data' not in ud2
+    assert '_data' in ud2
 
-    retrieved_node = graph.get(node.uid)
-    assert retrieved_node is node
+    # structure w Entity
+    gg = Entity.structure(ud2)
+    assert g == gg
 
-def test_get_node_by_label():
-    graph = Graph()
-    node = Node(label="unique_label")
-    graph.add(node)
+    # Changing data results in neq
+    gg.add_node(label="C")
+    assert g != gg
 
-    retrieved_node = graph.get("unique_label")
-    assert retrieved_node == node
+    ud4 = g.unstructure()
+    # structuring didn't mutate the unstructured data
+    assert ud2 == ud4
 
-class TestNodeByCls(Node):
-    ...
-
-def test_find_nodes():
-    registry = Graph()
-
-    # Create some nodes with specific tags
-    node1 = Node(tags=['red'])
-    node2 = Node(tags=['blue'])
-    node3 = TestNodeByCls(tags=['red', 'blue'])
-    registry.add(node1)
-    registry.add(node2)
-    registry.add(node3)
-
-    assert list(registry.values()) == [node1, node2, node3]
-
-    # Test finding nodes by type
-    assert registry.find(has_cls=TestNodeByCls) == [node3]
-
-    # Test finding nodes by filter
-    assert registry.find(tags="red") == [node1, node3]
-
-    # Test finding nodes by tags
-    assert registry.find(tags=node1.tags) == [node1, node3]
-
-def test_node_and_registry():
-    index = Graph()
-    print( index.nodes_by_path )
-
-    root = Node(label='root', graph=index)
-
-    assert root.graph is index
-    assert root in index
-
-    child1 = Node(label='child1')
-    root.add_child(child1)
-    assert child1 in root.children
-
-    assert child1.graph is index
-
-    print(index.keys())
-
-    assert child1 in index
-    assert child1.path in index
-    assert child1.uid in index
-
-    child2 = Node(label='child2')
-    root.add_child(child2)
-    assert child2 in root.children
-    # index.add_node(child2)
-    #
-    assert len(root.children) == 2
-    assert index.get(root.uid) == root
-    assert index.get(root.uid) == root
-    assert index.get(child1.uid) == child1
-    assert index.get(child2.uid) == child2
-    assert index.get(root.path) == root
-    assert index.get(root.path) == root
-    assert index.get(child1.path) == child1
-    assert index.get(child2.path) == child2
-
-    assert root.graph == index
-    assert child1.graph == index
-    assert child2.graph == index
-
-    assert child1 in root.children
-    root.remove_child(child1)
-    assert child1 not in root.children
-
-    print( child2.parent )
-    print( root.children_ids )
-    assert child2.uid in root.children_ids
-
-    index.remove(child2)
-    assert child2 not in index
-
-    assert index.get("dog") is None
-
-    assert index.get(uuid4()) is None
-
-    assert index.get(100) is None
-
-    assert 100 not in index
-
-def test_complex_hierarchies():
-    root = Node(label="r")
-    registry = Graph()
-    registry.add(root)
-
-    # Create child nodes
-    child1 = Node(label="ch1")
-    child2 = Node(label="ch2")
-    root.add_child(child1)
-    root.add_child(child2)
-
-    # Create grandchild nodes
-    grandchild1 = Node(label="gch1")
-    grandchild2 = Node(label="gch2")
-    child1.add_child(grandchild1)
-    child2.add_child(grandchild2)
-
-    # Check hierarchy and paths
-    assert root.path == root.label
-    assert child1.path == f"{root.label}/{child1.label}"
-    assert grandchild1.path == f"{root.label}/{child1.label}/{grandchild1.label}"
-
-    print( registry.keys() )
-    print( registry.nodes_by_path.keys() )
-
-    # Check registry nodes by path
-    assert registry.nodes_by_path == {
-        root.path: root,
-        child1.path: child1,
-        child2.path: child2,
-        grandchild1.path: grandchild1,
-        grandchild2.path: grandchild2,
-    }
-
-def test_graph_pickles():
-
-    graph = Graph()
-    node = Node(label="node", graph=graph)
-    child = Node(label="child")
-    node.add_child(child)
-
-    assert child.parent is node
-    assert child.graph is node.graph
-    assert node.uid in node.graph
-    assert child.uid in node.graph
-
-    s = pickle.dumps( graph )
-    print( s )
-    res = pickle.loads( s )
-    print( res )
-    assert graph == res
+    # structure directly w Graph
+    ggg = Graph.structure(ud4)
+    assert g == ggg

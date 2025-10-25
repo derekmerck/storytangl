@@ -1,10 +1,15 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import Callable, Any, Type, get_type_hints
+from typing import Callable, Any, Type, get_type_hints, Mapping
 import functools
 import inspect
 
 from pydantic import BaseModel, model_validator, Field
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AccessLevel(IntEnum):
     """
@@ -56,6 +61,36 @@ class ResponseType(Enum):
     INFO    = "info"             # User, world-, or sys-info model
     RUNTIME = "runtime"          # Acknowledgement model
     MEDIA   = "media"            # Raw or MIME-typed media data
+
+@dataclass(frozen=True)
+class PreprocessResult:
+    """Outcome from a preprocessor execution."""
+
+    args: tuple[Any, ...] | None = None
+    kwargs: Mapping[str, Any] | None = None
+    skip_main: bool = False
+    result: Any = None
+
+    @classmethod
+    def skip(cls, result: Any = None) -> "PreprocessResult":
+        """Return a result without invoking the endpoint body."""
+
+        return cls(args=None, kwargs=None, skip_main=True, result=result)
+
+
+@dataclass(frozen=True)
+class PostprocessResult:
+    """Outcome from a postprocessor execution."""
+
+    result: Any
+    stop: bool = False
+
+    @classmethod
+    def stop_with(cls, result: Any) -> "PostprocessResult":
+        """Return ``result`` and skip remaining postprocessors."""
+
+        return cls(result=result, stop=True)
+
 
 class ApiEndpoint(BaseModel):
     """
@@ -168,16 +203,47 @@ class ApiEndpoint(BaseModel):
         :param kwargs: Keyword arguments for the target function.
         :return: The result of the target function, optionally modified by postprocessors.
         """
+        logger.debug(f"calling target function: args={args} kwargs={kwargs}")
 
         # Optionally run preprocessors:
         for pre in self.preprocessors:
-            args, kwargs = pre(args, kwargs)
+            decision = pre(args, kwargs)
+
+            if isinstance(decision, PreprocessResult):
+                if decision.args is not None:
+                    args = tuple(decision.args)
+                if decision.kwargs is not None:
+                    kwargs = dict(decision.kwargs)
+                if decision.skip_main:
+                    return decision.result
+                continue
+
+            if decision is None:
+                continue
+
+            try:
+                args, kwargs = decision
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    "Preprocessor must return (args, kwargs) or PreprocessResult"
+                ) from exc
 
         result = self.func(*args, **kwargs)
 
         # Optionally run postprocessors:
         for post in self.postprocessors:
-            result = post(result)
+            decision = post(result)
+
+            if isinstance(decision, PostprocessResult):
+                result = decision.result
+                if decision.stop:
+                    return result
+                continue
+
+            if decision is None:
+                result = None
+            else:
+                result = decision
 
         return result
 

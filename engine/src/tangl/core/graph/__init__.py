@@ -1,5 +1,5 @@
+from .graph import GraphItem, Graph
+from .subgraph import Subgraph
 from .node import Node
-from .edge import EdgeP, SimpleEdge, Edge
-from .graph import Graph
-from .dynamic_edge import DynamicEdge
+from .edge import Edge, AnonymousEdge
 from .singleton_node import SingletonNode

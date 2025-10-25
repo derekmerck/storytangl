@@ -1,7 +1,7 @@
 import itertools
 import operator
 
-from tangl.narrative.lang.pronoun import Pronoun, Gens, PoV, PT
+from tangl.lang.pronoun import Pronoun, Gens, PoV, PT
 
 import pytest
 

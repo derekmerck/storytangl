@@ -1,8 +1,8 @@
 import random
 import logging
 
-from tangl.narrative.lang.gens import Gens as Gender
-from tangl.narrative.lang.age_range import AgeRange
+from tangl.lang.gens import Gens as Gender
+from tangl.lang.age_range import AgeRange
 from .data_models import Subtype, Country, Region, NameBank
 from .demographic import DemographicData
 
@@ -25,7 +25,7 @@ class DemographicSampler:
 
     @classmethod
     def sample_region(cls, weighted=False) -> Country:
-        regions = list(Region._instances.values())  # type: list[Region]
+        regions = list(Region.all_instances())  # type: list[Region]
         if not regions:
             raise IndexError('No regions found')
         if weighted:

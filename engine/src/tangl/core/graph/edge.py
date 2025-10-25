@@ -1,142 +1,119 @@
-"""
-Nodes can be associated in several ways:
-
-- Directly through parent/child relationships.  These relationships can be added programmatically with "add_child()" and "remove_child()".  No edge is required.
-- For direct parent/child relationships, the child node is added to the parent's children.
-- For direct peer relationships, neither node is the parent of the other, both nodes are added to the other's children.
-
-- Indirectly through an 'edge', where one node is the predecessor and the other is the successor.
-- Simple Edges have no parent/child relationships with the graph, and can be garbage collected.
-- Normal Edges have parent-only relationships and reference their successor as a named field.
-- Dynamic Edges have parent-only relationships UNTIL they are dereferenced, at which point they can attach to an already existing node by name or conditions, or even create a new node _de novo_.
-
-Both direct and indirect relationships may be _mutable_.  In such cases, nodes are either temporarily related as parent/child (ownership or assignment) or peer-to-peer (connected).  For indirect relationships (Dynamic Edges), the association is between the edge itself and the successor node.
-
-Managing such mutable associations and transactions requires additional flexibility, so they are managed through an AssociationHandler.
-"""
-
+# tangl/core/graph/edge.py
 from __future__ import annotations
-from typing import Optional, Protocol, Generic, TypeVar
+from typing import Optional, Iterator, TYPE_CHECKING
+from enum import Enum
 from uuid import UUID
 
-import logging
+from pydantic import model_validator
 
-from pydantic import Field, model_validator, field_validator
+from tangl.core.entity import Entity
+from .graph import GraphItem, Graph
 
-from tangl.core import Entity
 from .node import Node
 
-logger = logging.getLogger(__name__)
-
-SuccessorT = TypeVar("SuccessorT", bound=Entity)
-
-class EdgeP(Protocol):
-    predecessor: Entity
-    successor: Entity
-
-class SimpleEdge(Entity, Generic[SuccessorT]):
+class Edge(GraphItem):
     """
-    An SimpleEdge is an *anonymous* (unregistered) link between two entities. The entities
-    themselves do not hold links to the edge, so the connector can be garbage collected.
-    """
-    predecessor: Optional[Entity]
-    successor: SuccessorT
+    Edge(source: Node, destination: Node, edge_type: str)
 
-    def __repr__(self):
-        s = f"<{type(self).__name__}:{self.predecessor.label}->{self.successor.label}>"
-        return s
+    Directed connection between two nodes in the same graph.
 
-
-class Edge(Node, Generic[SuccessorT]):
-    """
-    An Edge is a specialized :class:`~tangl.core.graph.Node` that connects a parent predecessor node
-    with a linked successor node, facilitating traversal and story flow.
+    Why
+    ----
+    Encodes structure and flow (parent→child, dependency, sequence). Stores
+    endpoint ids for serialization, with properties that resolve to live nodes.
 
     Key Features
     ------------
-    * **Predecessor-Successor Relationship**: Links two nodes for traversal purposes.
-    * **Predecessor Child**: Edges are typically created as children of their predecessor nodes.
+    * **Typed** – optional :attr:`edge_type`.
+    * **Endpoint conversion** – pre-init validator accepts ``source``/``destination``
+      as :class:`GraphItem` and converts them to ids.
+    * **Live accessors** – :attr:`source` / :attr:`destination` resolve via graph.
 
-    Usage
-    -----
-    .. code-block:: python
+    API
+    ---
+    - :attr:`source_id`, :attr:`destination_id` – UUIDs (nullable for dangling edges).
+    - :attr:`source` / :attr:`destination` – properties with validation on set.
+    - :meth:`__repr__` – compact label showing endpoints for debugging.
 
-        from tangl.core.graph import Node, Edge
-
-        # Create nodes and an edge
-        predecessor = Node(label="start")
-        successor = Node(label="next")
-        edge = Edge(predecessor=predecessor, successor=successor)
-
-        # Access edge properties
-        print(edge.predecessor == predecessor)  # True
-        print(edge.successor == successor)  # True
+    See also
+    --------
+    :class:`~tangl.core.graph.AnonymousEdge`
     """
-    parent_id: UUID = Field(..., alias="predecessor_id")  # required now
 
-    # predecessor: Entity = Field(None, init_var=True)
-    @model_validator(mode='before')
+    edge_type: Optional[Enum|str] = None       # No need to enumerate this yet
+    source_id:  Optional[UUID] = None          # usually parent
+    destination_id: Optional[UUID] = None      # attach to a structure (choice) or dependency (role, loc, etc.)
+
+    @model_validator(mode="before")
     @classmethod
-    def _alias_predecessor_to_parent(cls, data):
-        if predecessor := data.pop('predecessor', None):
-            data.setdefault("predecessor_id", predecessor.uid)
-            if predecessor.graph is not None:
-                data.setdefault('graph', predecessor.graph)
-        return data
-
-    # successor: SuccessorT
-
-    # todo: what is the pydantic attribute property markup so this shows up as an allowable input in the schema?
-    @property
-    def predecessor(self) -> Node:
-        return self.parent
-
-    successor_id: UUID = None
-
-    @field_validator("successor_id", mode="before")
-    @classmethod
-    def _reference_entities_as_ids(cls, data):
-        if isinstance(data, Entity):
-            return data.uid
-        return data
-
-    @model_validator(mode='before')
-    @classmethod
-    def _reference_successor(cls, data):
-        if successor := data.pop('successor', None):
-            data.setdefault("successor_id", successor.uid)
-            if successor.graph is not None:
-                data.setdefault('graph', successor.graph)
+    def _convert_to_uid(cls, data):
+        for attr in ("source", "destination"):
+            if attr in data and isinstance(data[attr], GraphItem):
+                entity = data.pop(attr)
+                data.setdefault(f"{attr}_id", entity.uid)
         return data
 
     @property
-    def successor(self) -> Optional[SuccessorT]:
-        return self.graph.get(self.successor_id, None)
+    def source(self) -> Optional[Node]:
+        return self.graph.get(self.source_id)
 
-    # @successor.setter
-    # def successor(self, value: UUID | SuccessorT):
-    #     if value:
-    #         if isinstance(value, UUID):
-    #             self.successor_id = value
-    #         elif x := getattr(value, "uid", None):
-    #             self.successor_id = x
-    #         else:
-    #             raise TypeError("successor must be a UUID or a Node-like object")
+    @source.setter
+    def source(self, value: Optional[Node]) -> None:
+        if value is None:
+            self.source_id = None
+            return
+        self.graph._validate_linkable(value)
+        self.source_id = value.uid
 
-    # todo: add this to on avail handler for edges
-    # @on_avail.strategy("on_available")
-    # def _check_successor_avail(self, **kwargs) -> bool:
-    #     if hasattr(self.successor, "available"):
-    #         return self.successor.available()
+    @property
+    def destination(self) -> Optional[Node]:
+        return self.graph.get(self.destination_id)
 
-    def __repr__(self):
-        try:
-            successor_label = self.successor.label
-        except (KeyError, AttributeError, TypeError):
-            successor_label = self.successor_id
-        try:
-            predecessor_label = self.predecessor.label
-        except (KeyError, AttributeError, TypeError):
-            predecessor_label = "anon"
-        s = f"<{type(self).__name__}:{predecessor_label}->{successor_label}>"
-        return s
+    @destination.setter
+    def destination(self, value: Optional[Node]) -> None:
+        if value is None:
+            self.destination_id = None
+            return
+        self.graph._validate_linkable(value)
+        self.destination_id = value.uid
+
+    def __repr__(self) -> str:
+        if self.source is not None:
+            src_label = self.source.label or self.source.short_uid()
+        elif getattr(self, 'source_id', None) is not None:
+            src_label = self.source_id.hex
+        else:
+            src_label = "anon"
+
+        if self.destination is not None:
+            dest_label = self.destination.label or self.destination.short_uid()
+        elif getattr(self, 'destination_id', None) is not None:
+            dest_label = self.destination_id.hex
+        else:
+            dest_label = "anon"
+
+        return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
+
+
+class AnonymousEdge(Entity):
+    """
+    AnonymousEdge(source: Node, destination: Node)
+
+    Lightweight edge without a managing graph (GC-friendly helper).
+
+    Why
+    ----
+    Useful for transient computations (e.g., previews, diffs) where full graph
+    membership and registration would be unnecessary overhead.
+
+    API
+    ---
+    - :attr:`source` – optional node reference.
+    - :attr:`destination` – required node reference.
+    - :meth:`__repr__` – mirrors :class:`Edge` formatting for consistency.
+    """
+    # Minimal Edge that does not require a graph, so it can be garbage collected
+    source: Optional[Node] = None
+    destination: Node
+
+    __repr__ = Edge.__repr__

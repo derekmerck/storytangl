@@ -170,6 +170,7 @@ class BookmarkedList(Generic[T]):
         bookmarks = self.get_bookmarks(bookmark_type=bookmark_type)
 
         if not bookmarks:
+            logger.debug(f"No such bookmark type {bookmark_type}")
             return []
 
         # Find the bookmark
@@ -183,6 +184,8 @@ class BookmarkedList(Generic[T]):
 
             bookmark = bookmarks[which]
             selected_idx = which
+
+            logger.debug(f"Final which: {which}")
 
         else:  # which is a name
 

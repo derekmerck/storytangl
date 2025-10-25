@@ -1,12 +1,12 @@
 # Version History
 
-- 3.2, 2025, StoryTangl 3-layer ANG
-- 3.1, 2024
+- 3.7, 2025, dependency-driven interpreter, ai code agents
+- 3.2, 2025, 3-layer narrative graph
 - 2.9, 2024, strategy-based task handlers
-- 2.8, 2023, revise core dataclasses for serialization
-- 2.7, 2023, rewrite with ai assist
-- 2.5, 2022
-- 2.3, 2021, modular worlds
+- 2.8, 2023, switch attrs->pydantic and better serialization
+- 2.7, 2023, poetry, ai code helpers
+- 2.5, 2022, vue3/vite client, svg avatars
+- 2.3, 2021, modular worlds, vue2 client
 - 2.1, 2020, story trees, separate client and api
 - 1.0, 2019, lost to the sands of time
 

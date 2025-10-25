@@ -17,7 +17,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
 
     It is implemented as a pipeline with three parts:
       - a _structuring_ handler that implements `structure` and `unstructure` for a class that has a `uid` field
-      - a _serialization' handler that implements `serialize` and `deserialize` for dicts, like pickle, yaml, bson
+      - a _serialization_ handler that implements `serialize` and `deserialize` for dicts, like pickle, yaml, bson
       - a flat-data _storage_ backend that implements `read` and `write` for str|bytes, like in-mem, files, redis, mongodb
     """
 
@@ -74,7 +74,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
         if self.storage is not None:
             if hasattr(structured, 'uid'):
                 uid = structured.uid
-            elif isinstance(structured, UnstructuredData) and 'uid' in structured:
+            elif isinstance(structured, dict) and 'uid' in structured:
                 uid = structured['uid']
             else:
                 raise KeyError(f"Unable to infer key for {structured}")

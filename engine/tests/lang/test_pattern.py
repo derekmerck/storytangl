@@ -1,8 +1,8 @@
 import pytest
 
-from tangl.narrative.lang.conjugates import Conjugates
-from tangl.narrative.lang.pronoun import PoV
-from tangl.narrative.lang.helpers.pattern import is_plural, conjugate
+from tangl.lang.conjugates import Conjugates
+from tangl.lang.pronoun import PoV
+from tangl.lang.helpers.pattern import is_plural, conjugate
 
 conjugation_tests = {
     "runs": ("run", PoV._3s),

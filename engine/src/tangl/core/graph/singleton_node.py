@@ -1,3 +1,4 @@
+# tangl/core/singleton/singleton_node.py
 from __future__ import annotations
 from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
@@ -9,6 +10,7 @@ from pydantic import Field, field_validator
 
 from tangl.type_hints import UniqueLabel
 from tangl.core import Singleton
+from .graph import Graph  # for pydantic model schema
 from .node import Node
 
 logger = logging.getLogger(__name__)
@@ -17,51 +19,43 @@ WrappedType = TypeVar("WrappedType", bound=Singleton)
 
 class SingletonNode(Node, Generic[WrappedType]):
     """
-    SingletonNode is a :class:`~tangl.core.graph.Node` extension that wraps a
-    :class:`~tangl.core.entity.Singleton` with instance-specific
-    state, enabling it to be attached to a graph while maintaining singleton
-    behavior.
+    SingletonNode(from_ref: UniqueStr)
+
+    Graph node wrapper that attaches a :class:`~tangl.core.Singleton` to a graph with node-local state.
+
+    Why
+    ----
+    Let immutable singletons participate in topology while allowing per-node state (e.g.,
+    position, runtime flags) that does not mutate the singleton itself.
 
     Key Features
     ------------
-    * **Singleton Wrapper**: Wraps a Singleton, providing graph connectivity.  The wrapped Singleton is accessed via the :attr:`reference_entity` property.
-    * **Instance Variables**: Supports instance-specific variables.  Instance variables must be marked with :code:`json_schema_extra={"instance_var": True}` in the Singleton.
-    * **Method Rebinding**: Class methods are rebound to the wrapped instance.
-    * **Dynamic Class Creation**: Provides a method :meth:`create_wrapper_cls` to create wrapper classes for specific Singleton types.
-    * **Supports Generics**: SingletonNode[Singleton] automatically creates an appropriate class wrapper.
+    * **Binding** – :attr:`wrapped_cls` points to the singleton class; :attr:`label` selects instance.
+    * **Delegation** – attribute access defers to the wrapped singleton; methods are rebound for convenience.
+    * **Instance vars** – singleton fields marked ``json_schema_extra={"instance_var": True}``
+      are materialized on the node for local override.
+    * **Dynamic wrappers** – :meth:`__class_getitem__` / :meth:`_create_wrapper_cls` generate typed wrappers on demand.
 
-    Usage
+    API
+    ---
+    - :attr:`wrapped_cls` – singleton type bound to this wrapper.
+    - :attr:`label` – required label of the referenced instance; validated at creation.
+    - :attr:`reference_singleton` – access the underlying instance.
+    - :meth:`_instance_vars` – collect instance-var field definitions from the wrapped class.
+    - :meth:`_create_wrapper_cls` – emit a new wrapper subclass with those fields.
+
+    Notes
     -----
-    .. code-block:: python
-        from tangl.core.graph import SingletonNode, Graph
-        from tangl.core import Singleton
-
-        class MyConstant(Singleton):
-            value: int
-            state: str = Field(default="initial", json_schema_extra={"instance_var": True})
-
-        MyConstantNode = SingletonNode.create_wrapper_cls("MyConstantNode", MyConstant)
-
-        graph = Graph()
-        const_node1 = MyConstantNode(label="CONSTANT_1", value=42, graph=graph)
-        const_node2 = MyConstantNode(label="CONSTANT_1", state="modified", graph=graph)
-
-        print(const_node1.value == const_node2.value)  # True (42)
-        print(const_node1.state != const_node2.state)  # True ("initial" != "modified")
-
-    Related Components
-    ------------------
-    * :class:`~tangl.core.entity.Singleton`: The base class for singleton entities.
-    * :class:`~tangl.core.graph.Node`: The base class for graph nodes.
+    Prefer modeling behavior in the singleton; keep node-local overrides minimal and explicit.
     """
-    # Allows embedding a singleton into a mutable node so its properties can be
+    # Allows embedding a Singleton into a mutable node so its properties can be
     # referenced indirectly via a graph
-    # Note that singletons are frozen, so you shouldn't mess with its referred attributes.
+    # Note that singletons are frozen, so the referred attributes are immutable.
 
     #: The singleton entity class that this wrapper is associated with.
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
-    label: UniqueLabel = Field(...)  # required
+    label: UniqueLabel = Field(...)  # required now
 
     # noinspection PyNestedDecorators
     @field_validator("label")
@@ -92,9 +86,11 @@ class SingletonNode(Node, Generic[WrappedType]):
 
     @classmethod
     def _instance_vars(cls, wrapped_cls: Type[WrappedType] = None):
-        wrapped_cls = wrapped_cls or cls.get_wrapped_cls()
-        return {k: (v.annotation, v) for k, v in wrapped_cls.__pydantic_fields__.items()
-                if v.json_schema_extra and v.json_schema_extra.get("instance_var")}
+        inst_fields = list(wrapped_cls._fields(instance_var=(True, False)))
+        return {
+            name: (info.annotation, info)
+            for name, info in wrapped_cls.model_fields.items() if name in inst_fields
+        }
 
     @classmethod
     def _create_wrapper_cls(cls, wrapped_cls: Type[WrappedType], name: str = None) -> Type[Self]:
@@ -109,11 +105,20 @@ class SingletonNode(Node, Generic[WrappedType]):
         instance_vars = cls._instance_vars(wrapped_cls)
         generic_metadata = {'origin': cls, 'args': (wrapped_cls,), 'parameters': ()}
 
+        logger.debug(f"Creating new wrapper class {name} for {wrapped_cls.__name__}")
+
+        # prior pydantic create model allowed directly passing a class dict like type()
+        # new_cls = pydantic.create_model(name,
+        #                                 __base__= cls,
+        #                                 __pydantic_generic_metadata__=generic_metadata,
+        #                                 wrapped_cls = wrapped_cls,
+        #                                 **instance_vars )
         new_cls = pydantic.create_model(name,
-                                        __base__= cls,
-                                        __pydantic_generic_metadata__=generic_metadata,
-                                        wrapped_cls = wrapped_cls,
-                                        **instance_vars )
+                                        __base__=cls,
+                                        __module__=module.__name__,
+                                        **instance_vars)
+        setattr(new_cls, "wrapped_cls", wrapped_cls)
+        setattr(new_cls, "__pydantic_generic_metadata__", generic_metadata)
 
         # Adding the ephemeral class to this module's namespace allows them to be pickled and cached
         setattr(module, name, new_cls)
@@ -126,4 +131,7 @@ class SingletonNode(Node, Generic[WrappedType]):
         Unfortunately difficult to use pydantic's native Generic handling with this b/c we
         want to manipulate the fields as the model is created.
         """
+        if isinstance(wrapped_cls, TypeVar):
+            # Sometimes we want to use a type var
+            wrapped_cls = wrapped_cls.__bound__
         return cls._create_wrapper_cls(wrapped_cls)

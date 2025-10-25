@@ -2,7 +2,16 @@ from typing import Any
 
 import pytest
 
-from tangl.service.api_endpoint import HasApiEndpoints, ApiEndpoint, MethodType, ResponseType, AccessLevel
+
+from tangl.service.api_endpoint import (
+    AccessLevel,
+    ApiEndpoint,
+    HasApiEndpoints,
+    MethodType,
+    PostprocessResult,
+    PreprocessResult,
+    ResponseType,
+)
 
 # -------------------------------------------------------------------
 # 1. Fixtures & Sample Controller / Classes to Decorate
@@ -216,4 +225,62 @@ def test_pre_postprocessors():
 
     # Return should be {"wrapped": {"value": 99}}
     assert out == {"wrapped": {"value": 99}}
+
+
+def test_preprocessors_can_short_circuit():
+    calls: list[str] = []
+
+    def pre_skip(args, kwargs):
+        calls.append("pre1")
+        return PreprocessResult.skip({"status": "skipped"})
+
+    def pre_never(args, kwargs):  # pragma: no cover - defensive
+        calls.append("pre2")
+        return args, kwargs
+
+    def post_never(result):  # pragma: no cover - defensive
+        calls.append("post")
+        return result
+
+    class ShortCircuitController(HasApiEndpoints):
+        @ApiEndpoint.annotate(
+            preprocessors=[pre_skip, pre_never],
+            postprocessors=[post_never],
+            response_type=ResponseType.INFO,
+        )
+        def get_value(self) -> dict[str, str]:
+            raise AssertionError("Endpoint body should not run when preprocessor skips")
+
+    controller = ShortCircuitController()
+    endpoint = controller.get_api_endpoints()["get_value"]
+
+    result = endpoint(controller)
+
+    assert result == {"status": "skipped"}
+    assert calls == ["pre1"]
+
+
+def test_postprocessors_can_short_circuit():
+    post_calls: list[str] = []
+
+    def post_first(result):
+        post_calls.append("post1")
+        return PostprocessResult.stop_with({"wrapped": result})
+
+    def post_second(result):  # pragma: no cover - defensive
+        post_calls.append("post2")
+        return {"second": result}
+
+    class PostStopController(HasApiEndpoints):
+        @ApiEndpoint.annotate(postprocessors=[post_first, post_second], response_type=ResponseType.INFO)
+        def get_payload(self) -> dict[str, int]:
+            return {"value": 1}
+
+    controller = PostStopController()
+    endpoint = controller.get_api_endpoints()["get_payload"]
+
+    result = endpoint(controller)
+
+    assert result == {"wrapped": {"value": 1}}
+    assert post_calls == ["post1"]
 

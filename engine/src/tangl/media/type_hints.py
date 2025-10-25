@@ -2,9 +2,9 @@
 
 from PIL.Image import Image
 Svg = str
+Audio = tuple[bytes, dict]
 
-Media = Image | Svg | bytes
+Media = Image | Svg | Audio | bytes
 
-# Audio = tuple[bytes, dict]
 # Media = Image | Audio | bytes | str
 

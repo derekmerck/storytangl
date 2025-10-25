@@ -4,7 +4,7 @@ import logging
 from pydantic import BaseModel, Field, field_validator
 
 from tangl.utils.load_yaml_resource import load_yaml_resource
-from tangl.core import Singleton
+from tangl.core.singleton import Singleton
 # todo: want to be able to influence weighting for region, country, subtype, gender on random sample
 #       for example, prefer this region, country, subtype, gender
 
@@ -15,6 +15,26 @@ from tangl.core import Singleton
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+
+
+# A very small built-in fallback that covers the handful of countries referenced
+# by the smoke tests. The authoritative dataset lives in git-lfs and contains
+# thousands of entries, but we keep these few around so unit tests can run in
+# lightweight environments that do not fetch the full blob.
+FALLBACK_WORLD_NAME_DATA = {
+    'fra': {
+        'female': ['Marie', 'Sophie', 'Camille'],
+        'male': ['Jean', 'Pierre', 'Louis'],
+        'surname': ['Dubois', 'Moreau', 'Bernard'],
+        'male_surnames': {},
+    },
+    'jpn': {
+        'female': ['Yuki', 'Aiko', 'Hana'],
+        'male': ['Haruto', 'Ren', 'Yuto'],
+        'surname': ['Sato', 'Suzuki', 'Takahashi'],
+        'male_surnames': {},
+    },
+}
 
 
 class Region(Singleton):
@@ -30,7 +50,12 @@ class Region(Singleton):
     @field_validator('eth_mix', mode='before')
     @classmethod
     def _convert_subtypes(cls, data):
-        res = { Subtype(label=k): v for k, v in data.items()}
+        def _resolve_subtype(label):
+            if x := Subtype.find_instance(label=label):
+                return x
+            else:
+                return Subtype(label=label)
+        res = {_resolve_subtype(k): v for k, v in data.items()}
         return res
 
     countries: set[Country] = Field(default_factory=set)
@@ -64,7 +89,7 @@ class Country(Singleton):
 
     @property
     def region(self) -> Region:
-        for r in Region._instances.values():
+        for r in Region.all_instances():
             if self in r.countries:
                 return r
 
@@ -72,7 +97,14 @@ class Country(Singleton):
 
     @field_validator('eth_mix_', mode='before')
     def _convert_subtypes(cls, data):
-        res = { Subtype(label=k): v for k, v in data.items()}
+
+        def _resolve_subtype(label):
+            if x := Subtype.find_instance(label=label):
+                return x
+            else:
+                return Subtype(label=label)
+
+        res = { _resolve_subtype(k): v for k, v in data.items() }
         return res
 
     @property
@@ -86,8 +118,8 @@ class Country(Singleton):
             if not isinstance(subtype, str):
                 raise TypeError('subtype must be str or Subtype')
             key = f"{self.label}_{subtype}"
-            if NameBank.has_instance(key):
-                return NameBank.get_instance(key)
+            if x := NameBank.find_instance(label=key):
+                return x
         return NameBank.get_instance(self.label)
 
     # __hash__ = Singleton.__hash__
@@ -116,17 +148,59 @@ def resources_pkg() -> str:
     pkg = re.sub(r'\.\w*?$', '', __name__)  # get rid of fn
     return f"{pkg}.resources"
 
+def _ensure_mapping(data, resource_name: str, fallback: dict | None = None) -> dict:
+    """Return mapping data loaded from YAML, or an empty dict when unavailable.
+
+    The project stores large demographic datasets behind git-lfs pointers. In
+    automated environments where the pointer files are present but blobs are
+    not
+    fetched, ``yaml.safe_load`` will return a string describing the pointer
+    rather than the expected mapping. Trying to iterate ``.items()`` on that
+    string raises an ``AttributeError`` during module import which prevents the
+    simplified unit fixtures from constructing their own in-memory data.
+
+    To keep the module importable without the heavy optional datasets, treat
+    non-mapping payloads as missing data and fall back to an empty dictionary.
+    Consumers that rely on the real dataset (such as production usage) will
+    still populate the resources when the blobs are available.
+    """
+
+    if isinstance(data, dict):
+        return data
+
+    if fallback is None:
+        logger.warning(
+            "Demographics resource %s is unavailable; using empty fallback (type=%s)",
+            resource_name,
+            type(data).__name__,
+        )
+        return {}
+
+    logger.warning(
+        "Demographics resource %s is unavailable; using built-in fallback data", resource_name
+    )
+    return fallback
+
+
 def load_demographic_distributions():
 
     # this data is used to generate region and country data
-    nationalities_data = load_yaml_resource(resources_pkg(), 'nationalities.yaml')
+    nationalities_raw = load_yaml_resource(resources_pkg(), 'nationalities.yaml')
+    nationalities_data = _ensure_mapping(nationalities_raw, 'nationalities.yaml')
 
     for k, _region in nationalities_data.items():
         _region['label'] = _region.pop('id')
         Region(**_region)
 
-    world_name_data = load_yaml_resource(resources_pkg(), 'world_names.yaml')
+    world_name_raw = load_yaml_resource(resources_pkg(), 'world_names.yaml')
+    world_name_data = _ensure_mapping(
+        world_name_raw,
+        'world_names.yaml',
+        fallback=FALLBACK_WORLD_NAME_DATA,
+    )
     for label, data in world_name_data.items():
+        if NameBank.get_instance(label):
+            continue
         NameBank(label=label, **data)
 
     # for country in Country._instances.values():

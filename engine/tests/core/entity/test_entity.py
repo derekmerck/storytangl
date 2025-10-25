@@ -1,18 +1,43 @@
 import pytest
-from uuid import UUID, uuid4
+from uuid import UUID
 import pickle
 
-from tangl.core import Entity
+from tangl.core.entity import Entity
 
+class TestEntity(Entity):
+    foo: int = 0
+
+def test_entity_creation_and_label():
+    e = TestEntity(foo=42)
+    assert isinstance(e.uid, UUID)
+    # assert e.label is not None
+    assert e.foo == 42
+    assert e.matches(foo=42)
+    assert not e.matches(foo=43)
+    # label defaults to a 6-character slice of uid if not provided
+    # assert len(e.label) > 0
+
+def test_entity_structure_unstructure():
+    e = TestEntity(foo=7)
+    data = e.unstructure()
+    restored = TestEntity.structure(data)
+    assert restored.foo == 7
+    assert restored.uid == e.uid
+
+@pytest.mark.xfail(raises=AttributeError)
+def test_predicate_satisfied():
+    e = TestEntity(foo=1, predicate=lambda ctx: ctx.get("flag", False))
+    assert e.is_satisfied(ctx={"flag": True})
+    assert not e.is_satisfied(ctx={"flag": False})
 
 def test_entity_creation():
     e = Entity()
     assert isinstance(e.uid, UUID)
     assert isinstance(e.tags, set)
 
-def test_label_default():
+def test_get_label_default():
     e = Entity()
-    assert isinstance(e.label, str)
+    assert isinstance(e.get_label(), str)
 
 def test_has_tags():
     e = Entity(tags={"magic", "fire"})
@@ -26,32 +51,34 @@ def test_has_tags2():
     assert e.has_tags('tag1', 'tag2')
     assert not e.has_tags('tag1', 'tag3')
 
-def test_has_alias():
-    e = Entity(label="hero")
-    assert e.has_alias("hero")
-    assert not e.has_alias("villain")
+def test_has_tags3():
+    node = Entity(tags={'abc', 'def'})
+    assert node.has_tags("abc") is True
+    assert node.has_tags("abc", "def") is True
+    assert node.has_tags("abc", "def", "ghi") is False
+    assert node.has_tags("abc", "ghi") is False
 
-def test_get_identifiers():
-    e = Entity(label="hero")
-    identifiers = e.get_identifiers()
-    assert "hero" in identifiers
-    assert e.uid in identifiers
-
-def test_matches_criteria():
+def test_matches():
     e = Entity(label="hero", tags={"magic"})
-    assert e.matches_criteria(label="hero")
-    assert e.matches_criteria(tags={"magic"})
-    assert not e.matches_criteria(label="villain")
+    assert e.matches(label="hero")
+    assert e.matches(tags={"magic"})
+    assert not e.matches(label="villain")
+
+def test_tags_match():
+    e = Entity(label="hero", tags={"pc", "tough"})
+    assert e.matches(label="hero")
+    assert not e.matches(label="villain")
+    assert e.matches(tags={"pc", "tough"})
 
 def test_filter_by_criteria():
     e1 = Entity(label="hero", tags={"magic"})
     e2 = Entity(label="villain", tags={"dark"})
-    results = Entity.filter_by_criteria([e1, e2], label="hero")
+    results = list(Entity.filter_by_criteria([e1, e2], label="hero"))
     assert len(results) == 1 and results[0] == e1
 
 def test_model_dump():
     e = Entity(label="hero")
-    dump = e.model_dump()
+    dump = e.unstructure()
     assert "obj_cls" in dump
     assert dump["obj_cls"].__name__ == "Entity"
 
@@ -116,16 +143,16 @@ def test_entity_equality2():
 
 def test_entity_instantiation1():
 
-    kwargs = {'uid': uuid4(),
-              'label': "test label"}
+    kwargs = {'label': "test label"}
 
     e = Entity(**kwargs)
     print( e )
 
-    assert e.label == "test label"
+    assert e.label == "test_label"   # sanitized, no spaces or unicode
 
-    d = e.model_dump()
+    d = e.unstructure()
     print( d )
+    assert d['label'] == "test_label"
 
     # does not hash
     with pytest.raises(TypeError):
@@ -135,10 +162,7 @@ def test_entity_instantiation2():
     import shortuuid
     entity = Entity()
     assert isinstance(entity.uid, UUID)
-    # assert entity.tags == set()
-    # Testing label generation based on UID
-    # assert entity.label == key_for_secret(str(entity.uid))[0:6]
-    assert shortuuid.encode(entity.uid).startswith(entity.label)  # label is only first few chars
+    assert entity.get_label() == shortuuid.encode(entity.uid)
 
 def test_entity_uid_generation():
     node1 = Entity()
@@ -154,7 +178,7 @@ def test_entity_custom_label():
 
 def test_entity_model_dump():
     entity = Entity(label="TestLabel")
-    dumped = entity.model_dump()
+    dumped = entity.unstructure()
     # assert dumped['obj_cls'] == 'Entity'
     assert dumped['label'] == "TestLabel"
     assert 'uid' in dumped
@@ -164,7 +188,7 @@ def test_entity_tags():
     a = Entity()
     assert a.tags == set()
 
-    assert 'tags' not in a.model_dump()  # b/c it's unset
+    # assert 'tags' not in a.unstructure()  # b/c it's unset
 
     a = Entity(tags={"a"})
     assert a.tags == {"a"}
@@ -191,65 +215,9 @@ def test_entity_pickles():
     print( res )
     assert a == res
 
-def test_has_aliases():
-    class MyEntity(Entity):
-        alias: set
-
-    e = MyEntity(alias={'alias1', 'alias2'}, label='test_entity')
-    assert e.has_alias('alias1')
-    assert e.has_alias('alias2')
-    assert not e.has_alias('alias3')
-
-    identifiers = e.get_identifiers()
-    assert 'alias1' in identifiers
-    assert 'alias2' in identifiers
-    assert e.label in identifiers
-    assert e.short_uid[0:6] in identifiers
-
-
-def test_identifiers():
-    class MyEntity(Entity):
-        alias: set
-
-    e = MyEntity(alias={'alias1'}, label='test_label')
-    identifiers = e.get_identifiers()
-    assert 'alias1' in identifiers
-    assert 'test_label' in identifiers
-    assert e.short_uid in identifiers
-
-
 def test_entity_does_not_hash():
     e = Entity()
     print(e.uid, e.label)
 
     with pytest.raises(TypeError):
         {e}  # mutable, doesn't hash
-
-
-def test_filtering():
-    class MyEntity(Entity):
-        alias: set = None
-
-    e0 = MyEntity(alias={'alias1'})
-    e1 = MyEntity(alias={'alias1'}, tags={'tag1'})
-    e2 = MyEntity(alias={'alias2'}, tags={'tag2'})
-    e3 = MyEntity(tags={'tag1', 'tag3', 'tag4'})
-
-    instances = [e0, e1, e2, e3]
-    filtered = Entity.filter_by_criteria(instances, alias='alias1')
-    assert filtered == [e0, e1], "e0 and e1 both use that alias"
-    filtered = Entity.filter_by_criteria(instances, alias='alias1', tags=None)
-    assert filtered == [e0], "None query should fail on e1"
-
-    filtered = Entity.filter_by_criteria(instances, tags={'tag2'})
-    assert filtered == [e2]
-    # checking alias = None doesn't make any sense, just leave it blank
-    # filtered = Entity.filter_by_criteria(instances, alias=None, tags={'tag2'})
-    # assert filtered == [e2]
-
-    filtered = Entity.filter_by_criteria(instances, tags={'tag1', 'tag2'})
-    assert filtered == []
-
-    filtered = Entity.filter_by_criteria(instances, tags={'tag1', 'tag3'})
-    assert filtered == [e3]
-

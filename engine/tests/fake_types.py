@@ -39,20 +39,21 @@ class FakeWorld:
         return FakeStory(uid=f"story-{self.label}", user=user)
 
 class FakeUser:
-    def __init__(self, uid, access_level=AccessLevel.USER, current_story_id=None):
+    def __init__(self, uid, access_level=AccessLevel.USER, current_ledger_id=None):
         self.uid = uid
         self.access_level = access_level
-        self.current_story_id = current_story_id
+        self.current_ledger_id = current_ledger_id
         self.story_ids = []
 
     def add_story(self, story_id):
         self.story_ids.append(story_id)
-        self.current_story_id = story_id
+        self.current_ledger_id = story_id
 
 
 class FakeJournal(list):
     """A simple subclass of list to mimic a story's journal."""
-    pass
+    def get_entry(self, item):
+        return self[item]
 
 class FakeNode:
     """Represents a story node, with a 'dirty' flag and a 'model_dump' method."""
@@ -66,9 +67,9 @@ class FakeNode:
 
 class FakeEdge:
     """Mimics a TraversableEdge with predecessor/successor nodes."""
-    def __init__(self, predecessor=None, successor=None):
-        self.predecessor = predecessor
-        self.successor = successor
+    def __init__(self, source=None, dest=None):
+        self.source = source
+        self.dest = dest
 
 class FakeStory:
     """
@@ -100,10 +101,13 @@ class FakeStory:
     def find_one(self, alias=None):
         return self.nodes.get(alias)
 
-    def resolve_step(self, edge, **kwargs):
+    def get_journal_entry(self, item):
+        return self.journal.get_entry(item)
+
+    def resolve_choice(self, edge, **kwargs):
         # Just mark the story dirty or do minimal logic
         self.dirty = True
-        self.cursor = edge.successor or self.cursor
+        self.cursor = edge.dest or self.cursor
 
     def gather_context(self):
         return {"story_state": "demo"}
