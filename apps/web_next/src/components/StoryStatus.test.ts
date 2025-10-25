@@ -6,7 +6,7 @@ import * as directives from 'vuetify/directives'
 import { http, HttpResponse } from 'msw'
 
 import StoryStatus from './StoryStatus.vue'
-import { server } from '@/tests/setup'
+import { server } from '@tests/setup'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 

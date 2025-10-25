@@ -17,7 +17,8 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@tests/*": ["tests/*"]
     },
     
     /* Strict type-checking - THE IMPORTANT PART */
@@ -41,7 +42,8 @@
     "src/**/*.d.ts",
     "src/**/*.tsx",
     "src/**/*.vue",
-    "**/*.test.ts"
+    "tests/**/*.test.ts",
+    "src/**/*.test.ts"
   ],
   "references": [
     { "path": "./tsconfig.node.json" }

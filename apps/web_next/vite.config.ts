@@ -22,12 +22,21 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      '~': __dirname,
       '@': path.resolve(__dirname, './src'),
+      '@tests': path.resolve(__dirname, './tests'),
     },
   },
   css: {
     preprocessorOptions: {
       sass: {
+        // Fix warnings in _test_
+        api: "modern-compiler",
+        // Suppress Dart Sass legacy API deprecation warnings
+        // silenceDeprecations: ['legacy-js-api'],
+      },
+      scss: {
+        // Fix warnings in _dev_
         api: "modern-compiler",
         // Suppress Dart Sass legacy API deprecation warnings
         // silenceDeprecations: ['legacy-js-api'],
@@ -54,14 +63,14 @@ export default defineConfig({
     },
     globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./src/tests/setup.ts'],
+    setupFiles: ['./tests/setup.ts'],
     css: true, // Process CSS files instead of stubbing them
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: [
         'node_modules/',
-        'src/tests/',
+        'tests/',
         '**/*.d.ts',
         '**/*.config.*',
         '**/mockData',
