@@ -17,6 +17,13 @@ export const mockBlock1: JournalStoryUpdate = {
       uid: 'dialog-2',
       text: 'sed do eiusmod tempor...',
       style_dict: { color: 'rgb(var(--v-theme-primary))', opacity: 0.9 },
+      media: [
+        {
+          media_role: 'avatar_im',
+          url: '/media/avatar.png',
+          orientation: 'square',
+        },
+      ],
     },
   ],
   media: [
@@ -59,11 +66,11 @@ export const mockWorldList: WorldList = [
 
 export const mockWorldInfo: WorldInfo = {
   world_id: 'tangl_world',
-  title: 'Tangl World',
+  title: 'My world!',
   author: ['StoryTangl Team'],
   date: '2025-01-01',
-  version: '3.7.0',
-  comments: 'Mock world used for local development and testing.',
+  version: '2.7.9',
+  summary: 'A cozy corner of the Tangl multiverse used for development tests.',
   media: [
     {
       media_role: 'cover_im',
@@ -92,4 +99,33 @@ export const mockUserSecretResponse = {
 export const mockUpdatedSecretResponse = {
   secret: 'updated-secret-456',
   api_key: 'updated-api-key-456',
+}
+
+export const mockStatus = [
+  {
+    key: 'status',
+    value: 'working',
+    style: { color: 'red' },
+  },
+  {
+    key: 'health',
+    value: '100/100',
+    style: { color: 'green' },
+    icon: 'heart',
+  },
+  {
+    key: 'location',
+    value: 'Dark Forest',
+    icon: 'map-marker',
+  },
+  {
+    key: 'unstyled',
+    value: 'plain text',
+  },
+]
+
+export const mockSystemInfo = {
+  version: '3.7.0',
+  uptime: '72h',
+  status: 'operational',
 }

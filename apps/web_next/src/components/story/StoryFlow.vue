@@ -10,6 +10,8 @@ const { $http, $debug, $verbose, remapURL, makeMediaDict } = useGlobal()
 const blocks = ref<JournalStoryUpdate[]>([])
 const blockRefs = ref<InstanceType<typeof StoryBlock>[]>([])
 const blockCounter = ref(0)
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 
@@ -74,6 +76,7 @@ const handleResponse = async (payload: JournalStoryUpdate[]) => {
 
   if (payload[0]?.label) {
     blocks.value = []
+    blockCounter.value = 0
   }
 
   const processedBlocks = payload.map((block) => processBlock(block))
@@ -91,10 +94,15 @@ const handleResponse = async (payload: JournalStoryUpdate[]) => {
 
 const fetchInitialBlocks = async () => {
   try {
+    loading.value = true
+    error.value = null
     const response = await $http.value.get<JournalStoryUpdate[]>('/story/update')
     await handleResponse(response.data)
-  } catch (error) {
-    console.error('Failed to fetch initial story.', error)
+  } catch (err) {
+    console.error('Failed to fetch initial story.', err)
+    error.value = 'Failed to load story. Please refresh the page.'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -106,19 +114,43 @@ const doAction = async (
   passback?: unknown,
 ) => {
   try {
+    loading.value = true
+    error.value = null
     const response = await $http.value.post<JournalStoryUpdate[]>('/story/do', {
       uid: actionUid,
       passback,
     })
     await handleResponse(response.data)
-  } catch (error) {
-    console.error('Failed to execute action.', error)
+  } catch (err) {
+    console.error('Failed to execute action.', err)
+    error.value = 'Failed to execute action. Please try again.'
+  } finally {
+    loading.value = false
   }
 }
 </script>
 
 <template>
   <div>
+    <v-progress-linear
+      v-if="loading"
+      class="mb-4"
+      color="primary"
+      indeterminate
+      data-testid="storyflow-progress"
+    />
+
+    <v-alert
+      v-if="error"
+      class="mb-4"
+      type="error"
+      variant="tonal"
+      closable
+      @click:close="error = null"
+    >
+      {{ error }}
+    </v-alert>
+
     <StoryBlock
       v-for="block in blocks"
       :key="block.key"

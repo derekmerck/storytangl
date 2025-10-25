@@ -1,47 +1,71 @@
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import App from '@/App.vue'
-import StoryFlow from '@/components/story/StoryFlow.vue'
+import { setActivePinia, createPinia } from 'pinia'
 
-// Create Vuetify instance for testing
-const vuetify = createVuetify({
-  components,
-  directives,
-})
+import App from '@/App.vue'
+
+const vuetify = createVuetify({ components, directives })
+const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
 describe('App.vue', () => {
-  it('renders the application shell', () => {
-    const wrapper = mount(App, {
-      global: {
-        plugins: [vuetify],
-      },
-    })
-
-    expect(wrapper.text()).toContain('WebTangl v3.7')
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.unstubAllEnvs()
+    vi.stubEnv('VITE_DEFAULT_API_URL', DEFAULT_API_URL)
+    vi.resetModules()
+    vi.spyOn(window, 'open').mockImplementation(() => null)
   })
 
-  it('provides a container for the story flow', () => {
-    const wrapper = mount(App, {
-      global: {
-        plugins: [vuetify],
-      },
-    })
-
-    expect(wrapper.findComponent(StoryFlow).exists()).toBe(true)
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('wraps StoryFlow inside a Vuetify layout', () => {
-    const wrapper = mount(App, {
+  const mountApp = () =>
+    mount(App, {
       global: {
         plugins: [vuetify],
       },
     })
 
-    const container = wrapper.find('.v-container')
-    expect(container.exists()).toBe(true)
-    expect(container.findComponent(StoryFlow).exists()).toBe(true)
+  it('renders the full application shell', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    expect(wrapper.find('.v-app-bar').exists()).toBe(true)
+    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(true)
+    expect(wrapper.find('.v-main').exists()).toBe(true)
+    expect(wrapper.find('.v-footer').exists()).toBe(true)
+  })
+
+  it('toggles drawer when menu clicked', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const navButton = wrapper.find('[aria-label="menu"]')
+    expect(navButton.exists()).toBe(true)
+
+    const initialState = (wrapper.vm as any).drawer
+    await navButton.trigger('click')
+    expect((wrapper.vm as any).drawer).toBe(!initialState)
+  })
+
+  it('loads story content on mount', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const blocks = wrapper.findAll('.v-card')
+    expect(blocks.length).toBeGreaterThan(0)
+  })
+
+  it('loads status items in drawer', async () => {
+    const wrapper = mountApp()
+    await flushPromises()
+
+    const drawer = wrapper.find('.v-navigation-drawer')
+    expect(drawer.text()).toContain('Status')
+    expect(drawer.text()).toContain('working')
   })
 })

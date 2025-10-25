@@ -14,3 +14,13 @@
   color: rgb(var(--v-theme-primary)) !important;
   opacity: 0.8;
 }
+
+.brand {
+  color: rgb(var(--v-theme-primary));
+  fill: rgb(var(--v-theme-primary));
+}
+
+.text-caption {
+  font-size: 0.7em !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+}

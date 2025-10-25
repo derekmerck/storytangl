@@ -4,6 +4,8 @@ import {
   mockActions,
   mockBlock1,
   mockBlock2,
+  mockStatus,
+  mockSystemInfo,
   mockUpdatedSecretResponse,
   mockUserSecretResponse,
   mockWorldInfo,
@@ -23,9 +25,7 @@ export const handlers = [
     return HttpResponse.json([mockBlock1, mockBlock2])
   }),
 
-  http.post(`${apiBase}/story/do`, async ({ request }) => {
-    const body = await request.json()
-    console.debug('Mock story/do called with:', body)
+  http.post(`${apiBase}/story/do`, async () => {
     return HttpResponse.json([mockBlock1])
   }),
 
@@ -37,11 +37,19 @@ export const handlers = [
     return HttpResponse.json(mockWorldList)
   }),
 
+  http.get(`${apiBase}/story/status`, () => {
+    return HttpResponse.json(mockStatus)
+  }),
+
   http.get(`${apiBase}/world/:worldId/info`, ({ params }) => {
     return HttpResponse.json({
       ...mockWorldInfo,
       world_id: params.worldId as string,
     })
+  }),
+
+  http.get(`${apiBase}/system/info`, () => {
+    return HttpResponse.json(mockSystemInfo)
   }),
 
   http.put(`${apiBase}/user/world`, async ({ request }) => {

@@ -115,9 +115,12 @@ export interface WorldInfo {
   author: string | string[]
   date: string
   comments?: string
+  summary?: string
   ui_config?: UIConfig
   media?: JournalMediaItems
   media_dict?: JournalMediaDict
+  guide_url?: string
+  homepage_url?: string
   [key: string]: unknown
 }
 
@@ -176,6 +179,7 @@ export interface JournalKVItem {
   style_id?: string
   style_cls?: string
   style_dict?: StyleHints
+  style?: StyleHints
 }
 
 export type JournalEntry = JournalStoryUpdate[]

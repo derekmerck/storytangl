@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, afterEach, afterAll, describe, it, expect, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
@@ -47,6 +48,64 @@ const mountFlow = () =>
   })
 
 describe('StoryFlow', () => {
+  it('shows a loading indicator while fetching initial blocks', async () => {
+    let resolveResponse!: () => void
+    let notifyHandlerReady!: () => void
+    const handlerInvoked = new Promise<void>((resolve) => {
+      notifyHandlerReady = resolve
+    })
+
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        new Promise((resolve) => {
+          notifyHandlerReady()
+          resolveResponse = () => resolve(HttpResponse.json([mockBlock1, mockBlock2]))
+        }),
+      ),
+    )
+
+    const wrapper = mountFlow()
+    const component = wrapper.findComponent(StoryFlow)
+    const vm = component.vm as unknown as { loading: boolean }
+
+    await handlerInvoked
+    await flushPromises()
+    await nextTick()
+    await flushPromises()
+    await nextTick()
+
+    expect(vm.loading).toBe(true)
+    expect(wrapper.find('[data-testid="storyflow-progress"]').exists()).toBe(true)
+
+    resolveResponse()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flushPromises()
+    await nextTick()
+    await (component.vm as any).$nextTick?.()
+
+    expect(vm.loading).toBe(false)
+
+    await new Promise<void>((resolve, reject) => {
+      const start = Date.now()
+      const check = () => {
+        if (!wrapper.find('[data-testid="storyflow-progress"]').exists()) {
+          resolve()
+          return
+        }
+
+        if (Date.now() - start > 1000) {
+          reject(new Error('progress indicator still visible'))
+          return
+        }
+
+        setTimeout(check, 10)
+      }
+
+      check()
+    })
+  })
+
   it('fetches and renders initial blocks on mount', async () => {
     const wrapper = mountFlow()
     await flushPromises()
@@ -182,6 +241,7 @@ describe('StoryFlow', () => {
     await flushPromises()
 
     expect(wrapper.exists()).toBe(true)
+    expect(wrapper.text()).toContain('Failed to load story')
     expect(consoleSpy).toHaveBeenCalled()
   })
 })
