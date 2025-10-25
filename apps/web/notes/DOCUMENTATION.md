@@ -80,7 +80,7 @@ Keep them separate but link between:
 Web Client
 ==========
 
-See `apps/web_next/notes/ARCHITECTURE.md` for web client architecture.
+See `apps/web/notes/ARCHITECTURE.md` for web client architecture.
 ```
 
 ## 💡 My Recommendation
