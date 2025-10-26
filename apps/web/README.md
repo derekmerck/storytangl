@@ -1,311 +1,413 @@
-# StoryTangl Web Client - Development Setup
+# StoryTangl Web Client (v3.7)
 
-### File Manifest
+Modern Vue 3 + TypeScript web interface for StoryTangl narrative engine, resurrected from legacy codebase and rebuilt with current best practices.
 
-```
-/home/claude/
-├── SETUP_GUIDE.md           ⭐ START HERE - Complete installation guide
-├── TESTING_PATTERNS.md      📚 Testing recipes and best practices
-├── reset-web-env.sh         🧹 Environment cleanup script
-├── package.json             📦 Dependencies with testing tools
-├── tsconfig.json            ⚙️  TypeScript strict mode config
-├── vite.config.ts           ⚙️  Vite with Vuetify plugin
-├── .eslintrc.cjs            🔍 Linting rules
-├── .prettierrc              💅 Code formatting
-├── .gitignore               🚫 Git exclusions
-├── index.html               🌐 Entry HTML
-├── src/
-│   ├── main.ts              🎯 App entry point
-│   ├── App.vue              👋 Hello World component
-│   ├── App.test.ts          ✅ Example test
-│   ├── vite-env.d.ts        📝 Environment types
-│   ├── plugins/
-│   │   └── vuetify.ts       🎨 Vuetify configuration (FIXED!)
-│   └── styles/
-│       └── settings.scss    🎨 Vuetify SCSS customization
-└── tests/
-    ├── setup.ts         🔧 Vitest + MSW setup
-    └── mocks/
-        ├── handlers.ts  🎭 MSW API handlers
-        └── mockData.ts  📊 Mock API responses
-```
+## 🎯 Project Status
 
-## 🎯 Key Improvements Over Old Code
+**Current Phase:** MVP Feature Complete - Testing & Polish
 
-### Fixed Issues
-1. ✅ **Vuetify plugin properly configured** (was broken)
-2. ✅ **TypeScript strict mode enabled** (was off)
-3. ✅ **Testing infrastructure complete** (was incomplete)
-4. ✅ **MSW v2 for API mocking** (old code had v1)
-5. ✅ **Latest dependencies** (Vue 3.5, Vuetify 3.7, Vite 5)
+The core application is **functionally complete** for basic story interaction. All essential components from the legacy web client have been successfully ported and modernized.
 
-### New Capabilities
-1. ✅ **Component testing with Vitest** (fast, built into Vite)
-2. ✅ **API mocking with MSW** (matches your OpenAPI spec)
-3. ✅ **Type-safe environment variables**
-4. ✅ **ESLint + Prettier** (code quality from day 1)
-5. ✅ **Coverage reporting** (track test coverage)
+---
+
+## ✅ Completed Infrastructure
+
+### Core Setup
+- ✅ Vue 3.5 + Composition API
+- ✅ Vuetify 3.7 with Material Design Icons
+- ✅ TypeScript strict mode
+- ✅ Vite 5 build system
+- ✅ MSW v2 for API mocking (dev mode only)
+- ✅ Vitest + Vue Test Utils
+- ✅ ESLint + Prettier
+- ✅ Path aliases (@/*)
+
+### Global Utilities
+- ✅ `useGlobal()` composable
+  - Axios HTTP client with interceptors
+  - `remapURL()` - URL resolution for media
+  - `makeMediaDict()` - media array transformation
+  - Debug/verbose flags from environment
+- ✅ Pinia store for global state
+  - World selection
+  - User authentication (API keys)
+  - World info caching
+
+### Type System
+- ✅ Complete TypeScript definitions
+- ✅ Types match backend Pydantic models
+- ✅ `tangl_typedefs.ts` - core narrative types
+- ✅ Environment variable typing
+
+---
+
+## ✅ Completed Components
+
+### Layout Components
+| Component | Status | Tests | Notes |
+|-----------|--------|-------|-------|
+| `App.vue` | ✅ | Manual | Main layout with responsive drawer |
+| `AppNavbar.vue` | ✅ | ✅ | Top bar with menus |
+| `AppFooter.vue` | ✅ | - | Simple footer |
+
+### Story Components
+| Component | Status | Tests | Notes |
+|-----------|--------|-------|-------|
+| `StoryFlow.vue` | ✅ | ✅ | Block container, API calls, auto-scroll |
+| `StoryBlock.vue` | ✅ | ✅ | Text, media, dialog, actions |
+| `StoryAction.vue` | ✅ | ✅ | Clickable choice buttons |
+| `StoryDialogBlock.vue` | ✅ | ✅ | Character dialog with media |
+| `StoryStatus.vue` | ✅ | - | Sidebar status display (key/value) |
+
+### Dialog Components
+| Component | Status | Tests | Notes |
+|-----------|--------|-------|-------|
+| `WorldInfo.vue` | ✅ | - | World metadata modal |
+| `SystemInfo.vue` | ✅ | - | System/engine info modal |
+| `SecretDialog.vue` | ✅ | - | User authentication |
+
+---
+
+## 🚧 Known Gaps & Polish Items
+
+### Missing Features (Non-Critical)
+- ⏸️ **ApiDialog.vue** - Change API host (dev-only feature, low priority)
+- ⏸️ **Custom branding** - BrandTangl icon component (cosmetic)
+- ⏸️ **Keyboard shortcuts** - Not in legacy, but would be nice
+- ⏸️ **Accessibility audit** - ARIA labels, focus management
+
+### Testing Gaps
+- ⚠️ **StoryAction.test.ts** - Needs comprehensive tests
+- ⚠️ **StoryDialogBlock.test.ts** - Needs comprehensive tests
+- ⚠️ **StoryStatus.test.ts** - Needs tests
+- ⚠️ **Dialog components** - Need basic tests
+- ⚠️ **Integration tests** - Full user flow tests
+
+### Polish & UX
+- ⚠️ **Loading states** - More granular feedback
+- ⚠️ **Error boundaries** - Better error handling UI
+- ⚠️ **Mobile responsive** - Some layout quirks
+- ⚠️ **Media optimization** - Lazy loading, placeholders
+- ⚠️ **Animations** - Smooth transitions
+
+### Documentation
+- ⚠️ **Component READMEs** - Usage examples for complex components
+- ⚠️ **Storybook** - Interactive component showcase (optional)
+- ⚠️ **API client docs** - How to extend endpoints
+
+---
+
+## 📋 Roadmap: What's Left
+
+### Phase 1: Testing (Current Priority)
+**Goal:** Achieve 80%+ test coverage on all components
+
+- [ ] Write tests for `StoryAction.vue`
+- [ ] Write tests for `StoryDialogBlock.vue`
+- [ ] Write tests for `StoryStatus.vue`
+- [ ] Write tests for dialog components (WorldInfo, SystemInfo, SecretDialog)
+- [ ] Write integration tests for full story flow
+- [ ] Add E2E tests with Playwright (optional)
+
+**Estimated:** 1-2 days
+
+---
+
+### Phase 2: Polish & UX (Next)
+**Goal:** Production-ready user experience
+
+- [ ] Improve loading states and spinners
+- [ ] Add error boundaries and fallback UI
+- [ ] Audit mobile responsiveness
+- [ ] Add smooth transitions/animations
+- [ ] Optimize media loading (lazy load images)
+- [ ] Keyboard navigation support
+- [ ] Basic accessibility audit
+
+**Estimated:** 2-3 days
+
+---
+
+### Phase 3: Documentation (Then)
+**Goal:** Make codebase easy to maintain and extend
+
+- [ ] Document component architecture
+- [ ] Add JSDoc comments to all exports
+- [ ] Create component usage examples
+- [ ] Document common patterns
+- [ ] API client extension guide
+- [ ] Consider adding Storybook (optional)
+
+**Estimated:** 1-2 days
+
+---
+
+### Phase 4: Advanced Features (Future)
+**Goal:** Beyond MVP scope
+
+- [ ] Vue Router for multi-page navigation
+- [ ] Save/load game state
+- [ ] Character sheets / inventory UI
+- [ ] Settings panel (theme, text size, etc)
+- [ ] Achievement system UI
+- [ ] Replay/history browsing
+- [ ] Social features (if applicable)
+
+**Estimated:** TBD based on requirements
+
+---
 
 ## 🚀 Quick Start
 
-### Step 1: Install
+### Prerequisites
+- Node.js 18+
+- Yarn or npm
+
+### Installation
 ```bash
+cd apps/web
 yarn install
 ```
 
-### Step 2: Verify
+### Development
 ```bash
-# Type check (should pass)
-yarn type-check
-
-# Run tests (should pass)
-yarn test
-
-# Start dev server
+# Start with MSW mocks (no backend needed)
 yarn dev
-```
 
-### Step 3: Check Browser
-Open `http://localhost:5173` - you should see the Hello World page!
-
-## 📖 Read Next
-
-1. **SETUP_GUIDE.md** - Detailed installation and PyCharm configuration
-2. **TESTING_PATTERNS.md** - How to write tests for your components
-3. Then come back here for the development roadmap
-
-## 🗺️ Development Roadmap
-
-Now that you have a clean slate, here's the recommended build order:
-
-### Phase 1: Core Infrastructure (Week 1)
-- [ ] Set up axios with typed API client
-- [ ] Create proper auth flow (user secret → API key)
-- [ ] Add Vue Router with basic structure
-- [ ] Create global error handling
-- [ ] Add loading states
-
-### Phase 2: Story Components (Week 2)
-- [ ] **StoryBlock component** (with tests)
-  - Media rendering with role-based logic
-  - Text/HTML content display
-  - Dialog blocks
-- [ ] **StoryAction component** (with tests)
-  - Action buttons with icons
-  - Event emission
-- [ ] **StoryFlow component** (with tests)
-  - Fragment streaming
-  - Auto-scroll behavior
-  - Block accumulation
-
-### Phase 3: UI Components (Week 3)
-- [ ] **AppNavbar** (with tests)
-  - World selector
-  - User menu
-  - Settings
-- [ ] **StoryStatus** (with tests)
-  - Status display
-  - Icon rendering
-- [ ] **WorldInfo/SystemInfo** (with tests)
-  - Info dialogs
-  - Media display
-
-### Phase 4: State & Integration (Week 4)
-- [ ] Pinia store with proper typing
-- [ ] Connect to real FastAPI backend
-- [ ] Media URL handling
-- [ ] Error boundaries
-- [ ] Integration tests
-
-### Phase 5: Polish (Week 5+)
-- [ ] Mobile responsive design
-- [ ] Keyboard shortcuts
-- [ ] Accessibility improvements
-- [ ] Save/load functionality
-- [ ] Settings panel
-- [ ] Character sheets/inventory
-
-## 💡 Development Tips
-
-### Testing Philosophy
-**Write tests FIRST, then implement:**
-
-1. Write test describing behavior you want
-2. Run test (it fails - RED)
-3. Implement minimal code to pass test (GREEN)
-4. Refactor if needed (REFACTOR)
-5. Repeat
-
-Example workflow:
-```typescript
-// 1. Write test (fails)
-it('renders story text', () => {
-  expect(wrapper.text()).toContain('Story content')
-})
-
-// 2. Make it pass (minimal code)
-<template>
-  <div>{{ block.text }}</div>
-</template>
-
-// 3. Refactor (improve without breaking tests)
-<template>
-  <v-card>
-    <v-card-text v-html="block.text" />
-  </v-card>
-</template>
-```
-
-### TypeScript Tips
-- Run `yarn type-check` frequently
-- Fix type errors immediately (don't accumulate)
-- Use `any` only as last resort (add `// @ts-expect-error` comment explaining why)
-- Let TypeScript catch bugs before runtime
-
-### MSW Mock Strategy
-- Keep mocks in `/tests/mocks/`
-- One mock per API endpoint
-- Use realistic data that matches your types
-- Override mocks in individual tests when needed
-
-### Component Organization
-```
-components/
-├── story/           # Story-specific components
-│   ├── StoryBlock.vue
-│   ├── StoryBlock.test.ts
-│   ├── StoryAction.vue
-│   └── StoryAction.test.ts
-├── ui/              # Reusable UI components
-│   ├── LoadingSpinner.vue
-│   └── ErrorAlert.vue
-└── layout/          # Layout components
-    ├── AppNavbar.vue
-    └── AppFooter.vue
-```
-
-## 🧪 Testing Commands
-
-```bash
-# Run all tests once
-yarn test
-
-# Run tests in watch mode (TDD)
-yarn test --watch
-
-# Run tests with UI (visual test runner)
-yarn test:ui
-
-# Generate coverage report
-yarn test:coverage
-
-# Type check only
+# TypeScript checking
 yarn type-check
 
-# Lint code
-yarn lint
+# Run tests
+yarn test
 
-# Format code
-yarn format
+# Run tests in watch mode
+yarn test --watch
 ```
 
-## 🎨 Styling Approach
-
-### Vuetify Classes (Preferred)
-Use Vuetify's utility classes:
-```vue
-<v-card class="pa-4 ma-2 elevation-2">
-  <v-card-title class="text-h5 text-primary">
-    Title
-  </v-card-title>
-</v-card>
+### Environment Setup
+Create `.env.local`:
+```bash
+VITE_DEFAULT_API_URL=http://localhost:8000/api/v2
+VITE_DEFAULT_WORLD=tangl_world
+VITE_DEFAULT_USER_SECRET=dev-secret-123
+VITE_DEBUG=true
+VITE_VERBOSE=false
+VITE_MOCK_RESPONSES=true  # Use MSW mocks
 ```
 
-### Scoped Styles (When Needed)
-```vue
-<style scoped>
-.custom-class {
-  /* Your custom styles */
-}
-</style>
+### Production Build
+```bash
+yarn build
+yarn preview  # Test production build locally
 ```
 
-### Theme Customization
-Edit `src/plugins/vuetify.ts` to change colors:
-```typescript
-colors: {
-  primary: '#YOUR_COLOR',
-  secondary: '#YOUR_COLOR',
-}
+---
+
+## 🏗️ Architecture
+
+### Component Hierarchy
+```
+App.vue
+├── AppNavbar
+│   ├── WorldInfo (dialog)
+│   ├── SystemInfo (dialog)
+│   └── SecretDialog (dialog)
+├── v-navigation-drawer
+│   └── StoryStatus
+└── v-main
+    └── StoryFlow
+        └── StoryBlock (repeated)
+            ├── StoryDialogBlock (optional)
+            └── StoryAction (repeated)
 ```
 
-## 🐛 Common Issues & Solutions
+### Data Flow
+1. User clicks `StoryAction` button
+2. Event bubbles up: `StoryAction` → `StoryBlock` → `StoryFlow`
+3. `StoryFlow` calls API via `$http`
+4. Server returns `JournalStoryUpdate[]`
+5. `StoryFlow` processes media URLs and creates media dictionaries
+6. New blocks appended to reactive array
+7. Vue re-renders with new blocks
+8. Auto-scroll to latest block
 
-### "Cannot find module @/something"
-- Restart TypeScript service in PyCharm
-- Check `tsconfig.json` has correct paths
-- Verify file exists at expected location
+### State Management
+- **Pinia Store** (`src/store/index.ts`)
+  - Current world selection
+  - User secret & API key
+  - Cached world info
+- **Composables** (`src/composables/`)
+  - `useGlobal()` - shared utilities
+  - Future: `useStory()`, `useMedia()`, etc.
 
-### Tests failing with Vuetify errors
-- Make sure you're passing `vuetify` plugin in test
-- Check the test template in TESTING_PATTERNS.md
+### API Integration
+- **Base URL:** Environment variable `VITE_DEFAULT_API_URL`
+- **Auth:** API key in `X-API-Key` header
+- **Mocking:** MSW intercepts requests in dev mode
+- **Endpoints:** Match FastAPI OpenAPI spec
 
-### Types not updating
-- Restart TypeScript service
-- Run `yarn type-check` to see actual errors
-- Check `src/vite-env.d.ts` for environment types
+---
 
-### Hot reload not working
-- Check Vite dev server is running
-- Try hard refresh (Ctrl+Shift+R)
+## 📚 Key Documentation
+
+- **[ARCHITECTURE.md](notes/ARCHITECTURE.md)** - System design overview
+- **[AGENTS.md](AGENTS.md)** - Contributor guide & conventions
+- **[TESTING_PATTERNS.md](notes/TESTING_PATTERNS.md)** - Test recipes
+- **[SETUP_GUIDE.md](notes/SETUP_GUIDE.md)** - Detailed installation
+- **[QUICK_REFERENCE.md](notes/QUICK_REFERENCE.md)** - Cheat sheet
+
+---
+
+## 🧪 Testing Strategy
+
+### Current Coverage
+- **StoryFlow:** ✅ Comprehensive tests
+- **StoryBlock:** ✅ Comprehensive tests
+- **useGlobal:** ✅ Unit tests
+- **Store:** ✅ Unit tests
+- **AppNavbar:** ✅ Basic tests
+
+### Testing Commands
+```bash
+yarn test              # Run all tests
+yarn test --watch      # TDD mode
+yarn test:ui           # Visual test runner
+yarn test:coverage     # Coverage report
+```
+
+### Test Principles
+- Write tests first (TDD)
+- Test behavior, not implementation
+- Use MSW for API mocking
+- Keep tests simple and focused
+- One assertion per test when possible
+
+---
+
+## 🎨 Styling
+
+### Approach
+1. **Vuetify utilities first** - Use built-in classes when possible
+2. **Scoped styles second** - Component-specific CSS
+3. **Theme customization** - Edit `src/plugins/vuetify.ts`
+
+### Custom Fonts
+Currently using Adobe Fonts:
+- **Burnaby Stencil** - Titles
+- **Tenby** - Body text (optional)
+
+To customize, edit `App.vue` style section.
+
+---
+
+## 🔧 Development Tools
+
+### VS Code Extensions (Recommended)
+- Volar (Vue Language Features)
+- TypeScript Vue Plugin
+- ESLint
+- Prettier
+
+### PyCharm Setup
+- Enable Vue.js plugin
+- Set TypeScript service to use project version
+- Configure ESLint and Prettier
+
+---
+
+## 📦 Build & Deployment
+
+### Build for Production
+```bash
+yarn build
+```
+
+Outputs to `dist/` directory. Serve with any static file server.
+
+### Docker (Example)
+```dockerfile
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY . .
+RUN yarn build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+---
+
+## 🤝 Contributing
+
+### Before Starting
+1. Read [AGENTS.md](AGENTS.md) for conventions
+2. Check [TESTING_PATTERNS.md](notes/TESTING_PATTERNS.md)
+3. Set up environment per [SETUP_GUIDE.md](notes/SETUP_GUIDE.md)
+
+### Workflow
+1. Create feature branch
+2. Write failing test
+3. Implement feature
+4. Ensure tests pass
+5. Run `yarn type-check` and `yarn lint`
+6. Create PR with description
+
+### Code Style
+- TypeScript strict mode
+- Composition API with `<script setup>`
+- Vue 3.5 conventions
+- 100 char line limit
+- 2-space indentation
+- Single quotes
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**MSW not intercepting requests**
+- Check `.env.local` has `VITE_MOCK_RESPONSES=true`
+- Hard refresh browser (Ctrl+Shift+R)
+- Check console for MSW startup logs
+
+**TypeScript errors**
+- Restart TS server in IDE
+- Run `yarn type-check` to see all errors
+- Check path aliases in `tsconfig.json`
+
+**Tests failing**
+- Ensure env vars are stubbed in tests
+- Check Vuetify plugin is passed to mount
+- Verify MSW server is started in test setup
+
+**Hot reload not working**
 - Restart dev server
+- Check for syntax errors
+- Verify Vite config is correct
 
-## 📚 Documentation References
+---
 
-- **Vue 3**: https://vuejs.org/guide/
-- **Vuetify 3**: https://vuetifyjs.com/
-- **Vitest**: https://vitest.dev/
-- **MSW**: https://mswjs.io/
-- **Vue Test Utils**: https://test-utils.vuejs.org/
+## 📄 License
 
-## 🎓 Learning Resources
+See main project LICENSE file.
 
-If you're rusty on any of these:
+---
 
-- **Vue Composition API**: https://vuejs.org/guide/extras/composition-api-faq.html
-- **TypeScript with Vue**: https://vuejs.org/guide/typescript/overview.html
-- **Vitest Testing**: https://vitest.dev/guide/
-- **Component Testing**: https://test-utils.vuejs.org/guide/
+## 🎉 Summary
 
-## ✅ Success Checklist
+**The web client MVP is essentially complete!** All core components from the legacy codebase have been successfully ported and modernized with:
+- Modern Vue 3 + TypeScript architecture
+- Comprehensive testing infrastructure
+- Development-friendly tooling
+- Clean, maintainable codebase
 
-Before you start building features:
+**Next priorities:** Fill testing gaps, polish UX, and prepare for production deployment.
 
-- [x] New base project
-- [x] `yarn install` completed successfully
-- [x] `yarn type-check` passes with no errors
-- [x] `yarn test` passes (3/3 tests)
-- [x] `yarn dev` starts and shows Hello World at localhost:5173
-- [x] Hot reload works (edit App.vue, see instant update)
-- [ ] PyCharm recognizes TypeScript types in .vue files
-- [ ] You can run tests from PyCharm UI
-- [ ] You've read SETUP_GUIDE.md and TESTING_PATTERNS.md
+---
 
-## 🎉 You're Ready!
-
-Once all checkboxes are checked, you have a **production-ready development environment** with:
-- Modern tooling
-- Type safety
-- Testing infrastructure
-- Best practices baked in
-
-**Next**: Pick a component from the Phase 2 roadmap and build it TDD-style!
-
-## 💬 Questions?
-
-Refer to:
-1. **SETUP_GUIDE.md** for installation issues
-2. **TESTING_PATTERNS.md** for testing questions
-3. Config file comments for tool-specific details
-
-Let's build something amazing! 🚀
+**Questions? Check the `/notes` directory or review legacy code in `/scratch/legacy/web` for reference implementations.**

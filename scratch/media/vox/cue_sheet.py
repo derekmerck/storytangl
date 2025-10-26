@@ -1,4 +1,4 @@
-from tangl.narrative.dialog import DialogMuBlock
+from tangl.discourse.dialog import DialogMuBlock
 from tangl.media.images.staging_mu_block import StagingMuBlock
 from .vox_spec import VoxSpec
 

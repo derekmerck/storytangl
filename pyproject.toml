@@ -181,4 +181,3 @@ exclude_also = [
 
 [tool.coverage.html]
 directory = "html_cov"
-

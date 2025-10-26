@@ -11,7 +11,8 @@ on:
     branches: ["**"]
 
 jobs:
-  engine-tests:
+  python-tests:
+    # pyproject includes tests for engine, apps/cli, apps/server, docs
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,9 +39,9 @@ jobs:
           PYTHONPATH: engine/src
         run: |
           poetry run pytest -W ignore::DeprecationWarning -W ignore::pytest.PytestCollectionWarning
-#          poetry run pytest engine/tests
 
   web-client-tests:
+    # vite tests for apps/web
     runs-on: ubuntu-latest
     defaults:
       run:

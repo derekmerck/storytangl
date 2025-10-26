@@ -1,6 +1,6 @@
 from tangl.type_hints import StringMap
-from tangl.core import NamespaceHandler
-from tangl.story.scene import Block, Action
+from tangl.vm.vm_dispatch import on_get_ns
+from tangl.story.episode import Block, Action
 from tangl.mechanics.games import Game
 
 class ChallengeBlock(Block):
@@ -21,7 +21,7 @@ class ChallengeBlock(Block):
         return super().actions + [ Action.from_nodes(self, m) for m in self.game.get_moves() ]
         # todo: this isn't quite right -- need to return the same action with a payload, not create totally new actions each round
 
-    @NamespaceHandler.strategy()
-    def _include_game_status(self, **kwargs) -> StringMap:
+    @on_get_ns.register()
+    def _include_game_status(self, ctx=None, **kwargs) -> StringMap:
         return self.game.get_status()
 

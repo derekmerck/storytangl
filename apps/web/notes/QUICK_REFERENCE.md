@@ -26,8 +26,8 @@ yarn generate-api    # Generate types from OpenAPI spec
 ## 📁 Where Things Live
 
 ```
-src/
-├── components/       → Vue components
+src/                   (@)
+├── components/      → Vue components
 │   ├── story/       → StoryBlock, StoryFlow, etc
 │   ├── ui/          → Reusable UI components  
 │   └── layout/      → AppNavbar, AppFooter
@@ -35,8 +35,8 @@ src/
 ├── store/           → Pinia state management
 ├── composables/     → useGlobal() etc
 ├── plugins/         → Vuetify, Router setup
-├── tests/           → Test setup & mocks
 └── styles/          → SCSS files
+tests/               → Test setup & mocks (@tests)
 ```
 
 ## 🧪 Test Template (Copy/Paste Ready)

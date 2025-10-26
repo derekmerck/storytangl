@@ -80,18 +80,35 @@ class FantasticLook(Look):
     # For creatures with unusual features
 
     body_type: str = None  # human, snakelike, taur, robot
+
+    eye_count: int = 2
+    eye_type: str = None   # human, cat, spider (6)
+
+    mandible_type: str = None # human (1, vertical), insectoid (2, lateral), snout
+    mandible_count: int = 1
+
+    arm_count: int = 2
     arm_type: str = None   # human, insect, tentacle, robot
+
+    leg_count: int = 2     # indicate digitigrade
     leg_type: str = None   # horse, goat, dog, insect, tentacle, robot
 
     fur_color: str = None
 
-    horn_type: str = None  # goat, oni, unicorn
+    horn_count: int = 0
+    horn_type: str = None  # goat (2), oni (1), unicorn (1)
     horn_color: str = None # bone
-    horn_count: int = None
 
+    wing_count: int = 0
     wing_type: str = None  # bug, dragonfly, butterfly, bird/feathered, bat/leather, robotic
     wing_palette: str = None
 
+    tail_count = 0
     tail_type: str = None  # catlike, spaded, forked, prehensile
     tail_color: str = None
+
+    ovipositor_type: str = None
+    ovipositor_color: str = None
+    stinger_type: str = None   # scorpion, wasp
+    stinger_color: str = None
 

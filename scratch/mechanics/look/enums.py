@@ -1,8 +1,8 @@
 """
 Provides a common vocabulary for the physical traits of human-like actors.
 
-This enables extending the `describe` and `media_spec` adapters to additional
-voices and media styles.
+Using a structured format enables extending the `describe` and `media_spec` adapters
+for additional voices and media styles.
 """
 
 from enum import Enum, IntEnum
@@ -97,15 +97,16 @@ class HairStyle(EnumPlusMixin, Enum):
 
     PONY_TAIL = "pony_tail"
     LONG_PONY_TAIL = "long_pony_tail"
-    PIGTAILS = "pigtails"
+    PIGTAILS = "pigtails"      # double pony, twin tails for double braids
     LONG_PIGTAILS = "long_pigtails"
 
     BRAID = "braid"
     LONG_BRAID = "long_braid"
-    TWIN_TAILS = "twin_tails"
+    TWIN_TAILS = "twin_tails"  # double braid, pigtails for double pony
     CORNROWS = "cornrows"
 
     BUN = "bun"
+    MESSY_BUN = "messy_bun"
     SIDE_BUNS = "side_buns"
     UPDO = "updo"
 
