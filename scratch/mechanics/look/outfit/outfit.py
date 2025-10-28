@@ -15,15 +15,15 @@ from pydantic import BaseModel, model_validator
 import logging
 
 from tangl.type_hints import UniqueLabel
-from tangl.narrative.lang.helpers import oxford_join
+from tangl.lang.helpers import oxford_join
 # from tangl.entity import BaseEntityHandler
-from tangl.core import on_render, Renderable
-from tangl.story.story_node import StoryNode
-from tangl.narrative.lang.body_parts import BodyPart
+# from tangl.core import on_render, Renderable
+# from tangl.story.story_node import StoryNode
+from tangl.lang.body_parts import BodyPart
 from ..wearable.enums import WearableState, WearableLayer
 from ..wearable import Wearable
 
-logger = logging.getLogger("tangl.story.outfit")
+logger = logging.getLogger(__name__)
 
 
 class OutfitHandler:
@@ -50,15 +50,15 @@ class OutfitHandler:
         return True
 
     @classmethod
-    def render_desc(cls, outfit: OutfitManager) -> str:
+    def describe(cls, outfit: OutfitManager) -> str:
         """
-        >>> outfit.render_desc()
+        >>> outfit.describe()
         He is wearing a dark jacket and blue jeans.
-        >>> outfit.open(jacket)
-        >>> outfit.render_desc()
+        >>> outfit.open('jacket')
+        >>> outfit.describe()
         He is wearing a dark jacket and blue jeans.  His dark jacket is open,
         revealing a t-shirt underneath.
-        >>> outfit.render_desc()
+        >>> outfit.describe()
         He is wearing an open jacket, a light t-shirt, and blue jeans.
         """
 
@@ -183,8 +183,8 @@ class HasOutfit:
     def outfit(self) -> OutfitManager:
         return OutfitManager(self)
 
-    @RenderHandler.strategy
-    def _outfit_description(self):
+    @on_render.register()
+    def _provide_outfit_description(self):
         return {'outfit': self.outfit.render_desc()}
 
 
@@ -213,8 +213,17 @@ class OutfitManager:
             return value
         return super().__getattr__(item)
 
-    def render_desc(self) -> str:
-        return OutfitHandler.render_desc(self)
+    # --------------------
+    # Concept Api
+
+    def describe(self) -> str:
+        return OutfitHandler.describe(self)
+
+    def adapt_media_spec(self) -> MediaSpec:
+        ...
+
+    # --------------------
+    # Public Api
 
     def can_put_on(self, wearable: Wearable) -> bool:
         return OutfitHandler.can_transition(self, wearable, WearableState.ON)

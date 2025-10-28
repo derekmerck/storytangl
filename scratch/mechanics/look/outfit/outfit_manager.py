@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from tangl.core.services import BaseHandler
-from tangl.core import RenderHandler
-from tangl.story import StoryNode
-from .wearable import Wearable
+from tangl.core import Entity
+from ..wearable import Wearable
 
 
-class OutfitManager(BaseHandler):
+class OutfitManager():
 
     def __init__(self, node: HasOutfit):
         self.node = node
@@ -55,7 +53,7 @@ class OutfitManager(BaseHandler):
         ...
 
 
-class HasOutfit(StoryNode):
+class HasOutfit(Entity):
 
     @property
     def wearables(self) -> list[Wearable]:
@@ -66,6 +64,6 @@ class HasOutfit(StoryNode):
         # accessor for expressions like `actor.outfit.wear(item)`
         return OutfitManager(self)
 
-    @RenderHandler.strategy
+    @on_render.strategy
     def render(self):
         return {'outfit': self.outfit.describe()}

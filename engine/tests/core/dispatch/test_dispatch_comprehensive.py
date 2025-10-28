@@ -591,7 +591,7 @@ class TestBehaviorRegistryDispatch:
         registry.add_behavior(static_handler)
 
         char = Character(label="hero")
-        receipts = list(registry.dispatch(caller=char))
+        receipts = list(registry.dispatch(caller=char, ctx=None))
 
         assert len(receipts) == 1
         assert receipts[0].result == "static_result"
@@ -603,7 +603,7 @@ class TestBehaviorRegistryDispatch:
         registry.add_behavior(Character.self_heal, task="heal")
 
         char = Character(label="hero")
-        receipts = list(registry.dispatch(caller=char, task="heal"))
+        receipts = list(registry.dispatch(caller=char, task="heal", ctx=None))
 
         assert len(receipts) == 1
         assert receipts[0].result == "healed_self"
@@ -636,6 +636,7 @@ class TestBehaviorRegistryDispatch:
         char = Character(label="hero")
         receipts = list(registry.dispatch(
             caller=char,
+            ctx=None,
             extra_handlers=[extra_handler]
         ))
 
@@ -649,7 +650,7 @@ class TestBehaviorRegistryDispatch:
         registry = BehaviorRegistry()
         char = Character(label="hero")
 
-        receipts = list(registry.dispatch(caller=char))
+        receipts = list(registry.dispatch(caller=char, ctx=None))
         assert len(receipts) == 0
 
     def test_dispatch_preserves_order(self):
@@ -678,7 +679,7 @@ class TestBehaviorRegistryDispatch:
         )
 
         char = Character(label="hero")
-        list(registry.dispatch(caller=char))
+        list(registry.dispatch(caller=char, ctx=None))
 
         assert results == ["first", "normal", "last"]
 
@@ -697,7 +698,8 @@ class TestBehaviorRegistryChainDispatch:
         char = Character(label="hero")
         receipts = list(BehaviorRegistry.chain_dispatch(
             reg1, reg2,
-            caller=char
+            caller=char,
+            ctx=None
         ))
 
         assert len(receipts) == 2
@@ -717,6 +719,7 @@ class TestBehaviorRegistryChainDispatch:
         receipts = list(BehaviorRegistry.chain_dispatch(
             reg1, reg2,
             caller=char,
+            ctx=None,
             task="validate"
         ))
 
@@ -750,7 +753,7 @@ class TestBehaviorRegistryChainDispatch:
         )
 
         char = Character(label="hero")
-        list(BehaviorRegistry.chain_dispatch(reg1, reg2, caller=char))
+        list(BehaviorRegistry.chain_dispatch(reg1, reg2, caller=char, ctx=None))
 
         assert results == ["reg2_first", "reg1_normal", "reg1_last"]
 
@@ -801,6 +804,7 @@ class TestCompleteWorkflow:
         receipts = list(BehaviorRegistry.chain_dispatch(
             global_reg, app_reg,
             caller=char,
+            ctx=None,
             task="turn"
         ))
 
@@ -825,7 +829,7 @@ class TestCompleteWorkflow:
         # Run multiple times
         runs = []
         for _ in range(5):
-            receipts = list(registry.dispatch(caller=char))
+            receipts = list(registry.dispatch(caller=char, ctx=None))
             order = [registry.get(r.blame_id) for r in receipts]
             runs.append(order)
 
@@ -845,7 +849,7 @@ class TestCompleteWorkflow:
         print([r.func(None) for r in registry.values()])
 
         char = Character(label="hero")
-        receipts = list(registry.dispatch(caller=char))
+        receipts = list(registry.dispatch(caller=char, ctx=None))
         print([r.result for r in receipts])
 
         results = list( CallReceipt.gather_results(*receipts) )
@@ -869,9 +873,10 @@ class TestErrorConditions:
 
         char = Character(label="hero")
 
-        with pytest.raises(ValueError, match="task.*has_task"):
+        with pytest.raises(TypeError, match="unexpected.*has_task"):
             list(registry.dispatch(
                 caller=char,
+                ctx=None,
                 task="validate",
                 has_task="validate"
             ))
@@ -979,7 +984,7 @@ class TestDocumentationExamples:
         registry.add_behavior(specific, priority=HandlerPriority.NORMAL)
 
         char = Character(label="hero")
-        list(registry.dispatch(caller=char))
+        list(registry.dispatch(caller=char, ctx=None))
 
         # Both should run, but specific should be able to
         # "clobber" general if needed (runs later)

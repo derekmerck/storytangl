@@ -125,7 +125,7 @@ def test_refresh_ns_for_dependencies() -> None:
         label="companion",
     )
     dependency.requirement.provider = companion
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
     assert ns["companion"] is companion
 
 
@@ -144,7 +144,7 @@ def test_refresh_edge_projections_for_affordances() -> None:
         label="service",
     )
     affordance.requirement.provider = block
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
 
     assert ns["service"] is provider
 
@@ -161,11 +161,11 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
 
     scene = Scene(graph=g, label="scene", member_ids=[block.uid])
 
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
     assert "missing" not in ns
 
     requirement.provider = Block(graph=g, label="provider")
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block))
+    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
     assert "missing" in ns
     assert ns["missing"].get_label() == "provider"
 

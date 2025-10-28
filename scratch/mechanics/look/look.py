@@ -1,17 +1,22 @@
+# tangl/mechanics/look/look.py
+
+from typing import Self
 from pydantic import field_validator
 
-from tangl.core.entity import Entity
-# from tangl.core import on_render
-from tangl.lang.gens import Gens
 from tangl.lang.age_range import AgeRange
+from tangl.core import Entity
+# from tangl.vm.vm_dispatch import on_render
+from tangl.story.concepts import Concept
+from tangl.lang.gens import Gens
 
 from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
 from .ornaments import Ornamentation
+# from .outfit import Outfit
 
 Outfit = object
 
 
-class Look(Entity):
+class Look(Concept):
 
     # default_reduce_flag: ClassVar[bool] = True
 
@@ -30,10 +35,14 @@ class Look(Entity):
         return value
 
     # @on_render.register()
-    def _describe_look(self, *, gens: 'Gens' = "xx", outfit: 'Outfit' = None, **context):
+    def describe(self: Self, *, ctx=None, **_ ):
+        # person, outfit/state, visible ornamentation, attitude
         # Provide description, including current outfit if the caller provides it
         # with the request.
         # todo: or we want to invoke a narrative creation service here...
+        ...
+
+    def adapt_media_spec(self: Self, *, ctx=None, **_ ):
         ...
 
     # body type vector for more specific stats:
@@ -59,10 +68,6 @@ class Look(Entity):
 
     # todo: handle lipstick, makeup?
 
-    def describe(self):
-        # person, outfit/state, visible ornamentation, attitude
-        ...
-
     # def get_media_spec(self, spec_type: Type[MediaSpec] = MediaSpec) -> MediaSpec:
     #     ...
 
@@ -75,6 +80,10 @@ class HasLook(Entity):
     # @on_render.register()
     def _provide_look_desc(self):
         return { 'look': self.look.describe() }
+
+    # @on_create_media.register()
+    def _provide_media_spec(self):
+        return self.look.adapt_media_spec()
 
 class FantasticLook(Look):
     # For creatures with unusual features

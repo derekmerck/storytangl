@@ -4,8 +4,8 @@ Behavior Registry – dispatch (v3.7.2)
 
 Ordered, queryable registries of :class:`~tangl.core.dispatch.behavior.Behavior`
 with deterministic selection and execution. A registry can represent a single
-phase/task, a single layer (global/app/author/local), or a mix; registries can
-also be *chained* to provide CSS‑like precedence across origins.
+phase/task, a single layer (global/system/app/author/local), or a mix; registries
+can also be *chained* to provide CSS‑like precedence across origins.
 
 Why
 ----
@@ -47,13 +47,15 @@ import logging
 
 from pydantic import model_validator
 
+from tangl.type_hints import StringMap
 from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable
 from tangl.core.registry import _chained_registries
-from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority
+from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority, HandlerFunc
 from .call_receipt import CallReceipt
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # ----------------------------
 # Registry/Dispatch
@@ -187,7 +189,19 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             elif isinstance(h, Callable):
                 yield Behavior(func=h, task=None)
 
-    def dispatch(self, caller: Entity, *, task: str = None, ctx: dict = None, extra_handlers: list[Callable] = None, by_origin=False, dry_run=False, **inline_criteria) -> Iterator[CallReceipt]:
+    def dispatch(self,
+                 # Behavior invocation
+                 caller: Entity, *,
+                 ctx: dict,
+                 others: tuple[Entity, ...] = None,  # behavior *args
+                 params: StringMap = None,           # behavior **kwargs
+
+                 # Dispatch meta
+                 task: str = None,            # alias for has_task inline criteria
+                 inline_criteria=None,        # additional selection criterial
+                 extra_handlers: list[HandlerFunc|Behavior] = None,  # loose handlers
+                 dry_run=False                # just print handlers
+                 ) -> Iterator[CallReceipt]:
         """
         Select, sort, and invoke matching behaviors from this registry.
 
@@ -213,6 +227,10 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             One receipt per invoked behavior, in deterministic order.
         """
         # explicit 'task' param is an alias for `inline_criteria['has_task'] = '@foo'`
+        others = others or ()
+        params = params or {}
+        inline_criteria = inline_criteria or {}
+
         if task is not None:
             if 'has_task' in inline_criteria:
                 # could check if they are the same, but very edge case, so just raise
@@ -225,14 +243,31 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         if extra_handlers:
             behaviors = itertools.chain(behaviors, self._iter_normalize_handlers(extra_handlers))
 
-        behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller, by_origin=by_origin))
+        behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller))
         logger.debug(f"Behaviors invoked: {[b.get_label() for b in behaviors]}")
         if dry_run:
             return
-        return (b(caller, ctx=ctx) for b in behaviors)
+
+        return (b(caller, *others, ctx=ctx, **params) for b in behaviors)
+
+
 
     @classmethod
-    def chain_dispatch(cls, *registries: BehaviorRegistry, caller, task: str = None, ctx: dict = None, extra_handlers: list[Callable] = None, by_origin=False, **inline_criteria) -> Iterator[CallReceipt]:
+    def chain_dispatch(cls,
+                       *registries: BehaviorRegistry,
+
+                       # Behavior invocation
+                       caller: Entity,
+                       others: tuple[Entity, ...] = None,  # behavior *args
+                       ctx: dict,
+                       params: StringMap = None,           # behavior **kwargs
+
+                       # Dispatch meta
+                       task: str = None,      # alias for has_task inline criteria
+                       inline_criteria=None,  # additional selection criterial
+                       extra_handlers: list[HandlerFunc | Behavior] = None,  # loose handlers
+                       dry_run=False          # just print handlers
+                       ) -> Iterator[CallReceipt]:
         """
         Select, sort, and invoke matching behaviors across multiple registries.
 
@@ -240,6 +275,10 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         chaining context so :meth:`Behavior.origin_dist` can compute distances.
         Sorting uses :meth:`Behavior.sort_key(caller, by_origin=...)`.
         """
+        others = others or ()
+        params = params or {}
+        inline_criteria = inline_criteria or {}
+
         # explicit 'task' param is an alias for `inline_criteria['has_task'] = '@foo'`
         if task is not None:
             if 'has_task' in inline_criteria:
@@ -255,8 +294,12 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         if extra_handlers:
             behaviors = itertools.chain(behaviors, cls._iter_normalize_handlers(extra_handlers))
         with _chained_registries(registries):  # provide registries for origin_dist sort key
-            behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller, by_origin=by_origin))
-        return (b(caller, ctx=ctx) for b in behaviors)
+            behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller))
+        logger.debug(f"Chained behaviors invoked: {[b.get_label() for b in behaviors]}")
+        logger.debug(f"ctx: {ctx}")
+        logger.debug(f"others: {others}")
+        logger.debug(f"params: {params}")
+        return (b(caller, *others, ctx=ctx, **params) for b in behaviors)
 
     def iter_dispatch(self, *args, **kwargs) -> Iterator[CallReceipt]:
         """
@@ -278,54 +321,6 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         """
         return [x.task for x in self.data.values() if x.task is not None]
 
-
-# ----------------------------
-# Registration Helper
-
-class HasBehaviors(Entity):
-    """
-    Mixin for classes that define and auto‑annotate behaviors.
-
-    During class creation, :meth:`__init_subclass__` annotates any functions that
-    were decorated via :meth:`BehaviorRegistry.register` with ``owner_cls=cls``.
-    Instance‑level annotation can be added in :meth:`_annotate_inst_behaviors`.
-    """
-    # Use mixin or call `_annotate` in `__init_subclass__` for a class
-    # with registered behaviors
-
-    @classmethod
-    def _annotate_behaviors(cls):
-        """
-        Attach ``owner_cls=cls`` to behaviors declared on this class and
-        ``caller_cls=cls`` to inst or cls on caller  handler types.
-        """
-        logger.debug(f"Behaviors annotated on class {cls.__name__}")
-        # annotate handlers defined in this cls with the owner_cls
-        for name, obj in cls.__dict__.items():
-            h = getattr(obj, "_behavior", None)  # type: Behavior
-            if h is not None:
-                logger.debug(f"Handler owner set for {h}")
-                h.owner_cls = cls
-                if h.handler_type in [HandlerType.INSTANCE_ON_CALLER, HandlerType.CLASS_ON_CALLER]:
-                    logger.debug(f"Handler caller cls set for {h}")
-                    h.caller_cls = cls
-
-    @classmethod
-    def __init_subclass__(cls, **kwargs):
-        """
-        Ensure behavior annotations are applied when the subclass is created.
-        """
-        super().__init_subclass__(**kwargs)
-        cls._annotate_behaviors()
-
-    # @model_validator(mode="after")
-    # def _annotate_inst_behaviors(self):
-    #     """
-    #     (Planned) Annotate a *copy* of class behaviors for this instance, setting
-    #     ``owner=self`` where appropriate. Left unimplemented pending a concrete
-    #     registration strategy for instance‑bound behaviors.
-    #     """
-    #     # want to annotate and register a _copy_ of the instance (self, caller)
-    #     # but _not_ class (cls, caller) behaviors with owner = self instead
-    #     # of owner = cls
-    #     return self
+    # Hashes like a pseudo-singleton
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.label))

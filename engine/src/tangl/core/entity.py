@@ -172,7 +172,7 @@ class Entity(BaseModelPlus):
     @is_identifier
     def _id_hash(self) -> bytes:
         # For persistent id's, use either the uid or a field annotated as UniqueLabel
-        return hashing_func(self.uid, self.__class__)
+        return hashing_func(self.__class__, self.uid)
 
     # Entities are not frozen, should not be hashed or used in sets, use the uid directly if necessary
     # def __hash__(self) -> int:

@@ -24,7 +24,7 @@ def test_dep_in_ns():
     assert a in list(g.find_edges(source=m))
     assert a.satisfied and a.source is m
 
-    receipts = on_get_ns.dispatch(m)
+    receipts = on_get_ns.dispatch(m, ctx=None)
     ns = CallReceipt.merge_results(*receipts)
     print( ns )
     assert 'foo' in ns

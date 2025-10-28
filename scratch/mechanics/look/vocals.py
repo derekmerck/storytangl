@@ -1,9 +1,9 @@
 
-from tangl.core.solver import ResourceNode
+from tangl.story.concepts import Concept
 from .enums import *
 
 
-class Vocals(ResourceNode):
+class Vocals(Concept):
     # This is analogous to a _look_ for a vo creator/adapter
 
     accent: VocalAccent = VocalAccent.US

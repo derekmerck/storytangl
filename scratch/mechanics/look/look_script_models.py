@@ -1,3 +1,8 @@
+from typing import Optional
+
+from tangl.lang.age_range import AgeRange
+from tangl.ir.core_ir import BaseScriptItem
+from .enums import HairColor, HairStyle, EyeColor, SkinTone, BodyPhenotype
 
 # class OutfitScript(NodeScript):
 #     palette: Optional[str] = None
@@ -14,8 +19,8 @@ class LookScript(BaseScriptItem, extra="allow"):
 
     eye_color: Optional[EyeColor] = None
 
-    skin_color: Optional[SkinColor] = None
-    body_shape: Optional[BodyShape] = None  # banana, apple, pear, hourglass
+    skin_tone: Optional[SkinTone] = None
+    body_phenotype: Optional[BodyPhenotype] = None  # banana, apple, pear, hourglass
     sz: Optional[float] = None
     br: Optional[float] = None
     fit: Optional[float] = None
@@ -25,7 +30,7 @@ class LookScript(BaseScriptItem, extra="allow"):
     # can infer from shape + params
 
     pretty: Optional[float] = None
-    apparent_age: Optional[ApparentAge] = None
+    apparent_age: Optional[AgeRange] = None
     reference_model: Optional[str] = None
 
     outfit_type: Optional[str] = None

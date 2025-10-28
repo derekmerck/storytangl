@@ -48,6 +48,7 @@ from typing import Type, Callable, TypeVar, Generic, Optional
 from functools import total_ordering
 import inspect
 import weakref
+import logging
 
 from pydantic import field_validator, model_validator, ConfigDict, Field
 
@@ -58,6 +59,9 @@ from tangl.utils.func_info import FuncInfo, HandlerFunc
 from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable, is_identifier
 from .call_receipt import CallReceipt
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # ----------------------------
 # Kind Enums
@@ -72,15 +76,17 @@ class HandlerLayer(IntEnum):
     - :attr:`INLINE` (1) – behavior injected for a single task call.
     - :attr:`LOCAL` (2) – registered on the caller (node/graph) or its ancestors.
     - :attr:`AUTHOR` (3) – world/domain-provided mixins.
-    - :attr:`APPLICATION` (4) – app/vm-provided behaviors.
-    - :attr:`GLOBAL` (5) – core defaults available everywhere.
+    - :attr:`APPLICATION` (4) – task domain provided behaviors (e.g., story, discourse).
+    - :attr:`SYSTEM` (5) – system provided behaviors (e.g., vm, service, media).
+    - :attr:`GLOBAL` (6) – core defaults available everywhere.
     """
     # Reverse sort inline > global
     INLINE = 1       # injected for task (ignore missing @task)
     LOCAL = 2        # defined on a node, ancestors, or graph
     AUTHOR = 3       # world mixins
-    APPLICATION = 4  # included by application (i.e., vm jobs)
-    GLOBAL = 5       # available everywhere (i.e., core jobs)
+    APPLICATION = 4  # included by application (i.e., story jobs)
+    SYSTEM = 5       # subsystem jobs (i.e., vm jobs, service jobs)
+    GLOBAL = 6       # available everywhere (i.e., core jobs)
 
 class HandlerPriority(EnumPlusMixin, IntEnum):
     """
@@ -90,11 +96,11 @@ class HandlerPriority(EnumPlusMixin, IntEnum):
     The pipeline sorts handlers by these priorities first, with the
     following semantics:
 
-    - :attr:`FIRST` (0) – Runs before all other handlers.
-    - :attr:`EARLY` (25) – Runs after FIRST, but before NORMAL.
+    - :attr:`FIRST` (0)   – Runs before all other handlers.
+    - :attr:`EARLY` (25)  – Runs after FIRST, but before NORMAL.
     - :attr:`NORMAL` (50) – Default middle priority.
-    - :attr:`LATE` (75) – Runs after NORMAL, before LAST.
-    - :attr:`LAST` (100) – Runs very last in the sequence.
+    - :attr:`LATE` (75)   – Runs after NORMAL, before LAST.
+    - :attr:`LAST` (100)  – Runs very last in the sequence.
 
     Users are also free to use any int as a priority. Values lower than 0 will
     run before FIRST, greater than 100 will run after LAST, and other values will
@@ -483,6 +489,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
             propagated by the dispatch pipeline.
         """
         # bind func, call func, wrap in receipt
+        logger.debug(f"type: {self.handler_type.name}, ctx: {ctx}, args: {args!r}, params: {params}")
         bound = self.bind_func(caller)
         result = bound(caller, *args, ctx=ctx, **params)
         return CallReceipt(
