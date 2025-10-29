@@ -1,4 +1,6 @@
-"""Dispatch Layers
+# tangl/core/dispatch/core_dispatch.py
+"""
+Dispatch Layers
 ---------------
 
 1. global
@@ -29,8 +31,6 @@ Higher levels should not make any assumptions about lower level task definitions
 
 Higher level invocations should admit lower level layers
 """
-# --------------------------
-# tangl/core/dispatch/core_dispatch.py
 from functools import partial
 from typing import Iterator, Iterable, Protocol, Self
 import logging
@@ -43,6 +43,9 @@ from tangl.core.registry import VT
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+# --------------------------
+# Context Protocol
+
 class ContextP(Protocol):
     # ctx can ordinarily be anything, for 5-layer dispatch, it should implement:
     # - get_job_layers() -> behavior registries applicable to this context (sys, app, author)
@@ -53,14 +56,17 @@ class ContextP(Protocol):
     # global/core is fixed, local is expanded separately, inline is managed in func
     def get_local_layers(self) -> Iterable[Entity]: ...  # or Domain or whatever
 
+# --------------------------
+# Layered Dispatch Behavior Registry
+
 class LayeredDispatch(BehaviorRegistry):
 
-    def dispatch(self, *,
+    def dispatch(self,
                  # Behavior params
-                 caller: Entity,                    # Active entity
-                 others: tuple[Entity, ...] = None, # Other participating entities
-                 ctx: ContextP = None,              # Includes get_job_layers
-                 params: StringMap = None,
+                 caller: Entity, *,                    # Active entity
+                 ctx: ContextP,                        # Includes get_job_layers
+                 with_args: tuple[Entity, ...] = None, # Other participating entities
+                 with_kwargs: StringMap = None,
 
                  # Dispatch meta
                  task = None,  # alias for `inline_criteria[has_task]`
@@ -82,33 +88,40 @@ class LayeredDispatch(BehaviorRegistry):
             layers.add(caller.local_behaviors)
         # extra handlers are passed along and act as the INLINE layer
 
-        # logger.debug(f"Dispatch layers: {layers!r}")
+        logger.debug(f"Dispatch layers: {layers!r}")
 
         # --------------------
         # Invoke on chained layers
         receipts = self.chain_dispatch(
             *layers,
-            caller=caller,
-            others=others,
-            ctx=ctx,
-            params=params,
 
+            # Behavior invocation
+            caller=caller,
+            ctx=ctx,
+            with_args=with_args,
+            with_kwargs=with_kwargs,
+
+            # Dispatch meta params
             task=task,
             inline_criteria=inline_criteria,
             extra_handlers=extra_handlers,
             dry_run=dry_run
         )
+        return receipts
 
-        # --------------------
-        # Aggregate or return an iterator
-        return CallReceipt.gather_results(*receipts)
+
+# --------------------------
+# Core dispatch and convenience decos
 
 core_dispatch = LayeredDispatch(label="core.dispatch", handler_layer=L.GLOBAL)
 
-# core dispatch hooks, structuring, init, linking on graph, indexing on reg
-on_create = partial(core_dispatch.register, task="create")  # cls resolution hook (cls)
+# Used in HookedEntity for structuring and __post_init__
+on_create = partial(core_dispatch.register, task="create")  # cls and kwargs resolution (unstructured data)
 on_init   = partial(core_dispatch.register, task="init")    # post-init hook (self)
+# Used in HookedGraph when adding or removing an edge
 on_link   = partial(core_dispatch.register, task="link")    # connect nodes (source, dest)
+on_unlink = partial(core_dispatch.register, task="unlink")  # disconnect nodes (source, dest)
+# Used in hooked registry
 on_index  = partial(core_dispatch.register, task="index")   # on registry add (reg, item)
 
 # Core dispatch may have helpers, auditors, or other features; but lower
@@ -118,103 +131,12 @@ on_index  = partial(core_dispatch.register, task="index")   # on registry add (r
 # for the vm "planning" task, that's fine, but it none of vm's business.
 # vm will invoke it automatically along with core_dispatch.
 
-# --------------------
-# Example - on_index w locals
+# see `tangl/dispatch/hooked_registry.py` for a registry that uses the `on_index` hook and provides a local layer behavior registry.
 
-def do_index(registry: Registry, item: Entity, *, ctx=None, extra_handlers=None, params=None) -> Iterator[CallReceipt]:
-    # Convenience entry-point
-    return core_dispatch.dispatch(
-        # behavior ctx
-        caller=registry,
-        others=(item,),
-        ctx=ctx,
-        params=params,
-
-        # dispatch meta
-        task="index",
-        extra_handlers=extra_handlers,
-    )
-
-# Example of feature hooks in multiple layers
-class HookedRegistry(Registry, HasLocalBehaviors):
-
-    def add(self, item: VT, extra_handlers: Iterable = None) -> None:
-        logger.debug(f"{self!r}:add: Adding {item!r}")
-        receipts = do_index(self, item, ctx=None, extra_handlers=extra_handlers)
-        super().add(item)
-
-    # class behaviors are added the registry for the level where
-    # the class is defined
-    @on_index()
-    def _log_item_cls(self: Self, item, *, ctx: ContextP = None):
-        logger.debug(f"{self!r}:inst/global: indexed {item!r}")
-
-    # local/instance behaviors are registered directly on the class
-    @HasLocalBehaviors.register_local(task="index")
-    def _log_item_inst(self, other, *, ctx: ContextP = None):
-        logger.debug(f"{self!r}:inst/local: indexed {other!r}")
-
-def _log_item_static(caller: HookedRegistry, item: Entity, *, ctx: ContextP = None):
-    logger = logging.getLogger(__name__)
-    logger.debug(f"{caller!r}:static/local: indexed {item!r}")
-
-# This adds it to the class local behaviors as a static handler
-HookedRegistry.local_behaviors.add_behavior(_log_item_static, task="index")
-
-logging.basicConfig(level=logging.DEBUG)
-logging.debug("------------------")
-
-hooked_registry = HookedRegistry(label="r1")
-item = Entity(label="item")
-hooked_registry.add(item, extra_handlers=[lambda a, b, ctx: logger.debug(f"{a!r}:lambda: indexed {b!r}")])
-
-"""
-DEBUG:__main__:<HookedRegistry:r1>:add: Adding <Entity:item>
-DEBUG:__main__:<HookedRegistry:r1>:inst/global: indexed <Entity:item>
-DEBUG:__main__:<HookedRegistry:r1>:inst/local: indexed <Entity:item>
-DEBUG:__main__:<HookedRegistry:r1>:static/local: indexed <Entity:item>
-DEBUG:__main__:<HookedRegistry:r1>:lambda: indexed <Entity:item>
-"""
-logging.debug("------------------")
-
-hooked_registry2 = HookedRegistry(label="r2")
-hooked_registry2.add(item)
-# Add + same 3 funcs called, but not lambda
-
-"""
-DEBUG:__main__:<HookedRegistry:r2>:add: Adding <Entity:item>
-DEBUG:__main__:<HookedRegistry:r2>:inst/global: indexed <Entity:item>
-DEBUG:__main__:<HookedRegistry:r2>:inst/local: indexed <Entity:item>
-DEBUG:__main__:<HookedRegistry:r2>:static/local: indexed <Entity:item>
-"""
-logging.debug("------------------")
-
-registry = Registry(label='r3')
-registry.add(item)
-# Nothing
-
-logging.debug("------------------")
-
-class HookReg4(HookedRegistry):
-    ...
-
-hooked_registry4 = HookReg4(label="r4")
-hooked_registry4.add(item)
-# only global, doesn't inherit local behaviors
-"""
-DEBUG:__main__:<HookReg4:r4>:add: Adding <Entity:item>
-DEBUG:__main__:<HookReg4:r4>:inst/global: indexed <Entity:item>
-"""
-
-# No example of a local layer inst on owner, I couldn't think of one
-
-# todo: decorators don't like registering class functions, bc they don't match
-#       the HandlerFunc protocol
-
-exit()
+# see `tangl/vm/vm_dispatch.py` for an example of a system layer registry and features.
 
 # --------------------------
-# vm.planning
+# /tangl/vm/vm_dispatch.py
 from typing import Iterator
 from functools import partial
 
@@ -223,10 +145,8 @@ from tangl.core.dispatch import HandlerPriority as Prio
 from tangl.vm import Context, ResolutionPhase as P
 vm_dispatch = BehaviorRegistry(label="vm.dispatch", handler_layer=L.SYSTEM)
 
-# When creating a dispatch, we might enumerate the default layers _above_ that it should include in every call.
-# Then derive the layers below from the ctx, and override upper layers if needed
-
 # vm phase dispatch registration hooks
+# We can use enums for tasks since we have them
 on_validate = partial(vm_dispatch.register, task=P.VALIDATE)
 on_planning = partial(vm_dispatch.register, task=P.PLANNING)
 on_prereq   = partial(vm_dispatch.register, task=P.PREREQS)
@@ -273,7 +193,7 @@ on_story_render = partial(story_dispatch.register, task="render")
 on_cast_actor = partial(story_dispatch.register, task="link", is_instance='Role')
 on_scout_location = partial(story_dispatch.register, task="link", is_instance='Setting')
 
-# Create story-layer sub-tasks
+# Create story-layer sub-tasks, author layer can interact with these
 on_describe = partial(story_dispatch.register, task="describe")
 on_relationship_change = partial(story_dispatch.register, task="relationship_change")
 
@@ -286,6 +206,12 @@ def _provide_episode_offers(caller: Node, *, ctx=Context) -> "Offers":
     ...
 
 from typing import Type
+from collections import defaultdict
+
+from tangl.core.dispatch import HandlerPriority as Prio
+from tangl.story.concepts import Concept
+from tangl.story.episode import Block
+from tangl.journal.content import ContentFragment
 
 # should be an on_story_create()?  Or do we just want to hook the global handler?
 @on_create(is_subclass=Node)  # fires if c is a type, and it is Node or a subclass of Node
@@ -295,11 +221,6 @@ def _use_node_plus(c: Type, *, ctx=None):
         ...
     return NodePlus
     # Should only return a subclass of the is_subclass criteria
-
-from collections import defaultdict
-
-from tangl.story.concepts import Concept
-from tangl.story.episode import Block
 
 @on_describe(is_instance=Concept)
 def _provide_concept_description(c, *, ctx):
@@ -319,7 +240,9 @@ def do_describe(concept: Concept, *,
         **kwargs
     )
 
-@on_story_render()  # hook vm render task for episodic nodes (cursors are always episodes)
+@on_story_render(handler_priority=Prio.EARLY)
+# hook vm render task for episodic nodes (cursors are always episodes)
+# Early on, we gather concepts and cache them in the context
 def _provide_dependent_concept_descriptions(c: Block, *, ctx):
     """"
     setting:
@@ -328,7 +251,13 @@ def _provide_dependent_concept_descriptions(c: Block, *, ctx):
       john: John is a friend of yours...
       april: April is John's daughter...
     """
-    result = defaultdict(dict)
+    setattr(ctx, 'concepts', defaultdict(dict))
     for concept in c.dependencies:
-        result[type(concept)][concept.name] = do_describe(concept, ctx=ctx)
-    return result
+        # Execute a story level task, higher layers will be invoked, but will
+        # probably ignore it unless they are auditing.
+        ctx.concepts[type(concept)][concept.name] = do_describe(concept, ctx=ctx)
+
+@on_story_render(handler_priority=Prio.LATE)
+def _compose_fragments(c: Block, *, ctx):
+    results = [ContentFragment(**c) for c in ctx.concepts.values()]
+    return results

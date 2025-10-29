@@ -75,7 +75,7 @@ class CallReceipt(Record):
     # !don't try to serialize or compare these!
     ctx: Any = Field(None, exclude=True)
     args: tuple | None = Field(None, exclude=True)
-    params: dict | None = Field(None, exclude=True)
+    kwargs: dict | None = Field(None, exclude=True)
 
     # May include these explicitly or infer from args
     caller_id: Optional[UUID] = None  # args[0].uid

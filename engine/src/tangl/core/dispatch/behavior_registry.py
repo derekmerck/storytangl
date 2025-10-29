@@ -55,7 +55,7 @@ from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority, Hand
 from .call_receipt import CallReceipt
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.WARNING)
 
 # ----------------------------
 # Registry/Dispatch
@@ -175,8 +175,20 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             return func
         return deco
 
-    @staticmethod
-    def _iter_normalize_handlers(handlers: Iterable[Behavior | Callable]) -> Iterator[Behavior]:
+    @classmethod
+    def _normalize_inline_criteria(cls, task, inline_criteria: StringMap = None):
+        # explicit 'task' param is an alias for `inline_criteria['has_task'] = 'foo'`
+        inline_criteria = inline_criteria or {}
+        if task is not None:
+            has_task = inline_criteria.get('has_task')
+            if has_task is not None and task != has_task:
+                raise ValueError(f"Found both 'task={task}' and 'has_task={has_task}' in inline_criteria")
+            else:
+                inline_criteria['has_task'] = task
+        return inline_criteria
+
+    @classmethod
+    def _iter_normalize_handlers(cls, handlers: Iterable[Behavior | Callable]) -> Iterator[Behavior]:
         """
         Internal: normalize an iterable of behaviors or callables into behaviors.
 
@@ -189,12 +201,48 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             elif isinstance(h, Callable):
                 yield Behavior(func=h, task=None)
 
+    @classmethod
+    def _dispatch_many(cls, *,
+                       behaviors: Iterator[Behavior],
+                       caller: Entity,
+                       ctx: dict,
+                       with_args: tuple[Entity, ...] = None,  # behavior *args
+                       with_kwargs: StringMap = None,  # behavior **kwargs
+                       task: str = None,
+                       inline_criteria: StringMap = None,
+                       extra_handlers: Iterable[Behavior | Callable] = None,
+                       dry_run: bool = False,
+                       ):
+        behaviors = list(behaviors)
+        logger.debug(f"Dispatching behaviors {[b.get_label() for b in behaviors]!r}")
+
+        inline_criteria = cls._normalize_inline_criteria(task, inline_criteria)
+        logger.debug(f"Inline criteria: {inline_criteria!r}")
+
+        iter_behaviors = Selectable.filter_for_selector(behaviors, selector=caller, **inline_criteria)
+
+        # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
+        if extra_handlers:
+            iter_behaviors = itertools.chain(iter_behaviors, cls._iter_normalize_handlers(extra_handlers))
+
+        behaviors = sorted(iter_behaviors, key=lambda b: b.sort_key(caller))
+        logger.debug(f"Behaviors invoked: {[b.get_label() for b in behaviors]}")
+
+        if dry_run:
+            return
+
+        with_args = with_args or ()
+        with_kwargs = with_kwargs or {}
+
+        return (b(caller, *with_args, ctx=ctx, **with_kwargs) for b in behaviors)
+
+
     def dispatch(self,
                  # Behavior invocation
                  caller: Entity, *,
                  ctx: dict,
-                 others: tuple[Entity, ...] = None,  # behavior *args
-                 params: StringMap = None,           # behavior **kwargs
+                 with_args: tuple[Entity, ...] = None,  # behavior *args
+                 with_kwargs: StringMap = None,         # behavior **kwargs
 
                  # Dispatch meta
                  task: str = None,            # alias for has_task inline criteria
@@ -215,42 +263,27 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
             Execution context dict passed through to each behavior.
         extra_handlers:
             Optional list of ad‑hoc callables/behaviors appended post‑selection.
-        by_origin:
-            If True, origin/layer precedence sorts before priority (useful for
-            building namespaces where ancestor order must be preserved).
         **inline_criteria:
             Additional selection criteria merged with registry criteria.
+
+        .. admonition:: Lazy!
+            Remember, dispatch returns a receipt generator!  You have to iterate it
+            to create results and produce by-products, e.g., `list(receipts)`.
 
         Returns
         -------
         Iterator[:class:`CallReceipt`]
             One receipt per invoked behavior, in deterministic order.
         """
-        # explicit 'task' param is an alias for `inline_criteria['has_task'] = '@foo'`
-        others = others or ()
-        params = params or {}
-        inline_criteria = inline_criteria or {}
-
-        if task is not None:
-            if 'has_task' in inline_criteria:
-                # could check if they are the same, but very edge case, so just raise
-                raise ValueError("Found 'task' and 'has_task' in inline_criteria")
-            else:
-                inline_criteria['has_task'] = task
-        behaviors = self.select_all_for(selector=caller, **inline_criteria)
-
-        # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
-        if extra_handlers:
-            behaviors = itertools.chain(behaviors, self._iter_normalize_handlers(extra_handlers))
-
-        behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller))
-        logger.debug(f"Behaviors invoked: {[b.get_label() for b in behaviors]}")
-        if dry_run:
-            return
-
-        return (b(caller, *others, ctx=ctx, **params) for b in behaviors)
-
-
+        return self._dispatch_many(behaviors=self.values(),
+                                   caller=caller,
+                                   ctx=ctx,
+                                   with_args=with_args,
+                                   with_kwargs=with_kwargs,
+                                   task=task,
+                                   inline_criteria=inline_criteria,
+                                   extra_handlers=extra_handlers,
+                                   dry_run=dry_run)
 
     @classmethod
     def chain_dispatch(cls,
@@ -258,9 +291,9 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
 
                        # Behavior invocation
                        caller: Entity,
-                       others: tuple[Entity, ...] = None,  # behavior *args
                        ctx: dict,
-                       params: StringMap = None,           # behavior **kwargs
+                       with_args: tuple[Entity, ...] = None,  # behavior *args
+                       with_kwargs: StringMap = None,           # behavior **kwargs
 
                        # Dispatch meta
                        task: str = None,      # alias for has_task inline criteria
@@ -274,46 +307,21 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         Behaves like :meth:`dispatch`, but combines registries and installs a
         chaining context so :meth:`Behavior.origin_dist` can compute distances.
         Sorting uses :meth:`Behavior.sort_key(caller, by_origin=...)`.
+
+        .. admonition:: Lazy!
+            Remember, dispatch returns a receipt generator!  You have to iterate it
+            to create results and produce by-products, e.g., `list(receipts)`.
         """
-        others = others or ()
-        params = params or {}
-        inline_criteria = inline_criteria or {}
-
-        # explicit 'task' param is an alias for `inline_criteria['has_task'] = '@foo'`
-        if task is not None:
-            if 'has_task' in inline_criteria:
-                # could check if they are the same, but very edge case, so just raise
-                raise ValueError("Found both 'task' and 'has_task' in inline_criteria")
-            else:
-                inline_criteria['has_task'] = task
-
-        behaviors = cls.chain_select_all_for(*registries, selector=caller, **inline_criteria)
-        # could also treat this as an ephemeral registry and add it onto the registry
-        # stack and sort while filtering, but it seems clearer to copy the
-        # single-registry-dispatch code.
-        if extra_handlers:
-            behaviors = itertools.chain(behaviors, cls._iter_normalize_handlers(extra_handlers))
-        with _chained_registries(registries):  # provide registries for origin_dist sort key
-            behaviors = sorted(behaviors, key=lambda b: b.sort_key(caller))
-        logger.debug(f"Chained behaviors invoked: {[b.get_label() for b in behaviors]}")
-        logger.debug(f"ctx: {ctx}")
-        logger.debug(f"others: {others}")
-        logger.debug(f"params: {params}")
-        return (b(caller, *others, ctx=ctx, **params) for b in behaviors)
-
-    def iter_dispatch(self, *args, **kwargs) -> Iterator[CallReceipt]:
-        """
-        Prototype for a lazy/partial dispatch interface.
-
-        Not implemented. Future designs may yield thunks or partial receipts
-        to enable streaming or speculative execution.
-        """
-        raise NotImplementedError()
-        # We could return an iterator of handler calls that each produce a receipt:
-        return (lambda: b(caller, ctx) for b in behaviors)
-        # Or we could return an iterator of job receipts with lambda functions as result
-        return (b.partial_receipt(caller, ctx) for b in behaviors)
-        # Probably want a iter_chain_dispatch() as well for symmetry
+        behaviors = itertools.chain.from_iterable(r.values() for r in registries)
+        return cls._dispatch_many(behaviors=behaviors,
+                                  caller=caller,
+                                  ctx=ctx,
+                                  with_args=with_args,
+                                  with_kwargs=with_kwargs,
+                                  task=task,
+                                  inline_criteria=inline_criteria,
+                                  extra_handlers=extra_handlers,
+                                  dry_run=dry_run)
 
     def all_tasks(self) -> list[str]:
         """
@@ -322,5 +330,6 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         return [x.task for x in self.data.values() if x.task is not None]
 
     # Hashes like a pseudo-singleton
+    # todo: cast bytes to a full range int suitable for hash?  Use `self._id_hash()`
     def __hash__(self) -> int:
         return hash((self.__class__, self.label))

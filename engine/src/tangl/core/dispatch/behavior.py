@@ -224,6 +224,8 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         Also normalizes a bound caller method (self, no 'caller') to unbound
         to avoid double-binding at call time.
         """
+        # todo: can't we merge _all_ of this into func info's preprocessor
+        #       as hints?
         func = values.get("func")
         if func is None:
             return values
@@ -304,6 +306,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
     #       to self-register.  Moved it to GraphItem, maybe should re-generalize?
     origin: Registry = Field(None, exclude=True)
 
+    # todo: this is irrelevant in the 5-layer dispatch
     def origin_dist(self) -> int:
         """
         Compute distance from the current chained registries to :attr:`origin`.
@@ -476,7 +479,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
             case _:
                 raise RuntimeError("Unknown call mode")
 
-    def __call__(self, caller: CT, *args, ctx = None, **params) -> CallReceipt:
+    def __call__(self, caller: CT, *args, ctx = None, **kwargs) -> CallReceipt:
         """
         Invoke the wrapped behavior and return a :class:`CallReceipt`.
 
@@ -484,21 +487,21 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         ----------
         caller:
             The runtime caller (usually a :class:`~tangl.core.Entity`).
-        *args, **params:
+        *args, **kwargs:
             Forwarded to the underlying function. ``ctx`` is a reserved kwarg
             propagated by the dispatch pipeline.
         """
         # bind func, call func, wrap in receipt
-        logger.debug(f"type: {self.handler_type.name}, ctx: {ctx}, args: {args!r}, params: {params}")
+        logger.debug(f"type: {self.handler_type.name}, ctx: {ctx}, args: {args!r}, kwargs: {kwargs}")
         bound = self.bind_func(caller)
-        result = bound(caller, *args, ctx=ctx, **params)
+        result = bound(caller, *args, ctx=ctx, **kwargs)
         return CallReceipt(
             behavior_id=self.uid,
             result=result,
             # could put a lambda here if we want deferred/lazy eval or iter dispatch
             ctx=ctx,
             args=args,
-            params=params
+            kwargs=kwargs
         )
 
     def unstructure(self) -> StringMap:

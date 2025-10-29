@@ -235,6 +235,9 @@ class Registry(Entity, Generic[VT]):
         return Counter(itertools.chain.from_iterable(i.tags for i in self))
 
     # -------- EVENT SOURCED REPLAY ----------
+    # todo: I think this is redundant, only WatchedRegistry add/get/remove
+    #       is monitored, so we would only get echo if we are restoring via
+    #       a wrapped object?
 
     def _add_silent(self, entity: VT):
         self.data[entity.uid] = entity

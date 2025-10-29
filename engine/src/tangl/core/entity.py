@@ -245,6 +245,8 @@ class Selectable(BaseModel):
     * **Helpers** – :meth:`satisfies` (entity → criteria) and
       :meth:`filter_for_selector` (bulk filter).
 
+    Satisfies and filter both take `inline_criteria`, which tests the candidate node directly before checking its selection criteria against the selector.
+
     API
     ---
     - :attr:`selection_criteria` – default criteria dict (may include `predicate`).
