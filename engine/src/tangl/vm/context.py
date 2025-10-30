@@ -4,23 +4,25 @@ Execution context for one frame of resolution.
 Thin wrapper around the graph, cursor, and scope providing deterministic RNG.
 """
 from __future__ import annotations
-from typing import Iterator, TYPE_CHECKING
+from typing import Iterator, TYPE_CHECKING, Iterable
 from uuid import UUID
 import functools
 from dataclasses import dataclass, field
 from random import Random
 from collections import ChainMap
+import logging
 
-from tangl.type_hints import Hash
+from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
 from tangl.core.domain import Scope, NS, AffiliateRegistry
-from tangl.core.dispatch import Behavior, CallReceipt
-from .vm_dispatch.on_get_ns import on_get_ns
+from tangl.core.dispatch import Behavior, BehaviorRegistry, CallReceipt
+# from .vm_dispatch.on_get_ns import on_get_ns
 
 if TYPE_CHECKING:
     from .domain import TraversableDomain
 
+logger = logging.getLogger(__name__)
 
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)
@@ -70,6 +72,8 @@ class Context:
     call_receipts: list[CallReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
 
+    local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
+
     def __post_init__(self):
         # Set initial hash on frozen object
         object.__setattr__(self, "initial_state_hash", hashing_func(self.graph._state_hash()))
@@ -86,6 +90,21 @@ class Context:
         if self.cursor_id not in self.graph:
             raise RuntimeError(f"Bad cursor id in context {self.cursor_id} not in {[k for k in self.graph.keys()]}")
         return self.graph.get(self.cursor_id)
+
+    def get_active_layers(self) -> Iterable[BehaviorRegistry]:
+        from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
+        return vm_dispatch, self.local_behaviors
+        # return vm_dispatch, story_dispatch, world_dispatch
+
+    _ns_cache: dict[UUID, StringMap] = field(default_factory=dict)
+
+    def get_ns(self, node: Node = None, nocache=False) -> StringMap:
+        from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
+        node = node or self.cursor
+        if nocache or node.uid not in self._ns_cache:
+            logger.debug(f"getting ns for {node!r}")
+            self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
+        return self._ns_cache[node.uid]
 
     @functools.cached_property
     def scope(self) -> Scope:
@@ -124,7 +143,7 @@ class Context:
             maps.extend(CallReceipt.gather_results(*domain_maps))
         return ChainMap(*maps)
 
-    def get_ns(self) -> NS:
+    def __get_ns(self) -> NS:
         """Bootstrap ctx by calling get_vars on every domain in active
         domains and creating."""
         return self._get_ns(self.scope)

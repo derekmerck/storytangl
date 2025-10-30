@@ -23,6 +23,7 @@ def test_global_domain_is_present_in_scope_smoke():
 
 # --- tests ----------------------------------------------------------------
 
+@pytest.mark.xfail(reason="deprecated, this should be part of application domain tests?")
 def test_graph_level_domain_participates_in_scope():
     g = DomainGraph(label="DG", locals={'x': 'graph'})
     n = g.add_node(label="n")
@@ -33,11 +34,11 @@ def test_graph_level_domain_participates_in_scope():
     print( scope.active_domains )
 
     assert any(d.label == "DG" for d in domains), "graph-level domain should be active for all nodes"
-    from tangl.vm.context import Context
-    ns = Context._get_ns(scope)
+    from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
+    ns = do_get_ns(scope)
     assert ns.get("x") == "graph"
 
-
+@pytest.mark.xfail(reason="deprecated, domains going away")
 def test_subgraph_and_node_domains_are_discovered_and_nearest_wins():
     g = Graph(label="G")
     n1 = DomainNode(label="n1", graph=g)

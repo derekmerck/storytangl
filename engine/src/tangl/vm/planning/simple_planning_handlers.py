@@ -23,6 +23,7 @@ from .open_edge import Dependency, Affordance
 from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
 from .provisioning import Provisioner
 from .requirement import Requirement
+from ...core.dispatch import HandlerPriority
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,14 @@ logger = logging.getLogger(__name__)
 #       Provisioners need to implement "get_offers" and include a
 #       phase=PLANNING_OFFER selector
 
+from functools import partial
+from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
+
+on_planning = partial(vm_dispatch.register, task=P.PLANNING)
+
 # 1) Collect offers (EARLY)
-@global_domain.handlers.register(phase=P.PLANNING, priority=25)
+@on_planning(priority=HandlerPriority.EARLY)
+# @global_domain.handlers.register(phase=P.PLANNING, priority=25)
 def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     """Publish offers for open :class:`~tangl.vm.planning.open_edge.Dependency` edges."""
     offers: list[ProvisionOffer] = []
@@ -99,8 +106,9 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
 
     return offers
 
+@on_planning(priority=HandlerPriority.LATE)
 # 2) Select + apply (NORMAL/LATE)
-@global_domain.handlers.register(phase=P.PLANNING, priority=75)
+# @global_domain.handlers.register(phase=P.PLANNING, priority=75)
 def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
     """Select offers, bind providers, and emit :class:`BuildReceipt` records.
 
@@ -246,8 +254,9 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context, **kwargs):
 
     return builds
 
+@on_planning(priority=HandlerPriority.LAST)
 # 3) Compose a PlanningReceipt (LAST)
-@global_domain.handlers.register(phase=P.PLANNING, priority=100)
+# @global_domain.handlers.register(phase=P.PLANNING, priority=100)
 def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
     """Summarize build receipts into a :class:`~tangl.vm.planning.PlanningReceipt`."""
     builds: list[BuildReceipt] = []
@@ -260,10 +269,10 @@ def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
 
 
 from tangl.vm.context import NS
-from tangl.vm.vm_dispatch import on_get_ns
+from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
 from tangl.vm.planning import Dependency, Affordance
 
-@on_get_ns.register()
+@on_get_ns()
 def _contribute_deps_to_ns(caller: Node, ctx=None) -> NS:
     """Build namespace including base vars and satisfied dependencies."""
     # Automatically include satisfied dependencies/affordances

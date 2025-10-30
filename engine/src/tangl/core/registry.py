@@ -226,7 +226,7 @@ class Registry(Entity, Generic[VT]):
     # -------- SUMMARY HELPERS ----------
 
     def all_labels(self) -> list[str]:
-        return [x.get_label() for x in self.data.values() if x.get_label() is not None]
+        return list({x.get_label() for x in self.data.values() if x.get_label() is not None})
 
     def all_tags(self) -> set[Tag]:
         return set(itertools.chain.from_iterable(i.tags for i in self))

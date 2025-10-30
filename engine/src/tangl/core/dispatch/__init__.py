@@ -4,6 +4,9 @@ from tangl.utils.func_info import HandlerFunc  # Convenience surface for protoco
 from .behavior import Behavior, HandlerPriority, HandlerLayer
 from .behavior_registry import BehaviorRegistry
 from .has_behaviors import HasBehaviors, HasLocalBehaviors
+from .layered_dispatch import LayeredDispatch, ContextP
+from .core_dispatch import core_dispatch
+from .hooked_registry import HookedRegistry, on_index
 
 DEFAULT_HANDLERS = BehaviorRegistry(label='default_handlers')
 

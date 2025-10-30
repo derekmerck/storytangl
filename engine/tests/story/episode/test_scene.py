@@ -18,7 +18,7 @@ from tangl.vm import (
     Requirement,
     ResolutionPhase as P,
 )
-from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
+from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
 
 
 def _destination_ids(node: Node) -> set[UUID]:
@@ -125,7 +125,8 @@ def test_refresh_ns_for_dependencies() -> None:
         label="companion",
     )
     dependency.requirement.provider = companion
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
+
+    ns = do_get_ns(block, ctx=None)
     assert ns["companion"] is companion
 
 
@@ -144,7 +145,7 @@ def test_refresh_edge_projections_for_affordances() -> None:
         label="service",
     )
     affordance.requirement.provider = block
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
+    ns = do_get_ns(block, ctx=None)
 
     assert ns["service"] is provider
 
@@ -161,11 +162,11 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
 
     scene = Scene(graph=g, label="scene", member_ids=[block.uid])
 
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
+    ns = do_get_ns(block, ctx=None)
     assert "missing" not in ns
 
     requirement.provider = Block(graph=g, label="provider")
-    ns = CallReceipt.merge_results(*on_get_ns.dispatch(block, ctx=None))
+    ns = do_get_ns(block, ctx=None)
     assert "missing" in ns
     assert ns["missing"].get_label() == "provider"
 
@@ -192,7 +193,7 @@ def test_refresh_edge_projections_preserves_existing_vars() -> None:
     assert "prop" not in ns
 
     requirement.provider = provider
-    ns = ctx.get_ns()
+    ns = ctx.get_ns(nocache=True)
     assert ns["prop"] is provider
 
 
@@ -278,6 +279,6 @@ def test_refresh_edge_projections_updates_namespace_in_place() -> None:
     # scene.refresh_edge_projections()
     # assert scene.vars["npc"] is actor
 
-    # frame._invalidate_context()
+    frame._invalidate_context()
     ns = frame.context.get_ns()
     assert ns["npc"] is actor

@@ -79,26 +79,29 @@ class Block(TraversableDomain, Node):
         return choices
 
 
-@global_domain.handlers.register(
-    phase=P.JOURNAL,
-    priority=40,
-    selection_criteria={"is_instance": Block},
-)
-def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+# @global_domain.handlers.register(
+#     phase=P.JOURNAL,
+#     priority=40,
+#     selection_criteria={"is_instance": Block},
+# )
+# from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
+from tangl.vm.simple_handlers import on_journal
+@on_journal()
+def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
     """Render inline content, child concepts, and choice menu for a block."""
 
-    ns_raw = ctx.get_ns()
+    ns_raw = ctx.get_ns(caller)
     ns = _normalize_ns(ns_raw)
     fragments: list[BaseFragment] = []
 
-    if not isinstance(cursor, Block):  # pragma: no cover - defensive guard
+    if not isinstance(caller, Block):  # pragma: no cover - defensive guard
         return None
 
-    if cursor.content:
+    if caller.content:
         if ns is None:
-            inline_text = cursor.content
+            inline_text = caller.content
         else:
-            tmpl = jinja2.Template(cursor.content)
+            tmpl = jinja2.Template(caller.content)
             inline_text = tmpl.render(**ns)
             # try:
             #     inline_text = cursor.content.format_map(ns)
@@ -107,13 +110,13 @@ def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
         fragments.append(
             BaseFragment(
                 content=inline_text,
-                source_id=cursor.uid,
-                source_label=cursor.label,
+                source_id=caller.uid,
+                source_label=caller.label,
                 fragment_type="block_content",
             )
         )
 
-    for concept in cursor.get_concepts():
+    for concept in caller.get_concepts():
         rendered = concept.render(ns_raw)
         fragments.append(
             BaseFragment(
@@ -125,7 +128,7 @@ def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
         )
 
     # todo: Choices are themselves fragments, so we need to call render on each of our choices and add them to the stream
-    choices = cursor.get_choices(ns=ns)
+    choices = caller.get_choices(ns=ns)
     if choices:
         lines = [""]
         for index, choice in enumerate(choices, start=1):
@@ -135,8 +138,8 @@ def render_block(cursor: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
         fragments.append(
             BaseFragment(
                 content="\n".join(lines),
-                source_id=cursor.uid,
-                source_label=f"{cursor.label}_menu",
+                source_id=caller.uid,
+                source_label=f"{caller.label}_menu",
                 fragment_type="choice_menu",
             )
         )

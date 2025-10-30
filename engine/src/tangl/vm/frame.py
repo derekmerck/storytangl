@@ -194,13 +194,38 @@ class Frame:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph, self.cursor_id, self.step, self.domain_registries)
+        return Context(graph, self.cursor_id, self.step, local_behaviors=self.local_domain.handlers)
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):
             del self.context
 
-    def run_phase(self, phase: P) -> Any:
+    def run_phase(self, phase: P):
+        from .vm_dispatch.vm_dispatch import vm_dispatch
+
+        receipts = vm_dispatch.dispatch(
+            caller=self.cursor,
+            ctx=self.context,
+            task=phase,
+        )
+        # Iterate them out so we can reuse the variable
+        receipts = list(receipts)
+
+        agg_func, result_type = phase.properties()
+        outcome = agg_func(*receipts)
+
+        logger.debug(f'Ran {len(receipts)} handlers with final outcome {outcome} under {agg_func.__name__}')
+
+        # stash results for review/compositing
+        self.phase_receipts[phase] = receipts
+        self.phase_outcome[phase] = outcome
+
+        # Flush the call receipt buffer in context
+        self.context.call_receipts.clear()
+
+        return outcome
+
+    def run_phase_vers1(self, phase: P) -> Any:
         logger.debug(f'Running phase {phase}')
 
         self.context.call_receipts.clear()

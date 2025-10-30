@@ -14,7 +14,8 @@ from tangl.vm import Frame, ResolutionPhase as P
 
 def collect_fragment(fragments: Iterable[BaseFragment], *, source_id) -> BaseFragment:
     for fragment in fragments:
-        if isinstance(fragment, BaseFragment) and fragment.source_id == source_id:
+        print(fragment)
+        if isinstance(fragment, BaseFragment) and getattr(fragment, "source_id", None) == source_id:
             return fragment
     raise AssertionError("Expected fragment from source was not produced")
 
@@ -57,7 +58,7 @@ class TestSimpleConcept:
 
     def test_render_uses_frame_namespace(self):
         graph = Graph(label="test")
-        concept = Concept(graph=graph, label="greeting", content="Hello, {player_name}!")
+        concept = Concept(graph=graph, locals={"player_name": "Bob"}, label="greeting", content="Hello, {player_name}!")
 
         global_domain.locals.setdefault("player_name", "Bob")
         try:

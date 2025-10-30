@@ -56,11 +56,10 @@ from .singleton import Singleton
 from .graph import GraphItem, Node, Edge, Subgraph, Graph
 
 # Function dispatch, chaining, auditing
-from .dispatch import CallReceipt, Behavior, BehaviorRegistry
+from .dispatch import CallReceipt, Behavior, BehaviorRegistry, LayeredDispatch, core_dispatch
 
 # Opt-in and structurally scoped capability resolution
 from .domain import Domain, Scope, global_domain, NS
-
 
 __all__ = [
     # Identity & collections
@@ -72,7 +71,7 @@ __all__ = [
     # Records/streams
     "Record", "StreamRegistry", "Snapshot", "BaseFragment",
     # Dispatch
-    "CallReceipt", "Behavior", "BehaviorRegistry",
+    "CallReceipt", "Behavior", "BehaviorRegistry", "LayeredDispatch", "core_dispatch",
     # Domains & scope
     "Domain", "Scope", "global_domain",
 ]

@@ -28,7 +28,7 @@ Key Features
   enforce stable layer precedence.
 * **Stable ordering** — Behaviors are sorted by priority, origin distance,
   layer, MRO distance, selector specificity, handler type, and registration
-  order; optional ``by_origin`` preserves ancestor order for namespace builds.
+  order.
 * **Audited execution** — Every invocation yields a :class:`CallReceipt`.
 
 API
@@ -45,12 +45,9 @@ from typing import Type, Callable, Iterator, Iterable
 import itertools
 import logging
 
-from pydantic import model_validator
-
-from tangl.type_hints import StringMap
+from tangl.type_hints import StringMap, Tag as Task
 from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable
-from tangl.core.registry import _chained_registries
 from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority, HandlerFunc
 from .call_receipt import CallReceipt
 
@@ -90,7 +87,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
     * **Execution** – :meth:`dispatch` runs behaviors from this registry;
       :meth:`chain_dispatch` runs across multiple registries with origin‑aware
       ordering. ``extra_handlers`` can be included as ad‑hoc inline behaviors.
-    * **Stable ordering** – uses :meth:`Behavior.sort_key(caller, by_origin=...)`.
+    * **Stable ordering** – uses :meth:`Behavior.sort_key(caller)`.
     * **Auditing** – each behavior call returns a :class:`CallReceipt`.
 
     API
@@ -103,7 +100,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
     """
     # defaults
     handler_layer: HandlerLayer | int = HandlerLayer.GLOBAL
-    task: str = None
+    task: Task = None
 
     def add_behavior(self, item, *,
                      priority: HandlerPriority = HandlerPriority.NORMAL,
@@ -208,13 +205,13 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                        ctx: dict,
                        with_args: tuple[Entity, ...] = None,  # behavior *args
                        with_kwargs: StringMap = None,  # behavior **kwargs
-                       task: str = None,
+                       task: Task = None,
                        inline_criteria: StringMap = None,
                        extra_handlers: Iterable[Behavior | Callable] = None,
                        dry_run: bool = False,
                        ):
         behaviors = list(behaviors)
-        logger.debug(f"Dispatching behaviors {[b.get_label() for b in behaviors]!r}")
+        logger.debug(f"All possible behaviors {[f"{b.get_label()}(task={b.task})" for b in behaviors]!r}")
 
         inline_criteria = cls._normalize_inline_criteria(task, inline_criteria)
         logger.debug(f"Inline criteria: {inline_criteria!r}")
@@ -236,7 +233,6 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
 
         return (b(caller, *with_args, ctx=ctx, **with_kwargs) for b in behaviors)
 
-
     def dispatch(self,
                  # Behavior invocation
                  caller: Entity, *,
@@ -245,35 +241,82 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                  with_kwargs: StringMap = None,         # behavior **kwargs
 
                  # Dispatch meta
-                 task: str = None,            # alias for has_task inline criteria
+                 task: Task = None,            # alias for has_task inline criteria
                  inline_criteria=None,        # additional selection criterial
                  extra_handlers: list[HandlerFunc|Behavior] = None,  # loose handlers
                  dry_run=False                # just print handlers
                  ) -> Iterator[CallReceipt]:
         """
-        Select, sort, and invoke matching behaviors from this registry.
+        Select, sort, and execute matching behaviors.
 
         Parameters
         ----------
-        caller:
-            The runtime caller/entity used for selector matching and MRO distance.
-        task:
-            Convenience alias for ``has_task=...`` in ``inline_criteria``.
-        ctx:
-            Execution context dict passed through to each behavior.
-        extra_handlers:
-            Optional list of ad‑hoc callables/behaviors appended post‑selection.
-        **inline_criteria:
-            Additional selection criteria merged with registry criteria.
+        caller : Entity
+            Primary entity executing the task.
+        ctx : Context, optional
+            Execution context providing graph, namespace, etc.
+        with_args : tuple[Entity, ...], optional
+            Additional entities passed as positional args to behaviors.
+            Example: for link operations: caller=source, with_args=(target,).
+        with_kwargs : dict, optional
+            Additional keyword arguments passed to behaviors.
+            Example: {'status': 'active', 'force': True}.
+
+        task : str, optional
+            Filter behaviors by task (alias for inline_criteria['has_task']).
+        inline_criteria : dict, optional
+            Match criteria for filtering behaviors before checking to see
+            if their selection criteria are met by the caller.
+
+        extra_handlers : list, optional
+            Ad-hoc behaviors to include (INLINE layer).
+        dry_run : bool, default False
+            If True, select and sort but don't execute.
+
+        Returns
+        -------
+        Iterator[CallReceipt]
+            One receipt per executed behavior.
+
+        Notes
+        -----
+        The with_args and with_kwargs parameters are forwarded to behaviors.
+        Behaviors receive:
+            behavior(caller, *with_args, ctx=ctx, **with_kwargs)
 
         .. admonition:: Lazy!
             Remember, dispatch returns a receipt generator!  You have to iterate it
             to create results and produce by-products, e.g., `list(receipts)`.
 
-        Returns
-        -------
-        Iterator[:class:`CallReceipt`]
-            One receipt per invoked behavior, in deterministic order.
+        Examples
+        --------
+        # Simple single-entity dispatch
+        dispatch(caller=action, task="validate", ctx=ctx)
+
+        # Multi-entity operation
+        dispatch(
+            caller=source,
+            with_args=(target,),
+            task="link",
+            ctx=ctx
+        )
+
+        # Pass extra parameters to behaviors
+        dispatch(
+            caller=item,
+            with_kwargs={'status': 'active', 'required': True},
+            task="validate",
+            ctx=ctx
+        )
+
+        # Complex multi-entity with params
+        dispatch(
+            caller=merchant,
+            with_args=(player, item),
+            with_kwargs={'price': 100, 'currency': 'gold'},
+            task="trade",
+            ctx=ctx
+        )
         """
         return self._dispatch_many(behaviors=self.values(),
                                    caller=caller,
@@ -304,10 +347,6 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         """
         Select, sort, and invoke matching behaviors across multiple registries.
 
-        Behaves like :meth:`dispatch`, but combines registries and installs a
-        chaining context so :meth:`Behavior.origin_dist` can compute distances.
-        Sorting uses :meth:`Behavior.sort_key(caller, by_origin=...)`.
-
         .. admonition:: Lazy!
             Remember, dispatch returns a receipt generator!  You have to iterate it
             to create results and produce by-products, e.g., `list(receipts)`.
@@ -327,7 +366,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         """
         Return the list of non‑``None`` behavior tasks present in this registry.
         """
-        return [x.task for x in self.data.values() if x.task is not None]
+        return list({x.task for x in self.data.values() if x.task is not None})
 
     # Hashes like a pseudo-singleton
     # todo: cast bytes to a full range int suitable for hash?  Use `self._id_hash()`

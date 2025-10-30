@@ -89,7 +89,7 @@ class Scene(TraversableDomain, HasBehaviors):
         """Return all locations assigned to this :class:`Scene`."""
         return list(self.graph.find_edges(source=self, is_instance=Setting))
 
-    @on_get_ns.register()
+    @on_get_ns()
     def _contribute_settings_to_ns(self, ctx=None):
         if self.settings:
             return { 'settings': { s.get_label(): s.location for s in self.settings } }
@@ -99,7 +99,7 @@ class Scene(TraversableDomain, HasBehaviors):
         """Return all roles assigned to this :class:`Scene`."""
         return list(self.graph.find_edges(source=self, is_instance=Role))
 
-    @on_get_ns.register()
+    @on_get_ns()
     def _contribute_roles_to_ns(self, ctx=None):
         if self.roles:
             return { 'roles': { r.get_label(): r.actor for r in self.roles }}

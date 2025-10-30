@@ -21,12 +21,30 @@ from tangl.vm.frame import ResolutionPhase as P, ChoiceEdge
 
 logger = logging.getLogger(__name__)
 
+from functools import partial
+from tangl.core.dispatch import HandlerPriority as Prio
+from .vm_dispatch.vm_dispatch import vm_dispatch
+
+# vm phase dispatch registration hooks
+# We can use enums for tasks since we have them
+on_validate = partial(vm_dispatch.register, task=P.VALIDATE)
+on_prereq   = partial(vm_dispatch.register, task=P.PREREQS)
+on_update   = partial(vm_dispatch.register, task=P.UPDATE)
+on_journal  = partial(vm_dispatch.register, task=P.JOURNAL)
+on_finalize = partial(vm_dispatch.register, task=P.FINALIZE)
+on_postreq  = partial(vm_dispatch.register, task=P.POSTREQS)
+
+# Lower layer tasks should never invoke the phase dispatch directly, instead
+# add an application layer dispatch like "on_story_planning" that indicates
+# task "planning", application layer dispatch will be passed in by the phase
+# handler.
 # ------- VALIDATION ---------
 
-@global_domain.handlers.register(phase=P.VALIDATE, priority=0)
-def validate_cursor(cursor: Node, **kwargs):
+@on_validate(priority=Prio.EARLY)
+# @global_domain.handlers.register(phase=P.VALIDATE, priority=0)
+def validate_cursor(caller: Node, **kwargs):
     """Basic validation: cursor exists and is a :class:`~tangl.core.graph.Node`."""
-    ok = cursor is not None and isinstance(cursor, Node)
+    ok = caller is not None and isinstance(caller, Node)
     return ok
 
 # ------- PLANNING ---------
@@ -50,16 +68,17 @@ from .planning import simple_planning_handlers
 
 # ------- PRE/POST REDIRECTS ---------
 
-@global_domain.handlers.register(phase=P.PREREQS, priority=50)
-def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
+@on_prereq(priority=Prio.LATE)
+# @global_domain.handlers.register(phase=P.PREREQS, priority=50)
+def prereq_redirect(caller: Node, *, ctx: Context, **kwargs):
     """Follow auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` redirects for PREREQS."""
 
-    current_domain = ctx.get_traversable_domain_for_node(cursor)
+    current_domain = ctx.get_traversable_domain_for_node(caller)
     ns = ctx.get_ns()
 
     if current_domain is not None:
-        if cursor.uid == current_domain.source.uid:
-            for edge in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+        if caller.uid == current_domain.source.uid:
+            for edge in caller.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
                 destination = edge.destination
                 if destination is None:
                     continue
@@ -69,8 +88,8 @@ def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
                     )
                     return edge
 
-        if cursor.uid == current_domain.sink.uid:
-            for edge in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+        if caller.uid == current_domain.sink.uid:
+            for edge in caller.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
                 destination = edge.destination
                 if destination is None:
                     continue
@@ -82,11 +101,12 @@ def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
                     )
                     return edge
 
-    for edge in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+    for edge in caller.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
         if edge.available(ns):
             return edge
 
-@global_domain.handlers.register(phase=P.POSTREQS, priority=50)
+@on_postreq(priority=Prio.LATE)
+# @global_domain.handlers.register(phase=P.POSTREQS, priority=50)
 def postreq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow the first auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` in POSTREQS."""
     ns = ctx.get_ns()
@@ -96,19 +116,22 @@ def postreq_redirect(cursor: Node, *, ctx: Context, **kwargs):
 
 # ------- UPDATE/FINALIZE ---------
 
-@global_domain.handlers.register(phase=P.UPDATE, priority=50)
+@on_update()
+# @global_domain.handlers.register(phase=P.UPDATE, priority=50)
 def update_noop(*args, **kwargs):
     pass
 
-@global_domain.handlers.register(phase=P.FINALIZE, priority=50)
+@on_finalize()
+# @global_domain.handlers.register(phase=P.FINALIZE, priority=50)
 def finalize_noop(*args, **kwargs):
     # collapse-to-patch can go here later
     pass
 
 # ------- JOURNAL ---------
 
+@on_journal()
 # todo: we can move this to journal/io when that gets implemented
-@global_domain.handlers.register(phase=P.JOURNAL, priority=50)
+# @global_domain.handlers.register(phase=P.JOURNAL, priority=50)
 def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     """Emit a simple textual line describing the current step/cursor (reference output)."""
     step = ctx.step
@@ -116,8 +139,9 @@ def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     logger.debug(f"JOURNAL: Outputting journal line: {line}")
     return line
 
-@global_domain.handlers.register(phase=P.JOURNAL, priority=100)
-def coerce_to_fragments(*args, ctx: Context, **kwargs):
+@on_journal(priority=Prio.LAST)
+# @global_domain.handlers.register(phase=P.JOURNAL, priority=100)
+def coerce_to_fragments(*_, ctx: Context, **__):
     """Coerce mixed handler outputs into a list of :class:`~tangl.core.fragment.BaseFragment`.  Runs LAST."""
     fragments: list[BaseFragment] = []
 
@@ -131,6 +155,7 @@ def coerce_to_fragments(*args, ctx: Context, **kwargs):
             fragments.append(BaseFragment(content=value))
             return
         if isinstance(value, Iterable):
+            logger.debug(f"recursing on {value}")
             for item in value:
                 _extend(item)
             return

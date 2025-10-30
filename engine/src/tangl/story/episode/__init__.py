@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .block import Block as Block
-from .scene import Scene as Scene
+from .block import Block
+from .scene import Scene
 
 __all__ = [
     "Block",

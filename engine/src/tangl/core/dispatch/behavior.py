@@ -52,13 +52,14 @@ import logging
 
 from pydantic import field_validator, model_validator, ConfigDict, Field
 
-from tangl.type_hints import StringMap
+from tangl.type_hints import StringMap, Tag as Task
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.utils.base_model_plus import HasSeq
 from tangl.utils.func_info import FuncInfo, HandlerFunc
 from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable, is_identifier
 from .call_receipt import CallReceipt
+from ...utils.hashing import hashing_func
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -193,8 +194,8 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     .. admonition:: Reserved Keywords
 
-       ``ns`` and ``ctx`` are reserved keyword arguments on the called function
-       signature. They may be added or manipulated during :meth:`__call__`.
+       ``ctx`` is a reserved keyword argument on the called function
+       signature. It may be created or mutated during :meth:`__call__`.
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
     # arbitrary types allowed for possible WeakRef owner
@@ -304,42 +305,18 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
 
     # todo: we used to have a 'registry aware' object type that knew
     #       to self-register.  Moved it to GraphItem, maybe should re-generalize?
+    #       registry should just check for 'origin' on item when its added rather than
+    #       graph
     origin: Registry = Field(None, exclude=True)
 
-    # todo: this is irrelevant in the 5-layer dispatch
-    def origin_dist(self) -> int:
-        """
-        Compute distance from the current chained registries to :attr:`origin`.
-
-        Returns ``-1`` for inline, ``0`` for the local registry, ``1..n`` for
-        ancestors, and a large sentinel when called outside a chained context.
-        """
-        # how far away is this behavior's origin from the caller by discovery
-        # -1 = inline
-        #  0 = self layer
-        #  1-n = ancestor layers
-        #  >n = APP, GLOBAL handler layers
-        #  large = missing from registry
-        # todo: still not sure this is right, what about a global handler
-        #       referenced by a parent?
-        if self.origin is None or self.handler_layer() is HandlerLayer.INLINE:
-            return -1
-        from tangl.core.registry import _CHAINED_REGISTRIES
-        registries = _CHAINED_REGISTRIES.get()
-        if registries is None or self.origin not in registries:
-            # Called for a sort key without having a relevant chained registry ctx var
-            return 1 << 20
-        return registries.index(self.origin)
-
     def handler_layer(self) -> HandlerLayer:
-        # this isn't really the discovery 'origin', it's the registry's layer in this case
         if self.origin is not None and self.origin.handler_layer is not None:
             return self.origin.handler_layer
         return HandlerLayer.INLINE
 
-    task: Optional[str] = None   # "@validate", "@render", etc.
+    task: Optional[Task] = None   # "@validate", "@render", etc.
 
-    def has_task(self, task: str) -> bool:
+    def has_task(self, task: Task) -> bool:
         """
         Return True if this behavior participates in the given ``task``.
 
@@ -391,42 +368,25 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         # this handler has a task, or if it's using its registry's default task
         return self._criteria_specificity(**self.get_selection_criteria())
 
-    def sort_key(self, caller: CT = None, by_origin: bool = False):
+    def sort_key(self, caller: CT = None):
         """
         Return the stable ordering tuple used by Behavior registries.
 
         Default order (most significant → least):
 
         1. ``priority`` (lower runs first; later handlers can clobber)
-        2. ``-origin_dist()`` (closer registry shadows farther ones)
-        3. ``-handler_layer()`` (INLINE > GLOBAL)
-        4. ``-mro_dist(caller)`` (subclass beats superclass)
-        5. selector ``specificity`` (fewer → more → most)
-        6. ``handler_type`` (STATIC < CLASS < INSTANCE)
+        3. ``-handler_layer()`` (INLINE before GLOBAL)
+        4. ``mro_dist(caller)`` (subclass before superclass)
+        5. -selector ``specificity`` (more before fewer)
+        6. ``handler_type`` (instance before class before static)
         7. ``seq`` (registration order, for tie-breaking)
-
-        If ``by_origin`` is True, origin/layer take precedence over priority to
-        preserve ancestor order when building namespaces (i.e., origin distance
-        becomes the primary key).
         """
-        if by_origin:
-            # by priority within registry/layer
-            return (-self.origin_dist(),        # closer ancestors > farther ancestors
-                    -self.handler_layer(),      # inline > globals
-                     self.priority,             # explicit
-                    -self.mro_dist(caller),     # subclass meth > superclass meth
-                    *self.specificity,          # match specificity
-                     self.handler_type,         # instance > class > static
-                     self.seq)                  # registration order
-
-        # by priority first
-        return ( self.priority,                 # explicit
-                -self.origin_dist(),            # closer ancestors > farther ancestors
-                -self.handler_layer(),          # inline > globals
-                -self.mro_dist(caller),         # subclass meth > superclass meth
-                *self.specificity,              # match specificity
-                 self.handler_type,             # instance > class > static
-                 self.seq)                      # registration order
+        return ( self.priority,                 # explicit, early < late
+                -self.handler_layer(),          # inline < globals
+                 self.mro_dist(caller),         # closer < farther
+                *[-x for x in self.specificity], # more < less
+                 self.handler_type,             # instance < class < static
+                 self.seq)                      # registration order, early < late
 
     def __lt__(self, other: Behavior):
         return self.sort_key() < other.sort_key()
@@ -495,7 +455,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         logger.debug(f"type: {self.handler_type.name}, ctx: {ctx}, args: {args!r}, kwargs: {kwargs}")
         bound = self.bind_func(caller)
         result = bound(caller, *args, ctx=ctx, **kwargs)
-        return CallReceipt(
+        receipt = CallReceipt(
             behavior_id=self.uid,
             result=result,
             # could put a lambda here if we want deferred/lazy eval or iter dispatch
@@ -503,6 +463,9 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
             args=args,
             kwargs=kwargs
         )
+        if ctx is not None and hasattr(ctx, "call_receipts"):
+            ctx.call_receipts.append(receipt)
+        return receipt
 
     def unstructure(self) -> StringMap:
         """
@@ -511,22 +474,9 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         """
         raise RuntimeError(f"Do _not_ try to serialize {self!r}; contains Callable, WeakRef.")
 
-    def get_func_sig(self):
-        return self._get_func_sig(self.func)
-
-    @staticmethod
-    def _get_func_sig(func):
-        """
-        Return the ``inspect.Signature`` for the underlying function, unwrapping
-        descriptors (e.g., bound methods) to a raw function as needed.
-        """
-        if func is None:
-            raise ValueError("func cannot be None")
-        while hasattr(func, '__func__'):
-            # May be a wrapped object
-            func = func.__func__
-        return inspect.signature(func)
+    def _id_hash(self) -> bytes:
+        return hashing_func((self.__class__, self.func))
 
     def __hash__(self) -> int:
         # delegate hash, assuming each func can only correspond to a single handler
-        return hash(self.func)
+        return hash((self.__class__, self.func))

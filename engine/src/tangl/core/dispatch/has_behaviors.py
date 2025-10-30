@@ -1,9 +1,8 @@
 from __future__ import annotations
-from typing import Type, Callable, Iterator, Iterable, ClassVar
-import itertools
+from typing import ClassVar, Self
 import logging
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from tangl.core import Entity
 from .behavior import HandlerType, Behavior
@@ -48,15 +47,18 @@ class HasBehaviors(Entity):
         super().__init_subclass__(**kwargs)
         cls._annotate_behaviors()
 
-from typing import ClassVar
 
 class HasLocalBehaviors(HasBehaviors):
 
     # instance behaviors get stored here
-    local_behaviors: ClassVar[BehaviorRegistry] = None
+    local_behaviors: ClassVar[BehaviorRegistry] = BehaviorRegistry(
+        label="local.dispatch.haslocalbehaviors",
+        handler_layer=L.LOCAL)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__()
+        # In this case, we give each class its own local behavior registry,
+        # same thinking around Singleton._instances subclass vars applies.
         cls.local_behaviors = BehaviorRegistry(
             label=f"local.dispatch.{cls.__name__.lower()}",
             handler_layer=L.LOCAL)
@@ -65,6 +67,7 @@ class HasLocalBehaviors(HasBehaviors):
     @classmethod
     def register_local(cls, **attrs):
         def deco(func):
+            # stash attrs on _local_behavior for later
             func._local_behavior = attrs
             return func
         return deco
@@ -80,16 +83,38 @@ class HasLocalBehaviors(HasBehaviors):
                 if h.handler_layer in [HandlerType.INSTANCE_ON_CALLER, HandlerType.CLASS_ON_CALLER]:
                     h.caller_cls = cls
                 cls.local_behaviors.add_behavior(h)
+                item._local_behavior = h
 
+class HasInstanceBehaviors(HasBehaviors):
 
-    # @model_validator(mode="after")
-    # def _annotate_inst_behaviors(self):
-    #     """
-    #     (Planned) Annotate a *copy* of class behaviors for this instance, setting
-    #     ``owner=self`` where appropriate. Left unimplemented pending a concrete
-    #     registration strategy for instance‑bound behaviors.
-    #     """
-    #     # want to annotate and register a _copy_ of the instance (self, caller)
-    #     # but _not_ class (cls, caller) behaviors with owner = self instead
-    #     # of owner = cls
-    #     return self
+    instance_behaviors: BehaviorRegistry = None
+
+    @model_validator(mode="after")
+    def _create_instance_behaviors(self):
+        if self.instance_behaviors is None:
+            self.instance_behaviors = BehaviorRegistry(
+                label=f"local.dispatch.{self.get_label().lower()}",
+                handler_layer=L.LOCAL
+            )
+        return self
+
+    def register_instance_behavior(self: Self, **attrs):
+        """
+        >> a.register_instance_behavior()
+        >> def foo(caller, *, ctx):
+        >>    ...
+        """
+        def deco(func):
+            b = Behavior(func=func,
+                         owner=self,
+                         handler_type=HandlerType.INSTANCE_ON_OWNER,
+                         **attrs)
+            self.instance_behaviors.add_behavior(b)
+            # Want to stash a pointer to the handler on the func, but
+            # instance on owner can have many owners, so use a map
+            if not hasattr(func, "_instance_behavior"):
+                func._instance_behavior = {}
+            func._instance_behavior[self.uid] = b
+            return func
+
+        return deco

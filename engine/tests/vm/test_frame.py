@@ -30,7 +30,7 @@ def test_phase_order_is_total_and_strict(frame: Frame):
         return handler
 
     for phase in phases:
-        frame.local_domain.register_handler(phase=phase, priority=-1)(tracking_handler(phase))
+        frame.local_domain.register_handler(task=phase, priority=-1)(tracking_handler(phase))
     frame._invalidate_context()
 
     frame.follow_edge(AnonymousEdge(destination=frame.cursor))
@@ -48,7 +48,7 @@ def test_global_handlers_visible_in_scope():
         assert hasattr(h, "phase")
 
     print("Has VALIDATE")
-    for h in global_domain.handlers.find_all(phase=P.VALIDATE):
+    for h in global_domain.handlers.find_all(task=P.VALIDATE):
         print(h.func.__name__)
 
     ns = frame.run_phase(P.VALIDATE)
@@ -171,8 +171,8 @@ def test_journal_empty_is_persisted_as_empty_list():
     # Add a compositor that returns []
     def empty_fragments(*args, ctx, **kw): return []
     # This works, but it will pollute global handlers permanently and we have no reset func
-    # global_domain.handlers.register(phase=P.JOURNAL, priority=999)(empty_fragments)
-    f.local_domain.handlers.register(phase=P.JOURNAL, priority=999)(empty_fragments)
+    # global_domain.handlers.register(task=P.JOURNAL, priority=999)(empty_fragments)
+    f.local_domain.handlers.register(task=P.JOURNAL, priority=999)(empty_fragments)
     f._invalidate_context()
     import logging
     logging.debug( f.context.inspect_scope() )

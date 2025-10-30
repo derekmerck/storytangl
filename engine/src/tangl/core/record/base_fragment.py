@@ -2,7 +2,7 @@
 from typing import Optional, Literal
 from enum import Enum
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from .record import Record
 
@@ -38,6 +38,8 @@ class BaseFragment(Record, extra='allow'):
     (replayable ops). Use blame links to trace a fragment back to originating
     graph entities or handlers.
     """
+    model_config = ConfigDict(extra='allow')
+
     record_type: Literal['fragment'] = Field('fragment', alias='type')
     fragment_type: Optional[ str | Enum ] = None
     # intent for fragment, e.g., 'content', 'update', 'group', 'media', etc.  `See tangl.journal`

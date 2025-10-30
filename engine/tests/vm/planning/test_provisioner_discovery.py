@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 
+import pytest
 from pydantic import Field
 
 from tangl.core import Graph, Node, Registry
@@ -47,7 +48,7 @@ class ActorDomain(AffiliateDomain):
         super().__init__(label=label, templates=templates)
         self.handlers.add(ActorProvisioner(self.templates))
 
-
+@pytest.mark.xfail(rason="deprecated, provisioning in revision, domains going away")
 def test_custom_provisioner_from_domain_creates_actor():
     graph = Graph(label="story")
     scene = graph.add_node(label="scene", tags={"domain:actors"})

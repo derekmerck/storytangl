@@ -1,7 +1,7 @@
 from tangl.core import Node, Graph, CallReceipt
 from tangl.core.domain import DomainNode
 from tangl.vm import Requirement
-from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
+from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
 from tangl.vm.planning import Affordance, Dependency
 
 
@@ -24,8 +24,7 @@ def test_dep_in_ns():
     assert a in list(g.find_edges(source=m))
     assert a.satisfied and a.source is m
 
-    receipts = on_get_ns.dispatch(m, ctx=None)
-    ns = CallReceipt.merge_results(*receipts)
+    ns = do_get_ns(m, ctx=None)
     print( ns )
     assert 'foo' in ns
     assert 'dep' in ns
