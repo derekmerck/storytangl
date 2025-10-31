@@ -1,6 +1,16 @@
 Minimal planning data path
 --------------------------
 
+reimplement following journal and ns
+
+2-phase, like journal
+- get offers
+- accept offers
+
+get offers evaluates like get ns, by walking the ancestor tree and checking the author domain
+annotated potential existing matches with distance from caller, closer is cheaper
+
+
 Flow (one frame, one cursor):
 
 1.	**Collect**: Planning handlers publish offers (potential updates) for unsatisfied Dependency / Affordance edges visible in Context.scope.
