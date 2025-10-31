@@ -31,11 +31,6 @@ Conceptual layers
    - :class:`Behavior` wraps callable behaviors, returning a :class:`CallReceipt` record.
    - :class:`BehaviorRegistry` executes handlers in ordered pipelines.
 
-5. :ref:`Capabilities<core-capability>`
-
-   - :class:`Domain` publishes a namespace (vars + handlers).
-   - :class:`Scope` layers implicit (topological) and explicit (affiliated) domains around a node.
-
 Design intent
 -------------
 `tangl.core` isolates minimal abstractions so that story engines can reason about
@@ -56,10 +51,9 @@ from .singleton import Singleton
 from .graph import GraphItem, Node, Edge, Subgraph, Graph
 
 # Function dispatch, chaining, auditing
-from .dispatch import CallReceipt, Behavior, BehaviorRegistry, LayeredDispatch, core_dispatch
+from .behavior import CallReceipt, Behavior, BehaviorRegistry, LayeredDispatch
 
-# Opt-in and structurally scoped capability resolution
-from .domain import Domain, Scope, global_domain, NS
+from .dispatch import core_dispatch
 
 __all__ = [
     # Identity & collections
@@ -70,8 +64,8 @@ __all__ = [
     "GraphItem", "Node", "Edge", "Subgraph", "Graph",
     # Records/streams
     "Record", "StreamRegistry", "Snapshot", "BaseFragment",
-    # Dispatch
-    "CallReceipt", "Behavior", "BehaviorRegistry", "LayeredDispatch", "core_dispatch",
-    # Domains & scope
-    "Domain", "Scope", "global_domain",
+    # Behaviors
+    "CallReceipt", "Behavior", "BehaviorRegistry", "LayeredDispatch",
+    # Core-dispatch
+    "core_dispatch"
 ]

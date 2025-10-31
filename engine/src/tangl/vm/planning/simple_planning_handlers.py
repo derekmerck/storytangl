@@ -17,13 +17,12 @@ enrich or override behavior.
 from uuid import UUID
 import logging
 
-from tangl.core import Node, global_domain, CallReceipt
+from tangl.core import Node
 from tangl.vm import ResolutionPhase as P, Context, ProvisioningPolicy
-from .open_edge import Dependency, Affordance
 from .offer import ProvisionOffer, BuildReceipt, PlanningReceipt
 from .provisioning import Provisioner
 from .requirement import Requirement
-from ...core.dispatch import HandlerPriority
+from ...core.behavior import HandlerPriority
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ logger = logging.getLogger(__name__)
 #       phase=PLANNING_OFFER selector
 
 from functools import partial
-from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
+from tangl.vm.dispatch import vm_dispatch
 
 on_planning = partial(vm_dispatch.register, task=P.PLANNING)
 
@@ -47,6 +46,7 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     offers: list[ProvisionOffer] = []
 
     def provisioners() -> list[Provisioner]:
+        return []
         discovered = [
             h for h in ctx.get_handlers(is_instance=Provisioner)
             if isinstance(h, Provisioner)
@@ -78,7 +78,7 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     affordances = sorted(
         (
             edge
-            for edge in ctx.scope.find_all(
+            for edge in ctx.graph.find_all(
                 is_instance=Affordance,
                 destination_id=cursor.uid,
             )
@@ -93,7 +93,7 @@ def plan_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     dependencies = sorted(
         (
             edge
-            for edge in ctx.scope.find_all(
+            for edge in ctx.graph.find_all(
                 is_instance=Dependency,
                 source_id=cursor.uid,
             )
@@ -267,9 +267,7 @@ def plan_compose_receipt(cursor: Node, *, ctx: Context, **kwargs):
             builds.append(r.result)
     return PlanningReceipt.summarize(*builds)
 
-
-from tangl.vm.context import NS
-from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
+from tangl.vm.dispatch import on_get_ns, Namespace as NS
 from tangl.vm.planning import Dependency, Affordance
 
 @on_get_ns()

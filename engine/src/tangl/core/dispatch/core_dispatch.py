@@ -2,8 +2,8 @@
 """`core_dispatch` GLOBAL layer behavior registry and convenience decos"""
 
 from functools import partial
-from .behavior import HandlerLayer as L
-from .layered_dispatch import LayeredDispatch
+from tangl.core.behavior.behavior import HandlerLayer as L
+from tangl.core.behavior.layered_dispatch import LayeredDispatch
 
 core_dispatch = LayeredDispatch(label="core.dispatch", handler_layer=L.GLOBAL)
 

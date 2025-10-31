@@ -1,13 +1,14 @@
+from pydantic import create_model, Field
+
+from tangl.type_hints import StringMap
 from tangl.core import Node, Graph, CallReceipt
-from tangl.core.domain import DomainNode
 from tangl.vm import Requirement
-from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
+from tangl.vm.dispatch import do_get_ns
 from tangl.vm.planning import Affordance, Dependency
 
-
-def test_dep_in_ns():
+def test_dep_in_ns(NodeL, SubgraphL, GraphL):
     g = Graph()
-    m = DomainNode(graph=g, locals={"foo": 1})  # DomainNodes have locals
+    m = NodeL(graph=g, locals={"foo": 1})  # NodeL's have locals
     n = Node(graph=g)
     r = Requirement(graph=g, provider_id=n.uid)
     assert r.satisfied and r.provider is n

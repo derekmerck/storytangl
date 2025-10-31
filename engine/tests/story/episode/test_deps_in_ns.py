@@ -43,7 +43,7 @@ def test_structural_domain_vars_include_dependencies():
     assert role.satisfied
     frame._invalidate_context()
 
-    print(frame.context.inspect_scope())
+    # print(frame.context.inspect_scope())
 
 
     # Get namespace at block level

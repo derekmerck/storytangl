@@ -92,7 +92,7 @@ class LayeredDispatch(BehaviorRegistry):
         # --------------------
         # Assemble layer model
 
-        from .core_dispatch import core_dispatch
+        from tangl.core.dispatch.core_dispatch import core_dispatch
 
         # core_dispatch is _always_ included
         layers = {core_dispatch, self}  # self _may_ be core dispatch

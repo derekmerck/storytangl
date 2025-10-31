@@ -1,15 +1,13 @@
 from tangl.core.graph import Graph
-from tangl.core.domain import global_domain
 from tangl.vm.context import Context
 
 # ---------- context & scope ----------
 
-def test_scope_includes_global_domain_only_when_empty_registry():
-    g = Graph()
-    n = g.add_node(label="here")
-    ctx = Context(graph=g, cursor_id=n.uid, step=-1)
-    doms = list(ctx.scope.active_domains)
-    assert global_domain in doms
+# def test_scope_includes_global_domain_only_when_empty_registry():
+#     g = Graph()
+#     n = g.add_node(label="here")
+#     ctx = Context(graph=g, cursor_id=n.uid, step=-1)
+#     doms = list(ctx.scope.active_domains)
 
 def test_context_namespace_has_top_layer_and_is_not_polluting_domains():
     g = Graph()
@@ -23,15 +21,14 @@ def test_context_namespace_has_top_layer_and_is_not_polluting_domains():
     for m in ns.maps[1:]:
         assert "foo" not in m
 
-from tangl.core.domain import DomainNode
-def test_ns_gather():
+def test_ns_gather(NodeL):
     # check that ctx collects ns same as scope
     g = Graph()
-    n = g.add_node(label="here", locals={"foo": 1}, obj_cls=DomainNode)
+    n = g.add_node(label="here", locals={"foo": 1}, obj_cls=NodeL)
     assert n.locals["foo"] == 1
     ctx = Context(graph=g, cursor_id=n.uid)
 
-    print( ctx.inspect_scope() )
+    # print( ctx.inspect_scope() )
 
     ns = ctx.get_ns()
     # _ns = ctx._get_ns()

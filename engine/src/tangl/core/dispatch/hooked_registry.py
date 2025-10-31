@@ -4,9 +4,9 @@ from functools import partial
 
 from tangl.core import Entity, Registry
 from tangl.core.registry import VT
-from .call_receipt import CallReceipt
-from .has_behaviors import HasLocalBehaviors
-from .layered_dispatch import ContextP
+from tangl.core.behavior.call_receipt import CallReceipt
+from tangl.core.behavior.has_behaviors import HasLocalBehaviors
+from tangl.core.behavior.layered_dispatch import ContextP
 from .core_dispatch import core_dispatch
 
 logger = logging.getLogger(__name__)

@@ -10,7 +10,7 @@ from pydantic import Field
 from tangl.core.entity import Entity
 from tangl.core.graph import Graph, Node, GraphItem
 from tangl.core.registry import Registry
-from tangl.core.dispatch import Behavior
+from tangl.core.behavior import Behavior
 from .domain import Domain, global_domain, DomainRegistry
 
 NS: TypeAlias = ChainMap[str, Any]

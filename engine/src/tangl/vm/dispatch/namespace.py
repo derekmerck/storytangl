@@ -1,13 +1,14 @@
 import logging
-from typing import Iterable, TypeAlias, Any
+from typing import TypeAlias, Any
 from functools import partial
 from collections import ChainMap
 
-from tangl.core import Entity, Node, BehaviorRegistry
-from tangl.core.dispatch import HandlerLayer as L, HandlerPriority as Prio, CallReceipt, ContextP, LayeredDispatch
-from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
+from tangl.core import Entity, Node
+from tangl.core.behavior import HandlerPriority as Prio, CallReceipt, ContextP
+from .vm_dispatch import vm_dispatch
 
-NS: TypeAlias = ChainMap[str, Any]
+Namespace: TypeAlias = ChainMap[str, Any]
+NS = Namespace
 
 # system level task, specific to vm and applications that vm might use
 on_get_ns = partial(vm_dispatch.register, task="get_ns")
@@ -21,11 +22,20 @@ def _contribute_locals_to_ns(caller: Entity, *_, **__):
         return caller.locals
 
 def do_get_ns(anchor: Node, *, ctx: ContextP, extra_handlers=None, **kwargs) -> ChainMap[str, Any]:
-    # Walks local layers (ancestors) and gathers relevant object names
+    """
+    Walks local layers (ancestors) and gathers relevant object names.
 
-    # Non-specific application and author level owner handlers may want to
-    # register with is_instance=Graph rather than is_instance=Node, so they
-    # are only included once at the top.
+    Non-specific application and author level owner handlers may want to
+    register with is_instance=Graph rather than is_instance=Node, so they
+    are only included once at the top.
+
+
+    Warning
+    -------
+    Handlers must not call ctx.get_ns() for the same node, as this will
+    cause infinite recursion. If you need access to other namespace vars,
+    use a two-phase approach with EARLY and LATE priorities.
+    """
 
     receipts = []
     for node in (anchor, *anchor.ancestors(), anchor.graph):

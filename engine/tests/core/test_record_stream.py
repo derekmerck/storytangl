@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from tangl.core import BaseFragment, Graph
-from tangl.core.dispatch import CallReceipt
+from tangl.core.behavior import CallReceipt
 from tangl.core.entity import Entity
 from tangl.core.record import Record, Snapshot, StreamRegistry as RecordStream
 from tangl.core.registry import Registry

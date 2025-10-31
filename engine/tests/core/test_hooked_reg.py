@@ -2,7 +2,8 @@ import logging
 from typing import Self
 
 from tangl.core import Entity, Registry
-from tangl.core.dispatch import HookedRegistry as _HookedRegistry, on_index, HasLocalBehaviors
+from tangl.core.behavior import HasLocalBehaviors
+from tangl.core.dispatch import HookedRegistry as _HookedRegistry, on_index
 
 logger = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.DEBUG)

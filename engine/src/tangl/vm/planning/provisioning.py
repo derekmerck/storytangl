@@ -30,7 +30,7 @@ import functools
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
 from tangl.core import Node, Registry, Behavior, CallReceipt
-from tangl.core.dispatch.behavior import HandlerType
+from tangl.core.behavior.behavior import HandlerType
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:

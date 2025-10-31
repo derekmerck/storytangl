@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import HandlerPriority, HandlerRegistry
+from tangl.core.behavior import HandlerPriority, HandlerRegistry
 
 MyPipeline = HandlerRegistry(
     label="MyPipeline",

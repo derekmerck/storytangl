@@ -4,7 +4,7 @@ import uuid
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import Behavior as Behavior, HandlerPriority, BehaviorRegistry as BehaviorRegistry, CallReceipt
+from tangl.core.behavior import Behavior as Behavior, HandlerPriority, BehaviorRegistry as BehaviorRegistry, CallReceipt
 
 
 class DummyEntity(Entity):

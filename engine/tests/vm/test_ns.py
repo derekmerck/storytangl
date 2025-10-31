@@ -8,21 +8,15 @@ from pydantic import Field, create_model
 
 from tangl.type_hints import StringMap
 from tangl.core import Graph, Subgraph, Node, BehaviorRegistry, LayeredDispatch
-from tangl.core.dispatch import ContextP, HandlerLayer as L, HandlerPriority as Prio
+from tangl.core.behavior import ContextP, HandlerLayer as L, HandlerPriority as Prio
 
-from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
-from tangl.vm.vm_dispatch.on_get_ns import do_get_ns, on_get_ns
-
-logger = logging.getLogger(__name__)
-
-_dict_field = StringMap, Field(default_factory=dict)
-
-GraphL = create_model("GraphL", __base__=Graph, locals=_dict_field)
-SubgraphL = create_model("SubgraphL", __base__=Subgraph, locals=_dict_field)
-NodeL = create_model("NodeL", __base__=Node, locals=_dict_field)
+from tangl.vm.dispatch import vm_dispatch
+from tangl.vm.dispatch import do_get_ns, on_get_ns
 
 story_dispatch = LayeredDispatch(label="dispatch.story", handler_layer=L.APPLICATION)
 world_dispatch = LayeredDispatch(label="dispatch.world", handler_layer=L.AUTHOR)
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class FakeCtx:
@@ -43,7 +37,7 @@ class FakeCtx:
     local_behaviors: LayeredDispatch = field(default_factory=lambda: LayeredDispatch(label="dispatch_ctx"))
 
 
-def test_get_ns():
+def test_get_ns(NodeL, SubgraphL, GraphL):
 
     g = GraphL(locals={'g_layer': 'present'})
     s = SubgraphL(graph=g, locals={'sg_layer': 'present'})

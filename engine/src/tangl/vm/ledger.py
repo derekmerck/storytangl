@@ -4,12 +4,12 @@ State holder for the live graph, cursor, and record stream (snapshots, patches, 
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Iterable
 from pydantic import Field
 from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
-from tangl.core import Entity, Graph, Node, Domain, Record, StreamRegistry, Snapshot
+from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BehaviorRegistry
 from .frame import Frame
 
 if TYPE_CHECKING:
@@ -66,11 +66,18 @@ class Ledger(Entity):
     graph: Graph
     cursor_id: UUID = None
     step: int = 0
-    domains: list[Domain] = Field(default_factory=list)  # ledger-level singletons only
     records: StreamRegistry = Field(default_factory=StreamRegistry)
     snapshot_cadence: int = 1
     event_sourced: bool = False
     user: Optional[User] = Field(None, exclude=True)
+
+    def get_active_layers(self) -> Iterable[BehaviorRegistry]:
+        from tangl.vm.dispatch import vm_dispatch
+        # todo: should pass story-dispatch in on creation, violates looking
+        #       into application domain subpackages
+        from tangl.story.story_dispatch.story_dispatch import story_dispatch
+        # return vm_dispatch, story_dispatch
+        return vm_dispatch,
 
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
@@ -115,7 +122,8 @@ class Ledger(Entity):
             cursor_id=self.cursor_id,
             step=self.step,
             records=self.records,
-            event_sourced=self.event_sourced
+            event_sourced=self.event_sourced,
+            active_layers=self.get_active_layers()
         )
 
     def init_cursor(self) -> None:
@@ -144,11 +152,15 @@ class Ledger(Entity):
     # todo: should probably add this as a general pattern for structuring/unstructuring
     #       entity-typed model fields using introspection (see registry)
 
+    # todo: could include the author_domain here, as long as it is a SINGLETON type
+    #       behavior registry, maybe better to keep the world and get the author
+    #       domain from that?
+
     @classmethod
     def structure(cls, data: Mapping[str, Any], **kwargs) -> "Ledger":
         payload = dict(data)
         graph_data = payload.pop("graph", None)
-        domain_data = payload.pop("domains", None)
+        # domain_data = payload.pop("domains", None)
         record_data = payload.pop("records", None)
         if "graph" not in payload:
             payload["graph"] = Graph()
@@ -157,10 +169,10 @@ class Ledger(Entity):
         if graph_data is not None:
             ledger.graph = Graph.structure(graph_data)
 
-        if domain_data is not None:
-            ledger.domains = [Domain.structure(item) for item in domain_data]
-        else:
-            ledger.domains = []
+        # if domain_data is not None:
+        #     ledger.domains = [Domain.structure(item) for item in domain_data]
+        # else:
+        #     ledger.domains = []
 
         if record_data is not None:
             raw_records = list(record_data.get("_data", []))
@@ -185,7 +197,7 @@ class Ledger(Entity):
         graph_payload.pop("data", None)
         data["graph"] = graph_payload
 
-        data["domains"] = [domain.unstructure() for domain in self.domains]
+        # data["domains"] = [domain.unstructure() for domain in self.domains]
 
         records_payload = self.records.unstructure()
         sanitized_records: list[UnstructuredData] = []

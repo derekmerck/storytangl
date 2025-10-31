@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import Handler as BaseHandler, HandlerRegistry
+from tangl.core.behavior import Handler as BaseHandler, HandlerRegistry
 from tangl.type_hints import StringMap
 
 class DummyEntity(Entity):

@@ -5,7 +5,7 @@ import importlib
 import inspect
 import logging
 
-from tangl.core.dispatch import BehaviorRegistry
+from tangl.core.behavior import BehaviorRegistry
 from tangl.core.entity import Entity
 from tangl.core.graph.node import Node
 

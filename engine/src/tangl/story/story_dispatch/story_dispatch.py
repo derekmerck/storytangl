@@ -2,12 +2,10 @@
 from typing import Iterator
 from functools import partial
 
-from tangl.core import BehaviorRegistry, Node
-from tangl.core.dispatch import HandlerLayer as L, CallReceipt
-from tangl.core.dispatch.core_dispatch import ContextP, on_create, LayeredDispatch
+from tangl.core import Node, CallReceipt
+from tangl.core.behavior import HandlerLayer as L, ContextP, LayeredDispatch
 
-# tangl.story import story_dispatch
-story_dispatch = BehaviorRegistry(label="story.dispatch", handler_layer=L.APPLICATION)
+story_dispatch = LayeredDispatch(label="story.dispatch", handler_layer=L.APPLICATION)
 
 # Hook vm phase tasks
 on_story_planning = partial(story_dispatch.register, task="planning")
@@ -29,22 +27,22 @@ def _provide_concept_offers(caller: Node, *, ctx) -> "Offers":
 def _provide_episode_offers(caller: Node, *, ctx) -> "Offers":
     ...
 
-from typing import Type
+
 from collections import defaultdict
 
-from tangl.core.dispatch import HandlerPriority as Prio
+from tangl.core.behavior import HandlerPriority as Prio
 from tangl.story.concepts import Concept
 from tangl.story.episode import Block
 from tangl.journal.content import ContentFragment
 
 # should be an on_story_create()?  Or do we just want to hook the global handler?
-@on_create(is_subclass=Node)  # fires if c is a type, and it is Node or a subclass of Node
-def _use_node_plus(c: Type, *, ctx=None):
-    # One of the few dispatches where the caller item is _not_ an Entity, it's a Type
-    class NodePlus(Node):
-        ...
-    return NodePlus
-    # Should only return a subclass of the is_subclass criteria
+# @on_create(is_subclass=Node)  # fires if c is a type, and it is Node or a subclass of Node
+# def _use_node_plus(c: Type, *, ctx=None):
+#     # One of the few dispatches where the caller item is _not_ an Entity, it's a Type
+#     class NodePlus(Node):
+#         ...
+#     return NodePlus
+#     # Should only return a subclass of the is_subclass criteria
 
 @on_describe(is_instance=Concept)
 def _provide_concept_description(c, *, ctx):

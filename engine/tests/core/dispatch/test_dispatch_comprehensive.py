@@ -21,13 +21,13 @@ import logging
 import pytest
 
 from tangl.core import Entity, CallReceipt
-from tangl.core.dispatch.behavior import (
+from tangl.core.behavior.behavior import (
     Behavior,
     HandlerLayer,
     HandlerType,
     HandlerPriority
 )
-from tangl.core.dispatch.behavior_registry import BehaviorRegistry
+from tangl.core.behavior.behavior_registry import BehaviorRegistry
 
 from tangl.utils.func_info import FuncInfo
 

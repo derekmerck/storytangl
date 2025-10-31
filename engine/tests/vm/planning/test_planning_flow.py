@@ -133,7 +133,7 @@ def test_event_sourced_frame_records_planning_receipt_and_patch():
 
     node_counts: list[int] = []
 
-    @frame.local_domain.handlers.register(task=P.JOURNAL, priority=0)
+    @frame.local_behaviors.register(task=P.JOURNAL, priority=0)
     def capture_node_count(cursor: Node, *, ctx, **_):
         node_counts.append(len(list(ctx.graph.find_nodes())))
 

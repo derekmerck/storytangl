@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import pytest
 
 from tangl.core import Graph
-from tangl.core.domain.affiliate import SingletonDomain
+# from tangl.core.domain.affiliate import SingletonDomain
 from tangl.vm.ledger import Ledger
 
 
@@ -14,18 +14,18 @@ def _load_ledger(payload):
         return Ledger.structure(dict(payload))
     raise TypeError(f"Unexpected payload type {type(payload)!r}")
 
-@pytest.fixture(autouse=True)
-def clear_singleton_domain():
-    SingletonDomain.clear_instances()
-    yield
-    SingletonDomain.clear_instances()
-
+# @pytest.fixture(autouse=True)
+# def clear_singleton_domain():
+#     SingletonDomain.clear_instances()
+#     yield
+#     SingletonDomain.clear_instances()
+#
 
 def test_ledger_roundtrip_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="test_node")
     ledger = Ledger(graph=graph, cursor_id=node.uid, step=42)
-    ledger.domains.append(SingletonDomain(label="demo_domain"))
+    # ledger.domains.append(SingletonDomain(label="demo_domain"))
     ledger.push_snapshot()
 
     manager.save(ledger)
@@ -37,7 +37,7 @@ def test_ledger_roundtrip_all_backends(manager):
     assert restored.step == 42
     assert restored.cursor_id == node.uid
     assert restored.graph.find_one(label="test_node") is not None
-    assert [domain.label for domain in restored.domains] == ["demo_domain"]
+    # assert [domain.label for domain in restored.domains] == ["demo_domain"]
 
 
 def test_event_sourced_rebuild_all_backends(manager):

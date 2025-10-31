@@ -7,10 +7,10 @@ from typing import Any
 
 import jinja2
 
-from tangl.core import BaseFragment, Graph, Node, global_domain
+from tangl.core import BaseFragment, Graph, Node
 from tangl.vm.context import Context
-from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
-from tangl.vm.domain import TraversableDomain
+from tangl.vm.frame import ChoiceEdge
+from tangl.vm.traversal import TraversableSubgraph
 
 from tangl.story.concepts.concept import Concept
 
@@ -29,8 +29,8 @@ def _normalize_ns(ns: Any) -> Mapping[str, Any] | None:
     except TypeError:
         return None
 
-
-class Block(TraversableDomain, Node):
+# todo: is it a subgraph, that's more of a scene thing...
+class Block(TraversableSubgraph, Node):
     """Block(label: str, content: str = "")
 
     Structural node that groups :class:`Concept` children and presents
@@ -85,7 +85,7 @@ class Block(TraversableDomain, Node):
 #     selection_criteria={"is_instance": Block},
 # )
 # from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
-from tangl.vm.simple_handlers import on_journal
+from tangl.vm.dispatch import on_journal
 @on_journal()
 def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
     """Render inline content, child concepts, and choice menu for a block."""

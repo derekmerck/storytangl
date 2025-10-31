@@ -45,7 +45,7 @@ def demo_world() -> World:
 
 
 def _register_journal_handler(frame: Frame) -> None:
-    @frame.local_domain.handlers.register(task=ResolutionPhase.JOURNAL)
+    @frame.local_behaviors.register(task=ResolutionPhase.JOURNAL)
     def _journal_handler(*_, ctx, **__) -> list[ContentFragment]:  # type: ignore[override]
         return [ContentFragment(content=f"sp:cursor:{ctx.cursor.label}")]
 

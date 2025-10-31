@@ -45,3 +45,29 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 #     with open(fp) as f:
 #         data = yaml.safe_load(f)
 #     return data
+
+from tangl.type_hints import StringMap
+from tangl.core.graph import Graph, Node, Subgraph
+
+from pydantic import create_model, Field
+
+import pytest
+
+_dict_field = StringMap, Field(default_factory=dict)
+
+@pytest.fixture(scope="session")
+def GraphL():
+
+    GraphL = create_model("GraphL", __base__=Graph, locals=_dict_field)
+    return GraphL
+
+@pytest.fixture(scope="session")
+def SubgraphL():
+    SubgraphL = create_model("SubgraphL", __base__=Subgraph, locals=_dict_field)
+    return SubgraphL
+
+@pytest.fixture(scope="session")
+def NodeL():
+    NodeL = create_model("NodeL", __base__=Node, locals=_dict_field)
+    return NodeL
+

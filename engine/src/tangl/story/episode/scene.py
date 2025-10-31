@@ -5,9 +5,9 @@ from typing import Any
 from pydantic import PrivateAttr
 
 from tangl.core import Graph, Node
-from tangl.core.dispatch import HasBehaviors
-from tangl.vm.vm_dispatch.on_get_ns import on_get_ns
-from tangl.vm.domain import TraversableDomain
+from tangl.core.behavior import HasBehaviors
+from tangl.vm.dispatch import on_get_ns
+from tangl.vm.traversal import TraversableSubgraph
 from tangl.vm.planning import Affordance, Dependency
 from ..concepts.actor import Role
 from ..concepts.location import Setting
@@ -22,7 +22,7 @@ __all__ = ["Scene"]
 #       Need to consider how global domain templates can be restricted to
 #       instance structural domains by name or origin or something.
 
-class Scene(TraversableDomain, HasBehaviors):
+class Scene(TraversableSubgraph, HasBehaviors):
     """Scene(label: str, member_ids: list[Node], entry_ids: list[Node] | None = None, exit_ids: list[Node] | None = None)
 
     Structural domain that groups :class:`Block` members and projects

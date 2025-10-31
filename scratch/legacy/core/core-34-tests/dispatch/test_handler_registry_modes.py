@@ -3,7 +3,7 @@ from typing import Mapping, Iterator
 import pytest
 
 from tangl.core.entity import Entity, Graph
-from tangl.core.dispatch import HandlerRegistry, HasHandlers, Handler
+from tangl.core.behavior import HandlerRegistry, HasHandlers, Handler
 
 on_mock_task = HandlerRegistry(label="mock_task")
 on_pipeline_task = HandlerRegistry(label="pipeline_task")

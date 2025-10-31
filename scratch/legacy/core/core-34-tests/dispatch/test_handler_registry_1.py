@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.core.entity import Entity
-from tangl.core.dispatch import HandlerRegistry, HandlerPriority, Handler as BaseHandler
+from tangl.core.behavior import HandlerRegistry, HandlerPriority, Handler as BaseHandler
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
 
 

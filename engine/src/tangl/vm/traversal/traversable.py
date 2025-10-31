@@ -9,14 +9,13 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
-from tangl.core import Graph, Node
-from tangl.core.domain import DomainSubgraph
+from tangl.core import Graph, Node, Subgraph
 from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
 
-__all__ = ["TraversableDomain"]
+__all__ = ["TraversableSubgraph"]
 
 
-class TraversableDomain(DomainSubgraph):
+class TraversableSubgraph(Subgraph):
     """TraversableDomain(label: str, member_ids: list[UUID], entry_ids: list[UUID] | None = None, exit_ids: list[UUID] | None = None)
 
     Structural domain that exposes a canonical source/sink for resolution flow.

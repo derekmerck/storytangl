@@ -3,7 +3,7 @@
 Frame drives the phase bus over one *resolution step* over a :class:`~tangl.core.graph.Graph`.
 """
 from __future__ import annotations
-from typing import Literal, Optional, Any, Callable, Type, Self
+from typing import Literal, Optional, Any, Callable, Type, Self, Iterable
 import functools
 from enum import IntEnum, Enum
 from uuid import UUID
@@ -12,9 +12,8 @@ from copy import deepcopy, copy
 import logging
 
 from tangl.type_hints import Step
-from tangl.core import Registry, StreamRegistry, Graph, Edge, Node, CallReceipt, BaseFragment
+from tangl.core import StreamRegistry, Graph, Edge, Node, CallReceipt, BaseFragment, BehaviorRegistry
 from tangl.core.entity import Conditional
-from tangl.core.domain import AffiliateDomain, AffiliateRegistry
 from .context import Context
 from .planning import PlanningReceipt
 from .replay import ReplayWatcher, WatchedRegistry, Patch
@@ -94,11 +93,11 @@ class ChoiceEdge(Edge, Conditional):
     """
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
 
-# dataclass for simplified init, not serialized or tracked
-class _FrameLocalDomain(AffiliateDomain):
-    """Affiliate domain that is always selected for the current frame."""
-
-    selector_prefix = None
+# # dataclass for simplified init, not serialized or tracked
+# class _FrameLocalDomain(AffiliateDomain):
+#     """Affiliate domain that is always selected for the current frame."""
+#
+#     selector_prefix = None
 
 
 @dataclass
@@ -144,7 +143,16 @@ class Frame:
     graph: Graph
     cursor_id: UUID
     step: Step = 0
-    domain_registries: list[AffiliateRegistry] = field(default_factory=list)
+    # domain_registries: list[AffiliateRegistry] = field(default_factory=list)
+
+    local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
+    # SYSTEM, APPLICATION, AUTHOR layers
+    active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
+
+    def get_active_layers(self) -> Iterable[BehaviorRegistry]:
+        from tangl.vm.dispatch import vm_dispatch
+        layers = {vm_dispatch, *self.active_layers, self.local_behaviors}
+        return layers
 
     event_sourced: bool = False  # track effects on a mutable copy
     event_watcher: ReplayWatcher = field(default_factory=ReplayWatcher)
@@ -163,21 +171,21 @@ class Frame:
     # todo: make frame into a structural domain that passes itself into
     #       context, that way we get 'local_domain' for free
 
-    @property
-    def domain_registry(self) -> AffiliateRegistry:
-        # this is a convenience property that creates a registry
-        # if self.registries is empty and returns the first.
-        if not self.domain_registries:
-            self.domain_registries = [Registry()]
-        return self.domain_registries[0]
+    # @property
+    # def domain_registry(self) -> AffiliateRegistry:
+    #     # this is a convenience property that creates a registry
+    #     # if self.registries is empty and returns the first.
+    #     if not self.domain_registries:
+    #         self.domain_registries = [Registry()]
+    #     return self.domain_registries[0]
 
-    @property
-    def local_domain(self) -> AffiliateDomain:
-        local_domain = self.domain_registry.find_one(label="local_domain")
-        if local_domain is None:
-            local_domain = _FrameLocalDomain(label="local_domain")
-            self.domain_registry.add(local_domain)
-        return local_domain
+    # @property
+    # def local_domain(self) -> AffiliateDomain:
+    #     local_domain = self.domain_registry.find_one(label="local_domain")
+    #     if local_domain is None:
+    #         local_domain = _FrameLocalDomain(label="local_domain")
+    #         self.domain_registry.add(local_domain)
+    #     return local_domain
 
     def get_preview_graph(self):
         # create a disposable preview graph from the current event buffer
@@ -194,14 +202,17 @@ class Frame:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph, self.cursor_id, self.step, local_behaviors=self.local_domain.handlers)
+        return Context(graph=graph,
+                       cursor_id=self.cursor_id,
+                       step=self.step,
+                       active_layers=self.get_active_layers())
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):
             del self.context
 
     def run_phase(self, phase: P):
-        from .vm_dispatch.vm_dispatch import vm_dispatch
+        from .dispatch import vm_dispatch
 
         receipts = vm_dispatch.dispatch(
             caller=self.cursor,

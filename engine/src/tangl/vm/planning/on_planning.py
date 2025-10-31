@@ -1,6 +1,6 @@
 
 from tangl.core import Node
-from tangl.core.dispatch import CallReceipt, HandlerPriority as Prio
+from tangl.core.behavior import CallReceipt, HandlerPriority as Prio
 # we want a better contextP here, that includes get_ns()
 from tangl.core.dispatch.core_dispatch import ContextP
 from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch, on_planning

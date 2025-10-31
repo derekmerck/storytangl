@@ -6,7 +6,6 @@ import pytest
 from pydantic import Field
 
 from tangl.core import Graph, Node, Registry
-from tangl.core.domain import AffiliateDomain
 from tangl.vm import Frame, ResolutionPhase as P, ProvisioningPolicy
 from tangl.vm.context import Context
 from tangl.vm.planning import Dependency, ProvisionOffer, Provisioner, Requirement
@@ -38,7 +37,7 @@ class ActorProvisioner(Provisioner):
                 requirement.template = original_template
 
 
-class ActorDomain(AffiliateDomain):
+class ActorDomain:
     """Domain that publishes an actor provisioner seeded with templates."""
 
     selector_type = Node

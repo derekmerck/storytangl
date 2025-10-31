@@ -43,12 +43,3 @@ Dispatch
 .. autoclass:: tangl.core.Behavior
 .. autoclass:: tangl.core.BehaviorRegistry
 .. autoclass:: tangl.core.CallReceipt
-
-.. _core-capability:
-
-Capability
-----------
-.. autoclass:: tangl.core.Domain
-.. autoclass:: tangl.core.domain.AffiliateDomain
-.. autoclass:: tangl.core.domain.DomainSubgraph
-.. autoclass:: tangl.core.Scope

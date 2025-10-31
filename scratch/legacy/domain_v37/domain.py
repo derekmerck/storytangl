@@ -6,7 +6,7 @@ from pydantic import Field
 from tangl.info import __version__
 from tangl.type_hints import StringMap
 from tangl.core import Entity, Registry, BehaviorRegistry
-from tangl.core.dispatch import DEFAULT_HANDLERS
+from tangl.core.behavior import DEFAULT_HANDLERS
 
 # imported from tangl.__info__
 DEFAULT_VARS = {'version': __version__}

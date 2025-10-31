@@ -49,6 +49,16 @@ Notes
 # Event sourced state manager
 from .replay import Event, EventType, EventWatcher, Patch
 
+# Resolution step
+from .resolution_phase import ResolutionPhase
+from .context import Context
+from .frame import Frame, ChoiceEdge
+from .ledger import Ledger
+from .traversal import TraversableSubgraph
+
+# Dispatch
+from .dispatch import vm_dispatch
+
 # Provisioning
 from .planning import (
     Requirement,
@@ -61,22 +71,15 @@ from .planning import (
     PlanningReceipt,
 )
 
-# Resolution step
-from .context import Context
-from .frame import Frame, ChoiceEdge, ResolutionPhase
-from .ledger import Ledger
-from .domain import TraversableDomain
-
 Offer = ProvisionOffer
-
-# Simple phase-bus handlers
-import tangl.vm.simple_handlers
 
 __all__ = [
     # events/replay
     "Event", "EventType", "Patch",
+    # resolution
+    "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context", "TraversableSubgraph",
+    # dispatch
+    "vm_dispatch",
     # planning
     "Requirement", "Provisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "BuildReceipt", "PlanningReceipt",
-    # resolution
-    "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context", "TraversableDomain",
     ]

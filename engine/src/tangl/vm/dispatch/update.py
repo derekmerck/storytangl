@@ -1,15 +1,30 @@
 from __future__ import annotations
 from typing import Self, TYPE_CHECKING
+from functools import partial
 
 from pydantic import Field
 
 from tangl.type_hints import Expr
 from tangl.utils.safe_builtins import safe_builtins
-from tangl.core.dispatch import HasBehaviors
-from .vm_dispatch import on_update
+from tangl.core.behavior import HasBehaviors
+from tangl.vm.frame import ResolutionPhase as P
+from .vm_dispatch import vm_dispatch
 
 if TYPE_CHECKING:
     from tangl.vm.context import Context, NS
+
+on_update = partial(vm_dispatch.register, task=P.UPDATE)
+on_finalize = partial(vm_dispatch.register, task=P.FINALIZE)
+
+
+@on_update()
+def update_noop(*args, **kwargs):
+    pass
+
+@on_finalize()
+def finalize_noop(*args, **kwargs):
+    # collapse-to-patch can go here later
+    pass
 
 class HasEffects(HasBehaviors):
 

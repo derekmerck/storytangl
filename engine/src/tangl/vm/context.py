@@ -4,23 +4,20 @@ Execution context for one frame of resolution.
 Thin wrapper around the graph, cursor, and scope providing deterministic RNG.
 """
 from __future__ import annotations
-from typing import Iterator, TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable
 from uuid import UUID
 import functools
 from dataclasses import dataclass, field
 from random import Random
-from collections import ChainMap
 import logging
 
 from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
-from tangl.core.domain import Scope, NS, AffiliateRegistry
-from tangl.core.dispatch import Behavior, BehaviorRegistry, CallReceipt
-# from .vm_dispatch.on_get_ns import on_get_ns
+from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt
 
 if TYPE_CHECKING:
-    from .domain import TraversableDomain
+    from .traversal import TraversableSubgraph
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +65,19 @@ class Context:
     graph: Graph
     cursor_id: UUID
     step: int = -1
-    domain_registries: list[AffiliateRegistry] = field(default_factory=list)
+    # domain_registries: list[AffiliateRegistry] = field(default_factory=list)
     call_receipts: list[CallReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
 
     local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
+    # SYSTEM and APPLICATION layers
+    active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
+
+    def get_active_layers(self) -> Iterable[BehaviorRegistry]:
+        from tangl.vm.dispatch import vm_dispatch
+        # todo: get the graph's author layer as well
+        layers = {vm_dispatch, *self.active_layers, self.local_behaviors}
+        return layers
 
     def __post_init__(self):
         # Set initial hash on frozen object
@@ -91,73 +96,69 @@ class Context:
             raise RuntimeError(f"Bad cursor id in context {self.cursor_id} not in {[k for k in self.graph.keys()]}")
         return self.graph.get(self.cursor_id)
 
-    def get_active_layers(self) -> Iterable[BehaviorRegistry]:
-        from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
-        return vm_dispatch, self.local_behaviors
-        # return vm_dispatch, story_dispatch, world_dispatch
-
     _ns_cache: dict[UUID, StringMap] = field(default_factory=dict)
 
     def get_ns(self, node: Node = None, nocache=False) -> StringMap:
-        from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
+        from tangl.vm.dispatch import do_get_ns
         node = node or self.cursor
         if nocache or node.uid not in self._ns_cache:
             logger.debug(f"getting ns for {node!r}")
             self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
         return self._ns_cache[node.uid]
 
-    @functools.cached_property
-    def scope(self) -> Scope:
-        # Since Context is frozen wrt the scope parts, we never need to invalidate this.
-        return Scope(graph=self.graph,
-                     anchor_id=self.cursor_id,
-                     domain_registries=self.domain_registries)
+    # @functools.cached_property
+    # def scope(self) -> Scope:
+    #     # Since Context is frozen wrt the scope parts, we never need to invalidate this.
+    #     return Scope(graph=self.graph,
+    #                  anchor_id=self.cursor_id,
+    #                  domain_registries=self.domain_registries)
 
-    def inspect_scope(self) -> str:
-        lines = []
-        lines.append(f"Available domains:")
-        for dr in self.domain_registries:
-            for d in dr.values():
-                lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
-        lines.append("Active domains:")
-        for d in self.scope.active_domains:
-            lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
-        lines.append("Handlers by phase:")
-        from .frame import ResolutionPhase as P
-        for ph in P:
-            names = [h.func.__name__ for h in self.scope.get_handlers(phase=ph)]
-            lines.append(f"  {ph.name}: {', '.join(names)}")
-        lines.append("Handlers for ns:")
-        names = [h.func.__name__ for h in self.scope.get_handlers(job="namespace")]
-        lines.append(f"  ns: {', '.join(names)}")
-        return "\n".join(lines)
+    # def inspect_scope(self) -> str:
+    #     lines = []
+    #     lines.append(f"Available domains:")
+    #     for dr in self.domain_registries:
+    #         for d in dr.values():
+    #             lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
+    #     lines.append("Active domains:")
+    #     for d in self.scope.active_domains:
+    #         lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
+    #     lines.append("Handlers by phase:")
+    #     from .frame import ResolutionPhase as P
+    #     for ph in P:
+    #         names = [h.func.__name__ for h in self.scope.get_handlers(phase=ph)]
+    #         lines.append(f"  {ph.name}: {', '.join(names)}")
+    #     lines.append("Handlers for ns:")
+    #     names = [h.func.__name__ for h in self.scope.get_handlers(job="namespace")]
+    #     lines.append(f"  ns: {', '.join(names)}")
+    #     return "\n".join(lines)
+    #
+    # @staticmethod
+    # def _get_ns(scope: Scope) -> NS:
+    #     maps = []
+    #     for d in scope.active_domains:
+    #         # todo: how do we include other registry layers?
+    #         #       we always do global/app/author and don't worry about d's ancestors?
+    #         #       this is bootstrapping, so we have to accept some constraints...
+    #         domain_maps = on_get_ns.dispatch(caller=d, ctx=None)
+    #         maps.extend(CallReceipt.gather_results(*domain_maps))
+    #     return ChainMap(*maps)
+    #
+    # def __get_ns(self) -> NS:
+    #     """Bootstrap ctx by calling get_vars on every domain in active
+    #     domains and creating."""
+    #     return self._get_ns(self.scope)
 
-    @staticmethod
-    def _get_ns(scope: Scope) -> NS:
-        maps = []
-        for d in scope.active_domains:
-            # todo: how do we include other registry layers?
-            #       we always do global/app/author and don't worry about d's ancestors?
-            #       this is bootstrapping, so we have to accept some constraints...
-            domain_maps = on_get_ns.dispatch(caller=d, ctx=None)
-            maps.extend(CallReceipt.gather_results(*domain_maps))
-        return ChainMap(*maps)
-
-    def __get_ns(self) -> NS:
-        """Bootstrap ctx by calling get_vars on every domain in active
-        domains and creating."""
-        return self._get_ns(self.scope)
-
-    def get_handlers(self, **criteria) -> Iterator[Behavior]:
+    def get_handlers(self, **criteria) -> None:
+        return None
         # can pass phase in filter criteria if useful
         return self.scope.get_handlers(**criteria)
 
-    def get_traversable_domain_for_node(self, node: Node) -> TraversableDomain | None:
-        """Return the :class:`TraversableDomain` that contains ``node`` if available."""
-
-        from tangl.vm.domain import TraversableDomain  # Local import to avoid cycle
-
-        for domain in self.scope.active_domains:
-            if isinstance(domain, TraversableDomain) and node.uid in domain.member_ids:
-                return domain
-        return None
+    # def get_traversable_domain_for_node(self, node: Node) -> TraversableSubgraph | None:
+    #     """Return the :class:`TraversableDomain` that contains ``node`` if available."""
+    #
+    #     from tangl.vm.traversal import TraversableSubgraph  # Local import to avoid cycle
+    #
+    #     for domain in self.scope.active_domains:
+    #         if isinstance(domain, TraversableDomain) and node.uid in domain.member_ids:
+    #             return domain
+    #     return None

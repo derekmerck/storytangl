@@ -1,5 +1,5 @@
-from tangl.core import Graph, Node, global_domain
-from tangl.vm import ChoiceEdge, ResolutionPhase as P, Requirement, Dependency, Affordance, ProvisioningPolicy, Frame
+from tangl.core import Graph, Node
+from tangl.vm import ChoiceEdge, ResolutionPhase as P, Requirement, Dependency, ProvisioningPolicy, Frame
 
 def test_tiny_integration():
     # Build a tiny graph

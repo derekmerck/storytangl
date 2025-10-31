@@ -68,7 +68,7 @@ def _build_ledger_with_choice() -> tuple[Ledger, UUID]:
 
     frame = ledger.get_frame()
 
-    @frame.local_domain.handlers.register(task=ResolutionPhase.JOURNAL)
+    @frame.local_behaviors.register(task=ResolutionPhase.JOURNAL)
     def _journal_handler(*_: Any, ctx: SimpleNamespace, **__: Any) -> list[ContentFragment]:
         return [ContentFragment(content=f"cursor:{ctx.cursor.label}")]
 

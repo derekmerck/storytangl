@@ -7,7 +7,6 @@ from collections.abc import Iterable
 import pytest
 
 from tangl.core import BaseFragment, Graph, Node
-from tangl.core.domain import global_domain
 from tangl.story.concepts import Concept
 from tangl.vm import Frame, ResolutionPhase as P
 
@@ -60,13 +59,9 @@ class TestSimpleConcept:
         graph = Graph(label="test")
         concept = Concept(graph=graph, locals={"player_name": "Bob"}, label="greeting", content="Hello, {player_name}!")
 
-        global_domain.locals.setdefault("player_name", "Bob")
-        try:
-            frame = Frame(graph=graph, cursor_id=concept.uid)
-            fragments = frame.run_phase(P.JOURNAL)
-            fragment = collect_fragment(fragments, source_id=concept.uid)
-        finally:
-            global_domain.locals.pop("player_name", None)
+        frame = Frame(graph=graph, cursor_id=concept.uid)
+        fragments = frame.run_phase(P.JOURNAL)
+        fragment = collect_fragment(fragments, source_id=concept.uid)
 
         assert "Hello, Bob!" in fragment.content
 
@@ -79,11 +74,3 @@ class TestSimpleConcept:
         fragments = frame.run_phase(P.JOURNAL)
 
         assert any("cursor" in fragment.content for fragment in fragments)
-
-
-@pytest.fixture(autouse=True)
-def _reset_global_domain_vars():
-    original = dict(global_domain.locals)
-    yield
-    global_domain.locals.clear()
-    global_domain.locals.update(original)

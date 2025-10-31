@@ -5,10 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from tangl.core import BaseFragment, Graph, Node, global_domain
-from tangl.core.domain import NS
+from tangl.core import BaseFragment, Graph, Node
+from tangl.vm.dispatch.namespace import Namespace as NS
 from tangl.vm.context import Context
-from tangl.vm.frame import ResolutionPhase as P
 from pydantic import Field
 import logging
 
@@ -79,8 +78,8 @@ class Concept(Node):
             return self.content
 
 # todo: this should _very_ obviously be added to the 'story domain' domain rather than the global domain...
-from tangl.vm.simple_handlers import on_journal
-from tangl.core.dispatch import HandlerPriority as Prio
+from tangl.vm.dispatch import on_journal
+from tangl.core.behavior import HandlerPriority as Prio
 @on_journal(priority=Prio.EARLY)
 # @global_domain.handlers.register(phase=P.JOURNAL, priority=45)
 def render_concept_to_fragment(concept: Concept, *, ctx: Context, **_: Any) -> BaseFragment | None:

@@ -18,7 +18,7 @@ from tangl.vm import (
     Requirement,
     ResolutionPhase as P,
 )
-from tangl.vm.vm_dispatch.on_get_ns import do_get_ns
+from tangl.vm.dispatch import do_get_ns
 
 
 def _destination_ids(node: Node) -> set[UUID]:
@@ -171,10 +171,10 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
     assert ns["missing"].get_label() == "provider"
 
 
-def test_refresh_edge_projections_preserves_existing_vars() -> None:
+def test_refresh_edge_projections_preserves_existing_vars(SceneL) -> None:
     g = Graph(label="test")
 
-    scene = Scene(graph=g, label="scene")
+    scene = SceneL(graph=g, label="scene")
     scene.locals["region"] = "Tavern"
     block = Block(graph=g, label="block")
     scene.add_member(block)
@@ -236,11 +236,21 @@ def test_has_forward_progress_softlock() -> None:
 
     assert scene.has_forward_progress(dead_end) is False
 
+from tangl.type_hints import StringMap
+import pytest
+from pydantic import Field, create_model
+_dict_field = StringMap, Field(default_factory=dict)
 
-def test_scene_namespace_available_during_journal() -> None:
+@pytest.fixture(scope="session")
+def SceneL():
+
+    SceneL = create_model("SceneL", __base__=Scene, locals=_dict_field)
+    return SceneL
+
+def test_scene_namespace_available_during_journal(SceneL) -> None:
     g = Graph(label="test")
     block = Block(graph=g, label="block", content="Hello {{npc_name}}!")
-    scene = Scene(graph=g, label="tavern", member_ids=[block.uid])
+    scene = SceneL(graph=g, label="tavern", member_ids=[block.uid])
     scene.locals["npc_name"] = "Bartender Bob"
 
     frame = Frame(graph=g, cursor_id=block.uid)

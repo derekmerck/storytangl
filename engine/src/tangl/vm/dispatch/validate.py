@@ -1,15 +1,27 @@
 from __future__ import annotations
 from typing import Self, TYPE_CHECKING
+from functools import partial
 
 from pydantic import Field
 
 from tangl.type_hints import Expr
 from tangl.utils.safe_builtins import safe_builtins
-from tangl.core.dispatch import HasBehaviors
-from .vm_dispatch import on_validate
+from tangl.core import Node
+from tangl.core.behavior import HasBehaviors, HandlerPriority as Prio
+from tangl.vm.resolution_phase import ResolutionPhase as P
+from .vm_dispatch import vm_dispatch
+
+on_validate = partial(vm_dispatch.register, task=P.VALIDATE)
 
 if TYPE_CHECKING:
     from tangl.vm.context import Context, NS
+
+@on_validate(priority=Prio.EARLY)
+def validate_cursor(caller: Node, **kwargs):
+    """Basic validation: cursor exists and is a :class:`~tangl.core.graph.Node`."""
+    ok = caller is not None and isinstance(caller, Node)
+    return ok
+
 
 class HasConditions(HasBehaviors):
 
