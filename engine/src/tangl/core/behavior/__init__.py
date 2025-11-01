@@ -1,4 +1,4 @@
-# tangl/core/dispatch/__init__.py
+# tangl/core/behavior/__init__.py
 from .call_receipt import CallReceipt
 from .behavior import Behavior, HandlerPriority, HandlerLayer
 from .behavior_registry import BehaviorRegistry

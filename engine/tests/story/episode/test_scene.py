@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import UUID
-
-from pip._internal.resolution.resolvelib import provider
 
 from tangl.core import Graph, Node, CallReceipt
 from tangl.story.episode import Block, Scene
@@ -110,7 +109,7 @@ def test_get_member_blocks_returns_only_blocks() -> None:
     assert members == [block_one, block_two]
 
 
-def test_refresh_ns_for_dependencies() -> None:
+def test_refresh_ns_for_dependencies(trivial_ctx) -> None:
     g = Graph(label="test")
     block = Block(graph=g, label="block")
     companion = Node(graph=g, label="companion")
@@ -126,11 +125,11 @@ def test_refresh_ns_for_dependencies() -> None:
     )
     dependency.requirement.provider = companion
 
-    ns = do_get_ns(block, ctx=None)
+    ns = do_get_ns(block, ctx=trivial_ctx)
     assert ns["companion"] is companion
 
 
-def test_refresh_edge_projections_for_affordances() -> None:
+def test_refresh_edge_projections_for_affordances(trivial_ctx) -> None:
     g = Graph(label="test")
     block = Block(graph=g, label="block")
     provider = Node(graph=g, label="provider")
@@ -145,12 +144,12 @@ def test_refresh_edge_projections_for_affordances() -> None:
         label="service",
     )
     affordance.requirement.provider = block
-    ns = do_get_ns(block, ctx=None)
+    ns = do_get_ns(block, ctx=trivial_ctx)
 
     assert ns["service"] is provider
 
 
-def test_refresh_edge_projections_marks_unsatisfied() -> None:
+def test_refresh_edge_projections_marks_unsatisfied(trivial_ctx) -> None:
     g = Graph(label="test")
     block = Block(graph=g, label="block")
 
@@ -162,11 +161,11 @@ def test_refresh_edge_projections_marks_unsatisfied() -> None:
 
     scene = Scene(graph=g, label="scene", member_ids=[block.uid])
 
-    ns = do_get_ns(block, ctx=None)
+    ns = do_get_ns(block, ctx=trivial_ctx)
     assert "missing" not in ns
 
     requirement.provider = Block(graph=g, label="provider")
-    ns = do_get_ns(block, ctx=None)
+    ns = do_get_ns(block, ctx=trivial_ctx)
     assert "missing" in ns
     assert ns["missing"].get_label() == "provider"
 
@@ -235,17 +234,6 @@ def test_has_forward_progress_softlock() -> None:
     )
 
     assert scene.has_forward_progress(dead_end) is False
-
-from tangl.type_hints import StringMap
-import pytest
-from pydantic import Field, create_model
-_dict_field = StringMap, Field(default_factory=dict)
-
-@pytest.fixture(scope="session")
-def SceneL():
-
-    SceneL = create_model("SceneL", __base__=Scene, locals=_dict_field)
-    return SceneL
 
 def test_scene_namespace_available_during_journal(SceneL) -> None:
     g = Graph(label="test")

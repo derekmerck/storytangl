@@ -15,7 +15,7 @@ from tangl.type_hints import Step
 from tangl.core import StreamRegistry, Graph, Edge, Node, CallReceipt, BaseFragment, BehaviorRegistry
 from tangl.core.entity import Conditional
 from .context import Context
-from .planning import PlanningReceipt
+from .provision import PlanningReceipt
 from .replay import ReplayWatcher, WatchedRegistry, Patch
 
 logger = logging.getLogger(__name__)
@@ -168,25 +168,6 @@ class Frame:
     def cursor(self) -> Node:
         return self.graph.get(self.cursor_id)
 
-    # todo: make frame into a structural domain that passes itself into
-    #       context, that way we get 'local_domain' for free
-
-    # @property
-    # def domain_registry(self) -> AffiliateRegistry:
-    #     # this is a convenience property that creates a registry
-    #     # if self.registries is empty and returns the first.
-    #     if not self.domain_registries:
-    #         self.domain_registries = [Registry()]
-    #     return self.domain_registries[0]
-
-    # @property
-    # def local_domain(self) -> AffiliateDomain:
-    #     local_domain = self.domain_registry.find_one(label="local_domain")
-    #     if local_domain is None:
-    #         local_domain = _FrameLocalDomain(label="local_domain")
-    #         self.domain_registry.add(local_domain)
-    #     return local_domain
-
     def get_preview_graph(self):
         # create a disposable preview graph from the current event buffer
         _graph = deepcopy(self.graph)
@@ -236,33 +217,6 @@ class Frame:
 
         return outcome
 
-    def run_phase_vers1(self, phase: P) -> Any:
-        logger.debug(f'Running phase {phase}')
-
-        self.context.call_receipts.clear()
-
-        for h in self.context.get_handlers(phase=phase):
-            # Do this iteratively and update ctx, so compositors can access piped results
-            receipt = h(self.cursor, ctx=self.context)
-            self.context.call_receipts.append(receipt)
-
-        agg_func, result_type = phase.properties()
-        outcome = agg_func(*self.context.call_receipts)
-
-        logger.debug(f'Ran {len(self.context.call_receipts)} handlers with final outcome {outcome} under {agg_func.__name__}')
-
-        # todo: generic result type checking is complicated with list[Fragment]
-        #       we also potentially have the declared handler result type if any in the receipts
-        # if outcome and isinstance(result_type, type) and not isinstance(outcome, result_type):
-        #     raise RuntimeError(f"Phase {phase} generated a bad result type: {type(outcome)} but expected {result_type}")
-
-        # stash results on the context for review/compositing
-        self.phase_receipts[phase] = copy(self.context.call_receipts)
-        # copy or it will be cleared on next phase
-        self.phase_outcome[phase] = outcome
-
-        return outcome
-
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
 
@@ -279,8 +233,6 @@ class Frame:
         if not self.run_phase(P.VALIDATE):
             logger.debug(f'receipt results: {[r.result for r in self.phase_receipts[P.VALIDATE]]}')
             logger.debug(f'receipt agg: {list(CallReceipt.gather_results(*self.phase_receipts[P.VALIDATE]))}')
-            # for r in self.phase_receipts[P.VALIDATE]:
-            #     logger.debug(f'  {r}')
             raise RuntimeError(f"Proposed next cursor is not valid!")
 
         baseline_state_hash = self.context.initial_state_hash

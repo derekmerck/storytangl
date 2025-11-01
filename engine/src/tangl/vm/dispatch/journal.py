@@ -18,7 +18,6 @@ on_journal  = partial(vm_dispatch.register, task=P.JOURNAL)
 
 @on_journal()
 # todo: we can move this to journal/io when that gets implemented
-# @global_domain.handlers.register(phase=P.JOURNAL, priority=50)
 def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     """Emit a simple textual line describing the current step/cursor (reference output)."""
     step = ctx.step
@@ -27,7 +26,6 @@ def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     return line
 
 @on_journal(priority=Prio.LAST)
-# @global_domain.handlers.register(phase=P.JOURNAL, priority=100)
 def coerce_to_fragments(*_, ctx: Context, **__):
     """Coerce mixed handler outputs into a list of :class:`~tangl.core.fragment.BaseFragment`.  Runs LAST."""
     fragments: list[BaseFragment] = []

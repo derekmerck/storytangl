@@ -1,17 +1,17 @@
 import pytest
 
 from tangl.core import Graph, Node
-from tangl.vm.planning import (
+from tangl.vm.provision import (
     Provisioner,
     Requirement,
     ProvisioningPolicy,
     ProvisionOffer,
     BuildReceipt,
 )
-from tangl.vm.planning.open_edge import Dependency, Affordance
+from tangl.vm.provision.open_edge import Dependency, Affordance
 from tangl.vm.frame import Frame, ResolutionPhase as P
 from tangl.vm.context import Context
-from tangl.vm.planning.simple_planning_handlers import plan_collect_offers, plan_select_and_apply
+# from tangl.vm.dispatch.planning import plan_collect_offers, plan_select_and_apply
 from tangl.core.behavior import CallReceipt
 
 

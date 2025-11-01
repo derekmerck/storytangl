@@ -1,4 +1,4 @@
-# /tangle/core/dispatch/call_receipt.py
+# /tangle/core/behavior/call_receipt.py
 """
 Job receipts
 ------------
@@ -6,15 +6,19 @@ Immutable results returned by handlers. Each receipt is a :class:`~tangl.core.re
 that captures the result payload and optional typing info for validation.
 """
 from __future__ import annotations
-from typing import Any, Self, Optional, Type, Literal, ClassVar, Callable, Iterator
+import itertools
+from typing import Any, Self, Optional, Type, Literal, ClassVar, Callable, Iterator, Mapping, Union
 from enum import Enum
 from uuid import UUID
 from collections import ChainMap
+import logging
 
 from pydantic import Field
 
 from tangl.core.entity import Entity
 from tangl.core.record import Record
+
+logger = logging.getLogger(__name__)
 
 # ----------------------------
 # Receipts and Aggregation
@@ -91,9 +95,15 @@ class CallReceipt(Record):
         return (r.result for r in receipts if r.result is not None)
 
     @classmethod
-    def merge_results(cls, *receipts: Self) -> ChainMap:
-        results = cls.gather_results(*receipts)
-        return ChainMap(*results)
+    def merge_results(cls, *receipts: Self) -> Union[ChainMap, list]:
+        results = list( cls.gather_results(*receipts) )
+        logger.debug(f"Merging results: {results}")
+        if all([isinstance(a, Mapping) for a in results]):
+            return ChainMap(*results)
+        elif all([isinstance(a, list) for a in results]):
+            return list( itertools.chain(*results) )
+        else:
+            raise TypeError(f"Not sure how to merge {results}")
 
     @classmethod
     def first_result(cls, *receipts: Self) -> Any:

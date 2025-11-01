@@ -1,12 +1,10 @@
-from pydantic import create_model, Field
 
-from tangl.type_hints import StringMap
 from tangl.core import Node, Graph, CallReceipt
 from tangl.vm import Requirement
 from tangl.vm.dispatch import do_get_ns
-from tangl.vm.planning import Affordance, Dependency
+from tangl.vm.provision import Affordance, Dependency
 
-def test_dep_in_ns(NodeL, SubgraphL, GraphL):
+def test_dep_in_ns(NodeL, SubgraphL, GraphL, trivial_ctx) -> None:
     g = Graph()
     m = NodeL(graph=g, locals={"foo": 1})  # NodeL's have locals
     n = Node(graph=g)
@@ -25,7 +23,8 @@ def test_dep_in_ns(NodeL, SubgraphL, GraphL):
     assert a in list(g.find_edges(source=m))
     assert a.satisfied and a.source is m
 
-    ns = do_get_ns(m, ctx=None)
+
+    ns = do_get_ns(m, ctx=trivial_ctx)
     print( ns )
     assert 'foo' in ns
     assert 'dep' in ns

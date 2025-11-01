@@ -1,4 +1,4 @@
-# /tangl/core/dispatch/behavior.py
+# /tangl/core/behavior/behavior.py
 """
 Dispatch – Behavior model (v3.7.2)
 

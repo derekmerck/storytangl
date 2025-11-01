@@ -1,3 +1,4 @@
+# tangl/core/dispatch/hooked_registry.py
 from typing import Iterator, Iterable, Self
 import logging
 from functools import partial

@@ -60,7 +60,7 @@ from .traversal import TraversableSubgraph
 from .dispatch import vm_dispatch
 
 # Provisioning
-from .planning import (
+from .provision import (
     Requirement,
     Provisioner,
     Dependency,

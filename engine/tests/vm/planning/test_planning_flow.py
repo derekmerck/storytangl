@@ -10,7 +10,7 @@ from tangl.vm import (
     Affordance,
     ProvisioningPolicy,
 )
-from tangl.vm.planning import PlanningReceipt, BuildReceipt
+from tangl.vm.provision import PlanningReceipt, BuildReceipt
 from tangl.utils.hashing import hashing_func
 
 

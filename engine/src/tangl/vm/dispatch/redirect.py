@@ -15,10 +15,15 @@ if TYPE_CHECKING:
     from tangl.vm.context import Context
 
 @on_prereq(priority=Prio.LATE)
-# @global_domain.handlers.register(phase=P.PREREQS, priority=50)
-def prereq_redirect(caller: Node, *, ctx: Context, **kwargs):
+def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` redirects for PREREQS."""
-    return None
+    ns = ctx.get_ns()
+    for e in cursor.edges_out(is_instance=ChoiceEdge, trigger_phase=P.PREREQS):
+        if e.available(ns):
+            return e
+
+    return
+    # todo: implement descend and ascend in regular follow logic
 
     current_domain = ctx.get_traversable_domain_for_node(caller)
     ns = ctx.get_ns()
@@ -53,7 +58,6 @@ def prereq_redirect(caller: Node, *, ctx: Context, **kwargs):
             return edge
 
 @on_postreq(priority=Prio.LATE)
-# @global_domain.handlers.register(phase=P.POSTREQS, priority=50)
 def postreq_redirect(cursor: Node, *, ctx: Context, **kwargs):
     """Follow the first auto-triggering :class:`~tangl.vm.frame.ChoiceEdge` in POSTREQS."""
     ns = ctx.get_ns()

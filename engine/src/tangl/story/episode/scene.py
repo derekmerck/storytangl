@@ -8,7 +8,7 @@ from tangl.core import Graph, Node
 from tangl.core.behavior import HasBehaviors
 from tangl.vm.dispatch import on_get_ns
 from tangl.vm.traversal import TraversableSubgraph
-from tangl.vm.planning import Affordance, Dependency
+from tangl.vm.provision import Affordance, Dependency
 from ..concepts.actor import Role
 from ..concepts.location import Setting
 

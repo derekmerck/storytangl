@@ -29,3 +29,10 @@ def ledger(graph):
     abc = next( graph.find_nodes(label="abc") )
     return Ledger(graph=graph, cursor_id=abc.uid, records=StreamRegistry())
 
+@pytest.fixture
+def trivial_ctx():
+    class Ctx:
+        def get_active_layers(self):
+            from tangl.vm.dispatch import vm_dispatch
+            return vm_dispatch,
+    return Ctx()

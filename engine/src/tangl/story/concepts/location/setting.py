@@ -4,7 +4,7 @@ from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap, Identifier
 from tangl.core import Graph
-from tangl.vm.planning import Dependency
+from tangl.vm.provision import Dependency
 from tangl.vm import ProvisioningPolicy
 from .location import Location
 

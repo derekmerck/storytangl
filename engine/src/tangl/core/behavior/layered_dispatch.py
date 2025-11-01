@@ -1,4 +1,4 @@
-# tangl/core/dispatch/core_dispatch.py
+# tangl/core/behavior/layered_dispatch.py
 """
 Dispatch Layers
 ---------------
@@ -98,6 +98,7 @@ class LayeredDispatch(BehaviorRegistry):
         layers = {core_dispatch, self}  # self _may_ be core dispatch
         if ctx and hasattr(ctx, "get_active_layers"):
             ctx_layers = ctx.get_active_layers()
+            logger.debug(f"ctx_layers: {ctx_layers}")
             layers.update(ctx_layers)
         if hasattr(caller, "local_behaviors"):
             layers.add(caller.local_behaviors)
@@ -127,4 +128,3 @@ class LayeredDispatch(BehaviorRegistry):
             dry_run=dry_run
         )
         return receipts
-

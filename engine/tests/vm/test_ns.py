@@ -49,9 +49,9 @@ def test_get_ns(NodeL, SubgraphL, GraphL):
 
     import logging
     logging.basicConfig(level=logging.DEBUG)
-    logger.debug(dict(ns))
+    logger.debug(ns)
 
-    assert dict(ns) == {'g_layer': 'present', 'sg_layer': 'present', 'n_layer': 'present'}
+    assert ns == {'g_layer': 'present', 'sg_layer': 'present', 'n_layer': 'present'}
 
     g.locals['x'] = 'graph'
     s.locals['x'] = 'subgraph'
@@ -68,23 +68,11 @@ def test_get_ns(NodeL, SubgraphL, GraphL):
     logger.debug(dict(ns))
     assert ns['w_layer'] == 'present'
 
-    from tangl.vm.planning import Requirement, Dependency, Affordance
+    from tangl.vm.provision import Requirement, Dependency, Affordance
     m = NodeL(graph=g, locals={"foo": "bar"}, label="m")
     r = Requirement(graph=g, provider_id=m.uid)
     dep = Dependency(graph=g, source_id=n.uid, requirement=r, label='dependency')
     assert dep.satisfied
-
-    @on_get_ns()
-    def _contribute_deps_to_ns(caller: Node, ctx=None) -> dict:
-        """Add satisfied dependencies to NS chain."""
-        # Automatically include satisfied dependencies/affordances
-        logger.debug(f"Checking deps on caller {caller!r}")
-        dep_names = {}
-        for edge in caller.graph.find_edges(source=caller, is_instance=(Affordance, Dependency)):
-            logger.debug(f"Checking edge sat on edge {edge!r}")
-            if edge.satisfied:
-                dep_names[edge.get_label()] = edge.destination
-        return dep_names
 
     # todo: should this handler registration go away when it goes out of context?
 

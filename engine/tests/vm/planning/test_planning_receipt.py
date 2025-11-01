@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
-from tangl.vm.planning import BuildReceipt, PlanningReceipt, ProvisioningPolicy
+from tangl.vm.provision import BuildReceipt, PlanningReceipt, ProvisioningPolicy
 
 
 def _build_receipt(*, caller_id, operation, accepted, hard_req=None, reason=None, provider_id=None):

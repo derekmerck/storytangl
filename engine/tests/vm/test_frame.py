@@ -3,7 +3,7 @@ import uuid
 from tangl.core import Node, Graph, CallReceipt, BehaviorRegistry
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm.frame import ResolutionPhase as P, Frame, ChoiceEdge
-from tangl.vm.planning import Requirement, ProvisioningPolicy, Dependency
+from tangl.vm.provision import Requirement, ProvisioningPolicy, Dependency
 
 
 def test_phase_order_is_total_and_strict(frame: Frame):

@@ -8,7 +8,7 @@ from pydantic import Field
 from tangl.core import Graph, Node, Registry
 from tangl.vm import Frame, ResolutionPhase as P, ProvisioningPolicy
 from tangl.vm.context import Context
-from tangl.vm.planning import Dependency, ProvisionOffer, Provisioner, Requirement
+from tangl.vm.provision import Dependency, ProvisionOffer, Provisioner, Requirement
 
 
 class ActorProvisioner(Provisioner):

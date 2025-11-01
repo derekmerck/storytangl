@@ -1,4 +1,4 @@
-# tangl/core/dispatch/behavior_registry.py
+# tangl/core/behavior/behavior_registry.py
 """
 Behavior Registry – dispatch (v3.7.2)
 

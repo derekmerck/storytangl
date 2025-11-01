@@ -23,8 +23,8 @@ Planning
 .. autoclass:: tangl.vm.Provisioner
 .. autoclass:: tangl.vm.Offer
 .. autoclass:: tangl.vm.ProvisionOffer
-.. autoclass:: tangl.vm.planning.BuildReceipt
-.. autoclass:: tangl.vm.planning.PlanningReceipt
+.. autoclass:: tangl.vm.provision.BuildReceipt
+.. autoclass:: tangl.vm.provision.PlanningReceipt
 
 .. _vm-replay:
 

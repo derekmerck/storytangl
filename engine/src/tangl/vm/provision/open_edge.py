@@ -14,7 +14,7 @@ from typing import Generic
 from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap, Identifier
-from tangl.core.graph import Edge, Graph
+from tangl.core.graph import Edge, Graph, Node
 from .requirement import Requirement, NodeT, ProvisioningPolicy
 
 
@@ -72,6 +72,10 @@ class Dependency(Edge, Generic[NodeT]):
 
     def satisfied_by(self, other: NodeT) -> bool:
         return self.requirement.satisfied_by(other)
+
+    @classmethod
+    def get_dependencies(cls, node: Node, **criteria):
+        return node.edges_out(is_instance=Dependency, **criteria)
 
 
 

@@ -31,7 +31,7 @@ def test_structural_domain_vars_include_dependencies():
     villain = Actor_(graph=g, name="Dark Lord", archetype="villain")
 
     assert role.satisfied_by(villain)
-    from tangl.vm.planning import Dependency, Affordance
+    from tangl.vm.provision import Dependency, Affordance
     assert role in block.edges_out(is_instance=(Dependency, Affordance))
 
     # scene.add_member(block)

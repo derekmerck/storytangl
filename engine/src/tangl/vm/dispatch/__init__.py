@@ -1,4 +1,4 @@
-# application layer dispatch:  global > *app* > author > inline
+# vm system layer dispatch:  global > *system* > application > author > inline
 """
 Reference phase handlers for validation, redirects, and journaling.
 
@@ -19,6 +19,7 @@ from .vm_dispatch import vm_dispatch
 
 from .namespace import on_get_ns, do_get_ns, Namespace
 from .validate import on_validate, HasConditions
+from .planning import on_planning, on_get_provisioners, do_get_provisioners
 from .update import on_update, on_finalize, HasEffects
 from .redirect import on_prereq, on_postreq
 from .journal import on_journal
