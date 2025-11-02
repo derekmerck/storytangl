@@ -49,40 +49,57 @@ scenes:
 ### 2. Load and Play
 
 ```python
-from tangl.compiler.script_manager import ScriptManager
-from tangl.story.fabula.world import World
 import yaml
 
-# Load script
+from tangl.core import StreamRegistry
+from tangl.story.fabula.script_manager import ScriptManager
+from tangl.story.fabula.world import World
+from tangl.vm.frame import ChoiceEdge
+from tangl.vm.ledger import Ledger
+
+# Load script data (inline or from disk)
 with open("my_story.yaml") as f:
     data = yaml.safe_load(f)
 
-# Create world
-sm = ScriptManager.from_data(data)
-world = World(label="my_world", script_manager=sm)
+# Compile and register a world singleton
+script = ScriptManager.from_data(data)
+world = World(label="my_world", script_manager=script)
 
-# Create story instance
-story = world.create_story("player_story")
+# Materialize the story graph and bootstrap a ledger
+story_graph = world.create_story("player_story")
+ledger = Ledger(
+    graph=story_graph,
+    cursor_id=story_graph.cursor.cursor_id,
+    records=StreamRegistry(),
+)
+ledger.push_snapshot()
+ledger.init_cursor()
 
-# Navigate
-frame = story.cursor
-print(frame.journal())
+# Inspect the current cursor and available choices
+frame = ledger.get_frame()
+choices = [
+    edge
+    for edge in ledger.graph.find_edges(source_id=ledger.cursor_id)
+    if isinstance(edge, ChoiceEdge)
+]
+for index, edge in enumerate(choices):
+    label = getattr(edge, "text", edge.label)
+    print(f"{index}. {label} → {edge.uid}")
 
-actions = frame.get_available_actions()
-for i, action in enumerate(actions):
-    print(f"{i}. {action.text}")
-
-# Make choice
-frame.traverse_to(0)
+# Resolve a choice (updates frame + ledger state)
+if choices:
+    frame.resolve_choice(choices[0])
+    ledger.cursor_id = frame.cursor_id
+    ledger.step = frame.step
 ```
 
 ### 3. CLI Usage
 
 ```bash
-$ tangl-cli
-> load_script my_story.yaml
-> story
-> do 0
+$ PYTHONPATH=engine/src:apps/cli/src python -m tangl.cli
+⅁$ load_script my_story.yaml
+⅁$ story
+⅁$ do 0
 ```
 
 ---
@@ -115,17 +132,19 @@ At scale, Tangl can be hosted as a **multi-world server**:
 
 ### Install with `pip`
 
-Install and run a tangl story server on port 8000.
+Install and run a Tangl story server on port 8000.
 ```bash
 $ pip install storytangl
-$ tangl-serve
+$ python -m tangl.rest
 ```
-or run a story from the command-line interface (CLI).
+or run the command-line interface (CLI).
 ```bash
-$ tangl-cli
+$ python -m tangl.cli
 ```
 
-(Currently distributing on PyPI-testing.)
+(Currently distributing on PyPI-testing. When working from a source checkout,
+set ``PYTHONPATH=engine/src:apps/cli/src:apps/server/src`` before running the
+module entry points.)
 
 ### From source
 
@@ -137,7 +156,7 @@ $ cd storytangl
 $ git lfs pull
 $ pip install poetry
 $ poetry install --only main
-$ tangl-serve
+$ PYTHONPATH=engine/src:apps/server/src python -m tangl.rest
 ```
 
 ### Keep the docs green
@@ -157,6 +176,15 @@ You can always trigger the same check manually with `poetry run sphinx-build -b 
 
 The git repo includes a Dockerfile for the reference app that can be used as
 a quick-start on a PAAS environment.
+
+### Known issues
+
+- The packaged entry points in ``pyproject.toml`` still target the legacy
+  ``tangl.apps`` namespace (``tangl.apps.cli.__main__`` and
+  ``tangl.apps.rest.__main__``), but the current sources ship the CLI and REST
+  server under ``tangl.cli`` and ``tangl.rest`` respectively. Until the
+  entry-point definitions are updated, invoke them via ``python -m tangl.cli``
+  or ``python -m tangl.rest`` as shown above.【F:pyproject.toml†L23-L32】【F:apps/cli/src/tangl/cli/__main__.py†L1-L12】【F:apps/server/src/tangl/rest/__main__.py†L1-L17】
 
 ```bash
 $ docker build . -t storytangl:4

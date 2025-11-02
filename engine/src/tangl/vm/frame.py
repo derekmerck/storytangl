@@ -50,8 +50,8 @@ class Frame:
 
     Key Features
     ------------
-    * **Context management** – builds :class:`~tangl.vm.context.Context` (and thus
-      :class:`~tangl.core.domain.scope.Scope`) lazily and invalidates it on moves.
+    * **Context management** – builds :class:`~tangl.vm.context.Context` lazily,
+      injecting layered behavior registries and invalidating them on moves.
     * **Phase execution** – :meth:`run_phase` discovers handlers via scope and
       reduces their :class:`~tangl.core.dispatch.call_receipt.CallReceipt` outputs.
     * **Event sourcing (optional)** – when ``event_sourced=True``, applies changes
@@ -72,8 +72,7 @@ class Frame:
     The orchestrator should snapshot/commit via the ledger after resolution ends.
     """
     # Frame manages Context (graph, cursor) and the Phase bus
-    # Context manages Scope (capabilities over active domain layers)
-    # Scope is inferred from Graph, cursor node, latent domains
+    # Context manages layered behavior registries for active domains
     graph: Graph
     cursor_id: UUID
     step: Step = 0

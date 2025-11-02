@@ -11,11 +11,11 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 - Chronological tooling such as “story time vs discourse time,” temporal edges, and consequence propagation give us vocabulary for domain handlers that manage non-linear traversal within the phase pipeline.【F:engine/src/tangl/story/notes.md†L19-L53】
 
 ### Structural nodes
-- Scenes aggregate blocks, roles, and settings, expose local context, and gate traversal on casting/scouting hooks.【F:engine/src/tangl/story/episodic_process/scene.py†L1-L87】 In the modern engine these behaviors belong in structural domain handlers layered on top of `core.graph.Node` subclasses that participate in VM phases (validation, planning, journal, finalize).
+- Scenes aggregate blocks, roles, and settings, expose local context, and gate traversal on casting/scouting hooks.【F:engine/src/tangl/story/episode/scene.py†L1-L120】 In the modern engine these behaviors belong in structural domain handlers layered on top of `core.graph.Node` subclasses that participate in VM phases (validation, planning, journal, finalize).
 - Scratch prototypes show companion patterns: scenes exposing child maps, automatic continuation to entry blocks, and dot-access of sub-elements for scripting.【F:scratch/legacy/story/story-32/scene.py†L1-L58】 These patterns can be reintroduced via scope helpers or `vm.Context` accessors rather than bespoke magic methods.
 
 ### Resource nodes and affordances
-- Actors remain resource nodes that provide context, while `Role` edges act as dependency placeholders that can search, instantiate, or clone actors before traversal.【F:engine/src/tangl/story/fabula/actor/actor.py†L13-L40】【F:engine/src/tangl/story/fabula/actor/role.py†L1-L80】
+- Actors remain resource nodes that provide context, while `Role` edges act as dependency placeholders that can search, instantiate, or clone actors before traversal.【F:engine/src/tangl/story/concepts/actor/actor.py†L1-L89】【F:engine/src/tangl/story/concepts/actor/role.py†L1-L120】
 - This aligns with the current dependency handling in `vm.planning`: roles become specialized `DependencyEdge` derivatives whose planning handlers resolve `successor` references, while actors themselves can just extend `core.entity.Entity` or `core.graph.Node` with tags.
 
 ### Narrative lifecycle hooks
@@ -23,7 +23,7 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 
 ### Salvageable pieces
 - Keep the taxonomy (books/acts/scenes, events, roles/settings/props, narrative contracts, tension/emotional beats) as domain-specific registries layered onto the generic graph. They become data schemas + handler bundles rather than bespoke base classes.
-- Legacy world and controller APIs hint at service endpoints for listing worlds, creating stories, and retrieving media.【F:engine/src/tangl/service/controllers/runtime_controller.py†L1-L116】【F:engine/src/tangl/story/story_domain/world_controller.py†L1-L117】 These remain relevant for `service` integration once story orchestration stabilizes on the VM contracts.
+- Legacy world and controller APIs hint at service endpoints for listing worlds, creating stories, and retrieving media.【F:engine/src/tangl/service/controllers/runtime_controller.py†L1-L134】【F:engine/src/tangl/service/controllers/world_controller.py†L1-L116】 These remain relevant for `service` integration once story orchestration stabilizes on the VM contracts.
 
 ## Mechanics Layer Concepts
 
@@ -35,7 +35,7 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 - Outfit and ornament managers already depend on a `BodyRegion` ontology for coverage logic.【F:engine/src/tangl/mechanics/look/notes.md†L20-L22】 We can represent this as tagged entities and handler policies executed in `vm.planning` and `vm.update` phases.
 
 ### Progression, games, credentials
-- Credential gameplay prototypes detail rule-driven inspections, limited interaction verbs, and day-by-day rule changes reminiscent of a constraint puzzle.【F:scratch/mechanics/credentials/notes.md†L1-L83】 These align with `vm.planning` (rule evaluation) and `vm.update` (state mutations), while journal/media output capture the player's decisions.
+- Credential gameplay prototypes detail rule-driven inspections, limited interaction verbs, and day-by-day rule changes reminiscent of a constraint puzzle.【F:scratch/mechanics/credentials/notes.md†L1-L83】 These align with the behavior hooks exposed by `tangl.vm.dispatch` (planning/update tasks), while journal/media output capture the player's decisions.【F:engine/src/tangl/vm/dispatch/__init__.py†L1-L23】
 - Other mechanics (progression, crafting, sandbox) can be reimagined as domain registries that attach extra affordances (new choice edges, stat checks, resource synthesis) by registering handlers for specific node or resource types.
 
 ## Media Layer Concepts
@@ -46,7 +46,7 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 
 ### Salvageable pieces
 - Reuse the vocabulary and spec interfaces: `MediaDependency` stays a dependency edge with optional template/path/data inputs; `MediaSpec` instances become the forge contracts; provisioners remain dispatch registries hooking into planning.
-- Media controllers in story/world API wrappers can survive as service endpoints once the runtime surface area is finalized.【F:engine/src/tangl/service/controllers/runtime_controller.py†L1-L116】【F:engine/src/tangl/story/story_domain/world_controller.py†L87-L111】
+- Media controllers in story/world API wrappers can survive as service endpoints once the runtime surface area is finalized.【F:engine/src/tangl/service/controllers/runtime_controller.py†L1-L134】【F:engine/src/tangl/service/controllers/world_controller.py†L1-L116】
 
 ## Protocol and Overview Blueprints
 
@@ -63,7 +63,7 @@ This document surveys the historical `tangl.story`, `tangl.mechanics`, and `tang
 
 1. **Treat legacy data classes as schemas.** Convert story/mechanics/media script models into Pydantic models that populate `core.graph.Graph` nodes and edges. Handlers become domain registrations rather than methods on bespoke subclasses.
 2. **Leverage `vm.Frame` phases.** Map lifecycle hooks to the eight phases (`VALIDATE` for availability gates, `PLANNING` for dependency resolution like casting roles or provisioning media, `UPDATE` for stateful mechanics such as crafting outcomes, `JOURNAL`/`FINALIZE` for content fragments and replay patches).【F:engine/src/tangl/vm/frame.py†L1-L121】
-3. **Namespace capabilities with domains.** Mechanics like look, progression, or credentials become `AffiliateDomain` implementations registered on relevant nodes/resources so that `vm.Context` activates them only when the cursor is within their scope.【F:engine/src/tangl/vm/frame.py†L1-L121】
+3. **Namespace capabilities with behavior layers.** Mechanics like look, progression, or credentials should register handlers on behavior registries attached to the active frame/context so they activate only when the cursor is within their scope.【F:engine/src/tangl/vm/frame.py†L1-L200】【F:engine/src/tangl/vm/context.py†L1-L147】【F:engine/src/tangl/core/behavior/behavior_registry.py†L1-L189】
 4. **Represent resources as registries of entities.** Actors, locations, items, credentials, and media tags extend `core.entity.Entity` and live in `core.registry.Registry` instances. Dependency edges (roles, media deps, crafting recipes) remain `vm`-aware edges that resolve to concrete entities during planning.
 5. **Expose services via thin controllers.** The story/world controller patterns can wrap the orchestrator and media registries, delegating to `core`/`vm` functionality while enforcing access levels. This keeps the API surface similar to the legacy service layer without reintroducing tight coupling.
 
