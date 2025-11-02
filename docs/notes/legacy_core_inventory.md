@@ -30,12 +30,12 @@ flowchart LR
             Scope -- layers --> Domain
             Scope -- aggregates --> Handler
         end
-        subgraph Dispatch
-            Handler -- extends --> Entity
-            DispatchRegistry -- extends --> Registry
-            DispatchRegistry -- yields --> Handler
-            JobReceipt -- extends --> Entity
-            Handler -- produces --> JobReceipt
+        subgraph Behavior
+            Behavior -- extends --> Entity
+            BehaviorRegistry -- extends --> Registry
+            BehaviorRegistry -- yields --> Behavior
+            CallReceipt -- extends --> Entity
+            Behavior -- produces --> CallReceipt
         end
         subgraph Records
             Record -- extends --> Entity
@@ -50,18 +50,17 @@ flowchart LR
     subgraph tangl.vm
         ResolutionPhase --> Frame
         Frame -- builds --> Context
-        Context -- caches --> Scope
-        Context -- iterates --> Handler
-        PlanningReceipt -- aggregates --> JobReceipt
+        Context -- caches --> Namespace
+        Context -- merges --> BehaviorRegistry
+        PlanningReceipt -- aggregates --> CallReceipt
     end
 
     Frame -- writes --> StreamRegistry
-    Frame -- consults --> DispatchRegistry
-    AffiliateDomain -- registers --> DispatchRegistry
-    Scope -- queries --> DispatchRegistry
+    Frame -- consults --> LayeredDispatch
+    LayeredDispatch -- chains --> BehaviorRegistry
 ```
 
-The diagram updates the `notes_v34` system map to the current packages: entities sit at the core, graphs reuse registries, domains stack into scopes, and the VM’s frame/context pair invokes handlers across the phase bus while journaling to record streams.【F:scratch/overviews/notes_v34.md†L5-L97】【F:engine/src/tangl/core/entity.py†L24-L147】【F:engine/src/tangl/core/graph/node.py†L11-L62】【F:engine/src/tangl/core/domain/domain.py†L14-L47】【F:engine/src/tangl/core/domain/affiliate.py†L1-L41】【F:engine/src/tangl/core/domain/scope.py†L1-L104】【F:engine/src/tangl/core/dispatch/dispatch_registry.py†L1-L84】【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/vm/frame.py†L1-L200】【F:engine/src/tangl/vm/context.py†L1-L114】【F:engine/src/tangl/vm/planning/__init__.py†L1-L15】
+The diagram updates the `notes_v34` system map to the current packages: entities sit at the core, graphs reuse registries, behavior registries layer capabilities, and the VM’s frame/context pair invokes handlers across the phase bus while journaling to record streams.【F:scratch/overviews/notes_v34.md†L5-L97】【F:engine/src/tangl/core/entity.py†L24-L147】【F:engine/src/tangl/core/graph/node.py†L11-L62】【F:engine/src/tangl/core/behavior/behavior_registry.py†L1-L189】【F:engine/src/tangl/core/behavior/layered_dispatch.py†L1-L40】【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/vm/frame.py†L1-L200】【F:engine/src/tangl/vm/context.py†L1-L120】【F:engine/src/tangl/vm/dispatch/__init__.py†L1-L21】
 
 ## How handler dispatch evolved
 
@@ -106,29 +105,29 @@ The diagram updates the `notes_v34` system map to the current packages: entities
 
 ## Mapping to the modern architecture
 
-- `DispatchRegistry` in `tangl.core.dispatch` is the modern successor to the legacy handler
+- `BehaviorRegistry` in `tangl.core.behavior` is the modern successor to the legacy handler
   pipelines: it keeps deterministic ordering, decorator registration, and batch execution
-  that now emit `JobReceipt` objects for auditing.【F:engine/src/tangl/core/dispatch/dispatch_registry.py†L1-L82】
+  while yielding :class:`~tangl.core.behavior.call_receipt.CallReceipt` records for auditing.【F:engine/src/tangl/core/behavior/behavior_registry.py†L1-L189】
 - `tangl.vm.Frame` formalizes the phase ladder (VALIDATE → PLANNING → … → FINALIZE) and
   applies the correct reducer for each, letting domains plug handlers into granular
   phases instead of monolithic enter routines.【F:engine/src/tangl/vm/frame.py†L23-L200】
 - `tangl.vm.Context` centralizes namespace assembly, scope inference, deterministic RNG,
-  and handler lookup—capabilities the old `HasContext`/graph mixins provided ad-hoc.【F:engine/src/tangl/vm/context.py†L1-L114】
+  and handler lookup—capabilities the old `HasContext`/graph mixins provided ad-hoc.【F:engine/src/tangl/vm/context.py†L1-L147】
 - Modern `tangl.core.entity.Entity` preserves the portable-ID mindset while expanding the
   identifier/matching helpers, giving us a compatible foundation for reviving registry-
   driven behaviors.【F:engine/src/tangl/core/entity.py†L1-L115】
 
 ## Protocol-driven surfaces worth preserving
 
-- The protocol specs captured expectations for singleton worlds, story factories, traversal nodes, and handler slots, spelling out serialization hooks and cascading namespaces for every object.【F:scratch/protocols/protocols-26.py†L23-L200】 Those same responsibilities now land on `Domain`/`Scope` stacks and VM context helpers instead of bespoke mixins.【F:engine/src/tangl/core/domain/scope.py†L1-L104】【F:engine/src/tangl/vm/context.py†L1-L114】
+- The protocol specs captured expectations for singleton worlds, story factories, traversal nodes, and handler slots, spelling out serialization hooks and cascading namespaces for every object.【F:scratch/protocols/protocols-26.py†L23-L200】 Those same responsibilities now land on layered behavior registries and VM context helpers instead of bespoke mixins.【F:engine/src/tangl/core/behavior/layered_dispatch.py†L1-L40】【F:engine/src/tangl/vm/context.py†L1-L147】
 - Traversable mixins combined predicate tests, effect execution, and rendering in one method; porting them requires registering separate handlers for VM phases so audit receipts stay granular.【F:scratch/protocols/protocols-26.py†L117-L160】【F:engine/src/tangl/vm/frame.py†L23-L140】
-- Protocol emphasis on templated instantiation and streamable responses aligns with `StreamRegistry` journaling and `DispatchRegistry` pipeline receipts, helping reintroduce service APIs without rebuilding the monolith.【F:scratch/protocols/protocols-26.py†L10-L200】【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/core/dispatch/dispatch_registry.py†L1-L84】
+- Protocol emphasis on templated instantiation and streamable responses aligns with `StreamRegistry` journaling and behavior receipts, helping reintroduce service APIs without rebuilding the monolith.【F:scratch/protocols/protocols-26.py†L10-L200】【F:engine/src/tangl/core/record.py†L31-L168】【F:engine/src/tangl/core/behavior/behavior_registry.py†L1-L189】
 
 ## Gaps worth resurrecting
 
 1. **Templated rendering & journaling hooks** – Port the Jinja-enabled rendering pipeline
    into a journaling domain that runs during `ResolutionPhase.JOURNAL`, reusing
-   `DispatchRegistry` receipts so fragments stay auditable.【F:scratch/legacy/core/core-34/services/rendering.py†L23-L115】【F:engine/src/tangl/vm/frame.py†L23-L200】
+   behavior receipts so fragments stay auditable.【F:scratch/legacy/core/core-34/services/rendering.py†L23-L115】【F:engine/src/tangl/vm/frame.py†L23-L200】
 2. **Predicate / effect evaluation** – Reintroduce sandboxed `eval`/`exec` helpers as
    planning/update domains. Results can be wrapped in `JobReceipt` data so VM phases keep
    a trail of expressions that were run.【F:scratch/legacy/core/core-34/services/runtime_object.py†L14-L57】【F:engine/src/tangl/vm/frame.py†L48-L68】
@@ -140,9 +139,9 @@ The diagram updates the `notes_v34` system map to the current packages: entities
    can continue to assemble scopes deterministically like the legacy `ancestors`
    calculations did.【F:scratch/legacy/core/core-32/graph/node.py†L136-L199】【F:engine/src/tangl/vm/context.py†L86-L114】
 5. **Phase receipts as diagnostics** – The legacy service receipts logged aggregator mode
-   and handler ordering; we can revive that ergonomics by enriching `JobReceipt`
-   payloads or adding optional debug fragments during FINALIZE for easier spelunking when
-   revisiting older behaviors.【F:scratch/legacy/core/core-34/dispatch/handler_registry.py†L18-L195】【F:engine/src/tangl/core/dispatch/dispatch_registry.py†L17-L82】
+   and handler ordering; we can revive that ergonomics by enriching behavior
+   receipts or adding optional debug fragments during FINALIZE for easier spelunking when
+   revisiting older behaviors.【F:scratch/legacy/core/core-34/dispatch/handler_registry.py†L18-L195】【F:engine/src/tangl/core/behavior/behavior_registry.py†L95-L189】
 
 Capturing these patterns gives us a roadmap for rebuilding missing behaviors on top of the
 current phase bus without regressing to the monolithic handler stacks of earlier versions.

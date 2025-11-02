@@ -1,21 +1,17 @@
 `tangl.mechanics`
 =================
 
-`tangl.mechanics` is a _namespace_ package for story-related concepts that _extend_ or _combine_ concept and episode nodes along with media and discourse controllers.
+`tangl.mechanics` is a _namespace_ package for story-related concepts that _extend_ or _combine_ concept and episode nodes along with media and discourse controllers. In the current codebase only the **demographics** helpers ship as live modules; the remaining bullet points are legacy planning notes that still need implementation.
 
-- **Sandbox**: a Scene wrapper for map-based choices and scheduled events, and an Actor wrapper for peripatetic mob's
-
-- **Progression**: a tiny-rpg stat progression system and a Block wrapper for stat-challenges
-
-- **Game**: an interactive component and Block wrapper for interactive games, a generic framework for longer stateful interactions
-- **Credentials**: a multi-stage asset-based game framework similar to Pope's "Papers, Please", includes Credentials and Extras (generic Actors) generation by indication
-
-- **Demographic**: a parametric regional/ethnic name generator
-- **Look**: a manager for common references to a character's style and appearance, along with adapters to narrative description and media creation params
-- **Wearable**: assets and a state manager for removable clothes
-- **Ornaments**: tattoos and other permanent decorations
-
-- **Crafting**: recipes for combining assets to generate other assets
+- **Demographics**: a parametric regional/ethnic name generator used by `Player` and other concept nodes.【F:engine/src/tangl/mechanics/demographics/__init__.py†L1-L35】【F:engine/src/tangl/story/concepts/player.py†L9-L49】
+- **Sandbox** *(planned)*: a Scene wrapper for map-based choices and scheduled events, plus an Actor wrapper for peripatetic mobs.
+- **Progression** *(planned)*: a tiny-RPG stat progression system and a Block wrapper for stat challenges.
+- **Game** *(planned)*: an interactive component and Block wrapper for longer-form game loops.
+- **Credentials** *(planned)*: a multi-stage asset-based game framework similar to Pope's "Papers, Please", including credential/extras generation.
+- **Look** *(planned)*: a manager for character style and appearance with adapters to narrative description and media creation params.
+- **Wearable** *(planned)*: assets and a state manager for removable clothes.
+- **Ornaments** *(planned)*: tattoos and other permanent decorations.
+- **Crafting** *(planned)*: recipes for combining assets to generate other assets.
 
 ## Future Thoughts
 

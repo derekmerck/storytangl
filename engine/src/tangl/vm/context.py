@@ -33,17 +33,17 @@ class Context:
 
     Why
     ----
-    Centralizes the data needed to resolve one step—graph, cursor, registries,
-    and a deterministic RNG—while caching the derived :class:`~tangl.core.Scope`.
-    Handlers read from context; :class:`~tangl.vm.Frame` is responsible for
-    sequencing phases and writing records.
+    Centralizes the data needed to resolve one step—graph, cursor, layered
+    behavior registries, and a deterministic RNG. Handlers read from context;
+    :class:`~tangl.vm.Frame` is responsible for sequencing phases and writing
+    records.
 
     Key Features
     ------------
     * **Frozen** – safe to pass across phases; graph may be a watched proxy when event‑sourcing.
     * **Deterministic RNG** – :attr:`rand` is stable per ``(graph, cursor, step)``.
-    * **Cached scope** – computed once from :attr:`graph`, :attr:`cursor_id`, and
-      :attr:`domain_registries`.
+    * **Layered behaviors** – :attr:`local_behaviors` caches ad-hoc handlers while
+      :attr:`active_layers` inject application/system registries.
     * **Receipts** – :attr:`call_receipts` buffers per‑phase results for reducers.
     * **State hash** – :attr:`initial_state_hash` guards patch application.
 
@@ -52,8 +52,8 @@ class Context:
     - :attr:`graph` – working :class:`~tangl.core.Graph` (may be watched).
     - :attr:`cursor` – resolved :class:`~tangl.core.Node`.
     - :attr:`step` – integer step index used in journaling and RNG seed.
-    - :attr:`domain_registries` – registries of :class:`~tangl.core.domain.AffiliateDomain`.
-    - :attr:`scope` – cached :class:`~tangl.core.Scope`.
+    - :attr:`local_behaviors` – per-frame registry for inline handlers.
+    - :attr:`active_layers` – iterable of :class:`~tangl.core.behavior.BehaviorRegistry`.
     - :attr:`rand` – :class:`random.Random` seeded for replay.
     - :meth:`get_ns` – return merged namespace.
     - :meth:`get_handlers` – iterate handlers matching criteria (e.g., ``phase=…``).
