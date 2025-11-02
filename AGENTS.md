@@ -61,10 +61,10 @@ core ideas you should understand before contributing.
   artifacts capturing story state and playback.
 - **Fragments** (`tangl.core.fragment`): narrative output payloads that the UI or
   downstream systems consume.
-- **Handler & DispatchRegistry** (`tangl.core.dispatch`): behavior pipeline that
+- **Behavior & Dispatch** (`tangl.core.dispatch`): behavior pipeline that
   wraps and sequences callable actions while auditing results.
-- **Domain & Scope** (`tangl.core.domain`): capability layering and namespace
-  resolution for story nodes.
+- **Virtual Machine** (`tangl.vm`): Interpreter loop for evaluating and evolving 
+  graph state.
 - **Orchestrator** (`tangl.service.Orchestrator`): registers controller endpoints
   and hydrates `User`, `Ledger`, and `Frame` dependencies based on type hints.
   Applications should invoke controller logic via the orchestrator instead of the
