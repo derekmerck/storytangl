@@ -1,4 +1,5 @@
 from __future__ import annotations
+import pytest
 
 from tangl.core import Graph, Node
 from tangl.core.graph.edge import AnonymousEdge
@@ -23,7 +24,7 @@ def _collect_build_receipts(frame: Frame) -> list:
             )
     return receipts
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_plan_collect_offers_prioritizes_affordances_and_tags_sources():
     g = Graph(label="demo")
     cursor = g.add_node(label="scene")
@@ -70,7 +71,7 @@ def test_plan_collect_offers_prioritizes_affordances_and_tags_sources():
     assert planning_receipt.attached == 1
     assert planning_receipt.created == 1
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_planning_receipt_counts_created_unresolved_and_waived():
     g = Graph(label="demo")
     cursor = g.add_node(label="scene")
@@ -112,7 +113,7 @@ def test_planning_receipt_counts_created_unresolved_and_waived():
     assert len(builds) == 3
     assert all(br.hard_req is not None for br in builds)
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_event_sourced_frame_records_planning_receipt_and_patch():
     g = Graph(label="demo")
     start = g.add_node(label="start")

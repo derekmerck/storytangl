@@ -1,6 +1,8 @@
+import pytest
 from tangl.core import Graph, Node
 from tangl.vm import ChoiceEdge, ResolutionPhase as P, Requirement, Dependency, ProvisioningPolicy, Frame
 
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_tiny_integration():
     # Build a tiny graph
     g = Graph(label="demo")

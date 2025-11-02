@@ -23,7 +23,8 @@ def prereq_redirect(cursor: Node, *, ctx: Context, **kwargs):
             return e
 
     return
-    # todo: implement descend and ascend in regular follow logic
+    # todo: implement descend and ascend in regular follow logic, this belongs in
+    #       traversal/traversable-domain
 
     current_domain = ctx.get_traversable_domain_for_node(caller)
     ns = ctx.get_ns()

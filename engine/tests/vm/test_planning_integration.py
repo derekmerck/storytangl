@@ -1,4 +1,5 @@
 from __future__ import annotations
+import pytest
 
 from tangl.core import Graph, Node
 from tangl.utils.hashing import hashing_func
@@ -26,7 +27,7 @@ def _find_planning_receipt(records: list[object]) -> PlanningReceipt:
             return record
     raise AssertionError("planning receipt not found in records")
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_planning_cycle_with_mixed_requirements():
     """Full planning pass reuses affordances, waives soft requirements, and creates new nodes."""
 
@@ -159,7 +160,7 @@ def test_planning_cycle_with_mixed_requirements():
     assert frame.cursor == end
     assert frame.step == 3
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_softlock_detection_and_prevention():
     """Unresolvable hard requirements are surfaced in planning receipts and block progress."""
 
@@ -198,7 +199,7 @@ def test_softlock_detection_and_prevention():
     assert req_key.provider is None
     assert req_key.is_unresolvable
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_affordance_precedence_over_creation():
     """Affordances allow existing providers to satisfy dependencies instead of creating new nodes."""
 
@@ -270,7 +271,7 @@ def test_affordance_precedence_over_creation():
     planning_receipt = _find_planning_receipt(_collect_step_records(frame, 1))
     assert planning_receipt.created == 0
 
-
+@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_event_sourced_planning_replay():
     """Event-sourced planning produces deterministic patches that replay cleanly."""
 

@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 get_dependencies = Dependency.get_dependencies
 # todo: this should check that each dependency label is used only once per node
 
+# todo: we also need to guarantee that at least **one** selectable edge
+#       to a provisioned and available node exists on the frontier.
+
 # --------------------------
 # on-get provisioners helper
 
@@ -74,10 +77,12 @@ def _sort_offers(offers: list[ProvisionOffer],
                  provisioners: list[Provisioner]) -> list[ProvisionOffer]:
     """
     Sort offers by:
-    1. Priority (higher first) - from provisioner
-    2. Proximity (closer first) - from provisioner's location
-    3. Cost (lower first) - from offer
+    1. Proximity (closer first) - from provisioner's location
+    2. Cost (lower first) - from offer
     """
+    # todo: include provisioner layer as sort key?  Sort using dispatch sort?
+    #       this _is_ a kind of filtered dispatch...
+
     prov_ids = [p.uid for p in provisioners]
 
     def prox(o: ProvisionOffer):

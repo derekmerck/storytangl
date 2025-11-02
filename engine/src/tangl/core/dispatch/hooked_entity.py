@@ -21,6 +21,6 @@ class HookedEntity(Entity):
 
     @classmethod
     def structure(cls, data: StringMap) -> Self:
-        receipts = core_dispatch.dispatch(data, ctx=None, task="init")
+        receipts = core_dispatch.dispatch(data, ctx=None, task="create")
         data = CallReceipt.gather_results(*receipts)
         return super().structure(data)

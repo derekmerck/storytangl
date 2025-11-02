@@ -77,7 +77,6 @@ class Frame:
     graph: Graph
     cursor_id: UUID
     step: Step = 0
-    # domain_registries: list[AffiliateRegistry] = field(default_factory=list)
 
     local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
     # SYSTEM, APPLICATION, AUTHOR layers
@@ -232,6 +231,10 @@ class Frame:
                 raise RuntimeError(f"Proposed postreq jump is not a valid edge {type(nxt)}!")
 
         return None
+
+        # todo: should store two patches per tick, pre-projection, post-projection,
+        #       so projection can be reproduced on replay under different handlers,
+        #       for example?
 
     def resolve_choice(self, choice: ChoiceEdge) -> None:
         """
