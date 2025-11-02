@@ -16,6 +16,8 @@ from uuid import UUID
 
 from tangl.core.graph import Edge, Node
 
+from .requirement import ProvisioningPolicy
+
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard
     from tangl.vm.context import Context
     from .open_edge import Affordance, Dependency
@@ -132,6 +134,7 @@ class DependencyOffer:
     dependency_id: Optional[UUID]
     cost: ProvisionCost
     acceptor: DependencyAcceptor = field(repr=False)
+    operation: ProvisioningPolicy = ProvisioningPolicy.EXISTING
     layer_id: Optional[UUID] = None
     source_provisioner_id: Optional[UUID] = None
     proximity: Optional[int] = None
