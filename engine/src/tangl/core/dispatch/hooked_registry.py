@@ -9,6 +9,7 @@ from tangl.core.behavior.call_receipt import CallReceipt
 from tangl.core.behavior.has_behaviors import HasLocalBehaviors
 from tangl.core.behavior.layered_dispatch import ContextP
 from .core_dispatch import core_dispatch
+from .hooked_entity import HookedEntity
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 on_index  = partial(core_dispatch.register, task="index")   # add item to registry (reg, item)
 
 # Example of feature hooks in multiple layers
-class HookedRegistry(Registry, HasLocalBehaviors):
+class HookedRegistry(Registry, HookedEntity, HasLocalBehaviors):
 
     def do_index(self: Self, item: Entity, *, ctx: ContextP = None, extra_handlers=None, **kwargs) -> Iterator[CallReceipt]:
         # Convenience entry-point
