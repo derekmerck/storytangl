@@ -304,11 +304,23 @@ class FuncInfo:
 
         # === STEP 4: Consolidated refinement using explicitness and relationships ===
         # Flip based on explicit owner/owner_cls intent
-        if (explicit_owner or explicit_owner_cls):
+        def _owner_matches_caller() -> bool:
+            if not (isinstance(owner_cls, type) and isinstance(caller_cls, type)):
+                return False
+            try:
+                return issubclass(owner_cls, caller_cls) or issubclass(caller_cls, owner_cls)
+            except TypeError:
+                return False
+
+        owner_matches_caller = _owner_matches_caller()
+
+        if explicit_owner or explicit_owner_cls:
             if handler_type == HandlerType.CLASS_ON_CALLER:
-                handler_type = HandlerType.CLASS_ON_OWNER
+                if explicit_owner or not owner_matches_caller:
+                    handler_type = HandlerType.CLASS_ON_OWNER
             elif handler_type == HandlerType.INSTANCE_ON_CALLER:
-                handler_type = HandlerType.INSTANCE_ON_OWNER
+                if explicit_owner or not owner_matches_caller:
+                    handler_type = HandlerType.INSTANCE_ON_OWNER
 
         # Flip classmethod on foreign manager class if we can relate decl vs caller
         if handler_type == HandlerType.CLASS_ON_CALLER and decl_cls is not None and caller_cls is not None:
@@ -385,5 +397,29 @@ class FuncInfo:
                 values["owner"] = self.owner
             if (not explicit.owner_cls or values.get("owner_cls") is None) and self.owner_cls is not None:
                 values["owner_cls"] = self.owner_cls
+
+        # If OWNER handler types have no concrete owner and the owner/caller classes match,
+        # treat them as caller-bound behaviors to avoid dangling owner lookups.
+        def _classes_related(a: object, b: object) -> bool:
+            if not (isinstance(a, type) and isinstance(b, type)):
+                return False
+            try:
+                return issubclass(a, b) or issubclass(b, a)
+            except TypeError:
+                return False
+
+        handler_type = values.get("handler_type", self.handler_type)
+        if handler_type == HandlerType.INSTANCE_ON_OWNER and not explicit.owner:
+            owner_candidate = values.get("owner") or self.owner
+            if owner_candidate is None:
+                owner_cls_val = values.get("owner_cls") or self.owner_cls
+                caller_cls_val = values.get("caller_cls") or self.caller_cls
+                if _classes_related(owner_cls_val, caller_cls_val):
+                    values["handler_type"] = HandlerType.INSTANCE_ON_CALLER
+        elif handler_type == HandlerType.CLASS_ON_OWNER and not explicit.owner:
+            owner_cls_val = values.get("owner_cls") or self.owner_cls
+            caller_cls_val = values.get("caller_cls") or self.caller_cls
+            if _classes_related(owner_cls_val, caller_cls_val):
+                values["handler_type"] = HandlerType.CLASS_ON_CALLER
 
         return values

@@ -363,6 +363,18 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
     def __lt__(self, other: Behavior):
         return self.sort_key() < other.sort_key()
 
+    def _owner_matches_caller(self, caller: Entity | None) -> bool:
+        if caller is None:
+            return False
+        owner_cls = self.owner_cls
+        caller_cls = caller.__class__
+        if not (isinstance(owner_cls, type) and isinstance(caller_cls, type)):
+            return False
+        try:
+            return issubclass(caller_cls, owner_cls) or issubclass(owner_cls, caller_cls)
+        except TypeError:
+            return False
+
     def bind_func(self, caller: CT) -> Callable:
         """
         Return a callable with the correct binding for ``self.handler_type``.
@@ -405,6 +417,8 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
             case HandlerType.INSTANCE_ON_OWNER:
                 owner_inst = self.owner() if self.owner else None
                 if owner_inst is None:  # owner GC'd or otherwise missing
+                    if self._owner_matches_caller(caller):
+                        return self.func
                     raise RuntimeError("Behavior owner is not defined")
                 return self.func.__get__(owner_inst, owner_inst.__class__)
 

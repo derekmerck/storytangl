@@ -142,6 +142,22 @@ def test_owner_cls_inferred_from_owner_instance():
     assert info.owner_cls is TaskManager
 
 
+# ==================== Explicit owner_cls hints without owner ====================
+
+def test_owner_cls_matching_caller_does_not_flip_instance_binding():
+    """Explicit owner_cls equal to caller keeps INSTANCE_ON_CALLER semantics."""
+
+    class Local(Node):
+        def local_handler(self, item: Node, ctx=None):
+            return None
+
+    info = FuncInfo.from_func(Local.local_handler, owner_cls=Local)
+
+    assert info.handler_type is HandlerType.INSTANCE_ON_CALLER
+    assert info.owner_cls is Local
+    assert info.caller_cls is Local
+
+
 # ==================== Edge Cases ====================
 
 def test_none_function_returns_none():
@@ -338,3 +354,23 @@ def test_apply_behavior_defaults_keeps_explicit_owner_and_owner_cls():
 
     assert merged["owner"] is mgr
     assert merged["owner_cls"] is TaskManager
+
+
+def test_apply_behavior_defaults_demotes_owner_when_classes_match():
+    class Local(Node):
+        def local_handler(self, item: Node, ctx=None):
+            return None
+
+    info = FuncInfo.from_func(Local.local_handler, owner_cls=Local)
+    hints = BehaviorExplicitHints(
+        handler_type=False,
+        owner=False,
+        owner_cls=True,
+        caller_cls=False,
+    )
+
+    merged = info.apply_behavior_defaults({"func": Local.local_handler, "owner_cls": Local}, explicit=hints)
+
+    assert merged["handler_type"] is HandlerType.INSTANCE_ON_CALLER
+    assert merged["caller_cls"] is Local
+    assert merged["owner_cls"] is Local
