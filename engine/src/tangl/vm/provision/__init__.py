@@ -18,6 +18,7 @@ builders without modifying core VM code.
 """
 from .requirement import ProvisioningPolicy, Requirement
 from .provisioner import Provisioner
+from .graph_provisioner import GraphProvisioner
 from .open_edge import Dependency, Affordance
 from .offer import BuildReceipt, ProvisionOffer, PlanningReceipt
 from .offers import ProvisionCost, DependencyOffer, AffordanceOffer
