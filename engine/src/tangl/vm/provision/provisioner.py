@@ -25,12 +25,13 @@ API
 - :meth:`_resolve_existing` / :meth:`_resolve_update` / :meth:`_resolve_clone` / :meth:`_resolve_create` – internal helpers implementing each policy.
 """
 from __future__ import annotations
-from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING
+from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING, ClassVar
 import functools
+from warnings import warn
 
 from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, Registry, Behavior, CallReceipt
-from tangl.core.behavior.behavior import HandlerType
+from tangl.core import Node, Registry, CallReceipt
+from tangl.core.entity import Entity
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:
@@ -66,7 +67,7 @@ if TYPE_CHECKING:
 # - clone -> criteria + template
 
 
-class Provisioner(Behavior):
+class Provisioner(Entity):
     """
     Default provider resolver for independently satisfiable requirements.
 
@@ -96,10 +97,8 @@ class Provisioner(Behavior):
     - :meth:`_resolve_create()` – instantiate from template.
 
     """
-    phase: str = "PLANNING.OFFER"
-    result_type: Type = list['ProvisionOffer']
-    func: None = None
-    handler_type: HandlerType = HandlerType.INSTANCE_ON_OWNER
+    phase: ClassVar[str] = "PLANNING.OFFER"
+    result_type: ClassVar[Type] = list['ProvisionOffer']
 
     @staticmethod
     def _resolve_existing(*registries: Registry,
@@ -168,7 +167,7 @@ class Provisioner(Behavior):
         registry.add(provider)
         return provider
 
-    def _requirement_registries(self, requirement: Requirement) -> tuple[Registry, ...]:
+    def _collect_requirement_registries(self, requirement: Requirement) -> tuple[Registry, ...]:
         registries: list[Registry] = []
         if isinstance(getattr(requirement, "graph", None), Registry):
             registries.append(requirement.graph)
@@ -191,36 +190,28 @@ class Provisioner(Behavior):
         active :class:`~tangl.vm.context.Context`.
         """
 
-        registries = list(self._requirement_registries(requirement))
+        registries = list(self._collect_requirement_registries(requirement))
         if ctx is not None:
             context_graph = getattr(ctx, "graph", None)
             if context_graph is not None and all(r is not context_graph for r in registries):
                 registries.insert(0, context_graph)
         return tuple(registries)
 
-    @staticmethod
-    def _iter_policies(policy: ProvisioningPolicy) -> Sequence[ProvisioningPolicy]:
-        if policy in (
-            ProvisioningPolicy.EXISTING,
-            ProvisioningPolicy.UPDATE,
-            ProvisioningPolicy.CREATE,
-            ProvisioningPolicy.CLONE,
-        ):
-            return (policy,)
-        policies: list[ProvisioningPolicy] = []
-        for candidate in ProvisioningPolicy:
-            if candidate in (ProvisioningPolicy.NOOP, ProvisioningPolicy.ANY):
-                continue
-            if candidate in policy:
-                policies.append(candidate)
-        return tuple(policies)
+    def get_affordance_offers(
+        self,
+        *,
+        ctx: "Context" | None = None,
+    ) -> list["ProvisionOffer"]:
+        """Return affordance (broadcast) offers; none by default."""
 
-    def get_offers(
+        return []
+
+    def get_dependency_offers(
         self,
         requirement: Requirement,
         *,
         ctx: "Context" | None = None,
-    ) -> list[ProvisionOffer]:
+    ) -> list["ProvisionOffer"]:
         from .offer import ProvisionOffer
 
         registries = self.iter_requirement_registries(requirement, ctx=ctx)
@@ -282,6 +273,33 @@ class Provisioner(Behavior):
 
         return offers
 
+    @staticmethod
+    def _iter_policies(policy: ProvisioningPolicy) -> Sequence[ProvisioningPolicy]:
+        if policy in (
+            ProvisioningPolicy.EXISTING,
+            ProvisioningPolicy.UPDATE,
+            ProvisioningPolicy.CREATE,
+            ProvisioningPolicy.CLONE,
+        ):
+            return (policy,)
+        policies: list[ProvisioningPolicy] = []
+        for candidate in ProvisioningPolicy:
+            if candidate in (ProvisioningPolicy.NOOP, ProvisioningPolicy.ANY):
+                continue
+            if candidate in policy:
+                policies.append(candidate)
+        return tuple(policies)
+
+    def get_offers(
+        self,
+        requirement: Requirement | None,
+        *,
+        ctx: "Context" | None = None,
+    ) -> list[ProvisionOffer]:
+        if requirement is None:
+            return self.get_affordance_offers(ctx=ctx)
+        return self.get_dependency_offers(requirement, ctx=ctx)
+
     def __call__(
         self,
         requirement: Requirement,
@@ -304,39 +322,17 @@ class Provisioner(Behavior):
         ctx: "Context" | None = None,
     ) -> Optional[Node]:
         """Return a provider for ``requirement`` or ``None`` without side effects."""
+        warn(
+            "Provisioner.resolve() is deprecated; use get_dependency_offers() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        provider = None
+        offers = self.get_dependency_offers(requirement, ctx=ctx)
+        preferred_ops = tuple(self._iter_policies(requirement.policy))
 
-        registries = self.iter_requirement_registries(requirement, ctx=ctx)
-
-        match requirement.policy:
-            case ProvisioningPolicy.EXISTING:
-                provider = self._resolve_existing(
-                    *registries,
-                    provider_id=requirement.identifier,
-                    provider_criteria=requirement.criteria,
-                )
-            case ProvisioningPolicy.UPDATE:
-                provider = self._resolve_update(
-                    *registries,
-                    provider_id=requirement.identifier,
-                    provider_criteria=requirement.criteria,
-                    update_template=requirement.template
-                    )
-            case ProvisioningPolicy.CLONE:
-                provider = self._resolve_clone(
-                    *registries,
-                    ref_id=requirement.identifier,
-                    ref_criteria=requirement.criteria,
-                    update_template=requirement.template
-                    )
-            case ProvisioningPolicy.CREATE:
-                registry = registries[0] if registries else requirement.graph
-                provider = self._resolve_create(
-                    registry,
-                    requirement.template
-                    )
-            case _:
-                raise ValueError(f"Unsupported provisioning policy {requirement.policy}")
-
-        return provider
+        for operation in preferred_ops:
+            for offer in offers:
+                if offer.operation is operation:
+                    return offer.accept(ctx=ctx)
+        return None

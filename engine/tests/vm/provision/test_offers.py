@@ -140,6 +140,7 @@ def test_dependency_offer_accept_is_lazy(dependency_offer_setup):
     assert offer.requirement_id == requirement.uid
     assert offer.dependency_id == dependency.uid
     assert offer.proximity == 2
+    assert offer.operation is ProvisioningPolicy.EXISTING
 
 
 def test_affordance_offer_accept_allows_destination_override(affordance_offer_setup):
