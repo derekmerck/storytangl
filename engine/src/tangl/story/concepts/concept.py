@@ -33,7 +33,7 @@ class Concept(Node):
     * **Templating** – :meth:`render` performs best-effort ``str.format``
       substitution from the active namespace.
     * **Auto-journal** – a domain handler converts the rendered text into a
-      :class:`~tangl.core.fragment.BaseFragment`.
+      :class:`~tangl.core.BaseFragment`.
 
     API
     ---
@@ -56,7 +56,7 @@ class Concept(Node):
         Parameters
         ----------
         ns:
-            Namespace mapping exposed by the active :class:`~tangl.core.domain.Scope`.
+            Namespace mapping exposed by the active behavior layers.
 
         Notes
         -----
@@ -83,7 +83,7 @@ from tangl.core.behavior import HandlerPriority as Prio
 @on_journal(priority=Prio.EARLY)
 # @global_domain.handlers.register(phase=P.JOURNAL, priority=45)
 def render_concept_to_fragment(concept: Concept, *, ctx: Context, **_: Any) -> BaseFragment | None:
-    """Emit a :class:`~tangl.core.fragment.BaseFragment` when the cursor is a concept."""
+    """Emit a :class:`~tangl.core.BaseFragment` when the cursor is a concept."""
 
     if not isinstance(concept, Concept):  # pragma: no cover - defensive guard
         return None
