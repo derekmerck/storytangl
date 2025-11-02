@@ -14,8 +14,6 @@ Depends on lang package dev reqs:
 - pytidylib
 """
 
-# todo: throw out anything in <span class="hob">.*</span>, assume its generated
-
 from __future__ import annotations
 from collections import defaultdict
 

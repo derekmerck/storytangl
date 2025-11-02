@@ -19,6 +19,7 @@ from .provision import ProvisionOffer
 
 if TYPE_CHECKING:
     from .traversal import TraversableSubgraph
+    from .dispatch import Namespace as NS
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +103,9 @@ class Context:
     # The gather-namespace subphase is so frequently used that it has
     # its own helper.
 
-    _ns_cache: dict[UUID, StringMap] = field(default_factory=dict)
+    _ns_cache: dict[UUID, NS] = field(default_factory=dict)
 
-    def get_ns(self, node: Node = None, nocache=False) -> StringMap:
+    def get_ns(self, node: Node = None, nocache=False) -> NS:
         from tangl.vm.dispatch import do_get_ns
         node = node or self.cursor
         if nocache or node.uid not in self._ns_cache:
