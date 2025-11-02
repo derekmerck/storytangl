@@ -1,5 +1,4 @@
 # /tangl/vm/vm_dispatch/vm_dispatch.py
-
 from tangl.core.behavior import HandlerLayer as L
 from tangl.core.dispatch.core_dispatch import LayeredDispatch
 

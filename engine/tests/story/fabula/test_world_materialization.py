@@ -309,6 +309,6 @@ def test_action_edges_set_trigger_phase_for_auto_edges() -> None:
     assert len(edges) == 1
     edge = edges[0]
     assert isinstance(edge, ChoiceEdge)
-    from tangl.vm.frame import ResolutionPhase as P
+    from tangl.vm import ResolutionPhase as P
 
     assert edge.trigger_phase == P.POSTREQS

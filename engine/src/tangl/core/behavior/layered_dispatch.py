@@ -63,7 +63,7 @@ class LayeredDispatch(BehaviorRegistry):
     def dispatch(self,
                  # Behavior params
                  caller: Entity, *,                    # Active entity
-                 ctx: ContextP,                        # Includes get_job_layers
+                 ctx: ContextP,                        # Includes get_active_layers
                  with_args: tuple[Entity, ...] = None, # Other participating entities
                  with_kwargs: StringMap = None,
 

@@ -81,7 +81,7 @@ class HasLocalBehaviors(HasBehaviors):
                 h = Behavior(func=item,
                              owner_cls=cls,
                              **item._local_behavior)
-                if h.handler_layer in [HandlerType.INSTANCE_ON_CALLER, HandlerType.CLASS_ON_CALLER]:
+                if h.handler_type in [HandlerType.INSTANCE_ON_CALLER, HandlerType.CLASS_ON_CALLER]:
                     h.caller_cls = cls
                 cls.local_behaviors.add_behavior(h)
                 item._local_behavior = h

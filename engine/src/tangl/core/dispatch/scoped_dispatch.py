@@ -12,7 +12,7 @@ from .core_dispatch import core_dispatch
 #       `core.behavior`
 def scoped_dispatch(  # Behavior params
                     caller: Node, *,  # Active entity
-                    ctx: ContextP,    # Includes get_job_layers
+                    ctx: ContextP,    # Includes get_active_layers
                     with_args: tuple[Entity, ...] = None,  # Other participants
                     with_kwargs: StringMap = None,
 

@@ -54,10 +54,10 @@ def do_describe(concept: Concept, *,
                 ctx: ContextP,
                 extra_handlers=None,
                 **kwargs) -> Iterator[CallReceipt]:
-    return LayeredDispatch.layered_dispatch(
+    return story_dispatch.dispatch(
         concept,
         ctx=ctx,
-        active_layer=story_dispatch,
+        task="describe",
         extra_handlers=extra_handlers,
         **kwargs
     )
