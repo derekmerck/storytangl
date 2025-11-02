@@ -74,25 +74,35 @@ on_planning = partial(vm_dispatch.register, task=P.PLANNING)
 
 @on_planning(priority=Prio.EARLY)
 def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
-    """Publish offers for open :class:`~tangl.vm.planning.open_edge.Dependency` edges."""
+    """
+    Collect affordance and responsive offers for the frontier.
+
+    Returns:
+        Dict mapping requirement UIDs to sorted offer lists:
+        - offers['*'] = affordance offers (broadcast)
+        - offers[dep.uid] = responsive offers (unicast)
+
+    The behavior handler will wrap this in a call receipt and stash
+    it in `ctx.call_receipts` by default.
+    """
 
     provisioners = do_get_provisioners(cursor, ctx=ctx)
     offers: dict[UUID|str, list[ProvisionOffer]] = defaultdict(list)
 
+    # Gather broadcast affordance offers (not responsive to specific reqs)
     for provisioner in provisioners:
         offers['*'].extend(provisioner.get_offers())
-        # Offers with no requirement are affordances (they have a req)
 
+    # Gather responsive/unicast offers for each frontier node's dependencies
     for edge in cursor.edges_out(is_instance=ChoiceEdge):
         # All possible structural successors
         frontier_node = edge.destination
         if frontier_node is None:
-            warn("Found missing frontier node, this should only happen in testing.")
+            warn("Skipped missing frontier node, this should only happen in testing.")
             continue
         for dep in get_dependencies(frontier_node, satsified=False):
             for provisioner in provisioners:
                 offers[dep.uid].extend(provisioner.get_offers(dep))
-                # responsive offers are provide offers
 
     return offers
 

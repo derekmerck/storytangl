@@ -123,20 +123,22 @@ class Ledger(Entity):
         return self.records.get_section(marker_name, has_channel="fragment")
 
     def get_frame(self) -> Frame:
+        from .dispatch import vm_dispatch
         return Frame(
             graph=self.graph,
             cursor_id=self.cursor_id,
             step=self.step,
             records=self.records,
             event_sourced=self.event_sourced,
-            active_layers=self.get_active_layers()
+            active_layers=[vm_dispatch]
         )
 
     def init_cursor(self) -> None:
         """Enter the current cursor to bootstrap the ledger journal."""
 
         from tangl.core.graph.edge import AnonymousEdge
-        from tangl.vm.frame import ChoiceEdge, ResolutionPhase
+        from .frame import ChoiceEdge
+        from .resolution_phase import ResolutionPhase as P
 
         start_node = self.graph.get(self.cursor_id)
         if start_node is None:
@@ -148,7 +150,7 @@ class Ledger(Entity):
         next_edge = frame.follow_edge(bootstrap_edge)
         while (
             isinstance(next_edge, ChoiceEdge)
-            and getattr(next_edge, "trigger_phase", None) == ResolutionPhase.PREREQS
+            and getattr(next_edge, "trigger_phase", None) == P.PREREQS
         ):
             next_edge = frame.follow_edge(next_edge)
 

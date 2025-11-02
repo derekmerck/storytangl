@@ -8,9 +8,7 @@ from tangl.vm.provision import (
     ProvisionOffer,
     BuildReceipt,
 )
-from tangl.vm.provision.open_edge import Dependency, Affordance
-from tangl.vm.frame import Frame, ResolutionPhase as P
-from tangl.vm.context import Context
+from tangl.vm import Context, Frame, ResolutionPhase as P, Dependency, Affordance
 # from tangl.vm.dispatch.planning import plan_collect_offers, plan_select_and_apply
 from tangl.core.behavior import CallReceipt
 

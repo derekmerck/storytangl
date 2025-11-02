@@ -11,7 +11,7 @@ from tangl.core.graph.node import Node
 
 logger = logging.getLogger(__name__)
 
-
+# todo: TypeManager?
 class DomainManager:
     """DomainManager()
 

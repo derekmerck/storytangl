@@ -94,7 +94,7 @@ def test_call_receipt_seq_monotonic():
     assert r2.seq == r1.seq + 1
 
 def test_handler_ordering_and_receipts():
-    from tangl.vm.frame import ResolutionPhase as P
+    from tangl.vm import ResolutionPhase as P
     regs = BehaviorRegistry()
     calls = []
 
@@ -112,7 +112,7 @@ def test_handler_ordering_and_receipts():
     assert receipts[0].seq < receipts[1].seq  # monotonically increasing
 
 def test_handler_run_one_picks_first():
-    from tangl.vm.frame import ResolutionPhase as P
+    from tangl.vm import ResolutionPhase as P
     regs = BehaviorRegistry()
 
     @regs.register(priority=HandlerPriority.LATE)

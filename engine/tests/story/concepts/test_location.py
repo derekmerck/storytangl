@@ -5,7 +5,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.story.concepts.location import Location, Setting
-from tangl.vm.provision.provisioning import Provisioner, ProvisioningPolicy
+from tangl.vm.provision.provisioner import Provisioner, ProvisioningPolicy
 
 @pytest.fixture
 def location_setting():

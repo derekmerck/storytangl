@@ -7,7 +7,7 @@ from pydantic import Field
 from tangl.type_hints import Expr
 from tangl.utils.safe_builtins import safe_builtins
 from tangl.core.behavior import HasBehaviors
-from tangl.vm.frame import ResolutionPhase as P
+from tangl.vm.resolution_phase import ResolutionPhase as P
 from .vm_dispatch import vm_dispatch
 
 if TYPE_CHECKING:

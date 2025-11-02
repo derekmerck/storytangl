@@ -4,7 +4,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.story.concepts.actor import Actor, Role
-from tangl.vm.provision.provisioning import Provisioner, ProvisioningPolicy
+from tangl.vm.provision.provisioner import Provisioner, ProvisioningPolicy
 
 @pytest.fixture
 def actor_role():

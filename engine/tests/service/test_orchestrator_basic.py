@@ -13,8 +13,7 @@ from tangl.service.controllers import RuntimeController
 from tangl.service.user.user import User
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
-from tangl.vm.frame import ChoiceEdge, Frame, ResolutionPhase
-from tangl.vm.ledger import Ledger
+from tangl.vm import ChoiceEdge, Frame, ResolutionPhase, Ledger
 
 
 class FakePersistence(dict):

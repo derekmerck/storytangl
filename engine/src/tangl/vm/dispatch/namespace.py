@@ -28,18 +28,6 @@ def _contribute_deps_to_ns(caller: Node, *_, **__):
     reqs = caller.edges_out(is_instance=(Dependency, Affordance), satisfied=True)
     return { r.get_label(): r.destination for r in reqs }
 
-# @on_get_ns()
-# def _contribute_deps_to_ns(caller: Node, ctx=None) -> dict:
-#     """Add satisfied dependencies to NS chain."""
-#     # Automatically include satisfied dependencies/affordances
-#     logger.debug(f"Checking deps on caller {caller!r}")
-#     dep_names = {}
-#     for edge in caller.graph.find_edges(source=caller, is_instance=(Affordance, Dependency)):
-#         logger.debug(f"Checking edge sat on edge {edge!r}")
-#         if edge.satisfied:
-#             dep_names[edge.get_label()] = edge.destination
-#     return dep_names
-
 def do_get_ns(anchor: Node, *, ctx: ContextP, extra_handlers=None, **kwargs) -> ChainMap[str, Any]:
     """
     Walks local layers (ancestors) and gathers relevant object names.

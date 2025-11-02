@@ -22,7 +22,7 @@ from tangl.core import CallReceipt, Entity, Registry, Node
 from tangl.core.entity import Selectable
 from tangl.vm.context import Context
 from .requirement import Requirement, ProvisioningPolicy
-from .provisioning import Provisioner
+from .provisioner import Provisioner
 
 class BuildReceipt(CallReceipt):
     """

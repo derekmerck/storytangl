@@ -5,10 +5,8 @@ from uuid import uuid4
 import pytest
 
 from tangl.core import Graph, StreamRegistry
-from tangl.vm.frame import ChoiceEdge, ResolutionPhase
-from tangl.vm.replay.event import Event, EventType
-from tangl.vm.replay.patch import Patch
-from tangl.vm.ledger import Ledger
+from tangl.vm import ChoiceEdge, ResolutionPhase, Ledger
+from tangl.vm.replay import Event, EventType, Patch
 
 
 def test_init_cursor_generates_journal_entry() -> None:

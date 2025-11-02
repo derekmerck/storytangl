@@ -8,11 +8,9 @@ from typing import Any
 import jinja2
 
 from tangl.core import BaseFragment, Graph, Node
-from tangl.vm.context import Context
-from tangl.vm.frame import ChoiceEdge
-from tangl.vm.traversal import TraversableSubgraph
-
-from tangl.story.concepts.concept import Concept
+from tangl.vm import Context, ChoiceEdge, TraversableSubgraph
+from tangl.vm.dispatch import on_journal
+from tangl.story.concepts import Concept
 
 __all__ = ["Block"]
 
@@ -79,13 +77,6 @@ class Block(TraversableSubgraph, Node):
         return choices
 
 
-# @global_domain.handlers.register(
-#     phase=P.JOURNAL,
-#     priority=40,
-#     selection_criteria={"is_instance": Block},
-# )
-# from tangl.vm.vm_dispatch.vm_dispatch import vm_dispatch
-from tangl.vm.dispatch import on_journal
 @on_journal()
 def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
     """Render inline content, child concepts, and choice menu for a block."""
@@ -145,6 +136,3 @@ def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
         )
 
     return fragments or None
-
-
-Block.model_rebuild(_types_namespace={"Graph": Graph})

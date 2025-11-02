@@ -37,6 +37,34 @@ if TYPE_CHECKING:
     from .offer import ProvisionOffer
     from ..context import Context
 
+# Provisioning
+# ------------
+# should go something like this, resolved over structural scopes:
+# - subgraph
+#    1. check if a direct provider (self.members) satisfies req -> existing offer
+#    2. check if a local indirect provider would satisfy req -> build offer
+#    3. check if a local template sent to the core builder would satisfy req -> build offer
+# - graph
+#    1. check if a direct provider (self.values()) satisfies req -> existing offer
+#    2. check if an author/app indirect builder would satisfy req (e.g., a wrapped singleton asset from the asset registry?) -> build offer
+#    3. check if an author template sent to the core builder would satisfy req -> build offer
+
+# this covers find and create types, consider update (find+update) / clone (find+copy+update)
+
+# find: find by identifier (exact) or by criteria (any)
+# update:  find + update (e.g., change appearance in place)
+# create: create by builder, template
+# clone: find + evolve (typically by template, e.g., materialize a sibling)
+
+# `provision_mode` is optional if only one of criteria or template is provided b/c it can be inferred.
+# - find -> criteria only
+# - create -> template only
+
+# Reqs with both criteria and template must explicitly declare their mode.
+# - find _or_ create -> criteria + template
+# - update -> criteria + template
+# - clone -> criteria + template
+
 
 class Provisioner(Behavior):
     """

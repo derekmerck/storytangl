@@ -78,7 +78,6 @@ class Dependency(Edge, Generic[NodeT]):
         return node.edges_out(is_instance=Dependency, **criteria)
 
 
-
 class Affordance(Edge, Generic[NodeT]):
     """
     Affordance(destination: Node, requirement: Requirement)

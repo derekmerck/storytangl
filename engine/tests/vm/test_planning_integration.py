@@ -12,7 +12,7 @@ from tangl.vm import (
     PlanningReceipt,
     Patch,
 )
-from tangl.vm.frame import ResolutionPhase as P
+from tangl.vm.resolution_phase import ResolutionPhase as P
 
 
 def _collect_step_records(frame: Frame, step: int):

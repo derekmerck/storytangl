@@ -427,7 +427,7 @@ class World(Singleton):
         except AttributeError:  # pragma: no cover - defensive guard
             return None
 
-        from tangl.vm.frame import ResolutionPhase as P
+        from tangl.vm import ResolutionPhase as P
 
         if activation in {"first", "redirect"}:
             return P.PREREQS

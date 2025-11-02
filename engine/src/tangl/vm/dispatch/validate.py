@@ -35,5 +35,5 @@ class HasConditions(HasBehaviors):
     def _check_conditions(self: Self, *, ctx: Context) -> bool | None:
         if not self.conditions:
             return
-        ns = ctx.get_ns()
+        ns = ctx.get_ns(self)
         return all([self._eval_expr(expr=expr, ns=ns) for expr in self.conditions])

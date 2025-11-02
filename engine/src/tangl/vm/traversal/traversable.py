@@ -10,7 +10,8 @@ from uuid import UUID
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 from tangl.core import Graph, Node, Subgraph
-from tangl.vm.frame import ChoiceEdge, ResolutionPhase as P
+from tangl.vm.frame import ChoiceEdge
+from tangl.vm.resolution_phase import ResolutionPhase as P
 
 __all__ = ["TraversableSubgraph"]
 

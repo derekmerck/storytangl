@@ -106,59 +106,7 @@ class Context:
             self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
         return self._ns_cache[node.uid]
 
-    # @functools.cached_property
-    # def scope(self) -> Scope:
-    #     # Since Context is frozen wrt the scope parts, we never need to invalidate this.
-    #     return Scope(graph=self.graph,
-    #                  anchor_id=self.cursor_id,
-    #                  domain_registries=self.domain_registries)
-
-    # def inspect_scope(self) -> str:
-    #     lines = []
-    #     lines.append(f"Available domains:")
-    #     for dr in self.domain_registries:
-    #         for d in dr.values():
-    #             lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
-    #     lines.append("Active domains:")
-    #     for d in self.scope.active_domains:
-    #         lines.append(f" - {d.__class__.__name__}:{d.get_label()}")
-    #     lines.append("Handlers by phase:")
-    #     from .frame import ResolutionPhase as P
-    #     for ph in P:
-    #         names = [h.func.__name__ for h in self.scope.get_handlers(phase=ph)]
-    #         lines.append(f"  {ph.name}: {', '.join(names)}")
-    #     lines.append("Handlers for ns:")
-    #     names = [h.func.__name__ for h in self.scope.get_handlers(job="namespace")]
-    #     lines.append(f"  ns: {', '.join(names)}")
-    #     return "\n".join(lines)
-    #
-    # @staticmethod
-    # def _get_ns(scope: Scope) -> NS:
-    #     maps = []
-    #     for d in scope.active_domains:
-    #         # todo: how do we include other registry layers?
-    #         #       we always do global/app/author and don't worry about d's ancestors?
-    #         #       this is bootstrapping, so we have to accept some constraints...
-    #         domain_maps = on_get_ns.dispatch(caller=d, ctx=None)
-    #         maps.extend(CallReceipt.gather_results(*domain_maps))
-    #     return ChainMap(*maps)
-    #
-    # def __get_ns(self) -> NS:
-    #     """Bootstrap ctx by calling get_vars on every domain in active
-    #     domains and creating."""
-    #     return self._get_ns(self.scope)
-
     def get_handlers(self, **criteria) -> None:
         return None
         # can pass phase in filter criteria if useful
         return self.scope.get_handlers(**criteria)
-
-    # def get_traversable_domain_for_node(self, node: Node) -> TraversableSubgraph | None:
-    #     """Return the :class:`TraversableDomain` that contains ``node`` if available."""
-    #
-    #     from tangl.vm.traversal import TraversableSubgraph  # Local import to avoid cycle
-    #
-    #     for domain in self.scope.active_domains:
-    #         if isinstance(domain, TraversableDomain) and node.uid in domain.member_ids:
-    #             return domain
-    #     return None

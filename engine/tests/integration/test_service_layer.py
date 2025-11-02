@@ -11,8 +11,7 @@ from tangl.core import BaseFragment, Graph, StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service import Orchestrator
 from tangl.service.controllers import RuntimeController
-from tangl.vm.frame import ChoiceEdge, ResolutionPhase
-from tangl.vm.ledger import Ledger
+from tangl.vm import ChoiceEdge, ResolutionPhase, Ledger
 
 
 @dataclass

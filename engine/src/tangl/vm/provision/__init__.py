@@ -17,6 +17,6 @@ All types are intentionally small and generic so domains can publish richer
 builders without modifying core VM code.
 """
 from .requirement import ProvisioningPolicy, Requirement
-from .provisioning import Provisioner
+from .provisioner import Provisioner
 from .open_edge import Dependency, Affordance
 from .offer import BuildReceipt, ProvisionOffer, PlanningReceipt

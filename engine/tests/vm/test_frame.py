@@ -2,7 +2,8 @@ import uuid
 
 from tangl.core import Node, Graph, CallReceipt, BehaviorRegistry
 from tangl.core.graph.edge import AnonymousEdge
-from tangl.vm.frame import ResolutionPhase as P, Frame, ChoiceEdge
+from tangl.vm.resolution_phase import ResolutionPhase as P
+from tangl.vm.frame import Frame, ChoiceEdge
 from tangl.vm.provision import Requirement, ProvisioningPolicy, Dependency
 
 
