@@ -15,6 +15,7 @@ from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
 from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt
+from .provision import ProvisionOffer
 
 if TYPE_CHECKING:
     from .traversal import TraversableSubgraph
@@ -96,6 +97,11 @@ class Context:
             raise RuntimeError(f"Bad cursor id in context {self.cursor_id} not in {[k for k in self.graph.keys()]}")
         return self.graph.get(self.cursor_id)
 
+    # Composite phase helpers and storage
+    # Composite phases invoke subphases and store intermediate results.
+    # The gather-namespace subphase is so frequently used that it has
+    # its own helper.
+
     _ns_cache: dict[UUID, StringMap] = field(default_factory=dict)
 
     def get_ns(self, node: Node = None, nocache=False) -> StringMap:
@@ -106,7 +112,5 @@ class Context:
             self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
         return self._ns_cache[node.uid]
 
-    def get_handlers(self, **criteria) -> None:
-        return None
-        # can pass phase in filter criteria if useful
-        return self.scope.get_handlers(**criteria)
+    provision_offers: dict[UUID, ProvisionOffer] = field(default_factory=dict)
+    journal_content: dict[str, dict] = field(default_factory=dict)

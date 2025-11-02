@@ -11,7 +11,7 @@ constructing :class:`BuildReceipt` instances that document the outcome.
 This module also defines receipts used to summarize planning outcomes.
 """
 from __future__ import annotations
-from typing import Optional, Literal, Self, Callable, Type
+from typing import Optional, Literal, Self, Callable, Type, TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import Field
@@ -20,9 +20,11 @@ from tangl.type_hints import StringMap
 from tangl.core import Record
 from tangl.core import CallReceipt, Entity, Registry, Node
 from tangl.core.entity import Selectable
-from tangl.vm.context import Context
 from .requirement import Requirement, ProvisioningPolicy
 from .provisioner import Provisioner
+
+if TYPE_CHECKING:
+    from tangl.vm.context import Context
 
 class BuildReceipt(CallReceipt):
     """
