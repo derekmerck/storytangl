@@ -149,6 +149,27 @@ def _debug_func(f):
 # --------- Model ---------
 
 @dataclass(frozen=True)
+class BehaviorExplicitHints:
+    """Flags describing which Behavior fields were provided explicitly."""
+
+    handler_type: bool
+    owner: bool
+    owner_cls: bool
+    caller_cls: bool
+    owner_value: Optional[Any] = None
+
+    def owner_cls_from_value(self) -> Optional[type]:
+        """Derive an owner class from the explicit owner value, if any."""
+
+        value = self.owner_value
+        if isinstance(value, type):
+            return value
+        if value is not None:
+            return value.__class__
+        return None
+
+
+@dataclass(frozen=True)
 class FuncInfo:
     """Binding/typing info inferred for a handler callable.
 
@@ -166,12 +187,14 @@ class FuncInfo:
     owner: Optional[Any] = None  # may be a strong ref; up to caller to weakref later if desired
 
     @classmethod
-    def from_func(cls,
-                  func: HandlerFunc,
-                  handler_type: Optional[HandlerType] = None,
-                  caller_cls: Optional[Type] = None,
-                  owner_cls: Optional[Type] = None,
-                  owner: Optional[Any] = None) -> Optional[TypingSelf]:
+    def from_func(
+        cls,
+        func: HandlerFunc,
+        handler_type: Optional[HandlerType] = None,
+        caller_cls: Optional[Type] = None,
+        owner_cls: Optional[Type] = None,
+        owner: Optional[Any] = None,
+    ) -> Optional[TypingSelf]:
         """
         Analyze a callable and produce a FuncInfo with normalized metadata.
 
@@ -330,3 +353,37 @@ class FuncInfo:
     @classmethod
     def debug_func(cls, func):
         return _debug_func(func)
+
+    # ------------------------------------------------------------------
+    # Behavior integration helpers
+    # ------------------------------------------------------------------
+
+    def apply_behavior_defaults(
+        self,
+        values: dict,
+        *,
+        explicit: BehaviorExplicitHints,
+    ) -> dict:
+        """Merge inference results into Behavior model data."""
+
+        values["func"] = self.func
+
+        if not explicit.handler_type:
+            values["handler_type"] = self.handler_type
+
+        if not explicit.caller_cls and self.caller_cls is not None:
+            values["caller_cls"] = self.caller_cls
+
+        if explicit.owner:
+            # Preserve explicit owner but try to fill owner_cls when missing.
+            if (not explicit.owner_cls) or values.get("owner_cls") is None:
+                owner_cls = explicit.owner_cls_from_value() or self.owner_cls
+                if owner_cls is not None:
+                    values["owner_cls"] = owner_cls
+        else:
+            if self.owner is not None:
+                values["owner"] = self.owner
+            if (not explicit.owner_cls or values.get("owner_cls") is None) and self.owner_cls is not None:
+                values["owner_cls"] = self.owner_cls
+
+        return values

@@ -1,7 +1,10 @@
-import pytest
 import logging
+from typing import Self
+
+import pytest
+
 from tangl.core import Entity
-from tangl.utils.func_info import FuncInfo, HandlerType
+from tangl.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerType
 
 
 # Test fixtures
@@ -269,7 +272,6 @@ def test_local_class_instance_lambda_self_only():
     assert info.handler_type is HandlerType.INSTANCE_ON_CALLER
     assert info.caller_cls is N
 
-from typing import Self
 def test_classmethod_caller_self_maps_to_declaring_class():
     class C(Entity):
         @classmethod
@@ -280,3 +282,59 @@ def test_classmethod_caller_self_maps_to_declaring_class():
 
     assert info.handler_type is HandlerType.CLASS_ON_CALLER
     assert info.caller_cls is C
+
+
+# ==================== Behavior integration helpers ====================
+
+
+def test_apply_behavior_defaults_preserves_explicit_handler_type():
+    info = FuncInfo.from_func(static_handler)
+    values = {"func": static_handler, "handler_type": HandlerType.INSTANCE_ON_CALLER}
+
+    hints = BehaviorExplicitHints(
+        handler_type=True,
+        owner=False,
+        owner_cls=False,
+        caller_cls=False,
+    )
+
+    merged = info.apply_behavior_defaults(values, explicit=hints)
+
+    assert merged["handler_type"] is HandlerType.INSTANCE_ON_CALLER
+
+
+def test_apply_behavior_defaults_backfills_owner_when_missing():
+    mgr = TaskManager(label="mgr")
+    info = FuncInfo.from_func(mgr.manage)
+    values = {"func": TaskManager.manage}
+
+    hints = BehaviorExplicitHints(
+        handler_type=False,
+        owner=False,
+        owner_cls=False,
+        caller_cls=False,
+    )
+
+    merged = info.apply_behavior_defaults(values, explicit=hints)
+
+    assert merged["owner"] is mgr
+    assert merged["owner_cls"] is TaskManager
+
+
+def test_apply_behavior_defaults_keeps_explicit_owner_and_owner_cls():
+    mgr = TaskManager(label="mgr2")
+    info = FuncInfo.from_func(TaskManager.manage, owner=mgr)
+    values = {"func": TaskManager.manage, "owner": mgr}
+
+    hints = BehaviorExplicitHints(
+        handler_type=False,
+        owner=True,
+        owner_cls=False,
+        caller_cls=False,
+        owner_value=mgr,
+    )
+
+    merged = info.apply_behavior_defaults(values, explicit=hints)
+
+    assert merged["owner"] is mgr
+    assert merged["owner_cls"] is TaskManager

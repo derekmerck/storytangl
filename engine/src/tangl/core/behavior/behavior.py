@@ -55,7 +55,7 @@ from pydantic import field_validator, model_validator, ConfigDict, Field
 from tangl.type_hints import StringMap, Tag as Task
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.utils.base_model_plus import HasSeq
-from tangl.utils.func_info import FuncInfo, HandlerFunc
+from tangl.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerFunc
 from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable, is_identifier
 from .call_receipt import CallReceipt
@@ -232,12 +232,18 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
             return values
 
         # Track explicit hints (before inference)
-        explicit_handler_type = values.get("handler_type") not in (None, HandlerType.STATIC)
-        explicit_owner = values.get("owner") is not None
-        explicit_caller_cls = values.get("caller_cls") is not None
-
         owner_val = values.get("owner")
-        owner_cls_hint = owner_val if isinstance(owner_val, type) else None
+        explicit = BehaviorExplicitHints(
+            handler_type=values.get("handler_type") not in (None, HandlerType.STATIC),
+            owner=owner_val is not None,
+            owner_cls=values.get("owner_cls") is not None,
+            caller_cls=values.get("caller_cls") is not None,
+            owner_value=owner_val,
+        )
+
+        owner_cls_hint = values.get("owner_cls") if isinstance(values.get("owner_cls"), type) else None
+        if owner_cls_hint is None and isinstance(owner_val, type):
+            owner_cls_hint = owner_val
         owner_inst_hint = owner_val if (owner_val is not None and not isinstance(owner_val, type)) else None
 
         info = FuncInfo.from_func(
@@ -250,41 +256,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         if info is None:
             return values
 
-        # Always use normalized func from FuncInfo (may unbind bound methods)
-        values["func"] = info.func
-
-        # handler_type: explicit wins, otherwise inferred
-        if not explicit_handler_type:
-            values["handler_type"] = info.handler_type
-
-        # caller_cls: fill if missing
-        if not explicit_caller_cls and getattr(info, "caller_cls", None) is not None:
-            values["caller_cls"] = info.caller_cls
-
-        # owner / owner_cls merging:
-        # - If owner was NOT explicit: use FuncInfo to fill both owner and owner_cls as appropriate.
-        # - If owner WAS explicit: keep the given owner, but still backfill owner_cls if missing.
-        if not explicit_owner:
-            if info.handler_type == HandlerType.INSTANCE_ON_OWNER:
-                # Backfill owner_cls even for unbound manager methods; set owner if available
-                if getattr(info, "owner_cls", None) is not None:
-                    values["owner_cls"] = info.owner_cls
-                if getattr(info, "owner", None) is not None:
-                    values["owner"] = info.owner
-            elif info.handler_type == HandlerType.CLASS_ON_OWNER:
-                if getattr(info, "owner_cls", None) is not None:
-                    values["owner_cls"] = info.owner_cls
-        else:
-            # explicit owner provided; ensure owner_cls is populated if missing
-            if values.get("owner_cls") is None:
-                if isinstance(owner_val, Entity):
-                    values["owner_cls"] = owner_val.__class__
-                elif isinstance(owner_val, type):
-                    values["owner_cls"] = owner_val
-                elif getattr(info, "owner_cls", None) is not None:
-                    values["owner_cls"] = info.owner_cls
-
-        return values
+        return info.apply_behavior_defaults(values, explicit=explicit)
 
     # req if INST_ON_OWNER or CLASS_ON_OWNER
     @field_validator("owner", mode="before")
