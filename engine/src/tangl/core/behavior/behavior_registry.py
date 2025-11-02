@@ -211,7 +211,8 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                        dry_run: bool = False,
                        ):
         behaviors = list(behaviors)
-        logger.debug(f"All possible behaviors {[f"{b.get_label()}(task={b.task})" for b in behaviors]!r}")
+        behavior_labels = [f"{b.get_label()}(task={b.task})" for b in behaviors]
+        logger.debug("All possible behaviors %s", behavior_labels)
 
         inline_criteria = cls._normalize_inline_criteria(task, inline_criteria)
         logger.debug(f"Inline criteria: {inline_criteria!r}")
