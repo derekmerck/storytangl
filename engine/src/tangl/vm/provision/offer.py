@@ -22,7 +22,7 @@ planning phase.
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Callable, TYPE_CHECKING, Any
+from typing import Callable, TYPE_CHECKING, Any, Optional
 from uuid import UUID
 
 from pydantic import Field
@@ -79,7 +79,7 @@ class ProvisionOffer(Entity):
 
         return True
 
-    def get_label(self) -> str | None:  # pragma: no cover - compatibility hook
+    def get_label(self) -> str | None:
         """Return the offer label when available."""
 
         return getattr(self, "label", None)
@@ -95,6 +95,9 @@ class DependencyOffer(ProvisionOffer):
 
     requirement_id: UUID
     operation: str
+    provider_id: Optional[UUID] = None
+    # Need provider id for existing to dedup
+    target_tags: set[str] = Field(default_factory=set)
     accept_func: Callable[[Any], Node]
 
     def accept(self, *, ctx: "Context") -> Node:
@@ -102,6 +105,11 @@ class DependencyOffer(ProvisionOffer):
         if provider not in ctx.graph:
             ctx.graph.add(provider)
         return provider
+
+    def get_label(self) -> str | None:
+        """Return the offer label when available."""
+
+        return getattr(self, "label", f"{self.operation}")
 
 
 class AffordanceOffer(ProvisionOffer):

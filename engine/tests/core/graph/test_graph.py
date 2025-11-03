@@ -63,14 +63,20 @@ def test_graph_duplicate_labels_resolve_first_match_and_uid_lookup_unambiguous()
     assert g.get("X") in (a, b)
     assert g.get(a.uid) is a and g.get(b.uid) is b
 
-@pytest.mark.xfail(reason="haven't decided how to handle or restrict membership in multiple subgraphs")
 def test_subgraph_reparent_member_updates_parent_chain():
     g = Graph()
     a = g.add_node(label="A")
     s1 = g.add_subgraph(label="S1", members=[a])
+    assert a in s1.members
+
+    import logging
+    logging.debug(f"has a: {list(g.find_subgraphs(has_member=a))}" )
+
+    assert a.parent is s1
+
     s2 = g.add_subgraph(label="S2")
     s2.add_member(a)
-    assert a.parent == s2
+    assert a.parent is s2
     assert list(a.ancestors())[0] == s2
     assert s1 is not a.parent
 

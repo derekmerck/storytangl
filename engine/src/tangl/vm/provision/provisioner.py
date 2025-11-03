@@ -102,6 +102,7 @@ class GraphProvisioner(Provisioner):
                 requirement_id=requirement.uid,
                 operation="EXISTING",
                 cost=ProvisionCost.DIRECT,
+                provider_id=node.uid,
                 accept_func=lambda ctx, n=node: n,
                 source_provisioner_id=self.uid,
                 source_layer=self.layer,

@@ -46,7 +46,7 @@ def test_planning_prefers_existing_offer():
         template={"obj_cls": Node, "label": "door"},
         policy=ProvisioningPolicy.ANY,
     )
-    Dependency(graph=graph, source=cursor, requirement=requirement, label="needs_door")
+    Dependency(graph=graph, source_id=cursor.uid, requirement=requirement, label="needs_door")
 
     receipt = frame.run_phase(P.PLANNING)
 

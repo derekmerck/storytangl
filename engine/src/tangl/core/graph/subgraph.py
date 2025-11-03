@@ -3,7 +3,7 @@ from typing import Optional, Iterator, TYPE_CHECKING
 from uuid import UUID
 from enum import Enum
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .graph import GraphItem, Graph
 
@@ -53,8 +53,10 @@ class Subgraph(GraphItem):
 
     def add_member(self, item: GraphItem) -> None:
         self.graph._validate_linkable(item)
-        item._invalidate_parent_attr()
+        if item.parent and item.parent is not self:
+            item.parent.remove_member(item)
         self.member_ids.append(item.uid)
+        item._invalidate_parent_attr()
 
     def remove_member(self, item: GraphItem | UUID):
         if isinstance(item, UUID):

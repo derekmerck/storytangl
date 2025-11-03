@@ -2,6 +2,8 @@ import pytest
 from uuid import UUID
 import pickle
 
+from pydantic import create_model
+
 from tangl.core.entity import Entity
 
 class TestEntity(Entity):
@@ -24,11 +26,12 @@ def test_entity_structure_unstructure():
     assert restored.foo == 7
     assert restored.uid == e.uid
 
-@pytest.mark.xfail(raises=AttributeError)
 def test_predicate_satisfied():
-    e = TestEntity(foo=1, predicate=lambda ctx: ctx.get("flag", False))
-    assert e.is_satisfied(ctx={"flag": True})
-    assert not e.is_satisfied(ctx={"flag": False})
+    # We might want to remove this and fold it into selectable
+    from tangl.core.entity import Conditional
+    e = Conditional(predicate=lambda ctx: ctx.get("flag", False))
+    assert e.available({"flag": True})
+    assert not e.available({"flag": False})
 
 def test_entity_creation():
     e = Entity()

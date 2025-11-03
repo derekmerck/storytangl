@@ -160,7 +160,6 @@ def test_handler_priority_ordering():
     assert h1 < h2
     assert sorted([h2, h1]) == [h1, h2]
 
-@pytest.mark.skip(reason="Not yet implemented")
 def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
     # caller matches only if foo=1
     caller = DummyEntity(foo=1)
@@ -169,29 +168,26 @@ def test_handler_satisfied_with_predicate_and_criteria(monkeypatch):
     h = Behavior(
         func=lambda x, y: 1,
         priority=0,
-        caller_criteria={"foo": 1},
+        selection_criteria={"foo": 1, 'predicate': always_true},
         label="test",
-        predicate=always_true,
     )
-    assert h.is_satisfied(caller=caller, ctx=ctx)
+    assert h.satisfies(caller)
     # Behavior with caller_criteria foo=2, will NOT match
     h2 = Behavior(
         func=lambda x, y: 1,
         priority=0,
-        caller_criteria={"foo": 2},
+        selection_criteria={"foo": 2, 'predicate': always_true},
         label="test",
-        predicate=always_true,
     )
-    assert not h2.is_satisfied(caller=caller, ctx=ctx)
+    assert not h2.satisfies(caller)
     # Behavior with predicate always_false
     h3 = Behavior(
         func=lambda x, y: 1,
         priority=0,
-        caller_criteria={"foo": 1},
-        label="test",
-        predicate=always_false,
+        selection_criteria={"foo": 1, 'predicate': always_false},
+        label="test"
     )
-    assert not h3.is_satisfied(caller=caller, ctx=ctx)
+    assert not h3.satisfies(caller)
 
 
 def test_handler_registry_register_returns_function():

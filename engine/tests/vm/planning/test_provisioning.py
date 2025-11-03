@@ -9,10 +9,10 @@ from tangl.vm.provision import (
     BuildReceipt,
 )
 from tangl.vm import Context, Frame, ResolutionPhase as P, Dependency, Affordance
-# from tangl.vm.dispatch.planning import plan_collect_offers, plan_select_and_apply
+import tangl.vm.dispatch
 from tangl.core.behavior import CallReceipt
 
-pytest.skip(allow_module_level=True, reason="planning needs reimplemented")
+# pytest.skip(allow_module_level=True, reason="planning needs reimplemented")
 
 # ---------- Provisioning orchestration ----------
 
