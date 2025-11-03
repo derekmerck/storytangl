@@ -1,14 +1,15 @@
-"""Graph-aware provisioner that surfaces existing node offers."""
+"""Graph-scoped provisioner that surfaces lazy dependency offers."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Iterator, Sequence, TYPE_CHECKING
-from uuid import UUID, uuid4
+from typing import Iterable, Iterator, Optional, TYPE_CHECKING
+from uuid import UUID
 
+from tangl.core import Entity
+from tangl.core.behavior import HandlerLayer
 from tangl.core.graph import Graph, Node
 
-from .offers import DependencyOffer, DependencyAcceptor, ProvisionCost
+from .offers import DependencyOffer, ProvisionCost
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard
@@ -16,109 +17,100 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle guard
     from .open_edge import Dependency
 
 
-@dataclass(slots=True)
-class GraphProvisioner:
-    """Collect existing graph nodes as dependency offers."""
+_LAYER_PROXIMITY: dict[HandlerLayer | None, int] = {
+    None: 0,
+    HandlerLayer.INLINE: 0,
+    HandlerLayer.LOCAL: 0,
+    HandlerLayer.AUTHOR: 1,
+    HandlerLayer.APPLICATION: 2,
+    HandlerLayer.SYSTEM: 3,
+    HandlerLayer.GLOBAL: 4,
+}
 
-    graphs: Sequence[Graph] = field(default_factory=tuple)
-    uid: UUID = field(default_factory=uuid4, init=False)
+_LAYER_PENALTY: dict[HandlerLayer | None, float] = {
+    None: 0.0,
+    HandlerLayer.INLINE: 0.0,
+    HandlerLayer.LOCAL: 0.0,
+    HandlerLayer.AUTHOR: 0.25,
+    HandlerLayer.APPLICATION: 0.5,
+    HandlerLayer.SYSTEM: 0.75,
+    HandlerLayer.GLOBAL: 1.0,
+}
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "graphs", tuple(self.graphs))
+
+class GraphProvisioner(Entity):
+    """Emit dependency offers for nodes already present in a graph."""
+
+    graph: Graph
+    layer: HandlerLayer = HandlerLayer.LOCAL
+    layer_id: Optional[UUID] = None
+    cost_weight: float = 1.0
 
     def iter_dependency_offers(
         self,
-        requirement: Requirement,
         *,
-        dependency: Dependency | None = None,
-        ctx: Context | None = None,
+        requirement: Requirement,
+        dependency: "Dependency" | None = None,
     ) -> Iterator[DependencyOffer]:
-        """Yield dependency offers that attach existing nodes."""
-
-        criteria = requirement.get_selection_criteria()
-        if not criteria:
+        if not self._supports_requirement(requirement):
             return
 
-        seen_nodes: set[UUID] = set()
-        for proximity, layer_graph in enumerate(
-            self._iter_graph_layers(requirement=requirement, ctx=ctx)
-        ):
-            for node in layer_graph.find_nodes(**criteria):
-                if node.uid in seen_nodes:
-                    continue
-                seen_nodes.add(node.uid)
-                yield self._build_offer(
-                    requirement=requirement,
-                    dependency=dependency,
-                    node=node,
-                    layer_graph=layer_graph,
-                    proximity=proximity,
-                )
+        for node in self._iter_matches(requirement):
+            yield self._build_offer(requirement, node, dependency)
 
-    def _iter_graph_layers(
+    def get_dependency_offers(
         self,
         *,
         requirement: Requirement,
-        ctx: Context | None,
-    ) -> Iterator[Graph]:
-        seen: set[UUID] = set()
-        ordered: list[Graph] = []
+        dependency: "Dependency" | None = None,
+    ) -> list[DependencyOffer]:
+        return list(self.iter_dependency_offers(requirement=requirement, dependency=dependency))
 
-        def add_graph(graph: Graph | None) -> None:
-            if graph is None or graph.uid in seen:
-                return
-            seen.add(graph.uid)
-            ordered.append(graph)
+    # ------------------------------------------------------------------
+    # Helpers
+    def _supports_requirement(self, requirement: Requirement) -> bool:
+        if not requirement.identifier and not requirement.criteria:
+            return False
+        if requirement.policy is ProvisioningPolicy.NOOP:
+            return False
+        return bool(requirement.policy & ProvisioningPolicy.EXISTING)
 
-        for graph in self.graphs:
-            add_graph(graph)
-        add_graph(requirement.graph)
-        if ctx is not None:
-            add_graph(getattr(ctx, "graph", None))
-
-        yield from ordered
+    def _iter_matches(self, requirement: Requirement) -> Iterable[Node]:
+        criteria = requirement.get_selection_criteria()
+        if not criteria:
+            return ()
+        return self.graph.find_nodes(**criteria)
 
     def _build_offer(
         self,
-        *,
         requirement: Requirement,
-        dependency: Dependency | None,
         node: Node,
-        layer_graph: Graph,
-        proximity: int,
+        dependency: "Dependency" | None,
     ) -> DependencyOffer:
+        proximity = _LAYER_PROXIMITY.get(self.layer, 0)
+        cost = ProvisionCost(
+            weight=self.cost_weight,
+            proximity=proximity,
+            layer_penalty=_LAYER_PENALTY.get(self.layer, 0.0),
+        )
+
+        def acceptor(
+            *,
+            ctx: "Context",
+            requirement: Requirement,
+            dependency: "Dependency" | None = None,
+            **_: object,
+        ) -> Node:
+            return node
+
         return DependencyOffer(
             requirement_id=requirement.uid,
-            dependency_id=getattr(dependency, "uid", None),
-            cost=self._cost_for_layer(proximity),
+            dependency_id=dependency.uid if dependency is not None else None,
+            cost=cost,
             operation=ProvisioningPolicy.EXISTING,
-            acceptor=self._make_acceptor(node),
-            layer_id=layer_graph.uid,
+            acceptor=acceptor,
+            layer_id=self.layer_id,
             source_provisioner_id=self.uid,
             proximity=proximity,
         )
 
-    @staticmethod
-    def _make_acceptor(node: Node) -> DependencyAcceptor:
-        node_ref = node
-        node_id = node.uid
-
-        def acceptor(
-            *,
-            ctx: Context,
-            requirement: Requirement,
-            dependency: Dependency | None = None,
-            **_: object,
-        ) -> Node | None:
-            if node_ref.graph is ctx.graph:
-                return node_ref
-            return ctx.graph.get(node_id)
-
-        return acceptor
-
-    @staticmethod
-    def _cost_for_layer(proximity: int) -> ProvisionCost:
-        return ProvisionCost(weight=1.0 + float(proximity), proximity=proximity)
-
-
-__all__ = ["GraphProvisioner"]

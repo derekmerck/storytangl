@@ -123,6 +123,8 @@ class DependencyOffer:
     - :attr:`requirement_id` – requirement backing the offer.
     - :attr:`dependency_id` – optional edge the requirement travelled on.
     - :attr:`cost` – :class:`ProvisionCost` used for arbitration.
+    - :attr:`operation` – :class:`~tangl.vm.provision.requirement.ProvisioningPolicy`
+      implied by this offer.
     - :attr:`layer_id` – emitting behavior layer (if any).
     - :attr:`source_provisioner_id` – provisioning capability that produced the
       offer.

@@ -1,84 +1,71 @@
-from __future__ import annotations
-
-import pytest
-
 from tangl.core.graph import Graph
 from tangl.vm.context import Context
 from tangl.vm.provision.graph_provisioner import GraphProvisioner
-from tangl.vm.provision.open_edge import Dependency
 from tangl.vm.provision.requirement import ProvisioningPolicy, Requirement
 
 
-@pytest.fixture
-def graph_setup():
+def test_graph_provisioner_only_emits_offers_for_matching_nodes() -> None:
     graph = Graph()
-    source = graph.add_node(label="source")
-    matching = graph.add_node(label="target")
-    _ = graph.add_node(label="bystander")
+    _matching = graph.add_node(label="target")
+    graph.add_node(label="other")
 
     requirement = Requirement(
         graph=graph,
         criteria={"label": "target"},
         policy=ProvisioningPolicy.EXISTING,
     )
-    dependency = Dependency(graph=graph, source=source, requirement=requirement)
+    graph.add(requirement)
 
-    return {
-        "graph": graph,
-        "source": source,
-        "matching": matching,
-        "requirement": requirement,
-        "dependency": dependency,
-    }
+    provisioner = GraphProvisioner(graph=graph)
 
-
-def test_graph_provisioner_only_emits_matching_offers(graph_setup):
-    provisioner = GraphProvisioner()
-    requirement = graph_setup["requirement"]
-    dependency = graph_setup["dependency"]
-
-    offers = list(
-        provisioner.iter_dependency_offers(
-            requirement,
-            dependency=dependency,
-        )
-    )
+    offers = list(provisioner.iter_dependency_offers(requirement=requirement))
 
     assert len(offers) == 1
-    offer = offers[0]
 
+    offer = offers[0]
+    assert offer.requirement_id == requirement.uid
+    assert offer.source_provisioner_id == provisioner.uid
     assert offer.operation is ProvisioningPolicy.EXISTING
-    assert offer.layer_id == graph_setup["graph"].uid
-    assert offer.cost.proximity == 0
     assert offer.proximity == 0
+    assert offer.cost.weight == provisioner.cost_weight
+    assert offer.cost.proximity == 0
+    assert offer.cost.layer_penalty == 0.0
 
-
-def test_graph_provisioner_accept_returns_existing_node(graph_setup):
-    provisioner = GraphProvisioner()
-    graph = graph_setup["graph"]
-    source = graph_setup["source"]
-    requirement = graph_setup["requirement"]
-    dependency = graph_setup["dependency"]
-    matching = graph_setup["matching"]
-
-    offers = list(
-        provisioner.iter_dependency_offers(
-            requirement,
-            dependency=dependency,
-        )
+    unmatched_requirement = Requirement(
+        graph=graph,
+        criteria={"label": "missing"},
+        policy=ProvisioningPolicy.EXISTING,
     )
+    graph.add(unmatched_requirement)
 
-    ctx = Context(graph=graph, cursor_id=source.uid)
+    assert list(provisioner.iter_dependency_offers(requirement=unmatched_requirement)) == []
 
-    assert requirement.provider is None
+
+def test_graph_provisioner_offer_accept_returns_existing_node_without_side_effects() -> None:
+    graph = Graph()
+    provider = graph.add_node(label="provider")
+
+    requirement = Requirement(
+        graph=graph,
+        identifier=provider.uid,
+        policy=ProvisioningPolicy.EXISTING,
+    )
+    graph.add(requirement)
+
+    provisioner = GraphProvisioner(graph=graph)
+    offers = list(provisioner.iter_dependency_offers(requirement=requirement))
+
+    assert len(offers) == 1
 
     offer = offers[0]
-    provider = offer.accept(ctx=ctx)
+    ctx = Context(graph=graph, cursor_id=provider.uid)
 
-    assert provider is matching
+    before_nodes = set(graph.data.keys())
     assert requirement.provider is None
 
-    # Graph should remain unchanged during offer generation and acceptance.
-    nodes = list(graph.find_nodes())
-    labels = {node.label for node in nodes}
-    assert labels == {"source", "target", "bystander"}
+    resolved = offer.accept(ctx=ctx)
+
+    assert resolved is provider
+    assert requirement.provider is None
+    assert set(graph.data.keys()) == before_nodes
+
