@@ -51,8 +51,12 @@ def test_provision_update_modifies_existing():
 def test_provision_clone_produces_new_uid():
     g, n = _frame_with_cursor()
     ref = g.add_node(label="Ref")
-    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.CLONE,
-                            identifier="Ref", template={"label": "RefClone"})
+    req = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.CLONE,
+        reference_id=ref.uid,
+        template={"label": "RefClone"},
+    )
     Dependency[Node](graph=g, source_id=n.uid, requirement=req)
     frame = Frame(graph=g, cursor_id=n.uid)
     frame.run_phase(P.PLANNING)
