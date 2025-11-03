@@ -17,6 +17,26 @@ The redesign (v3.7) focuses on three goals:
 Planning receipts (:class:`BuildReceipt` and :class:`PlanningReceipt`) remain in
 this module because they summarise what happened to the emitted offers during a
 planning phase.
+
+Offer Selection & Deduplication
+-------------------------------
+
+Planning dispatch is responsible for collecting offers, deduplicating
+equivalent proposals, and selecting which ones to accept.  EXISTING offers can
+now expose :attr:`DependencyOffer.provider_id`, allowing the dispatcher to
+retain only the cheapest (and closest) offer for a given node without executing
+callbacks.
+
+Example::
+
+    >>> # Two provisioners both offer the same door
+    >>> local_offer.provider_id == door.uid
+    >>> global_offer.provider_id == door.uid
+    >>> # Deduplication keeps only the best-scored offer per requirement/provider
+
+CREATE/UPDATE/CLONE offers omit ``provider_id`` because they either produce a
+new node or mutate one after the offer is accepted, so duplicates are inherently
+distinct.
 """
 
 from __future__ import annotations
@@ -99,6 +119,8 @@ class DependencyOffer(ProvisionOffer):
     # Need provider id for existing to dedup
     target_tags: set[str] = Field(default_factory=set)
     accept_func: Callable[[Any], Node]
+    provider_id: UUID | None = None
+    """Identifier of the node that will be provided when known (EXISTING offers)."""
 
     def accept(self, *, ctx: "Context") -> Node:
         provider = self.accept_func(ctx)
