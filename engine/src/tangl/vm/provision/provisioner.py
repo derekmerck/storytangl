@@ -1,342 +1,284 @@
-# tangl/vm/planning/provisioning.py
-"""
-Provisioning logic
-==================
+"""Provisioners generate offers that can satisfy frontier requirements."""
 
-Why
-----
-Provides the default :class:`Provisioner`, responsible for satisfying a
-:class:`~tangl.vm.planning.requirement.Requirement` by locating or constructing
-a provider node.  It searches across one or more registries, updating or
-cloning existing nodes, or creating a new one from a template when needed.
-
-Key Features
-------------
-* **Multiple acquisition modes** – EXISTING, UPDATE, CLONE, CREATE.
-* **Graph integration** – discovered or built providers are bound to the
-  requirement and inserted into the active graph.
-* **Extensible** – domains may subclass or replace this implementation to
-  add scope‑aware provisioning, aliases, or custom creation pipelines.
-
-API
----
-- :class:`Provisioner` – default resolver for requirements.
-- :meth:`Provisioner.resolve` – main entry point; dispatches by policy.
-- :meth:`_resolve_existing` / :meth:`_resolve_update` / :meth:`_resolve_clone` / :meth:`_resolve_create` – internal helpers implementing each policy.
-"""
 from __future__ import annotations
-from typing import Iterable, Optional, Sequence, Type, TYPE_CHECKING
-import functools
 
-from tangl.type_hints import StringMap, Identifier, UnstructuredData
-from tangl.core import Node, Registry, Behavior, CallReceipt
-from tangl.core.behavior.behavior import HandlerType
+from copy import deepcopy
+from typing import Iterator, TYPE_CHECKING
+from uuid import UUID
+
+from pydantic import ConfigDict
+
+from tangl.core import Edge, Entity, Node, Registry
+
+from .offer import (
+    AffordanceOffer,
+    DependencyOffer,
+    ProvisionCost,
+    ProvisionOffer,
+)
 from .requirement import Requirement, ProvisioningPolicy
 
 if TYPE_CHECKING:
-    from .offer import ProvisionOffer
-    from ..context import Context
-
-# Provisioning
-# ------------
-# should go something like this, resolved over structural scopes:
-# - subgraph
-#    1. check if a direct provider (self.members) satisfies req -> existing offer
-#    2. check if a local indirect provider would satisfy req -> build offer
-#    3. check if a local template sent to the core builder would satisfy req -> build offer
-# - graph
-#    1. check if a direct provider (self.values()) satisfies req -> existing offer
-#    2. check if an author/app indirect builder would satisfy req (e.g., a wrapped singleton asset from the asset registry?) -> build offer
-#    3. check if an author template sent to the core builder would satisfy req -> build offer
-
-# this covers find and create types, consider update (find+update) / clone (find+copy+update)
-
-# find: find by identifier (exact) or by criteria (any)
-# update:  find + update (e.g., change appearance in place)
-# create: create by builder, template
-# clone: find + evolve (typically by template, e.g., materialize a sibling)
-
-# `provision_mode` is optional if only one of criteria or template is provided b/c it can be inferred.
-# - find -> criteria only
-# - create -> template only
-
-# Reqs with both criteria and template must explicitly declare their mode.
-# - find _or_ create -> criteria + template
-# - update -> criteria + template
-# - clone -> criteria + template
+    from tangl.vm.context import Context
+    from .open_edge import Dependency
 
 
-class Provisioner(Behavior):
-    """
-    Default provider resolver for independently satisfiable requirements.
+class Provisioner(Entity):
+    """Base class for objects that propose ways to satisfy requirements."""
 
-    Why
-    ----
-    Attempts to fulfill a :class:`~tangl.vm.planning.requirement.Requirement`
-    by applying the policy specified in its :attr:`Requirement.policy`.  Each
-    policy corresponds to a helper that locates, mutates, clones, or constructs
-    a provider node.
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    node_registry: Registry[Node] | None = None
+    template_registry: dict[str, dict] | None = None
+    layer: str = "global"
 
-    Key Features
-    ------------
-    * **Policy‑driven** – delegates to helpers matching :class:`ProvisioningPolicy`.
-    * **Registry search** – uses :meth:`~tangl.core.registry.Registry.chain_find_one`
-      across provided registries and the graph.
-    * **Template application** – UPDATE/CLONE/CREATE use the requirement’s
-      :attr:`Requirement.template` to modify or instantiate nodes.
-    * **Pure resolution** – :meth:`resolve` returns providers without mutating
-      requirements; callers decide how to handle success or failure.
-
-    API
-    ---
-    - :meth:`resolve()` – execute provisioning per policy and return a provider or ``None``.
-    - :meth:`_resolve_existing()` – locate existing provider.
-    - :meth:`_resolve_update()` – mutate in place using template.
-    - :meth:`_resolve_clone()` – duplicate and evolve a reference provider.
-    - :meth:`_resolve_create()` – instantiate from template.
-
-    """
-    phase: str = "PLANNING.OFFER"
-    result_type: Type = list['ProvisionOffer']
-    func: None = None
-    handler_type: HandlerType = HandlerType.INSTANCE_ON_OWNER
-
-    @staticmethod
-    def _resolve_existing(*registries: Registry,
-                          provider_id: Optional[Identifier] = None,
-                          provider_criteria: Optional[StringMap] = None) -> Optional[Node]:
-        """Find successor by reference and filter by criteria"""
-        # todo: do we want to check that it's available in the current ns?  We don't include the ns in the sig?
-        provider_criteria = provider_criteria or {}
-        if provider_id is not None:
-            # clobber existing if given
-            # Entity.has_identifier(x) will match uid, get_label(), and short_uid() by default
-            # for subclasses, it also matches fields tagged with "is_identifier" or methods
-            # annotated with meth._is_identifier = True
-            provider_criteria['has_identifier'] = provider_id
-        if not provider_criteria:
-            raise ValueError("Must include some provider id or criteria")
-        registries = [r for r in registries if r is not None]
-        if not registries:
-            raise ValueError("Must include at least one registry to search")
-        return Registry.chain_find_one(*registries, **provider_criteria)
-
-    @staticmethod
-    def _resolve_update(*registries: Registry,
-                        provider_id: Optional[Identifier] = None,
-                        provider_criteria: Optional[StringMap] = None,
-                        update_template: UnstructuredData = None
-                        ) -> Optional[Node]:
-        """Find successor by reference and filter by criteria, update by template"""
-        if update_template is None:
-            raise ValueError("UPDATE must include update template")
-        if 'graph' in update_template:
-            raise KeyError("Update template may not include 'graph' key")
-        provider = Provisioner._resolve_existing(*registries,
-                                                provider_id=provider_id,
-                                                provider_criteria=provider_criteria)
-        if not provider:
-            return None
-        provider.update_attrs(**update_template)
-        return provider
-
-    @staticmethod
-    def _resolve_clone(*registries: Registry,
-                       ref_id: Optional[Identifier] = None,
-                       ref_criteria: Optional[StringMap] = None,
-                       update_template: UnstructuredData = None
-                       ) -> Optional[Node]:
-        """Find successor by reference and filter by criteria, evolve copy by template"""
-        if update_template is None:
-            raise ValueError("CLONE must include update template")
-        if 'graph' in update_template:
-            raise KeyError("Update template may not include 'graph' key")
-        ref = Provisioner._resolve_existing(*registries,
-                                            provider_id=ref_id,
-                                            provider_criteria=ref_criteria)
-        if not ref:
-            return None
-        provider = ref.evolve(**update_template)  # todo: ensure NEW uid, graph says the same
-        return provider
-
-    @staticmethod
-    def _resolve_create(registry: Registry, provider_template: UnstructuredData) -> Node:
-        """Create successor from template"""
-        if 'graph' in provider_template:
-            raise KeyError("Provider template may not include 'graph' key")
-        provider = Node.structure(provider_template)
-        registry.add(provider)
-        return provider
-
-    def _requirement_registries(self, requirement: Requirement) -> tuple[Registry, ...]:
-        registries: list[Registry] = []
-        if isinstance(getattr(requirement, "graph", None), Registry):
-            registries.append(requirement.graph)
-        extra_registry = getattr(requirement, "registry", None)
-        if isinstance(extra_registry, Registry):
-            registries.append(extra_registry)
-        elif isinstance(extra_registry, Iterable):
-            registries.extend([r for r in extra_registry if isinstance(r, Registry)])
-        return tuple(registries)
-
-    def iter_requirement_registries(
+    def get_dependency_offers(
         self,
         requirement: Requirement,
         *,
-        ctx: "Context" | None = None,
-    ) -> tuple[Registry, ...]:
-        """Return registries to search while evaluating ``requirement``.
+        ctx: Context,
+    ) -> Iterator[DependencyOffer]:
+        raise NotImplementedError
 
-        Subclasses may override to inject additional registries derived from the
-        active :class:`~tangl.vm.context.Context`.
-        """
-
-        registries = list(self._requirement_registries(requirement))
-        if ctx is not None:
-            context_graph = getattr(ctx, "graph", None)
-            if context_graph is not None and all(r is not context_graph for r in registries):
-                registries.insert(0, context_graph)
-        return tuple(registries)
-
-    @staticmethod
-    def _iter_policies(policy: ProvisioningPolicy) -> Sequence[ProvisioningPolicy]:
-        if policy in (
-            ProvisioningPolicy.EXISTING,
-            ProvisioningPolicy.UPDATE,
-            ProvisioningPolicy.CREATE,
-            ProvisioningPolicy.CLONE,
-        ):
-            return (policy,)
-        policies: list[ProvisioningPolicy] = []
-        for candidate in ProvisioningPolicy:
-            if candidate in (ProvisioningPolicy.NOOP, ProvisioningPolicy.ANY):
-                continue
-            if candidate in policy:
-                policies.append(candidate)
-        return tuple(policies)
+    def get_affordance_offers(
+        self,
+        node: Node,
+        *,
+        ctx: Context,
+    ) -> Iterator[AffordanceOffer]:
+        return iter(())
 
     def get_offers(
         self,
+        requirement: Requirement | "Dependency" | None = None,
+        *,
+        ctx: Context,
+        node: Node | None = None,
+    ) -> list[ProvisionOffer]:
+        """Compatibility shim returning a concrete list of offers."""
+
+        if requirement is not None:
+            req: Requirement
+            if hasattr(requirement, "requirement"):
+                dependency = requirement  # type: ignore[assignment]
+                req = dependency.requirement  # type: ignore[attr-defined]
+            else:
+                req = requirement  # type: ignore[assignment]
+            return list(self.get_dependency_offers(req, ctx=ctx))
+
+        if node is None:
+            cursor_id = getattr(ctx, "cursor_id", None)
+            if cursor_id is not None:
+                node = ctx.graph.get(cursor_id)
+        if node is None:
+            raise ValueError("node must be provided when collecting affordance offers")
+        return list(self.get_affordance_offers(node, ctx=ctx))
+
+
+class GraphProvisioner(Provisioner):
+    """Offer existing nodes from a registry."""
+
+    def __init__(self, node_registry: Registry[Node], **kwargs):
+        super().__init__(**kwargs)
+        self.node_registry = node_registry
+
+    def get_dependency_offers(
+        self,
         requirement: Requirement,
         *,
-        ctx: "Context" | None = None,
-    ) -> list[ProvisionOffer]:
-        from .offer import ProvisionOffer
+        ctx: Context,
+    ) -> Iterator[DependencyOffer]:
+        if self.node_registry is None:
+            return
 
-        registries = self.iter_requirement_registries(requirement, ctx=ctx)
-        offers: list[ProvisionOffer] = []
-
-        extant: Optional[Node] = None
-        if requirement.identifier or requirement.criteria:
-            try:
-                extant = self._resolve_existing(
-                    *registries,
-                    provider_id=requirement.identifier,
-                    provider_criteria=requirement.criteria,
-                )
-            except ValueError:
-                extant = None
-
-        has_template = requirement.template is not None
-
-        for policy in self._iter_policies(requirement.policy):
-            accept_cb = None
-            match policy:
-                case ProvisioningPolicy.EXISTING if extant is not None:
-                    accept_cb = functools.partial(
-                        self._resolve_existing,
-                        *registries,
-                        provider_id=extant.uid,
-                    )
-                case ProvisioningPolicy.UPDATE if extant is not None and has_template:
-                    accept_cb = functools.partial(
-                        self._resolve_update,
-                        *registries,
-                        provider_id=extant.uid,
-                        update_template=requirement.template,
-                    )
-                case ProvisioningPolicy.CLONE if extant is not None and has_template:
-                    accept_cb = functools.partial(
-                        self._resolve_clone,
-                        *registries,
-                        ref_id=extant.uid,
-                        update_template=requirement.template,
-                    )
-                case ProvisioningPolicy.CREATE if has_template and registries:
-                    accept_cb = functools.partial(
-                        self._resolve_create,
-                        registries[0],
-                        requirement.template,
-                    )
-                case _:
-                    continue
-
-            offers.append(
-                ProvisionOffer(
-                    requirement=requirement,
-                    provisioner=self,
-                    accept_func=accept_cb,
-                    operation=policy,
-                )
+        seen: set[UUID] = set()
+        criteria = requirement.get_selection_criteria()
+        for node in self.node_registry.find_all(**criteria):
+            if not requirement.satisfied_by(node):
+                continue
+            if node.uid in seen:
+                continue
+            seen.add(node.uid)
+            yield DependencyOffer(
+                requirement_id=requirement.uid,
+                operation="EXISTING",
+                cost=ProvisionCost.DIRECT,
+                accept_func=lambda ctx, n=node: n,
+                source_provisioner_id=self.uid,
+                source_layer=self.layer,
             )
 
-        return offers
 
-    def __call__(
-        self,
-        requirement: Requirement,
-        *args,
-        **kwargs,
-    ) -> CallReceipt:
-        ctx: "Context" | None = kwargs.get("ctx")
-        offers = self.get_offers(requirement=requirement, ctx=ctx)
-        return CallReceipt(
-            blame_id=self.uid,
-            caller_id=requirement.uid,
-            result=offers,
-            result_type=self.result_type,
-        )
+class TemplateProvisioner(Provisioner):
+    """Create new nodes from requirement templates."""
 
-    def resolve(
+    def __init__(self, template_registry: dict[str, dict] | None = None, **kwargs):
+        super().__init__(template_registry=template_registry or {}, **kwargs)
+
+    def _resolve_template(self, requirement: Requirement) -> dict | None:
+        if requirement.template is not None:
+            return deepcopy(requirement.template)
+        if self.template_registry and requirement.identifier:
+            template = self.template_registry.get(str(requirement.identifier))
+            if template is not None:
+                return deepcopy(template)
+        return None
+
+    def get_dependency_offers(
         self,
         requirement: Requirement,
         *,
-        ctx: "Context" | None = None,
-    ) -> Optional[Node]:
-        """Return a provider for ``requirement`` or ``None`` without side effects."""
+        ctx: Context,
+    ) -> Iterator[DependencyOffer]:
+        template = self._resolve_template(requirement)
+        if template is None:
+            return
 
-        provider = None
+        def create_node(ctx: Context) -> Node:
+            template_data = deepcopy(template)
+            template_data.setdefault("obj_cls", Node)
+            template_data["graph"] = ctx.graph
+            return Node.structure(template_data)
 
-        registries = self.iter_requirement_registries(requirement, ctx=ctx)
+        yield DependencyOffer(
+            requirement_id=requirement.uid,
+            operation="CREATE",
+            cost=ProvisionCost.CREATE,
+            accept_func=create_node,
+            source_provisioner_id=self.uid,
+            source_layer=self.layer,
+        )
 
-        match requirement.policy:
-            case ProvisioningPolicy.EXISTING:
-                provider = self._resolve_existing(
-                    *registries,
-                    provider_id=requirement.identifier,
-                    provider_criteria=requirement.criteria,
+
+class UpdatingProvisioner(TemplateProvisioner):
+    """Modify existing nodes with template data."""
+
+    def __init__(self, node_registry: Registry[Node], **kwargs):
+        super().__init__(**kwargs)
+        self.node_registry = node_registry
+
+    def get_dependency_offers(
+        self,
+        requirement: Requirement,
+        *,
+        ctx: Context,
+    ) -> Iterator[DependencyOffer]:
+        if self.node_registry is None:
+            return
+        template = self._resolve_template(requirement)
+        if template is None:
+            return
+
+        template.pop("graph", None)
+        seen: set[UUID] = set()
+        criteria = requirement.get_selection_criteria()
+
+        for node in self.node_registry.find_all(**criteria):
+            if not requirement.satisfied_by(node):
+                continue
+            if node.uid in seen:
+                continue
+            seen.add(node.uid)
+
+            def update_node(ctx: Context, n=node) -> Node:
+                n.update_attrs(**template)
+                return n
+
+            yield DependencyOffer(
+                requirement_id=requirement.uid,
+                operation="UPDATE",
+                cost=ProvisionCost.LIGHT_INDIRECT,
+                accept_func=update_node,
+                source_provisioner_id=self.uid,
+                source_layer=self.layer,
+            )
+
+
+class CloningProvisioner(TemplateProvisioner):
+    """Clone and evolve existing nodes using a template."""
+
+    def __init__(self, node_registry: Registry[Node], **kwargs):
+        super().__init__(**kwargs)
+        self.node_registry = node_registry
+
+    def get_dependency_offers(
+        self,
+        requirement: Requirement,
+        *,
+        ctx: Context,
+    ) -> Iterator[DependencyOffer]:
+        if self.node_registry is None:
+            return
+        template = self._resolve_template(requirement)
+        if template is None:
+            return
+
+        template.pop("graph", None)
+        seen: set[UUID] = set()
+        criteria = requirement.get_selection_criteria()
+
+        for node in self.node_registry.find_all(**criteria):
+            if not requirement.satisfied_by(node):
+                continue
+            if node.uid in seen:
+                continue
+            seen.add(node.uid)
+
+            def clone_node(ctx: Context, n=node) -> Node:
+                return n.evolve(**template)
+
+            yield DependencyOffer(
+                requirement_id=requirement.uid,
+                operation="CLONE",
+                cost=ProvisionCost.HEAVY_INDIRECT,
+                accept_func=clone_node,
+                source_provisioner_id=self.uid,
+                source_layer=self.layer,
+            )
+
+
+class CompanionProvisioner(Provisioner):
+    """Example provisioner that offers character affordances."""
+
+    companion_node: Node
+
+    def __init__(self, companion_node: Node, **kwargs):
+        super().__init__(companion_node=companion_node, **kwargs)
+
+    def get_affordance_offers(
+        self,
+        node: Node,
+        *,
+        ctx: Context,
+    ) -> Iterator[AffordanceOffer]:
+        def create_affordance(label: str, *, target_tags: set[str] | None = None) -> AffordanceOffer:
+            def _accept(context: Context, dest: Node) -> Edge:
+                from tangl.vm.provision import Affordance
+
+                req = Requirement(
+                    graph=context.graph,
+                    identifier=self.companion_node.uid,
+                    policy=ProvisioningPolicy.EXISTING,
                 )
-            case ProvisioningPolicy.UPDATE:
-                provider = self._resolve_update(
-                    *registries,
-                    provider_id=requirement.identifier,
-                    provider_criteria=requirement.criteria,
-                    update_template=requirement.template
-                    )
-            case ProvisioningPolicy.CLONE:
-                provider = self._resolve_clone(
-                    *registries,
-                    ref_id=requirement.identifier,
-                    ref_criteria=requirement.criteria,
-                    update_template=requirement.template
-                    )
-            case ProvisioningPolicy.CREATE:
-                registry = registries[0] if registries else requirement.graph
-                provider = self._resolve_create(
-                    registry,
-                    requirement.template
-                    )
-            case _:
-                raise ValueError(f"Unsupported provisioning policy {requirement.policy}")
+                req.provider = self.companion_node
+                return Affordance(
+                    graph=context.graph,
+                    source=self.companion_node,
+                    destination=dest,
+                    requirement=req,
+                    label=label,
+                )
 
-        return provider
+            return AffordanceOffer(
+                label=label,
+                cost=ProvisionCost.DIRECT,
+                accept_func=_accept,
+                source_provisioner_id=self.uid,
+                source_layer=self.layer,
+                target_tags=target_tags or set(),
+            )
+
+        yield create_affordance("talk")
+
+        if "happy" in self.companion_node.tags:
+            yield create_affordance("sing", target_tags={"musical", "peaceful"})
+

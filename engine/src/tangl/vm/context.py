@@ -15,7 +15,7 @@ from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
 from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt
-from .provision import ProvisionOffer
+from .provision import BuildReceipt, ProvisionOffer
 
 if TYPE_CHECKING:
     from .traversal import TraversableSubgraph
@@ -113,5 +113,6 @@ class Context:
             self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
         return self._ns_cache[node.uid]
 
-    provision_offers: dict[UUID, ProvisionOffer] = field(default_factory=dict)
+    provision_offers: dict[UUID | str, list[ProvisionOffer]] = field(default_factory=dict)
+    provision_builds: list[BuildReceipt] = field(default_factory=list)
     journal_content: dict[str, dict] = field(default_factory=dict)

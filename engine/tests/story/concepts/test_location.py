@@ -5,7 +5,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.story.concepts.location import Location, Setting
-from tangl.vm.provision.provisioner import Provisioner, ProvisioningPolicy
+from tangl.vm.provision import GraphProvisioner, TemplateProvisioner
 
 @pytest.fixture
 def location_setting():
@@ -22,14 +22,11 @@ def test_location_setting_sat(location_setting) -> None:
 def test_setting_prov(location_setting):
     location, setting = location_setting
     ctx = SimpleNamespace(graph=location.graph)
-    prov = Provisioner()
-    offers = prov.get_offers(setting.requirement, ctx=ctx)
+    prov = GraphProvisioner(node_registry=location.graph, layer="local")
+    offers = list(prov.get_dependency_offers(setting.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation == ProvisioningPolicy.EXISTING
-
-    for offer in offers:
-        print(offer.describe())
+    assert offers[0].operation == "EXISTING"
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -45,16 +42,14 @@ def test_location_setting_unsat(location_setting):
 
 def test_alice_templ_prov(location_setting):
     location, setting = location_setting
-    prov = Provisioner()
+    graph_prov = GraphProvisioner(node_registry=location.graph, layer="local")
+    template_prov = TemplateProvisioner(layer="author")
     wants_city = Setting(location_ref="city", location_template={"label": "city"}, graph=location.graph)
     ctx = SimpleNamespace(graph=location.graph)
-    offers = prov.get_offers(wants_city.requirement, ctx=ctx)
+    offers = list(template_prov.get_dependency_offers(wants_city.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation == ProvisioningPolicy.CREATE
-
-    for offer in offers:
-        print(offer.describe())
+    assert offers[0].operation == "CREATE"
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -65,8 +60,10 @@ def test_alice_templ_prov(location_setting):
 
     wants_city2 = Setting(location_ref="city", location_template={"label": "city"}, graph=location.graph)
 
-    offers = prov.get_offers(wants_city2.requirement, ctx=ctx)
-    assert len(offers) >= 2  # find create; update is included, even though update is irrelevant
-    for offer in offers:
-        print(offer.describe())
+    offers = []
+    offers.extend(graph_prov.get_dependency_offers(wants_city2.requirement, ctx=ctx))
+    offers.extend(template_prov.get_dependency_offers(wants_city2.requirement, ctx=ctx))
+    kinds = {offer.operation for offer in offers}
+    assert "EXISTING" in kinds
+    assert "CREATE" in kinds
 

@@ -19,13 +19,22 @@ from collections import defaultdict
 from uuid import UUID
 import logging
 from functools import partial
-from warnings import warn
+from typing import Iterable
 
 from tangl.core import Entity, Node
 from tangl.core.behavior import HandlerPriority as Prio, CallReceipt, ContextP
 from tangl.core.dispatch import scoped_dispatch
 from tangl.vm import ResolutionPhase as P, Context, ChoiceEdge
-from tangl.vm.provision import Provisioner, ProvisionOffer, Dependency
+from tangl.vm.provision import (
+    Provisioner,
+    ProvisionOffer,
+    Dependency,
+    AffordanceOffer,
+    DependencyOffer,
+    BuildReceipt,
+    PlanningReceipt,
+    ProvisioningPolicy,
+)
 from .vm_dispatch import vm_dispatch
 
 logger = logging.getLogger(__name__)
@@ -73,27 +82,48 @@ def do_get_provisioners(anchor: Node, *, ctx: ContextP, extra_handlers=None, **k
 
 on_planning = partial(vm_dispatch.register, task=P.PLANNING)
 
-def _sort_offers(offers: list[ProvisionOffer],
-                 provisioners: list[Provisioner]) -> list[ProvisionOffer]:
-    """
-    Sort offers by:
-    1. Proximity (closer first) - from provisioner's location
-    2. Cost (lower first) - from offer
-    """
-    # todo: include provisioner layer as sort key?  Sort using dispatch sort?
-    #       this _is_ a kind of filtered dispatch...
+def _policy_from_offer(offer: DependencyOffer) -> ProvisioningPolicy:
+    try:
+        return ProvisioningPolicy[offer.operation]
+    except KeyError:
+        return ProvisioningPolicy.NOOP
 
-    prov_ids = [p.uid for p in provisioners]
 
-    def prox(o: ProvisionOffer):
-        return prov_ids.index(o.blame_id)
+def _iter_frontier(cursor: Node) -> list[Node]:
+    nodes = [
+        edge.destination
+        for edge in cursor.edges_out(is_instance=ChoiceEdge)
+        if edge.destination is not None
+    ]
+    return nodes or [cursor]
 
-    return sorted(
-        offers,
-        key=lambda o: ( -prox(o),
-                        getattr(o, 'cost', 1.0)
+
+def _attach_offer_metadata(
+    offer: ProvisionOffer,
+    provisioner: Provisioner,
+    proximity: int,
+) -> ProvisionOffer:
+    if offer.source_provisioner_id is None:
+        offer.source_provisioner_id = provisioner.uid
+    if offer.source_layer is None:
+        offer.source_layer = getattr(provisioner, "layer", None)
+    offer.proximity = min(getattr(offer, "proximity", proximity), proximity)
+    return offer
+
+
+def _sort_offers(offers: Iterable[ProvisionOffer]) -> list[ProvisionOffer]:
+    enumerated = list(enumerate(offers))
+    return [
+        offer
+        for _, offer in sorted(
+            enumerated,
+            key=lambda item: (
+                getattr(item[1], "cost", 0),
+                getattr(item[1], "proximity", 999),
+                item[0],
+            ),
         )
-    )
+    ]
 
 @on_planning(priority=Prio.EARLY)
 def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
@@ -109,37 +139,34 @@ def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     it in `ctx.call_receipts` by default.
     """
 
-    provisioners = do_get_provisioners(cursor, ctx=ctx)
-    offers: dict[UUID|str, list[ProvisionOffer]] = defaultdict(list)
+    provisioners = list(do_get_provisioners(cursor, ctx=ctx))
+    indexed_provisioners = list(enumerate(provisioners))
+    offers: dict[UUID | str, list[ProvisionOffer]] = defaultdict(list)
 
-    # Gather broadcast affordance offers (not responsive to specific reqs)
-    for prox, provisioner in enumerate( provisioners ):
-        _offers = provisioner.get_offers()
-        offers['*'].extend(_offers)
+    for proximity, provisioner in indexed_provisioners:
+        for offer in provisioner.get_affordance_offers(cursor, ctx=ctx):
+            offers["*"].append(_attach_offer_metadata(offer, provisioner, proximity))
 
-    # Gather responsive/unicast offers for each frontier node's dependencies
-    for edge in cursor.edges_out(is_instance=ChoiceEdge):
-        # All possible structural successors
-        frontier_node = edge.destination
-        if frontier_node is None:
-            warn("Skipped missing frontier node, this should only happen in testing.")
-            continue
-        for dep in get_dependencies(frontier_node, satsified=False):
-            for provisioner in provisioners:
-                offers[dep.uid].extend(provisioner.get_offers(dep))
+    for frontier_node in _iter_frontier(cursor):
+        for dep in get_dependencies(frontier_node, satisfied=False):
+            for proximity, provisioner in indexed_provisioners:
+                for offer in provisioner.get_dependency_offers(dep.requirement, ctx=ctx):
+                    offers[dep.uid].append(
+                        _attach_offer_metadata(offer, provisioner, proximity)
+                    )
 
-    offers = { k: _sort_offers(v, provisioners) for k, v in offers.items() }
+    sorted_offers = {key: _sort_offers(value) for key, value in offers.items()}
 
-    # Stash provision offers across sub-phases
     if hasattr(ctx, "provision_offers"):
-        ctx.provision_offers.update(offers)  # frozen, don't reassign, update
-    return offers
+        for key, value in sorted_offers.items():
+            ctx.provision_offers.setdefault(key, []).extend(value)
+    return sorted_offers
     # Offers are also be wrapped in a call receipt and added to ctx.call_receipts
 
 # ------------------
 # 2. Handle affordances
 
-def _unstash_offers(ctx: ContextP) -> dict[UUID, ProvisionOffer]:
+def _unstash_offers(ctx: ContextP) -> dict[UUID | str, list[ProvisionOffer]]:
     if hasattr(ctx, "provision_offers"):
         return ctx.provision_offers
     if hasattr(ctx, "call_receipts"):
@@ -150,32 +177,35 @@ def _unstash_offers(ctx: ContextP) -> dict[UUID, ProvisionOffer]:
 def _planning_link_affordances(cursor: Node, *, ctx: Context, **kwargs):
 
     offers = _unstash_offers(ctx)
-    affordance_offers = offers.get('*', [])
-    # default dict, returns [] on missing, regardless
+    affordance_offers = offers.get("*", [])
 
-    # Track which affordance labels have been used per frontier node
     used_labels: dict[UUID, set[str]] = defaultdict(set)
 
-    # for each affordance offer, try to link to all frontier nodes
     for offer in affordance_offers:
-        for edge in cursor.edges_out(is_instance=ChoiceEdge):
-            # All possible structural successors
-            frontier_node = edge.destination
-            ns = ctx.get_ns(frontier_node)
+        if not isinstance(offer, AffordanceOffer):
+            continue
+        for frontier_node in _iter_frontier(cursor):
+            label = offer.get_label()
+            if label is not None and label in used_labels[frontier_node.uid]:
+                continue
+            if not offer.available_for(frontier_node):
+                continue
+            try:
+                affordance_edge = offer.accept(ctx=ctx, destination=frontier_node)
+            except Exception:
+                logger.exception(
+                    "Provisioner affordance offer failed",
+                    extra={"offer": offer, "destination": frontier_node},
+                )
+                continue
 
-            if offer.satisfied_by(frontier_node) and \
-                    offer.available(ns) and \
-                    offer.get_label() not in used_labels[frontier_node.uid]:
-                aff = offer.accept()  # type: Edge
-                # todo: affordances may have _many_ sources or need to be copied
-                #       when attached?  add_source() func that copies the edge?
-                aff.sources.append(frontier_node)
-                used_labels[frontier_node.uid].add(offer.get_label())
+            if label is not None:
+                used_labels[frontier_node.uid].add(label)
 
-                for dep in get_dependencies(frontier_node, satisfied=False):
-                    if dep.satsified_by(aff.destination):
-                        dep.destination = aff.destination
-                        # satisfy dependencies if possible
+            for dep in get_dependencies(frontier_node, satisfied=False):
+                provider = affordance_edge.destination
+                if provider is not None and dep.satisfied_by(provider):
+                    dep.destination = provider
 
 # --------------------------
 # 3. accept offers and link
@@ -184,25 +214,73 @@ def _planning_link_affordances(cursor: Node, *, ctx: Context, **kwargs):
 def _planning_link_dependencies(cursor: Node, *, ctx: Context, **kwargs):
 
     offers = _unstash_offers(ctx)
+    builds = getattr(ctx, "provision_builds", [])
 
-    # for each frontier node, try to link its deps with provide offers
-    for edge in cursor.edges_out(is_instance=ChoiceEdge):
-        # All possible structural successors
-        frontier_node = edge.destination
-        ns = ctx.get_ns(frontier_node)
-
+    for frontier_node in _iter_frontier(cursor):
         for dep in get_dependencies(frontier_node, satisfied=False):
-            for offer in offers.get(dep.uid, []):
-                # how do we sort offers by cost/prox
-                # only accept one per dependency label?
-                if offer.available(ns):  # responsive, guaranteed satisfied
-                    provider = offer.accept()
-                    dep.destination = provider  # calls on-link
+            requirement = dep.requirement
+            accepted_provider: Node | None = None
 
-                    # satisfy other dependencies if able
-                    for dep_ in get_dependencies(frontier_node, satisfied=False):
-                        if dep_.satsified_by(provider):
-                            dep_.destination = provider
+            for offer in offers.get(dep.uid, []):
+                if not isinstance(offer, DependencyOffer):
+                    continue
+                try:
+                    provider = offer.accept(ctx=ctx)
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.exception(
+                        "Provisioner dependency offer failed",
+                        extra={"offer": offer, "requirement": requirement},
+                    )
+                    requirement.is_unresolvable = True
+                    builds.append(
+                        BuildReceipt(
+                            provisioner_id=offer.source_provisioner_id or offer.uid,
+                            requirement_id=requirement.uid,
+                            provider_id=None,
+                            operation=_policy_from_offer(offer),
+                            accepted=False,
+                            hard_req=requirement.hard_requirement,
+                            reason=str(exc),
+                        )
+                    )
+                    continue
+
+                if provider is None:
+                    continue
+
+                dep.destination = provider
+                for sibling in get_dependencies(frontier_node, satisfied=False):
+                    if sibling is not dep and sibling.satisfied_by(provider):
+                        sibling.destination = provider
+
+                builds.append(
+                    BuildReceipt(
+                        provisioner_id=offer.source_provisioner_id or offer.uid,
+                        requirement_id=requirement.uid,
+                        provider_id=provider.uid,
+                        operation=_policy_from_offer(offer),
+                        accepted=True,
+                        hard_req=requirement.hard_requirement,
+                    )
+                )
+                accepted_provider = provider
+                break
+
+            if accepted_provider is None:
+                requirement.is_unresolvable = True
+                builds.append(
+                    BuildReceipt(
+                        provisioner_id=UUID(int=0),
+                        requirement_id=requirement.uid,
+                        provider_id=None,
+                        operation=ProvisioningPolicy.NOOP,
+                        accepted=False,
+                        hard_req=requirement.hard_requirement,
+                        reason="no_viable_offers",
+                    )
+                )
+
+    return list(builds)
 
 # --------------------------
 # 4. Provide a summary job receipt
@@ -210,4 +288,8 @@ def _planning_link_dependencies(cursor: Node, *, ctx: Context, **kwargs):
 @on_planning(priority=Prio.LAST)
 def _planning_job_receipt(cursor: Node, *, ctx: Context, **kwargs):
     """Summarize build receipts into a :class:`~tangl.vm.planning.PlanningReceipt`."""
-    ...
+    builds = getattr(ctx, "provision_builds", [])
+    receipt = PlanningReceipt.summarize(*builds)
+    ctx.provision_offers.clear()
+    builds.clear()
+    return receipt

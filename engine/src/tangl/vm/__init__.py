@@ -63,10 +63,18 @@ from .dispatch import vm_dispatch
 from .provision import (
     Requirement,
     Provisioner,
+    GraphProvisioner,
+    TemplateProvisioner,
+    UpdatingProvisioner,
+    CloningProvisioner,
+    CompanionProvisioner,
     Dependency,
     Affordance,
     ProvisioningPolicy,
     ProvisionOffer,
+    DependencyOffer,
+    AffordanceOffer,
+    ProvisionCost,
     BuildReceipt,
     PlanningReceipt,
 )
@@ -81,5 +89,5 @@ __all__ = [
     # dispatch
     "vm_dispatch",
     # planning
-    "Requirement", "Provisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "BuildReceipt", "PlanningReceipt",
+    "Requirement", "Provisioner", "GraphProvisioner", "TemplateProvisioner", "UpdatingProvisioner", "CloningProvisioner", "CompanionProvisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "DependencyOffer", "AffordanceOffer", "ProvisionCost", "BuildReceipt", "PlanningReceipt",
     ]
