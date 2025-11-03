@@ -62,8 +62,10 @@ class Requirement(GraphItem, Generic[NodeT]):
     * **Multiple acquisition modes** – find, update, create, or clone via :class:`ProvisioningPolicy`.
     * **Flexible targeting** – match by :attr:`identifier` or :attr:`criteria` (or both).
     * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE/CLONE.
+    * **Explicit cloning** – :attr:`reference_id` binds CLONE operations to a specific source node.
     * **Binding** – :attr:`provider` resolves to a live :class:`~tangl.core.graph.Node`; auto-added to the graph if needed.
     * **Hard/soft semantics** – :attr:`hard_requirement` gates whether unresolved requirements block progress.
+    * **Scoped inheritance** – :attr:`satisfied_at_scope_id` records where a binding occurred for downstream reuse.
 
     API
     ---
@@ -72,16 +74,19 @@ class Requirement(GraphItem, Generic[NodeT]):
     - :attr:`template` – unstructured data used to create/update/clone a provider.
     - :attr:`policy` – :class:`ProvisioningPolicy` that validates required fields.
     - :attr:`provider` – get/set bound provider node (backed by :attr:`provider_id`).
+    - :attr:`reference_id` – explicit source node for :attr:`ProvisioningPolicy.CLONE`.
     - :attr:`hard_requirement` – if ``True``, unresolved requirements are reported at planning end.
     - :attr:`is_unresolvable` – sticky flag when prior attempts failed.
+    - :attr:`satisfied_at_scope_id` – scope node where the requirement was satisfied.
     - :attr:`satisfied` – ``True`` if a provider is bound or the requirement is soft.
 
     Notes
     -----
     Validation rules:
 
-    - ``EXISTING/UPDATE/CLONE`` require :attr:`identifier` **or** :attr:`criteria`.
-    - ``CREATE/UPDATE/CLONE`` require :attr:`template`.
+    - ``EXISTING/UPDATE`` require :attr:`identifier` **or** :attr:`criteria`.
+    - ``CLONE`` requires :attr:`reference_id` and :attr:`template`.
+    - ``CREATE/UPDATE`` require :attr:`template`.
     """
     provider_id: Optional[UUID] = None
 
@@ -89,6 +94,11 @@ class Requirement(GraphItem, Generic[NodeT]):
     criteria: Optional[StringMap] = Field(default_factory=dict)
     template: Optional[UnstructuredData] = None
     policy: ProvisioningPolicy = ProvisioningPolicy.ANY
+    reference_id: Optional[UUID] = None
+    """Explicit reference node to support :attr:`ProvisioningPolicy.CLONE`."""
+
+    satisfied_at_scope_id: Optional[UUID] = None
+    """Scope identifier where the requirement was satisfied."""
 
     @model_validator(mode="after")
     def _validate_policy(self):
@@ -109,21 +119,23 @@ class Requirement(GraphItem, Generic[NodeT]):
         if self.policy is ProvisioningPolicy.NOOP:
             raise ValueError("Policy cannot be NOOP")
 
-        if self.policy in [ProvisioningPolicy.EXISTING,
-                           ProvisioningPolicy.UPDATE,
-                           ProvisioningPolicy.CLONE ]:
+        if self.policy in [ProvisioningPolicy.EXISTING, ProvisioningPolicy.UPDATE]:
             if self.identifier is None and self.criteria is None:
-                raise ValueError("EXISTING/UPDATE/CLONE requires an identifier or match criteria")
+                raise ValueError("EXISTING/UPDATE requires an identifier or match criteria")
 
-        if self.policy in [ProvisioningPolicy.CREATE,
-                           ProvisioningPolicy.UPDATE,
-                           ProvisioningPolicy.CLONE]:
+        if self.policy is ProvisioningPolicy.CLONE:
+            if self.reference_id is None:
+                raise ValueError("CLONE requires reference_id to specify source node")
             if self.template is None:
-                raise ValueError("CREATE/UPDATE/CLONE requires a template")
+                raise ValueError("CLONE requires template data to evolve clone")
+
+        if self.policy in [ProvisioningPolicy.CREATE, ProvisioningPolicy.UPDATE]:
+            if self.template is None:
+                raise ValueError(f"{self.policy.name} requires a template")
 
         if self.policy in [ProvisioningPolicy.ANY]:
             if self.identifier is None and self.criteria is None and self.template is None:
-                raise ValueError("ALL requires at least one of identifier, criteria, or template")
+                raise ValueError("ANY requires at least one of identifier, criteria, or template")
 
         return self
 
@@ -150,6 +162,14 @@ class Requirement(GraphItem, Generic[NodeT]):
     @property
     def satisfied(self):
         return self.provider is not None or not self.hard_requirement
+
+    @property
+    def reference(self) -> Optional[NodeT]:
+        """Return the reference node used for :attr:`ProvisioningPolicy.CLONE`."""
+
+        if self.reference_id is None:
+            return None
+        return self.graph.get(self.reference_id)
 
     def get_selection_criteria(self) -> StringMap:
         criteria = deepcopy(self.criteria)
