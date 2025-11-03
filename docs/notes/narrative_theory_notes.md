@@ -12,4 +12,4 @@ Capture the recurring theoretical framing that guided earlier iterations so we c
 ## Implications for the modern engine
 
 - The VM phase bus reflects the "observation collapses possibility" framing: `ResolutionPhase` enumerates ordered, auditable passes that gather context, realize dependencies, and emit a journal, echoing the theoretical requirement for deterministic yet revisitable progression.【F:engine/src/tangl/vm/frame.py†L23-L140】
-- `Context` and `Scope` provide the layered perspective shifts (global → domain → local) discussed in the theory docs, ensuring that observation is always grounded in the correct namespace hierarchy.【F:scratch/overviews/notes_v34.md†L189-L196】【F:engine/src/tangl/vm/context.py†L1-L114】【F:engine/src/tangl/core/domain/scope.py†L1-L104】
+- `Context` and layered behavior registries provide the perspective shifts (global → system → local) discussed in the theory docs, ensuring that observation is always grounded in the correct namespace hierarchy.【F:scratch/overviews/notes_v34.md†L189-L196】【F:engine/src/tangl/vm/context.py†L1-L147】【F:engine/src/tangl/core/behavior/behavior_registry.py†L1-L189】

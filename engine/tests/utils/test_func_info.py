@@ -1,7 +1,10 @@
-import pytest
 import logging
+from typing import Self
+
+import pytest
+
 from tangl.core import Entity
-from tangl.utils.func_info import FuncInfo, HandlerType
+from tangl.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerType
 
 
 # Test fixtures
@@ -139,6 +142,22 @@ def test_owner_cls_inferred_from_owner_instance():
     assert info.owner_cls is TaskManager
 
 
+# ==================== Explicit owner_cls hints without owner ====================
+
+def test_owner_cls_matching_caller_does_not_flip_instance_binding():
+    """Explicit owner_cls equal to caller keeps INSTANCE_ON_CALLER semantics."""
+
+    class Local(Node):
+        def local_handler(self, item: Node, ctx=None):
+            return None
+
+    info = FuncInfo.from_func(Local.local_handler, owner_cls=Local)
+
+    assert info.handler_type is HandlerType.INSTANCE_ON_CALLER
+    assert info.owner_cls is Local
+    assert info.caller_cls is Local
+
+
 # ==================== Edge Cases ====================
 
 def test_none_function_returns_none():
@@ -269,7 +288,6 @@ def test_local_class_instance_lambda_self_only():
     assert info.handler_type is HandlerType.INSTANCE_ON_CALLER
     assert info.caller_cls is N
 
-from typing import Self
 def test_classmethod_caller_self_maps_to_declaring_class():
     class C(Entity):
         @classmethod
@@ -280,3 +298,79 @@ def test_classmethod_caller_self_maps_to_declaring_class():
 
     assert info.handler_type is HandlerType.CLASS_ON_CALLER
     assert info.caller_cls is C
+
+
+# ==================== Behavior integration helpers ====================
+
+
+def test_apply_behavior_defaults_preserves_explicit_handler_type():
+    info = FuncInfo.from_func(static_handler)
+    values = {"func": static_handler, "handler_type": HandlerType.INSTANCE_ON_CALLER}
+
+    hints = BehaviorExplicitHints(
+        handler_type=True,
+        owner=False,
+        owner_cls=False,
+        caller_cls=False,
+    )
+
+    merged = info.apply_behavior_defaults(values, explicit=hints)
+
+    assert merged["handler_type"] is HandlerType.INSTANCE_ON_CALLER
+
+
+def test_apply_behavior_defaults_backfills_owner_when_missing():
+    mgr = TaskManager(label="mgr")
+    info = FuncInfo.from_func(mgr.manage)
+    values = {"func": TaskManager.manage}
+
+    hints = BehaviorExplicitHints(
+        handler_type=False,
+        owner=False,
+        owner_cls=False,
+        caller_cls=False,
+    )
+
+    merged = info.apply_behavior_defaults(values, explicit=hints)
+
+    assert merged["owner"] is mgr
+    assert merged["owner_cls"] is TaskManager
+
+
+def test_apply_behavior_defaults_keeps_explicit_owner_and_owner_cls():
+    mgr = TaskManager(label="mgr2")
+    info = FuncInfo.from_func(TaskManager.manage, owner=mgr)
+    values = {"func": TaskManager.manage, "owner": mgr}
+
+    hints = BehaviorExplicitHints(
+        handler_type=False,
+        owner=True,
+        owner_cls=False,
+        caller_cls=False,
+        owner_value=mgr,
+    )
+
+    merged = info.apply_behavior_defaults(values, explicit=hints)
+
+    assert merged["owner"] is mgr
+    assert merged["owner_cls"] is TaskManager
+
+
+def test_apply_behavior_defaults_demotes_owner_when_classes_match():
+    class Local(Node):
+        def local_handler(self, item: Node, ctx=None):
+            return None
+
+    info = FuncInfo.from_func(Local.local_handler, owner_cls=Local)
+    hints = BehaviorExplicitHints(
+        handler_type=False,
+        owner=False,
+        owner_cls=True,
+        caller_cls=False,
+    )
+
+    merged = info.apply_behavior_defaults({"func": Local.local_handler, "owner_cls": Local}, explicit=hints)
+
+    assert merged["handler_type"] is HandlerType.INSTANCE_ON_CALLER
+    assert merged["caller_cls"] is Local
+    assert merged["owner_cls"] is Local

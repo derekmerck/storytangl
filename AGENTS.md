@@ -59,10 +59,10 @@ core ideas you should understand before contributing.
   subgraphs for narrative structure.
 - **Record / StreamRegistry / Snapshot** (`tangl.core.record`): immutable runtime
   artifacts capturing story state and playback.
-- **Fragments** (`tangl.core.fragment`): narrative output payloads that the UI or
-  downstream systems consume.
-- **Behavior & Dispatch** (`tangl.core.dispatch`): behavior pipeline that
-  wraps and sequences callable actions while auditing results.
+- **Fragments** (`tangl.core.BaseFragment`, `tangl.journal.content`): narrative
+  output payloads that the UI or downstream systems consume.
+- **Behavior & Dispatch** (`tangl.core.behavior`, `tangl.vm.dispatch`): behavior
+  pipelines that wrap and sequence callable actions while auditing results.
 - **Virtual Machine** (`tangl.vm`): Interpreter loop for evaluating and evolving 
   graph state.
 - **Orchestrator** (`tangl.service.Orchestrator`): registers controller endpoints
