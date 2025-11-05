@@ -8,6 +8,7 @@ from tangl.core.entity import Entity
 from .record import Record
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 EntityT = TypeVar('EntityT', bound=Entity)
 

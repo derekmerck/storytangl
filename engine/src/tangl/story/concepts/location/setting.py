@@ -9,6 +9,7 @@ from tangl.vm import ProvisioningPolicy
 from .location import Location
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class Setting(Dependency[Location]):
     # Scene setting, indirect reference to a concrete loc

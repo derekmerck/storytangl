@@ -8,7 +8,7 @@ from tangl.exceptions import RemoteApiUnavailable
 from tangl.config import settings
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class MeriamWebsterApi:
     """

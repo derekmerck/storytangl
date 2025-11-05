@@ -38,6 +38,7 @@ from tangl.vm.provision import (
 from .vm_dispatch import vm_dispatch
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 get_dependencies = Dependency.get_dependencies
 # todo: this should check that each dependency label is used only once per node

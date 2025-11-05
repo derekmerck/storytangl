@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .dispatch import Namespace as NS
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)

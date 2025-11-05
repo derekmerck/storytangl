@@ -17,7 +17,7 @@ from pydantic import Field
 from tangl.core import Entity, Record, Registry
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class EventType(Enum):
     """

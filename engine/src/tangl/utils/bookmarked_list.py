@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import logging
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 T = TypeVar("T")  # List item type
 BName = str       # Convenience for arg type ordering

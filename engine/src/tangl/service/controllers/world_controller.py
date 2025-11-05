@@ -21,7 +21,7 @@ else:
     class Story: pass
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 def _dereference_world_id(args, kwargs):
     logger.debug(f"dereferencing world: args={args} kwargs={kwargs}")

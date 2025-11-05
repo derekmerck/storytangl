@@ -21,7 +21,7 @@ from .location_script_models import LocationScript
 from .asset_script_models import AssetsScript
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class StoryScript(MasterScript):
 

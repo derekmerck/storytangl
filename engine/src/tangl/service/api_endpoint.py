@@ -10,6 +10,7 @@ from pydantic import BaseModel, model_validator, Field
 import logging
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class AccessLevel(IntEnum):
     """

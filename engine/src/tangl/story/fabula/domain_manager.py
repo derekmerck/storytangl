@@ -10,6 +10,7 @@ from tangl.core.entity import Entity
 from tangl.core.graph.node import Node
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # todo: TypeManager?
 class DomainManager:

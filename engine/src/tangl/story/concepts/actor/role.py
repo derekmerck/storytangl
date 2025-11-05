@@ -11,7 +11,7 @@ from tangl.vm import Dependency, ProvisioningPolicy, Requirement
 from .actor import Actor
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class Role(Dependency[Actor]):
     """

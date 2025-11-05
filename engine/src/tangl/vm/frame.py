@@ -20,7 +20,7 @@ from .replay import ReplayWatcher, WatchedRegistry, Patch
 from .resolution_phase import ResolutionPhase as P
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class ChoiceEdge(Edge, Conditional):
     """

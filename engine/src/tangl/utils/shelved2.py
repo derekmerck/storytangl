@@ -15,6 +15,7 @@ except AttributeError:  # pragma: no cover
     cache_dir: Path = Path.cwd() / "shelf"
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 os.makedirs(cache_dir, exist_ok=True)
 

@@ -3,6 +3,7 @@ import logging
 import jinja2
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class RecursiveTemplate(jinja2.Template):
     """Must instantiate with env.from_str(source, globals={}) if including globals"""

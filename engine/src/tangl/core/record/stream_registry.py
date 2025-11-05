@@ -10,6 +10,7 @@ from tangl.core.registry import Registry
 from .record import Record
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 RecordT = TypeVar('RecordT', bound=Record)
 

@@ -9,6 +9,7 @@ from .block import Block
 from .action import Action
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # Menu blocks work by creating a set of local affordances for future possibilities
 # these affordances attach opportunistically and can be turned off by updating

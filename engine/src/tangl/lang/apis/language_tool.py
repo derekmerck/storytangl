@@ -6,6 +6,7 @@ from tangl.config import settings
 from tangl.exceptions import RemoteApiUnavailable
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class LanguageToolApi:
     """

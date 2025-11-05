@@ -14,6 +14,7 @@ from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # note: currently HasSeq uses a different instance counter _per_ class and shares
 #       that counter across all sessions/frames regardless of differences in graph

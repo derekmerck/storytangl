@@ -14,6 +14,7 @@ import logging
 __all__ = ["Concept"]
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class Concept(Node):
     """Concept(label: str, content: str = "")

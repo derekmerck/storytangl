@@ -14,6 +14,7 @@ from .graph import Graph  # for pydantic model schema
 from .node import Node
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 WrappedType = TypeVar("WrappedType", bound=Singleton)
 

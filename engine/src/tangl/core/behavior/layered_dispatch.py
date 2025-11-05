@@ -40,7 +40,7 @@ from .behavior_registry import BehaviorRegistry
 from .call_receipt import CallReceipt
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logger.setLevel(level=logging.WARNING)
 
 # --------------------------
 # Context Protocol

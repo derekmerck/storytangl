@@ -52,7 +52,7 @@ from .behavior import HandlerType, Behavior, HandlerLayer, HandlerPriority, Hand
 from .call_receipt import CallReceipt
 
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.WARNING)
+logger.setLevel(logging.WARNING)
 
 # ----------------------------
 # Registry/Dispatch

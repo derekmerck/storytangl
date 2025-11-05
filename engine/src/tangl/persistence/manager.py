@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from logging import getLogger
+import logging
 from uuid import UUID
 from typing import Type, ClassVar, Mapping
 
@@ -9,7 +9,8 @@ from .storage import StorageProtocol
 from .serializers import SerializationHandlerProtocol
 from .structuring import StructuringHandlerProtocol
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class PersistenceManager(Mapping[UUID, HasUid]):
     """

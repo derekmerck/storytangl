@@ -15,6 +15,7 @@ from .forge_utils import basic_info, dims_given_max, DEFAULT_MAX_DIM
 from .stable_spec import StableSpec
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 re_spaces = re.compile(r" +")
 

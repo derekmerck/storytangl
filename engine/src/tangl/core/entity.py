@@ -13,6 +13,7 @@ from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitise_str
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 match_logger = logging.getLogger(__name__ + '.match')
 match_logger.setLevel(logging.WARNING)
 

@@ -8,7 +8,7 @@ from tangl.type_hints import UniqueLabel
 from .singleton import Singleton
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class InheritingSingleton(Singleton):
     """

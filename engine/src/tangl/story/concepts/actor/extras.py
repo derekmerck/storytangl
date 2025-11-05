@@ -10,7 +10,7 @@ from .role import Role
 from .actor import Actor
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class Extras(Role):
     """

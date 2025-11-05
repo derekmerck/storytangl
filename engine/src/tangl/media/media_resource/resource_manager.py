@@ -8,7 +8,7 @@ from tangl.media.media_resource.media_resource_registry import MediaResourceRegi
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class ResourceManager:
     """ResourceManager(resource_path: Path)

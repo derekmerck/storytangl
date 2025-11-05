@@ -19,6 +19,7 @@ from tangl.core.entity import Entity
 from tangl.core.record import Record
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # ----------------------------
 # Receipts and Aggregation

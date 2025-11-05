@@ -16,7 +16,6 @@ from tangl.core.singleton import Singleton
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-
 # A very small built-in fallback that covers the handful of countries referenced
 # by the smoke tests. The authoritative dataset lives in git-lfs and contains
 # thousands of entries, but we keep these few around so unit tests can run in

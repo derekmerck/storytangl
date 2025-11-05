@@ -10,6 +10,7 @@ from lxml.etree import _ElementTree, _Element, ElementTree, Element
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class SvgSourceManager(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)

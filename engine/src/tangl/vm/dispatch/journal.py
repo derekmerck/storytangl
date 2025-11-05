@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from tangl.vm.context import Context
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 on_journal  = partial(vm_dispatch.register, task=P.JOURNAL)
 

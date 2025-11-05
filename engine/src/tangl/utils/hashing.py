@@ -14,6 +14,8 @@ except (ImportError, AttributeError):
     HASHING_SALT = b'<!--2t0ryT4n5L--/>'
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+
 logger.debug( f"Hashing with salt: {HASHING_SALT}" )
 
 def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:

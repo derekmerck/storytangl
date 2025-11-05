@@ -39,6 +39,7 @@ from tangl.vm.provision import (
 from .vm_dispatch import vm_dispatch
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 def get_dependencies(*args, **kwargs) -> list[Dependency]:
     return list( Dependency.get_dependencies(*args, **kwargs) )

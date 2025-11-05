@@ -10,6 +10,7 @@ from tangl.service.api_endpoint import HasApiEndpoints, ApiEndpoint, AccessLevel
 from tangl.service.response.info_response import SystemInfo
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class SystemController(HasApiEndpoints):
     """

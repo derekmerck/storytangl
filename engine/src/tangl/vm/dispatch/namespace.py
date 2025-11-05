@@ -15,6 +15,7 @@ NS = Namespace
 on_get_ns = partial(vm_dispatch.register, task="get_ns")
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # No need for a HasNs mixin, assume anything with 'locals' wants to contribute.
 @on_get_ns(priority=Prio.LATE)

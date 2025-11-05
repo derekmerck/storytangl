@@ -12,6 +12,7 @@ from .core_dispatch import core_dispatch
 from .hooked_entity import HookedEntity
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # Used in hooked registry
 on_index  = partial(core_dispatch.register, task="index")   # add item to registry (reg, item)

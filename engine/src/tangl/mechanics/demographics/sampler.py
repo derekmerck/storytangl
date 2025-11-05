@@ -7,6 +7,7 @@ from .data_models import Subtype, Country, Region, NameBank
 from .demographic import DemographicData
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class DemographicSampler:
     """

@@ -7,6 +7,7 @@ from tangl.lang.pronoun import Pronoun
 from tangl.lang.conjugates import Conjugates
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class VerbixApi:
     """

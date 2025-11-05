@@ -7,6 +7,7 @@ from tangl.core import Edge, CallReceipt, BaseFragment
 from .replay import Patch
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class ResolutionPhase(IntEnum):
     """

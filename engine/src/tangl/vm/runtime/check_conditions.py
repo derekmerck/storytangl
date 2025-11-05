@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from tangl.vm.context import Context
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # do we want a separate vm task decorator for 'check conditions' that gets invoked during validation?  Or just register directly with on_validate?
 # on_check_conditions = partial(vm_dispatch.register, task="check_conditions")

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 # todo: separate on_gather_exprs, on_runtime_exprs?  Is the gathering the pluggable part?
 # on_apply_effects = partial(vm_dispatch.register, task="on_update_effects")

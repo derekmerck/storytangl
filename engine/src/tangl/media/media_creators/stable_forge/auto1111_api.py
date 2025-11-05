@@ -8,6 +8,7 @@ from tangl.utils.pixel_avg_hash import pix_avg_hash
 from .auto1111_spec import Auto1111Spec
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class Auto1111Api(WebUIApi):
     """

@@ -18,6 +18,7 @@ from .helpers.pattern import conjugate
 from .helpers.adjective_to_adverb import adjective_to_adverb
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class Synset(Singleton):
     """
