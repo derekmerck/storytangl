@@ -12,8 +12,6 @@ from tangl.vm.provision import (
     ProvisioningPolicy,
 )
 
-pytestmark = pytest.mark.xfail(reason="Planning dispatch not yet implemented")
-
 
 def test_proximity_calculation_prefers_local_provisioners():
     graph = Graph()

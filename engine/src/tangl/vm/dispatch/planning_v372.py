@@ -41,7 +41,7 @@ from .vm_dispatch import vm_dispatch
 logger = logging.getLogger(__name__)
 
 def get_dependencies(*args, **kwargs) -> list[Dependency]:
-    return Dependency.get_dependencies(*args, **kwargs)
+    return list( Dependency.get_dependencies(*args, **kwargs) )
 
 # --------------------------
 # Provisioner discovery

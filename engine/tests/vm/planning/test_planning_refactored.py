@@ -26,7 +26,7 @@ from tangl.vm.provision import (
     PlanningReceipt,
 )
 
-from tangl.vm.dispatch.planning import _deduplicate_offers, _select_best_offer, _policy_from_offer
+from tangl.vm.dispatch.planning_v372 import _deduplicate_offers, _select_best_offer, _policy_from_offer
 
 
 # =============================================================================

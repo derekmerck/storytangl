@@ -25,10 +25,19 @@ def test_provision_existing_success():
     g, n = _frame_with_cursor()
     target = g.add_node(label="T")
     req = Requirement[Node](graph=g, policy=ProvisioningPolicy.EXISTING, identifier="T")
-    Dependency[Node](graph=g, source_id=n.uid, requirement=req, label="needs_T")
+    assert req.satisfied_by(target)
+
+    dep = Dependency(graph=g, source_id=n.uid, requirement=req, label="needs_T")
     frame = Frame(graph=g, cursor_id=n.uid)
+
+    from tangl.vm.dispatch.planning_v372 import get_dependencies
+    assert len( get_dependencies(n ) ) == 1
+    assert len( get_dependencies(n, satisfied=False) ) == 1
+    assert dep.satisfied_by(target)
+
     frame.run_phase(P.PLANNING)
-    assert req.satisfied and req.provider is target
+    assert req.provider is target
+    assert req.satisfied
 
 def test_provision_existing_failure_sets_unresolvable():
     g, n = _frame_with_cursor()
