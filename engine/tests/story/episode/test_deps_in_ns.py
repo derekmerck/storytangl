@@ -5,7 +5,6 @@ from tangl.vm import Frame, ResolutionPhase as P
 from tangl.story.concepts.actor import Actor, Role
 from tangl.story.episode import Scene, Block
 
-@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_structural_domain_vars_include_dependencies():
     g = Graph()
 

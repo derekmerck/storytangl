@@ -97,7 +97,6 @@ def test_session_follow_edge_updates_cursor_and_stops():
 #     assert ns["phase"] is P.VALIDATE
 #     assert isinstance(ns["results"], list)
 
-@pytest.mark.xfail(reason="planning needs reimplemented")
 def test_provisioning_create_policy_assigns_provider():
     g = Graph(label="demo")
     scene = g.add_node(label="scene")

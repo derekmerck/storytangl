@@ -3,6 +3,9 @@ import pytest
 import pydantic
 
 from tangl.persistence.factory import PersistenceManagerFactory, PersistenceManagerName
+from tangl.persistence.storage.mongo_storage import HAS_MONGO
+from tangl.persistence.storage.redis_storage import HAS_REDIS
+
 
 class TestModel1(pydantic.BaseModel):
     # Needs a different name to avoid collision
@@ -12,15 +15,19 @@ class TestModel1(pydantic.BaseModel):
 
 @pytest.fixture
 def test_obj():
-
     data = {'uid': uuid4(), 'data': 'test data'}
     return TestModel1(**data)
 
-
-@pytest.mark.xfail(raises=ImportError)
 @pytest.mark.parametrize('manager_name', PersistenceManagerName.__args__)
 def test_factory(manager_name, test_obj, tmpdir):
     print( manager_name )
+
+    if 'redis' in manager_name and not HAS_REDIS:
+        pytest.skip("Skipping, no Redis")
+
+    if 'mongo' in manager_name or 'bson' in manager_name and not HAS_MONGO:
+        pytest.skip("Skipping, no MongoDB/BSON")
+
     manager = PersistenceManagerFactory.create_persistence_manager(
         manager_name = manager_name, user_data_path=tmpdir)
 
