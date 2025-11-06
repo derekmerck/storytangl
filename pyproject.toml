@@ -111,6 +111,7 @@ sphinx-markdown-builder = "^0.6.8"
 linkify-it-py = "^2.0.3"
 
 [tool.pytest.ini_options]
+xfail_strict = true  # identify xpasses
 log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [

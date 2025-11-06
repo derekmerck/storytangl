@@ -38,12 +38,19 @@ def test_name_sampler():
     print( DemographicSampler.sample_xx_name('fra' ) )
     print( DemographicSampler.sample_xy_name('jpn' ) )
 
+def country_params():
+    for country in Country.all_instances():
+        marks = []
+        if country.label in ['zaf', 'usa']:
+            marks.append(
+                pytest.mark.xfail(
+                    reason="zaf and usa require subtype"
+                )
+            )
+        yield pytest.param(country, marks=marks)
 
-# @pytest.mark.parametrize("country,subtype", itertools.product( Country._instances.keys(), Subtype._instances.keys() ))
-# todo: need to fix subtype handler
-@pytest.mark.xfail(raises=KeyError)
-@pytest.mark.parametrize("country", Country.all_instances())
-def test_name_sampler_variations(country: str):
+@pytest.mark.parametrize("country", country_params())
+def test_name_sampler_variations(country: Country):
 
     female_name = DemographicSampler.sample_xx_name(country.label)
     male_name = DemographicSampler.sample_xy_name(country.label)
