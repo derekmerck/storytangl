@@ -5,11 +5,17 @@ from tangl.vm.provision import (
     Provisioner,
     Requirement,
     ProvisioningPolicy,
-    ProvisionOffer,
     BuildReceipt,
+    DependencyOffer,
+    AffordanceOffer,
+    GraphProvisioner,
+    TemplateProvisioner,
+    UpdatingProvisioner,
+    CloningProvisioner,
+    ProvisionCost,
 )
 from tangl.vm import Context, Frame, ResolutionPhase as P, Dependency, Affordance
-import tangl.vm.dispatch
+from tangl.vm.dispatch.planning_v372 import plan_collect_offers, plan_select_and_apply
 from tangl.core.behavior import CallReceipt
 
 # pytest.skip(allow_module_level=True, reason="planning needs reimplemented")
@@ -88,7 +94,7 @@ def test_plan_collect_offers_emits_multiple_operations_when_available():
     offers = plan_collect_offers(cursor, ctx=ctx)
 
     ops_for_requirement = {
-        offer.operation for offer in offers if offer.requirement.uid == req.uid
+        offer.operation for offer in offers if getattr(offer, "requirement", None) is req
     }
 
     assert ProvisioningPolicy.EXISTING in ops_for_requirement
@@ -120,8 +126,11 @@ def test_planning_resolves_dependency_existing():
                             policy=ProvisioningPolicy.EXISTING)
     dep = Dependency(source_id=a.uid, requirement=req, graph=g)
 
-    prov = Provisioner()
-    req.provider = prov.resolve(req)
+    prov = GraphProvisioner(node_registry=g)
+    ctx = Context(graph=g, cursor_id=a.uid)
+    offers = list(prov.get_dependency_offers(req, ctx=ctx))
+    assert offers
+    req.provider = offers[0].accept(ctx=ctx)
     assert req.provider is b
     assert req.satisfied
     assert dep.destination is b
@@ -134,8 +143,11 @@ def test_planning_create_when_missing():
                             policy=ProvisioningPolicy.CREATE)
     dep = Dependency(source_id=a.uid, requirement=req, graph=g)
 
-    prov = Provisioner()
-    req.provider = prov.resolve(req)
+    prov = TemplateProvisioner()
+    ctx = Context(graph=g, cursor_id=a.uid)
+    offers = list(prov.get_dependency_offers(req, ctx=ctx))
+    assert offers
+    req.provider = offers[0].accept(ctx=ctx)
     assert req.provider is not None
     assert req.provider in g
     assert req.provider.get_label() == "B"
@@ -239,22 +251,20 @@ def test_selector_skips_failed_offers_and_binds_first_success():
 
     provisioner = Provisioner()
 
-    failing_offer = ProvisionOffer(
-        label="fail",
+    failing_offer = DependencyOffer(
+        requirement_id=req.uid,
         requirement=req,
-        provisioner=provisioner,
-        priority=1,
         operation=ProvisioningPolicy.EXISTING,
-        accept_func=lambda: None,
+        accept_func=lambda ctx: None,
+        source_provisioner_id=provisioner.uid,
     )
 
-    succeeding_offer = ProvisionOffer(
-        label="succeed",
+    succeeding_offer = DependencyOffer(
+        requirement_id=req.uid,
         requirement=req,
-        provisioner=provisioner,
-        priority=2,
         operation=ProvisioningPolicy.EXISTING,
-        accept_func=lambda: winner,
+        accept_func=lambda ctx: winner,
+        source_provisioner_id=provisioner.uid,
     )
 
     frame = Frame(graph=g, cursor_id=anchor.uid)
@@ -294,15 +304,24 @@ def test_affordance_offers_are_prioritized_over_dependency_offers():
 
     provisioner = Provisioner()
 
-    affordance_offer = ProvisionOffer(
+    def _accept_affordance(ctx: Context, destination: Node):
+        req.provider = existing
+        return Affordance(
+            graph=ctx.graph,
+            source=existing,
+            destination=destination,
+            requirement=req,
+            label="use_existing",
+        )
+
+    affordance_offer = AffordanceOffer(
         label="use_existing",
-        requirement=req,
-        provisioner=provisioner,
-        priority=100,
-        operation=ProvisioningPolicy.EXISTING,
-        selection_criteria={"source": "affordance"},
-        accept_func=lambda: existing,
+        cost=ProvisionCost.DIRECT,
+        accept_func=_accept_affordance,
+        target_tags=set(),
     )
+
+    affordance_offer.selection_criteria = {"source": "affordance"}
 
     created: list[Node] = []
 
@@ -311,15 +330,14 @@ def test_affordance_offers_are_prioritized_over_dependency_offers():
         created.append(node)
         return node
 
-    dependency_offer = ProvisionOffer(
-        label="create_new",
+    dependency_offer = DependencyOffer(
+        requirement_id=req.uid,
         requirement=req,
-        provisioner=provisioner,
-        priority=0,
         operation=ProvisioningPolicy.CREATE,
-        selection_criteria={"source": "dependency"},
-        accept_func=_create,
+        accept_func=lambda ctx: _create(),
+        source_provisioner_id=provisioner.uid,
     )
+    dependency_offer.selection_criteria = {"source": "dependency"}
 
     frame = Frame(graph=g, cursor_id=anchor.uid)
     ctx = frame.context

@@ -34,7 +34,7 @@ def test_graph_provisioner_finds_existing_node():
 
     assert len(offers) == 1
     offer = offers[0]
-    assert offer.operation == "EXISTING"
+    assert offer.operation is ProvisioningPolicy.EXISTING
     assert offer.cost is ProvisionCost.DIRECT
     provider = offer.accept(ctx=_ctx(graph))
     assert provider is existing
@@ -82,7 +82,7 @@ def test_cheapest_offer_wins_existing_over_create():
 
     offers.sort(key=lambda offer: offer.cost)
     best = offers[0]
-    assert best.operation == "EXISTING"
+    assert best.operation is ProvisioningPolicy.EXISTING
     assert best.accept(ctx=_ctx(graph)) is existing
 
 

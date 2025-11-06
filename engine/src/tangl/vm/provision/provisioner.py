@@ -108,6 +108,8 @@ class GraphProvisioner(Provisioner):
         *,
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
+        if not (requirement.policy & ProvisioningPolicy.EXISTING):
+            return
         if self.node_registry is None:
             return
 
@@ -125,7 +127,8 @@ class GraphProvisioner(Provisioner):
 
             yield DependencyOffer(
                 requirement_id=requirement.uid,
-                operation="EXISTING",
+                requirement=requirement,
+                operation=ProvisioningPolicy.EXISTING,
                 cost=ProvisionCost.DIRECT,
                 accept_func=make_accept_func(node),
                 provider_id=node.uid,
@@ -142,11 +145,17 @@ class TemplateProvisioner(Provisioner):
 
     def _resolve_template(self, requirement: Requirement) -> dict | None:
         if requirement.template is not None:
-            return deepcopy(requirement.template)
+            template = deepcopy(requirement.template)
+            if not template:
+                return None
+            return template
         if self.template_registry and requirement.identifier:
             template = self.template_registry.get(str(requirement.identifier))
             if template is not None:
-                return deepcopy(template)
+                template_copy = deepcopy(template)
+                if not template_copy:
+                    return None
+                return template_copy
         return None
 
     def get_dependency_offers(
@@ -155,6 +164,8 @@ class TemplateProvisioner(Provisioner):
         *,
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
+        if not (requirement.policy & ProvisioningPolicy.CREATE):
+            return
         template = self._resolve_template(requirement)
         if template is None:
             return
@@ -170,7 +181,8 @@ class TemplateProvisioner(Provisioner):
 
         yield DependencyOffer(
             requirement_id=requirement.uid,
-            operation="CREATE",
+            requirement=requirement,
+            operation=ProvisioningPolicy.CREATE,
             cost=ProvisionCost.CREATE,
             accept_func=create_node,
             source_provisioner_id=self.uid,
@@ -192,6 +204,8 @@ class UpdatingProvisioner(TemplateProvisioner):
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
         if self.node_registry is None:
+            return
+        if not (requirement.policy & ProvisioningPolicy.UPDATE):
             return
         template = self._resolve_template(requirement)
         if template is None:
@@ -220,7 +234,8 @@ class UpdatingProvisioner(TemplateProvisioner):
 
             yield DependencyOffer(
                 requirement_id=requirement.uid,
-                operation="UPDATE",
+                requirement=requirement,
+                operation=ProvisioningPolicy.UPDATE,
                 cost=ProvisionCost.LIGHT_INDIRECT,
                 accept_func=make_update_func(node, deepcopy(template)),
                 source_provisioner_id=self.uid,
@@ -241,7 +256,7 @@ class CloningProvisioner(TemplateProvisioner):
         *,
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
-        if requirement.policy is not ProvisioningPolicy.CLONE:
+        if not (requirement.policy & ProvisioningPolicy.CLONE):
             return
         if requirement.reference_id is None:
             raise ValueError("CLONE policy requires reference_id to specify source node")
@@ -270,7 +285,8 @@ class CloningProvisioner(TemplateProvisioner):
 
         yield DependencyOffer(
             requirement_id=requirement.uid,
-            operation="CLONE",
+            requirement=requirement,
+            operation=ProvisioningPolicy.CLONE,
             cost=ProvisionCost.HEAVY_INDIRECT,
             accept_func=make_clone_func(reference, deepcopy(template)),
             source_provisioner_id=self.uid,

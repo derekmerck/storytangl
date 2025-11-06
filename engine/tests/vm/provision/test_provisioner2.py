@@ -19,6 +19,7 @@ from tangl.vm.provision import (
     CloningProvisioner,
     CompanionProvisioner,
     Requirement,
+    ProvisioningPolicy,
 )
 from tangl.core import Node, Graph
 
@@ -55,7 +56,7 @@ def test_graph_provisioner_finds_existing_node():
     
     # Assert
     assert len(offers) == 1
-    assert offers[0].operation == 'EXISTING'
+    assert offers[0].operation is ProvisioningPolicy.EXISTING
     assert offers[0].cost == ProvisionCost.DIRECT
     
     # Accept offer
@@ -112,7 +113,8 @@ def test_template_provisioner_creates_from_template():
     
     requirement = Requirement(
         identifier="door",
-        template={'label': 'door', 'locked': True, 'obj_cls': LockableNode}
+        template={'label': 'door', 'locked': True, 'obj_cls': LockableNode},
+        policy=ProvisioningPolicy.CREATE,
     )
     ctx = MockContext(graph=registry, cursor_id=UUID('00000000-0000-0000-0000-000000000003'))
     
@@ -123,7 +125,7 @@ def test_template_provisioner_creates_from_template():
     
     # Assert
     assert len(offers) == 1
-    assert offers[0].operation == 'CREATE'
+    assert offers[0].operation is ProvisioningPolicy.CREATE
     assert offers[0].cost == ProvisionCost.CREATE
     
     # Accept offer
@@ -152,7 +154,7 @@ def test_updating_provisioner_modifies_existing():
     
     # Assert
     assert len(offers) == 1
-    assert offers[0].operation == 'UPDATE'
+    assert offers[0].operation is ProvisioningPolicy.UPDATE
     assert offers[0].cost == ProvisionCost.LIGHT_INDIRECT
     
     # Accept offer
@@ -170,7 +172,9 @@ def test_cloning_provisioner_creates_copy():
     
     requirement = Requirement(
         identifier="door",
-        template={'label': 'door_clone', 'locked': True}
+        template={'label': 'door_clone', 'locked': True},
+        policy=ProvisioningPolicy.CLONE,
+        reference_id=ref_door.uid,
     )
     ctx = MockContext(graph=registry, cursor_id=ref_door.uid)
     
@@ -181,7 +185,7 @@ def test_cloning_provisioner_creates_copy():
     
     # Assert
     assert len(offers) == 1
-    assert offers[0].operation == 'CLONE'
+    assert offers[0].operation is ProvisioningPolicy.CLONE
     assert offers[0].cost == ProvisionCost.HEAVY_INDIRECT
     
     # Accept offer
@@ -205,6 +209,7 @@ def test_cheapest_offer_wins():
     requirement = Requirement(
         identifier="door",
         template={'label': 'door', 'locked': False},
+        policy=ProvisioningPolicy.ANY,
     )
     ctx = MockContext(graph=registry, cursor_id=existing_door.uid)
     
@@ -226,7 +231,7 @@ def test_cheapest_offer_wins():
     # Assert cheapest wins
     assert len(all_offers) == 2
     best = all_offers[0]
-    assert best.operation == 'EXISTING'
+    assert best.operation is ProvisioningPolicy.EXISTING
     assert best.cost < all_offers[1].cost
     
     provider = best.accept(ctx=ctx)
@@ -243,6 +248,8 @@ def test_multiple_strategies_for_same_requirement():
     requirement = Requirement(
         identifier="door",
         template={'label': 'door_updated', 'locked': True},
+        policy=ProvisioningPolicy.ANY | ProvisioningPolicy.CLONE,
+        reference_id=existing_door.uid,
     )
     ctx = MockContext(graph=registry, cursor_id=existing_door.uid)
     
@@ -261,15 +268,22 @@ def test_multiple_strategies_for_same_requirement():
     
     # Assert we got multiple strategies
     operations = {offer.operation for offer in all_offers}
-    assert 'EXISTING' in operations
-    assert 'UPDATE' in operations
-    assert 'CLONE' in operations
-    assert 'CREATE' in operations
+    assert ProvisioningPolicy.EXISTING in operations
+    assert ProvisioningPolicy.UPDATE in operations
+    assert ProvisioningPolicy.CLONE in operations
+    assert ProvisioningPolicy.CREATE in operations
     
     # Cost ordering is correct
-    costs = {op: next(o.cost for o in all_offers if o.operation == op) 
-             for op in operations}
-    assert costs['EXISTING'] < costs['UPDATE'] < costs['CLONE'] < costs['CREATE']
+    costs = {
+        op: next(o.cost for o in all_offers if o.operation is op)
+        for op in operations
+    }
+    assert (
+        costs[ProvisioningPolicy.EXISTING]
+        < costs[ProvisioningPolicy.UPDATE]
+        < costs.get(ProvisioningPolicy.CLONE, ProvisionCost.CREATE + 1)
+        < costs[ProvisioningPolicy.CREATE]
+    )
 
 
 # ============================================================================
@@ -381,9 +395,9 @@ def test_offer_with_failing_callback():
     
     offer = DependencyOffer(
         requirement_id=UUID('00000000-0000-0000-0000-000000000002'),
-        operation='CREATE',
+        operation=ProvisioningPolicy.CREATE,
         cost=ProvisionCost.CREATE,
-        accept_func=failing_callback
+        accept_func=failing_callback,
     )
     
     registry = Graph()
