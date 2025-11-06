@@ -19,16 +19,28 @@ def test_obj():
     return TestModel1(**data)
 
 from tangl.config import settings
+import logging
 
-@pytest.mark.parametrize('manager_name', PersistenceManagerName.__args__)
+def _manager_name():
+    all_names = PersistenceManagerName.__args__
+
+    for name in all_names:
+
+        if 'redis' in name and (not settings or not settings.service.apis.redis.enabled):
+            logging.debug("Marking redis xfail")
+            yield pytest.param(name, marks=[pytest.mark.xfail(raises=ImportError, reason="No Redis")])
+
+        elif ('mongo' in name or 'bson' in name) and (not settings or not settings.service.apis.mongo.enabled):
+            logging.debug("Marking mongo xfail")
+            yield pytest.param(name, marks=[pytest.mark.xfail(raises=ImportError, reason="No Mongo/BSON")])
+
+        else:
+            yield pytest.param(name)
+
+
+@pytest.mark.parametrize('manager_name', _manager_name())
 def test_factory(manager_name, test_obj, tmpdir):
     print( manager_name )
-
-    if 'redis' in manager_name and (not settings or not settings.service.apis.redis.enabled):
-        pytest.skip("Skipping, no Redis")
-
-    if ('mongo' in manager_name or 'bson' in manager_name) and (not settings or not settings.service.apis.mongo.enabled):
-        pytest.skip("Skipping, no MongoDB/BSON")
 
     manager = PersistenceManagerFactory.create_persistence_manager(
         manager_name = manager_name, user_data_path=tmpdir)

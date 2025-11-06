@@ -29,7 +29,7 @@ except ModuleNotFoundError:  # pragma: no cover - executed in CI environment
     stub = types.SimpleNamespace(ObjectProxy=_ObjectProxy)
     sys.modules["wrapt"] = stub
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("markdown_it").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
