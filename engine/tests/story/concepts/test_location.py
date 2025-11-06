@@ -5,7 +5,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.story.concepts.location import Location, Setting
-from tangl.vm.provision import GraphProvisioner, TemplateProvisioner
+from tangl.vm.provision import GraphProvisioner, TemplateProvisioner, ProvisioningPolicy
 
 @pytest.fixture
 def location_setting():
@@ -26,7 +26,7 @@ def test_setting_prov(location_setting):
     offers = list(prov.get_dependency_offers(setting.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation == "EXISTING"
+    assert offers[0].operation is ProvisioningPolicy.EXISTING
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -49,7 +49,7 @@ def test_alice_templ_prov(location_setting):
     offers = list(template_prov.get_dependency_offers(wants_city.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation == "CREATE"
+    assert offers[0].operation is ProvisioningPolicy.CREATE
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -64,6 +64,6 @@ def test_alice_templ_prov(location_setting):
     offers.extend(graph_prov.get_dependency_offers(wants_city2.requirement, ctx=ctx))
     offers.extend(template_prov.get_dependency_offers(wants_city2.requirement, ctx=ctx))
     kinds = {offer.operation for offer in offers}
-    assert "EXISTING" in kinds
-    assert "CREATE" in kinds
+    assert ProvisioningPolicy.EXISTING in kinds
+    assert ProvisioningPolicy.CREATE in kinds
 

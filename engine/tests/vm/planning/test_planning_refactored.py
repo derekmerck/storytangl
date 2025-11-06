@@ -24,6 +24,7 @@ from tangl.vm.provision import (
     TemplateProvisioner,
     ProvisioningPolicy,
     PlanningReceipt,
+    BuildReceipt,
 )
 
 from tangl.vm.dispatch.planning_v372 import _deduplicate_offers, _select_best_offer, _policy_from_offer
@@ -41,7 +42,7 @@ def test_deduplicate_offers_keeps_cheapest_existing():
     # Create two EXISTING offers for the same door
     expensive_offer = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=door_id,
         cost=ProvisionCost.DIRECT,
         proximity=999,  # Distant
@@ -50,7 +51,7 @@ def test_deduplicate_offers_keeps_cheapest_existing():
     
     cheap_offer = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=door_id,
         cost=ProvisionCost.DIRECT,
         proximity=0,  # Close
@@ -72,7 +73,7 @@ def test_deduplicate_offers_preserves_non_existing():
     
     existing_offer = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=door_id,
         cost=ProvisionCost.DIRECT,
         accept_func=lambda ctx: None,
@@ -80,7 +81,7 @@ def test_deduplicate_offers_preserves_non_existing():
     
     create_offer = DependencyOffer(
         requirement_id=req_id,
-        operation="CREATE",
+        operation=ProvisioningPolicy.CREATE,
         provider_id=None,  # CREATE offers don't have provider_id
         cost=ProvisionCost.CREATE,
         accept_func=lambda ctx: None,
@@ -103,7 +104,7 @@ def test_deduplicate_offers_sorts_by_cost_proximity_order():
     # Three EXISTING offers for different doors
     offer1 = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         proximity=10,
@@ -112,7 +113,7 @@ def test_deduplicate_offers_sorts_by_cost_proximity_order():
     
     offer2 = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         proximity=5,  # Closer
@@ -121,7 +122,7 @@ def test_deduplicate_offers_sorts_by_cost_proximity_order():
     
     offer3 = DependencyOffer(
         requirement_id=req_id,
-        operation="CREATE",
+        operation=ProvisioningPolicy.CREATE,
         provider_id=None,
         cost=ProvisionCost.CREATE,  # More expensive
         proximity=0,
@@ -144,7 +145,7 @@ def test_deduplicate_offers_uses_registration_order_as_tiebreaker():
     
     offer1 = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         proximity=10,
@@ -153,7 +154,7 @@ def test_deduplicate_offers_uses_registration_order_as_tiebreaker():
     
     offer2 = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         proximity=10,  # Same proximity
@@ -173,14 +174,14 @@ def test_select_best_offer_chooses_cheapest():
     
     expensive = DependencyOffer(
         requirement_id=req_id,
-        operation="CREATE",
+        operation=ProvisioningPolicy.CREATE,
         cost=ProvisionCost.CREATE,
         accept_func=lambda ctx: None,
     )
     
     cheap = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         accept_func=lambda ctx: None,
@@ -198,7 +199,7 @@ def test_select_best_offer_prefers_proximity():
     
     distant = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         proximity=999,
@@ -207,7 +208,7 @@ def test_select_best_offer_prefers_proximity():
     
     close = DependencyOffer(
         requirement_id=req_id,
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         proximity=0,
@@ -230,7 +231,7 @@ def test_policy_from_offer():
     """Extract ProvisioningPolicy from offer operation string."""
     offer = DependencyOffer(
         requirement_id=uuid4(),
-        operation="EXISTING",
+        operation=ProvisioningPolicy.EXISTING,
         provider_id=uuid4(),
         cost=ProvisionCost.DIRECT,
         accept_func=lambda ctx: None,
@@ -320,7 +321,11 @@ def test_planning_deduplicates_multiple_provisioners():
     for call_receipt in frame.phase_receipts.get(P.PLANNING, []):
         if isinstance(call_receipt.result, list):
             builds.extend(call_receipt.result)
-    dependency_builds = [b for b in builds if hasattr(b, 'requirement_id') and b.requirement_id == requirement.uid]
+        dependency_builds = [
+            b
+            for b in builds
+            if isinstance(b, BuildReceipt) and b.caller_id == requirement.uid
+        ]
     assert len(dependency_builds) == 1
 
 

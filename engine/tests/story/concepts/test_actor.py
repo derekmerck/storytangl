@@ -4,7 +4,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.story.concepts.actor import Actor, Role
-from tangl.vm.provision import GraphProvisioner, TemplateProvisioner
+from tangl.vm.provision import GraphProvisioner, TemplateProvisioner, ProvisioningPolicy
 
 @pytest.fixture
 def actor_role():
@@ -25,7 +25,7 @@ def test_role_prov(actor_role):
     offers = list(prov.get_dependency_offers(role.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation == "EXISTING"
+    assert offers[0].operation is ProvisioningPolicy.EXISTING
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -48,7 +48,7 @@ def test_alice_templ_prov(actor_role):
     offers = list(template_prov.get_dependency_offers(wants_alice.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation == "CREATE"
+    assert offers[0].operation is ProvisioningPolicy.CREATE
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -63,6 +63,6 @@ def test_alice_templ_prov(actor_role):
     offers.extend(graph_prov.get_dependency_offers(wants_alice2.requirement, ctx=ctx))
     offers.extend(template_prov.get_dependency_offers(wants_alice2.requirement, ctx=ctx))
     kinds = {offer.operation for offer in offers}
-    assert "EXISTING" in kinds
-    assert "CREATE" in kinds
+    assert ProvisioningPolicy.EXISTING in kinds
+    assert ProvisioningPolicy.CREATE in kinds
 
