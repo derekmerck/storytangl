@@ -154,6 +154,9 @@ class Requirement(GraphItem, Generic[NodeT]):
         if value is None:
             self.provider_id = None
             return
+        if value.graph is not None and value.graph is not self.graph:
+            self.provider_id = value.uid
+            return
         if value not in self.graph:
             self.graph.add(value)
         self.graph._validate_linkable(value)  # redundant check that it's in the graph

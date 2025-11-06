@@ -49,7 +49,7 @@ from pydantic import Field
 
 from tangl.core import CallReceipt, Edge, Entity, Node, Record, Registry
 from tangl.type_hints import StringMap
-from .requirement import ProvisioningPolicy
+from .requirement import ProvisioningPolicy, Requirement
 
 if TYPE_CHECKING:
     from tangl.vm.context import Context
@@ -83,6 +83,7 @@ class ProvisionOffer(Entity):
     proximity: int = 999
     source_provisioner_id: UUID | None = None
     source_layer: str | None = None
+    selection_criteria: StringMap = Field(default_factory=dict)
 
     @property
     def blame_id(self) -> UUID | None:  # pragma: no cover - compatibility hook
@@ -114,13 +115,14 @@ class DependencyOffer(ProvisionOffer):
     """Proposal to satisfy a dependency by providing a node."""
 
     requirement_id: UUID
-    operation: str
+    operation: ProvisioningPolicy
     provider_id: Optional[UUID] = None
     # Need provider id for existing to dedup
     target_tags: set[str] = Field(default_factory=set)
     accept_func: Callable[[Any], Node]
     provider_id: UUID | None = None
     """Identifier of the node that will be provided when known (EXISTING offers)."""
+    requirement: Requirement | None = Field(default=None, exclude=True)
 
     def accept(self, *, ctx: "Context") -> Node:
         provider = self.accept_func(ctx)
