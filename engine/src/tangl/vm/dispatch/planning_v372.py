@@ -103,14 +103,44 @@ def do_get_provisioners(anchor: Node, *, ctx: ContextP, extra_handlers=None, **k
 def _iter_frontier(cursor: Node) -> list[Node]:
     """Return frontier destinations reachable from ``cursor`` via choices."""
 
-    frontier = [
+    return [
         edge.destination
         for edge in cursor.edges_out(is_instance=ChoiceEdge)
         if edge.destination is not None
     ]
+
+
+def _iter_planning_targets(cursor: Node) -> list[Node]:
+    """Return the nodes that should be provisioned during planning."""
+
+    frontier = _iter_frontier(cursor)
     if frontier:
-        return frontier
+        return [cursor, *frontier]
     return [cursor]
+
+
+def _refresh_dependency_offers(
+    requirement, *, ctx: Context
+) -> list[DependencyOffer]:
+    """Re-query provisioners for dependency offers after graph mutations."""
+
+    indexed_provisioners: list[tuple[int, Provisioner]] = getattr(
+        ctx, "planning_indexed_provisioners", []
+    )
+    refreshed: list[DependencyOffer] = []
+    for proximity, provisioner in indexed_provisioners:
+        for offer in provisioner.get_dependency_offers(requirement, ctx=ctx):
+            refreshed.append(
+                _attach_offer_metadata(
+                    offer,
+                    provisioner,
+                    proximity,
+                    source="dependency",
+                )
+            )
+    if not refreshed:
+        return []
+    return _deduplicate_offers(refreshed)
 
 
 def _attach_offer_metadata(
@@ -179,7 +209,7 @@ def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
             )
 
     # Collect dependency offers (unicast per requirement)
-    for frontier_node in _iter_frontier(cursor):
+    for frontier_node in _iter_planning_targets(cursor):
         for dep in get_dependencies(frontier_node):
             if dep.requirement.provider is not None:
                 continue
@@ -219,6 +249,7 @@ def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     if not hasattr(ctx, "provision_offers"):
         ctx.provision_offers = {}
     ctx.provision_offers.update(deduplicated_offers)
+    object.__setattr__(ctx, "planning_indexed_provisioners", indexed_provisioners)
 
     flattened: list[ProvisionOffer] = []
     for offer_list in deduplicated_offers.values():
@@ -249,7 +280,7 @@ def _planning_link_affordances(cursor: Node, *, ctx: Context, **kwargs):
     builds_snapshot = []
     satisfied_requirements: set[UUID] = set()
 
-    for frontier_node in _iter_frontier(cursor):
+    for frontier_node in _iter_planning_targets(cursor):
         # Filter available offers for this frontier node
         for offer in affordance_offers:
             if not isinstance(offer, AffordanceOffer):
@@ -386,7 +417,7 @@ def _planning_link_dependencies(cursor: Node, *, ctx: Context, **kwargs):
 
     builds_snapshot = []
 
-    for frontier_node in _iter_frontier(cursor):
+    for frontier_node in _iter_planning_targets(cursor):
         # Materialize dependencies list BEFORE iterating
         # This prevents "dictionary changed size during iteration" errors
         # when accept() calls add nodes to the graph
@@ -394,6 +425,12 @@ def _planning_link_dependencies(cursor: Node, *, ctx: Context, **kwargs):
         for dep in deps:
             requirement = dep.requirement
             offers = ctx.provision_offers.get(dep.uid, [])
+
+            if not offers:
+                refreshed = _refresh_dependency_offers(requirement, ctx=ctx)
+                if refreshed:
+                    offers = refreshed
+                    ctx.provision_offers[dep.uid] = offers
 
             if not offers:
                 requirement.is_unresolvable = True
@@ -485,6 +522,7 @@ def _planning_job_receipt(cursor: Node, *, ctx: Context, **kwargs):
         ctx.provision_offers.clear()
     if hasattr(ctx, "provision_builds"):
         ctx.provision_builds.clear()
+    object.__setattr__(ctx, "planning_indexed_provisioners", [])
 
     return receipt
 
@@ -518,10 +556,11 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context) -> list[BuildReceipt]:
             ctx.provision_offers["*"] = _deduplicate_offers(affordance_offers)
 
         if offers_by_req:
-            for dep in cursor.edges_out(is_instance=Dependency):
-                offer_list = offers_by_req.get(dep.requirement.uid)
-                if offer_list:
-                    ctx.provision_offers[dep.uid] = _deduplicate_offers(offer_list)
+            for target_node in _iter_planning_targets(cursor):
+                for dep in target_node.edges_out(is_instance=Dependency):
+                    offer_list = offers_by_req.get(dep.requirement.uid)
+                    if offer_list:
+                        ctx.provision_offers[dep.uid] = _deduplicate_offers(offer_list)
 
     ctx.provision_builds.clear()
     affordance_builds = _planning_link_affordances(cursor, ctx=ctx)

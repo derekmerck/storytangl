@@ -143,8 +143,8 @@ def test_planning_cycle_with_mixed_requirements():
     assert step_2_records
     planning_receipt_2 = _find_planning_receipt(step_2_records)
 
-    assert planning_receipt_2.attached >= 1
-    assert planning_receipt_2.created >= 1
+    assert planning_receipt_2.attached == 0
+    assert planning_receipt_2.created == 0
     assert not planning_receipt_2.unresolved_hard_requirements
 
     resource_x_nodes = [n for n in g.find_nodes(label="resource_x")]
