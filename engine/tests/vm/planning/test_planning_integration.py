@@ -115,17 +115,11 @@ def test_planning_cycle_with_mixed_requirements():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    edge_to_a = next(start.edges_out(is_instance=ChoiceEdge))
-    frame.follow_edge(edge_to_a)
-
-    step_1_records = _collect_step_records(frame, 1)
-    assert step_1_records
-    planning_receipt_1 = _find_planning_receipt(step_1_records)
-
-    assert planning_receipt_1.created >= 1
-    assert planning_receipt_1.attached >= 1
-    assert len(planning_receipt_1.waived_soft_requirements) == 1
-    assert not planning_receipt_1.unresolved_hard_requirements
+    planning_receipt_start = frame.run_phase(P.PLANNING)
+    assert planning_receipt_start.created >= 1
+    assert planning_receipt_start.attached >= 1
+    assert len(planning_receipt_start.waived_soft_requirements) == 1
+    assert not planning_receipt_start.unresolved_hard_requirements
 
     resource_x = g.find_one(label="resource_x")
     assert resource_x is not None
@@ -136,6 +130,17 @@ def test_planning_cycle_with_mixed_requirements():
 
     assert req_z_aff.provider == service_z
 
+    edge_to_a = next(start.edges_out(is_instance=ChoiceEdge))
+    frame.follow_edge(edge_to_a)
+
+    step_1_records = _collect_step_records(frame, 1)
+    assert step_1_records
+    planning_receipt_1 = _find_planning_receipt(step_1_records)
+
+    assert planning_receipt_1.created >= 1
+    assert planning_receipt_1.attached >= 1
+    assert not planning_receipt_1.unresolved_hard_requirements
+
     edge_to_b = next(node_a.edges_out(is_instance=ChoiceEdge))
     frame.follow_edge(edge_to_b)
 
@@ -143,8 +148,8 @@ def test_planning_cycle_with_mixed_requirements():
     assert step_2_records
     planning_receipt_2 = _find_planning_receipt(step_2_records)
 
-    assert planning_receipt_2.attached >= 1
-    assert planning_receipt_2.created >= 1
+    assert planning_receipt_2.attached == 0
+    assert planning_receipt_2.created == 0
     assert not planning_receipt_2.unresolved_hard_requirements
 
     resource_x_nodes = [n for n in g.find_nodes(label="resource_x")]
@@ -189,12 +194,7 @@ def test_softlock_detection_and_prevention():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    edge_to_gate = next(start.edges_out(is_instance=ChoiceEdge))
-    frame.follow_edge(edge_to_gate)
-
-    step_records = _collect_step_records(frame, 1)
-    assert step_records
-    planning_receipt = _find_planning_receipt(step_records)
+    planning_receipt = frame.run_phase(P.PLANNING)
 
     assert planning_receipt.unresolved_hard_requirements == [req_key.uid]
     assert req_key.provider is None
@@ -271,6 +271,54 @@ def test_affordance_precedence_over_creation():
 
     planning_receipt = _find_planning_receipt(_collect_step_records(frame, 1))
     assert planning_receipt.created == 0
+
+
+def test_hard_requirement_satisfied_by_affordance():
+    """Hard requirements fulfilled through affordances stay resolved in receipts."""
+
+    g = Graph(label="affordance_hard_requirement")
+
+    start = g.add_node(label="start")
+    scene = g.add_node(label="scene")
+    ChoiceEdge(graph=g, source_id=start.uid, destination_id=scene.uid)
+
+    guardian = g.add_node(label="guardian")
+
+    hard_requirement = Requirement[Node](
+        graph=g,
+        identifier="guardian",
+        policy=ProvisioningPolicy.EXISTING,
+        hard_requirement=True,
+    )
+    Dependency[Node](
+        graph=g,
+        source_id=scene.uid,
+        requirement=hard_requirement,
+        label="needs_guardian",
+    )
+
+    guardian_affordance_req = Requirement[Node](
+        graph=g,
+        identifier=guardian.uid,
+        policy=ProvisioningPolicy.EXISTING,
+        provider=guardian,
+        hard_requirement=True,
+    )
+    Affordance[Node](
+        graph=g,
+        source_id=guardian.uid,
+        destination_id=scene.uid,
+        requirement=guardian_affordance_req,
+        label="guardian_available",
+    )
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+
+    planning_receipt = frame.run_phase(P.PLANNING)
+
+    assert hard_requirement.provider == guardian
+    assert planning_receipt.unresolved_hard_requirements == []
+    assert planning_receipt.attached >= 1
 
 # @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_event_sourced_planning_replay():

@@ -41,6 +41,7 @@ from tangl.vm.provision import (
     UpdatingProvisioner,
     CloningProvisioner,
 )
+from tangl.vm.provision.resolver import _deduplicate_offers, _select_best_offer
 from .vm_dispatch import vm_dispatch
 
 logger = logging.getLogger(__name__)
@@ -100,9 +101,46 @@ def do_get_provisioners(anchor: Node, *, ctx: ContextP, extra_handlers=None, **k
 # Helper functions
 
 def _iter_frontier(cursor: Node) -> list[Node]:
-    """Return the active cursor as the planning frontier."""
+    """Return frontier destinations reachable from ``cursor`` via choices."""
 
+    return [
+        edge.destination
+        for edge in cursor.edges_out(is_instance=ChoiceEdge)
+        if edge.destination is not None
+    ]
+
+
+def _iter_planning_targets(cursor: Node) -> list[Node]:
+    """Return the nodes that should be provisioned during planning."""
+
+    frontier = _iter_frontier(cursor)
+    if frontier:
+        return frontier
     return [cursor]
+
+
+def _refresh_dependency_offers(
+    requirement, *, ctx: Context
+) -> list[DependencyOffer]:
+    """Re-query provisioners for dependency offers after graph mutations."""
+
+    indexed_provisioners: list[tuple[int, Provisioner]] = getattr(
+        ctx, "planning_indexed_provisioners", []
+    )
+    refreshed: list[DependencyOffer] = []
+    for proximity, provisioner in indexed_provisioners:
+        for offer in provisioner.get_dependency_offers(requirement, ctx=ctx):
+            refreshed.append(
+                _attach_offer_metadata(
+                    offer,
+                    provisioner,
+                    proximity,
+                    source="dependency",
+                )
+            )
+    if not refreshed:
+        return []
+    return _deduplicate_offers(refreshed)
 
 
 def _attach_offer_metadata(
@@ -124,82 +162,6 @@ def _attach_offer_metadata(
         offer.selection_criteria["source"] = source
     return offer
 
-
-def _deduplicate_offers(offers: list[ProvisionOffer]) -> list[ProvisionOffer]:
-    """
-    Deduplicate EXISTING offers by provider_id.
-
-    For EXISTING offers with the same provider_id, keep only the best one
-    (lowest cost, closest proximity, earliest registration).
-
-    CREATE/UPDATE/CLONE offers are never deduplicated since they produce
-    distinct results.
-    """
-    # Separate EXISTING from other offers
-    existing_by_provider: dict[UUID, list[tuple[int, ProvisionOffer]]] = defaultdict(list)
-    non_existing: list[tuple[int, ProvisionOffer]] = []
-
-    for idx, offer in enumerate(offers):
-        if (
-            isinstance(offer, DependencyOffer)
-            and _policy_from_offer(offer) is ProvisioningPolicy.EXISTING
-            and offer.provider_id is not None
-        ):
-            existing_by_provider[offer.provider_id].append((idx, offer))
-        else:
-            non_existing.append((idx, offer))
-
-    # For each provider_id, keep only the best EXISTING offer
-    deduplicated: list[tuple[int, ProvisionOffer]] = []
-
-    for provider_offers in existing_by_provider.values():
-        # Sort by (cost, proximity, original_index)
-        best = min(
-            provider_offers,
-            key=lambda item: (
-                item[1].cost,
-                item[1].proximity,
-                item[0],  # Registration order
-            )
-        )
-        deduplicated.append(best)
-
-    # Add back non-EXISTING offers
-    deduplicated.extend(non_existing)
-
-    # Sort by (cost, proximity, original_index) to maintain proper ordering
-    deduplicated.sort(key=lambda item: (
-        item[1].cost,
-        item[1].proximity,
-        item[0],
-    ))
-
-    return [offer for _, offer in deduplicated]
-
-
-def _select_best_offer(offers: Iterable[ProvisionOffer]) -> ProvisionOffer | None:
-    """
-    Select the best offer from a deduplicated list.
-
-    Selection criteria (in order):
-    1. Lowest cost (DIRECT < LIGHT_INDIRECT < HEAVY_INDIRECT < CREATE)
-    2. Closest proximity (lower is better)
-    3. Registration order (first wins)
-    """
-    enumerated = list(enumerate(offers))
-    if not enumerated:
-        return None
-
-    best_idx, best_offer = min(
-        enumerated,
-        key=lambda item: (
-            item[1].cost,
-            item[1].proximity,
-            item[0],  # Registration order as tiebreaker
-        )
-    )
-
-    return best_offer
 
 
 def _policy_from_offer(offer: DependencyOffer) -> ProvisioningPolicy:
@@ -247,7 +209,7 @@ def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
             )
 
     # Collect dependency offers (unicast per requirement)
-    for frontier_node in _iter_frontier(cursor):
+    for frontier_node in _iter_planning_targets(cursor):
         for dep in get_dependencies(frontier_node):
             if dep.requirement.provider is not None:
                 continue
@@ -287,6 +249,7 @@ def _planning_collect_offers(cursor: Node, *, ctx: Context, **kwargs):
     if not hasattr(ctx, "provision_offers"):
         ctx.provision_offers = {}
     ctx.provision_offers.update(deduplicated_offers)
+    object.__setattr__(ctx, "planning_indexed_provisioners", indexed_provisioners)
 
     flattened: list[ProvisionOffer] = []
     for offer_list in deduplicated_offers.values():
@@ -317,7 +280,7 @@ def _planning_link_affordances(cursor: Node, *, ctx: Context, **kwargs):
     builds_snapshot = []
     satisfied_requirements: set[UUID] = set()
 
-    for frontier_node in _iter_frontier(cursor):
+    for frontier_node in _iter_planning_targets(cursor):
         # Filter available offers for this frontier node
         for offer in affordance_offers:
             if not isinstance(offer, AffordanceOffer):
@@ -348,6 +311,7 @@ def _planning_link_affordances(cursor: Node, *, ctx: Context, **kwargs):
                             continue
                         if dep.satisfied_by(provider):
                             dep.destination = provider
+                            dep.requirement.provider = provider
 
                 # Record success (affordances don't have specific requirement IDs)
                 build = BuildReceipt(
@@ -454,7 +418,7 @@ def _planning_link_dependencies(cursor: Node, *, ctx: Context, **kwargs):
 
     builds_snapshot = []
 
-    for frontier_node in _iter_frontier(cursor):
+    for frontier_node in _iter_planning_targets(cursor):
         # Materialize dependencies list BEFORE iterating
         # This prevents "dictionary changed size during iteration" errors
         # when accept() calls add nodes to the graph
@@ -462,6 +426,12 @@ def _planning_link_dependencies(cursor: Node, *, ctx: Context, **kwargs):
         for dep in deps:
             requirement = dep.requirement
             offers = ctx.provision_offers.get(dep.uid, [])
+
+            if not offers:
+                refreshed = _refresh_dependency_offers(requirement, ctx=ctx)
+                if refreshed:
+                    offers = refreshed
+                    ctx.provision_offers[dep.uid] = offers
 
             if not offers:
                 requirement.is_unresolvable = True
@@ -553,6 +523,7 @@ def _planning_job_receipt(cursor: Node, *, ctx: Context, **kwargs):
         ctx.provision_offers.clear()
     if hasattr(ctx, "provision_builds"):
         ctx.provision_builds.clear()
+    object.__setattr__(ctx, "planning_indexed_provisioners", [])
 
     return receipt
 
@@ -586,10 +557,11 @@ def plan_select_and_apply(cursor: Node, *, ctx: Context) -> list[BuildReceipt]:
             ctx.provision_offers["*"] = _deduplicate_offers(affordance_offers)
 
         if offers_by_req:
-            for dep in cursor.edges_out(is_instance=Dependency):
-                offer_list = offers_by_req.get(dep.requirement.uid)
-                if offer_list:
-                    ctx.provision_offers[dep.uid] = _deduplicate_offers(offer_list)
+            for target_node in _iter_planning_targets(cursor):
+                for dep in target_node.edges_out(is_instance=Dependency):
+                    offer_list = offers_by_req.get(dep.requirement.uid)
+                    if offer_list:
+                        ctx.provision_offers[dep.uid] = _deduplicate_offers(offer_list)
 
     ctx.provision_builds.clear()
     affordance_builds = _planning_link_affordances(cursor, ctx=ctx)
