@@ -94,10 +94,6 @@
   - *Priority – Low*: Leave skipped; optional microbenchmark.
 - **`test_resource_inventory_tag` xfails** – covered above.
 
-## Persistence factory
-- **`test_factory`** – `xfail`
-  - *Observation*: Parameterized over Redis/Mongo backends; when the corresponding services are disabled in settings the factory intentionally raises `ImportError`, triggering the xfail.【F:engine/tests/persistence/test_persistence_mgr_factory.py†L18-L27】【F:engine/src/tangl/persistence/factory.py†L70-L118】
-  - *Priority – External*: Keep xfail unless we add smarter skipping based on backend availability; the local in-memory/file configurations already pass without the marker.
 
 ## Overall recommendations
 1. **Provisioning & graph reparenting** are the only high-priority items—they affect story planning fidelity. Schedule implementation work and flip those tests to required coverage.
