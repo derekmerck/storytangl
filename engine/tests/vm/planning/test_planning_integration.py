@@ -115,17 +115,11 @@ def test_planning_cycle_with_mixed_requirements():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    edge_to_a = next(start.edges_out(is_instance=ChoiceEdge))
-    frame.follow_edge(edge_to_a)
-
-    step_1_records = _collect_step_records(frame, 1)
-    assert step_1_records
-    planning_receipt_1 = _find_planning_receipt(step_1_records)
-
-    assert planning_receipt_1.created >= 1
-    assert planning_receipt_1.attached >= 1
-    assert len(planning_receipt_1.waived_soft_requirements) == 1
-    assert not planning_receipt_1.unresolved_hard_requirements
+    planning_receipt_start = frame.run_phase(P.PLANNING)
+    assert planning_receipt_start.created >= 1
+    assert planning_receipt_start.attached >= 1
+    assert len(planning_receipt_start.waived_soft_requirements) == 1
+    assert not planning_receipt_start.unresolved_hard_requirements
 
     resource_x = g.find_one(label="resource_x")
     assert resource_x is not None
@@ -135,6 +129,17 @@ def test_planning_cycle_with_mixed_requirements():
     assert g.find_one(label="resource_y") is None
 
     assert req_z_aff.provider == service_z
+
+    edge_to_a = next(start.edges_out(is_instance=ChoiceEdge))
+    frame.follow_edge(edge_to_a)
+
+    step_1_records = _collect_step_records(frame, 1)
+    assert step_1_records
+    planning_receipt_1 = _find_planning_receipt(step_1_records)
+
+    assert planning_receipt_1.created >= 1
+    assert planning_receipt_1.attached >= 1
+    assert not planning_receipt_1.unresolved_hard_requirements
 
     edge_to_b = next(node_a.edges_out(is_instance=ChoiceEdge))
     frame.follow_edge(edge_to_b)
@@ -189,12 +194,7 @@ def test_softlock_detection_and_prevention():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    edge_to_gate = next(start.edges_out(is_instance=ChoiceEdge))
-    frame.follow_edge(edge_to_gate)
-
-    step_records = _collect_step_records(frame, 1)
-    assert step_records
-    planning_receipt = _find_planning_receipt(step_records)
+    planning_receipt = frame.run_phase(P.PLANNING)
 
     assert planning_receipt.unresolved_hard_requirements == [req_key.uid]
     assert req_key.provider is None

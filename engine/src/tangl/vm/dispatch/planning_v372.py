@@ -115,7 +115,7 @@ def _iter_planning_targets(cursor: Node) -> list[Node]:
 
     frontier = _iter_frontier(cursor)
     if frontier:
-        return [cursor, *frontier]
+        return frontier
     return [cursor]
 
 
