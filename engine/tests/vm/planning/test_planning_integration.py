@@ -272,6 +272,54 @@ def test_affordance_precedence_over_creation():
     planning_receipt = _find_planning_receipt(_collect_step_records(frame, 1))
     assert planning_receipt.created == 0
 
+
+def test_hard_requirement_satisfied_by_affordance():
+    """Hard requirements fulfilled through affordances stay resolved in receipts."""
+
+    g = Graph(label="affordance_hard_requirement")
+
+    start = g.add_node(label="start")
+    scene = g.add_node(label="scene")
+    ChoiceEdge(graph=g, source_id=start.uid, destination_id=scene.uid)
+
+    guardian = g.add_node(label="guardian")
+
+    hard_requirement = Requirement[Node](
+        graph=g,
+        identifier="guardian",
+        policy=ProvisioningPolicy.EXISTING,
+        hard_requirement=True,
+    )
+    Dependency[Node](
+        graph=g,
+        source_id=scene.uid,
+        requirement=hard_requirement,
+        label="needs_guardian",
+    )
+
+    guardian_affordance_req = Requirement[Node](
+        graph=g,
+        identifier=guardian.uid,
+        policy=ProvisioningPolicy.EXISTING,
+        provider=guardian,
+        hard_requirement=True,
+    )
+    Affordance[Node](
+        graph=g,
+        source_id=guardian.uid,
+        destination_id=scene.uid,
+        requirement=guardian_affordance_req,
+        label="guardian_available",
+    )
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+
+    planning_receipt = frame.run_phase(P.PLANNING)
+
+    assert hard_requirement.provider == guardian
+    assert planning_receipt.unresolved_hard_requirements == []
+    assert planning_receipt.attached >= 1
+
 # @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_event_sourced_planning_replay():
     """Event-sourced planning produces deterministic patches that replay cleanly."""

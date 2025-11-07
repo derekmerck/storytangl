@@ -311,6 +311,7 @@ def _planning_link_affordances(cursor: Node, *, ctx: Context, **kwargs):
                             continue
                         if dep.satisfied_by(provider):
                             dep.destination = provider
+                            dep.requirement.provider = provider
 
                 # Record success (affordances don't have specific requirement IDs)
                 build = BuildReceipt(
