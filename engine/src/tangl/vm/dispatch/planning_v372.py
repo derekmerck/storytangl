@@ -41,6 +41,7 @@ from tangl.vm.provision import (
     UpdatingProvisioner,
     CloningProvisioner,
 )
+from tangl.vm.provision.resolver import _deduplicate_offers, _select_best_offer
 from .vm_dispatch import vm_dispatch
 
 logger = logging.getLogger(__name__)
@@ -100,8 +101,15 @@ def do_get_provisioners(anchor: Node, *, ctx: ContextP, extra_handlers=None, **k
 # Helper functions
 
 def _iter_frontier(cursor: Node) -> list[Node]:
-    """Return the active cursor as the planning frontier."""
+    """Return frontier destinations reachable from ``cursor`` via choices."""
 
+    frontier = [
+        edge.destination
+        for edge in cursor.edges_out(is_instance=ChoiceEdge)
+        if edge.destination is not None
+    ]
+    if frontier:
+        return frontier
     return [cursor]
 
 
@@ -124,82 +132,6 @@ def _attach_offer_metadata(
         offer.selection_criteria["source"] = source
     return offer
 
-
-def _deduplicate_offers(offers: list[ProvisionOffer]) -> list[ProvisionOffer]:
-    """
-    Deduplicate EXISTING offers by provider_id.
-
-    For EXISTING offers with the same provider_id, keep only the best one
-    (lowest cost, closest proximity, earliest registration).
-
-    CREATE/UPDATE/CLONE offers are never deduplicated since they produce
-    distinct results.
-    """
-    # Separate EXISTING from other offers
-    existing_by_provider: dict[UUID, list[tuple[int, ProvisionOffer]]] = defaultdict(list)
-    non_existing: list[tuple[int, ProvisionOffer]] = []
-
-    for idx, offer in enumerate(offers):
-        if (
-            isinstance(offer, DependencyOffer)
-            and _policy_from_offer(offer) is ProvisioningPolicy.EXISTING
-            and offer.provider_id is not None
-        ):
-            existing_by_provider[offer.provider_id].append((idx, offer))
-        else:
-            non_existing.append((idx, offer))
-
-    # For each provider_id, keep only the best EXISTING offer
-    deduplicated: list[tuple[int, ProvisionOffer]] = []
-
-    for provider_offers in existing_by_provider.values():
-        # Sort by (cost, proximity, original_index)
-        best = min(
-            provider_offers,
-            key=lambda item: (
-                item[1].cost,
-                item[1].proximity,
-                item[0],  # Registration order
-            )
-        )
-        deduplicated.append(best)
-
-    # Add back non-EXISTING offers
-    deduplicated.extend(non_existing)
-
-    # Sort by (cost, proximity, original_index) to maintain proper ordering
-    deduplicated.sort(key=lambda item: (
-        item[1].cost,
-        item[1].proximity,
-        item[0],
-    ))
-
-    return [offer for _, offer in deduplicated]
-
-
-def _select_best_offer(offers: Iterable[ProvisionOffer]) -> ProvisionOffer | None:
-    """
-    Select the best offer from a deduplicated list.
-
-    Selection criteria (in order):
-    1. Lowest cost (DIRECT < LIGHT_INDIRECT < HEAVY_INDIRECT < CREATE)
-    2. Closest proximity (lower is better)
-    3. Registration order (first wins)
-    """
-    enumerated = list(enumerate(offers))
-    if not enumerated:
-        return None
-
-    best_idx, best_offer = min(
-        enumerated,
-        key=lambda item: (
-            item[1].cost,
-            item[1].proximity,
-            item[0],  # Registration order as tiebreaker
-        )
-    )
-
-    return best_offer
 
 
 def _policy_from_offer(offer: DependencyOffer) -> ProvisioningPolicy:
