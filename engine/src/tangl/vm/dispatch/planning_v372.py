@@ -113,6 +113,9 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
 
     if not provisioners:
         logger.warning("No provisioners available for %s", cursor.label)
+        ctx.frontier_provision_results.clear()
+        ctx.frontier_provision_plans.clear()
+        object.__setattr__(ctx, "planning_indexed_provisioners", [])
         return None
 
     prov_ctx = ProvisioningContext(

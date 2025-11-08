@@ -11,6 +11,7 @@ from tangl.vm import (
     Affordance,
     ProvisioningPolicy,
 )
+from tangl.vm.dispatch import planning_v372
 from tangl.vm.provision import PlanningReceipt, BuildReceipt
 from tangl.utils.hashing import hashing_func
 
@@ -165,3 +166,36 @@ def test_event_sourced_frame_records_planning_receipt_and_patch():
 
     patched_graph = patch.apply(baseline_graph)
     assert patched_graph.find_one(label="projected") is not None
+
+
+def test_planning_clears_frontier_cache_when_provisioners_missing(monkeypatch):
+    g = Graph(label="demo")
+    cursor = g.add_node(label="scene")
+
+    created_req = Requirement[Node](
+        graph=g,
+        policy=ProvisioningPolicy.CREATE,
+        template={"obj_cls": Node, "label": "created"},
+        hard_requirement=True,
+    )
+    Dependency[Node](graph=g, source_id=cursor.uid, requirement=created_req, label="needs_created")
+
+    frame = Frame(graph=g, cursor_id=cursor.uid)
+    frame.run_phase(P.PLANNING)
+
+    ctx = frame.context
+    assert ctx.frontier_provision_results
+    assert ctx.frontier_provision_plans
+
+    monkeypatch.setattr(planning_v372, "do_get_provisioners", lambda *_, **__: [])
+
+    frame.run_phase(P.PLANNING)
+
+    assert ctx.frontier_provision_results == {}
+    assert ctx.frontier_provision_plans == {}
+    assert ctx.planning_indexed_provisioners == []
+
+    receipt = frame.run_phase(P.FINALIZE)
+    assert isinstance(receipt, PlanningReceipt)
+    assert receipt.builds == []
+    assert receipt.frontier_node_ids == []
