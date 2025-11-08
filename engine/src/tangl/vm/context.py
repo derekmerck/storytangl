@@ -78,14 +78,28 @@ class Context:
     call_receipts: list[CallReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
 
+    # todo: several classes follow this protocol for attrib names and a getter,
+    #       however, this is a dataclass, not an entity, so we might need 2
+    #       implementations?
+    # Mount for LOCAL behaviors on the context
     local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
-    # SYSTEM and APPLICATION layers
+    # Could pass APPLICATION or override layers on creation
     active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
 
     def get_active_layers(self) -> Iterable[BehaviorRegistry]:
-        from tangl.vm.dispatch import vm_dispatch
-        # todo: get the graph's author layer as well
-        layers = {vm_dispatch, *self.active_layers, self.local_behaviors}
+        # We know that we are part of the SYSTEM layer, and we always
+        # include any local behaviors.
+        from .dispatch import vm_dispatch
+        layers = {vm_dispatch, self.local_behaviors}
+        # We may have been initialized with an APPLICATION domain
+        if self.active_layers:
+            layers.update(self.active_layers)
+        # Our graph may know what APPLICATION and AUTHOR domain it lives in,
+        # and/or may have LOCAL behaviors attached
+        if hasattr(self.graph, 'get_active_layers'):
+            layers.update(self.graph.get_active_layers())
+        elif hasattr(self.graph, 'local_behaviors'):
+            layers.add(self.graph.local_behaviors)
         return layers
 
     def __post_init__(self):
