@@ -52,14 +52,14 @@ class TestEntryPoints:
         console_scripts = eps.select(group='console_scripts')
         script_names = {s.name for s in console_scripts}
 
-        assert 'cli' in script_names
-        assert 'serve' in script_names
+        assert 'tangl-cli' in script_names
+        assert 'tangl-serve' in script_names
 
     def test_cli_entry_point_loads(self):
         """Verify cli entry point resolves and is callable."""
         from importlib.metadata import entry_points
 
-        eps = entry_points().select(group='console_scripts', name='cli')
+        eps = entry_points().select(group='console_scripts', name='tangl-cli')
         cli_ep = next(iter(eps))
 
         # Should be tangl.cli.__main__:main, not tangl.apps.cli...
@@ -73,7 +73,7 @@ class TestEntryPoints:
         """Verify serve entry point resolves and is callable."""
         from importlib.metadata import entry_points
 
-        eps = entry_points().select(group='console_scripts', name='serve')
+        eps = entry_points().select(group='console_scripts', name='tangl-serve')
         serve_ep = next(iter(eps))
 
         assert 'tangl.rest' in serve_ep.value
@@ -89,7 +89,7 @@ class TestScriptInvocation:
     def test_cli_script_exists(self):
         """Verify 'cli' is on PATH."""
         result = subprocess.run(
-            ['which', 'cli'],
+            ['which', 'tangl-cli'],
             capture_output=True,
             text=True
         )
@@ -121,7 +121,7 @@ class TestScriptInvocation:
     def test_serve_script_exists(self):
         """Verify 'serve' is on PATH."""
         result = subprocess.run(
-            ['which', 'serve'],
+            ['which', 'tangl-serve'],
             capture_output=True,
             text=True
         )
@@ -131,7 +131,7 @@ class TestScriptInvocation:
     def test_serve_help_works(self):
         """Verify 'serve --help' runs without error."""
         result = subprocess.run(
-            ['serve', '--help'],
+            ['tangl-serve', '--help'],
             capture_output=True,
             text=True,
             timeout=2

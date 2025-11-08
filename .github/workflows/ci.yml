@@ -36,9 +36,10 @@ jobs:
           uv python install 3.13
           poetry env use "$(uv python find 3.13)"
           poetry install --no-interaction --with dev
+          pip install . -e
       - name: Run tests
         env:
-          PYTHONPATH: engine/src
+          PYTHONPATH: "engine/src:apps/cli/src:apps/rest/src"
         run: |
           poetry run pytest -W ignore::DeprecationWarning -W ignore::pytest.PytestCollectionWarning
 
@@ -98,12 +99,12 @@ jobs:
 
       - name: Test console scripts work
         run: |
-          which cli
-          which serve
+          which tangl-cli
+          which tangl-serve
 #          cli --help
 #          serve --help
 
       - name: Run distribution tests
         run: |
           pip install pytest
-          pytest engine/tests/test_package_distribution.py -v
+          pytest engine/tests/test_package_distribution.py -v -W ignore::DeprecationWarning -W ignore::pytest.PytestCollectionWarning
