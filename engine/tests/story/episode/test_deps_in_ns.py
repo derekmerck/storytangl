@@ -40,7 +40,10 @@ def test_structural_domain_vars_include_dependencies():
 
     # Run frame at block level
     frame = Frame(graph=g, cursor_id=block.uid)
-    frame.run_phase(P.PLANNING)  # Should provision villain
+    frame.run_phase(P.PLANNING)  # Should plan villain
+    assert not role.satisfied
+
+    frame.run_phase(P.FINALIZE)
 
     assert role.satisfied
     frame._invalidate_context()

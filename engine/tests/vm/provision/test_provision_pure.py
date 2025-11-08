@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 from tangl.core import Graph, Node
+from tangl.vm.context import Context as VMContext
 from tangl.vm.provision import (
     CompanionProvisioner,
     Dependency,
     GraphProvisioner,
+    ProvisioningContext,
     ProvisioningPolicy,
     Requirement,
     TemplateProvisioner,
     provision_node,
-    ProvisioningContext,
 )
 
 
 def _ctx(graph: Graph, step: int = 0) -> ProvisioningContext:
     return ProvisioningContext(graph=graph, step=step)
+
+
+def _vm_ctx(graph: Graph, cursor: Node) -> VMContext:
+    return VMContext(graph=graph, cursor_id=cursor.uid, step=0)
 
 
 def test_provision_with_existing_resource():
@@ -32,11 +37,19 @@ def test_provision_with_existing_resource():
     provisioners = [GraphProvisioner(node_registry=graph)]
     result = provision_node(scene, provisioners, ctx=_ctx(graph))
 
+    plan = result.primary_plan
+
     assert result.is_viable
+    assert plan is not None
+    assert dependency.destination is None
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
     assert dependency.destination is key
     offers = result.dependency_offers[requirement.uid]
     assert len(offers) == 1
     assert offers[0].provider_id == key.uid
+    assert len(receipts) == 1
+    assert receipts[0].provider_id == key.uid
+    assert receipts[0].operation is ProvisioningPolicy.EXISTING
 
 
 def test_provision_creates_when_missing():
@@ -53,9 +66,16 @@ def test_provision_creates_when_missing():
     provisioners = [TemplateProvisioner(layer="author")]
     result = provision_node(scene, provisioners, ctx=_ctx(graph))
 
+    plan = result.primary_plan
+
+    assert dependency.destination is None
+    assert plan is not None
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
     assert dependency.destination is not None
     assert dependency.destination.label == "generated_key"
     assert dependency.destination in graph
+    assert len(receipts) == 1
+    assert receipts[0].operation is ProvisioningPolicy.CREATE
     assert result.is_viable
 
 
@@ -76,9 +96,12 @@ def test_provision_marks_hard_requirement_failure():
     assert not result.is_viable
     assert requirement.uid in result.dependency_offers
     assert result.dependency_offers[requirement.uid] == []
-    failure = next(receipt for receipt in result.builds if receipt.caller_id == requirement.uid)
-    assert not failure.accepted
-    assert failure.reason == "No offers available"
+    plan = result.primary_plan
+    assert plan is not None
+    assert plan.steps == []
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
+    assert receipts == []
+    assert requirement.uid in result.unresolved_hard_requirements
 
 
 def test_provision_satisfies_soft_requirements_opportunistically():
@@ -99,7 +122,12 @@ def test_provision_satisfies_soft_requirements_opportunistically():
     assert result.is_viable
     assert requirement.uid in result.dependency_offers
     assert result.dependency_offers[requirement.uid] == []
-    assert all(receipt.requirement_id != requirement.uid for receipt in result.builds)
+    plan = result.primary_plan
+    assert plan is not None
+    assert plan.steps == []
+    assert requirement.uid in result.waived_soft_requirements
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
+    assert receipts == []
 
 
 def test_provision_deduplicates_existing_offers():
@@ -120,11 +148,16 @@ def test_provision_deduplicates_existing_offers():
     ]
     result = provision_node(scene, provisioners, ctx=_ctx(graph))
 
+    plan = result.primary_plan
+
     offers = result.dependency_offers[requirement.uid]
     assert len(offers) == 1
     assert offers[0].provider_id == provider.uid
-    build = next(receipt for receipt in result.builds if receipt.caller_id == requirement.uid)
-    assert build.accepted
+    assert plan is not None
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
+    assert len(receipts) == 1
+    assert receipts[0].accepted
+    assert receipts[0].provider_id == provider.uid
 
 
 def test_provision_accepts_best_offer_by_cost():
@@ -146,9 +179,13 @@ def test_provision_accepts_best_offer_by_cost():
     ]
     result = provision_node(scene, provisioners, ctx=_ctx(graph))
 
+    plan = result.primary_plan
+    assert plan is not None
+    assert dependency.destination is None
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
     assert dependency.destination is existing
-    build = next(receipt for receipt in result.builds if receipt.caller_id == requirement.uid)
-    assert build.operation is ProvisioningPolicy.EXISTING
+    assert len(receipts) == 1
+    assert receipts[0].operation is ProvisioningPolicy.EXISTING
 
 
 def test_provision_handles_affordances():
@@ -170,9 +207,16 @@ def test_provision_handles_affordances():
     ]
     result = provision_node(scene, provisioners, ctx=_ctx(graph))
 
+    plan = result.primary_plan
+
     assert any(offer.label == "talk" for offer in result.affordance_offers)
+    assert plan is not None
+    assert dep_edge.destination is None
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
     assert dep_edge.destination is ally
     assert result.is_viable
+    assert receipts
+    assert any(receipt.provider_id == ally.uid for receipt in receipts)
 
 
 def test_provision_result_tracks_all_offers():
@@ -199,4 +243,8 @@ def test_provision_result_tracks_all_offers():
         ProvisioningPolicy.EXISTING,
         ProvisioningPolicy.CREATE,
     }
-    assert any(receipt.provider_id == existing.uid for receipt in result.builds)
+    plan = result.primary_plan
+    assert plan is not None
+    receipts = plan.execute(ctx=_vm_ctx(graph, scene))
+    assert receipts
+    assert any(receipt.provider_id == existing.uid for receipt in receipts)

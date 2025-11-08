@@ -15,7 +15,13 @@ from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
 from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt
-from .provision import BuildReceipt, ProvisionOffer, Provisioner
+from .provision import (
+    BuildReceipt,
+    ProvisionOffer,
+    Provisioner,
+    ProvisioningPlan,
+    ProvisioningResult,
+)
 
 if TYPE_CHECKING:
     from .traversal import TraversableSubgraph
@@ -118,3 +124,5 @@ class Context:
     provision_builds: list[BuildReceipt] = field(default_factory=list)
     journal_content: dict[str, dict] = field(default_factory=dict)
     planning_indexed_provisioners: list[tuple[int, Provisioner]] = field(default_factory=list)
+    frontier_provision_results: dict[UUID, ProvisioningResult] = field(default_factory=dict)
+    frontier_provision_plans: dict[UUID, ProvisioningPlan] = field(default_factory=dict)

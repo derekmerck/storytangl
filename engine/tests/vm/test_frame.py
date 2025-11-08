@@ -110,7 +110,11 @@ def test_provisioning_create_policy_assigns_provider():
 
     frame = Frame(graph=g, cursor_id=scene.uid)
 
-    ns = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
+    assert not req.satisfied
+
+    receipt = frame.run_phase(P.FINALIZE)
+    assert receipt is not None
     assert req.satisfied
     assert g.get("Companion") is not None
 

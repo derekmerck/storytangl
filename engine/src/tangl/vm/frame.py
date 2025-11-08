@@ -175,9 +175,6 @@ class Frame:
         if isinstance(planning_receipt, PlanningReceipt):
             self.records.add_record(planning_receipt)
 
-        if self.event_sourced:
-            self._invalidate_context()
-
         # Check for prereq cursor redirects
         # todo: implement j/r redirect stack
         if nxt := self.run_phase(P.PREREQS):  # may set an edge to next cursor
@@ -189,13 +186,16 @@ class Frame:
 
         self.run_phase(P.UPDATE)         # No-op for now
 
-        if self.event_sourced:
-            self._invalidate_context()
-
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
 
         # Generate the output content for the current state
         entry_fragments = self.run_phase(P.JOURNAL)
+
+        # Cleanup bookkeeping
+        finalize_receipt = self.run_phase(P.FINALIZE)
+
+        if isinstance(finalize_receipt, PlanningReceipt):
+            self.records.add_record(finalize_receipt)
 
         if entry_fragments:
             self.records.push_records(
@@ -204,19 +204,26 @@ class Frame:
                 marker_name=f"step-{self.step:04d}"
             )
 
-        # Cleanup bookkeeping
-        self.run_phase(P.FINALIZE)
-
         patch: Patch | None = None
         if self.event_sourced and self.event_watcher.events:
+            patch_events = list(self.event_watcher.events)
             patch = Patch(
-                events=self.event_watcher.events,
+                events=patch_events,
                 registry_id=self.graph.uid,
                 registry_state_hash=baseline_state_hash,
             )
             self.records.add_record(patch)
+            # Apply the patch to the authoritative graph so subsequent phases
+            # observe the committed state. Skip state hash validation during the
+            # apply step because finalize may have already updated metadata
+            # (e.g., requirement bindings) prior to event emission.
+            patch_for_apply = patch.model_copy(update={"registry_state_hash": None})
+            self.graph = patch_for_apply.apply(self.graph)
             # ready for next frame
             self.event_watcher.clear()
+            # Invalidate the cached context so POSTREQS rebuilds against the
+            # updated graph state.
+            self._invalidate_context()
 
         if patch is not None:
             self.phase_outcome[P.FINALIZE] = patch
