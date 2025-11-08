@@ -2,7 +2,7 @@ import logging
 from typing import Self
 
 from tangl.core import Entity, Registry
-from tangl.core.behavior import HasLocalBehaviors
+from tangl.core.behavior import HasClassBehaviors
 from tangl.core.dispatch import HookedRegistry as _HookedRegistry, on_index
 
 logger = logging.getLogger(__name__)
@@ -16,10 +16,10 @@ class HookedRegistry(_HookedRegistry):
     def _log_item_cls(self: Self, item, *_, **__):
         logger.debug(f"{self!r}:inst/global: indexed {item!r}")
 
-    # local/instance behaviors are registered directly on the class
-    @HasLocalBehaviors.register_local(task="index")
+    # class local behaviors are registered directly on the class
+    @HasClassBehaviors.register_cls_behavior(task="index")
     def _log_item_inst(self, item: Entity, *_, **__):
-        logger.debug(f"{self!r}:inst/local: indexed {item!r}")
+        logger.debug(f"{self!r}:cls/local: indexed {item!r}")
 
 def _log_item_static(caller: HookedRegistry, item: Entity, *_, **__):
     logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def _log_item_static(caller: HookedRegistry, item: Entity, *_, **__):
 
     # This adds it to the class local behaviors as a static handler
 
-HookedRegistry.local_behaviors.add_behavior(_log_item_static, task="index")
+HookedRegistry.cls_behaviors.add_behavior(_log_item_static, task="index")
 
 # todo: decorators don't like registering class functions, bc they don't match the HandlerFunc protocol
 

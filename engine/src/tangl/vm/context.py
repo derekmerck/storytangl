@@ -49,7 +49,7 @@ class Context:
     ------------
     * **Frozen** – safe to pass across phases; graph may be a watched proxy when event‑sourcing.
     * **Deterministic RNG** – :attr:`rand` is stable per ``(graph, cursor, step)``.
-    * **Layered behaviors** – :attr:`local_behaviors` caches ad-hoc handlers while
+    * **Layered behaviors** – :attr:`cls_behaviors` caches ad-hoc handlers while
       :attr:`active_layers` inject application/system registries.
     * **Receipts** – :attr:`call_receipts` buffers per‑phase results for reducers.
     * **State hash** – :attr:`initial_state_hash` guards patch application.
@@ -59,7 +59,7 @@ class Context:
     - :attr:`graph` – working :class:`~tangl.core.Graph` (may be watched).
     - :attr:`cursor` – resolved :class:`~tangl.core.Node`.
     - :attr:`step` – integer step index used in journaling and RNG seed.
-    - :attr:`local_behaviors` – per-frame registry for inline handlers.
+    - :attr:`cls_behaviors` – per-frame registry for inline handlers.
     - :attr:`active_layers` – iterable of :class:`~tangl.core.behavior.BehaviorRegistry`.
     - :attr:`rand` – :class:`random.Random` seeded for replay.
     - :meth:`get_ns` – return merged namespace.
@@ -74,32 +74,35 @@ class Context:
     graph: Graph
     cursor_id: UUID
     step: int = -1
-    # domain_registries: list[AffiliateRegistry] = field(default_factory=list)
     call_receipts: list[CallReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
 
-    # todo: several classes follow this protocol for attrib names and a getter,
-    #       however, this is a dataclass, not an entity, so we might need 2
-    #       implementations?
+    # this is just a dataclass re-implementation of HasLocalBehaviors mixin
+    # recall, anything with local behaviors is NOT serializable.
     # Mount for LOCAL behaviors on the context
     local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
     # Could pass APPLICATION or override layers on creation
     active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
 
     def get_active_layers(self) -> Iterable[BehaviorRegistry]:
-        # We know that we are part of the SYSTEM layer, and we always
-        # include any local behaviors.
+        # We know that we are part of the SYSTEM layer
         from .dispatch import vm_dispatch
-        layers = {vm_dispatch, self.local_behaviors}
-        # We may have been initialized with an APPLICATION domain
+        layers = {vm_dispatch}
+        # And we always include any local behaviors.
+        if self.local_behaviors:
+            layers.add(self.local_behaviors)
+        # We may have been initialized with an APPLICATION or AUTHOR domain
         if self.active_layers:
             layers.update(self.active_layers)
-        # Our graph may know what APPLICATION and AUTHOR domain it lives in,
-        # and/or may have LOCAL behaviors attached
+        # Our graph may know what APPLICATION or AUTHOR domain it lives in
         if hasattr(self.graph, 'get_active_layers'):
             layers.update(self.graph.get_active_layers())
+        # Or it may have its own LOCAL behaviors attached
         elif hasattr(self.graph, 'local_behaviors'):
-            layers.add(self.graph.local_behaviors)
+            # attaching local behaviors to a caller is usually going to be _ad hoc_
+            locs = self.graph.local_behaviors
+            if locs:
+                layers.add(locs)
         return layers
 
     def __post_init__(self):

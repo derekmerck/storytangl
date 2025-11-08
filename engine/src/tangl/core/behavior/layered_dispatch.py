@@ -98,12 +98,14 @@ class LayeredDispatch(BehaviorRegistry):
         layers = {core_dispatch, self}  # self _may_ be core dispatch
         if ctx and hasattr(ctx, "get_active_layers"):
             # Includes ctx's local behaviors if any
-            ctx_layers = ctx.get_active_layers()
+            ctx_layers = ctx.get_active_layers() or []
             logger.debug(f"ctx_layers: {ctx_layers}")
             layers.update(ctx_layers)
         if hasattr(caller, "local_behaviors"):
             # attaching local behaviors to a caller is usually going to be _ad hoc_
-            layers.add(caller.local_behaviors)
+            locs = caller.local_behaviors
+            if locs:
+                layers.add(locs)
         # extra handlers are passed along and act as the INLINE layer
 
         logger.debug(f"Dispatch layers: {layers!r}")
