@@ -88,7 +88,8 @@ jobs:
 
       - name: Install from wheel
         run: |
-          pip install "dist/*.whl[server,cli]"
+          pip install "$(find dist -name '*.whl')[all]"
+#          pip install "dist/*.whl[server,cli]"
 
       - name: Test console scripts work
         run: |
