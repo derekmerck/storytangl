@@ -69,3 +69,41 @@ jobs:
 
       - name: Build
         run: yarn build
+
+  distribution-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true  # This pulls LFS files automatically
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "poetry.lock"
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry uv
+          uv python install 3.13
+          poetry env use "$(uv python find 3.13)"
+          poetry build --no-interaction --with dev
+
+      - name: Install from wheel (not editable)
+        run: |
+          pip install dist/*.whl
+
+      - name: Test console scripts work
+        run: |
+          which cli
+          which serve
+#          cli --help
+#          serve --help
+
+      - name: Run distribution tests
+        run: |
+          pip install pytest
+          pytest engine/tests/test_package_distribution.py -v
