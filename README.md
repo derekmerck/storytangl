@@ -96,7 +96,7 @@ if choices:
 ### 3. CLI Usage
 
 ```bash
-$ PYTHONPATH=engine/src:apps/cli/src python -m tangl.cli
+$ tangle-cli
 ⅁$ load_script my_story.yaml
 ⅁$ story
 ⅁$ do 0
@@ -135,11 +135,11 @@ At scale, Tangl can be hosted as a **multi-world server**:
 Install and run a Tangl story server on port 8000.
 ```bash
 $ pip install storytangl
-$ python -m tangl.rest
+$ tangl-serve
 ```
 or run the command-line interface (CLI).
 ```bash
-$ python -m tangl.cli
+$ tangl-cli
 ```
 
 (Currently distributing on PyPI-testing. When working from a source checkout,
@@ -177,20 +177,15 @@ You can always trigger the same check manually with `poetry run sphinx-build -b 
 The git repo includes a Dockerfile for the reference app that can be used as
 a quick-start on a PAAS environment.
 
-### Known issues
-
-- The packaged entry points in ``pyproject.toml`` still target the legacy
-  ``tangl.apps`` namespace (``tangl.apps.cli.__main__`` and
-  ``tangl.apps.rest.__main__``), but the current sources ship the CLI and REST
-  server under ``tangl.cli`` and ``tangl.rest`` respectively. Until the
-  entry-point definitions are updated, invoke them via ``python -m tangl.cli``
-  or ``python -m tangl.rest`` as shown above.【F:pyproject.toml†L23-L32】【F:apps/cli/src/tangl/cli/__main__.py†L1-L12】【F:apps/server/src/tangl/rest/__main__.py†L1-L17】
+### Docker
 
 ```bash
-$ docker build . -t storytangl:4
-$ docker run -p 8000:8000 storytangl:4
+$ docker build . -t storytangl:3.7
+$ docker run -p 8000:8000 storytangl:3.7
 ```
+Defaults to server, includes default web client and docs.  
 
+Change the entry point to `tangl-cli` for the command-line interface.
 
 ---
 
