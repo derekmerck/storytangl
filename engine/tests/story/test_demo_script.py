@@ -7,7 +7,8 @@ import yaml
 from tangl.story.concepts.actor import Actor
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
-from tangl.vm.frame import Frame
+from tangl.vm.ledger import Ledger
+from tangl.core import StreamRegistry
 
 
 def test_load_demo_script() -> None:
@@ -20,17 +21,29 @@ def test_load_demo_script() -> None:
 
     story = world.create_story("demo_story")
 
-    # todo: _why_ is the story.cursor a Frame?
-    assert isinstance(story.cursor, Frame)
-    frame = story.cursor
+    assert story.initial_cursor_id is not None
+    start_node = story.get(story.initial_cursor_id)
+    assert start_node is not None
+    assert start_node.label == "start"
+
+    ledger = Ledger(
+        graph=story,
+        cursor_id=story.initial_cursor_id,
+        records=StreamRegistry(),
+        label="demo_story",
+    )
+    ledger.init_cursor()
+    frame = ledger.get_frame()
     assert frame.cursor.label == "start"
 
     # todo: this does _not_ test that an initial journal entry was created at the cursor
 
-    outgoing = list(
-        story.find_edges(source_id=frame.cursor_id, trigger_phase=None)
-    )
-    labels = {edge.label for edge in outgoing}
+    outgoing = list(story.find_edges(source_id=frame.cursor_id))
+    labels = {
+        edge.label
+        for edge in outgoing
+        if getattr(edge, "trigger_phase", None) is None
+    }
     expected_labels = {text.replace(" ", "_") for text in ("Take the left path", "Take the right path")}
     assert labels == expected_labels
 

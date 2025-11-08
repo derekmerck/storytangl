@@ -136,6 +136,21 @@ def test_prereq_redirect_and_journal_line():
     assert "[step " in line
     assert "end" in line
 
+
+def test_jump_to_node_handles_prereq_redirects():
+    g = Graph(label="demo")
+    start = g.add_node(label="start")
+    forced = g.add_node(label="forced")
+
+    ChoiceEdge(graph=g, source_id=start.uid, destination_id=forced.uid, trigger_phase=P.PREREQS)
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+    frame.jump_to_node(start.uid)
+
+    assert frame.cursor_id == forced.uid
+    assert frame.cursor.uid == forced.uid
+    assert frame.step >= 1
+
 def test_postreq_redirect():
     g = Graph(); a = g.add_node(label="A"); b = g.add_node(label="B")
     ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid, trigger_phase=P.POSTREQS)

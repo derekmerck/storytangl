@@ -162,8 +162,10 @@ def test_create_story_full_returns_populated_graph() -> None:
 
     edges = list(story_graph.find_edges())
     assert edges and edges[0].destination_id in story_graph.data
-    assert story_graph.cursor is not None
-    assert story_graph.cursor.cursor.label in {"start", "next"}
+    assert story_graph.initial_cursor_id is not None
+    start_node = story_graph.get(story_graph.initial_cursor_id)
+    assert start_node is not None
+    assert start_node.label in {"start", "next"}
 
 
 def test_create_story_full_uses_metadata_start_at() -> None:
@@ -190,7 +192,10 @@ def test_create_story_full_uses_metadata_start_at() -> None:
     world = _make_world(script)
     story_graph = world.create_story("story")
 
-    assert story_graph.cursor.cursor.label == "next"
+    assert story_graph.initial_cursor_id is not None
+    start_node = story_graph.get(story_graph.initial_cursor_id)
+    assert start_node is not None
+    assert start_node.label == "next"
 
 
 def test_create_story_full_defaults_to_first_block() -> None:
@@ -208,7 +213,10 @@ def test_create_story_full_defaults_to_first_block() -> None:
     world = _make_world(script)
     story_graph = world.create_story("story")
 
-    assert story_graph.cursor.cursor.label == "start"
+    assert story_graph.initial_cursor_id is not None
+    start_node = story_graph.get(story_graph.initial_cursor_id)
+    assert start_node is not None
+    assert start_node.label == "start"
 
 
 def test_story_creation_uses_default_classes_when_obj_cls_missing() -> None:

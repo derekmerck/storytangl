@@ -106,8 +106,6 @@ class RuntimeController(HasApiEndpoints):
     def jump_to_node(self, ledger: Ledger, node_id: UUID) -> dict[str, Any]:
         """Teleport the ledger cursor to ``node_id`` for debugging purposes."""
 
-        from tangl.core.graph.edge import AnonymousEdge
-
         destination = ledger.graph.get(node_id)
         if destination is None:
             raise ValueError(f"Node {node_id} not found in graph")
@@ -115,14 +113,8 @@ class RuntimeController(HasApiEndpoints):
         if not destination.has_tags("dirty"):
             destination.tags = set(destination.tags) | {"dirty"}
 
-        source = ledger.graph.get(ledger.cursor_id)
-        if source is None:
-            raise RuntimeError(f"Ledger cursor {ledger.cursor_id} not found in graph")
-
-        jump_edge = AnonymousEdge(source=source, destination=destination)
-
         frame = ledger.get_frame()
-        frame.resolve_choice(jump_edge)
+        frame.jump_to_node(destination, include_postreq=True)
 
         ledger.cursor_id = frame.cursor_id
         ledger.step = frame.step
@@ -149,7 +141,9 @@ class RuntimeController(HasApiEndpoints):
 
         story_label = kwargs.get("story_label") or f"story_{user.uid}"
         story_graph = world.create_story(story_label, mode="full")
-        start_cursor_id = story_graph.cursor.cursor_id
+        start_cursor_id = story_graph.initial_cursor_id
+        if start_cursor_id is None:
+            raise RuntimeError("Story graph did not define an initial cursor")
 
         ledger = Ledger(
             graph=story_graph,

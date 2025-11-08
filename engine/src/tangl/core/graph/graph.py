@@ -126,6 +126,8 @@ class Graph(Registry[GraphItem]):
     # def add(self, *args) -> None:
     #     raise NotImplementedError("Graph is read-only")
 
+    initial_cursor_id: UUID | None = None
+
     # special adds
     def add(self, item: GraphItem) -> None:
         item.graph = self

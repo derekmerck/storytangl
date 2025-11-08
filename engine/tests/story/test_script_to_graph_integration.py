@@ -4,7 +4,8 @@ from tangl.story.fabula.script_manager import ScriptManager
 from tangl.core.graph import Edge, Node, Graph
 from tangl.story.concepts.actor import Actor
 from tangl.story.fabula.world import World
-from tangl.vm.frame import Frame
+from tangl.vm.ledger import Ledger
+from tangl.core import StreamRegistry
 
 
 class NarrativeBlock(Node):
@@ -81,24 +82,33 @@ def test_complete_story_creation() -> None:
     world = _build_world(_make_crossroads_script())
     story = world.create_story("test_story")
 
-    assert isinstance(story.cursor, Frame)
-    frame = story.cursor
+    assert story.initial_cursor_id is not None
+    start_node = story.get(story.initial_cursor_id)
+    assert isinstance(start_node, NarrativeBlock)
+    assert start_node.label == "start"
+    assert start_node.content == "You stand at a crossroads."
 
+    ledger = Ledger(
+        graph=story,
+        cursor_id=story.initial_cursor_id,
+        records=StreamRegistry(),
+        label="test_story",
+    )
+    ledger.init_cursor()
+    frame = ledger.get_frame()
     assert frame.cursor.label == "start"
-    assert isinstance(frame.cursor, NarrativeBlock)
-    assert frame.cursor.content == "You stand at a crossroads."
 
     actions = [
         edge
         for edge in story.find_edges(source_id=frame.cursor_id)
-        if getattr(edge, "text", None)
+        if getattr(edge, "trigger_phase", None) is None
     ]
-    assert {action.text for action in actions} == {
-        "Take the left path",
-        "Take the right path",
+    assert {action.label for action in actions} == {
+        "Take_the_left_path",
+        "Take_the_right_path",
     }
 
-    left_action = next(action for action in actions if action.text == "Take the left path")
+    left_action = next(action for action in actions if action.label == "Take_the_left_path")
 
     frame.follow_edge(left_action)
 
