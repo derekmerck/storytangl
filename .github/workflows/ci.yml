@@ -91,7 +91,7 @@ jobs:
           pip install poetry uv
           uv python install 3.13
           poetry env use "$(uv python find 3.13)"
-          poetry build --no-interaction --with dev
+          poetry build
 
       - name: Install from wheel (not editable)
         run: |
@@ -104,6 +104,8 @@ jobs:
 #          cli --help
 #          serve --help
 
+      # todo: maybe rerun all tests under a full install?
+      #       check that lfs files were properly included
       - name: Run distribution tests
         run: |
           pip install pytest
