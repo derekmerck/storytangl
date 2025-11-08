@@ -115,7 +115,8 @@ def test_planning_cycle_with_mixed_requirements():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    planning_receipt_start = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
+    planning_receipt_start = frame.run_phase(P.FINALIZE)
     assert planning_receipt_start.created >= 1
     assert planning_receipt_start.attached >= 1
     assert len(planning_receipt_start.waived_soft_requirements) == 1
@@ -150,6 +151,7 @@ def test_planning_cycle_with_mixed_requirements():
 
     assert planning_receipt_2.attached == 0
     assert planning_receipt_2.created == 0
+    assert not planning_receipt_2.builds
     assert not planning_receipt_2.unresolved_hard_requirements
 
     resource_x_nodes = [n for n in g.find_nodes(label="resource_x")]
@@ -194,11 +196,12 @@ def test_softlock_detection_and_prevention():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    planning_receipt = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
+    planning_receipt = frame.run_phase(P.FINALIZE)
 
     assert planning_receipt.unresolved_hard_requirements == [req_key.uid]
     assert req_key.provider is None
-    assert req_key.is_unresolvable
+    assert planning_receipt.softlock_detected is True
 
 # @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_affordance_precedence_over_creation():
@@ -314,7 +317,11 @@ def test_hard_requirement_satisfied_by_affordance():
 
     frame = Frame(graph=g, cursor_id=start.uid)
 
-    planning_receipt = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
+
+    assert hard_requirement.provider is None
+
+    planning_receipt = frame.run_phase(P.FINALIZE)
 
     assert hard_requirement.provider == guardian
     assert planning_receipt.unresolved_hard_requirements == []

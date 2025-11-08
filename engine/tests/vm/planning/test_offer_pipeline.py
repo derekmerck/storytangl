@@ -30,7 +30,7 @@ def _frame_with_provisioners():
 
 def _collect_build_receipts(frame: Frame) -> list[BuildReceipt]:
     receipts: list[BuildReceipt] = []
-    for call in frame.phase_receipts.get(P.PLANNING, []):
+    for call in frame.phase_receipts.get(P.FINALIZE, []):
         result = call.result
         if isinstance(result, list):
             receipts.extend(br for br in result if isinstance(br, BuildReceipt))
@@ -48,7 +48,10 @@ def test_planning_prefers_existing_offer():
     )
     Dependency(graph=graph, source_id=cursor.uid, requirement=requirement, label="needs_door")
 
-    receipt = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
+    assert requirement.provider is None
+
+    receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is existing
@@ -69,10 +72,15 @@ def test_planning_marks_unresolved_requirement():
     )
     Dependency(graph=graph, source=cursor, requirement=requirement, label="needs_missing")
 
-    receipt = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
+
+    assert requirement.provider is None
+
+    receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is None
-    assert requirement.is_unresolvable is True
     assert receipt.unresolved_hard_requirements == [requirement.uid]
-    assert _collect_build_receipts(frame)
+    assert receipt.softlock_detected is True
+    assert receipt.unresolved_hard_requirements == [requirement.uid]
+    assert _collect_build_receipts(frame) == []

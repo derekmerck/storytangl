@@ -17,7 +17,7 @@ from tangl.utils.hashing import hashing_func
 
 def _collect_build_receipts(frame: Frame) -> list:
     receipts = []
-    for receipt in frame.phase_receipts.get(P.PLANNING, []):
+    for receipt in frame.phase_receipts.get(P.FINALIZE, []):
         if isinstance(receipt.result, list):
             receipts.extend(
                 item for item in receipt.result if isinstance(item, BuildReceipt)
@@ -55,9 +55,15 @@ def test_plan_collect_offers_prioritizes_affordances_and_tags_sources():
     frame = Frame(graph=g, cursor_id=cursor.uid)
     frame.run_phase(P.PLANNING)
 
-    offer_receipts = frame.phase_receipts[P.PLANNING][0]
-    offers = offer_receipts.result
-    assert isinstance(offers, list)
+    orchestrator_receipt = frame.phase_receipts[P.PLANNING][0]
+    frontier_results = orchestrator_receipt.result
+    assert isinstance(frontier_results, dict)
+
+    offers = []
+    for result in frontier_results.values():
+        offers.extend(result.affordance_offers)
+        for offer_list in result.dependency_offers.values():
+            offers.extend(offer_list)
 
     sources = [offer.selection_criteria.get("source") for offer in offers]
     assert "affordance" in sources
@@ -66,7 +72,7 @@ def test_plan_collect_offers_prioritizes_affordances_and_tags_sources():
     first_dependency_index = sources.index("dependency")
     assert all(source == "affordance" for source in sources[:first_dependency_index])
 
-    planning_receipt = frame.phase_outcome[P.PLANNING]
+    planning_receipt = frame.run_phase(P.FINALIZE)
     assert isinstance(planning_receipt, PlanningReceipt)
     assert planning_receipt.attached == 1
     assert planning_receipt.created == 1
@@ -103,15 +109,15 @@ def test_planning_receipt_counts_created_unresolved_and_waived():
     frame = Frame(graph=g, cursor_id=cursor.uid)
     frame.run_phase(P.PLANNING)
 
-    planning_receipt = frame.phase_outcome[P.PLANNING]
+    planning_receipt = frame.run_phase(P.FINALIZE)
     assert isinstance(planning_receipt, PlanningReceipt)
     assert planning_receipt.created == 1
     assert planning_receipt.unresolved_hard_requirements == [missing_hard.uid]
     assert planning_receipt.waived_soft_requirements == [missing_soft.uid]
 
     builds = _collect_build_receipts(frame)
-    assert len(builds) == 3
-    assert all(br.hard_req is not None for br in builds)
+    assert len(builds) == 1
+    assert builds[0].operation is ProvisioningPolicy.CREATE
 
 # @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_event_sourced_frame_records_planning_receipt_and_patch():
@@ -141,7 +147,10 @@ def test_event_sourced_frame_records_planning_receipt_and_patch():
     frame.follow_edge(AnonymousEdge(source=start, destination=scene))
 
     assert node_counts, "journal handler should have observed a graph snapshot"
-    assert node_counts[0] >= 3  # start, scene, projected
+    assert node_counts[0] == 2  # start, scene before finalize applies plan
+
+    projected = frame.graph.find_one(label="projected")
+    assert projected is not None
 
     section = list(frame.records.get_section("step-0001", marker_type="frame"))
     assert section[0].record_type == "planning_receipt"

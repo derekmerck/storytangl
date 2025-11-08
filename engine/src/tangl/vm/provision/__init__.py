@@ -21,6 +21,7 @@ from .offer import (
 )
 from .resolver import (
     ProvisioningContext,
+    ProvisioningPlan,
     ProvisioningResult,
     provision_node,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "BuildReceipt",
     "PlanningReceipt",
     "ProvisioningContext",
+    "ProvisioningPlan",
     "ProvisioningResult",
     "provision_node",
 ]

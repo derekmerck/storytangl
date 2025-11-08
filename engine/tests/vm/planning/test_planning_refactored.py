@@ -27,7 +27,7 @@ from tangl.vm.provision import (
     BuildReceipt,
 )
 
-from tangl.vm.dispatch.planning_v372 import _deduplicate_offers, _select_best_offer, _policy_from_offer
+from tangl.vm.provision.resolver import _deduplicate_offers, _select_best_offer, _policy_from_offer
 
 
 # =============================================================================
@@ -276,9 +276,12 @@ def test_planning_prefers_existing_over_create():
     def _supply_provisioners(*_, **__):
         return provisioners
     
-    # Run planning phase
-    receipt = frame.run_phase(P.PLANNING)
-    
+    # Run planning/finalize phases
+    frame.run_phase(P.PLANNING)
+    assert requirement.provider is None
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is existing_door
     assert receipt.attached == 1
@@ -310,15 +313,18 @@ def test_planning_deduplicates_multiple_provisioners():
     def _supply_provisioners(*_, **__):
         return provisioners
     
-    # Run planning phase
-    receipt = frame.run_phase(P.PLANNING)
-    
+    # Run planning/finalize phases
+    frame.run_phase(P.PLANNING)
+    assert requirement.provider is None
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is door
     assert receipt.attached == 1
     # Only ONE build receipt should exist (deduplication worked)
     builds = []
-    for call_receipt in frame.phase_receipts.get(P.PLANNING, []):
+    for call_receipt in frame.phase_receipts.get(P.FINALIZE, []):
         if isinstance(call_receipt.result, list):
             builds.extend(call_receipt.result)
         dependency_builds = [
@@ -351,12 +357,15 @@ def test_planning_marks_unresolved_hard_requirement():
     def _supply_provisioners(*_, **__):
         return provisioners
     
-    # Run planning phase
-    receipt = frame.run_phase(P.PLANNING)
-    
+    # Run planning/finalize phases
+    frame.run_phase(P.PLANNING)
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is None
-    assert requirement.is_unresolvable is True
+    assert receipt.unresolved_hard_requirements == [requirement.uid]
+    assert receipt.softlock_detected is True
     assert receipt.unresolved_hard_requirements == [requirement.uid]
 
 
@@ -382,9 +391,11 @@ def test_planning_waives_soft_requirement():
     def _supply_provisioners(*_, **__):
         return provisioners
     
-    # Run planning phase
-    receipt = frame.run_phase(P.PLANNING)
-    
+    # Run planning/finalize phases
+    frame.run_phase(P.PLANNING)
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is None
     assert receipt.unresolved_hard_requirements == []
@@ -416,9 +427,12 @@ def test_planning_creates_when_no_existing():
     def _supply_provisioners(*_, **__):
         return provisioners
     
-    # Run planning phase
-    receipt = frame.run_phase(P.PLANNING)
-    
+    # Run planning/finalize phases
+    frame.run_phase(P.PLANNING)
+    assert requirement.provider is None
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     assert isinstance(receipt, PlanningReceipt)
     assert requirement.provider is not None
     assert requirement.provider.label == "new_thing"
@@ -477,15 +491,17 @@ def test_planning_affordances_dont_duplicate_labels():
     def _supply_provisioners(*_, **__):
         return provisioners
     
-    # Run planning phase
-    receipt = frame.run_phase(P.PLANNING)
-    
+    # Run planning/finalize phases
+    frame.run_phase(P.PLANNING)
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     # Only ONE affordance should be attached (label uniqueness enforced)
     assert isinstance(receipt, PlanningReceipt)
     # The receipt counts affordances in the "attached" counter
     # Since affordances are always EXISTING policy, they increment attached
     builds = []
-    for call_receipt in frame.phase_receipts.get(P.PLANNING, []):
+    for call_receipt in frame.phase_receipts.get(P.FINALIZE, []):
         if isinstance(call_receipt.result, list):
             builds.extend(call_receipt.result)
     affordance_builds = [b for b in builds if hasattr(b, 'requirement_id') and b.requirement_id.int == 0]

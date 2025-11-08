@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from random import Random
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
 from uuid import UUID
 
 from tangl.core import Graph, Node
@@ -18,7 +18,10 @@ from .offer import (
 )
 from .open_edge import Affordance, Dependency
 from .provisioner import Provisioner
-from .requirement import ProvisioningPolicy
+from .requirement import ProvisioningPolicy, Requirement
+
+if TYPE_CHECKING:  # pragma: no cover - import guarded for typing only
+    from tangl.vm.context import Context
 
 
 @dataclass(slots=True)
@@ -43,29 +46,148 @@ class ProvisioningContext:
 
 
 @dataclass
+class PlannedOffer:
+    """Deferred execution of a provision offer captured during planning."""
+
+    offer: ProvisionOffer
+    requirement: Requirement | None = None
+    dependency: Dependency | None = None
+    affordance: Affordance | None = None
+    destination: Node | None = None
+    hard_requirement: bool | None = None
+
+    def execute(self, *, ctx: "Context") -> BuildReceipt:
+        """Execute ``offer`` and record the resulting build receipt."""
+
+        provisioner_id = self.offer.source_provisioner_id or self.offer.uid
+        requirement = self.requirement
+        requirement_id = requirement.uid if requirement is not None else UUID(int=0)
+        hard_req = self.hard_requirement if self.hard_requirement is not None else (
+            requirement.hard_requirement if requirement is not None else False
+        )
+
+        try:
+            if isinstance(self.offer, AffordanceOffer):
+                edge = self.offer.accept(ctx=ctx, destination=self.destination)
+                provider = edge.source if edge is not None else None
+                resolved_requirement = edge.requirement if edge is not None else requirement
+                if resolved_requirement is not None:
+                    requirement_id = resolved_requirement.uid
+                    if provider is not None and resolved_requirement.provider is None:
+                        resolved_requirement.provider = provider
+                if self.affordance is not None and provider is not None:
+                    self.affordance.requirement.provider = provider
+                if self.dependency is not None and provider is not None:
+                    self.dependency.destination = provider
+                operation = ProvisioningPolicy.EXISTING
+            else:
+                provider = self.offer.accept(ctx=ctx)
+                if provider is None:
+                    raise ValueError("Offer accepted without provider")
+                if requirement is not None and requirement.provider is None:
+                    requirement.provider = provider
+                if self.dependency is not None:
+                    self.dependency.destination = provider
+                if self.affordance is not None:
+                    self.affordance.requirement.provider = provider
+                operation = _policy_from_offer(self.offer)
+
+            provider_id = provider.uid if provider is not None else None
+            return BuildReceipt(
+                provisioner_id=provisioner_id,
+                requirement_id=requirement_id,
+                provider_id=provider_id,
+                operation=operation,
+                accepted=True,
+                hard_req=hard_req,
+            )
+        except Exception as exc:  # pragma: no cover - defensive path
+            if isinstance(self.offer, AffordanceOffer):
+                operation = ProvisioningPolicy.EXISTING
+            else:
+                operation = _policy_from_offer(self.offer)
+            return BuildReceipt(
+                provisioner_id=provisioner_id,
+                requirement_id=requirement_id,
+                provider_id=None,
+                operation=operation,
+                accepted=False,
+                hard_req=hard_req,
+                reason=str(exc),
+            )
+
+
+@dataclass
+class ProvisioningPlan:
+    """Plan describing how to satisfy requirements for a node."""
+
+    node: Node
+    steps: list[PlannedOffer] = field(default_factory=list)
+    satisfied_requirement_ids: set[UUID] = field(default_factory=set)
+    already_satisfied_requirement_ids: set[UUID] = field(default_factory=set)
+
+    _executed: bool = field(default=False, init=False, repr=False)
+    _receipts: list[BuildReceipt] = field(default_factory=list, init=False, repr=False)
+
+    def execute(self, *, ctx: "Context") -> list[BuildReceipt]:
+        """Execute the plan once and return resulting build receipts."""
+
+        if self._executed:
+            return list(self._receipts)
+
+        receipts: list[BuildReceipt] = []
+        for planned in self.steps:
+            requirement = planned.requirement
+            if requirement is not None and requirement.provider is not None:
+                continue
+            receipts.append(planned.execute(ctx=ctx))
+
+        self._receipts = receipts
+        self._executed = True
+        return list(receipts)
+
+    @property
+    def planned_accept_count(self) -> int:
+        """Return how many offers this plan will attempt to accept."""
+
+        return len(self.steps)
+
+
+@dataclass
 class ProvisioningResult:
     """Result of provisioning a single structural node."""
 
     node: Node
+    plans: list[ProvisioningPlan] = field(default_factory=list)
     builds: list[BuildReceipt] = field(default_factory=list)
     dependency_offers: dict[UUID, list[DependencyOffer]] = field(default_factory=dict)
     affordance_offers: list[AffordanceOffer] = field(default_factory=list)
+    unresolved_hard_requirements: list[UUID] = field(default_factory=list)
+    waived_soft_requirements: list[UUID] = field(default_factory=list)
+
+    @property
+    def primary_plan(self) -> ProvisioningPlan | None:
+        """Return the preferred plan for this node when available."""
+
+        return self.plans[0] if self.plans else None
+
+    @property
+    def satisfied_count(self) -> int:
+        """Number of requirements expected to be satisfied by the plan or builds."""
+
+        if self.builds:
+            return sum(1 for build in self.builds if build.accepted)
+
+        plan = self.primary_plan
+        if plan is None:
+            return 0
+        return len(plan.satisfied_requirement_ids) + len(plan.already_satisfied_requirement_ids)
 
     @property
     def is_viable(self) -> bool:
-        """True when all hard requirements targeting the node are satisfied."""
+        """True when no hard requirements remain unresolved."""
 
-        for dependency in Dependency.get_dependencies(self.node):
-            requirement = dependency.requirement
-            if requirement.hard_requirement and requirement.provider is None:
-                return False
-        for affordance in self.node.edges_in(is_instance=Affordance):
-            requirement = affordance.requirement
-            if requirement is None:
-                continue
-            if requirement.hard_requirement and requirement.provider is None:
-                return False
-        return True
+        return not self.unresolved_hard_requirements
 
 
 def _attach_offer_metadata(
@@ -165,11 +287,7 @@ def provision_node(
     result = ProvisioningResult(node=node)
 
     indexed_provisioners = list(enumerate(provisioners))
-    dependencies = [
-        dep
-        for dep in Dependency.get_dependencies(node)
-        if dep.requirement.provider is None
-    ]
+    dependencies = list(Dependency.get_dependencies(node))
     dependency_by_requirement: dict[UUID, Dependency] = {
         dep.requirement.uid: dep for dep in dependencies
     }
@@ -192,10 +310,13 @@ def provision_node(
             )
 
     for requirement_id, dep in dependency_by_requirement.items():
+        requirement = dep.requirement
+        if requirement.provider is not None:
+            continue
         offer_map.setdefault(requirement_id, [])
         for proximity, provisioner in indexed_provisioners:
             try:
-                offers_iter = provisioner.get_dependency_offers(dep.requirement, ctx=ctx)
+                offers_iter = provisioner.get_dependency_offers(requirement, ctx=ctx)
             except NotImplementedError:
                 continue
             for offer in offers_iter:
@@ -226,6 +347,18 @@ def provision_node(
 
     result.dependency_offers.update(deduplicated_map)
 
+    plan = ProvisioningPlan(node=node)
+
+    for dep in dependencies:
+        requirement = dep.requirement
+        if requirement.provider is not None:
+            plan.already_satisfied_requirement_ids.add(requirement.uid)
+
+    for affordance in inbound_affordances:
+        requirement = affordance.requirement
+        if requirement is not None and requirement.provider is not None:
+            plan.already_satisfied_requirement_ids.add(requirement.uid)
+
     used_affordance_labels: dict[UUID, set[str]] = defaultdict(set)
 
     for offer in result.affordance_offers:
@@ -236,98 +369,50 @@ def provision_node(
             continue
         if not offer.available_for(node):
             continue
-        try:
-            affordance_edge = offer.accept(ctx=ctx, destination=node)
-            provider = affordance_edge.source if affordance_edge else None
-            requirement = affordance_edge.requirement if affordance_edge else None
-            if label is not None:
-                used_affordance_labels[node.uid].add(label)
-            if provider is not None:
-                for dep in dependencies:
-                    if dep.requirement.provider is not None:
-                        continue
-                    if dep.satisfied_by(provider):
-                        dep.destination = provider
-            if requirement is not None and requirement.provider is None and provider is not None:
-                requirement.provider = provider
-            build = BuildReceipt(
-                provisioner_id=offer.source_provisioner_id or offer.uid,
-                requirement_id=(requirement.uid if requirement is not None else UUID(int=0)),
-                provider_id=(provider.uid if provider is not None else None),
-                operation=ProvisioningPolicy.EXISTING,
-                accepted=True,
-                hard_req=False,
+        if label is not None:
+            used_affordance_labels[node.uid].add(label)
+        plan.steps.append(
+            PlannedOffer(
+                offer=offer,
+                destination=node,
+                hard_requirement=False,
             )
-            result.builds.append(build)
-        except Exception as exc:  # pragma: no cover - defensive
-            build = BuildReceipt(
-                provisioner_id=offer.source_provisioner_id or offer.uid,
-                requirement_id=UUID(int=0),
-                provider_id=None,
-                operation=ProvisioningPolicy.NOOP,
-                accepted=False,
-                hard_req=False,
-                reason=str(exc),
-            )
-            result.builds.append(build)
+        )
 
     for requirement_id, offers in deduplicated_map.items():
-        if requirement_id in dependency_by_requirement:
-            dependency = dependency_by_requirement[requirement_id]
-            requirement = dependency.requirement
-        else:
-            affordance = affordance_by_requirement.get(requirement_id)
-            if affordance is None:
-                continue
-            requirement = affordance.requirement
-            dependency = None
+        dependency = dependency_by_requirement.get(requirement_id)
+        affordance = affordance_by_requirement.get(requirement_id)
+        requirement = (
+            dependency.requirement if dependency is not None else (
+                affordance.requirement if affordance is not None else None
+            )
+        )
+        if requirement is None:
+            continue
         if requirement.provider is not None:
+            plan.already_satisfied_requirement_ids.add(requirement.uid)
             continue
         best_offer = _select_best_offer(offers)
         if best_offer is None:
             if requirement.hard_requirement:
-                result.builds.append(
-                    BuildReceipt(
-                        provisioner_id=UUID(int=0),
-                        requirement_id=requirement.uid,
-                        provider_id=None,
-                        operation=ProvisioningPolicy.NOOP,
-                        accepted=False,
-                        hard_req=True,
-                        reason="No offers available",
-                    )
-                )
+                result.unresolved_hard_requirements.append(requirement.uid)
+            else:
+                result.waived_soft_requirements.append(requirement.uid)
             continue
-        try:
-            provider = best_offer.accept(ctx=ctx)
-            if provider is None:
-                raise ValueError("Offer accepted without provider")
-            requirement.provider = provider
-            if dependency is not None:
-                dependency.destination = provider
-            elif requirement.uid in affordance_by_requirement:
-                affordance_by_requirement[requirement.uid].requirement.provider = provider
-            result.builds.append(
-                BuildReceipt(
-                    provisioner_id=best_offer.source_provisioner_id or best_offer.uid,
-                    requirement_id=requirement.uid,
-                    provider_id=provider.uid,
-                    operation=_policy_from_offer(best_offer),
-                    accepted=True,
-                    hard_req=requirement.hard_requirement,
-                )
+        plan.satisfied_requirement_ids.add(requirement.uid)
+        plan.steps.append(
+            PlannedOffer(
+                offer=best_offer,
+                requirement=requirement,
+                dependency=dependency,
+                affordance=affordance,
+                hard_requirement=requirement.hard_requirement,
             )
-        except Exception as exc:  # pragma: no cover - defensive
-            result.builds.append(
-                BuildReceipt(
-                    provisioner_id=best_offer.source_provisioner_id or best_offer.uid,
-                    requirement_id=requirement.uid,
-                    provider_id=None,
-                    operation=_policy_from_offer(best_offer),
-                    accepted=False,
-                    hard_req=requirement.hard_requirement,
-                    reason=str(exc),
-                )
-            )
+        )
+
+    result.unresolved_hard_requirements = list(dict.fromkeys(result.unresolved_hard_requirements))
+    result.waived_soft_requirements = list(dict.fromkeys(result.waived_soft_requirements))
+
+    result.plans.append(plan)
 
     return result

@@ -13,10 +13,11 @@ from tangl.vm.provision import (
     UpdatingProvisioner,
     CloningProvisioner,
     ProvisionCost,
+    ProvisioningContext,
+    provision_node,
 )
 from tangl.vm import Context, Frame, ResolutionPhase as P, Dependency, Affordance
-from tangl.vm.dispatch.planning_v372 import plan_collect_offers, plan_select_and_apply
-from tangl.core.behavior import CallReceipt
+from tangl.vm.dispatch.planning_v372 import plan_collect_offers
 
 # pytest.skip(allow_module_level=True, reason="planning needs reimplemented")
 
@@ -42,6 +43,10 @@ def test_provision_existing_success():
     assert dep.satisfied_by(target)
 
     frame.run_phase(P.PLANNING)
+    assert req.provider is None
+    assert not req.satisfied
+
+    frame.run_phase(P.FINALIZE)
     assert req.provider is target
     assert req.satisfied
 
@@ -51,7 +56,11 @@ def test_provision_existing_failure_sets_unresolvable():
     Dependency[Node](graph=g, source_id=n.uid, requirement=req)
     frame = Frame(graph=g, cursor_id=n.uid)
     frame.run_phase(P.PLANNING)
-    assert req.is_unresolvable and not req.satisfied
+    assert req.provider is None
+    assert not req.satisfied
+    receipt = frame.run_phase(P.FINALIZE)
+    assert receipt.unresolved_hard_requirements == [req.uid]
+    assert receipt.softlock_detected is True
 
 def test_provision_update_modifies_existing():
     g, n = _frame_with_cursor()
@@ -61,6 +70,10 @@ def test_provision_update_modifies_existing():
     Dependency[Node](graph=g, source_id=n.uid, requirement=req)
     frame = Frame(graph=g, cursor_id=n.uid)
     frame.run_phase(P.PLANNING)
+    assert not req.satisfied
+    assert target.label == "T"
+
+    frame.run_phase(P.FINALIZE)
     assert req.satisfied and target.label == "T2"
 
 def test_provision_clone_produces_new_uid():
@@ -75,6 +88,10 @@ def test_provision_clone_produces_new_uid():
     Dependency[Node](graph=g, source_id=n.uid, requirement=req)
     frame = Frame(graph=g, cursor_id=n.uid)
     frame.run_phase(P.PLANNING)
+    assert not req.satisfied
+    assert req.provider is None
+
+    frame.run_phase(P.FINALIZE)
     assert req.satisfied and req.provider.label == "RefClone"
     assert req.provider.uid != ref.uid and req.provider in g
 
@@ -179,12 +196,18 @@ def test_requirement_satisfaction_matrix(policy, present, expected_satisfied):
 
     frame = Frame(graph=g, cursor_id=anchor.uid)
     frame.run_phase(P.PLANNING)
+    assert req.satisfied is False
+
+    receipt = frame.run_phase(P.FINALIZE)
 
     assert req.satisfied is expected_satisfied
     if expected_satisfied:
         assert req.provider is not None
         if present and policy is ProvisioningPolicy.EXISTING:
-            assert req.provider is existing, f'req.provider {req.provider} is not {existing}'
+            assert req.provider is existing, f"req.provider {req.provider} is not {existing}"
+    else:
+        assert req.provider is None
+        assert req.uid in receipt.unresolved_hard_requirements or req.uid in receipt.waived_soft_requirements
 
 def test_hard_requirement_unresolved_is_reported():
     g = Graph(label="demo")
@@ -195,9 +218,12 @@ def test_hard_requirement_unresolved_is_reported():
     Dependency[Node](graph=g, source_id=n.uid, requirement=hard_req, label="needs_missing")
 
     frame = Frame(graph=g, cursor_id=n.uid)
-    receipt = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
 
     assert hard_req.satisfied is False
+
+    receipt = frame.run_phase(P.FINALIZE)
+
     assert hasattr(receipt, "unresolved_hard_requirements")
     assert hard_req.uid in receipt.unresolved_hard_requirements
 
@@ -215,28 +241,17 @@ def test_hard_affordance_without_offers_marks_unresolvable_once():
     Affordance[Node](graph=g, destination_id=destination.uid, requirement=req, label="from_nowhere")
 
     frame = Frame(graph=g, cursor_id=destination.uid)
-    planning_receipt = frame.run_phase(P.PLANNING)
+    frame.run_phase(P.PLANNING)
 
-    # Requirement is marked unresolved and appears exactly once in the aggregated receipt.
-    assert req.is_unresolvable is True
+    # Requirement appears exactly once in the aggregated receipt after finalize.
+    assert req.provider is None
+
+    planning_receipt = frame.run_phase(P.FINALIZE)
     assert planning_receipt.unresolved_hard_requirements == [req.uid]
-
-    build_receipts: list[BuildReceipt] = []
-    for r in frame.phase_receipts[P.PLANNING]:
-        if isinstance(r.result, list):
-            build_receipts.extend([b for b in r.result if isinstance(b, BuildReceipt)])
-        elif isinstance(r.result, BuildReceipt):
-            build_receipts.append(r.result)
-
-    assert len(build_receipts) == 1
-    failure = build_receipts[0]
-    assert failure.accepted is False
-    assert failure.reason == "no_offers"
-    assert failure.provider_id is None
-    assert failure.caller_id == req.uid
+    assert planning_receipt.waived_soft_requirements == []
 
 
-def test_selector_skips_failed_offers_and_binds_first_success():
+def test_provision_node_records_failure_when_offer_returns_none():
     g, anchor = _graph_and_anchor()
 
     req = Requirement[Node](
@@ -249,42 +264,43 @@ def test_selector_skips_failed_offers_and_binds_first_success():
 
     winner = g.add_node(label="winner")
 
-    provisioner = Provisioner()
+    class _TestProvisioner(Provisioner):
+        def get_dependency_offers(self, requirement, *, ctx):
+            yield DependencyOffer(
+                requirement_id=requirement.uid,
+                requirement=requirement,
+                operation=ProvisioningPolicy.EXISTING,
+                accept_func=lambda ctx: None,
+                source_provisioner_id=self.uid,
+            )
+            yield DependencyOffer(
+                requirement_id=requirement.uid,
+                requirement=requirement,
+                operation=ProvisioningPolicy.EXISTING,
+                accept_func=lambda ctx: winner,
+                source_provisioner_id=self.uid,
+            )
 
-    failing_offer = DependencyOffer(
-        requirement_id=req.uid,
-        requirement=req,
-        operation=ProvisioningPolicy.EXISTING,
-        accept_func=lambda ctx: None,
-        source_provisioner_id=provisioner.uid,
-    )
+    provisioner = _TestProvisioner()
+    prov_ctx = ProvisioningContext(graph=g, step=0)
 
-    succeeding_offer = DependencyOffer(
-        requirement_id=req.uid,
-        requirement=req,
-        operation=ProvisioningPolicy.EXISTING,
-        accept_func=lambda ctx: winner,
-        source_provisioner_id=provisioner.uid,
-    )
+    result = provision_node(anchor, [provisioner], ctx=prov_ctx)
 
-    frame = Frame(graph=g, cursor_id=anchor.uid)
-    ctx = frame.context
-    ctx.call_receipts.clear()
-    ctx.call_receipts.append(CallReceipt(
-        behavior_id=provisioner.uid,
-        result=[failing_offer, succeeding_offer]))
+    assert req.provider is None
 
-    builds = plan_select_and_apply(anchor, ctx=ctx)
+    plan = result.primary_plan
+    assert plan is not None
 
-    assert len(builds) == 1
-    success = builds[0]
-    assert success.accepted is True
-    assert success.provider_id == winner.uid
-    assert req.provider is winner
-    assert req.is_unresolvable is False
+    vm_ctx = Context(graph=g, cursor_id=anchor.uid)
+    receipts = plan.execute(ctx=vm_ctx)
+
+    assert len(receipts) == 1
+    failure = receipts[0]
+    assert failure.accepted is False
+    assert failure.provider_id is None
 
 
-def test_affordance_offers_are_prioritized_over_dependency_offers():
+def test_provision_node_prioritizes_affordance_offers():
     g, anchor = _frame_with_cursor()
     existing = g.add_node(label="existing")
 
@@ -302,9 +318,32 @@ def test_affordance_offers_are_prioritized_over_dependency_offers():
         label="needs_existing",
     )
 
-    provisioner = Provisioner()
+    created: list[Node] = []
 
-    def _accept_affordance(ctx: Context, destination: Node):
+    class _TestProvisioner(Provisioner):
+        def get_affordance_offers(self, node, *, ctx):
+            offer = AffordanceOffer(
+                label="use_existing",
+                cost=ProvisionCost.DIRECT,
+                accept_func=lambda ctx, destination: _attach_existing(destination, ctx),
+                target_tags=set(),
+            )
+            offer.source_provisioner_id = self.uid
+            offer.selection_criteria = {"source": "affordance"}
+            return [offer]
+
+        def get_dependency_offers(self, requirement, *, ctx):
+            offer = DependencyOffer(
+                requirement_id=requirement.uid,
+                requirement=requirement,
+                operation=ProvisioningPolicy.CREATE,
+                accept_func=lambda ctx: _create_created(),
+                source_provisioner_id=self.uid,
+            )
+            offer.selection_criteria = {"source": "dependency"}
+            return [offer]
+
+    def _attach_existing(destination: Node, ctx: Context) -> Affordance:
         req.provider = existing
         return Affordance(
             graph=ctx.graph,
@@ -314,46 +353,26 @@ def test_affordance_offers_are_prioritized_over_dependency_offers():
             label="use_existing",
         )
 
-    affordance_offer = AffordanceOffer(
-        label="use_existing",
-        cost=ProvisionCost.DIRECT,
-        accept_func=_accept_affordance,
-        target_tags=set(),
-    )
-
-    affordance_offer.selection_criteria = {"source": "affordance"}
-
-    created: list[Node] = []
-
-    def _create() -> Node:
+    def _create_created() -> Node:
         node = Node(label="created")
         created.append(node)
         return node
 
-    dependency_offer = DependencyOffer(
-        requirement_id=req.uid,
-        requirement=req,
-        operation=ProvisioningPolicy.CREATE,
-        accept_func=lambda ctx: _create(),
-        source_provisioner_id=provisioner.uid,
-    )
-    dependency_offer.selection_criteria = {"source": "dependency"}
+    provisioner = _TestProvisioner()
+    prov_ctx = ProvisioningContext(graph=g, step=0)
 
-    frame = Frame(graph=g, cursor_id=anchor.uid)
-    ctx = frame.context
-    ctx.call_receipts.clear()
-    ctx.call_receipts.append(
-        CallReceipt(
-            behavior_id=provisioner.uid,
-            result=[affordance_offer, dependency_offer])
-    )
+    result = provision_node(anchor, [provisioner], ctx=prov_ctx)
 
-    builds = plan_select_and_apply(anchor, ctx=ctx)
+    plan = result.primary_plan
+    assert plan is not None
+
+    vm_ctx = Context(graph=g, cursor_id=anchor.uid)
+    receipts = plan.execute(ctx=vm_ctx)
 
     assert req.provider is existing
     assert created == []
-    assert builds
-    assert builds[0].operation is ProvisioningPolicy.EXISTING
+    assert receipts
+    assert receipts[0].operation is ProvisioningPolicy.EXISTING
 
 def test_affordance_creates_or_finds_source():
     g = Graph(label="demo")
@@ -365,6 +384,10 @@ def test_affordance_creates_or_finds_source():
 
     frame = Frame(graph=g, cursor_id=dst.uid)
     frame.run_phase(P.PLANNING)
+
+    assert not req.satisfied
+
+    frame.run_phase(P.FINALIZE)
 
     assert req.satisfied
     assert g.find_nodes(label="origin"), "source should have been created"

@@ -31,6 +31,9 @@ def test_planning_receipt_marks_no_offers_unresolved():
 
     assert summary.unresolved_hard_requirements == [requirement_id]
     assert summary.waived_soft_requirements == []
+    assert summary.frontier_node_ids == []
+    assert summary.softlock_detected is False
+    assert summary.builds == [receipt]
 
 
 def test_planning_receipt_counters_preserved_for_positive_receipts():
@@ -58,6 +61,7 @@ def test_planning_receipt_counters_preserved_for_positive_receipts():
     assert summary.unresolved_hard_requirements == [unresolved_id]
     assert summary.waived_soft_requirements == []
     assert isinstance(summary.unresolved_hard_requirements[0], UUID)
+    assert summary.builds == [successful, unresolved]
 
 
 def test_planning_receipt_tracks_waived_soft_requirements():
@@ -75,3 +79,4 @@ def test_planning_receipt_tracks_waived_soft_requirements():
 
     assert summary.unresolved_hard_requirements == []
     assert summary.waived_soft_requirements == [waived_id]
+    assert summary.softlock_detected is False
