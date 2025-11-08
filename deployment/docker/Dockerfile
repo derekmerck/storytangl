@@ -71,7 +71,7 @@ COPY --from=doc_builder /build/docs/html /app/docs
 #COPY --from=app_builder /app/dist /app/client
 
 # Install the application
-RUN pip install --upgrade pip && pip install *.whl && rm *.whl
+RUN pip install --upgrade pip && pip install *.whl[cli,server] && rm *.whl
 
 # Make port 8000 available to the world outside this container
 EXPOSE 8000

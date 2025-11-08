@@ -86,9 +86,9 @@ jobs:
           pip install poetry
           poetry build
 
-      - name: Install from wheel (not editable)
+      - name: Install from wheel
         run: |
-          pip install dist/*.whl
+          pip install dist/*.whl[server,cli]
 
       - name: Test console scripts work
         run: |
