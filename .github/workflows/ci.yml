@@ -36,7 +36,7 @@ jobs:
           uv python install 3.13
           poetry env use "$(uv python find 3.13)"
           poetry install --no-interaction --with dev
-          pip install . -e
+          pip install -e .
       - name: Run tests
         env:
           PYTHONPATH: "engine/src:apps/cli/src:apps/rest/src"
