@@ -242,6 +242,35 @@ class Frame:
         #       so projection can be reproduced on replay under different handlers,
         #       for example?
 
+    def jump_to_node(self, destination: Node | UUID, *, include_postreq: bool = False) -> None:
+        """Teleport to ``destination`` by following an anonymous edge."""
+
+        if isinstance(destination, UUID):
+            node = self.graph.get(destination)
+        else:
+            node = destination
+
+        if node is None:
+            raise RuntimeError(f"Destination {destination!r} not found in graph")
+
+        from tangl.core.graph.edge import AnonymousEdge
+
+        bootstrap_edge = AnonymousEdge(destination=node)
+        next_edge = self.follow_edge(bootstrap_edge)
+
+        while (
+            isinstance(next_edge, ChoiceEdge)
+            and getattr(next_edge, "trigger_phase", None) == P.PREREQS
+        ):
+            next_edge = self.follow_edge(next_edge)
+
+        if include_postreq:
+            while (
+                isinstance(next_edge, ChoiceEdge)
+                and getattr(next_edge, "trigger_phase", None) == P.POSTREQS
+            ):
+                next_edge = self.follow_edge(next_edge)
+
     def resolve_choice(self, choice: ChoiceEdge) -> None:
         """
         Follows edges until no next edge is returned.

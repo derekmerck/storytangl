@@ -136,23 +136,13 @@ class Ledger(Entity):
     def init_cursor(self) -> None:
         """Enter the current cursor to bootstrap the ledger journal."""
 
-        from tangl.core.graph.edge import AnonymousEdge
-        from .frame import ChoiceEdge
-        from .resolution_phase import ResolutionPhase as P
-
         start_node = self.graph.get(self.cursor_id)
         if start_node is None:
             raise RuntimeError(f"Initial cursor {self.cursor_id} not found in graph")
 
-        bootstrap_edge = AnonymousEdge(source=start_node, destination=start_node)
         frame = self.get_frame()
 
-        next_edge = frame.follow_edge(bootstrap_edge)
-        while (
-            isinstance(next_edge, ChoiceEdge)
-            and getattr(next_edge, "trigger_phase", None) == P.PREREQS
-        ):
-            next_edge = frame.follow_edge(next_edge)
+        frame.jump_to_node(start_node)
 
         self.cursor_id = frame.cursor_id
         self.step = frame.step

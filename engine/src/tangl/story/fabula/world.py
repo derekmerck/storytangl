@@ -17,12 +17,10 @@ from .domain_manager import DomainManager  # behaviors and classes
 from .script_manager import ScriptManager  # concept templates
 from .asset_manager import AssetManager    # platonic objects
 
-# Optional Story Domains
-from tangl.media.media_resource.resource_manager import ResourceManager   # media/data resources
 # from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
-    from tangl.vm.frame import ResolutionPhase
+    from tangl.media.media_resource.resource_manager import ResourceManager
 
     StoryGraph = Graph
 else:  # pragma: no cover - runtime alias
@@ -71,18 +69,25 @@ class World(Singleton):
         script_manager: ScriptManager,
         domain_manager: Optional[DomainManager] = None,
         asset_manager: Optional[AssetManager] = None,
-        resource_manager: Optional[ResourceManager] = None,
+        resource_manager: Optional["ResourceManager"] = None,
     ) -> None:
         super().__init__(label=label)
         self.script_manager = script_manager
         self.domain_manager = domain_manager or DomainManager()
         self.asset_manager = asset_manager or AssetManager()
-        self.resource_manager = resource_manager or ResourceManager(Path("."))
+        self.resource_manager = resource_manager or self._create_resource_manager()
 
         self.metadata = script_manager.get_story_metadata() or {}
         self.name = self.metadata.get("title", label)
 
         self._setup_default_assets()
+
+    def _create_resource_manager(self) -> "ResourceManager | None":
+        try:
+            from tangl.media.media_resource.resource_manager import ResourceManager as RM
+        except ModuleNotFoundError:  # pragma: no cover - optional dependency gap
+            return None
+        return RM(Path("."))
 
     def _setup_default_assets(self) -> None:
         """Register built-in asset classes if not already present."""
@@ -123,10 +128,7 @@ class World(Singleton):
         if start_uid is None:
             raise ValueError(f"Start block '{start_label}' not found in story graph")
 
-        from tangl.vm.frame import Frame  # local import to avoid vm dependency at module load time
-
-        frame = Frame(graph=graph, cursor_id=start_uid)
-        object.__setattr__(graph, "cursor", frame)
+        graph.initial_cursor_id = start_uid
         return graph
 
     def _build_actors(self, graph: StoryGraph) -> dict[str, UUID]:

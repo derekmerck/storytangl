@@ -256,8 +256,7 @@ def test_create_story_handles_prereq_redirects(
             destination_id=forced.uid,
             trigger_phase=ResolutionPhase.PREREQS,
         )
-        frame = Frame(graph=graph, cursor_id=start.uid)
-        object.__setattr__(graph, "cursor", frame)
+        graph.initial_cursor_id = start.uid
         return graph
 
     stub_world = SimpleNamespace(label="stub_world", create_story=_create_redirect_story)

@@ -30,12 +30,13 @@ Create a new story instance.
 - `story_label`: Unique identifier for this story instance
 - `mode`: Materialization mode ('full', 'hybrid', 'lazy')
 
-**Returns**: Graph ready for navigation
+**Returns**: Graph ready for navigation. Inspect ``graph.initial_cursor_id`` for the
+starting node identifier.
 
 **Example**:
 ```python
 story = world.create_story(user=player_1)
-frame = story.cursor
+start_node = story.get(story.initial_cursor_id)
 ```
 
 ### Managers
