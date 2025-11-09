@@ -7,11 +7,12 @@ from uuid import UUID, uuid4
 import pytest
 import yaml
 
-from tangl.core import Graph, StreamRegistry
+from tangl.core import StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service.controllers import RuntimeController
 from tangl.service.user.user import User
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase, Ledger
+from tangl.story.story_graph import StoryGraph
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 
@@ -23,7 +24,7 @@ def runtime_controller() -> RuntimeController:
 
 @pytest.fixture()
 def ledger() -> Ledger:
-    graph = Graph(label="demo")
+    graph = StoryGraph(label="demo")
     start = graph.add_node(label="start")
     ledger = Ledger(graph=graph, cursor_id=start.uid, records=StreamRegistry())
     ledger.push_snapshot()
@@ -246,8 +247,8 @@ def test_create_story_handles_prereq_redirects(
     runtime_controller: RuntimeController,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def _create_redirect_story(_: str, **__) -> Graph:
-        graph = Graph(label="redirect_story")
+    def _create_redirect_story(_: str, **__) -> StoryGraph:
+        graph = StoryGraph(label="redirect_story")
         start = graph.add_node(label="start")
         forced = graph.add_node(label="redirected_destination")
         ChoiceEdge(

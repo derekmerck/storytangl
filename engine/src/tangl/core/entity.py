@@ -204,13 +204,16 @@ class Entity(BaseModelPlus):
         return cls(**_data)
 
     def unstructure(self) -> StringMap:
+        return self.model_dump()
+
+    def model_dump(self, **kwargs) -> StringMap:
         """
         Unstructure an object into a string-keyed dict of unflattened data.
         """
         # Also excludes any fields attrib 'exclude' (Pydantic only, not dataclass)
         exclude = set(self._fields(serialize=False))
         # logger.debug(f"exclude={exclude}")
-        data = self.model_dump(
+        data = super().model_dump(
             # exclude_unset=True,  # too many things are mutated after being initially unset
             exclude_none=True,
             exclude_defaults=True,

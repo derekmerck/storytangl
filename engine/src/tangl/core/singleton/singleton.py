@@ -98,7 +98,7 @@ class Singleton(Entity):
         obj_cls = data.get("obj_cls", cls)
         return obj_cls.get_instance(label)
 
-    def unstructure(self) -> StringMap:
+    def model_dump(self, **kwargs) -> StringMap:
         return {'obj_cls': self.__class__, 'label': self.label}
 
     def __reduce__(self) -> tuple:

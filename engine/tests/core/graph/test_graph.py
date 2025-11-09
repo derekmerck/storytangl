@@ -92,12 +92,12 @@ def test_unstructure_and_eq_on_data_attr():
     e = g.add_edge(a, b)  # no type semantics tested here
 
     ud = g.model_dump()
-    assert 'data' in ud
-    assert '_data' not in ud
+    assert 'data' not in ud
+    assert '_data' in ud
 
     ud3 = Entity.unstructure(g)
     assert 'data' not in ud3
-    assert '_data' not in ud3
+    assert '_data' in ud3
 
     ud2 = g.unstructure()
     assert 'data' not in ud2

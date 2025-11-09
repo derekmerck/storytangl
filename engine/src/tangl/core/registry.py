@@ -262,8 +262,8 @@ class Registry(Entity, Generic[VT]):
             obj.add(_obj)
         return obj
 
-    def unstructure(self) -> StringMap:
-        data = super().unstructure()
+    def model_dump(self, **kwargs) -> StringMap:
+        data = super().model_dump()  # ignores data
         data["_data"] = []
         for v in self.data.values():
             data['_data'].append(v.unstructure())

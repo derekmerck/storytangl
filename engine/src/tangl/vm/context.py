@@ -14,7 +14,7 @@ import logging
 from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
 from tangl.core.graph import Graph, Node
-from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt
+from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt, HandlerLayer
 from .provision import (
     BuildReceipt,
     ProvisionOffer,
@@ -80,7 +80,7 @@ class Context:
     # this is just a dataclass re-implementation of HasLocalBehaviors mixin
     # recall, anything with local behaviors is NOT serializable.
     # Mount for LOCAL behaviors on the context
-    local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
+    local_behaviors: BehaviorRegistry = field(default_factory=lambda: BehaviorRegistry(handler_layer=HandlerLayer.LOCAL))
     # Could pass APPLICATION or override layers on creation
     active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
 

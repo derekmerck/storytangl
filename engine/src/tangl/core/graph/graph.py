@@ -122,12 +122,6 @@ class Graph(Registry[GraphItem]):
     - :meth:`get` – lookup by id or by label/path.
     """
 
-    # Stub out mutators
-    # def add(self, *args) -> None:
-    #     raise NotImplementedError("Graph is read-only")
-
-    initial_cursor_id: UUID | None = None
-
     # special adds
     def add(self, item: GraphItem) -> None:
         item.graph = self

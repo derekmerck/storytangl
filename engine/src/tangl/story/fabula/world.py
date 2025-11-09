@@ -21,8 +21,7 @@ from .asset_manager import AssetManager    # platonic objects
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
     from tangl.media.media_resource.resource_manager import ResourceManager
-
-    StoryGraph = Graph
+    from tangl.story.story_graph import StoryGraph
 else:  # pragma: no cover - runtime alias
     StoryGraph = Graph
 
@@ -107,7 +106,8 @@ class World(Singleton):
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
-        graph = StoryGraph(label=story_label)
+        from tangl.story.story_graph import StoryGraph
+        graph = StoryGraph(label=story_label, world=self)
 
         node_map: dict[str, UUID] = {}
 

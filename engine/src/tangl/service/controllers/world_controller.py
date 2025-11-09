@@ -7,18 +7,19 @@ from pydantic import BaseModel
 
 from tangl.service.response.info_response.world_info import WorldList
 from tangl.type_hints import Identifier, UnstructuredData
+
+from tangl.core import Graph
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
 # from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
+from tangl.story.story_graph import StoryGraph
 from tangl.story.fabula.world import World
 from tangl.service.response.info_response import WorldInfo
 
 if TYPE_CHECKING:
     from tangl.service.user import User
-    from tangl.story.story import Story
 else:
     # Fallbacks for endpoint type hinting
     class User: pass
-    class Story: pass
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -68,7 +69,7 @@ class WorldController(HasApiEndpoints):
         # The world list is formatted as content fragments and can be interpreted
         # as an ordered, styled list
         # It is not strictly necessary, as the available worlds can be learned from
-        # system_info, and each world could be queried for info to determine it's branding
+        # system_info, and each world could be queried for info to determine its branding
         # style.  This is a convenience function that provides that info as a single call.
         return { v.label: v.name for v in World.all_instances() }
 
@@ -96,7 +97,7 @@ class WorldController(HasApiEndpoints):
         preprocessors=[_dereference_world_id],
         access_level=AccessLevel.USER,
         group="user")
-    def create_story(self, world: World, user: User = None, **kwargs) -> Story:
+    def create_story(self, world: World, user: User = None, **kwargs) -> Graph:
         # explicitly including the user kwarg is redundant, but it signals the
         # service manager logic to dereference a calling user for this method.
         return world.create_story(user=user, **kwargs)
@@ -106,12 +107,8 @@ class WorldController(HasApiEndpoints):
     # World Restricted API
     ###########################################################################
 
-    # @ApiEndpoint.annotate(access_level=AccessLevel.RESTRICTED)
-    # def load_world(self, **sources):
-    #     raise NotImplementedError
-
     @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
+        access_level=AccessLevel.RESTRICTED,
         method_type=MethodType.CREATE
     )
     def load_world(self, *, script_path: str | Path = None, script_data: UnstructuredData = None) -> dict[str, str]:
