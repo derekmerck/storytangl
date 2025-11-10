@@ -36,10 +36,16 @@ Artifacts
 .. autoclass:: tangl.core.Snapshot
 .. autoclass:: tangl.core.BaseFragment
 
-.. _core-dispatch:
+.. _core-behaviors:
 
-Dispatch
+Behaviors
 ---------
 .. autoclass:: tangl.core.Behavior
 .. autoclass:: tangl.core.BehaviorRegistry
 .. autoclass:: tangl.core.CallReceipt
+
+.. _core-global-dispatch:
+
+Global Dispatch
+---------------
+.. automodule:: tangl.core.dispatch

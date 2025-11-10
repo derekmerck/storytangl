@@ -26,10 +26,14 @@ Conceptual layers
    - :class:`Snapshot` wraps a copy of an entity for record keeping and rematerialization.
    - :class:`Fragment<BaseFragment>` is a record type that encodes narrative/UI output.
 
-4. :ref:`Dispatch<core-dispatch>`
+4. :ref:`Behaviors<core-behaviors>`
 
    - :class:`Behavior` wraps callable behaviors, returning a :class:`CallReceipt` record.
    - :class:`BehaviorRegistry` executes handlers in ordered pipelines.
+
+4. :ref:`Dispatch<core-global-dispatch>`
+
+   - `core_dispatch` provides global hooks for identity and topology
 
 Design intent
 -------------

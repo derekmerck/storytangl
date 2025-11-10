@@ -273,9 +273,26 @@ class Frame:
 
     def resolve_choice(self, choice: ChoiceEdge) -> None:
         """
-        Follows edges until no next edge is returned.
+        Follow a user's choice and continue through any automatic redirects.
 
-        Orchestrator should call :meth:`Ledger.push_snapshot` after resolution is complete.
+        Executes the phase pipeline for ``choice``, then keeps following
+        any edges returned by PREREQ/POSTREQ redirect handlers. Stops when
+        a stable cursor is reached (no more auto-triggered edges).
+
+        **Important**: Only edges with ``trigger_phase`` set are auto-followed,
+        and only if they pass their predicate guard given the current namespace.
+        Single blocking choices still require explicit user selection - use
+        this method after the user picks from available choices.
+
+        Notes
+        -----
+        Orchestrator should call :meth:`Ledger.push_snapshot` after resolution
+        completes to persist the new state.
+
+        See Also
+        --------
+        get_available_choices : List choices for user selection
+        ChoiceEdge.trigger_phase : Mark edges for automatic following
         """
 
         cur = choice
