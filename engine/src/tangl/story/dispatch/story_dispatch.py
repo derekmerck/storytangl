@@ -62,24 +62,24 @@ def do_describe(concept: Concept, *,
         **kwargs
     )
 
-@on_story_render(priority=Prio.EARLY)
-# hook vm render task for episodic nodes (cursors are always episodes)
-# Early on, we gather concepts and cache them in the context
-def _describe_concept_dependencies(c: Block, *, ctx):
-    """"
-    setting:
-      abc: Abc is a place where...
-    role:
-      john: John is a friend of yours...
-      april: April is John's daughter...
-    """
-    setattr(ctx, 'concepts', defaultdict(dict))
-    for concept in c.dependencies:
-        # Execute a story level task, higher layers will be invoked, but will
-        # probably ignore it unless they are auditing.
-        ctx.concepts[type(concept)][concept.name] = do_describe(concept, ctx=ctx)
+# @on_story_render(priority=Prio.EARLY)
+# # hook vm render task for episodic nodes (cursors are always episodes)
+# # Early on, we gather concepts and cache them in the context
+# def _describe_concept_dependencies(c: Block, *, ctx):
+#     """"
+#     setting:
+#       abc: Abc is a place where...
+#     role:
+#       john: John is a friend of yours...
+#       april: April is John's daughter...
+#     """
+#     setattr(ctx, 'concepts', defaultdict(dict))
+#     for concept in c.dependencies:
+#         # Execute a story level task, higher layers will be invoked, but will
+#         # probably ignore it unless they are auditing.
+#         ctx.concepts[type(concept)][concept.name] = do_describe(concept, ctx=ctx)
 
-@on_story_render(priority=Prio.LATE)
-def _compose_fragments(c: Block, *, ctx):
-    results = [ContentFragment(**c) for c in ctx.concepts.values()]
-    return results
+# @on_story_render(priority=Prio.LATE)
+# def _compose_fragments(c: Block, *, ctx):
+#     results = [ContentFragment(**c) for c in ctx.concepts.values()]
+#     return results

@@ -444,7 +444,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         receipt = CallReceipt(
             behavior_id=self.uid,
             result=result,
-            # could put a lambda here if we want deferred/lazy eval or iter dispatch
+            message=f"handler: {self.get_label()}",
             ctx=ctx,
             args=args,
             kwargs=kwargs

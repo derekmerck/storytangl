@@ -93,7 +93,7 @@ def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
             inline_text = caller.content
         else:
             tmpl = jinja2.Template(caller.content)
-            inline_text = tmpl.render(**ns)
+            inline_text = tmpl.render(ns)
             # try:
             #     inline_text = cursor.content.format_map(ns)
             # except (KeyError, ValueError):
@@ -103,20 +103,20 @@ def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
                 content=inline_text,
                 source_id=caller.uid,
                 source_label=caller.label,
-                fragment_type="block_content",
+                fragment_type="content",
             )
         )
 
-    for concept in caller.get_concepts():
-        rendered = concept.render(ns_raw)
-        fragments.append(
-            BaseFragment(
-                content=rendered,
-                source_id=concept.uid,
-                source_label=concept.label,
-                fragment_type="concept",
-            )
-        )
+    # for concept in caller.get_concepts():
+    #     rendered = concept.render(ns_raw)
+    #     fragments.append(
+    #         BaseFragment(
+    #             content=rendered,
+    #             source_id=concept.uid,
+    #             source_label=concept.label,
+    #             fragment_type="linked_concept",
+    #         )
+    #     )
 
     # todo: Choices are themselves fragments, so we need to call render on each of our choices and add them to the stream
     choices = caller.get_choices(ns=ns)

@@ -16,11 +16,11 @@ class Setting(Dependency[Location]):
 
     @property
     def location(self) -> Location | None:
-        return self.requirement.provider
+        return self.destination
 
     @location.setter
     def location(self, value: Location) -> None:
-        self.requirement.provider = value
+        self.destination = value
 
     # init helpers
     location_ref: Identifier = Field(None, init_var=True)

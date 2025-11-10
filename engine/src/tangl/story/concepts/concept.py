@@ -77,26 +77,26 @@ class Concept(Node):
             logger.debug(f"Caught an error: {e}")
             logger.debug(dict(ns))
             return self.content
-
-# todo: this should _very_ obviously be added to the 'story domain' domain rather than the global domain...
-from tangl.vm.dispatch import on_journal
-from tangl.core.behavior import HandlerPriority as Prio
-@on_journal(priority=Prio.EARLY)
-# @global_domain.handlers.register(phase=P.JOURNAL, priority=45)
-def render_concept_to_fragment(concept: Concept, *, ctx: Context, **_: Any) -> BaseFragment | None:
-    """Emit a :class:`~tangl.core.BaseFragment` when the cursor is a concept."""
-
-    if not isinstance(concept, Concept):  # pragma: no cover - defensive guard
-        return None
-
-    ns = ctx.get_ns()
-    rendered = concept.render(ns)
-    return BaseFragment(
-        content=rendered,
-        source_id=concept.uid,
-        source_label=concept.label,
-        fragment_type="content",
-    )
+#
+# # todo: this should _very_ obviously be added to the 'story domain' domain rather than the global domain...
+# from tangl.vm.dispatch import on_journal
+# from tangl.core.behavior import HandlerPriority as Prio
+# @on_journal(priority=Prio.EARLY)
+# # @global_domain.handlers.register(phase=P.JOURNAL, priority=45)
+# def render_concept_to_fragment(concept: Concept, *, ctx: Context, **_: Any) -> BaseFragment | None:
+#     """Emit a :class:`~tangl.core.BaseFragment` when the cursor is a concept."""
+#
+#     if not isinstance(concept, Concept):  # pragma: no cover - defensive guard
+#         return None
+#
+#     ns = ctx.get_ns()
+#     rendered = concept.render(ns)
+#     return BaseFragment(
+#         content=rendered,
+#         source_id=concept.uid,
+#         source_label=concept.label,
+#         fragment_type="content",
+#     )
 
 
 Concept.model_rebuild(_types_namespace={"Graph": Graph})

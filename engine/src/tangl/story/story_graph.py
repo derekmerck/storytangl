@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import field_serializer, field_validator
 
 from ..type_hints import StringMap
-from tangl.core import Graph
+from tangl.core import Graph, BehaviorRegistry
 from .dispatch import story_dispatch
 from .fabula import World
 
@@ -16,8 +16,12 @@ class StoryGraph(Graph):
     world: World | None = None
     initial_cursor_id: UUID | None = None
 
+    # Just override this in a subclass to create graph's that use
+    # variant dispatches, for testing, for example.
+    application_dispatch: ClassVar[BehaviorRegistry] = story_dispatch
+
     def get_active_layers(self):
-        layers = { story_dispatch }
+        layers = { self.application_dispatch }
         if self.world and hasattr(self.world, "get_active_layers"):
             layers.update(*self.world.get_active_layers())
         return layers

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from .dispatch import Namespace as NS
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)
@@ -133,8 +133,20 @@ class Context:
         from tangl.vm.dispatch import do_get_ns
         node = node or self.cursor
         if nocache or node.uid not in self._ns_cache:
-            logger.debug(f"getting ns for {node!r}")
+            logger.debug(f"getting fresh ns for {node!r}")
+
+            # todo: this is super-hacky, but a quick patch for nested get_ns
+            #       corrupting call receipts
+            # stash current call receipts
+            from copy import copy
+            call_receipts = copy(self.call_receipts)
+
             self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
+
+            # restore
+            self.call_receipts.clear()
+            self.call_receipts.extend(call_receipts)
+
         return self._ns_cache[node.uid]
 
     provision_offers: dict[UUID | str, list[ProvisionOffer]] = field(default_factory=dict)

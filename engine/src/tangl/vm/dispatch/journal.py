@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from tangl.vm.context import Context
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 on_journal  = partial(vm_dispatch.register, task=P.JOURNAL)
 
@@ -38,14 +38,15 @@ def coerce_to_fragments(*_, ctx: Context, **__):
             fragments.append(value)
             return
         if isinstance(value, str):
-            fragments.append(BaseFragment(content=value))
+            logger.debug(f"Adding str fragment: {value}")
+            fragments.append(BaseFragment(content=value, fragment_type="text"))
             return
         if isinstance(value, Iterable):
             logger.debug(f"recursing on {value}")
             for item in value:
                 _extend(item)
             return
-        fragments.append(BaseFragment(content=str(value)))
+        fragments.append(BaseFragment(content=str(value), fragment_type="text"))
 
     for receipt in ctx.call_receipts:
         _extend(receipt.result)

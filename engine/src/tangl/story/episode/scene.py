@@ -92,7 +92,7 @@ class Scene(TraversableSubgraph, HasBehaviors):
     @on_get_ns()
     def _contribute_settings_to_ns(self, ctx=None):
         if self.settings:
-            return { 'settings': { s.get_label(): s.location for s in self.settings } }
+            return { s.get_label(): s.location for s in self.settings }
 
     @property
     def roles(self) -> list[Role]:
@@ -102,7 +102,7 @@ class Scene(TraversableSubgraph, HasBehaviors):
     @on_get_ns()
     def _contribute_roles_to_ns(self, ctx=None):
         if self.roles:
-            return { 'roles': { r.get_label(): r.actor for r in self.roles }}
+            return { r.get_label(): r.actor for r in self.roles }
 
     def refresh_edge_projections(self) -> None:
         """Project satisfied dependency and affordance edges into ``vars``."""
