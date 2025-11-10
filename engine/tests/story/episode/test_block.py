@@ -56,7 +56,7 @@ def test_block_journal_renders_inline_content() -> None:
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    inline = _by_fragment_type(fragments, "block_content")
+    inline = _by_fragment_type(fragments, "block")
     assert len(inline) == 1
     assert "Inline text" in inline[0].content
 
@@ -89,7 +89,7 @@ def test_block_journal_renders_choice_menu() -> None:
     frame = Frame(graph=g, cursor_id=start.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    menus = _by_fragment_type(fragments, "choice_menu")
+    menus = _by_fragment_type(fragments, "choice")
     assert len(menus) == 1
     menu_text = menus[0].content
     assert "1. Left" in menu_text
@@ -112,9 +112,9 @@ def test_block_with_concepts_and_choices_emits_all_fragments() -> None:
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    inline = _by_fragment_type(fragments, "block_content")
+    inline = _by_fragment_type(fragments, "block")
     concepts = _by_fragment_type(fragments, "concept")
-    menus = _by_fragment_type(fragments, "choice_menu")
+    menus = _by_fragment_type(fragments, "choice")
 
     assert inline and concepts and menus
 

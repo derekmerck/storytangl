@@ -103,20 +103,20 @@ def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
                 content=inline_text,
                 source_id=caller.uid,
                 source_label=caller.label,
-                fragment_type="content",
+                fragment_type="block",
             )
         )
 
-    # for concept in caller.get_concepts():
-    #     rendered = concept.render(ns_raw)
-    #     fragments.append(
-    #         BaseFragment(
-    #             content=rendered,
-    #             source_id=concept.uid,
-    #             source_label=concept.label,
-    #             fragment_type="linked_concept",
-    #         )
-    #     )
+    for concept in caller.get_concepts():
+        rendered = concept.render(ns_raw)
+        fragments.append(
+            BaseFragment(
+                content=rendered,
+                source_id=concept.uid,
+                source_label=concept.label,
+                fragment_type="concept",
+            )
+        )
 
     # todo: Choices are themselves fragments, so we need to call render on each of our choices and add them to the stream
     choices = caller.get_choices(ns=ns)
@@ -131,7 +131,7 @@ def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]
                 content="\n".join(lines),
                 source_id=caller.uid,
                 source_label=f"{caller.label}_menu",
-                fragment_type="choice_menu",
+                fragment_type="choice",
             )
         )
 
