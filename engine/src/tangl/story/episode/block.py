@@ -1,34 +1,18 @@
 """Block primitive for the reference narrative domain."""
-
 from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any
 
-import jinja2
-
-from tangl.core import BaseFragment, Graph, Node
-from tangl.vm import Context, ChoiceEdge, TraversableSubgraph
-from tangl.vm.dispatch import on_journal
+from tangl.type_hints import StringMap
+from tangl.core import BaseFragment, Node, Graph
+from tangl.core.behavior import HasBehaviors
+from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
+from tangl.story.dispatch import story_dispatch
+from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
+from .action import Action
 
-__all__ = ["Block"]
-
-
-def _normalize_ns(ns: Any) -> Mapping[str, Any] | None:
-    """Return a mapping suitable for formatting or ``None`` if unavailable."""
-
-    if ns is None:
-        return None
-    if isinstance(ns, Mapping):
-        return ns
-    try:
-        return dict(ns)
-    except TypeError:
-        return None
-
-# todo: is it a subgraph, that's more of a scene thing...
-class Block(TraversableSubgraph, Node):
+class Block(Node, HasBehaviors):
     """Block(label: str, content: str = "")
 
     Structural node that groups :class:`Concept` children and presents
@@ -66,73 +50,43 @@ class Block(TraversableSubgraph, Node):
                 concepts.append(destination)
         return concepts
 
-    def get_choices(self, *, ns: Mapping[str, Any] | None = None) -> list[ChoiceEdge]:
-        """Return available :class:`ChoiceEdge` instances from this block."""
+    def get_choices(self, *, ns: Mapping[str, Any] | None = None, **criteria) -> list[ChoiceEdge]:
+        """Return available :class:`Action` instances from this block."""
 
         choices: list[ChoiceEdge] = []
-        for edge in self.edges_out(is_instance=ChoiceEdge):
+        criteria.setdefault("trigger_phase", None)  # only blocking choices by default
+        criteria.setdefault("is_instance", ChoiceEdge)
+        for edge in self.edges_out(**criteria):
             if ns is not None and not edge.available(ns):
                 continue
             choices.append(edge)
         return choices
 
-
-@on_journal()
-def render_block(caller: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
-    """Render inline content, child concepts, and choice menu for a block."""
-
-    ns_raw = ctx.get_ns(caller)
-    ns = _normalize_ns(ns_raw)
-    fragments: list[BaseFragment] = []
-
-    if not isinstance(caller, Block):  # pragma: no cover - defensive guard
-        return None
-
-    if caller.content:
-        if ns is None:
-            inline_text = caller.content
-        else:
-            tmpl = jinja2.Template(caller.content)
-            inline_text = tmpl.render(ns)
-            # try:
-            #     inline_text = cursor.content.format_map(ns)
-            # except (KeyError, ValueError):
-            #     inline_text = cursor.content
-        fragments.append(
-            BaseFragment(
-                content=inline_text,
-                source_id=caller.uid,
-                source_label=caller.label,
+    @story_dispatch.register(task=P.JOURNAL)
+    def block_fragment(self: Block, *, ctx: Context, **locals_: Any) -> BaseFragment | None:
+        """Render inline content for a block."""
+        content = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
+        if content:
+            return BaseFragment(
+                content=content,
+                source_id=self.uid,
+                source_label=self.label,
                 fragment_type="block",
             )
-        )
 
-    for concept in caller.get_concepts():
-        rendered = concept.render(ns_raw)
-        fragments.append(
-            BaseFragment(
-                content=rendered,
-                source_id=concept.uid,
-                source_label=concept.label,
-                fragment_type="concept",
-            )
-        )
+    @story_dispatch.register(task=P.JOURNAL)
+    def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+        ns = ctx.get_ns(self)
+        fragments: list[BaseFragment] = []
+        for choice in self.get_choices(ns=ns, is_instance=Action):
+            f = choice.choice_fragment(ctx=ctx)
+            if f:
+                fragments.append(f)
+        return fragments or None
 
-    # todo: Choices are themselves fragments, so we need to call render on each of our choices and add them to the stream
-    choices = caller.get_choices(ns=ns)
-    if choices:
-        lines = [""]
-        for index, choice in enumerate(choices, start=1):
-            destination = choice.destination
-            label = choice.label or (destination.label if destination is not None else "")
-            lines.append(f"{index}. {label}")
-        fragments.append(
-            BaseFragment(
-                content="\n".join(lines),
-                source_id=caller.uid,
-                source_label=f"{caller.label}_menu",
-                fragment_type="choice",
-            )
-        )
-
-    return fragments or None
+    @story_dispatch.register(task=P.JOURNAL)
+    def describe_concepts(self: Block, *, ctx: Context, **_: Any) -> StringMap | None:
+        fragments: list[BaseFragment] = []
+        for concept in self.get_concepts():
+            fragments.append(concept.concept_fragment(ctx=ctx))
+        return fragments or None

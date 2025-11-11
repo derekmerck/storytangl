@@ -6,7 +6,7 @@ from pydantic import Field, model_validator, field_validator
 
 from tangl.exceptions import AssociationHandlerError
 from tangl.type_hints import UniqueLabel, StringMap, Identifier
-from tangl.core.graph.graph import Graph  # noqa: F401  # ensure forward ref availability
+from tangl.core import Graph  # noqa: F401  # ensure forward ref availability
 from tangl.vm import Dependency, ProvisioningPolicy, Requirement
 from .actor import Actor
 

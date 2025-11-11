@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING, Iterator
 
-from tangl.core.graph.graph import Graph  # noqa: F401  # ensure forward ref availability
+from tangl.core import Graph  # noqa: F401  # ensure forward ref availability
 from tangl.story.concepts import Concept
 
 if TYPE_CHECKING:

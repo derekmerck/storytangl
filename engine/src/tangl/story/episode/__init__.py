@@ -4,8 +4,4 @@ from __future__ import annotations
 
 from .block import Block
 from .scene import Scene
-
-__all__ = [
-    "Block",
-    "Scene",
-]
+from .action import Action

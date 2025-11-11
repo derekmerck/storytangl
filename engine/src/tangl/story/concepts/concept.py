@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
-
-from tangl.core import BaseFragment, Graph, Node
-from tangl.vm.dispatch.namespace import Namespace as NS
-from tangl.vm.context import Context
-from pydantic import Field
 import logging
 
-__all__ = ["Concept"]
+from pydantic import Field
+
+from tangl.core import BaseFragment, Node, Graph
+from tangl.core.behavior import HasBehaviors
+from tangl.story.runtime.render import ContentRenderer
+from tangl.vm.context import Context
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class Concept(Node):
+class Concept(Node, HasBehaviors):
     """Concept(label: str, content: str = "")
 
     Minimal narrative node that stores textual content and renders it into the
@@ -45,13 +45,9 @@ class Concept(Node):
     content: str = ""
     locals: Mapping[str, Any] = Field(default_factory=dict)
 
-    # concepts render pre-fragments with 'describe()'?
-    # render is for episodes to assemble a fragment stream with any required describe() pre-fragments
+    # concepts generate pre-fragments with 'describe()'
 
-    def describe(self):
-        ...
-
-    def render(self, ns: NS | Mapping[str, Any]) -> str:
+    def describe(self, *, ctx: Context = None, ns: dict = None, **locals_) -> str:
         """Return :attr:`content` with namespace variables substituted.
 
         Parameters
@@ -64,39 +60,22 @@ class Concept(Node):
         Missing keys or malformed format strings fall back to the raw content to
         ensure journal output is never interrupted by template errors.
         """
-
-        mapping: Mapping[str, Any]
-        if isinstance(ns, Mapping):
-            mapping = ns
+        if not self.content:
+            return
+        if ctx is not None:
+            renderer = ContentRenderer.from_context(ctx)
+            ns = ctx.get_ns(self)
         else:
-            mapping = dict(ns)
+            renderer = ContentRenderer()
+            ns = ns or {}
+        return renderer.render_str(self.content, ns=ns, **locals_)
 
-        try:
-            return self.content.format_map(mapping)
-        except (KeyError, ValueError) as e:
-            logger.debug(f"Caught an error: {e}")
-            logger.debug(dict(ns))
-            return self.content
-#
-# # todo: this should _very_ obviously be added to the 'story domain' domain rather than the global domain...
-# from tangl.vm.dispatch import on_journal
-# from tangl.core.behavior import HandlerPriority as Prio
-# @on_journal(priority=Prio.EARLY)
-# # @global_domain.handlers.register(phase=P.JOURNAL, priority=45)
-# def render_concept_to_fragment(concept: Concept, *, ctx: Context, **_: Any) -> BaseFragment | None:
-#     """Emit a :class:`~tangl.core.BaseFragment` when the cursor is a concept."""
-#
-#     if not isinstance(concept, Concept):  # pragma: no cover - defensive guard
-#         return None
-#
-#     ns = ctx.get_ns()
-#     rendered = concept.render(ns)
-#     return BaseFragment(
-#         content=rendered,
-#         source_id=concept.uid,
-#         source_label=concept.label,
-#         fragment_type="content",
-#     )
-
-
-Concept.model_rebuild(_types_namespace={"Graph": Graph})
+    def concept_fragment(self, ctx: Context = None, **locals_: Any) -> BaseFragment:
+            content = self.describe(ctx=ctx, **locals_)
+            if content:
+                return BaseFragment(
+                    content=content,
+                    source_id=self.uid,
+                    source_label=self.label,
+                    fragment_type="concept",
+                )

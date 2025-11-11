@@ -4,9 +4,10 @@ from tangl.core import Graph
 from tangl.vm import Frame, ResolutionPhase as P
 from tangl.story.concepts.actor import Actor, Role
 from tangl.story.episode import Scene, Block
+from tangl.story.story_graph import StoryGraph
 
 def test_structural_domain_vars_include_dependencies():
-    g = Graph()
+    g = StoryGraph()
 
     # todo: it doesn't provision ancestors when trying to provision the block
     # Create scene with role

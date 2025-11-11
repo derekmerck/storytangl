@@ -27,22 +27,24 @@ class TestSimpleConcept:
         assert concept.label == "test"
 
     def test_render_with_namespace(self):
-        concept = Concept(label="greeting", content="Hello, {name}!")
-        rendered = concept.render({"name": "Alice"})
+        concept = Concept(label="greeting", content="Hello, {{name}}!")
+        rendered = concept.describe(ns={"name": "Alice"})
 
         assert rendered == "Hello, Alice!"
 
     def test_render_without_variables(self):
         concept = Concept(label="plain", content="This is plain text.")
 
-        rendered = concept.render({})
+        rendered = concept.describe(ns={})
         assert rendered == "This is plain text."
 
     def test_render_missing_variables_returns_raw_content(self):
-        concept = Concept(label="incomplete", content="Hello, {name}!")
+        # todo: do we want to catch incompletes or just let them
+        #       render empty (jinja's default)
+        concept = Concept(label="incomplete", content="Hello, {{name}}!")
 
-        rendered = concept.render({})
-        assert rendered == "Hello, {name}!"
+        rendered = concept.describe()
+        assert rendered == "Hello, !"
 
     @pytest.mark.xfail(reason="Concepts do not render like this")
     def test_journal_handler_emits_fragment(self):

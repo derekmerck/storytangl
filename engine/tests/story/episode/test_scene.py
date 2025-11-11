@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from uuid import UUID
 
 from tangl.core import Graph, Node, CallReceipt
 from tangl.story.episode import Block, Scene
 from tangl.story.concepts import Concept
+from tangl.story.story_graph import StoryGraph
 from tangl.vm import (
     Affordance,
     ChoiceEdge,
@@ -236,7 +236,7 @@ def test_has_forward_progress_softlock() -> None:
     assert scene.has_forward_progress(dead_end) is False
 
 def test_scene_namespace_available_during_journal(SceneL) -> None:
-    g = Graph(label="test")
+    g = StoryGraph(label="test")
     block = Block(graph=g, label="block", content="Hello {{npc_name}}!")
     scene = SceneL(graph=g, label="tavern", member_ids=[block.uid])
     scene.locals["npc_name"] = "Bartender Bob"

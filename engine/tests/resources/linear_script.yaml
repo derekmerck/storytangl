@@ -1,0 +1,24 @@
+label: linear_path
+version: "1.0.0"
+
+metadata:
+  title: "The Path"
+  author: "Demo Author"
+  date: "2025-10-10"
+  summary: "A simple linear story"
+
+scenes:
+  journey:
+    blocks:
+      start:
+        content: "You begin your journey at dawn."
+        actions:
+          - text: "Continue"
+            successor: middle1
+      middle1:
+        content: "The path winds through ancient woods."
+        actions:
+          - text: "Continue"
+            successor: end
+      end:
+        content: "You arrive at the village."

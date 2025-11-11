@@ -71,3 +71,9 @@ def NodeL():
     NodeL = create_model("NodeL", __base__=Node, locals=_dict_field)
     return NodeL
 
+from pathlib import Path
+
+@pytest.fixture(scope="session")
+def resources_dir():
+    return Path(__file__).resolve().parent / "resources"
+

@@ -17,7 +17,7 @@ logger.setLevel(logging.DEBUG)
 on_journal  = partial(vm_dispatch.register, task=P.JOURNAL)
 
 
-@on_journal()
+@on_journal(priority=Prio.EARLY)
 # todo: we can move this to journal/io when that gets implemented
 def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     """Emit a simple textual line describing the current step/cursor (reference output)."""

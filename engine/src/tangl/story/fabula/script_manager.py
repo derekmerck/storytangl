@@ -47,7 +47,7 @@ class ScriptManager:
                         alias="block_cls",
                         children={
                             key: _DefaultClassConfig(
-                                class_path="tangl.vm.frame.ChoiceEdge",
+                                class_path="tangl.story.episode.Action",
                             )
                             for key in ("actions", "continues", "redirects")
                         },

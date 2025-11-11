@@ -8,13 +8,9 @@ from tangl.core import Graph, Node
 from tangl.core.behavior import HasBehaviors
 from tangl.vm.dispatch import on_get_ns
 from tangl.vm.traversal import TraversableSubgraph
-from tangl.vm.provision import Affordance, Dependency
-from ..concepts.actor import Role
-from ..concepts.location import Setting
-
+from tangl.story.concepts.actor import Role
+from tangl.story.concepts.location import Setting
 from .block import Block
-
-__all__ = ["Scene"]
 
 # todo: templates for member blocks should be included at the domain level
 #       here, so we can ask for a block named "start" and get the one that
@@ -103,63 +99,3 @@ class Scene(TraversableSubgraph, HasBehaviors):
     def _contribute_roles_to_ns(self, ctx=None):
         if self.roles:
             return { r.get_label(): r.actor for r in self.roles }
-
-    def refresh_edge_projections(self) -> None:
-        """Project satisfied dependency and affordance edges into ``vars``."""
-
-        current_vars = dict(self.vars)
-        previous_projected = getattr(self, "_projected_keys", set())
-        base_vars = getattr(self, "_base_vars", None)
-
-        if base_vars is None:
-            base_vars = current_vars
-        else:
-            # Remove base keys that were deleted between refreshes.
-            for key in list(base_vars.keys()):
-                if key not in current_vars and key not in previous_projected:
-                    base_vars.pop(key, None)
-            # Capture manual updates to non-projected keys.
-            for key, value in current_vars.items():
-                if key not in previous_projected:
-                    base_vars[key] = value
-
-        projected = dict(base_vars)
-        projected_keys: set[str] = set()
-
-        for block in self.get_member_blocks():
-            for edge in block.edges_out(is_instance=Dependency):
-                label = edge.label
-                if not label:
-                    continue
-                satisfied_key = f"{label}_satisfied"
-                provider = edge.destination
-                if provider is not None:
-                    projected[label] = provider
-                elif label not in base_vars:
-                    projected.pop(label, None)
-                projected[satisfied_key] = edge.satisfied
-                projected_keys.add(label)
-                projected_keys.add(satisfied_key)
-
-            for edge in block.edges_in(is_instance=Affordance):
-                label = edge.label
-                if not label:
-                    continue
-                satisfied_key = f"{label}_satisfied"
-                provider = edge.source
-                if provider is not None:
-                    projected[label] = provider
-                elif label not in base_vars:
-                    projected.pop(label, None)
-                projected[satisfied_key] = edge.satisfied
-                projected_keys.add(label)
-                projected_keys.add(satisfied_key)
-
-        # Update the existing mapping in-place so cached namespaces keep the reference.
-        self.vars.clear()
-        self.vars.update(projected)
-        self._base_vars = base_vars
-        self._projected_keys = projected_keys
-
-
-Scene.model_rebuild(_types_namespace={"Graph": Graph, "Node": Node})

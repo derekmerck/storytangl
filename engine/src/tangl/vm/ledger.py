@@ -106,7 +106,7 @@ class Ledger(Entity):
 
     def get_journal(self, marker_name: str):
         # todo: should default to most recent -1 or something
-        return self.records.get_section(marker_name, has_channel="fragment")
+        return self.records.get_section(marker_name, marker_type="journal", has_channel="fragment")
 
     def get_frame(self) -> Frame:
         from .dispatch import vm_dispatch
