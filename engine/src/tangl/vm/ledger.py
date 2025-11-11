@@ -71,20 +71,6 @@ class Ledger(Entity):
     event_sourced: bool = False
     user: Optional[User] = Field(None, exclude=True)
 
-    # todo: could include the author_domain here, as long as it is a SINGLETON type
-    #       behavior registry, maybe better to keep the world and get the author
-    #       domain from that?
-    #       since it serializes, should ONLY admit singleton dispatch as injected layer
-
-    def get_active_layers(self) -> Iterable[BehaviorRegistry]:
-        from tangl.vm.dispatch import vm_dispatch
-        # todo: should pass story-dispatch in on creation, violates looking
-        #       into application domain subpackages, or collect it from a
-        #       'story graph' object that also includes the author dispatch
-        # from tangl.story.dispatch import story_dispatch
-        # return vm_dispatch, story_dispatch
-        return vm_dispatch,
-
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
         # everything else on the stream
@@ -130,7 +116,6 @@ class Ledger(Entity):
             step=self.step,
             records=self.records,
             event_sourced=self.event_sourced,
-            active_layers=[vm_dispatch]
         )
 
     def init_cursor(self) -> None:

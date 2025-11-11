@@ -13,6 +13,7 @@ import logging
 
 from tangl.type_hints import Step
 from tangl.core import StreamRegistry, Graph, Edge, Node, CallReceipt, BaseFragment, BehaviorRegistry
+from tangl.core.behavior import HandlerLayer
 from tangl.core.entity import Conditional
 from .context import Context
 from .provision import PlanningReceipt
@@ -77,13 +78,18 @@ class Frame:
     cursor_id: UUID
     step: Step = 0
 
-    local_behaviors: BehaviorRegistry = field(default_factory=BehaviorRegistry)
-    # SYSTEM, APPLICATION, AUTHOR layers
-    active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
+    local_behaviors: BehaviorRegistry = field(default_factory=lambda: BehaviorRegistry(label="frame.local.dispatch", handler_layer=HandlerLayer.LOCAL))
+    # # SYSTEM, APPLICATION, AUTHOR layers
+    # active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
 
     def get_active_layers(self) -> Iterable[BehaviorRegistry]:
-        from tangl.vm.dispatch import vm_dispatch
-        layers = {vm_dispatch, *self.active_layers, self.local_behaviors}
+        # We know that we are part of the SYSTEM layer
+        from tangl.core.dispatch import core_dispatch
+        from .dispatch import vm_dispatch
+        layers = {vm_dispatch}
+        # And we always include any local behaviors.
+        if self.local_behaviors:
+            layers.add(self.local_behaviors)
         return layers
 
     event_sourced: bool = False  # track effects on a mutable copy
@@ -118,7 +124,8 @@ class Frame:
         return Context(graph=graph,
                        cursor_id=self.cursor_id,
                        step=self.step,
-                       active_layers=self.get_active_layers())
+                       active_layers=self.get_active_layers()
+                       )
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):

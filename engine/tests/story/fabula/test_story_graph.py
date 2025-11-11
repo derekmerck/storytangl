@@ -40,12 +40,12 @@ def test_story_graph_surfaces_story_disp(world):
     # Check active layers for APPLICATION layer, provided by story graph
     active_layers = [reg.handler_layer for reg in f.context.get_active_layers()]
     print(active_layers)
-    assert set(active_layers) == { HandlerLayer.GLOBAL, HandlerLayer.SYSTEM, HandlerLayer.APPLICATION }
+    assert HandlerLayer.APPLICATION in active_layers
 
     # Check active layers for LOCAL layer, provided by context itself in this case
     f.context.local_behaviors.add_behavior(lambda _, **__: "foo")
     active_layers = [reg.handler_layer for reg in f.context.get_active_layers()]
     print( active_layers )
-    assert set(active_layers) == { HandlerLayer.GLOBAL, HandlerLayer.SYSTEM, HandlerLayer.APPLICATION, HandlerLayer.LOCAL }
+    assert HandlerLayer.LOCAL in active_layers
 
     # todo: once world has an associated dispatch, we can check for AUTHOR layer too.

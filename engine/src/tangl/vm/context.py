@@ -80,20 +80,22 @@ class Context:
     # this is just a dataclass re-implementation of HasLocalBehaviors mixin
     # recall, anything with local behaviors is NOT serializable.
     # Mount for LOCAL behaviors on the context
-    local_behaviors: BehaviorRegistry = field(default_factory=lambda: BehaviorRegistry(handler_layer=HandlerLayer.LOCAL))
+    local_behaviors: BehaviorRegistry = field(default_factory=lambda: BehaviorRegistry(label="ctx.local.dispatch", handler_layer=HandlerLayer.LOCAL))
     # Could pass APPLICATION or override layers on creation
     active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
 
     def get_active_layers(self) -> Iterable[BehaviorRegistry]:
-        # We know that we are part of the SYSTEM layer
-        from .dispatch import vm_dispatch
-        layers = {vm_dispatch}
+        layers = set()
+        if self.active_layers:
+            # We may have been initialized with a custom SYSTEM layer
+            layers.update(self.active_layers)
+        else:
+            # Otherwise use vm_dispatch for SYSTEM
+            from tangl.vm.dispatch import vm_dispatch
+            layers.add(vm_dispatch)
         # And we always include any local behaviors.
         if self.local_behaviors:
             layers.add(self.local_behaviors)
-        # We may have been initialized with an APPLICATION or AUTHOR domain
-        if self.active_layers:
-            layers.update(self.active_layers)
         # Our graph may know what APPLICATION or AUTHOR domain it lives in
         if hasattr(self.graph, 'get_active_layers'):
             layers.update(self.graph.get_active_layers())
