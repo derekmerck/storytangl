@@ -70,15 +70,18 @@ core ideas you should understand before contributing.
   Applications should invoke controller logic via the orchestrator instead of the
   deprecated `ServiceManager`.
 
+## Rendering Architecture
+- See `tangl.story.runtime.render` for the two-stage rendering pipeline.
+- See `tangl.story.episode.block` for the multi-handler JOURNAL pattern.
+- Key principle: Pure text transformation (render) is separate from 
+  fragment wrapping (domain nodes).
+
 ## Service layer workflow (v3.7+)
 - Controllers live in `tangl.service.controllers` and expose orchestrated
   endpoints via `@ApiEndpoint.annotate`.
 - Applications call `Orchestrator.execute("Controller.method", user_id=..., **params)`
   and receive raw engine objects or dictionaries; transport layers handle
   serialization.
-- The legacy `tangl.story.story_controller` path now proxies to
-  `RuntimeController` for backward compatibility—prefer importing controllers
-  from `tangl.service.controllers` directly.
 
 When introducing new engine features, align them with these primitives instead of
 creating parallel abstractions. Favor composition over inheritance unless extending
