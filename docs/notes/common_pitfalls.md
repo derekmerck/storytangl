@@ -78,32 +78,6 @@ graph.add(node)  # Sets node.graph = self, then registers
 
 ---
 
-## Duplicate UUID Addition
-
-**Problem**: Adding an entity with duplicate UUID silently overwrites the existing entry (pre-fix behavior).
-
-```python
-# ❌ Bug: silent overwrite
-registry.add(entity1)
-entity2 = Entity(uid=entity1.uid, label="different")
-registry.add(entity2)  # Used to overwrite silently
-```
-
-**Current behavior** (post-fix): Raises `ValueError` unless same object reference.
-
-```python
-# ✅ Idempotent: same reference is fine
-registry.add(entity1)
-registry.add(entity1)  # No error
-
-# ❌ Error: different object, same UUID
-registry.add(entity1)
-entity2 = Entity(uid=entity1.uid, label="different")
-registry.add(entity2)  # ValueError: already exists
-```
-
----
-
 ## Dereferencing Without Registry
 
 **Problem**: Records store `*_id` fields but have no `.graph` to resolve them.
@@ -274,14 +248,12 @@ json.dumps(data)  # TypeError: not JSON serializable
 
 **Problem**: Tests marked `xfail` or `skip` indicate incomplete features or known bugs.
 
-**Rule**: Reference implementations must have **zero failing tests**.
+**Rule**: Reference releases should have **zero failing tests**.  For non-release versions, use `xfail` markers to track known bugs and `skip` to hide tests completely.  Since we use `xfail=strict`, inadvertently fixing a marked bug will result in an error, which indicates that the xfail can be lifted.
 
-**Action before release**:
+**Generally before release**:
 1. Review all `xfail`/`skip` markers
 2. Fix implementation to pass test, OR
 3. Delete test if feature is not planned
-
-**Current status**: See [skip_xfail_triage.md](../notes/skip_xfail_triage.md) for inventory.
 
 ---
 
