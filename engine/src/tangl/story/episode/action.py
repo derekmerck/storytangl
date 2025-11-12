@@ -46,10 +46,15 @@ class Action(ChoiceEdge, HasConditions, HasEffects):
     ) -> bool:
         """Evaluate predicate and scripted conditions for this action."""
 
+        resolved_ns: Mapping[str, Any] | None = ns
         if ctx is not None:
-            resolved_ns: Mapping[str, Any] | None = ctx.get_ns(self)
-        else:
-            resolved_ns = ns
+            action_ns = ctx.get_ns(self)
+            if resolved_ns is None:
+                resolved_ns = action_ns
+            else:
+                merged_ns = dict(resolved_ns)
+                merged_ns.update(action_ns)
+                resolved_ns = merged_ns
 
         if resolved_ns is not None and not ChoiceEdge.available(self, resolved_ns):
             return False

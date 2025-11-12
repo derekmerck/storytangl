@@ -91,7 +91,7 @@ class Block(Node, HasEffects):
 
         for edge in self.edges_out(**criteria):
             if ctx is not None and isinstance(edge, Action):
-                if not edge.is_available(ctx=ctx, ns=ns):
+                if not edge.is_available(ctx=ctx, ns=block_ns):
                     continue
             else:
                 if block_ns is not None and not edge.available(block_ns):

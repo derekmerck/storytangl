@@ -3,6 +3,8 @@ from __future__ import annotations
 from tangl.core import Graph, Node
 from tangl.vm.context import Context
 from tangl.story.episode.action import Action
+from tangl.story.episode.block import Block
+from tangl.story.story_graph import StoryGraph
 
 
 def _make_graph() -> tuple[Graph, Node, Node]:
@@ -62,3 +64,28 @@ def test_choice_fragment_defaults_to_continue() -> None:
     assert fragment is not None
     assert fragment.content == "continue"
     assert fragment.source_id == action.uid
+
+
+def test_action_is_available_inherits_block_namespace() -> None:
+    story = StoryGraph(label="action_namespace")
+    start = story.add_node(obj_cls=Block, label="start")
+    start.locals["has_hint"] = True
+    destination = story.add_node(obj_cls=Block, label="destination")
+
+    action = story.add_edge(
+        start,
+        destination,
+        obj_cls=Action,
+        label="Proceed",
+        content="Proceed",
+    )
+    action.conditions = ["has_hint"]
+
+    ctx = Context(graph=story, cursor_id=start.uid, step=1)
+
+    assert action in start.get_choices(ctx=ctx, is_instance=Action)
+
+    start.locals["has_hint"] = False
+    ctx_after = Context(graph=story, cursor_id=start.uid, step=2)
+
+    assert action not in start.get_choices(ctx=ctx_after, is_instance=Action)
