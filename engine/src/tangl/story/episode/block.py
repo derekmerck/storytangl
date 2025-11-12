@@ -13,15 +13,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from pydantic import Field
+
 from tangl.core import BaseFragment, Node, Graph
-from tangl.core.behavior import HasBehaviors, HandlerPriority as Prio
+from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.story.dispatch import story_dispatch
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
+from tangl.vm.runtime import HasEffects
 from .action import Action
 
-class Block(Node, HasBehaviors):
+class Block(Node, HasEffects):
     """
     Block(label: str, content: str = "")
 
@@ -40,6 +43,7 @@ class Block(Node, HasBehaviors):
     """
 
     content: str = ""
+    locals: dict[str, Any] = Field(default_factory=dict)
 
     def get_concepts(self) -> list[Concept]:
         """
@@ -56,7 +60,13 @@ class Block(Node, HasBehaviors):
                 concepts.append(destination)
         return concepts
 
-    def get_choices(self, *, ns: Mapping[str, Any] | None = None, **criteria) -> list[ChoiceEdge]:
+    def get_choices(
+        self,
+        *,
+        ns: Mapping[str, Any] | None = None,
+        ctx: Context | None = None,
+        **criteria,
+    ) -> list[ChoiceEdge]:
         """
         Return available :class:`ChoiceEdge` (usually :class:`Action`) edges.
 
@@ -75,9 +85,17 @@ class Block(Node, HasBehaviors):
         choices: list[ChoiceEdge] = []
         criteria.setdefault("trigger_phase", None)  # only blocking choices by default
         criteria.setdefault("is_instance", ChoiceEdge)
+        block_ns = ns
+        if block_ns is None and ctx is not None:
+            block_ns = ctx.get_ns(self)
+
         for edge in self.edges_out(**criteria):
-            if ns is not None and not edge.available(ns):
-                continue
+            if ctx is not None and isinstance(edge, Action):
+                if not edge.is_available(ctx=ctx, ns=ns):
+                    continue
+            else:
+                if block_ns is not None and not edge.available(block_ns):
+                    continue
             choices.append(edge)
         return choices
 
@@ -123,9 +141,8 @@ class Block(Node, HasBehaviors):
         -------
         list[BaseFragment] | None
         """
-        ns = ctx.get_ns(self)
         fragments: list[BaseFragment] = []
-        for choice in self.get_choices(ns=ns, is_instance=Action):
+        for choice in self.get_choices(ctx=ctx, is_instance=Action):
             f = choice.choice_fragment(ctx=ctx)
             if f:
                 fragments.append(f)

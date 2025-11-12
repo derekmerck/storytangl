@@ -159,6 +159,15 @@ class Frame:
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
 
+        current_ctx = self.context
+        if hasattr(edge, "apply_selected"):
+            edge.apply_selected(ctx=current_ctx)  # type: ignore[call-arg]
+        else:
+            from tangl.vm.runtime import HasEffects  # local import to avoid circular deps
+
+            if isinstance(edge, HasEffects):
+                edge.apply_entry_effects(ctx=current_ctx)
+
         self.step += 1
         self.cursor_id = edge.destination.uid
 
