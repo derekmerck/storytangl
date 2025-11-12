@@ -99,9 +99,9 @@ def test_load_linear_script(resources_dir) -> None:
 
     def render_step(step, _fragments):
         print(f"------- step {step} --------")
-        print(get_blocks(fragments)[0].content)
+        print(get_blocks(_fragments)[0].content)
         print('choices:')
-        print([f"{i+1}. {f.content}" for i, f in enumerate(get_choices(fragments))])
+        print([f"{i+1}. {f.content}" for i, f in enumerate(get_choices(_fragments))])
 
     fragments = list( ledger.get_journal('step-0001') )
     render_step(1, fragments)
@@ -119,5 +119,5 @@ def test_load_linear_script(resources_dir) -> None:
     choice = ledger.graph.get(choice_id)
     frame.follow_edge(choice)
 
-    fragments = ledger.get_journal('step-0003')
+    fragments = list( ledger.get_journal('step-0003') )
     render_step(3, fragments)
