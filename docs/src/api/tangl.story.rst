@@ -28,7 +28,6 @@ Setting Concepts
 .. autoclass:: tangl.story.concepts.location.Location
 .. autoclass:: tangl.story.concepts.location.Setting
 
-
 .. _story-episode:
 
 Episodic Process

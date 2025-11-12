@@ -17,7 +17,7 @@ from tangl.vm.provision import (
     provision_node,
 )
 from tangl.vm import Context, Frame, ResolutionPhase as P, Dependency, Affordance
-from tangl.vm.dispatch.planning_v372 import plan_collect_offers
+from tangl.vm.dispatch.planning import plan_collect_offers
 
 # pytest.skip(allow_module_level=True, reason="planning needs reimplemented")
 
@@ -37,7 +37,7 @@ def test_provision_existing_success():
     dep = Dependency(graph=g, source_id=n.uid, requirement=req, label="needs_T")
     frame = Frame(graph=g, cursor_id=n.uid)
 
-    from tangl.vm.dispatch.planning_v372 import get_dependencies
+    from tangl.vm.dispatch.planning import get_dependencies
     assert len( get_dependencies(n ) ) == 1
     assert len( get_dependencies(n, satisfied=False) ) == 1
     assert dep.satisfied_by(target)

@@ -10,8 +10,8 @@ ENGINE_SRC = PROJECT_ROOT / "engine" / "src"
 sys.path.insert(0, str(ENGINE_SRC))
 
 project = 'StoryTangl'
-copyright = '2025, Derek Merck'
-author = 'Derek Merck'
+copyright = '2025, tangldev'
+author = 'tangldev'
 release = '3.7'
 
 # -- General configuration ---------------------------------------------------

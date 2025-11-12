@@ -1,5 +1,5 @@
 """
-Renders out an entire world as a cyoa-style e-book.
+Renders out an entirely materialized story as a cyoa-style e-book.
 
 Requires [pypandoc](https://github.com/NicklasTegner/pypandoc), [pandoc-secnos](https://github.com/tomduck/pandoc-xnos)
 """

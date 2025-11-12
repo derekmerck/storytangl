@@ -11,8 +11,25 @@ class Stat3(Enum):
 class Stat5(Enum):
     # Somewhat more nuanced, power may be applied at range and under various
     # conditions, like before opponents can act
+    BODY   = "body"    # strength/health, club
+    MIND   = "mind"    # leverage/cleverness, lamp
+    WILL   = "will"    # endurance/spirit/light
+    CHARM  = "charm"   # range/influence, cup
+    HIDDEN = "hidden"  # speed/cunning/dark, key
+
+class Stat10(Enum):
+    # Intrinsics
     BODY   = "body"    # strength/health
     MIND   = "mind"    # leverage/cleverness
     WILL   = "will"    # endurance/spirit/light
     CHARM  = "charm"   # range/influence
     HIDDEN = "hidden"  # speed/cunning/dark
+
+    # Extrinsics
+    LOOKS = "looks"            # body
+    FIGHT = "fight"
+    PRINCESS = "princess"      # charm/etiquette
+    COMFORT = "comfort"        # charm/skill
+    CORRUPTION = "corruption"  # hidden
+
+    PRESTIGE = "prestige"      # background

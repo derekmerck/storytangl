@@ -18,7 +18,7 @@ examples. Real applications can register additional handlers in their domains.
 from .vm_dispatch import vm_dispatch
 from .namespace import on_get_ns, do_get_ns, Namespace
 from .validate import on_validate
-from .planning_v372 import on_planning, on_get_provisioners, do_get_provisioners
+from .planning import on_planning, on_get_provisioners, do_get_provisioners
 from .update import on_update, on_finalize
 from .redirect import on_prereq, on_postreq
 from .journal import on_journal

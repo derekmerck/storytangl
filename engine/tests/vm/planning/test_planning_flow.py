@@ -11,7 +11,7 @@ from tangl.vm import (
     Affordance,
     ProvisioningPolicy,
 )
-from tangl.vm.dispatch import planning_v372
+from tangl.vm.dispatch import planning
 from tangl.vm.provision import PlanningReceipt, BuildReceipt
 from tangl.utils.hashing import hashing_func
 
@@ -187,7 +187,7 @@ def test_planning_clears_frontier_cache_when_provisioners_missing(monkeypatch):
     assert ctx.frontier_provision_results
     assert ctx.frontier_provision_plans
 
-    monkeypatch.setattr(planning_v372, "do_get_provisioners", lambda *_, **__: [])
+    monkeypatch.setattr(planning, "do_get_provisioners", lambda *_, **__: [])
 
     frame.run_phase(P.PLANNING)
 
