@@ -150,7 +150,27 @@ async def get_story_status(
 
 
 @router.delete("/drop")
-async def reset_story():
-    """Resetting stories is not yet supported in the orchestrated REST API."""
+async def reset_story(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    user_locks=Depends(get_user_locks),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
+    archive: bool = Query(default=False, description="Retain the ledger if true."),
+):
+    """End the user's active story and optionally archive the ledger."""
 
-    raise HTTPException(status_code=501, detail="Story reset is not yet supported")
+    user_id = uuid_for_key(api_key)
+
+    try:
+        async with user_locks[user_id]:
+            result = _call(
+                orchestrator,
+                "RuntimeController.drop_story",
+                user_id=user_id,
+                archive=archive,
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return _serialize(result)

@@ -172,3 +172,34 @@ class RuntimeController(HasApiEndpoints):
             "step": ledger.step,
             "ledger": ledger,
         }
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.PUBLIC,
+        method_type=MethodType.UPDATE,
+        response_type=ResponseType.RUNTIME,
+    )
+    def drop_story(
+        self,
+        user: User,
+        ledger: Ledger | None = None,
+        *,
+        archive: bool = False,
+    ) -> dict[str, Any]:
+        """Clear the user's active story and optionally schedule ledger deletion."""
+
+        current_ledger_id = getattr(user, "current_ledger_id", None)
+        if current_ledger_id is None:
+            raise ValueError("User has no active story to drop")
+
+        user.current_ledger_id = None
+
+        result: dict[str, Any] = {
+            "status": "dropped",
+            "dropped_ledger_id": str(current_ledger_id),
+            "archived": archive,
+        }
+
+        if not archive:
+            result["_delete_ledger_id"] = str(current_ledger_id)
+
+        return result

@@ -44,6 +44,13 @@ def demo_world() -> World:
     World.clear_instances()
 
 
+@pytest.fixture()
+def user_with_ledger(ledger: Ledger) -> User:
+    user = User(uid=uuid4())
+    user.current_ledger_id = ledger.uid
+    return user
+
+
 def _register_journal_handler(frame: Frame) -> None:
     @frame.local_behaviors.register(task=ResolutionPhase.JOURNAL)
     def _journal_handler(*_, ctx, **__) -> list[ContentFragment]:  # type: ignore[override]
@@ -274,3 +281,34 @@ def test_create_story_handles_prereq_redirects(
     assert ledger_obj.step >= 1
 
 
+
+def test_drop_story_clears_active_ledger(
+    runtime_controller: RuntimeController,
+    ledger: Ledger,
+    user_with_ledger: User,
+) -> None:
+    result = runtime_controller.drop_story(user=user_with_ledger, ledger=ledger)
+
+    assert user_with_ledger.current_ledger_id is None
+    assert result["status"] == "dropped"
+    assert result["archived"] is False
+    assert result["dropped_ledger_id"] == str(ledger.uid)
+    assert result["_delete_ledger_id"] == str(ledger.uid)
+
+
+def test_drop_story_archive_skips_deletion_marker(
+    runtime_controller: RuntimeController,
+    ledger: Ledger,
+    user_with_ledger: User,
+) -> None:
+    result = runtime_controller.drop_story(user=user_with_ledger, ledger=ledger, archive=True)
+
+    assert result["archived"] is True
+    assert "_delete_ledger_id" not in result
+
+
+def test_drop_story_without_active_story_raises(runtime_controller: RuntimeController) -> None:
+    user = User(uid=uuid4())
+
+    with pytest.raises(ValueError, match="no active story"):
+        runtime_controller.drop_story(user=user)
