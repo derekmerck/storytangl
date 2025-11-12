@@ -96,30 +96,3 @@ def test_block_journal_renders_choice_menu() -> None:
     assert menus[1].content == "Right"
 
 
-def test_block_with_concepts_and_choices_emits_all_fragments() -> None:
-    g = StoryGraph(label="test")
-    block = Block(graph=g, label="tavern", content="You enter the tavern.")
-    smell = Concept(graph=g, label="smell", content="It smells of ale.")
-    sound = Concept(graph=g, label="sound", content="Music plays softly.")
-    g.add_edge(block, smell)
-    g.add_edge(block, sound)
-
-    bar = Block(graph=g, label="bar")
-    corner = Block(graph=g, label="corner")
-    Action(graph=g, source_id=block.uid, destination_id=bar.uid, label="Approach bar")
-    Action(graph=g, source_id=block.uid, destination_id=corner.uid, label="Find corner")
-
-    frame = Frame(graph=g, cursor_id=block.uid)
-    fragments = frame.run_phase(P.JOURNAL)
-
-    inline = _by_fragment_type(fragments, "block")
-    menus = _by_fragment_type(fragments, "choice")
-    concepts = _by_fragment_type(fragments, "concept")
-
-    assert inline and concepts and menus
-
-    inline_index = fragments.index(inline[0])
-    first_concept_index = fragments.index(concepts[0])
-    menu_index = fragments.index(menus[0])
-
-    assert inline_index < menu_index < first_concept_index

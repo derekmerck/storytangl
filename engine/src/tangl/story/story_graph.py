@@ -1,8 +1,8 @@
 
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import field_serializer, field_validator
+from pydantic import Field, field_serializer, field_validator
 
 from ..type_hints import StringMap
 from tangl.core import Graph, BehaviorRegistry
@@ -15,6 +15,7 @@ class StoryGraph(Graph):
 
     world: World | None = None
     initial_cursor_id: UUID | None = None
+    locals: dict[str, Any] = Field(default_factory=dict)
 
     # Just override this in a subclass to create graph's that use
     # variant dispatches, for testing, for example.

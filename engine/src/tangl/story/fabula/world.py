@@ -108,6 +108,9 @@ class World(Singleton):
         """Materialize a fully-instantiated :class:`StoryGraph`."""
         from tangl.story.story_graph import StoryGraph
         graph = StoryGraph(label=story_label, world=self)
+        globals_ns = self.script_manager.get_story_globals() or {}
+        if globals_ns:
+            graph.locals.update(globals_ns)
 
         node_map: dict[str, UUID] = {}
 
@@ -397,9 +400,19 @@ class World(Singleton):
         model_fields = getattr(cls, "model_fields", {})
         if model_fields:
             allowed = set(model_fields.keys())
+            aliases = {
+                field.alias
+                for field in model_fields.values()
+                if getattr(field, "alias", None)
+            }
             if self._is_graph_item(cls):
                 allowed.add("graph")
-            payload = {key: value for key, value in payload.items() if key in allowed}
+
+            filtered: dict[str, Any] = {}
+            for key, value in payload.items():
+                if key in allowed or key in aliases:
+                    filtered[key] = value
+            payload = filtered
         return payload
 
     @staticmethod

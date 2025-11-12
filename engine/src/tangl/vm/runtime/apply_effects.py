@@ -52,12 +52,12 @@ class HasEffects(HasBehaviors):
                 entity.locals[k] = updated_context[k]
 
     @classmethod
-    def exec_expr(cls, expr: Expr, ns: NS, rand: Random=None) -> StringMap:
+    def _exec_expr(cls, expr: Expr, ns: NS, rand: Random = None) -> StringMap:
         """
         Execute an effect expression within the given namespace.
 
         :param expr: The effect expression to be executed.
-        :param context: A dict of variables to be used in the expression.
+        :param ns: Namespace mapping containing variables used in the expression.
         :return dict: StringMap with updated context
         """
         rand = rand or Random()

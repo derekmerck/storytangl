@@ -3,16 +3,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from typing import Any
-from uuid import UUID
-
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
-from tangl.service.response import ContentResponse
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret, uuid_for_key
 
@@ -32,6 +28,25 @@ class ChoiceRequest(BaseModel):
 
 
 router = APIRouter(tags=["Story"])
+
+
+def _serialize(value: Any) -> Any:
+    """Best-effort JSON encoding for fragments and response payloads."""
+
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, set):
+        return [_serialize(item) for item in sorted(value, key=str)]
+    if isinstance(value, type):
+        return value.__name__
+    if isinstance(value, list):
+        return [_serialize(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _serialize(item) for key, item in value.items()}
+    if hasattr(value, "model_dump"):
+        data = value.model_dump(mode="python")
+        return {key: _serialize(item) for key, item in data.items()}
+    return value
 
 
 def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
@@ -64,9 +79,11 @@ async def create_story(
 @router.get("/update")
 async def get_story_update(
     orchestrator: Orchestrator = Depends(get_orchestrator),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
     limit: int = Query(default=10, ge=0),
-) -> ContentResponse:
+) -> dict[str, Any]:
     """Return journal fragments and available choices for the active user."""
 
     user_id = uuid_for_key(api_key)
@@ -77,7 +94,7 @@ async def get_story_update(
         limit=limit,
     )
     choices = _call(orchestrator, "RuntimeController.get_available_choices", user_id=user_id)
-    return {"fragments": fragments, "choices": choices}
+    return {"fragments": _serialize(fragments), "choices": _serialize(choices)}
 
 
 @router.post("/do")
@@ -85,7 +102,9 @@ async def do_story_action(
     request: ChoiceRequest = Body(...),
     orchestrator: Orchestrator = Depends(get_orchestrator),
     user_locks = Depends(get_user_locks),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
 ):
     """Resolve a player choice and return the resulting journal fragments."""
 
@@ -110,15 +129,19 @@ async def do_story_action(
             limit=0,
         )
 
-    payload = dict(status) if isinstance(status, dict) else {"status": status}
-    payload["fragments"] = fragments
+    payload = _serialize(status)
+    if not isinstance(payload, dict):
+        payload = {"status": payload}
+    payload["fragments"] = _serialize(fragments)
     return payload
 
 
 @router.get("/status")
 async def get_story_status(
     orchestrator: Orchestrator = Depends(get_orchestrator),
-    api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
 ):
     """Return a lightweight summary of the current story state."""
 
