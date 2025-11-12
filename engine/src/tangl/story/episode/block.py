@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from tangl.type_hints import StringMap
 from tangl.core import BaseFragment, Node, Graph
 from tangl.core.behavior import HasBehaviors, HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
@@ -82,10 +81,10 @@ class Block(Node, HasBehaviors):
             choices.append(edge)
         return choices
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.EARLY)
     def block_fragment(self: Block, *, ctx: Context, **locals_: Any) -> BaseFragment | None:
         """
-        JOURNAL (NORMAL): render `content` and wrap as a "block" fragment.
+        JOURNAL (EARLY): render `content` and wrap as a "block" fragment.
 
         Returns
         -------
@@ -101,10 +100,24 @@ class Block(Node, HasBehaviors):
             )
         # todo: the Block fragment type actually expects a list of 'choice' fragments as a parameter, we can consider that later
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL+5)
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
+    def describe_concepts(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+        """
+        JOURNAL (NORMAL): collect "concept" fragments from child concepts.
+
+        Returns
+        -------
+        list[BaseFragment] | None
+        """
+        fragments: list[BaseFragment] = []
+        for concept in self.get_concepts():
+            fragments.append(concept.concept_fragment(ctx=ctx))
+        return fragments or None
+
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.LATE)
     def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
         """
-        JOURNAL (NORMAL+5): collect "choice" fragments for available actions.
+        JOURNAL (LATE): collect "choice" fragments for available actions.
 
         Returns
         -------
@@ -116,18 +129,4 @@ class Block(Node, HasBehaviors):
             f = choice.choice_fragment(ctx=ctx)
             if f:
                 fragments.append(f)
-        return fragments or None
-
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL+10)
-    def describe_concepts(self: Block, *, ctx: Context, **_: Any) -> StringMap | None:
-        """
-        JOURNAL (NORMAL+10): collect "concept" fragments from child concepts.
-
-        Returns
-        -------
-        list[BaseFragment] | None
-        """
-        fragments: list[BaseFragment] = []
-        for concept in self.get_concepts():
-            fragments.append(concept.concept_fragment(ctx=ctx))
         return fragments or None
