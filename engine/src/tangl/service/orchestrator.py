@@ -45,6 +45,7 @@ class Orchestrator:
         self._resource_cache = {}
         resolved_params = self._hydrate_resources(endpoint, user_id, params)
         result = endpoint(controller, **resolved_params)
+        result = self._handle_result_cleanup(result)
 
         if endpoint.method_type in {MethodType.CREATE, MethodType.UPDATE, MethodType.DELETE}:
             for entry in self._resource_cache.values():
@@ -146,6 +147,47 @@ class Orchestrator:
 
             return Ledger.structure(dict(data))
         raise TypeError("Unsupported ledger payload")
+
+    def _handle_result_cleanup(self, result: Any) -> Any:
+        if not isinstance(result, MutableMapping):
+            return result
+
+        raw_ledger_id = result.pop("_delete_ledger_id", None)
+        if raw_ledger_id is None:
+            return result
+
+        try:
+            ledger_id = UUID(str(raw_ledger_id))
+        except (TypeError, ValueError):
+            result["persistence_deleted"] = False
+            return result
+
+        self._resource_cache.pop(ledger_id, None)
+        deleted = self._delete_from_persistence(ledger_id)
+        result["persistence_deleted"] = deleted
+        return result
+
+    def _delete_from_persistence(self, ledger_id: UUID) -> bool:
+        if self.persistence is None:
+            return False
+
+        remover = getattr(self.persistence, "remove", None)
+        if callable(remover):
+            try:
+                remover(ledger_id)
+                return True
+            except KeyError:
+                return False
+
+        try:
+            del self.persistence[ledger_id]
+            return True
+        except KeyError:
+            try:
+                del self.persistence[str(ledger_id)]
+                return True
+            except KeyError:
+                return False
 
     def _write_back_resources(self) -> None:
         dirty_items = [entry.resource for entry in self._resource_cache.values() if entry.dirty]

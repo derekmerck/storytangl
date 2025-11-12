@@ -21,6 +21,7 @@ class FakePersistence(dict):
         super().__init__()
         self.get_requests: list[UUID] = []
         self.saved: list[object] = []
+        self.deleted: list[UUID] = []
 
     def get(self, key, default=None):
         self.get_requests.append(key)
@@ -34,6 +35,10 @@ class FakePersistence(dict):
         if key is None:
             raise ValueError("Unable to determine key for saved value")
         super().__setitem__(key, value)
+
+    def remove(self, key) -> None:
+        self.deleted.append(key)
+        super().__delitem__(key)
 
 
 class StubUser:
@@ -310,3 +315,31 @@ def test_create_story_via_orchestrator_persists_ledger(
     )
 
     World.clear_instances()
+
+def test_orchestrator_drop_story_deletes_ledger(
+    fake_persistence: FakePersistence,
+    minimal_ledger: Ledger,
+) -> None:
+    ledger = minimal_ledger
+    ledger_id = ledger.uid
+    user_id = uuid4()
+    user = User(uid=user_id)
+    user.current_ledger_id = ledger_id
+
+    fake_persistence[user_id] = user
+    fake_persistence[ledger_id] = ledger.unstructure()
+
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(RuntimeController)
+
+    result = orchestrator.execute("RuntimeController.drop_story", user_id=user_id)
+
+    assert result["status"] == "dropped"
+    assert result["archived"] is False
+    assert result.get("persistence_deleted") is True
+    assert "_delete_ledger_id" not in result
+    assert ledger_id in fake_persistence.deleted
+    assert ledger_id not in fake_persistence
+    persisted_user = fake_persistence[user_id]
+    assert getattr(persisted_user, "current_ledger_id", None) is None
+    assert any(isinstance(saved, User) and saved.uid == user_id for saved in fake_persistence.saved)

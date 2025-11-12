@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 import cmd2
@@ -24,6 +24,9 @@ class RecordingCLI(cmd2.Cmd):
     def poutput(self, message: object, *, end: str = "\n", **_: object) -> None:
         self.outputs.append(str(message))
 
+    def set_ledger(self, ledger_id: UUID | None) -> None:  # type: ignore[override]
+        self.ledger_id = ledger_id
+
     def call_endpoint(self, endpoint: str, /, **params: object) -> object:
         self.calls.append((endpoint, params))
         if endpoint.endswith("get_journal_entries"):
@@ -34,6 +37,13 @@ class RecordingCLI(cmd2.Cmd):
             return {"fragments": [SimpleNamespace(content="moved")]} 
         if endpoint.endswith("get_story_info"):
             return {"title": "demo", "cursor_id": uuid4(), "step": 0, "journal_size": 1}
+        if endpoint.endswith("drop_story"):
+            return {
+                "status": "dropped",
+                "dropped_ledger_id": str(self.ledger_id),
+                "archived": bool(params.get("archive", False)),
+                "persistence_deleted": not bool(params.get("archive", False)),
+            }
         return {}
 
 
@@ -58,3 +68,24 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     assert resolve_calls
     _, params = resolve_calls[-1]
     assert params["choice_id"] == cli.choice_id
+
+
+def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    story_controller._current_story_update = [SimpleNamespace(content="previous")]
+    story_controller._current_choices = [SimpleNamespace(uid=cli.choice_id, label="Go")]
+    cli.outputs.clear()
+
+    story_controller.do_drop_story("--archive")
+
+    drop_calls = [call for call in cli.calls if call[0].endswith("drop_story")]
+    assert drop_calls
+    _, params = drop_calls[-1]
+    assert params["archive"] is True
+    assert cli.ledger_id is None
+    assert not story_controller._current_story_update
+    assert not story_controller._current_choices
+    assert cli.outputs[0] == "Story dropped."
+    assert cli.outputs[1].startswith("Dropped ledger:")
+    assert cli.outputs[2] == "Archived: True"
+    assert cli.outputs[3] == "Persistence deleted: False"
