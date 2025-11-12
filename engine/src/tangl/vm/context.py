@@ -4,7 +4,9 @@ Execution context for one frame of resolution.
 Thin wrapper around the graph, cursor, and scope providing deterministic RNG.
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable
+from collections import ChainMap
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Iterable, Any
 from uuid import UUID
 import functools
 from dataclasses import dataclass, field
@@ -143,7 +145,31 @@ class Context:
             from copy import copy
             call_receipts = copy(self.call_receipts)
 
-            self._ns_cache[node.uid] = do_get_ns(node, ctx=self)
+            raw_ns = do_get_ns(node, ctx=self)
+
+            composed_maps: list[Mapping[str, Any]] = []
+            graph_locals = getattr(self.graph, "locals", None)
+            if isinstance(graph_locals, dict):
+                composed_maps.append(graph_locals)
+            elif graph_locals is not None:
+                composed_maps.append(graph_locals)
+
+            base_ns: dict[str, Any] = {
+                "cursor": node,
+                "graph": self.graph,
+                "ctx": self,
+            }
+            composed_maps.append(base_ns)
+
+            if isinstance(raw_ns, ChainMap):
+                for existing in raw_ns.maps:
+                    if any(existing is candidate for candidate in composed_maps):
+                        continue
+                    composed_maps.append(existing)
+            else:  # pragma: no cover - defensive
+                composed_maps.append(raw_ns)  # type: ignore[arg-type]
+
+            self._ns_cache[node.uid] = ChainMap(*composed_maps)
 
             # restore
             self.call_receipts.clear()

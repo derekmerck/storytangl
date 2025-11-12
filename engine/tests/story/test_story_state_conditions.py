@@ -50,6 +50,34 @@ def test_story_globals_seed_namespace() -> None:
     assert ns["visited"] is False
 
 
+def test_namespace_writes_update_graph_locals() -> None:
+    data = {
+        "label": "state_story",
+        "metadata": {"title": "State Story", "author": "Test Author"},
+        "globals": {"visited": False},
+        "scenes": {
+            "start": {
+                "blocks": {
+                    "door": {
+                        "content": "A plain door blocks your way.",
+                    }
+                }
+            }
+        },
+    }
+
+    ledger = _build_ledger(data)
+    frame = ledger.get_frame()
+
+    ns = frame.context.get_ns(frame.cursor)
+    assert ns.maps[0] is ledger.graph.locals
+    ns["visited"] = True
+
+    assert ledger.graph.locals["visited"] is True
+    assert ns["cursor"] is frame.cursor
+    assert ns["graph"] is ledger.graph
+
+
 def test_action_conditions_and_effects_update_state() -> None:
     data = {
         "label": "conditional_story",
