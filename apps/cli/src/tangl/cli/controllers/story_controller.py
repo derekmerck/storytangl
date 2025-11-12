@@ -169,6 +169,48 @@ class StoryController(CommandSet):
         self._current_choices = self._load_choices()
         self._render_current_story_update()
 
+    drop_story_parser = argparse.ArgumentParser()
+    drop_story_parser.add_argument(
+        "--archive",
+        action="store_true",
+        help="Keep the dropped ledger in persistence for later inspection.",
+    )
+
+    @with_argparser(drop_story_parser)
+    def do_drop_story(self, args: argparse.Namespace) -> None:
+        if self._cmd.user_id is None:
+            self._cmd.poutput("No active user. Create a user first with 'create_user'.")
+            return
+
+        try:
+            result = self._cmd.call_endpoint(
+                "RuntimeController.drop_story",
+                archive=bool(args.archive),
+            )
+        except ValueError as exc:
+            self._cmd.poutput(str(exc))
+            return
+
+        self._cmd.set_ledger(None)
+        self._current_story_update.clear()
+        self._current_choices.clear()
+
+        if isinstance(result, dict):
+            status = result.get("status", "dropped")
+            self._cmd.poutput(f"Story {status}.")
+            dropped_ledger_id = result.get("dropped_ledger_id")
+            if dropped_ledger_id:
+                self._cmd.poutput(f"Dropped ledger: {dropped_ledger_id}")
+            archived = bool(result.get("archived", False))
+            self._cmd.poutput(f"Archived: {archived}")
+            if "persistence_deleted" in result:
+                self._cmd.poutput(
+                    f"Persistence deleted: {bool(result['persistence_deleted'])}"
+                )
+            return
+
+        self._cmd.poutput("Story dropped.")
+
     def do_status(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if not self._require_story_context():
             return
