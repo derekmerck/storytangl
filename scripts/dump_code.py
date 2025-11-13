@@ -13,10 +13,11 @@ ignore_imports = True
 
 project_root = Path(__file__).parent.parent
 pkg_root = project_root / "engine/src/tangl"
-docs_root = project_root / "docs/source"
+docs_root = project_root / "docs/src"
 apps_root = project_root / "apps"
 tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
+scratch_root = project_root / "scratch"
 
 outfile_dir = project_root / "tmp/dumps"
 
@@ -186,3 +187,5 @@ if __name__ == "__main__":
     process_directory(legacy_root / "core/core-35", "tangl35_core_archive.py")
     process_directory(legacy_root / "core/core-36", "tangl36_core_archive.py")
     process_directory(legacy_root / "vm/vm-36",     "tangl36_vm_archive.py")
+
+    process_directory(scratch_root / "compilers/md2yaml", "tangl3x_md2yaml_archive.py", include_notes=True)
