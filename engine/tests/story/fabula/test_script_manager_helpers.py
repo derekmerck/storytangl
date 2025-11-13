@@ -87,7 +87,7 @@ def test_get_unstructured_injects_default_obj_classes() -> None:
     manager = ScriptManager.from_data(script)
 
     actor_payload = next(manager.get_unstructured("actors"))
-    assert actor_payload["obj_cls"] == "tangl.story.fabula.actor.actor.Actor"
+    assert actor_payload["obj_cls"] == "tangl.story.concepts.actor.actor.Actor"
 
     scene_payload = next(manager.get_unstructured("scenes"))
     assert scene_payload["obj_cls"] == "tangl.story.episode.scene.Scene"

@@ -21,6 +21,7 @@ from .asset_manager import AssetManager    # platonic objects
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
     from tangl.media.media_resource.resource_manager import ResourceManager
+    from tangl.story.episode.scene import Scene
     from tangl.story.story_graph import StoryGraph
 else:  # pragma: no cover - runtime alias
     StoryGraph = Graph
@@ -106,21 +107,37 @@ class World(Singleton):
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
+        from tangl.story.concepts.item import Item, Flag
         from tangl.story.story_graph import StoryGraph
         graph = StoryGraph(label=story_label, world=self)
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
 
+        graph.locals.setdefault("Item", Item)
+        graph.locals.setdefault("Flag", Flag)
+
         node_map: dict[str, UUID] = {}
 
-        node_map.update(self._build_actors(graph))
-        node_map.update(self._build_locations(graph))
+        actor_map = self._build_actors(graph)
+        location_map = self._build_locations(graph)
+        item_map = self._build_items(graph)
+        flag_map = self._build_flags(graph)
+
+        node_map.update(actor_map)
+        node_map.update(location_map)
+        node_map.update(item_map)
+        node_map.update(flag_map)
 
         block_map, action_scripts = self._build_blocks(graph)
         node_map.update(block_map)
 
-        scene_map = self._build_scenes(graph, block_map)
+        scene_map = self._build_scenes(
+            graph,
+            block_map,
+            actor_map=actor_map,
+            location_map=location_map,
+        )
         node_map.update(scene_map)
 
         self._build_action_edges(graph, block_map, action_scripts)
@@ -159,6 +176,34 @@ class World(Singleton):
             location = cls.structure(self._prepare_payload(cls, payload, graph))
             location_map[label] = location.uid
         return location_map
+
+    def _build_items(self, graph: StoryGraph) -> dict[str, UUID]:
+        """Instantiate items defined in the script into ``graph``."""
+
+        item_map: dict[str, UUID] = {}
+        for item_data in self.script_manager.get_unstructured("items") or ():
+            payload = dict(item_data)
+            label = payload.get("label")
+            if not label:
+                continue
+            cls = self.domain_manager.resolve_class(payload.get("obj_cls"))
+            item = cls.structure(self._prepare_payload(cls, payload, graph))
+            item_map[label] = item.uid
+        return item_map
+
+    def _build_flags(self, graph: StoryGraph) -> dict[str, UUID]:
+        """Instantiate flags defined in the script into ``graph``."""
+
+        flag_map: dict[str, UUID] = {}
+        for flag_data in self.script_manager.get_unstructured("flags") or ():
+            payload = dict(flag_data)
+            label = payload.get("label")
+            if not label:
+                continue
+            cls = self.domain_manager.resolve_class(payload.get("obj_cls"))
+            flag = cls.structure(self._prepare_payload(cls, payload, graph))
+            flag_map[label] = flag.uid
+        return flag_map
 
     def _build_blocks(
         self,
@@ -204,6 +249,9 @@ class World(Singleton):
         self,
         graph: StoryGraph,
         block_map: dict[str, UUID],
+        *,
+        actor_map: dict[str, UUID],
+        location_map: dict[str, UUID],
     ) -> dict[str, UUID]:
         """Instantiate scenes and associate their member blocks."""
 
@@ -233,7 +281,86 @@ class World(Singleton):
             scene = cls.structure(payload)
             scene_map[scene_label] = scene.uid
 
+            self._build_scene_roles(
+                scene,
+                scene_data.get("roles"),
+                actor_map=actor_map,
+            )
+            self._build_scene_settings(
+                scene,
+                scene_data.get("settings"),
+                location_map=location_map,
+            )
+
         return scene_map
+
+    def _build_scene_roles(
+        self,
+        scene: "Scene",
+        roles_data: Any,
+        *,
+        actor_map: dict[str, UUID],
+    ) -> None:
+        roles = self._normalize_section(roles_data)
+        if not roles:
+            return
+
+        for role_label, role_payload in roles.items():
+            role_cls = self.domain_manager.resolve_class(
+                role_payload.get("obj_cls")
+                or "tangl.story.concepts.actor.role.Role"
+            )
+            payload = self._prepare_payload(
+                role_cls,
+                role_payload,
+                scene.graph,
+            )
+            payload.setdefault("label", role_label)
+            payload.setdefault("source_id", scene.uid)
+
+            role = role_cls.structure(payload)
+            actor_label = role_payload.get("actor_ref") or role_label
+            actor_uid = actor_map.get(actor_label)
+            if actor_uid is None:
+                continue
+
+            actor = scene.graph.get(actor_uid)
+            if actor is not None and hasattr(role, "actor"):
+                role.actor = actor
+
+    def _build_scene_settings(
+        self,
+        scene: "Scene",
+        settings_data: Any,
+        *,
+        location_map: dict[str, UUID],
+    ) -> None:
+        settings = self._normalize_section(settings_data)
+        if not settings:
+            return
+
+        for setting_label, setting_payload in settings.items():
+            setting_cls = self.domain_manager.resolve_class(
+                setting_payload.get("obj_cls")
+                or "tangl.story.concepts.location.setting.Setting"
+            )
+            payload = self._prepare_payload(
+                setting_cls,
+                setting_payload,
+                scene.graph,
+            )
+            payload.setdefault("label", setting_label)
+            payload.setdefault("source_id", scene.uid)
+
+            setting = setting_cls.structure(payload)
+            location_label = setting_payload.get("location_ref") or setting_label
+            location_uid = location_map.get(location_label)
+            if location_uid is None:
+                continue
+
+            location = scene.graph.get(location_uid)
+            if location is not None and hasattr(setting, "location"):
+                setting.location = location
 
     def _build_action_edges(
         self,

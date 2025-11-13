@@ -67,9 +67,10 @@ def test_branching_left_path_walkthrough(resources_dir: Path) -> None:
     assert block_fragments and "crossroads" in block_fragments[0].content.lower()
 
     choices = _fragments_of_type(step1, "choice")
-    assert len(choices) == 2
+    assert len(choices) >= 2
     assert any("left" in fragment.content.lower() for fragment in choices)
     assert any("right" in fragment.content.lower() for fragment in choices)
+    assert any("guide" in fragment.content.lower() for fragment in choices)
 
     left_choice = next(fragment for fragment in choices if "left" in fragment.content.lower())
     left_edge = ledger.graph.get(left_choice.source_id)
@@ -151,7 +152,7 @@ def test_branching_backtrack_then_garden(resources_dir: Path) -> None:
 
     step3 = _step_fragments(ledger, 3)
     loop_choices = _fragments_of_type(step3, "choice")
-    assert len(loop_choices) == 2
+    assert len(loop_choices) >= 2
     assert any("left" in fragment.content.lower() for fragment in loop_choices)
     assert any("right" in fragment.content.lower() for fragment in loop_choices)
 

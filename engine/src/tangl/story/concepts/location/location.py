@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING, Iterator
+from typing import Any, Optional, TYPE_CHECKING, Iterator
 
 from tangl.core import Graph
 from tangl.story.concepts import Concept
 from tangl.story.concepts.actor import Extras
 
 if TYPE_CHECKING:
+    from tangl.vm.context import Context
     from .setting import Setting
 
 # originally named as "dep location -> concrete place", refactored to "dep setting -> concrete location" b/c I think 'setting' is more common and abstract, and 'location' refers to a specific place.  Filmed "on location" vs. "fantasy setting"
@@ -30,8 +31,14 @@ class Location(Concept):
     def extras(self) -> Iterator[Extras]:
         return self.edges_out(is_instance=Extras)
 
-    def describe(self):
-        ...
+    def describe(
+        self,
+        *,
+        ctx: "Context" | None = None,
+        ns: dict[str, Any] | None = None,
+        **locals_: Any,
+    ) -> str | None:
+        return super().describe(ctx=ctx, ns=ns, **locals_)
 
     # @on_can_associate.register()
     # def _can_associate_setting(self, other: Setting, **kwargs):

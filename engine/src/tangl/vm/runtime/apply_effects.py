@@ -12,6 +12,7 @@ from tangl.utils.safe_builtins import safe_builtins
 from tangl.core.graph import Node
 from tangl.core.behavior import HasBehaviors
 from tangl.vm.dispatch import vm_dispatch, on_update, on_finalize, Namespace as NS
+from tangl.story.runtime.effect_helpers import bind_effect_helpers
 
 if TYPE_CHECKING:
     from tangl.vm.context import Context
@@ -64,8 +65,9 @@ class HasEffects(HasBehaviors):
         if not expr:
             return
         logger.debug(f"exec {expr} with {ns}")
+        builtins = {**safe_builtins, **bind_effect_helpers(graph=ns.get("graph"))}
         try:
-            exec( expr, {'rand': rand, '__builtins__': safe_builtins}, ns )
+            exec(expr, {'rand': rand, '__builtins__': builtins}, ns)
         except (SyntaxError, TypeError, KeyError, AttributeError, NameError):
             logger.critical(f"Failed to apply expr: '{expr}'")
             raise

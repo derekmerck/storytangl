@@ -34,10 +34,16 @@ class ScriptManager:
         self.master_script = master_script
         self._default_tree: dict[str, _DefaultClassConfig] = {
             "actors": _DefaultClassConfig(
-                class_path="tangl.story.fabula.actor.actor.Actor",
+                class_path="tangl.story.concepts.actor.actor.Actor",
             ),
             "locations": _DefaultClassConfig(
-                class_path="tangl.story.fabula.location.location.Location",
+                class_path="tangl.story.concepts.location.location.Location",
+            ),
+            "items": _DefaultClassConfig(
+                class_path="tangl.story.concepts.item.Item",
+            ),
+            "flags": _DefaultClassConfig(
+                class_path="tangl.story.concepts.item.Flag",
             ),
             "scenes": _DefaultClassConfig(
                 class_path="tangl.story.episode.scene.Scene",
@@ -53,10 +59,10 @@ class ScriptManager:
                         },
                     ),
                     "roles": _DefaultClassConfig(
-                        class_path="tangl.story.fabula.actor.role.Role",
+                        class_path="tangl.story.concepts.actor.role.Role",
                     ),
                     "settings": _DefaultClassConfig(
-                        class_path="tangl.story.fabula.location.setting.Setting",
+                        class_path="tangl.story.concepts.location.setting.Setting",
                     ),
                 },
             ),

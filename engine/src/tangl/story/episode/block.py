@@ -12,6 +12,7 @@ Only blocks register JOURNAL handlers; other nodes contribute fragments on reque
 from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
+from uuid import UUID
 
 from pydantic import Field
 
@@ -54,11 +55,50 @@ class Block(Node, HasEffects):
         list[Concept]
         """
         concepts: list[Concept] = []
+        seen: set[UUID] = set()
+
+        def _append_concept(candidate: Concept | None) -> None:
+            if candidate is None or not isinstance(candidate, Concept):
+                return
+            if candidate.graph is not self.graph:
+                return
+            if candidate.uid in seen:
+                return
+            seen.add(candidate.uid)
+            concepts.append(candidate)
+
         for edge in self.edges_out():
-            destination = edge.destination
-            if isinstance(destination, Concept):
-                concepts.append(destination)
+            destination = getattr(edge, "destination", None)
+            _append_concept(destination)
+
+        for ancestor in self.ancestors():
+            if hasattr(ancestor, "roles"):
+                for role in getattr(ancestor, "roles") or ():
+                    actor = getattr(role, "actor", None)
+                    _append_concept(actor)
+            if hasattr(ancestor, "settings"):
+                for setting in getattr(ancestor, "settings") or ():
+                    location = getattr(setting, "location", None)
+                    _append_concept(location)
+
         return concepts
+
+    def attach_concept(self, concept: Concept) -> None:
+        """Attach ``concept`` to the block if not already linked."""
+
+        if concept.graph is not self.graph:
+            raise ValueError("Concept does not belong to the same graph as the block")
+
+        if self.graph.find_edge(source=self, destination=concept) is not None:
+            return
+
+        self.graph.add_edge(source=self, destination=concept)
+
+    def detach_concept(self, concept: Concept) -> None:
+        """Remove edges between this block and ``concept`` if present."""
+
+        for edge in list(self.graph.find_edges(source=self, destination=concept)):
+            self.graph.remove(edge)
 
     def get_choices(
         self,
@@ -129,7 +169,9 @@ class Block(Node, HasEffects):
         """
         fragments: list[BaseFragment] = []
         for concept in self.get_concepts():
-            fragments.append(concept.concept_fragment(ctx=ctx))
+            fragment = concept.concept_fragment(ctx=ctx)
+            if fragment:
+                fragments.append(fragment)
         return fragments or None
 
     @story_dispatch.register(task=P.JOURNAL, priority=Prio.LATE)
