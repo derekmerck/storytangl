@@ -14,6 +14,10 @@ globals:
 scenes:
   crossroads:
     title: "The Crossroads"
+    roles:
+      guide:
+        obj_cls: tangl.story.concepts.actor.role.Role
+        actor_ref: guide
     blocks:
       start:
         content: |
@@ -21,11 +25,21 @@ scenes:
           Two paths stretch before you.
 
         actions:
+          - text: "Ask the Guide for advice"
+            successor: guide_advice
+            conditions:
+              - "'guide' in [c.label for c in ctx.cursor.get_concepts()]"
+
           - text: "Take the left path"
             successor: garden.entrance
 
           - text: "Take the right path"
             successor: cave.entrance
+
+      guide_advice:
+        content: |
+          The Guide points toward the left path.
+          "Trust your instincts," they whisper.
 
   garden:
     title: "The Peaceful Garden"

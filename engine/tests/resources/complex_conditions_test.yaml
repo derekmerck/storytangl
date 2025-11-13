@@ -1,0 +1,78 @@
+label: complex_conditions_story
+metadata:
+  title: Complex Condition Story
+  author: Test Author
+globals:
+  has_key: false
+  visited_garden: false
+  player_strength: 3
+  door_hint: locked
+items:
+  ancient_key:
+    obj_cls: tangl.story.concepts.item.Item
+    name: Ancient Key
+    description: A heavy iron key coated in verdigris.
+scenes:
+  entry:
+    blocks:
+      door:
+        content: >-
+          A sealed stone door bars your path.
+        actions:
+          - text: Force the door open
+            successor: forced
+            conditions:
+              - player_strength >= 5
+              - not has_key
+          - text: Use the key
+            successor: opened
+            conditions:
+              - has_key and visited_garden
+          - text: Call for help
+            successor: help
+            conditions:
+              - door_hint == 'locked' or player_strength < 5
+          - text: Inspect the courtyard
+            successor: courtyard
+          - text: Practice your swings
+            successor: training
+      courtyard:
+        content: >-
+          You explore the overgrown courtyard beyond the door.
+        effects:
+          - set_flag('visited_garden')
+        actions:
+          - text: Search the ivy
+            successor: key_cache
+          - text: Return to the door
+            successor: door
+      key_cache:
+        content: >-
+          Behind the ivy you discover an ancient key.
+        effects:
+          - acquire_item('ancient_key')
+          - set_flag('has_key')
+        continues:
+          - successor: door
+            trigger: last
+      training:
+        content: >-
+          You drill your technique until your muscles ache.
+        effects:
+          - player_strength = max(player_strength, 6)
+          - set_flag('has_key', value=False)
+          - door_hint = 'brute_force'
+        continues:
+          - successor: door
+            trigger: last
+      forced:
+        content: >-
+          With a roar you batter the door until it splinters apart.
+        effects:
+          - door_hint = 'smashed'
+      opened:
+        content: >-
+          The key turns smoothly and the door swings open.
+      help:
+        content: >-
+          You call out for help, but the ruin remains silent.

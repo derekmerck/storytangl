@@ -126,6 +126,21 @@ class Context:
             raise RuntimeError(f"Bad cursor id in context {self.cursor_id} not in {[k for k in self.graph.keys()]}")
         return self.graph.get(self.cursor_id)
 
+    @property
+    def current_location(self) -> "Location | None":
+        """Return the :class:`~tangl.story.concepts.location.Location` attached to the cursor."""
+
+        cursor = self.cursor
+        if not hasattr(cursor, "get_concepts"):
+            return None
+
+        from tangl.story.concepts.location.location import Location
+
+        for concept in cursor.get_concepts():
+            if isinstance(concept, Location):
+                return concept
+        return None
+
     # Composite phase helpers and storage
     # Composite phases invoke subphases and store intermediate results.
     # The gather-namespace subphase is so frequently used that it has

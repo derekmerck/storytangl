@@ -3,6 +3,8 @@ from __future__ import annotations
 from uuid import uuid4
 from typing import Any
 
+from tangl.story.concepts.item import Item, Flag
+
 from tangl.core import StreamRegistry
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
@@ -42,7 +44,10 @@ def test_story_globals_seed_namespace() -> None:
     }
 
     ledger = _build_ledger(data)
-    assert ledger.graph.locals == {"has_key": False, "visited": False}
+    assert ledger.graph.locals["has_key"] is False
+    assert ledger.graph.locals["visited"] is False
+    assert ledger.graph.locals["Item"] is Item
+    assert ledger.graph.locals["Flag"] is Flag
 
     frame = ledger.get_frame()
     ns = frame.context.get_ns(frame.cursor)
@@ -139,4 +144,120 @@ def test_action_conditions_and_effects_update_state() -> None:
     updated_choices = frame.cursor.get_choices(ctx=frame.context)
     assert [choice.get_content().replace("_", " ") for choice in updated_choices] == [
         "Unlock the door"
+    ]
+
+
+def test_item_and_flag_concepts_gate_choices() -> None:
+    data = {
+        "label": "item_flag_story",
+        "metadata": {"title": "Item Flag Story", "author": "Test Author"},
+        "items": {
+            "rusty_key": {
+                "obj_cls": "tangl.story.concepts.item.Item",
+                "name": "Rusty Key",
+                "description": "An old key covered in rust.",
+            }
+        },
+        "flags": {
+            "door_unlocked": {
+                "obj_cls": "tangl.story.concepts.item.Flag",
+                "description": "The heavy door has been unlocked.",
+            }
+        },
+        "scenes": {
+            "start": {
+                "blocks": {
+                    "door": {
+                        "content": "A sealed stone door bars your way.",
+                        "actions": [
+                            {
+                                "text": "Search the alcove",
+                                "successor": "found",
+                                "conditions": [
+                                    "not Item.has_item('rusty_key', graph=graph)",
+                                ],
+                                "effects": [
+                                    "Item.acquire('rusty_key', graph=graph)",
+                                ],
+                            },
+                            {
+                                "text": "Unlock the door",
+                                "successor": "opened",
+                                "conditions": [
+                                    "Item.has_item('rusty_key', graph=graph)",
+                                    "not Flag.is_active('door_unlocked', graph=graph)",
+                                ],
+                                "effects": [
+                                    "Flag.activate('door_unlocked', graph=graph)",
+                                ],
+                            },
+                            {
+                                "text": "Enter the chamber",
+                                "successor": "beyond",
+                                "conditions": [
+                                    "Flag.is_active('door_unlocked', graph=graph)",
+                                ],
+                            },
+                        ],
+                    },
+                    "found": {
+                        "content": "You discover a rusted key hidden in the dust.",
+                        "continues": [
+                            {"successor": "door", "trigger": "last"},
+                        ],
+                    },
+                    "opened": {
+                        "content": "The key grinds in the lock until the door yields.",
+                        "continues": [
+                            {"successor": "door", "trigger": "last"},
+                        ],
+                    },
+                    "beyond": {
+                        "content": "You step into the chamber beyond the door.",
+                    },
+                }
+            }
+        },
+    }
+
+    ledger = _build_ledger(data)
+    graph = ledger.graph
+
+    rusty_key = graph.find_one(label="rusty_key")
+    assert isinstance(rusty_key, Item)
+    assert not Item.has_item("rusty_key", graph=graph)
+    assert graph.locals["Item"] is Item
+    assert graph.locals["Flag"] is Flag
+
+    frame = ledger.get_frame()
+    initial_choices = frame.cursor.get_choices(ctx=frame.context)
+    assert [choice.get_content().replace("_", " ") for choice in initial_choices] == [
+        "Search the alcove"
+    ]
+
+    search_choice = initial_choices[0]
+    frame.resolve_choice(search_choice)
+    ledger.cursor_id = frame.cursor_id
+    ledger.step = frame.step
+
+    assert Item.has_item("rusty_key", graph=graph) is True
+    assert rusty_key.has_tags({Item.ACQUIRED_TAG})
+
+    frame = ledger.get_frame()
+    post_search_choices = frame.cursor.get_choices(ctx=frame.context)
+    assert [choice.get_content().replace("_", " ") for choice in post_search_choices] == [
+        "Unlock the door"
+    ]
+
+    unlock_choice = post_search_choices[0]
+    frame.resolve_choice(unlock_choice)
+    ledger.cursor_id = frame.cursor_id
+    ledger.step = frame.step
+
+    assert Flag.is_active("door_unlocked", graph=graph) is True
+
+    frame = ledger.get_frame()
+    final_choices = frame.cursor.get_choices(ctx=frame.context)
+    assert [choice.get_content().replace("_", " ") for choice in final_choices] == [
+        "Enter the chamber"
     ]

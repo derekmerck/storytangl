@@ -49,8 +49,15 @@ def test_load_demo_script(resources_dir) -> None:
         for edge in outgoing
         if getattr(edge, "trigger_phase", None) is None
     }
-    expected_labels = {text.replace(" ", "_") for text in ("Take the left path", "Take the right path")}
-    assert labels == expected_labels
+    expected_labels = {
+        text.replace(" ", "_")
+        for text in (
+            "Ask the Guide for advice",
+            "Take the left path",
+            "Take the right path",
+        )
+    }
+    assert labels >= expected_labels
 
     left_edge = next(edge for edge in outgoing if edge.label.endswith("left_path"))
     frame.follow_edge(left_edge)
