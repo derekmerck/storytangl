@@ -157,7 +157,7 @@ def test_branching_story_left_path_cli(tangl_cli: TanglShell) -> None:
     first_update = _capture_output(app)
 
     assert "Choices:" in first_update
-    assert "1. exit crossroads" in first_update
+    assert "1. Ask the Guide for advice" in first_update
     assert "2. Take the left path" in first_update
     assert "3. Take the right path" in first_update
 
@@ -212,5 +212,7 @@ def test_branching_story_cave_backtrack_cli(tangl_cli: TanglShell) -> None:
     backtrack_update = _capture_output(app)
 
     assert "You stand at a crossroads in the forest." in backtrack_update
+    assert "Choices:" in backtrack_update
+    assert "Ask the Guide for advice" in backtrack_update
     assert "Take the left path" in backtrack_update
-    assert "No available choices." in backtrack_update
+    assert "Take the right path" in backtrack_update

@@ -132,4 +132,7 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
     payload_three = third_update.json()
 
     assert _fragment_contains(payload_three["fragments"], "You stand at a crossroads in the forest.")
-    assert payload_three["choices"] == []
+    assert len(payload_three["choices"]) == 3
+    assert _find_choice(payload_three["choices"], "guide")
+    assert _find_choice(payload_three["choices"], "left")
+    assert _find_choice(payload_three["choices"], "right")
