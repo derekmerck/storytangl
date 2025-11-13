@@ -120,6 +120,6 @@ def test_world_initializes_managers():
         assert isinstance(world.resource_manager, ResourceManager)
         assert world.metadata["title"] == "Test Story"
         assert world.name == "Test Story"
-        assert "countable" in world.asset_manager.asset_classes
+        assert "countable" in world.asset_manager.countable_classes
     finally:
         World.clear_instances()
