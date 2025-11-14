@@ -67,7 +67,7 @@ class AssetWallet(Counter[str]):
             return "empty"
 
         items = sorted(self.items(), key=lambda item: -item[1])
-        parts = [f"{count:.0f} {label}" for label, count in items if count > 0]
+        parts = [f"{count:.1f} {label}" for label, count in items if count > 0]
         return ", ".join(parts)
 
 
