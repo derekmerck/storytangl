@@ -1,0 +1,15 @@
+# Example currency definitions
+- label: gold
+  value: 1.0
+  units: coins
+  symbol: 🪙
+
+- label: gems
+  value: 10.0
+  units: gems
+  symbol: 💎
+
+- label: tokens
+  value: 0.1
+  units: tokens
+  symbol: 🎫

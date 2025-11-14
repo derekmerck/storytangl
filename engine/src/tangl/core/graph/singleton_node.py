@@ -1,5 +1,6 @@
 # tangl/core/singleton/singleton_node.py
 from __future__ import annotations
+import re
 from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
 import sys
@@ -53,6 +54,9 @@ class SingletonNode(Node, Generic[WrappedType]):
     # referenced indirectly via a graph
     # Note that singletons are frozen, so the referred attributes are immutable.
 
+    #: Cached wrapper classes keyed by (wrapper base, singleton type).
+    _wrapper_cache: ClassVar[dict[tuple[type[SingletonNode], Type[Singleton]], type[SingletonNode]]] = {}
+
     #: The singleton entity class that this wrapper is associated with.
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
@@ -96,12 +100,15 @@ class SingletonNode(Node, Generic[WrappedType]):
     @classmethod
     def _create_wrapper_cls(cls, wrapped_cls: Type[WrappedType], name: str = None) -> Type[Self]:
         """Class method to dynamically create a new wrapper class given a reference singleton type."""
-        name = name or f"{cls.__name__}[{wrapped_cls.__name__}]"
-        module = sys.modules[__name__]
+        cache_key = (cls, wrapped_cls)
+        if cache_key in cls._wrapper_cache:
+            return cls._wrapper_cache[cache_key]
 
-        if new_cls := getattr(module, name, None):
-            logger.debug(f"Found extant wrapper class {new_cls.__name__}")
-            return new_cls
+        module = sys.modules[__name__]
+        if name is None:
+            qualname = f"{wrapped_cls.__module__}.{wrapped_cls.__qualname__}"
+            sanitized = re.sub(r"[^0-9a-zA-Z_]", "_", qualname)
+            name = f"{cls.__name__}[{sanitized}]"
 
         instance_vars = cls._instance_vars(wrapped_cls)
         generic_metadata = {'origin': cls, 'args': (wrapped_cls,), 'parameters': ()}
@@ -123,6 +130,7 @@ class SingletonNode(Node, Generic[WrappedType]):
 
         # Adding the ephemeral class to this module's namespace allows them to be pickled and cached
         setattr(module, name, new_cls)
+        cls._wrapper_cache[cache_key] = new_cls
 
         return new_cls
 

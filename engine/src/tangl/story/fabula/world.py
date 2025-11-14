@@ -91,13 +91,13 @@ class World(Singleton):
 
     def _setup_default_assets(self) -> None:
         """Register built-in asset classes if not already present."""
-        if "countable" in self.asset_manager.asset_classes:
+        if "countable" in self.asset_manager.countable_classes:
             return
         try:
             from tangl.story.concepts.asset import CountableAsset
         except ModuleNotFoundError:  # pragma: no cover - optional dependency gap
             return
-        self.asset_manager.register_asset_class("countable", CountableAsset)
+        self.asset_manager.register_countable_class("countable", CountableAsset)
 
     def create_story(self, story_label: str, mode: str = "full") -> StoryGraph:
         """Create a new story instance from the world script."""
