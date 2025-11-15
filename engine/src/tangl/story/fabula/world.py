@@ -1,16 +1,27 @@
 """World singleton coordinating managers for story construction."""
 
 from __future__ import annotations
-from collections.abc import Iterable
+
+import logging
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
+from tangl.core.registry import Registry
 from tangl.core.singleton import Singleton
+from tangl.ir.core_ir import BaseScriptItem
+from tangl.ir.story_ir.actor_script_models import ActorScript
+from tangl.ir.story_ir.location_script_models import LocationScript
+from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.story.concepts.actor.role import Role
+from tangl.story.concepts.location.setting import Setting
+from tangl.vm import ProvisioningPolicy
+from tangl.vm.provision.open_edge import Dependency
 
 # Integrated Story Domains
 from .domain_manager import DomainManager  # behaviors and classes
@@ -18,6 +29,10 @@ from .script_manager import ScriptManager  # concept templates
 from .asset_manager import AssetManager    # platonic objects
 
 # from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
     from tangl.media.media_resource.resource_manager import ResourceManager
@@ -80,7 +95,10 @@ class World(Singleton):
         self.metadata = script_manager.get_story_metadata() or {}
         self.name = self.metadata.get("title", label)
 
+        self.template_registry = Registry(label=f"{label}_templates")
+
         self._setup_default_assets()
+        self._compile_templates()
 
     def _create_resource_manager(self) -> "ResourceManager | None":
         try:
@@ -99,11 +117,178 @@ class World(Singleton):
             return
         self.asset_manager.register_countable_class("countable", CountableAsset)
 
+    def _compile_templates(self) -> None:
+        """Traverse script hierarchy and populate ``template_registry``."""
+
+        script = self.script_manager.master_script
+
+        def _extract_label(default: str | None, item: Any) -> str | None:
+            if isinstance(item, BaseScriptItem):
+                return item.label or item.get_label()
+            if isinstance(item, Mapping):
+                label_value = item.get("label")
+                if isinstance(label_value, str):
+                    return label_value
+            return default
+
+        def _determine_script_cls(payload: Mapping[str, Any]) -> type[BaseScriptItem]:
+            obj_cls = payload.get("obj_cls")
+            if isinstance(obj_cls, type) and issubclass(obj_cls, BaseScriptItem):
+                return obj_cls
+            if isinstance(obj_cls, str):
+                lowered = obj_cls.lower()
+                if "location" in lowered:
+                    return LocationScript
+                if "actor" in lowered:
+                    return ActorScript
+            if obj_cls is None:
+                return ActorScript
+            return ActorScript
+
+        def _parse_template(label: str, raw_data: Any, scope: ScopeSelector | None) -> BaseScriptItem | None:
+            if isinstance(raw_data, BaseScriptItem):
+                template_cls: type[BaseScriptItem] = raw_data.__class__
+                scope_specified = getattr(raw_data, "scope", None) is not None
+                updates: dict[str, Any] = {}
+                if not raw_data.label and label:
+                    updates["label"] = label
+                if (
+                    scope is not None
+                    and not scope_specified
+                    and "scope" in template_cls.model_fields
+                ):
+                    updates["scope"] = scope
+                if updates:
+                    return raw_data.model_copy(update=updates)
+                return raw_data
+            elif isinstance(raw_data, Mapping):
+                payload = dict(raw_data)
+                scope_specified = "scope" in raw_data
+            else:
+                logger.warning("Skipping template %s with unsupported payload %r", label, raw_data)
+                return None
+
+            payload.setdefault("label", label)
+            template_cls = _determine_script_cls(payload)
+            if (
+                scope is not None
+                and not scope_specified
+                and "scope" in template_cls.model_fields
+            ):
+                payload.setdefault("scope", scope.model_dump())
+
+            try:
+                template = template_cls.model_validate(payload)
+            except ValidationError as exc:
+                logger.warning("Skipping template %s due to validation error: %s", label, exc)
+                return None
+            return template
+
+        def _add_templates(templates: Mapping[str, Any] | None, scope: ScopeSelector | None) -> None:
+            if not templates:
+                return
+            if not isinstance(templates, Mapping):
+                logger.warning("Expected mapping for templates but received %r", type(templates))
+                return
+            for template_label, template_data in templates.items():
+                label_value = template_label
+                if isinstance(template_label, str):
+                    label_value = template_label
+                else:
+                    label_value = str(template_label)
+                template = _parse_template(label_value, template_data, scope)
+                if template is None:
+                    continue
+                if template.label is None:
+                    logger.warning("Skipping template without label derived from %s", template_data)
+                    continue
+                existing = self.template_registry.find_one(label=template.label)
+                if existing is not None:
+                    logger.warning(
+                        "Duplicate template label %s skipped", template.label,
+                    )
+                    continue
+                try:
+                    self.template_registry.add(template)
+                except ValueError as exc:
+                    logger.warning("Duplicate template %s skipped: %s", template.label, exc)
+
+        world_templates = getattr(script, "templates", None)
+        if isinstance(world_templates, Mapping):
+            _add_templates(world_templates, scope=None)
+        elif world_templates:
+            logger.warning("World templates should be a mapping; received %r", type(world_templates))
+
+        scenes = getattr(script, "scenes", None)
+        scene_items: Iterable[Any]
+        if isinstance(scenes, Mapping):
+            scene_items = scenes.items()
+        elif isinstance(scenes, Iterable):
+            scene_items = ((getattr(scene, "label", None), scene) for scene in scenes)
+        else:
+            scene_items = ()
+
+        for scene_key, scene_obj in scene_items:
+            scene_label = _extract_label(scene_key if isinstance(scene_key, str) else None, scene_obj)
+            if scene_label is None:
+                continue
+            scene_templates = getattr(scene_obj, "templates", None)
+            if isinstance(scene_templates, Mapping):
+                _add_templates(scene_templates, scope=ScopeSelector(parent_label=scene_label))
+            elif scene_templates:
+                logger.warning(
+                    "Scene %s templates should be a mapping; received %r",
+                    scene_label,
+                    type(scene_templates),
+                )
+
+            blocks = getattr(scene_obj, "blocks", None)
+            if isinstance(blocks, Mapping):
+                block_items: Iterable[Any] = blocks.items()
+            elif isinstance(blocks, Iterable):
+                block_items = ((getattr(block, "label", None), block) for block in blocks)
+            else:
+                block_items = ()
+
+            for block_key, block_obj in block_items:
+                block_label = _extract_label(block_key if isinstance(block_key, str) else None, block_obj)
+                if block_label is None:
+                    continue
+                block_templates = getattr(block_obj, "templates", None)
+                if isinstance(block_templates, Mapping):
+                    _add_templates(
+                        block_templates,
+                        scope=ScopeSelector(source_label=block_label),
+                    )
+                elif block_templates:
+                    logger.warning(
+                        "Block %s templates should be a mapping; received %r",
+                        block_label,
+                        type(block_templates),
+                    )
+
     def create_story(self, story_label: str, mode: str = "full") -> StoryGraph:
         """Create a new story instance from the world script."""
         if mode == "full":
             return self._create_story_full(story_label)
         raise NotImplementedError(f"Mode {mode} not yet implemented")
+
+    @property
+    def actor_templates(self) -> list[ActorScript]:
+        """Return all actor templates declared in this world."""
+
+        return list(self.template_registry.find_all(is_instance=ActorScript))
+
+    @property
+    def location_templates(self) -> list[LocationScript]:
+        """Return all location templates declared in this world."""
+
+        return list(self.template_registry.find_all(is_instance=LocationScript))
+
+    def find_template(self, label: str) -> BaseScriptItem | None:
+        """Return a template by ``label`` if it has been registered."""
+
+        return self.template_registry.find_one(label=label)
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
@@ -281,86 +466,162 @@ class World(Singleton):
             scene = cls.structure(payload)
             scene_map[scene_label] = scene.uid
 
-            self._build_scene_roles(
-                scene,
-                scene_data.get("roles"),
+            self._wire_roles(
+                graph=graph,
+                source_node=scene,
+                roles_data=scene_data.get("roles"),
                 actor_map=actor_map,
             )
-            self._build_scene_settings(
-                scene,
-                scene_data.get("settings"),
+            self._wire_settings(
+                graph=graph,
+                source_node=scene,
+                settings_data=scene_data.get("settings"),
                 location_map=location_map,
             )
 
+            for block_label, block_data in members.items():
+                qualified_label = f"{scene_label}.{block_label}"
+                block_uid = block_map.get(qualified_label)
+                if block_uid is None:
+                    continue
+
+                block = graph.get(block_uid)
+                if block is None:
+                    continue
+
+                self._wire_roles(
+                    graph=graph,
+                    source_node=block,
+                    roles_data=block_data.get("roles"),
+                    actor_map=actor_map,
+                )
+                self._wire_settings(
+                    graph=graph,
+                    source_node=block,
+                    settings_data=block_data.get("settings"),
+                    location_map=location_map,
+                )
+
         return scene_map
 
-    def _build_scene_roles(
+    def _resolve_dependency_class(
         self,
-        scene: "Scene",
-        roles_data: Any,
+        obj_cls: Any,
         *,
+        fallback: type[Dependency],
+    ) -> type[Dependency]:
+        """Resolve ``obj_cls`` to a :class:`Dependency` subclass."""
+
+        candidate: type[Any] | None
+        if isinstance(obj_cls, type):
+            candidate = obj_cls
+        elif obj_cls:
+            candidate = self.domain_manager.resolve_class(obj_cls)
+        else:
+            candidate = fallback
+
+        try:
+            if issubclass(candidate, Dependency):  # type: ignore[arg-type]
+                return candidate  # type: ignore[return-value]
+        except TypeError:
+            pass
+
+        logger.warning(
+            "Dependency class %r is not a Dependency; using %s", obj_cls, fallback.__name__
+        )
+        return fallback
+
+    def _wire_roles(
+        self,
+        *,
+        graph: StoryGraph,
+        source_node: GraphItem,
+        roles_data: Any,
         actor_map: dict[str, UUID],
     ) -> None:
         roles = self._normalize_section(roles_data)
         if not roles:
             return
 
-        for role_label, role_payload in roles.items():
-            role_cls = self.domain_manager.resolve_class(
-                role_payload.get("obj_cls")
-                or "tangl.story.concepts.actor.role.Role"
+        for role_label, role_spec in roles.items():
+            role_cls = self._resolve_dependency_class(
+                role_spec.get("obj_cls"),
+                fallback=Role,
             )
             payload = self._prepare_payload(
                 role_cls,
-                role_payload,
-                scene.graph,
+                role_spec,
+                graph,
             )
             payload.setdefault("label", role_label)
-            payload.setdefault("source_id", scene.uid)
+            payload.setdefault("source_id", source_node.uid)
+            payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
+            actor_identifier = role_spec.get("actor_ref") or role_label
+            actor_uid = actor_map.get(actor_identifier)
+            if actor_uid is None:
+                if role_spec.get("actor_ref"):
+                    logger.warning(
+                        "Role '%s' references unknown actor '%s'",
+                        role_label,
+                        role_spec["actor_ref"],
+                    )
+            else:
+                payload.setdefault("destination_id", actor_uid)
 
             role = role_cls.structure(payload)
-            actor_label = role_payload.get("actor_ref") or role_label
-            actor_uid = actor_map.get(actor_label)
+
             if actor_uid is None:
                 continue
 
-            actor = scene.graph.get(actor_uid)
+            actor = graph.get(actor_uid)
             if actor is not None and hasattr(role, "actor"):
-                role.actor = actor
+                role.actor = actor  # type: ignore[attr-defined]
 
-    def _build_scene_settings(
+    def _wire_settings(
         self,
-        scene: "Scene",
-        settings_data: Any,
         *,
+        graph: StoryGraph,
+        source_node: GraphItem,
+        settings_data: Any,
         location_map: dict[str, UUID],
     ) -> None:
         settings = self._normalize_section(settings_data)
         if not settings:
             return
 
-        for setting_label, setting_payload in settings.items():
-            setting_cls = self.domain_manager.resolve_class(
-                setting_payload.get("obj_cls")
-                or "tangl.story.concepts.location.setting.Setting"
+        for setting_label, setting_spec in settings.items():
+            setting_cls = self._resolve_dependency_class(
+                setting_spec.get("obj_cls"),
+                fallback=Setting,
             )
             payload = self._prepare_payload(
                 setting_cls,
-                setting_payload,
-                scene.graph,
+                setting_spec,
+                graph,
             )
             payload.setdefault("label", setting_label)
-            payload.setdefault("source_id", scene.uid)
+            payload.setdefault("source_id", source_node.uid)
+            payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
+            location_identifier = setting_spec.get("location_ref") or setting_label
+            location_uid = location_map.get(location_identifier)
+            if location_uid is None:
+                if setting_spec.get("location_ref"):
+                    logger.warning(
+                        "Setting '%s' references unknown location '%s'",
+                        setting_label,
+                        setting_spec["location_ref"],
+                    )
+            else:
+                payload.setdefault("destination_id", location_uid)
 
             setting = setting_cls.structure(payload)
-            location_label = setting_payload.get("location_ref") or setting_label
-            location_uid = location_map.get(location_label)
+
             if location_uid is None:
                 continue
 
-            location = scene.graph.get(location_uid)
+            location = graph.get(location_uid)
             if location is not None and hasattr(setting, "location"):
-                setting.location = location
+                setting.location = location  # type: ignore[attr-defined]
 
     def _build_action_edges(
         self,

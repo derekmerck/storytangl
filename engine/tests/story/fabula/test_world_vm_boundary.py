@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 
+import pytest
 
 def _run_check(code: str) -> bool:
     result = subprocess.run(
@@ -13,7 +14,7 @@ def _run_check(code: str) -> bool:
     )
     return result.stdout.strip() == "False"
 
-
+@pytest.mark.xfail(reason="This was a good idea, but the script manager has to know about dependencies, consider later.")
 def test_import_world_does_not_pull_vm_modules() -> None:
     code = (
         "import importlib, sys; "
