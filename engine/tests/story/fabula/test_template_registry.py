@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 
+from tangl.ir.core_ir.script_metadata_model import ScriptMetadata
 from tangl.ir.story_ir import ActorScript, LocationScript, StoryScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.script_manager import ScriptManager
@@ -232,3 +233,25 @@ def test_duplicate_template_labels_raise_warning(caplog: pytest.LogCaptureFixtur
     templates = _collect_templates(world)
     assert list(templates) == ["duplicate"]
     assert any("Duplicate template label duplicate skipped" in message for message in caplog.messages)
+
+
+def test_inline_location_template_preserves_concrete_type() -> None:
+    """Inline ``LocationScript`` objects should remain locations after registration."""
+
+    inline_location = LocationScript(label="hideout")
+
+    metadata = ScriptMetadata.model_construct(title="Example", author="Tests")
+    script = StoryScript.model_construct(
+        label="example",
+        metadata=metadata,
+        templates={"hideout": inline_location},
+        scenes={},
+    )
+    manager = ScriptManager(master_script=script)
+    world = World(label="example", script_manager=manager)
+
+    template = world.find_template("hideout")
+    assert isinstance(template, LocationScript)
+
+    location_labels = {location.label for location in world.location_templates}
+    assert location_labels == {"hideout"}
