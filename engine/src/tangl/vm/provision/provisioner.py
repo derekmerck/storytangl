@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from copy import deepcopy
-from typing import Iterator, TYPE_CHECKING, Callable
+from typing import Iterator, TYPE_CHECKING, Callable, Mapping, Any
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -110,6 +111,8 @@ class GraphProvisioner(Provisioner):
     ) -> Iterator[DependencyOffer]:
         if not (requirement.policy & ProvisioningPolicy.EXISTING):
             return
+        if requirement.template_ref is not None:
+            return
         if self.node_registry is None:
             return
 
@@ -122,6 +125,10 @@ class GraphProvisioner(Provisioner):
                 continue
             seen.add(node.uid)
 
+            proximity, detail = self._calculate_proximity(node, ctx=ctx)
+            base_cost = ProvisionCost.DIRECT
+            final_cost = float(base_cost) + proximity
+
             def make_accept_func(captured: Node) -> Callable[["Context"], Node]:
                 return lambda ctx: captured
 
@@ -129,19 +136,116 @@ class GraphProvisioner(Provisioner):
                 requirement_id=requirement.uid,
                 requirement=requirement,
                 operation=ProvisioningPolicy.EXISTING,
-                cost=ProvisionCost.DIRECT,
+                base_cost=base_cost,
+                cost=final_cost,
+                proximity=proximity,
+                proximity_detail=detail,
                 accept_func=make_accept_func(node),
                 provider_id=node.uid,
                 source_provisioner_id=self.uid,
                 source_layer=self.layer,
             )
 
+    def _calculate_proximity(self, node: Node, *, ctx: Context) -> tuple[float, str]:
+        """Return (modifier, description) relative to the active requirement source."""
+
+        source_id = getattr(ctx, "current_requirement_source_id", None)
+        if source_id is None:
+            source_id = getattr(ctx, "cursor_id", None)
+        if source_id is None:
+            return 20.0, "unknown"
+
+        source = ctx.graph.get(source_id)
+        if source is None:
+            return 20.0, "unknown"
+
+        if node.uid == source.uid:
+            return 0.0, "same block"
+
+        source_parent = getattr(source, "parent", None)
+        node_parent = getattr(node, "parent", None)
+        if (
+            source_parent is not None
+            and node_parent is not None
+            and source_parent.uid == node_parent.uid
+        ):
+            return 5.0, "same scene"
+
+        source_root = getattr(source, "root", None)
+        node_root = getattr(node, "root", None)
+        if (
+            source_root is not None
+            and node_root is not None
+            and source_root.uid == node_root.uid
+        ):
+            return 10.0, "same episode"
+
+        return 20.0, "distant"
+
 
 class TemplateProvisioner(Provisioner):
     """Create new nodes from requirement templates."""
 
-    def __init__(self, template_registry: dict[str, dict] | None = None, **kwargs):
-        super().__init__(template_registry=template_registry or {}, **kwargs)
+    def __init__(
+        self,
+        template_registry: Mapping[str, dict] | Registry | None = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        object.__setattr__(self, "template_registry", template_registry or {})
+
+    def _normalize_template_payload(self, template: Any) -> dict | None:
+        if template is None:
+            return None
+        if hasattr(template, "model_dump"):
+            payload = template.model_dump()
+        elif isinstance(template, dict):
+            payload = deepcopy(template)
+        else:
+            try:
+                payload = deepcopy(dict(template))
+            except TypeError:  # pragma: no cover - defensive fallback
+                return None
+
+        obj_cls = payload.get("obj_cls")
+        resolved = self._resolve_obj_cls(obj_cls)
+        if resolved is not None:
+            payload["obj_cls"] = resolved
+        elif "obj_cls" in payload and obj_cls is not None:
+            payload.pop("obj_cls")
+
+        return payload
+
+    def _resolve_obj_cls(self, obj_cls: Any) -> type | None:
+        if isinstance(obj_cls, type):
+            return obj_cls
+        if isinstance(obj_cls, str):
+            try:
+                module_path, class_name = obj_cls.rsplit(".", 1)
+            except ValueError:
+                return Entity.dereference_cls_name(obj_cls)
+            try:
+                module = import_module(module_path)
+            except ImportError:  # pragma: no cover - best-effort fallback
+                return Entity.dereference_cls_name(class_name)
+            return getattr(module, class_name, None)
+        return None
+
+    def _lookup_template_ref(self, template_ref: str | None) -> dict | None:
+        if not template_ref:
+            return None
+
+        registry = self.template_registry
+        if not registry:
+            return None
+
+        template: Any | None
+        if isinstance(registry, Mapping):
+            template = registry.get(template_ref)
+        else:
+            template = registry.find_one(label=template_ref)
+
+        return self._normalize_template_payload(template)
 
     def _resolve_template(self, requirement: Requirement) -> dict | None:
         if requirement.template is not None:
@@ -149,13 +253,14 @@ class TemplateProvisioner(Provisioner):
             if not template:
                 return None
             return template
+        if requirement.template_ref:
+            template = self._lookup_template_ref(str(requirement.template_ref))
+            if template:
+                return template
         if self.template_registry and requirement.identifier:
-            template = self.template_registry.get(str(requirement.identifier))
-            if template is not None:
-                template_copy = deepcopy(template)
-                if not template_copy:
-                    return None
-                return template_copy
+            template = self._lookup_template_ref(str(requirement.identifier))
+            if template:
+                return template
         return None
 
     def get_dependency_offers(
@@ -183,7 +288,10 @@ class TemplateProvisioner(Provisioner):
             requirement_id=requirement.uid,
             requirement=requirement,
             operation=ProvisioningPolicy.CREATE,
-            cost=ProvisionCost.CREATE,
+            base_cost=ProvisionCost.CREATE,
+            cost=float(ProvisionCost.CREATE),
+            proximity=999.0,
+            proximity_detail="new instance",
             accept_func=create_node,
             source_provisioner_id=self.uid,
             source_layer=self.layer,
@@ -236,7 +344,10 @@ class UpdatingProvisioner(TemplateProvisioner):
                 requirement_id=requirement.uid,
                 requirement=requirement,
                 operation=ProvisioningPolicy.UPDATE,
-                cost=ProvisionCost.LIGHT_INDIRECT,
+                base_cost=ProvisionCost.LIGHT_INDIRECT,
+                cost=float(ProvisionCost.LIGHT_INDIRECT),
+                proximity=999.0,
+                proximity_detail="update",
                 accept_func=make_update_func(node, deepcopy(template)),
                 source_provisioner_id=self.uid,
                 source_layer=self.layer,
@@ -287,7 +398,10 @@ class CloningProvisioner(TemplateProvisioner):
             requirement_id=requirement.uid,
             requirement=requirement,
             operation=ProvisioningPolicy.CLONE,
-            cost=ProvisionCost.HEAVY_INDIRECT,
+            base_cost=ProvisionCost.HEAVY_INDIRECT,
+            cost=float(ProvisionCost.HEAVY_INDIRECT),
+            proximity=999.0,
+            proximity_detail="clone",
             accept_func=make_clone_func(reference, deepcopy(template)),
             source_provisioner_id=self.uid,
             source_layer=self.layer,
@@ -328,7 +442,10 @@ class CompanionProvisioner(Provisioner):
 
             return AffordanceOffer(
                 label=label,
-                cost=ProvisionCost.DIRECT,
+                base_cost=ProvisionCost.DIRECT,
+                cost=float(ProvisionCost.DIRECT),
+                proximity=0.0,
+                proximity_detail="affordance",
                 accept_func=_accept,
                 source_provisioner_id=self.uid,
                 source_layer=self.layer,

@@ -79,8 +79,10 @@ class ProvisionCost(IntEnum):
 class ProvisionOffer(Entity):
     """Base class for all provision offers."""
 
-    cost: ProvisionCost = ProvisionCost.DIRECT
-    proximity: int = 999
+    base_cost: ProvisionCost = ProvisionCost.DIRECT
+    cost: float = Field(default=float(ProvisionCost.DIRECT))
+    proximity: float = 999.0
+    proximity_detail: str | None = None
     source_provisioner_id: UUID | None = None
     source_layer: str | None = None
     selection_criteria: StringMap = Field(default_factory=dict)
@@ -104,6 +106,11 @@ class ProvisionOffer(Entity):
         """Return the offer label when available."""
 
         return getattr(self, "label", None)
+
+    def get_sort_key(self) -> tuple[float, float]:
+        """Return the arbitration sort key used for deterministic selection."""
+
+        return (self.cost, self.proximity)
 
     def accept(self, *, ctx: "Context") -> Node | Edge:
         """Execute the offer and return the resulting graph item."""
@@ -195,6 +202,7 @@ class PlanningReceipt(Record):
     unresolved_hard_requirements: list[UUID] = Field(default_factory=list)
     waived_soft_requirements: list[UUID] = Field(default_factory=list)
     softlock_detected: bool = False
+    selection_audit: list[dict[str, object]] = Field(default_factory=list)
 
     @property
     def attached(self) -> int:
@@ -239,6 +247,7 @@ class PlanningReceipt(Record):
         cursor_id: UUID | None = None,
         frontier_node_ids: Iterable[UUID] | None = None,
         softlock_detected: bool = False,
+        selection_audit: Iterable[dict[str, object]] | None = None,
     ) -> PlanningReceipt:
         attached = 0
         updated = 0
@@ -274,6 +283,7 @@ class PlanningReceipt(Record):
             unresolved_hard_requirements=unresolved_hard_requirements,
             waived_soft_requirements=waived_soft_requirements,
             softlock_detected=softlock_detected,
+            selection_audit=list(selection_audit or ()),
         )
 
         # Prime derived properties for summarize callers.

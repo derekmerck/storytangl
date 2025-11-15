@@ -16,8 +16,9 @@ from tangl.vm.provision import (
 )
 
 
-def _ctx(graph: Graph) -> SimpleNamespace:
-    return SimpleNamespace(graph=graph)
+def _ctx(graph: Graph, cursor: Node | None = None) -> SimpleNamespace:
+    cursor_id = cursor.uid if cursor is not None else None
+    return SimpleNamespace(graph=graph, cursor_id=cursor_id)
 
 
 def test_graph_provisioner_finds_existing_node():
@@ -30,13 +31,14 @@ def test_graph_provisioner_finds_existing_node():
     )
 
     provisioner = GraphProvisioner(node_registry=graph, layer="local")
-    offers = list(provisioner.get_dependency_offers(requirement, ctx=_ctx(graph)))
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=_ctx(graph, existing)))
 
     assert len(offers) == 1
     offer = offers[0]
     assert offer.operation is ProvisioningPolicy.EXISTING
-    assert offer.cost is ProvisionCost.DIRECT
-    provider = offer.accept(ctx=_ctx(graph))
+    assert offer.base_cost is ProvisionCost.DIRECT
+    assert offer.cost == float(ProvisionCost.DIRECT)
+    provider = offer.accept(ctx=_ctx(graph, existing))
     assert provider is existing
 
 

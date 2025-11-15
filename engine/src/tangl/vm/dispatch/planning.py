@@ -268,6 +268,24 @@ def _planning_job_receipt(cursor: Node, *, ctx: Context, **_):
                 waived_soft_requirements.append(build.caller_id)
     waived_soft_requirements = list(dict.fromkeys(waived_soft_requirements))
 
+    selection_audit: list[dict[str, object]] = []
+    for node_uid, result in frontier_results.items():
+        node = ctx.graph.get(node_uid)
+        node_label = node.label if node is not None else None
+        for req_id, metadata in result.selection_metadata.items():
+            entry = {
+                "node_id": str(node_uid),
+                "node_label": node_label,
+                "requirement_uid": metadata.get("requirement_uid", str(req_id)),
+                "requirement_label": metadata.get("requirement_label"),
+                "reason": metadata.get("reason"),
+                "num_offers": metadata.get("num_offers"),
+                "selected_cost": metadata.get("selected_cost"),
+                "selected_provider_id": metadata.get("selected_provider_id"),
+                "all_offers": metadata.get("all_offers", []),
+            }
+            selection_audit.append(entry)
+
     receipt = PlanningReceipt(
         cursor_id=cursor.uid,
         frontier_node_ids=frontier_node_ids,
@@ -275,6 +293,7 @@ def _planning_job_receipt(cursor: Node, *, ctx: Context, **_):
         unresolved_hard_requirements=unresolved_hard_reqs,
         waived_soft_requirements=waived_soft_requirements,
         softlock_detected=softlock_detected,
+        selection_audit=selection_audit,
     )
 
     if softlock_detected:

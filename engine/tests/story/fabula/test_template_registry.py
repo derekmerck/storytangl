@@ -255,3 +255,135 @@ def test_inline_location_template_preserves_concrete_type() -> None:
 
     location_labels = {location.label for location in world.location_templates}
     assert location_labels == {"hideout"}
+
+
+def test_templates_with_same_structure_have_same_content_hash() -> None:
+    """Templates that only differ by metadata should hash identically."""
+
+    story_data = {
+        "label": "example",
+        "metadata": {"title": "Example", "author": "Tests"},
+        "templates": {
+            "global.guard": {
+                "obj_cls": ACTOR_CLASS,
+                "archetype": "guard",
+                "hp": 50,
+            }
+        },
+        "scenes": {
+            "village": {
+                "label": "village",
+                "blocks": {},
+                "templates": {
+                    "scene.guard": {
+                        "obj_cls": ACTOR_CLASS,
+                        "archetype": "guard",
+                        "hp": 50,
+                    }
+                },
+            }
+        },
+    }
+
+    world = build_world(story_data)
+    templates = _collect_templates(world)
+
+    guard_global = templates["global_guard"]
+    guard_scene = templates["scene_guard"]
+
+    assert guard_global.label != guard_scene.label
+    assert guard_global.scope is None
+    assert guard_scene.scope is not None
+    assert guard_global.content_hash is not None
+    assert guard_scene.content_hash is not None
+    assert guard_global.content_hash == guard_scene.content_hash
+
+
+def test_templates_with_different_structure_have_different_hashes() -> None:
+    """Distinct template content should produce unique hashes."""
+
+    story_data = {
+        "label": "example",
+        "metadata": {"title": "Example", "author": "Tests"},
+        "templates": {
+            "global.guard": {
+                "obj_cls": ACTOR_CLASS,
+                "archetype": "guard",
+                "hp": 50,
+            },
+            "global.wizard": {
+                "obj_cls": ACTOR_CLASS,
+                "archetype": "wizard",
+                "hp": 30,
+            },
+        },
+        "scenes": {},
+    }
+
+    world = build_world(story_data)
+    templates = _collect_templates(world)
+
+    guard = templates["global_guard"]
+    wizard = templates["global_wizard"]
+
+    assert guard.content_hash is not None
+    assert wizard.content_hash is not None
+    assert guard.content_hash != wizard.content_hash
+
+
+def test_template_content_hash_is_deterministic() -> None:
+    """Rehydrating the same template data should yield the same hash."""
+
+    template_payload = {
+        "obj_cls": ACTOR_CLASS,
+        "archetype": "guard",
+        "hp": 50,
+    }
+
+    template_one = ActorScript.model_validate({**template_payload, "label": "guard.one"})
+    template_two = ActorScript.model_validate({**template_payload, "label": "guard.two"})
+
+    assert template_one.uid != template_two.uid
+    assert template_one.content_hash == template_two.content_hash
+
+
+def test_template_scope_excluded_from_content_hash() -> None:
+    """Changing scope metadata alone should not alter the hash."""
+
+    template_global = ActorScript.model_validate(
+        {
+            "label": "guard.global",
+            "obj_cls": ACTOR_CLASS,
+            "archetype": "guard",
+            "scope": None,
+        }
+    )
+
+    template_scoped = ActorScript.model_validate(
+        {
+            "label": "guard.scoped",
+            "obj_cls": ACTOR_CLASS,
+            "archetype": "guard",
+            "scope": ScopeSelector(parent_label="village"),
+        }
+    )
+
+    assert template_global.scope != template_scoped.scope
+    assert template_global.content_hash == template_scoped.content_hash
+
+
+def test_template_exposes_content_identifier_helper() -> None:
+    """Templates should surface a short content identifier for logging."""
+
+    template = ActorScript.model_validate(
+        {
+            "label": "guard.identifier",
+            "obj_cls": ACTOR_CLASS,
+            "archetype": "guard",
+        }
+    )
+
+    identifier = template.get_content_identifier()
+    assert isinstance(identifier, str)
+    assert len(identifier) == 16
+    assert identifier == template.content_hash.hex()[:16]

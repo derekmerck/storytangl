@@ -50,6 +50,7 @@ class Role(Dependency[Actor]):
     actor_ref: Identifier = Field(None, init_var=True)
     actor_criteria: StringMap = Field(None, init_var=True)
     actor_template: StringMap = Field(None, init_var=True)
+    actor_template_ref: Identifier = Field(None, init_var=True)
     requirement_policy: ProvisioningPolicy = Field(None, init_var=True)
 
     @model_validator(mode="before")
@@ -60,6 +61,7 @@ class Role(Dependency[Actor]):
                 'identifier': data.pop('actor_ref', None),
                 'criteria': data.pop('actor_criteria', {}),
                 'template': data.pop('actor_template', None),
+                'template_ref': data.pop('actor_template_ref', None),
                 'policy': data.pop('requirement_policy', ProvisioningPolicy.ANY),
                 'graph': data['graph']
             }

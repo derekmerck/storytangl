@@ -10,6 +10,7 @@ Conceptual layers
 
 1. :ref:`Identity and Collection<core-identity>`
 
+   - :class:`ContentAddressable` standardizes content-based identifiers for records.
    - :class:`Entity` provides a universal base for all managed objects.
    - :class:`Registry` organizes entities with robust search and chaining.
    - :class:`Singleton` shared entities that are discoverable by a unique label.
@@ -42,6 +43,7 @@ identity, relationships, and events *without presupposing narrative content*.
 """
 
 # Base classes for all objects and collections
+from .content_addressable import ContentAddressable
 from .entity import Entity
 from .registry import Registry
 
@@ -61,7 +63,7 @@ from .dispatch import core_dispatch
 
 __all__ = [
     # Identity & collections
-    "Entity", "Registry",
+    "ContentAddressable", "Entity", "Registry",
     # Singleton
     "Singleton",
     # Graph topology

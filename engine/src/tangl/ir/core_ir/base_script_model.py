@@ -1,17 +1,14 @@
-from typing import Optional, Any
+from typing import Any, Optional
 import functools
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 
-from tangl.core import Record
-from tangl.type_hints import Label, StringMap, ClassName, Expr
+from tangl.core import ContentAddressable, Record
+from tangl.type_hints import ClassName, Expr, Label, StringMap
 
-class BaseScriptItem(Record):
-    """
-    Basic intermedia representation model for describing any Entity-type object.
 
-    Includes obj_cls, label, tags, locked, locals, conditions, effects, content, and icon
-    """
+class BaseScriptItem(Record, ContentAddressable):
+    """Template IR record that also provides a deterministic content hash."""
     record_type: str = Field("script", alias="type")
 
     obj_cls: Optional[ClassName] = None      # For structuring/unstructuring
@@ -33,6 +30,22 @@ class BaseScriptItem(Record):
     content: Optional[str] = None           # Rendered content fields
     icon: Optional[str] = None
 
+    @classmethod
+    def _get_hashable_content(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Exclude metadata so structurally-identical templates share a hash."""
+
+        exclude = {
+            "uid",
+            "seq",
+            "is_dirty_",
+            "is_dirty",
+            "content_hash",
+            "scope",
+            "label",
+            "template_names",
+        }
+        return {key: value for key, value in data.items() if key not in exclude}
+
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
         kwargs.setdefault('exclude_unset', True)
         kwargs.setdefault('exclude_defaults', True)
@@ -41,6 +54,7 @@ class BaseScriptItem(Record):
         res.pop("uid", None)
         res.pop("seq", None)
         res.pop("is_dirty_", None)
+        # Keep ``content_hash`` for provenance tracking
 
         def _strip_metadata(value: Any) -> None:
             if isinstance(value, dict):

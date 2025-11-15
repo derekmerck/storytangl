@@ -31,6 +31,9 @@ class ProvisioningContext:
     graph: Graph
     step: int
     rng_seed: int | None = None
+    current_requirement_id: UUID | None = None
+    current_requirement_label: str | None = None
+    current_requirement_source_id: UUID | None = None
 
     _rand: Random = field(init=False, repr=False)
 
@@ -164,6 +167,7 @@ class ProvisioningResult:
     affordance_offers: list[AffordanceOffer] = field(default_factory=list)
     unresolved_hard_requirements: list[UUID] = field(default_factory=list)
     waived_soft_requirements: list[UUID] = field(default_factory=list)
+    selection_metadata: dict[UUID, dict[str, object]] = field(default_factory=dict)
 
     @property
     def primary_plan(self) -> ProvisioningPlan | None:
@@ -203,7 +207,8 @@ def _attach_offer_metadata(
         offer.source_provisioner_id = provisioner.uid
     if offer.source_layer is None:
         offer.source_layer = getattr(provisioner, "layer", None)
-    offer.proximity = min(getattr(offer, "proximity", proximity), proximity)
+    if getattr(offer, "proximity", None) in (None, 999, 999.0):
+        offer.proximity = float(proximity)
     if not hasattr(offer, "selection_criteria") or offer.selection_criteria is None:
         offer.selection_criteria = {}
     offer.selection_criteria.setdefault("source", source)
@@ -254,13 +259,20 @@ def _deduplicate_offers(offers: list[ProvisionOffer]) -> list[ProvisionOffer]:
     return [offer for _, offer in deduplicated]
 
 
-def _select_best_offer(offers: Iterable[ProvisionOffer]) -> ProvisionOffer | None:
-    """Select the most desirable offer from *offers*."""
+def _select_best_offer(
+    offers: Iterable[ProvisionOffer],
+) -> tuple[ProvisionOffer | None, dict[str, object]]:
+    """Select the most desirable offer from *offers* and record audit metadata."""
 
     enumerated = list(enumerate(offers))
     if not enumerated:
-        return None
-    _, offer = min(
+        return None, {
+            "reason": "no_offers",
+            "num_offers": 0,
+            "all_offers": [],
+        }
+
+    sorted_offers = sorted(
         enumerated,
         key=lambda item: (
             item[1].cost,
@@ -268,7 +280,37 @@ def _select_best_offer(offers: Iterable[ProvisionOffer]) -> ProvisionOffer | Non
             item[0],
         ),
     )
-    return offer
+    best_index, best_offer = sorted_offers[0]
+
+    audit_entries: list[dict[str, object]] = []
+    for _, offer in sorted_offers:
+        policy = _policy_from_offer(offer)
+        audit_entries.append(
+            {
+                "provider_id": str(offer.provider_id) if getattr(offer, "provider_id", None) else None,
+                "cost": offer.cost,
+                "base_cost": float(getattr(offer, "base_cost", offer.cost)),
+                "proximity": offer.proximity,
+                "proximity_detail": getattr(offer, "proximity_detail", None),
+                "operation": policy.name,
+                "source_provisioner_id": str(offer.source_provisioner_id)
+                if getattr(offer, "source_provisioner_id", None)
+                else None,
+            }
+        )
+
+    metadata = {
+        "reason": "best_cost",
+        "selected_cost": best_offer.cost if best_offer is not None else None,
+        "selected_provider_id": str(best_offer.provider_id)
+        if getattr(best_offer, "provider_id", None)
+        else None,
+        "selected_index": best_index,
+        "num_offers": len(sorted_offers),
+        "all_offers": audit_entries,
+    }
+
+    return best_offer, metadata
 
 
 def provision_node(
@@ -314,6 +356,9 @@ def provision_node(
         if requirement.provider is not None:
             continue
         offer_map.setdefault(requirement_id, [])
+        ctx.current_requirement_id = requirement.uid
+        ctx.current_requirement_label = requirement.label
+        ctx.current_requirement_source_id = dep.source_id
         for proximity, provisioner in indexed_provisioners:
             try:
                 offers_iter = provisioner.get_dependency_offers(requirement, ctx=ctx)
@@ -329,6 +374,9 @@ def provision_node(
         if requirement.provider is not None:
             continue
         offer_map.setdefault(requirement_id, [])
+        ctx.current_requirement_id = requirement.uid
+        ctx.current_requirement_label = requirement.label
+        ctx.current_requirement_source_id = affordance.destination_id
         for proximity, provisioner in indexed_provisioners:
             try:
                 offers_iter = provisioner.get_dependency_offers(requirement, ctx=ctx)
@@ -392,7 +440,11 @@ def provision_node(
         if requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
             continue
-        best_offer = _select_best_offer(offers)
+        best_offer, selection_meta = _select_best_offer(offers)
+        selection_meta.setdefault("requirement_label", requirement.label)
+        selection_meta.setdefault("requirement_uid", str(requirement.uid))
+        selection_meta.setdefault("node_label", node.label)
+        result.selection_metadata[requirement.uid] = selection_meta
         if best_offer is None:
             if requirement.hard_requirement:
                 result.unresolved_hard_requirements.append(requirement.uid)

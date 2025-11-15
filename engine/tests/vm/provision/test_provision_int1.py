@@ -324,7 +324,8 @@ def test_provision_node_prioritizes_affordance_offers():
         def get_affordance_offers(self, node, *, ctx):
             offer = AffordanceOffer(
                 label="use_existing",
-                cost=ProvisionCost.DIRECT,
+                base_cost=ProvisionCost.DIRECT,
+                cost=float(ProvisionCost.DIRECT),
                 accept_func=lambda ctx, destination: _attach_existing(destination, ctx),
                 target_tags=set(),
             )
@@ -337,6 +338,8 @@ def test_provision_node_prioritizes_affordance_offers():
                 requirement_id=requirement.uid,
                 requirement=requirement,
                 operation=ProvisioningPolicy.CREATE,
+                base_cost=ProvisionCost.CREATE,
+                cost=float(ProvisionCost.CREATE),
                 accept_func=lambda ctx: _create_created(),
                 source_provisioner_id=self.uid,
             )
