@@ -188,9 +188,11 @@ def test_select_best_offer_chooses_cheapest():
     )
     
     offers = [expensive, cheap]
-    best = _select_best_offer(offers)
-    
+    best, metadata = _select_best_offer(offers)
+
     assert best is cheap
+    assert metadata["reason"] == "best_cost"
+    assert metadata["num_offers"] == len(offers)
 
 
 def test_select_best_offer_prefers_proximity():
@@ -216,15 +218,18 @@ def test_select_best_offer_prefers_proximity():
     )
     
     offers = [distant, close]
-    best = _select_best_offer(offers)
-    
+    best, metadata = _select_best_offer(offers)
+
     assert best is close
+    assert metadata["reason"] == "best_cost"
+    assert metadata["selected_cost"] == close.cost
 
 
 def test_select_best_offer_returns_none_for_empty_list():
     """Selection returns None when no offers are available."""
-    best = _select_best_offer([])
+    best, metadata = _select_best_offer([])
     assert best is None
+    assert metadata["reason"] == "no_offers"
 
 
 def test_policy_from_offer():

@@ -57,7 +57,8 @@ def test_graph_provisioner_finds_existing_node():
     # Assert
     assert len(offers) == 1
     assert offers[0].operation is ProvisioningPolicy.EXISTING
-    assert offers[0].cost == ProvisionCost.DIRECT
+    assert offers[0].base_cost is ProvisionCost.DIRECT
+    assert offers[0].cost == float(ProvisionCost.DIRECT)
     
     # Accept offer
     provider = offers[0].accept(ctx=ctx)
@@ -126,7 +127,8 @@ def test_template_provisioner_creates_from_template():
     # Assert
     assert len(offers) == 1
     assert offers[0].operation is ProvisioningPolicy.CREATE
-    assert offers[0].cost == ProvisionCost.CREATE
+    assert offers[0].base_cost is ProvisionCost.CREATE
+    assert offers[0].cost == float(ProvisionCost.CREATE)
     
     # Accept offer
     provider = offers[0].accept(ctx=ctx)
@@ -155,7 +157,8 @@ def test_updating_provisioner_modifies_existing():
     # Assert
     assert len(offers) == 1
     assert offers[0].operation is ProvisioningPolicy.UPDATE
-    assert offers[0].cost == ProvisionCost.LIGHT_INDIRECT
+    assert offers[0].base_cost is ProvisionCost.LIGHT_INDIRECT
+    assert offers[0].cost == float(ProvisionCost.LIGHT_INDIRECT)
     
     # Accept offer
     provider = offers[0].accept(ctx=ctx)
@@ -186,7 +189,8 @@ def test_cloning_provisioner_creates_copy():
     # Assert
     assert len(offers) == 1
     assert offers[0].operation is ProvisioningPolicy.CLONE
-    assert offers[0].cost == ProvisionCost.HEAVY_INDIRECT
+    assert offers[0].base_cost is ProvisionCost.HEAVY_INDIRECT
+    assert offers[0].cost == float(ProvisionCost.HEAVY_INDIRECT)
     
     # Accept offer
     provider = offers[0].accept(ctx=ctx)
@@ -281,7 +285,7 @@ def test_multiple_strategies_for_same_requirement():
     assert (
         costs[ProvisioningPolicy.EXISTING]
         < costs[ProvisioningPolicy.UPDATE]
-        < costs.get(ProvisioningPolicy.CLONE, ProvisionCost.CREATE + 1)
+        < costs.get(ProvisioningPolicy.CLONE, float(ProvisionCost.CREATE) + 1)
         < costs[ProvisioningPolicy.CREATE]
     )
 
@@ -396,7 +400,8 @@ def test_offer_with_failing_callback():
     offer = DependencyOffer(
         requirement_id=UUID('00000000-0000-0000-0000-000000000002'),
         operation=ProvisioningPolicy.CREATE,
-        cost=ProvisionCost.CREATE,
+        base_cost=ProvisionCost.CREATE,
+        cost=float(ProvisionCost.CREATE),
         accept_func=failing_callback,
     )
     

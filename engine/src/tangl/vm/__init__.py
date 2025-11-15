@@ -78,6 +78,7 @@ from .provision import (
     BuildReceipt,
     PlanningReceipt,
 )
+from .debug import PlanningDebugger
 
 Offer = ProvisionOffer
 
@@ -89,5 +90,5 @@ __all__ = [
     # dispatch
     "vm_dispatch",
     # planning
-    "Requirement", "Provisioner", "GraphProvisioner", "TemplateProvisioner", "UpdatingProvisioner", "CloningProvisioner", "CompanionProvisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "DependencyOffer", "AffordanceOffer", "ProvisionCost", "BuildReceipt", "PlanningReceipt",
-    ]
+    "Requirement", "Provisioner", "GraphProvisioner", "TemplateProvisioner", "UpdatingProvisioner", "CloningProvisioner", "CompanionProvisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "DependencyOffer", "AffordanceOffer", "ProvisionCost", "BuildReceipt", "PlanningReceipt", "PlanningDebugger",
+]

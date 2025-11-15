@@ -62,3 +62,28 @@ for author-facing guidance and YAML examples.
   trace exactly which template was instantiated.
 - Use `world.template_registry.find_all(content_hash=...)` to locate duplicate templates if you
   suspect multiple declarations share the same content.
+
+## Cost Model & Auditing
+
+Offer selection is now deterministic and proximity-aware:
+
+- **Base costs** come from :class:`~tangl.vm.provision.offer.ProvisionCost` (e.g., `DIRECT=10`,
+  `CREATE=200`).
+- **Graph proximity** adds a modifier before the planner compares offers:
+
+  | Scenario        | Modifier |
+  |----------------|----------|
+  | Same block     | `+0`
+  | Same scene     | `+5`
+  | Same episode   | `+10`
+  | Elsewhere      | `+20`
+
+- **Template offers** use the fixed create cost (`200`) so nearby existing providers almost always
+  win unless the requirement policy is `CREATE`.
+
+Every call to :func:`~tangl.vm.provision.resolver._select_best_offer` records audit metadata. The
+final :class:`~tangl.vm.provision.offer.PlanningReceipt` includes `selection_audit`, a list of the
+offers considered for each requirement plus the reason the winner was chosen. Developers can print
+these decisions with :class:`tangl.vm.debug.PlanningDebugger`.
+
+See :doc:`COST_MODEL` for an extended breakdown of the calculations and troubleshooting tips.
