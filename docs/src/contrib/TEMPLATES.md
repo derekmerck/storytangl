@@ -5,6 +5,23 @@ Templates are reusable blueprints for creating actors, locations, and other narr
 entities. They are stored as immutable :class:`Record` objects inside
 ``World.template_registry`` once a world is instantiated.
 
+**Content-addressable records.** Templates inherit from
+:class:`tangl.core.content_addressable.ContentAddressable`. Each template therefore
+exposes a ``content_hash`` that captures the structure of the template while ignoring
+metadata such as ``label`` or ``scope``. Identical structures have the same hash,
+allowing the registry to deduplicate entries, audit provenance, and perform content-based
+queries.
+
+```python
+template = world.find_template("generic_guard")
+template.content_hash  # raw bytes suitable for registry lookups
+template.get_content_identifier()  # 16-char hex string for logs and receipts
+```
+
+Use the hash when emitting receipts or proving which template created an entity. Fields
+like ``obj_cls``, ``archetype``, ``conditions``, and ``effects`` influence the hash,
+while metadata fields (``label``, ``scope``, ``template_names``) do not.
+
 ## Declaration Levels
 Templates can be declared at three levels. The world registry records where a template
 originated via the optional :class:`ScopeSelector` metadata.

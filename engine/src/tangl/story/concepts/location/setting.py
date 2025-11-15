@@ -26,6 +26,7 @@ class Setting(Dependency[Location]):
     location_ref: Identifier = Field(None, init_var=True)
     location_criteria: StringMap = Field(None, init_var=True)
     location_template: StringMap = Field(None, init_var=True)
+    location_template_ref: Identifier = Field(None, init_var=True)
     requirement_policy: ProvisioningPolicy = Field(None, init_var=True)
 
     @model_validator(mode="before")
@@ -36,6 +37,7 @@ class Setting(Dependency[Location]):
                 'identifier': data.pop('location_ref', None),
                 'criteria': data.pop('location_criteria', {}),
                 'template': data.pop('location_template', None),
+                'template_ref': data.pop('location_template_ref', None),
                 'policy': data.pop('requirement_policy', ProvisioningPolicy.ANY),
                 'graph': data['graph']
             }

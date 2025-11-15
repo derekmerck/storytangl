@@ -93,6 +93,7 @@ class Requirement(GraphItem, Generic[NodeT]):
     identifier: Optional[Identifier] = None  # aka 'ref' or 'alias'
     criteria: Optional[StringMap] = Field(default_factory=dict)
     template: Optional[UnstructuredData] = None
+    template_ref: Optional[Identifier] = None
     policy: ProvisioningPolicy = ProvisioningPolicy.ANY
     reference_id: Optional[UUID] = None
     """Explicit reference node to support :attr:`ProvisioningPolicy.CLONE`."""
@@ -119,6 +120,8 @@ class Requirement(GraphItem, Generic[NodeT]):
         if self.policy is ProvisioningPolicy.NOOP:
             raise ValueError("Policy cannot be NOOP")
 
+        has_template_source = self.template is not None or self.template_ref is not None
+
         if self.policy in [ProvisioningPolicy.EXISTING, ProvisioningPolicy.UPDATE]:
             if self.identifier is None and self.criteria is None:
                 raise ValueError("EXISTING/UPDATE requires an identifier or match criteria")
@@ -126,16 +129,22 @@ class Requirement(GraphItem, Generic[NodeT]):
         if self.policy is ProvisioningPolicy.CLONE:
             if self.reference_id is None:
                 raise ValueError("CLONE requires reference_id to specify source node")
-            if self.template is None:
+            if not has_template_source:
                 raise ValueError("CLONE requires template data to evolve clone")
 
         if self.policy in [ProvisioningPolicy.CREATE, ProvisioningPolicy.UPDATE]:
-            if self.template is None:
+            if not has_template_source:
                 raise ValueError(f"{self.policy.name} requires a template")
 
         if self.policy in [ProvisioningPolicy.ANY]:
-            if self.identifier is None and self.criteria is None and self.template is None:
-                raise ValueError("ANY requires at least one of identifier, criteria, or template")
+            if (
+                self.identifier is None
+                and self.criteria is None
+                and not has_template_source
+            ):
+                raise ValueError(
+                    "ANY requires at least one of identifier, criteria, template, or template_ref"
+                )
 
         return self
 

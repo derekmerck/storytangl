@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from copy import deepcopy
-from typing import Iterator, TYPE_CHECKING, Callable
+from typing import Iterator, TYPE_CHECKING, Callable, Mapping, Any
 from uuid import UUID
 
 from pydantic import ConfigDict
@@ -140,8 +141,66 @@ class GraphProvisioner(Provisioner):
 class TemplateProvisioner(Provisioner):
     """Create new nodes from requirement templates."""
 
-    def __init__(self, template_registry: dict[str, dict] | None = None, **kwargs):
-        super().__init__(template_registry=template_registry or {}, **kwargs)
+    def __init__(
+        self,
+        template_registry: Mapping[str, dict] | Registry | None = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        object.__setattr__(self, "template_registry", template_registry or {})
+
+    def _normalize_template_payload(self, template: Any) -> dict | None:
+        if template is None:
+            return None
+        if hasattr(template, "model_dump"):
+            payload = template.model_dump()
+        elif isinstance(template, dict):
+            payload = deepcopy(template)
+        else:
+            try:
+                payload = deepcopy(dict(template))
+            except TypeError:  # pragma: no cover - defensive fallback
+                return None
+
+        obj_cls = payload.get("obj_cls")
+        resolved = self._resolve_obj_cls(obj_cls)
+        if resolved is not None:
+            payload["obj_cls"] = resolved
+        elif "obj_cls" in payload and obj_cls is not None:
+            payload.pop("obj_cls")
+
+        return payload
+
+    def _resolve_obj_cls(self, obj_cls: Any) -> type | None:
+        if isinstance(obj_cls, type):
+            return obj_cls
+        if isinstance(obj_cls, str):
+            try:
+                module_path, class_name = obj_cls.rsplit(".", 1)
+            except ValueError:
+                return Entity.dereference_cls_name(obj_cls)
+            try:
+                module = import_module(module_path)
+            except ImportError:  # pragma: no cover - best-effort fallback
+                return Entity.dereference_cls_name(class_name)
+            return getattr(module, class_name, None)
+        return None
+
+    def _lookup_template_ref(self, template_ref: str | None) -> dict | None:
+        if not template_ref:
+            return None
+
+        registry = self.template_registry
+        if not registry:
+            return None
+
+        template: Any | None
+        if isinstance(registry, Mapping):
+            template = registry.get(template_ref)
+        else:
+            template = registry.find_one(label=template_ref)
+
+        return self._normalize_template_payload(template)
 
     def _resolve_template(self, requirement: Requirement) -> dict | None:
         if requirement.template is not None:
@@ -149,13 +208,14 @@ class TemplateProvisioner(Provisioner):
             if not template:
                 return None
             return template
+        if requirement.template_ref:
+            template = self._lookup_template_ref(str(requirement.template_ref))
+            if template:
+                return template
         if self.template_registry and requirement.identifier:
-            template = self.template_registry.get(str(requirement.identifier))
-            if template is not None:
-                template_copy = deepcopy(template)
-                if not template_copy:
-                    return None
-                return template_copy
+            template = self._lookup_template_ref(str(requirement.identifier))
+            if template:
+                return template
         return None
 
     def get_dependency_offers(
