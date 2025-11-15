@@ -21,3 +21,16 @@ def test_base_script_item_defaults_and_extras() -> None:
     assert item.extra_field == 3
     # Tags come from :class:`Entity` so `None` becomes an empty set.
     assert item.tags == set()
+
+
+def test_model_dump_emits_string_class_without_entity_fields() -> None:
+    """Serialized scripts should match legacy export semantics."""
+
+    item = BaseScriptItem(obj_cls="tangl.story.Node", label="demo")
+
+    payload = item.model_dump()
+
+    assert payload["obj_cls"] == "tangl.story.Node"
+    assert payload["label"] == "demo"
+    assert "uid" not in payload
+    assert "seq" not in payload

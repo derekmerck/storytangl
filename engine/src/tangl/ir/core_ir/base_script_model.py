@@ -1,7 +1,7 @@
 from typing import Optional, Any
 import functools
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from tangl.core import Record
 from tangl.type_hints import Label, StringMap, ClassName, Expr
@@ -33,12 +33,22 @@ class BaseScriptItem(Record):
     content: Optional[str] = None           # Rendered content fields
     icon: Optional[str] = None
 
-    @functools.wraps(Record.model_dump)
+    @functools.wraps(BaseModel.model_dump)
     def model_dump(self, *args, **kwargs) -> dict[str, Any]:
         kwargs.setdefault('exclude_unset', True)
         kwargs.setdefault('exclude_defaults', True)
         kwargs.setdefault('exclude_none', True)
-        res = super().model_dump(**kwargs)
+        res = BaseModel.model_dump(self, *args, **kwargs)
+        res.pop("uid", None)
+        res.pop("seq", None)
+        obj_cls_value = res.get("obj_cls")
+        if isinstance(obj_cls_value, type):
+            module = getattr(obj_cls_value, "__module__", "")
+            qualname = getattr(obj_cls_value, "__qualname__", obj_cls_value.__name__)
+            if module:
+                res["obj_cls"] = f"{module}.{qualname}"
+            else:  # pragma: no cover - defensive fallback
+                res["obj_cls"] = qualname
         if self.obj_cls is None:
             res.pop("obj_cls", None)
         return res
