@@ -16,8 +16,8 @@ from pydantic import BaseModel, Field, field_validator
 from tangl.type_hints import UniqueLabel, StringMap
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from .scene_script_models import SceneScript, BlockScript, MenuBlockScript
-from .actor_script_models import ActorScript
-from .location_script_models import LocationScript
+from .actor_script_models import ActorScript, RoleScript
+from .location_script_models import LocationScript, SettingScript
 from .asset_script_models import AssetsScript
 
 logger = logging.getLogger(__name__)
@@ -60,6 +60,8 @@ class ScopeSelector(BaseModel):
 
 ActorScript.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
 LocationScript.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
+RoleScript.model_rebuild(_types_namespace={"ActorScript": ActorScript})
+SettingScript.model_rebuild(_types_namespace={"LocationScript": LocationScript})
 BlockScript.model_rebuild()
 MenuBlockScript.model_rebuild()
 SceneScript.model_rebuild()

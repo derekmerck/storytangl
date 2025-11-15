@@ -18,6 +18,10 @@ from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.story.concepts.actor.role import Role
+from tangl.story.concepts.location.setting import Setting
+from tangl.vm import ProvisioningPolicy
+from tangl.vm.provision.open_edge import Dependency
 
 # Integrated Story Domains
 from .domain_manager import DomainManager  # behaviors and classes
@@ -450,86 +454,162 @@ class World(Singleton):
             scene = cls.structure(payload)
             scene_map[scene_label] = scene.uid
 
-            self._build_scene_roles(
-                scene,
-                scene_data.get("roles"),
+            self._wire_roles(
+                graph=graph,
+                source_node=scene,
+                roles_data=scene_data.get("roles"),
                 actor_map=actor_map,
             )
-            self._build_scene_settings(
-                scene,
-                scene_data.get("settings"),
+            self._wire_settings(
+                graph=graph,
+                source_node=scene,
+                settings_data=scene_data.get("settings"),
                 location_map=location_map,
             )
 
+            for block_label, block_data in members.items():
+                qualified_label = f"{scene_label}.{block_label}"
+                block_uid = block_map.get(qualified_label)
+                if block_uid is None:
+                    continue
+
+                block = graph.get(block_uid)
+                if block is None:
+                    continue
+
+                self._wire_roles(
+                    graph=graph,
+                    source_node=block,
+                    roles_data=block_data.get("roles"),
+                    actor_map=actor_map,
+                )
+                self._wire_settings(
+                    graph=graph,
+                    source_node=block,
+                    settings_data=block_data.get("settings"),
+                    location_map=location_map,
+                )
+
         return scene_map
 
-    def _build_scene_roles(
+    def _resolve_dependency_class(
         self,
-        scene: "Scene",
-        roles_data: Any,
+        obj_cls: Any,
         *,
+        fallback: type[Dependency],
+    ) -> type[Dependency]:
+        """Resolve ``obj_cls`` to a :class:`Dependency` subclass."""
+
+        candidate: type[Any] | None
+        if isinstance(obj_cls, type):
+            candidate = obj_cls
+        elif obj_cls:
+            candidate = self.domain_manager.resolve_class(obj_cls)
+        else:
+            candidate = fallback
+
+        try:
+            if issubclass(candidate, Dependency):  # type: ignore[arg-type]
+                return candidate  # type: ignore[return-value]
+        except TypeError:
+            pass
+
+        logger.warning(
+            "Dependency class %r is not a Dependency; using %s", obj_cls, fallback.__name__
+        )
+        return fallback
+
+    def _wire_roles(
+        self,
+        *,
+        graph: StoryGraph,
+        source_node: GraphItem,
+        roles_data: Any,
         actor_map: dict[str, UUID],
     ) -> None:
         roles = self._normalize_section(roles_data)
         if not roles:
             return
 
-        for role_label, role_payload in roles.items():
-            role_cls = self.domain_manager.resolve_class(
-                role_payload.get("obj_cls")
-                or "tangl.story.concepts.actor.role.Role"
+        for role_label, role_spec in roles.items():
+            role_cls = self._resolve_dependency_class(
+                role_spec.get("obj_cls"),
+                fallback=Role,
             )
             payload = self._prepare_payload(
                 role_cls,
-                role_payload,
-                scene.graph,
+                role_spec,
+                graph,
             )
             payload.setdefault("label", role_label)
-            payload.setdefault("source_id", scene.uid)
+            payload.setdefault("source_id", source_node.uid)
+            payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
+            actor_identifier = role_spec.get("actor_ref") or role_label
+            actor_uid = actor_map.get(actor_identifier)
+            if actor_uid is None:
+                if role_spec.get("actor_ref"):
+                    logger.warning(
+                        "Role '%s' references unknown actor '%s'",
+                        role_label,
+                        role_spec["actor_ref"],
+                    )
+            else:
+                payload.setdefault("destination_id", actor_uid)
 
             role = role_cls.structure(payload)
-            actor_label = role_payload.get("actor_ref") or role_label
-            actor_uid = actor_map.get(actor_label)
+
             if actor_uid is None:
                 continue
 
-            actor = scene.graph.get(actor_uid)
+            actor = graph.get(actor_uid)
             if actor is not None and hasattr(role, "actor"):
-                role.actor = actor
+                role.actor = actor  # type: ignore[attr-defined]
 
-    def _build_scene_settings(
+    def _wire_settings(
         self,
-        scene: "Scene",
-        settings_data: Any,
         *,
+        graph: StoryGraph,
+        source_node: GraphItem,
+        settings_data: Any,
         location_map: dict[str, UUID],
     ) -> None:
         settings = self._normalize_section(settings_data)
         if not settings:
             return
 
-        for setting_label, setting_payload in settings.items():
-            setting_cls = self.domain_manager.resolve_class(
-                setting_payload.get("obj_cls")
-                or "tangl.story.concepts.location.setting.Setting"
+        for setting_label, setting_spec in settings.items():
+            setting_cls = self._resolve_dependency_class(
+                setting_spec.get("obj_cls"),
+                fallback=Setting,
             )
             payload = self._prepare_payload(
                 setting_cls,
-                setting_payload,
-                scene.graph,
+                setting_spec,
+                graph,
             )
             payload.setdefault("label", setting_label)
-            payload.setdefault("source_id", scene.uid)
+            payload.setdefault("source_id", source_node.uid)
+            payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
+            location_identifier = setting_spec.get("location_ref") or setting_label
+            location_uid = location_map.get(location_identifier)
+            if location_uid is None:
+                if setting_spec.get("location_ref"):
+                    logger.warning(
+                        "Setting '%s' references unknown location '%s'",
+                        setting_label,
+                        setting_spec["location_ref"],
+                    )
+            else:
+                payload.setdefault("destination_id", location_uid)
 
             setting = setting_cls.structure(payload)
-            location_label = setting_payload.get("location_ref") or setting_label
-            location_uid = location_map.get(location_label)
+
             if location_uid is None:
                 continue
 
-            location = scene.graph.get(location_uid)
+            location = graph.get(location_uid)
             if location is not None and hasattr(setting, "location"):
-                setting.location = location
+                setting.location = location  # type: ignore[attr-defined]
 
     def _build_action_edges(
         self,
