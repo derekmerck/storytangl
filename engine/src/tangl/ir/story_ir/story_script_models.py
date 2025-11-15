@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from tangl.type_hints import UniqueLabel, StringMap
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
@@ -22,6 +22,45 @@ from .asset_script_models import AssetsScript
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+
+
+class ScopeSelector(BaseModel):
+    """Declare where a template is valid within a story hierarchy."""
+
+    source_label: Optional[str] = Field(
+        None,
+        description="Exact block or scene label where the template is valid.",
+    )
+    parent_label: Optional[str] = Field(
+        None,
+        description="Direct parent label constraint.",
+    )
+    ancestor_tags: Optional[set[str]] = Field(
+        None,
+        description="Template is valid if any ancestor has these tags.",
+    )
+    ancestor_labels: Optional[set[str]] = Field(
+        None,
+        description="Template is valid if any ancestor has these labels.",
+    )
+
+    def is_global(self) -> bool:
+        """Return ``True`` when no scope constraints are declared."""
+
+        return all(
+            getattr(self, field_name) is None
+            for field_name in (
+                "source_label",
+                "parent_label",
+                "ancestor_tags",
+                "ancestor_labels",
+            )
+        )
+
+
+ActorScript.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
+LocationScript.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
+
 
 class StoryScript(MasterScript):
 

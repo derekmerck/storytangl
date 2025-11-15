@@ -1,5 +1,5 @@
 import pydantic
-from typing import Optional, Literal, Type
+from typing import Any, Optional, Literal, Type
 from uuid import UUID
 
 from pydantic import Field, model_validator, ConfigDict
@@ -74,6 +74,10 @@ class BlockScript(BaseScriptItem):
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.")
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.")
     redirects: list[ActionScript] = Field(None, description="Automatic redirections to a different block.")
+    templates: Optional[dict[UniqueLabel, dict[str, Any]]] = Field(
+        None,
+        description="Templates available only within this block.",
+    )
 
     @pydantic.field_validator('redirects', mode='before')
     @classmethod
@@ -109,6 +113,10 @@ class SceneScript(BaseScriptItem):
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.")
     settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.")
     assets: list[AssetsScript] = Field(None, description="A list of asset types and items associated with the scene.")
+    templates: Optional[dict[UniqueLabel, dict[str, Any]]] = Field(
+        None,
+        description="Templates available to blocks in this scene.",
+    )
 
     @pydantic.field_validator('roles', 'settings', mode='after')
     @classmethod

@@ -1,0 +1,23 @@
+"""Tests for :mod:`tangl.ir.core_ir.base_script_model`."""
+
+from tangl.core import Record
+from tangl.ir.core_ir import BaseScriptItem
+
+
+def test_base_script_item_is_record() -> None:
+    """``BaseScriptItem`` should inherit :class:`~tangl.core.Record`."""
+
+    assert issubclass(BaseScriptItem, Record)
+
+
+def test_base_script_item_defaults_and_extras() -> None:
+    """Instantiation should set defaults and allow Record features."""
+
+    item = BaseScriptItem(obj_cls="Node", templates="demo", extra_field=3)
+
+    assert item.record_type == "script"
+    assert item.uid is not None
+    assert item.template_names == "demo"
+    assert item.extra_field == 3
+    # Tags come from :class:`Entity` so `None` becomes an empty set.
+    assert item.tags == set()

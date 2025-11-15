@@ -1,9 +1,16 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING
+
+from pydantic import Field
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
 from tangl.lang.gens import Gens
 from tangl.ir.core_ir import BaseScriptItem
 from .asset_script_models import AssetsScript
+
+if TYPE_CHECKING:
+    from .story_script_models import ScopeSelector
 
 MediaItemScript = BaseScriptItem
 
@@ -25,6 +32,11 @@ class ActorScript(BaseScriptItem):
     # ornaments: Optional[OrnamentationScript] = None
 
     media: list[MediaItemScript] = None
+
+    scope: ScopeSelector | None = Field(
+        None,
+        description="Where this template is valid (``None`` makes it global).",
+    )
 
 class RoleScript(BaseScriptItem):
     actor_template: Optional[ActorScript] = None
