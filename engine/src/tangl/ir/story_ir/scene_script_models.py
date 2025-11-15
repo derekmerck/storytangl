@@ -1,7 +1,10 @@
-import pydantic
-from typing import Any, Optional, Literal, Type
+from __future__ import annotations
+
+import logging
+from typing import Any, Optional, Literal
 from uuid import UUID
 
+import pydantic
 from pydantic import Field, model_validator, ConfigDict
 
 from tangl.type_hints import UniqueLabel, Tag, ClassName
@@ -9,6 +12,109 @@ from tangl.ir.core_ir import BaseScriptItem
 from .actor_script_models import RoleScript
 from .location_script_models import SettingScript
 from .asset_script_models import AssetsScript
+
+
+logger = logging.getLogger(__name__)
+
+
+def _role_spec_missing_references(spec: dict[str, Any]) -> bool:
+    return not any(
+        spec.get(field)
+        for field in ('actor_ref', 'actor_template', 'actor_template_ref')
+    )
+
+
+def _expand_role_shorthands(value: Any) -> Any:
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        result: dict[UniqueLabel, Any] = {}
+        for item in value:
+            if isinstance(item, str):
+                result[item] = {'actor_ref': item}
+            elif isinstance(item, dict):
+                label = item.get('label')
+                if not label:
+                    raise ValueError(f"Role in list must have 'label': {item}")
+                result[label] = dict(item)
+            else:
+                raise ValueError(f"Invalid role list entry: {item}")
+        return result
+
+    if isinstance(value, dict):
+        result: dict[UniqueLabel, Any] = {}
+        for label, spec in value.items():
+            if spec is None:
+                result[label] = {'actor_ref': label}
+            elif isinstance(spec, str):
+                result[label] = {'actor_ref': spec}
+            elif isinstance(spec, RoleScript):
+                result[label] = spec
+            elif isinstance(spec, dict):
+                normalized = dict(spec)
+                if _role_spec_missing_references(normalized):
+                    logger.warning(
+                        "Role '%s' has no actor_ref/template/template_ref, "
+                        "inferring actor_ref='%s'", label, label,
+                    )
+                    normalized.setdefault('actor_ref', label)
+                result[label] = normalized
+            else:
+                raise ValueError(f"Invalid role spec for '{label}': {spec}")
+        return result
+
+    return value
+
+
+def _expand_setting_shorthands(value: Any) -> Any:
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        result: dict[UniqueLabel, Any] = {}
+        for item in value:
+            if isinstance(item, str):
+                result[item] = {'location_ref': item}
+            elif isinstance(item, dict):
+                label = item.get('label')
+                if not label:
+                    raise ValueError(f"Setting in list must have 'label': {item}")
+                result[label] = dict(item)
+            else:
+                raise ValueError(f"Invalid setting list entry: {item}")
+        return result
+
+    if isinstance(value, dict):
+        result: dict[UniqueLabel, Any] = {}
+        for label, spec in value.items():
+            if spec is None:
+                result[label] = {'location_ref': label}
+            elif isinstance(spec, str):
+                result[label] = {'location_ref': spec}
+            elif isinstance(spec, SettingScript):
+                result[label] = spec
+            elif isinstance(spec, dict):
+                normalized = dict(spec)
+                if not any(
+                    normalized.get(field)
+                    for field in (
+                        'location_ref',
+                        'location_template',
+                        'location_template_ref',
+                    )
+                ):
+                    logger.warning(
+                        "Setting '%s' has no location_ref/template/template_ref, "
+                        "inferring location_ref='%s'", label, label,
+                    )
+                    normalized.setdefault('location_ref', label)
+                result[label] = normalized
+            else:
+                raise ValueError(f"Invalid setting spec for '{label}': {spec}")
+        return result
+
+    return value
 
 
 class ActionScript(BaseScriptItem):
@@ -78,6 +184,14 @@ class BlockScript(BaseScriptItem):
         None,
         description="Templates available only within this block.",
     )
+    roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(
+        None,
+        description="Roles scoped to this block, provided as a list or mapping.",
+    )
+    settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(
+        None,
+        description="Settings scoped to this block, provided as a list or mapping.",
+    )
 
     @pydantic.field_validator('redirects', mode='before')
     @classmethod
@@ -96,6 +210,16 @@ class BlockScript(BaseScriptItem):
                 print( d )
                 raise
         return data
+
+    @pydantic.field_validator('roles', mode='before')
+    @classmethod
+    def _expand_role_shorthands(cls, value):
+        return _expand_role_shorthands(value)
+
+    @pydantic.field_validator('settings', mode='before')
+    @classmethod
+    def _expand_setting_shorthands(cls, value):
+        return _expand_setting_shorthands(value)
 
 
 class MenuBlockScript(BlockScript):
@@ -118,13 +242,16 @@ class SceneScript(BaseScriptItem):
         description="Templates available to blocks in this scene.",
     )
 
-    @pydantic.field_validator('roles', 'settings', mode='after')
+    @pydantic.field_validator('roles', mode='before')
     @classmethod
-    def _null_roles_and_locs_reference_their_key(cls, data: dict[UniqueLabel, BaseScriptItem]):
-        if isinstance(data, dict):
-            for k, v in data.items():
-                if v is None:
-                    data[k] = RoleScript(actor_ref=k)
-        return data
+    def _expand_role_shorthands(cls, value):
+        return _expand_role_shorthands(value)
+
+    @pydantic.field_validator('settings', mode='before')
+    @classmethod
+    def _expand_setting_shorthands(cls, value):
+        return _expand_setting_shorthands(value)
+
+
 
 
