@@ -22,7 +22,7 @@ Setting Concepts
 .. autoclass:: tangl.story.concepts.location.Setting
 
 Asset Concepts
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 .. autoclass:: tangl.story.concepts.asset.AssetType
 .. autoclass:: tangl.story.concepts.asset.DiscreteAsset
 .. autoclass:: tangl.story.concepts.asset.CountableAsset
