@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
 from tangl.lang.gens import Gens
@@ -41,10 +41,34 @@ class ActorScript(BaseScriptItem):
 class RoleScript(BaseScriptItem):
     actor_template: Optional[ActorScript] = None
     actor_ref: Optional[UniqueLabel] = None
+    actor_template_ref: Optional[UniqueLabel] = Field(
+        None,
+        description="Reference to template in :attr:`World.template_registry`.",
+    )
+    actor_overrides: Optional[dict[str, Any]] = Field(
+        None,
+        description="Overrides applied when instantiating from a template reference.",
+    )
     actor_criteria: Optional[StringMap] = None
     actor_conditions: Optional[list[Expr]] = None
+    requirement_policy: Optional[str] = Field(
+        None,
+        description="Provisioning policy such as ``EXISTING`` or ``CREATE``.",
+    )
 
     assets: list[AssetsScript] = None     # assets associated with the role, titles, gold badge for sherif
+
+    @model_validator(mode="after")
+    def _validate_reference_exclusivity(self) -> RoleScript:
+        """Ensure mutually exclusive actor template sources."""
+
+        if self.actor_template is not None and self.actor_template_ref is not None:
+            msg = (
+                f"Role '{self.label}': Cannot combine inline template and template reference"
+            )
+            raise ValueError(msg)
+
+        return self
 
 # class ExtrasScript ... ?
 
