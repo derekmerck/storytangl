@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
+from tangl.core import StreamRegistry
 from tangl.story.concepts.actor.actor import Actor
 from tangl.story.concepts.actor.role import Role
 from tangl.story.episode.scene import Scene
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
+from tangl.vm.ledger import Ledger
 
 
 def _build_world(script: dict[str, Any]) -> World:
@@ -84,7 +86,15 @@ def test_scene_roles_link_referenced_actor() -> None:
     actor = story.find_one(label="king_actor", is_instance=Actor)
     assert actor is not None
 
-    scene = story.find_one(label="throne_room", is_instance=Scene)
+    ledger = Ledger(
+        graph=story,
+        cursor_id=story.initial_cursor_id,
+        records=StreamRegistry(),
+    )
+    ledger.push_snapshot()
+    ledger.init_cursor()
+
+    scene = ledger.graph.find_one(label="throne_room", is_instance=Scene)
     assert scene is not None
 
     roles = scene.roles

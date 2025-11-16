@@ -104,10 +104,26 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
     """Provision all frontier nodes using the pure resolver."""
 
     frontier = _iter_frontier(cursor)
+    nodes_to_provision: list[Node] = [cursor, *frontier] if frontier else [cursor]
+    # Preserve ordering but avoid duplicate provisioning when the cursor reappears
+    ordered_nodes: list[Node] = []
+    seen: set[UUID] = set()
 
-    if not frontier:
+    def _append(node: Node) -> None:
+        if node.uid in seen:
+            return
+        seen.add(node.uid)
+        ordered_nodes.append(node)
+
+    for node in nodes_to_provision:
+        for ancestor in node.ancestors():
+            _append(ancestor)
+        _append(node)
+
+    nodes_to_provision = ordered_nodes
+
+    if len(nodes_to_provision) == 1:
         logger.debug("No frontier from %s - provisioning cursor", cursor.label)
-        frontier = [cursor]
 
     provisioners = do_get_provisioners(cursor, ctx=ctx)
 
@@ -126,7 +142,7 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
 
     frontier_results: dict[UUID, ProvisioningResult] = {}
 
-    for node in frontier:
+    for node in nodes_to_provision:
         logger.debug("Provisioning frontier node: %s", node.label)
 
         try:
@@ -158,7 +174,7 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
             frontier_results[node.uid] = ProvisioningResult(node=node)
 
     viable_nodes: list[Node] = []
-    for node in frontier:
+    for node in nodes_to_provision:
         result = frontier_results.get(node.uid)
         if result is not None and result.is_viable:
             viable_nodes.append(node)
@@ -167,7 +183,7 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
         logger.warning(
             "⚠️  SOFTLOCK DETECTED at %s: None of the %s frontier nodes are viable.",
             cursor.label,
-            len(frontier),
+            len(nodes_to_provision),
         )
 
     ctx.frontier_provision_results.clear()

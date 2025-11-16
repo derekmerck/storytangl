@@ -80,6 +80,22 @@ class Scene(TraversableSubgraph, HasBehaviors):
                 blocks.append(node)
         return blocks
 
+    def edges_out(self, **criteria):
+        """Expose outgoing edges for dependency provisioning helpers."""
+
+        if self.graph is None:
+            return []
+
+        return list(self.graph.find_edges(source=self, **criteria))
+
+    def edges_in(self, **criteria):
+        """Expose incoming edges for dependency provisioning helpers."""
+
+        if self.graph is None:
+            return []
+
+        return list(self.graph.find_edges(destination=self, **criteria))
+
     @property
     def settings(self) -> list[Setting]:
         """Return all locations assigned to this :class:`Scene`."""

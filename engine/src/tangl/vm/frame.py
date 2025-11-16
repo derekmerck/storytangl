@@ -204,14 +204,14 @@ class Frame:
 
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
 
-        # Generate the output content for the current state
-        entry_fragments = self.run_phase(P.JOURNAL)
-
-        # Cleanup bookkeeping
+        # Apply provisioning/build steps before generating output so availability reflects bindings
         finalize_receipt = self.run_phase(P.FINALIZE)
 
         if isinstance(finalize_receipt, PlanningReceipt):
             self.records.add_record(finalize_receipt)
+
+        # Generate the output content for the current state
+        entry_fragments = self.run_phase(P.JOURNAL)
 
         if entry_fragments:
             self.records.push_records(
