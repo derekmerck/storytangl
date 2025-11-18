@@ -274,18 +274,18 @@ class Frame:
         bootstrap_edge = AnonymousEdge(destination=node)
         next_edge = self.follow_edge(bootstrap_edge)
 
-        while (
-            isinstance(next_edge, ChoiceEdge)
-            and getattr(next_edge, "trigger_phase", None) == P.PREREQS
-        ):
-            next_edge = self.follow_edge(next_edge)
+        while isinstance(next_edge, ChoiceEdge):
+            trigger_phase = getattr(next_edge, "trigger_phase", None)
 
-        if include_postreq:
-            while (
-                isinstance(next_edge, ChoiceEdge)
-                and getattr(next_edge, "trigger_phase", None) == P.POSTREQS
-            ):
+            if trigger_phase == P.PREREQS:
                 next_edge = self.follow_edge(next_edge)
+                continue
+
+            if trigger_phase == P.POSTREQS and include_postreq:
+                next_edge = self.follow_edge(next_edge)
+                continue
+
+            break
 
     def resolve_choice(self, choice: ChoiceEdge) -> None:
         """

@@ -160,6 +160,24 @@ def test_postreq_redirect():
     assert nxt is None  # but ensure POSTREQS found and would have been returned if available
     # Or directly assert f.run_phase(P.POSTREQS) returns the ChoiceEdge
 
+
+def test_jump_to_node_follows_alternating_redirects():
+    g = Graph(label="demo")
+    start = g.add_node(label="start")
+    prereq_target = g.add_node(label="prereq-target")
+    postreq_target = g.add_node(label="postreq-target")
+    final = g.add_node(label="final")
+
+    ChoiceEdge(graph=g, source_id=start.uid, destination_id=prereq_target.uid, trigger_phase=P.PREREQS)
+    ChoiceEdge(graph=g, source_id=prereq_target.uid, destination_id=postreq_target.uid, trigger_phase=P.POSTREQS)
+    ChoiceEdge(graph=g, source_id=postreq_target.uid, destination_id=final.uid, trigger_phase=P.PREREQS)
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+    frame.jump_to_node(start.uid, include_postreq=True)
+
+    assert frame.cursor_id == final.uid
+    assert frame.step == 4
+
 def test_rand_is_deterministic_for_same_context():
     guid = uuid.uuid4()
     nuid = uuid.uuid4()
