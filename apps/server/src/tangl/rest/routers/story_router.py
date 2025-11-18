@@ -100,7 +100,19 @@ async def get_story_update(
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
-    limit: int = Query(default=10, ge=0),
+    limit: int = Query(default=0, ge=0),
+    marker: str | None = Query(
+        default=None,
+        description="Return journal fragments for a specific journal marker/step.",
+    ),
+    start_marker: str | None = Query(
+        default=None,
+        description="Inclusive starting marker when requesting a range of steps.",
+    ),
+    end_marker: str | None = Query(
+        default=None,
+        description="Exclusive end marker for a marker range.",
+    ),
 ) -> dict[str, Any]:
     """Return journal fragments and available choices for the active user."""
 
@@ -110,7 +122,9 @@ async def get_story_update(
         "RuntimeController.get_journal_entries",
         user_id=user_id,
         limit=limit,
-        current_only=True,
+        marker=marker,
+        start_marker=start_marker,
+        end_marker=end_marker,
     )
     choice_fragments = [
         fragment for fragment in fragments if getattr(fragment, "fragment_type", None) == "choice"
@@ -149,7 +163,6 @@ async def do_story_action(
             "RuntimeController.get_journal_entries",
             user_id=user_id,
             limit=0,
-            current_only=True,
         )
 
     payload = _serialize(status)

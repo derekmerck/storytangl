@@ -83,8 +83,66 @@ def test_get_journal_entries_limits_results(runtime_controller: RuntimeControlle
         marker_name="entry-0002",
     )
 
-    result = runtime_controller.get_journal_entries(ledger, limit=1)
+    result = runtime_controller.get_journal_entries(
+        ledger, limit=1, current_only=False
+    )
     assert [fragment.content for fragment in result] == ["second"]
+
+
+def test_get_journal_entries_defaults_to_latest_step(runtime_controller: RuntimeController, ledger: Ledger) -> None:
+    ledger.records.push_records(
+        ContentFragment(content="[step 0001]: cursor at start"),
+        ContentFragment(content="choice one"),
+        marker_type="journal",
+        marker_name="step-0001",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0002]: cursor at end"),
+        ContentFragment(content="choice two"),
+        ContentFragment(content="choice three"),
+        marker_type="journal",
+        marker_name="step-0002",
+    )
+
+    result = runtime_controller.get_journal_entries(ledger, limit=1)
+
+    assert [fragment.content for fragment in result] == [
+        "[step 0002]: cursor at end",
+        "choice two",
+        "choice three",
+    ]
+
+
+def test_get_journal_entries_supports_marker_range(
+    runtime_controller: RuntimeController, ledger: Ledger
+) -> None:
+    ledger.records.push_records(
+        ContentFragment(content="[step 0001]: cursor at start"),
+        ContentFragment(content="choice one"),
+        marker_type="journal",
+        marker_name="step-0001",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0002]: cursor at middle"),
+        ContentFragment(content="choice two"),
+        marker_type="journal",
+        marker_name="step-0002",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0003]: cursor at end"),
+        ContentFragment(content="choice three"),
+        marker_type="journal",
+        marker_name="step-0003",
+    )
+
+    result = runtime_controller.get_journal_entries(
+        ledger, start_marker="step-0002", end_marker="step-0003"
+    )
+
+    assert [fragment.content for fragment in result] == [
+        "[step 0002]: cursor at middle",
+        "choice two",
+    ]
 
 
 def test_get_journal_entries_only_returns_latest_step(
