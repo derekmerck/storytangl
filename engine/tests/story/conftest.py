@@ -16,8 +16,8 @@ import pytest
 from pydantic import Field, create_model
 _dict_field = StringMap, Field(default_factory=dict)
 
+SceneL_ = create_model("SceneL", __base__=Scene, locals=_dict_field)
+
 @pytest.fixture(scope="session")
 def SceneL():
-
-    SceneL = create_model("SceneL", __base__=Scene, locals=_dict_field)
-    return SceneL
+    return SceneL_

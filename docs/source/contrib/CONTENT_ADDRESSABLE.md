@@ -18,7 +18,8 @@ Use ContentAddressable when your Record type needs:
 
 ```python
 from tangl.core.entity import Record
-from tangl.core.content_addressable import ContentAddressable
+from tangl.core.record.content_addressable import ContentAddressable
+
 
 class MyTemplate(Record, ContentAddressable):
     name: str

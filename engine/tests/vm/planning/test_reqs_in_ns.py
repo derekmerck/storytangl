@@ -23,7 +23,6 @@ def test_dep_in_ns(NodeL, SubgraphL, GraphL, trivial_ctx) -> None:
     assert a in list(g.find_edges(source=m))
     assert a.satisfied and a.source is m
 
-
     ns = do_get_ns(m, ctx=trivial_ctx)
     print( ns )
     assert 'foo' in ns

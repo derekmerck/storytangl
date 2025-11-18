@@ -223,17 +223,17 @@ def test_build_scenes_wires_role_and_setting_dependencies() -> None:
     scene = graph.get(scene_uid)
     assert scene is not None
 
-    hero_uid = actor_map["hero"]
-
     scene_roles = list(graph.find_edges(source_id=scene_uid, is_instance=Role))
     assert len(scene_roles) == 1
     assert scene_roles[0].label == "leader"
-    assert scene_roles[0].destination_id == hero_uid
+    assert scene_roles[0].destination_id is None
+    assert scene_roles[0].requirement.identifier == "hero"
 
     scene_settings = list(graph.find_edges(source_id=scene_uid, is_instance=Setting))
     assert len(scene_settings) == 1
     assert scene_settings[0].label == "meeting_hall"
-    assert scene_settings[0].destination_id == location_map["town"]
+    assert scene_settings[0].destination_id is None
+    assert scene_settings[0].requirement.identifier == "town"
 
     block = graph.get(block_map["intro.start"])
     assert block is not None
@@ -241,15 +241,17 @@ def test_build_scenes_wires_role_and_setting_dependencies() -> None:
     block_roles = list(graph.find_edges(source=block, is_instance=Role))
     assert len(block_roles) == 1
     assert block_roles[0].label == "hero_role"
-    assert block_roles[0].destination_id == hero_uid
+    assert block_roles[0].destination_id is None
+    assert block_roles[0].requirement.identifier == "hero"
 
     block_settings = list(graph.find_edges(source=block, is_instance=Setting))
     assert len(block_settings) == 1
     assert block_settings[0].label == "home"
-    assert block_settings[0].destination_id == location_map["town"]
+    assert block_settings[0].destination_id is None
+    assert block_settings[0].requirement.identifier == "town"
 
 
-def test_missing_role_and_setting_targets_warn(caplog) -> None:
+def test_missing_role_creates_requirement() -> None:
     script = _base_script()
     script["scenes"] = {
         "intro": {
@@ -270,17 +272,12 @@ def test_missing_role_and_setting_targets_warn(caplog) -> None:
     location_map = world._build_locations(graph)
     block_map, _ = world._build_blocks(graph)
 
-    with caplog.at_level("WARNING"):
-        scene_map = world._build_scenes(
-            graph,
-            block_map,
-            actor_map=actor_map,
-            location_map=location_map,
-        )
-
-    warnings = caplog.text
-    assert "unknown actor" in warnings
-    assert "unknown location" in warnings
+    scene_map = world._build_scenes(
+        graph,
+        block_map,
+        actor_map=actor_map,
+        location_map=location_map,
+    )
 
     scene_uid = scene_map["intro"]
     scene = graph.get(scene_uid)
@@ -289,10 +286,40 @@ def test_missing_role_and_setting_targets_warn(caplog) -> None:
     role = graph.find_one(source_id=scene_uid, is_instance=Role)
     assert role is not None
     assert role.destination is None
+    assert role.requirement.identifier == "unknown_actor"
 
     setting = graph.find_one(source_id=scene_uid, is_instance=Setting)
     assert setting is not None
     assert setting.destination is None
+    assert setting.requirement.identifier == "unknown_location"
+
+
+def test_role_validator_creates_requirement_from_template_ref() -> None:
+    script = _base_script()
+    script["templates"] = {
+        "guardian": {
+            "obj_cls": "tangl.story.concepts.actor.actor.Actor",
+            "archetype": "guardian",
+        }
+    }
+    script["scenes"] = {
+        "castle": {
+            "blocks": {
+                "gate": {
+                    "obj_cls": "Block",
+                }
+            },
+            "roles": {"gatekeeper": {"actor_template_ref": "guardian"}},
+        }
+    }
+
+    world = _make_world(script)
+    graph = world.create_story("story")
+
+    role = graph.find_one(is_instance=Role, label="gatekeeper")
+    assert role is not None
+    assert role.destination_id is None
+    assert role.requirement.template_ref == "guardian"
 
 
 def test_story_creation_uses_default_classes_when_obj_cls_missing() -> None:

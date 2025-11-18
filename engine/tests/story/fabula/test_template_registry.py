@@ -383,7 +383,7 @@ def test_template_exposes_content_identifier_helper() -> None:
         }
     )
 
-    identifier = template.get_content_identifier()
+    identifier = template.content_identifier()
     assert isinstance(identifier, str)
     assert len(identifier) == 16
     assert identifier == template.content_hash.hex()[:16]

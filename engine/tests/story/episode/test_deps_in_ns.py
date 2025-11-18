@@ -44,7 +44,7 @@ def test_structural_domain_vars_include_dependencies():
     frame.run_phase(P.PLANNING)  # Should plan villain
     assert not role.satisfied
 
-    frame.run_phase(P.FINALIZE)
+    frame.run_phase(P.UPDATE)
 
     assert role.satisfied
     frame._invalidate_context()

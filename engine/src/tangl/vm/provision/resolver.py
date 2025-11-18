@@ -329,7 +329,15 @@ def provision_node(
     result = ProvisioningResult(node=node)
 
     indexed_provisioners = list(enumerate(provisioners))
-    dependencies = list(Dependency.get_dependencies(node))
+
+    # don't forget to check provisioning for all of the ancestors as well
+    # particularly important when going into a new scene (fixme, shouldn't
+    # be hidden like this)
+    dependencies = []
+    for a in reversed( [node] + list(node.ancestors()) ):
+        dependencies.extend(list(Dependency.get_dependencies(a)))
+    # dependencies = list(Dependency.get_dependencies(node))
+
     dependency_by_requirement: dict[UUID, Dependency] = {
         dep.requirement.uid: dep for dep in dependencies
     }

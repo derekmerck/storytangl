@@ -92,5 +92,13 @@ def test_scene_roles_link_referenced_actor() -> None:
 
     role = roles[0]
     assert isinstance(role, Role)
+
+    # Link everything (requires frontier includes cursor)
+    from tangl.vm import Frame, ResolutionPhase as P
+    frame = Frame(graph=story, cursor_id=story.initial_cursor_id)
+    assert frame is not None
+    frame.run_phase(P.PLANNING)
+    frame.run_phase(P.UPDATE)
+
     assert role.actor is actor
     assert role.satisfied is True

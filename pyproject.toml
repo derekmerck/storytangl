@@ -114,9 +114,11 @@ testpaths = [
     "apps/server/tests"           # rest server tests
 #    "worlds/*/tests"             # sample world tests
 ]
-#pythonpath = [
-#    "engine/src/tangl",
-#]
+pythonpath = [
+    "engine/src/",
+    "apps/cli/src/",
+    "apps/server/src"
+]
 norecursedirs = [
     "tmp",
     "old",

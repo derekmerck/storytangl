@@ -285,6 +285,7 @@ def test_planning_prefers_existing_over_create():
     frame.run_phase(P.PLANNING)
     assert requirement.provider is None
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
@@ -322,6 +323,7 @@ def test_planning_deduplicates_multiple_provisioners():
     frame.run_phase(P.PLANNING)
     assert requirement.provider is None
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
@@ -329,7 +331,7 @@ def test_planning_deduplicates_multiple_provisioners():
     assert receipt.attached == 1
     # Only ONE build receipt should exist (deduplication worked)
     builds = []
-    for call_receipt in frame.phase_receipts.get(P.FINALIZE, []):
+    for call_receipt in frame.phase_receipts.get(P.UPDATE, []):
         if isinstance(call_receipt.result, list):
             builds.extend(call_receipt.result)
         dependency_builds = [
@@ -343,7 +345,7 @@ def test_planning_deduplicates_multiple_provisioners():
 def test_planning_marks_unresolved_hard_requirement():
     """Hard requirements without offers are marked unresolved."""
     graph = Graph(label="demo")
-    cursor = graph.add_node(label="scene")
+    cursor = graph.add_node(label="cursor")
     
     requirement = Requirement(
         graph=graph,
@@ -364,7 +366,7 @@ def test_planning_marks_unresolved_hard_requirement():
     
     # Run planning/finalize phases
     frame.run_phase(P.PLANNING)
-
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
@@ -399,6 +401,7 @@ def test_planning_waives_soft_requirement():
     # Run planning/finalize phases
     frame.run_phase(P.PLANNING)
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
@@ -436,6 +439,7 @@ def test_planning_creates_when_no_existing():
     frame.run_phase(P.PLANNING)
     assert requirement.provider is None
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
@@ -499,6 +503,7 @@ def test_planning_affordances_dont_duplicate_labels():
     # Run planning/finalize phases
     frame.run_phase(P.PLANNING)
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     # Only ONE affordance should be attached (label uniqueness enforced)
@@ -506,12 +511,9 @@ def test_planning_affordances_dont_duplicate_labels():
     # The receipt counts affordances in the "attached" counter
     # Since affordances are always EXISTING policy, they increment attached
     builds = []
-    for call_receipt in frame.phase_receipts.get(P.FINALIZE, []):
+    for call_receipt in frame.phase_receipts.get(P.UPDATE, []):
         if isinstance(call_receipt.result, list):
             builds.extend(call_receipt.result)
     affordance_builds = [b for b in builds if hasattr(b, 'requirement_id') and b.requirement_id.int == 0]
     assert len(affordance_builds) == 1
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

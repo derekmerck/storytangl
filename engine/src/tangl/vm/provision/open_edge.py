@@ -75,6 +75,8 @@ class Dependency(Edge, Generic[NodeT]):
 
     @classmethod
     def get_dependencies(cls, node: Node, **criteria):
+        # subgraphs don't have edges_out
+        return node.graph.find_edges(is_instance=cls, source=node, **criteria)
         return node.edges_out(is_instance=Dependency, **criteria)
 
 

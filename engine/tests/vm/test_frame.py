@@ -113,6 +113,7 @@ def test_provisioning_create_policy_assigns_provider():
     frame.run_phase(P.PLANNING)
     assert not req.satisfied
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
     assert receipt is not None
     assert req.satisfied

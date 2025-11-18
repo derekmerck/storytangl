@@ -1517,6 +1517,25 @@ templates:
 
 ---
 
-**Document Version:** 2.1  
-**Date:** 2024-11-14  
+## Implementation Status
+
+### Phase 1-2: Template Registry & TemplateProvisioner ✅ COMPLETE
+
+### Phase 3: World Creation Modes ✅ LAZY MODE (DEFAULT)
+
+Current runtime behavior wires role and setting edges with attached requirements, leaving
+all provisioning to the planning phase:
+
+- GraphProvisioner binds existing affordances that satisfy the requirement.
+- TemplateProvisioner materializes nodes from templates when no affordance is available.
+
+World creation does not pre-link destinations. The compiler remains lean and the virtual
+machine owns provisioning. A future optimization could add a `pre_plan=True` flag on the
+VM to pre-run planning for faster traversal; this would remain outside the World
+builder.
+
+---
+
+**Document Version:** 2.1
+**Date:** 2024-11-14
 **Status:** Design Target (Implementation in Progress)

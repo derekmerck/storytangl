@@ -556,26 +556,7 @@ class World(Singleton):
             payload.setdefault("label", role_label)
             payload.setdefault("source_id", source_node.uid)
             payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
-            actor_identifier = role_spec.get("actor_ref") or role_label
-            actor_uid = actor_map.get(actor_identifier)
-            if actor_uid is None:
-                if role_spec.get("actor_ref"):
-                    logger.warning(
-                        "Role '%s' references unknown actor '%s'",
-                        role_label,
-                        role_spec["actor_ref"],
-                    )
-            else:
-                payload.setdefault("destination_id", actor_uid)
-
-            role = role_cls.structure(payload)
-
-            if actor_uid is None:
-                continue
-
-            actor = graph.get(actor_uid)
-            if actor is not None and hasattr(role, "actor"):
-                role.actor = actor  # type: ignore[attr-defined]
+            role_cls.structure(payload)
 
     def _wire_settings(
         self,
@@ -602,26 +583,7 @@ class World(Singleton):
             payload.setdefault("label", setting_label)
             payload.setdefault("source_id", source_node.uid)
             payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
-            location_identifier = setting_spec.get("location_ref") or setting_label
-            location_uid = location_map.get(location_identifier)
-            if location_uid is None:
-                if setting_spec.get("location_ref"):
-                    logger.warning(
-                        "Setting '%s' references unknown location '%s'",
-                        setting_label,
-                        setting_spec["location_ref"],
-                    )
-            else:
-                payload.setdefault("destination_id", location_uid)
-
-            setting = setting_cls.structure(payload)
-
-            if location_uid is None:
-                continue
-
-            location = graph.get(location_uid)
-            if location is not None and hasattr(setting, "location"):
-                setting.location = location  # type: ignore[attr-defined]
+            setting_cls.structure(payload)
 
     def _build_action_edges(
         self,

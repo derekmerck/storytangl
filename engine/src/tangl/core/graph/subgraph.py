@@ -10,9 +10,7 @@ from .graph import GraphItem, Graph
 if TYPE_CHECKING:
     from .node import Node
 
-# todo: should be a registry b/c its a collection?  It's really a _view_ of a registry
-#       just need to implement pass-through for get and have add() and values() refer
-#       to a private member list
+
 class Subgraph(GraphItem):
     """
     Subgraph(members: list[GraphItem], subgraph_type: str)
