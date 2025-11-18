@@ -148,7 +148,8 @@ class World(Singleton):
         def _parse_template(label: str, raw_data: Any, scope: ScopeSelector | None) -> BaseScriptItem | None:
             if isinstance(raw_data, BaseScriptItem):
                 template_cls: type[BaseScriptItem] = raw_data.__class__
-                scope_specified = getattr(raw_data, "scope", None) is not None
+                fields_set = getattr(raw_data, "model_fields_set", set())
+                scope_specified = "scope" in fields_set
                 updates: dict[str, Any] = {}
                 if not raw_data.label and label:
                     updates["label"] = label
