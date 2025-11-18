@@ -177,14 +177,14 @@ class Block(Node, HasEffects):
     @story_dispatch.register(task=P.JOURNAL, priority=Prio.LATE)
     def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
         """
-        JOURNAL (LATE): collect "choice" fragments for available actions.
+        JOURNAL (LATE): collect "choice" fragments for outgoing actions.
 
         Returns
         -------
         list[BaseFragment] | None
         """
         fragments: list[BaseFragment] = []
-        for choice in self.get_choices(ctx=ctx, is_instance=Action):
+        for choice in self.edges_out(is_instance=Action, trigger_phase=None):
             f = choice.choice_fragment(ctx=ctx)
             if f:
                 fragments.append(f)

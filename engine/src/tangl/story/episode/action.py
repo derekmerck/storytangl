@@ -3,9 +3,11 @@ from collections.abc import Mapping
 from typing import Optional, Any
 
 from tangl.core import Node, BaseFragment, Graph
+from tangl.journal.discourse import ChoiceFragment
 from tangl.vm import ChoiceEdge, Context
 from tangl.story.runtime import ContentRenderer
 from tangl.vm.runtime import HasConditions, HasEffects
+from tangl.vm.provision import Dependency
 
 class Action(ChoiceEdge, HasConditions, HasEffects):
 
@@ -18,25 +20,46 @@ class Action(ChoiceEdge, HasConditions, HasEffects):
     def get_content(self) -> str:
         return self.content or self.label or "continue"
 
-    def choice_fragment(self: Action, *, ctx: Context, **locals_: Any) -> BaseFragment | None:
-        """Render inline content for a block."""
+    def choice_fragment(self: Action, *, ctx: Context, **locals_: Any) -> ChoiceFragment | None:
+        """Render this action as a journaled choice fragment."""
+
         content = self.get_content()
         content = ContentRenderer.render_with_ctx(content, self, ctx=ctx)
-        if content:
-            if self.payload:
-                return BaseFragment(
-                    content=content,
-                    payload=self.payload,
-                    source_id=self.uid,
-                    source_label=self.label,
-                    fragment_type="choice",
-                )
-            return BaseFragment(
-                content=content,
-                source_id=self.uid,
-                source_label=self.label,
-                fragment_type="choice",
-            )
+
+        if not content:
+            return None
+
+        is_available = self.is_available(ctx=ctx)
+        unavailable_reason: str | None = None
+
+        unmet_dependencies: list[Dependency] = []
+        if self.destination_id:
+            destination = self.graph.get(self.destination_id)
+            if destination is not None:
+                unmet_dependencies = [
+                    edge
+                    for edge in self.graph.find_edges(
+                        source_id=destination.uid,
+                        is_instance=Dependency,
+                    )
+                    if edge.requirement.hard_requirement and not edge.requirement.satisfied
+                ]
+                if unmet_dependencies:
+                    is_available = False
+                    labels = [edge.label or "requirement" for edge in unmet_dependencies]
+                    unavailable_reason = f"Requires: {', '.join(labels)}"
+
+        if not is_available and unavailable_reason is None:
+            unavailable_reason = "Prerequisites not met"
+
+        return ChoiceFragment(
+            content=content,
+            source_id=self.uid,
+            source_label=self.label,
+            active=is_available,
+            unavailable_reason=unavailable_reason,
+            activation_payload=self.payload,
+        )
 
     def is_available(
         self,

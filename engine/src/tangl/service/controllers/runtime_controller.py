@@ -79,28 +79,6 @@ class RuntimeController(HasApiEndpoints):
             "journal_size": sum(1 for _ in ledger.records.iter_channel("fragment")),
         }
 
-    # todo: this could be out of sync with fragments b/c it doesn't check availability
-    #       is it necessary at all for client functioning?  Or should we just use get
-    #       latest journal entry and take choices from that?
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        response_type=ResponseType.INFO,
-    )
-    def get_available_choices(self, ledger: Ledger) -> list[dict[str, Any]]:
-        """Return lightweight metadata for the cursor's outgoing choices."""
-
-        node = ledger.graph.get(ledger.cursor_id)
-        if node is None:
-            return []
-
-        choices: list[dict[str, Any]] = []
-        for edge in ledger.graph.find_edges(source_id=node.uid):
-            if not isinstance(edge, ChoiceEdge):
-                continue
-            label = getattr(edge, "text", None) or getattr(edge, "label", None) or ""
-            choices.append({"uid": edge.uid, "label": label})
-        return choices
-
     @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,
         method_type=MethodType.UPDATE,

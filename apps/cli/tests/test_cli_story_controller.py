@@ -30,9 +30,15 @@ class RecordingCLI(cmd2.Cmd):
     def call_endpoint(self, endpoint: str, /, **params: object) -> object:
         self.calls.append((endpoint, params))
         if endpoint.endswith("get_journal_entries"):
-            return [SimpleNamespace(content="start")]
-        if endpoint.endswith("get_available_choices"):
-            return [{"uid": self.choice_id, "label": "Go"}]
+            return [
+                SimpleNamespace(content="start"),
+                SimpleNamespace(
+                    fragment_type="choice",
+                    content="Go",
+                    active=True,
+                    source_id=self.choice_id,
+                ),
+            ]
         if endpoint.endswith("resolve_choice"):
             return {"fragments": [SimpleNamespace(content="moved")]} 
         if endpoint.endswith("get_story_info"):
@@ -56,7 +62,6 @@ def test_story_command_fetches_journal_and_choices(story_controller: StoryContro
     story_controller.do_story()
     cli = story_controller._cmd
     assert cli.calls[0][0].endswith("get_journal_entries")
-    assert cli.calls[1][0].endswith("get_available_choices")
     assert any("Choices:" in line for line in cli.outputs)
 
 
@@ -68,6 +73,33 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     assert resolve_calls
     _, params = resolve_calls[-1]
     assert params["choice_id"] == cli.choice_id
+
+
+def test_cli_shows_locked_choices_with_reason(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    locked_fragment = SimpleNamespace(
+        fragment_type="choice",
+        content="Open vault",
+        active=False,
+        unavailable_reason="Requires keycard",
+        source_id=uuid4(),
+    )
+    active_fragment = SimpleNamespace(
+        fragment_type="choice",
+        content="Go north",
+        active=True,
+        source_id=uuid4(),
+    )
+
+    cli.outputs.clear()
+    story_controller._current_story_update = [locked_fragment, active_fragment]
+    story_controller._current_choices = story_controller._load_choices()
+
+    story_controller._render_current_story_update()
+
+    output = "\n".join(cli.outputs)
+    assert "1. Go north" in output
+    assert "x) Open vault [locked: Requires keycard]" in output
 
 
 def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:

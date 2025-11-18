@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from tangl.core import Graph, Node
 from tangl.vm.context import Context
+from tangl.core import Graph, Node
 from tangl.story.episode.action import Action
 from tangl.story.episode.block import Block
 from tangl.story.story_graph import StoryGraph
+from tangl.vm import Context
+from tangl.vm.provision import Dependency, Requirement, ProvisioningPolicy
 
 
 def _make_graph() -> tuple[Graph, Node, Node]:
@@ -89,3 +92,34 @@ def test_action_is_available_inherits_block_namespace() -> None:
     ctx_after = Context(graph=story, cursor_id=start.uid, step=2)
 
     assert action not in start.get_choices(ctx=ctx_after, is_instance=Action)
+
+
+def test_choice_fragment_marks_unavailable_with_reason() -> None:
+    graph = StoryGraph(label="action_choice_unavailable")
+    block = Block(graph=graph, label="block")
+    target = Block(graph=graph, label="target")
+    block.locals["has_key"] = False
+
+    action = Action(
+        graph=graph,
+        source_id=block.uid,
+        destination_id=target.uid,
+        label="locked_door",
+        conditions=["False"],
+    )
+
+    requirement = Requirement(
+        graph=graph,
+        identifier="keycard",
+        policy=ProvisioningPolicy.EXISTING,
+        hard_requirement=True,
+    )
+    Dependency(graph=graph, source_id=target.uid, requirement=requirement, label="keycard")
+
+    ctx = Context(graph=graph, cursor_id=block.uid)
+    fragment = action.choice_fragment(ctx=ctx)
+
+    assert fragment is not None
+    assert fragment.active is False
+    assert fragment.unavailable_reason is not None
+    assert "keycard" in fragment.unavailable_reason.lower()

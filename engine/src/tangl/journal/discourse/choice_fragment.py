@@ -12,7 +12,8 @@ class ChoiceFragment(ContentFragment, extra='allow'):
     #   True  -> activatable and enabled
     #   False -> activatable but disabled
     active: Optional[bool] = True
-    # todo: could provide a reason it is inactive as well in message
+    # Human-readable explanation for why this choice is unavailable
+    unavailable_reason: Optional[str] = None
 
     # Params to be included with the cb if the fragment is "activated", i.e., a choice, link, button, input, rollover hint, custom ui event trigger
     activation_payload: Optional[Any] = None

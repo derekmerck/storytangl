@@ -93,8 +93,10 @@ async def get_story_update(
         user_id=user_id,
         limit=limit,
     )
-    choices = _call(orchestrator, "RuntimeController.get_available_choices", user_id=user_id)
-    return {"fragments": _serialize(fragments), "choices": _serialize(choices)}
+    choice_fragments = [
+        fragment for fragment in fragments if getattr(fragment, "fragment_type", None) == "choice"
+    ]
+    return {"fragments": _serialize(fragments), "choices": _serialize(choice_fragments)}
 
 
 @router.post("/do")

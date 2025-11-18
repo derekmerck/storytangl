@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tangl.core import BaseFragment
+from tangl.core import BaseFragment
 from tangl.story.episode import Block, Action
 from tangl.story.concepts import Concept
 from tangl.story.story_graph import StoryGraph
@@ -94,5 +95,35 @@ def test_block_journal_renders_choice_menu() -> None:
     assert len(menus) == 2
     assert menus[0].content == "Left"
     assert menus[1].content == "Right"
+
+
+def test_block_journal_includes_locked_choices() -> None:
+    g = StoryGraph(label="test")
+    start = Block(graph=g, label="start")
+    open_block = Block(graph=g, label="open")
+    locked_block = Block(graph=g, label="locked")
+    start.locals["has_key"] = False
+
+    Action(graph=g, source_id=start.uid, destination_id=open_block.uid, label="Open Door")
+    Action(
+        graph=g,
+        source_id=start.uid,
+        destination_id=locked_block.uid,
+        label="Locked Door",
+        conditions=["False"],
+    )
+
+    frame = Frame(graph=g, cursor_id=start.uid)
+    fragments = frame.run_phase(P.JOURNAL)
+
+    choice_fragments = _by_fragment_type(fragments, "choice")
+    assert len(choice_fragments) == 2
+
+    active = [fragment for fragment in choice_fragments if fragment.active]
+    inactive = [fragment for fragment in choice_fragments if not fragment.active]
+
+    assert len(active) == 1
+    assert len(inactive) == 1
+    assert inactive[0].unavailable_reason is not None
 
 
