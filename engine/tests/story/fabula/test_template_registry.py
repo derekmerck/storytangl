@@ -8,7 +8,7 @@ from uuid import UUID
 import pytest
 
 from tangl.ir.core_ir.script_metadata_model import ScriptMetadata
-from tangl.ir.story_ir import ActorScript, LocationScript, StoryScript
+from tangl.ir.story_ir import ActorScript, BlockScript, LocationScript, SceneScript, StoryScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
@@ -135,6 +135,30 @@ def test_explicit_scope_overrides_inferred() -> None:
 
     explicit_template = templates["scene_guard"]
     assert explicit_template.scope is None
+
+
+def test_inline_templates_respect_explicit_none_scope() -> None:
+    """Inline script instances should preserve ``scope=None`` even in nested contexts."""
+
+    inline_template = ActorScript(label="scene.guard", scope=None)
+    block = BlockScript.model_construct(label="village.market")
+    scene_script = SceneScript.model_construct(
+        label="village",
+        blocks={"village.market": block},
+        templates={"scene.guard": inline_template},
+    )
+    script = StoryScript.model_construct(
+        label="example",
+        metadata=ScriptMetadata(title="Example", author="Tests"),
+        scenes={"village": scene_script},
+    )
+
+    manager = ScriptManager(master_script=script)
+    world = World(label="example", script_manager=manager)
+    templates = _collect_templates(world)
+
+    inline_scene_template = templates["scene_guard"]
+    assert inline_scene_template.scope is None
 
 
 def test_template_registry_queries() -> None:
