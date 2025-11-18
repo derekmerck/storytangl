@@ -33,6 +33,16 @@ class GraphItem(Entity):
     * **Hierarchy helpers** – :meth:`parent`, :meth:`ancestors`, :meth:`root`, :meth:`path`.
     * **Stable identity** – :meth:`_id_hash` includes the graph uid when present.
 
+    .. admonition::Auto-Registration
+        If possible, GraphItems will automatically register with their
+        parent Graph on instantiation since they are inert without graph
+        context (cannot resolve relationships, query neighbors, etc.).
+        GraphItems are bound to a single graph for their lifetime and
+        should not be transferred between graphs.
+
+        Use `graph.add(item)` only when you need to defer registration or
+        explicitly document the attachment point.
+
     API
     ---
     - :attr:`graph` – back-reference to the owning :class:`Graph` (not serialized).

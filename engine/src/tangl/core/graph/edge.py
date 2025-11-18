@@ -35,6 +35,16 @@ class Edge(GraphItem):
     - :attr:`source` / :attr:`destination` – properties with validation on set.
     - :meth:`__repr__` – compact label showing endpoints for debugging.
 
+    .. admonition:: Mutability
+        Edges are intentionally mutable to support provisioning workflows
+        (e.g., retargeting open-ended dependencies).
+        However, mutating edges post-attachment requires careful consideration
+        of graph consistency. Most edges should be treated as immutable after
+        their initial binding.
+
+        See :class:`~tangl.vm.provision.Dependency` edges for an example of
+        controlled mutation during the planning phase.
+
     See also
     --------
     :class:`~tangl.core.graph.AnonymousEdge`
