@@ -1,0 +1,124 @@
+label: tier2_demo
+metadata:
+  title: "The Quest for the Crystal"
+  author: "Test Harness"
+
+globals:
+  has_crystal: false
+  has_map: false
+  visited_shrine: false
+  companion_trust: 0
+
+items:
+  crystal:
+    obj_cls: tangl.story.concepts.item.Item
+    name: "Ancient Crystal"
+    description: "A shard that hums with latent power."
+  map:
+    obj_cls: tangl.story.concepts.item.Item
+    name: "Treasure Map"
+    description: "A weathered chart marking the shrine."
+
+actors:
+  companion:
+    obj_cls: tangl.story.concepts.actor.actor.Actor
+    name: "Aria the Ranger"
+    tags: [npc, ally]
+
+scenes:
+  village:
+    roles:
+      companion:
+        obj_cls: tangl.story.concepts.actor.role.Role
+        actor_ref: companion
+    blocks:
+      start:
+        content: "You arrive in a quiet village."
+        actions:
+          - text: "Talk to Aria"
+            successor: meet_companion
+          - text: "Visit the shrine"
+            successor: shrine.entrance
+          - text: "Head into the wilds"
+            successor: wilds.trail
+
+      meet_companion:
+        content: "Aria greets you and offers to guide your search."
+        effects:
+          - "companion_trust = max(companion_trust, 2)"
+        actions:
+          - text: "Ask for guidance"
+            successor: guidance
+          - text: "Request her help"
+            successor: start
+            effects:
+              - "companion_trust = max(companion_trust, 4)"
+
+      guidance:
+        content: "She mentions an old shrine where the crystal is kept."
+        continues:
+          - successor: start
+            trigger: last
+
+  wilds:
+    roles:
+      companion:
+        obj_cls: tangl.story.concepts.actor.role.Role
+        actor_ref: companion
+    blocks:
+      trail:
+        content: "You follow Aria into the thick forest trails."
+        actions:
+          - text: "Search for the map"
+            successor: shrine.entrance
+            conditions:
+              - "companion_trust >= 2"
+              - "'companion' in {concept.label for concept in ctx.cursor.get_concepts()}"
+            effects:
+              - "Item.acquire('map', graph=graph)"
+              - "has_map = True"
+          - text: "Return to the village"
+            successor: village.start
+
+  shrine:
+    roles:
+      companion:
+        obj_cls: tangl.story.concepts.actor.role.Role
+        actor_ref: companion
+    blocks:
+      entrance:
+        content: "An ancient shrine stands before you."
+        effects:
+          - "visited_shrine = True"
+        actions:
+          - text: "Ask Aria to translate the runes"
+            successor: lore
+            conditions:
+              - "'companion' in {concept.label for concept in ctx.cursor.get_concepts()}"
+          - text: "Take the crystal"
+            successor: crystal_obtained
+            conditions:
+              - "companion_trust >= 5"
+              - "has_map"
+          - text: "Return to the village"
+            successor: village.start
+
+      lore:
+        content: "The inscriptions reveal a trial of worthiness."
+        effects:
+          - "companion_trust = companion_trust + 2 if has_map else companion_trust + 1"
+        continues:
+          - successor: entrance
+            trigger: last
+
+      crystal_obtained:
+        content: "The crystal hums as you lift it from the altar."
+        effects:
+          - "Item.acquire('crystal', graph=graph)"
+          - "has_crystal = True"
+        actions:
+          - text: "Return triumphantly"
+            successor: finale
+
+      finale:
+        content: "With Aria at your side, you depart with the Ancient Crystal."
