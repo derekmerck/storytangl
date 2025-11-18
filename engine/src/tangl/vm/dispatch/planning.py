@@ -105,14 +105,14 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
 
     frontier = _iter_frontier(cursor)
 
-    if not frontier:
-        logger.debug("No frontier from %s - provisioning cursor", cursor.label)
-        frontier = [cursor]
+    # if not frontier:
+    #     logger.debug("No frontier from %s - provisioning cursor", cursor.label)
+    #     frontier = [cursor]
 
     provisioners = do_get_provisioners(cursor, ctx=ctx)
 
     if not provisioners:
-        logger.warning("No provisioners available for %s", cursor.label)
+        logger.warning("No provisioners available for %s", cursor.get_label())
         ctx.frontier_provision_results.clear()
         ctx.frontier_provision_plans.clear()
         object.__setattr__(ctx, "planning_indexed_provisioners", [])
@@ -126,8 +126,9 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
 
     frontier_results: dict[UUID, ProvisioningResult] = {}
 
-    for node in frontier:
-        logger.debug("Provisioning frontier node: %s", node.label)
+    for node in [cursor] + frontier:
+        # always provision the cursor (fixme, shouldn't have to do this)
+        logger.debug("Provisioning frontier node: %s", node.get_label())
 
         try:
             result = provision_node(node, provisioners, ctx=prov_ctx)
@@ -142,31 +143,36 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
             if not result.is_viable:
                 logger.debug(
                     "  └─ Frontier node %s is NOT viable: %s unresolved hard requirements",
-                    node.label,
+                    node.get_label(),
                     len(result.unresolved_hard_requirements),
                 )
             else:
                 logger.debug(
                     "  └─ Frontier node %s is viable: %s/%s requirements satisfied",
-                    node.label,
+                    node.get_label(),
                     result.satisfied_count,
-                    total_requirements or 1,
+                    total_requirements,
                 )
 
         except Exception as exc:  # pragma: no cover - defensive guard
             logger.error("Error provisioning %s: %s", node.label, exc, exc_info=True)
             frontier_results[node.uid] = ProvisioningResult(node=node)
 
+    logger.debug(f"frontier: {frontier!r}")
     viable_nodes: list[Node] = []
     for node in frontier:
         result = frontier_results.get(node.uid)
+        logger.debug(f"Checking frontier node: {node!r}.viable = {result}")
         if result is not None and result.is_viable:
             viable_nodes.append(node)
 
-    if not viable_nodes:
+    if cursor not in viable_nodes:
+        logger.error(f"Failed to provision {cursor!r}!")
+
+    if bool(frontier) and not bool(viable_nodes):
         logger.warning(
             "⚠️  SOFTLOCK DETECTED at %s: None of the %s frontier nodes are viable.",
-            cursor.label,
+            cursor.get_label(),
             len(frontier),
         )
 
@@ -200,8 +206,9 @@ def _planning_index_frontier_plans(cursor: Node, *, ctx: Context, **_):
 
     return plans
 
+from .update import on_update
 
-@on_finalize(priority=Prio.FIRST, label="apply_frontier_provisions")
+@on_update(priority=Prio.FIRST, label="apply_frontier_provisions")
 def _finalize_apply_frontier_provisions(cursor: Node, *, ctx: Context, **_):
     """Execute cached provisioning plans and record build receipts."""
 
@@ -251,12 +258,27 @@ def _planning_job_receipt(cursor: Node, *, ctx: Context, **_):
     builds = list(getattr(ctx, "provision_builds", []))
     frontier_results = getattr(ctx, "frontier_provision_results", {})
 
-    viable_count = sum(1 for result in frontier_results.values() if result.is_viable)
-    softlock_detected = bool(frontier_results) and viable_count == 0
-    frontier_node_ids = list(frontier_results.keys())
+    # There might be a lot of extra nodes in frontier results, lets narrow it down to just the actual frontier
+    only_frontier_uids = [ v.uid for v in _iter_frontier(cursor)]
+    only_frontier_results = { k: v for k, v in frontier_results.items() if k in only_frontier_uids }
+
+    softlock_detected = False
+
+    if x := frontier_results.get(cursor.uid):
+        if not x.is_viable:
+            logger.error(f"Cursor {cursor!r} is not viable!")
+            softlock_detected = True
+
+    viable_count = sum(1 for result in only_frontier_results.values() if result.is_viable)
+    logger.debug("Viable count: %d", viable_count)
+    logger.debug("Frontier nodes: %s", [cursor.graph.get(f).get_label() for f in only_frontier_uids])
+    if bool(only_frontier_uids) and viable_count == 0:
+        logger.warning(f"Failed to provision any frontier nodes.")
+        softlock_detected = True
+    frontier_node_ids = only_frontier_uids
 
     unresolved_hard_reqs: list[UUID] = []
-    for result in frontier_results.values():
+    for uid, result in frontier_results.items():
         unresolved_hard_reqs.extend(result.unresolved_hard_requirements)
 
     waived_soft_requirements: list[UUID] = []

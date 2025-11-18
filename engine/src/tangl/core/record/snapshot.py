@@ -3,8 +3,8 @@ from typing import TypeVar, Generic, Literal
 import logging
 from copy import deepcopy
 
-from tangl.type_hints import Hash
 from tangl.core.entity import Entity
+from .content_addressable import ContentAddressable
 from .record import Record
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ logger.setLevel(logging.WARNING)
 
 EntityT = TypeVar('EntityT', bound=Entity)
 
-class Snapshot(Record, Generic[EntityT]):
+class Snapshot(Record, ContentAddressable, Generic[EntityT]):
     """
     Snapshot[EntityT]()
 
@@ -52,17 +52,16 @@ class Snapshot(Record, Generic[EntityT]):
     """
     record_type: Literal['snapshot'] = 'snapshot'
     item: EntityT  #: :meta-private:
-    item_state_hash: Hash
 
     @classmethod
     def from_item(cls, item: EntityT) -> Snapshot[EntityT]:
         # No need to unstructure or serialize here, that can be handled by the
         # general persistence manager like anything else.
-        return cls(item=deepcopy(item), item_state_hash=item._state_hash())
+        return cls(item=deepcopy(item), content_hash=item._state_hash())
 
     def restore_item(self, verify: bool = False) -> EntityT:
         item = deepcopy(self.item)
-        if verify and item._state_hash() != self.item_state_hash:
+        if verify and item._state_hash() != self.content_hash:
             raise RuntimeError("Recovered item state does not match item state hash.")
         return item
 

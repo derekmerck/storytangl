@@ -93,19 +93,20 @@ def test_no_hash_when_get_hashable_content_returns_none():
 
     assert record.content_hash is None
 
+import logging
 
 def test_get_content_identifier_with_hash():
     record = SimpleContentRecord(name="test", value=42)
 
-    identifier = record.get_content_identifier()
+    identifier = record.content_identifier()
     assert len(identifier) == 16
     assert identifier == record.content_hash.hex()[:16]
 
 
 def test_get_content_identifier_without_hash():
     record = NoHashRecord(name="test")
-
-    assert record.get_content_identifier() == "no-hash"
+    logging.debug(record.content_identifier())
+    assert record.content_identifier() == "no-hash"
 
 
 def test_content_hash_serialization_roundtrip():

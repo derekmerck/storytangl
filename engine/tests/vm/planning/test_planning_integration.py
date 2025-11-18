@@ -116,6 +116,7 @@ def test_planning_cycle_with_mixed_requirements():
     frame = Frame(graph=g, cursor_id=start.uid)
 
     frame.run_phase(P.PLANNING)
+    frame.run_phase(P.UPDATE)
     planning_receipt_start = frame.run_phase(P.FINALIZE)
     assert planning_receipt_start.created >= 1
     assert planning_receipt_start.attached >= 1
@@ -197,6 +198,7 @@ def test_softlock_detection_and_prevention():
     frame = Frame(graph=g, cursor_id=start.uid)
 
     frame.run_phase(P.PLANNING)
+    frame.run_phase(P.UPDATE)
     planning_receipt = frame.run_phase(P.FINALIZE)
 
     assert planning_receipt.unresolved_hard_requirements == [req_key.uid]
@@ -321,6 +323,7 @@ def test_hard_requirement_satisfied_by_affordance():
 
     assert hard_requirement.provider is None
 
+    frame.run_phase(P.UPDATE)
     planning_receipt = frame.run_phase(P.FINALIZE)
 
     assert hard_requirement.provider == guardian

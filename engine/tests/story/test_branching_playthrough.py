@@ -70,6 +70,10 @@ def test_branching_left_path_walkthrough(resources_dir: Path) -> None:
     assert len(choices) >= 2
     assert any("left" in fragment.content.lower() for fragment in choices)
     assert any("right" in fragment.content.lower() for fragment in choices)
+
+    assert "guide" in ledger.graph.all_labels()
+    assert 'guide' in [c.label for c in ledger.graph.get(ledger.cursor_id).get_concepts()]
+
     assert any("guide" in fragment.content.lower() for fragment in choices)
 
     left_choice = next(fragment for fragment in choices if "left" in fragment.content.lower())

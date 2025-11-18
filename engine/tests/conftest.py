@@ -55,21 +55,21 @@ import pytest
 
 _dict_field = StringMap, Field(default_factory=dict)
 
+GraphL_ = create_model("GraphL", __base__=Graph, locals=_dict_field)
+
 @pytest.fixture(scope="session")
 def GraphL():
+    return GraphL_
 
-    GraphL = create_model("GraphL", __base__=Graph, locals=_dict_field)
-    return GraphL
-
+SubgraphL_ = create_model("SubgraphL", __base__=Subgraph, locals=_dict_field)
 @pytest.fixture(scope="session")
 def SubgraphL():
-    SubgraphL = create_model("SubgraphL", __base__=Subgraph, locals=_dict_field)
-    return SubgraphL
+    return SubgraphL_
 
+NodeL_ = create_model("NodeL", __base__=Node, locals=_dict_field)
 @pytest.fixture(scope="session")
 def NodeL():
-    NodeL = create_model("NodeL", __base__=Node, locals=_dict_field)
-    return NodeL
+    return NodeL_
 
 from pathlib import Path
 

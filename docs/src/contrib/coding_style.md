@@ -37,10 +37,36 @@ presentation (renderers, web/UI)
 - **Hooks over overrides** where it improves clarity—use `_structure_post/_unstructure_post` to avoid mutual recursion.  
   *Alternate pattern allowed:* explicit `structure/unstructure` overrides with a clear base case and round-trip tests.
 
+
 ## 4) Data model & serialization
 - Pydantic v2 models for entities and records.
 - `Entity.structure(data)` is the factory; `unstructure()` emits a minimal, portable dict (class tag + uid).
 - No implicit IO in models; persistence belongs to ledger/service.
+
+## 4a) Type purity on attributes
+- **Store types in their native form; serialize only at boundaries.**
+  - Hash digests are `bytes`, not hex strings (`content_hash: bytes`).
+  - UUIDs are `UUID` objects, not strings.
+  - Datetimes are `datetime` objects, not ISO strings.
+  - Entity types are Python `Type` objects, not fully‑qualified name strings.
+
+- **Use Pydantic serializers for JSON/YAML output.**
+  - Add `@field_serializer` for rich types needing string form (e.g., `bytes.hex()`).
+  - Keep in‑memory types pure for comparisons, hashing, and fast operations.
+  - Example: `content_hash: bytes` serializes to hex via a serializer, not by storing hex internally.
+
+- **Expose convenience accessors when appropriate.**
+  - Properties such as `.content_hash_hex` for logs/UI.
+  - Validators accepting multiple input forms (hex string → bytes).
+  - Registry/query helpers that accept either native or serialized representations.
+
+- **Rationale.**
+  - Faster operations: comparing `bytes`/`UUID` beats parsing strings.
+  - Stronger type safety: mistakes surface at boundaries.
+  - Lower overhead: avoid repeated `.hex()`/`str()` conversions in hot paths.
+  - Clearer semantics: `obj_cls: Type[Entity]` expresses intent better than a string FQN.
+  - Type objects are the native representation in Python; FQNs serve only as serialized forms.
+  - Serialization is a boundary concern; runtime behavior should never pay for it.
 
 ## 5) Mutations & replay
 - Plan → Project → Commit. Planning computes intent; commit applies and logs artifacts.

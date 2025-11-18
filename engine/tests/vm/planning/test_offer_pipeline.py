@@ -7,8 +7,8 @@ from tangl.vm.provision import (
     TemplateProvisioner,
     ProvisioningPolicy,
     PlanningReceipt,
-    BuildReceipt,
 )
+from conftest import _collect_build_receipts
 
 
 def _frame_with_provisioners():
@@ -28,15 +28,6 @@ def _frame_with_provisioners():
     return graph, cursor, frame
 
 
-def _collect_build_receipts(frame: Frame) -> list[BuildReceipt]:
-    receipts: list[BuildReceipt] = []
-    for call in frame.phase_receipts.get(P.FINALIZE, []):
-        result = call.result
-        if isinstance(result, list):
-            receipts.extend(br for br in result if isinstance(br, BuildReceipt))
-    return receipts
-
-
 def test_planning_prefers_existing_offer():
     graph, cursor, frame = _frame_with_provisioners()
     existing = graph.add_node(label="door")
@@ -51,6 +42,7 @@ def test_planning_prefers_existing_offer():
     frame.run_phase(P.PLANNING)
     assert requirement.provider is None
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)
@@ -76,6 +68,7 @@ def test_planning_marks_unresolved_requirement():
 
     assert requirement.provider is None
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert isinstance(receipt, PlanningReceipt)

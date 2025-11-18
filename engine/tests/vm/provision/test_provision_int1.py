@@ -46,6 +46,7 @@ def test_provision_existing_success():
     assert req.provider is None
     assert not req.satisfied
 
+    frame.run_phase(P.UPDATE)
     frame.run_phase(P.FINALIZE)
     assert req.provider is target
     assert req.satisfied
@@ -73,6 +74,7 @@ def test_provision_update_modifies_existing():
     assert not req.satisfied
     assert target.label == "T"
 
+    frame.run_phase(P.UPDATE)
     frame.run_phase(P.FINALIZE)
     assert req.satisfied and target.label == "T2"
 
@@ -91,6 +93,7 @@ def test_provision_clone_produces_new_uid():
     assert not req.satisfied
     assert req.provider is None
 
+    frame.run_phase(P.UPDATE)
     frame.run_phase(P.FINALIZE)
     assert req.satisfied and req.provider.label == "RefClone"
     assert req.provider.uid != ref.uid and req.provider in g
@@ -198,6 +201,7 @@ def test_requirement_satisfaction_matrix(policy, present, expected_satisfied):
     frame.run_phase(P.PLANNING)
     assert req.satisfied is False
 
+    frame.run_phase(P.UPDATE)
     receipt = frame.run_phase(P.FINALIZE)
 
     assert req.satisfied is expected_satisfied
@@ -390,6 +394,7 @@ def test_affordance_creates_or_finds_source():
 
     assert not req.satisfied
 
+    frame.run_phase(P.UPDATE)
     frame.run_phase(P.FINALIZE)
 
     assert req.satisfied

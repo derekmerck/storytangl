@@ -43,7 +43,7 @@ identity, relationships, and events *without presupposing narrative content*.
 """
 
 # Base classes for all objects and collections
-from .content_addressable import ContentAddressable
+from tangl.core.record.content_addressable import ContentAddressable
 from .entity import Entity
 from .registry import Registry
 

@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from tangl.type_hints import Hash
 from tangl.utils.hashing import hashing_func
+from tangl.core.entity import is_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +129,9 @@ class ContentAddressable:
         # Default: Hash everything except known metadata fields
         exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "type", "record_type"}
         return {k: v for k, v in data.items() if k not in exclude}
-    
-    def get_content_identifier(self) -> str:
+
+    @is_identifier
+    def content_identifier(self) -> str:
         """Get human-readable content identifier (truncated hex).
         
         Useful for logging and debugging.
