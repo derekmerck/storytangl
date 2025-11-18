@@ -166,8 +166,9 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
         if result is not None and result.is_viable:
             viable_nodes.append(node)
 
-    if cursor not in viable_nodes:
-        logger.error(f"Failed to provision {cursor!r}!")
+    if x := frontier_results.get(cursor.uid):
+        if not x.is_viable:
+            logger.error(f"Failed to provision {cursor!r}!")
 
     if bool(frontier) and not bool(viable_nodes):
         logger.warning(
