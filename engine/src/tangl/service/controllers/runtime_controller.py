@@ -26,16 +26,32 @@ class RuntimeController(HasApiEndpoints):
         access_level=AccessLevel.PUBLIC,
         response_type=ResponseType.CONTENT,
     )
-    def get_journal_entries(self, ledger: Ledger, limit: int = 10) -> list[BaseFragment]:
-        """Return the most recent journal fragments from a ledger."""
+    def get_journal_entries(
+        self, ledger: Ledger, limit: int = 10, *, current_only: bool = False
+    ) -> list[BaseFragment]:
+        """Return journal fragments from a ledger.
+
+        Parameters
+        ----------
+        ledger:
+            Ledger to read from.
+        limit:
+            Maximum number of fragments to return. ``0`` means no limit.
+        current_only:
+            If true, return only the fragments from the latest step marker.
+        """
 
         if limit < 0:
             raise ValueError("limit must be non-negative")
 
         fragments = list(ledger.records.iter_channel("fragment"))
-        if limit == 0 or limit >= len(fragments):
-            return fragments
-        return fragments[-limit:]
+        if 0 < limit < len(fragments):
+            fragments = fragments[-limit:]
+
+        if current_only:
+            fragments = self._latest_step_slice(fragments)
+
+        return fragments
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
@@ -181,3 +197,29 @@ class RuntimeController(HasApiEndpoints):
             result["_delete_ledger_id"] = str(current_ledger_id)
 
         return result
+
+    @staticmethod
+    def _latest_step_slice(fragments: list[BaseFragment]) -> list[BaseFragment]:
+        """Return fragments from the most recent ``[step ...]`` marker onward."""
+
+        step_indices: list[int] = []
+
+        for idx, fragment in enumerate(fragments):
+            content = getattr(fragment, "content", None)
+            if isinstance(content, str) and content.startswith("[step "):
+                step_indices.append(idx)
+
+        if not step_indices:
+            return fragments
+
+        step_indices.append(len(fragments))
+        slices = [
+            fragments[start:end]
+            for start, end in zip(step_indices[:-1], step_indices[1:])
+        ]
+
+        for fragment_slice in reversed(slices):
+            if len(fragment_slice) > 1:
+                return fragment_slice
+
+        return slices[-1]

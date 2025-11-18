@@ -86,6 +86,38 @@ def test_get_journal_entries_limits_results(runtime_controller: RuntimeControlle
     result = runtime_controller.get_journal_entries(ledger, limit=1)
     assert [fragment.content for fragment in result] == ["second"]
 
+
+def test_get_journal_entries_only_returns_latest_step(
+    runtime_controller: RuntimeController, ledger: Ledger
+) -> None:
+    ledger.records.push_records(
+        ContentFragment(content="[step 0001]: cursor at start"),
+        marker_type="journal",
+        marker_name="entry-0001",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="choice one"),
+        marker_type="journal",
+        marker_name="entry-0001a",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0002]: cursor at end"),
+        marker_type="journal",
+        marker_name="entry-0002",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="final choice"),
+        marker_type="journal",
+        marker_name="entry-0002a",
+    )
+
+    result = runtime_controller.get_journal_entries(ledger, limit=0, current_only=True)
+
+    assert [fragment.content for fragment in result] == [
+        "[step 0002]: cursor at end",
+        "final choice",
+    ]
+
 # todo: _what_ is this testing??
 def test_resolve_choice_returns_status_not_fragments(
     runtime_controller: RuntimeController,

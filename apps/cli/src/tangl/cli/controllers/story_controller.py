@@ -124,6 +124,7 @@ class StoryController(CommandSet):
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
+            current_only=True,
         )
         self._current_story_update = list(fragments)
 
@@ -148,7 +149,11 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        fragments = self._cmd.call_endpoint("RuntimeController.get_journal_entries", limit=10)
+        fragments = self._cmd.call_endpoint(
+            "RuntimeController.get_journal_entries",
+            limit=10,
+            current_only=True,
+        )
         self._current_story_update = list(fragments)
         self._current_choices = self._load_choices()
         self._render_current_story_update()
@@ -178,6 +183,7 @@ class StoryController(CommandSet):
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
+            current_only=True,
         )
         self._current_story_update = list(fragments)
         self._current_choices = self._load_choices()

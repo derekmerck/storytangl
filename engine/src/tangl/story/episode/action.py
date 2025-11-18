@@ -55,6 +55,7 @@ class Action(ChoiceEdge, HasConditions, HasEffects):
         return ChoiceFragment(
             content=content,
             source_id=self.uid,
+            label=self.label,
             source_label=self.label,
             active=is_available,
             unavailable_reason=unavailable_reason,
