@@ -53,28 +53,42 @@ class StoryController(CommandSet):
         for fragment in self._current_story_update:
             self._cmd.poutput(_fragment_text(fragment))
 
-        if not self._current_choices:
+        choice_fragments = [
+            fragment
+            for fragment in self._current_story_update
+            if getattr(fragment, "fragment_type", None) == "choice"
+        ]
+
+        if not choice_fragments:
             self._cmd.poutput("No available choices.")
             return
 
         self._cmd.poutput("Choices:")
-        for index, choice in enumerate(self._current_choices, start=1):
-            label = choice.label or str(choice.uid)
-            self._cmd.poutput(f"{index}. {label} ({str(choice.uid)[:6]})")
+        active_index = 1
+        for fragment in choice_fragments:
+            is_active = getattr(fragment, "active", True)
+            reason = getattr(fragment, "unavailable_reason", None)
+            if is_active:
+                self._cmd.poutput(f"{active_index}. {_fragment_text(fragment)}")
+                active_index += 1
+                continue
+            reason_text = f" [locked: {reason}]" if reason else " [locked]"
+            self._cmd.poutput(f"x) {_fragment_text(fragment)}{reason_text}")
 
     def _load_choices(self) -> list[SimpleNamespace]:
-        choices = self._cmd.call_endpoint("RuntimeController.get_available_choices")
         parsed: list[SimpleNamespace] = []
-        for choice in choices:
-            if isinstance(choice, dict):
-                uid = choice.get("uid") or choice.get("id")
-                label = choice.get("label") or choice.get("text") or ""
-            else:
-                uid = getattr(choice, "uid", None)
-                label = getattr(choice, "label", "") or getattr(choice, "text", "")
-            if uid is None:
-                continue
-            parsed.append(SimpleNamespace(uid=UUID(str(uid)), label=label.replace("_", " ")))
+        choice_fragments = [
+            fragment
+            for fragment in self._current_story_update
+            if getattr(fragment, "fragment_type", None) == "choice"
+            and getattr(fragment, "active", True)
+        ]
+
+        for fragment in choice_fragments:
+            uid = getattr(fragment, "source_id", None)
+            label = _fragment_text(fragment)
+            if uid:
+                parsed.append(SimpleNamespace(uid=UUID(str(uid)), label=label.replace("_", " ")))
         return parsed
 
     # ------------------------------------------------------------------
@@ -109,7 +123,6 @@ class StoryController(CommandSet):
 
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
-            limit=10,
         )
         self._current_story_update = list(fragments)
 
@@ -134,7 +147,9 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        fragments = self._cmd.call_endpoint("RuntimeController.get_journal_entries", limit=10)
+        fragments = self._cmd.call_endpoint(
+            "RuntimeController.get_journal_entries",
+        )
         self._current_story_update = list(fragments)
         self._current_choices = self._load_choices()
         self._render_current_story_update()
@@ -163,7 +178,6 @@ class StoryController(CommandSet):
         )
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
-            limit=10,
         )
         self._current_story_update = list(fragments)
         self._current_choices = self._load_choices()

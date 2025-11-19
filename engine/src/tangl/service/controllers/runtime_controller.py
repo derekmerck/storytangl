@@ -26,16 +26,95 @@ class RuntimeController(HasApiEndpoints):
         access_level=AccessLevel.PUBLIC,
         response_type=ResponseType.CONTENT,
     )
-    def get_journal_entries(self, ledger: Ledger, limit: int = 10) -> list[BaseFragment]:
-        """Return the most recent journal fragments from a ledger."""
+    def get_journal_entries(
+        self,
+        ledger: Ledger,
+        limit: int = 0,
+        *,
+        current_only: bool = True,
+        marker: str | None = None,
+        marker_type: str = "journal",
+        start_marker: str | None = None,
+        end_marker: str | None = None,
+    ) -> list[BaseFragment]:
+        """Return journal fragments from a ledger.
+
+        Parameters
+        ----------
+        ledger:
+            Ledger to read from.
+        limit:
+            Maximum number of fragments to return. ``0`` means no limit. Limits are
+            ignored when a marker-based slice is requested so a full step is
+            returned.
+        current_only:
+            If true (the default), return only fragments for the latest journal
+            marker/step.
+        marker:
+            Return the journal section beginning at ``marker`` (inclusive) and
+            ending at the next marker of the same type.
+        marker_type:
+            Marker namespace to use. Defaults to ``"journal"`` which matches the
+            step markers emitted by :class:`Frame`.
+        start_marker:
+            Inclusive starting marker name for a marker range.
+        end_marker:
+            Optional exclusive ending marker. When provided, the slice ends at the
+            marker immediately following ``end_marker``.
+        """
 
         if limit < 0:
             raise ValueError("limit must be non-negative")
 
-        fragments = list(ledger.records.iter_channel("fragment"))
-        if limit == 0 or limit >= len(fragments):
-            return fragments
-        return fragments[-limit:]
+        marker_channels = ledger.records.markers.get(marker_type, {})
+
+        def _section_for(name: str) -> list[BaseFragment]:
+            return list(
+                ledger.records.get_section(
+                    name, marker_type=marker_type, has_channel="fragment"
+                )
+            )
+
+        def _slice_between(start: str, stop: str | None) -> list[BaseFragment]:
+            start_seq = marker_channels[start]
+            end_seq = (
+                marker_channels[stop]
+                if stop is not None
+                else ledger.records._next_marker_seq(start_seq, marker_type)
+            )
+            if end_seq <= start_seq:
+                return []
+            return list(
+                ledger.records.get_slice(
+                    start_seq=start_seq,
+                    end_seq=end_seq,
+                    has_channel="fragment",
+                )
+            )
+
+        fragments: list[BaseFragment]
+
+        if marker is not None:
+            if marker not in marker_channels:
+                return []
+            fragments = _section_for(marker)
+        elif start_marker is not None or end_marker is not None:
+            start_name = start_marker or self._latest_marker_name(marker_channels)
+            if end_marker is not None and end_marker not in marker_channels:
+                return []
+            if start_name is None or start_name not in marker_channels:
+                return []
+            fragments = _slice_between(start_name, end_marker)
+        elif current_only:
+            fragments = list(ledger.records.iter_channel("fragment"))
+            fragments = self._latest_step_slice(fragments)
+        else:
+            fragments = list(ledger.records.iter_channel("fragment"))
+
+        if limit > 0 and not (marker or start_marker or end_marker or current_only):
+            fragments = fragments[-limit:]
+
+        return fragments
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
@@ -78,28 +157,6 @@ class RuntimeController(HasApiEndpoints):
             "cursor_id": ledger.cursor_id,
             "journal_size": sum(1 for _ in ledger.records.iter_channel("fragment")),
         }
-
-    # todo: this could be out of sync with fragments b/c it doesn't check availability
-    #       is it necessary at all for client functioning?  Or should we just use get
-    #       latest journal entry and take choices from that?
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        response_type=ResponseType.INFO,
-    )
-    def get_available_choices(self, ledger: Ledger) -> list[dict[str, Any]]:
-        """Return lightweight metadata for the cursor's outgoing choices."""
-
-        node = ledger.graph.get(ledger.cursor_id)
-        if node is None:
-            return []
-
-        choices: list[dict[str, Any]] = []
-        for edge in ledger.graph.find_edges(source_id=node.uid):
-            if not isinstance(edge, ChoiceEdge):
-                continue
-            label = getattr(edge, "text", None) or getattr(edge, "label", None) or ""
-            choices.append({"uid": edge.uid, "label": label})
-        return choices
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,
@@ -203,3 +260,39 @@ class RuntimeController(HasApiEndpoints):
             result["_delete_ledger_id"] = str(current_ledger_id)
 
         return result
+
+    @staticmethod
+    def _latest_step_slice(fragments: list[BaseFragment]) -> list[BaseFragment]:
+        """Return fragments from the most recent ``[step ...]`` marker onward."""
+
+        step_indices: list[int] = []
+
+        for idx, fragment in enumerate(fragments):
+            content = getattr(fragment, "content", None)
+            if isinstance(content, str) and content.startswith("[step "):
+                step_indices.append(idx)
+
+        if not step_indices:
+            return fragments
+
+        step_indices.append(len(fragments))
+        slices = [
+            fragments[start:end]
+            for start, end in zip(step_indices[:-1], step_indices[1:])
+        ]
+
+        for fragment_slice in reversed(slices):
+            if len(fragment_slice) > 1:
+                return fragment_slice
+
+        return slices[-1]
+
+    @staticmethod
+    def _latest_marker_name(markers: dict[str, int]) -> str | None:
+        if not markers:
+            return None
+        latest_seq = max(markers.values())
+        for name, seq in markers.items():
+            if seq == latest_seq:
+                return name
+        return None

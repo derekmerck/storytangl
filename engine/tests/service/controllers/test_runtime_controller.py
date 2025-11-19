@@ -12,9 +12,21 @@ from tangl.journal.content import ContentFragment
 from tangl.service.controllers import RuntimeController
 from tangl.service.user.user import User
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase, Ledger
+from pathlib import Path
+from uuid import UUID, uuid4
+
+import pytest
+import yaml
+
+from tangl.core import StreamRegistry
+from tangl.journal.content import ContentFragment
+from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.user.user import User
+from tangl.story.episode import Action, Block
 from tangl.story.story_graph import StoryGraph
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
+from tangl.vm import ChoiceEdge, Frame, Ledger, ResolutionPhase
 
 
 @pytest.fixture()
@@ -25,7 +37,7 @@ def runtime_controller() -> RuntimeController:
 @pytest.fixture()
 def ledger() -> Ledger:
     graph = StoryGraph(label="demo")
-    start = graph.add_node(label="start")
+    start = graph.add_node(obj_cls=Block, label="start")
     ledger = Ledger(graph=graph, cursor_id=start.uid, records=StreamRegistry())
     ledger.push_snapshot()
     return ledger
@@ -71,8 +83,98 @@ def test_get_journal_entries_limits_results(runtime_controller: RuntimeControlle
         marker_name="entry-0002",
     )
 
-    result = runtime_controller.get_journal_entries(ledger, limit=1)
+    result = runtime_controller.get_journal_entries(
+        ledger, limit=1, current_only=False
+    )
     assert [fragment.content for fragment in result] == ["second"]
+
+
+def test_get_journal_entries_defaults_to_latest_step(runtime_controller: RuntimeController, ledger: Ledger) -> None:
+    ledger.records.push_records(
+        ContentFragment(content="[step 0001]: cursor at start"),
+        ContentFragment(content="choice one"),
+        marker_type="journal",
+        marker_name="step-0001",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0002]: cursor at end"),
+        ContentFragment(content="choice two"),
+        ContentFragment(content="choice three"),
+        marker_type="journal",
+        marker_name="step-0002",
+    )
+
+    result = runtime_controller.get_journal_entries(ledger, limit=1)
+
+    assert [fragment.content for fragment in result] == [
+        "[step 0002]: cursor at end",
+        "choice two",
+        "choice three",
+    ]
+
+
+def test_get_journal_entries_supports_marker_range(
+    runtime_controller: RuntimeController, ledger: Ledger
+) -> None:
+    ledger.records.push_records(
+        ContentFragment(content="[step 0001]: cursor at start"),
+        ContentFragment(content="choice one"),
+        marker_type="journal",
+        marker_name="step-0001",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0002]: cursor at middle"),
+        ContentFragment(content="choice two"),
+        marker_type="journal",
+        marker_name="step-0002",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0003]: cursor at end"),
+        ContentFragment(content="choice three"),
+        marker_type="journal",
+        marker_name="step-0003",
+    )
+
+    result = runtime_controller.get_journal_entries(
+        ledger, start_marker="step-0002", end_marker="step-0003"
+    )
+
+    assert [fragment.content for fragment in result] == [
+        "[step 0002]: cursor at middle",
+        "choice two",
+    ]
+
+
+def test_get_journal_entries_only_returns_latest_step(
+    runtime_controller: RuntimeController, ledger: Ledger
+) -> None:
+    ledger.records.push_records(
+        ContentFragment(content="[step 0001]: cursor at start"),
+        marker_type="journal",
+        marker_name="entry-0001",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="choice one"),
+        marker_type="journal",
+        marker_name="entry-0001a",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="[step 0002]: cursor at end"),
+        marker_type="journal",
+        marker_name="entry-0002",
+    )
+    ledger.records.push_records(
+        ContentFragment(content="final choice"),
+        marker_type="journal",
+        marker_name="entry-0002a",
+    )
+
+    result = runtime_controller.get_journal_entries(ledger, limit=0, current_only=True)
+
+    assert [fragment.content for fragment in result] == [
+        "[step 0002]: cursor at end",
+        "final choice",
+    ]
 
 # todo: _what_ is this testing??
 def test_resolve_choice_returns_status_not_fragments(
@@ -197,17 +299,24 @@ def test_get_story_info_reports_metadata(runtime_controller: RuntimeController, 
     assert info["title"] == ledger.graph.label
 
 
-def test_get_available_choices_returns_metadata(
-    runtime_controller: RuntimeController,
-    ledger: Ledger,
+def test_choices_come_from_journal_stream(
+    runtime_controller: RuntimeController, ledger: Ledger
 ) -> None:
     graph = ledger.graph
     start = graph.get(ledger.cursor_id)
-    end = graph.add_node(label="end")
-    choice = ChoiceEdge(graph=graph, source_id=start.uid, destination_id=end.uid, label="go")
+    end = graph.add_node(obj_cls=Block, label="end")
+    Action(graph=graph, source_id=start.uid, destination_id=end.uid, label="go")
 
-    result = runtime_controller.get_available_choices(ledger)
-    assert result == [{"uid": choice.uid, "label": "go"}]
+    frame = ledger.get_frame()
+    fragments = frame.run_phase(ResolutionPhase.JOURNAL)
+    ledger.records.push_records(*fragments, marker_type="fragment")
+
+    fragments = runtime_controller.get_journal_entries(ledger, limit=10)
+    choice_fragments = [fragment for fragment in fragments if fragment.fragment_type == "choice"]
+
+    assert len(choice_fragments) == 1
+    assert choice_fragments[0].content == "go"
+    assert choice_fragments[0].active is True
 
 
 def test_get_journal_entries_rejects_negative_limit(
