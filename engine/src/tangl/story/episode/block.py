@@ -144,7 +144,7 @@ class Block(Node, HasEffects):
     @story_dispatch.register(task=P.JOURNAL, priority=Prio.EARLY)
     def block_fragment(self: Block, *, ctx: Context, **locals_: Any) -> BaseFragment | None:
         """
-        JOURNAL (EARLY): render `content` and wrap as a "block" fragment.
+        JOURNAL (EARLY): render `content` and choices and wrap as a "block" fragment.
 
         Returns
         -------
