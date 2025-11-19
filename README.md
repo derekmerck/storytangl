@@ -8,6 +8,16 @@
 
 ---
 
+[//]: # (<picture>)
+
+[//]: # (  <source media="&#40;prefers-color-scheme: dark&#41;" srcset="brand/storytangl_logo-im-dark.png">)
+
+[//]: # (  <source media="&#40;prefers-color-scheme: light&#41;" srcset="brand/storytangl_logo-im.png">)
+
+[//]: # (  <img alt="Fallback image description" src="brand/storytangl_logo-im.png" width="100%" height="50px">)
+
+[//]: # (</picture>)
+
 ## What This Is
 
 StoryTangl is a **reference implementation** of a sophisticated graph-based narrative system. It demonstrates a novel architecture where stories exist as abstract graphs that "collapse" into linear narratives through player choices—think quantum superposition for interactive fiction.

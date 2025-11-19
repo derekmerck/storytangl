@@ -16,4 +16,4 @@ class ChoiceFragment(ContentFragment, extra='allow'):
     unavailable_reason: Optional[str] = None
 
     # Params to be included with the cb if the fragment is "activated", i.e., a choice, link, button, input, rollover hint, custom ui event trigger
-    activation_payload: Optional[Any] = None
+    activation_payload: Optional[Any] = Field(None, alias='payload')

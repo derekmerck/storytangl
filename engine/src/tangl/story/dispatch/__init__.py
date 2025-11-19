@@ -4,6 +4,7 @@ from .story_dispatch import (
     # journaling
     on_render,
     on_describe,
+    on_get_choices,
 
     # linking
     on_cast_actor,

@@ -19,11 +19,13 @@ from pydantic import Field
 from tangl.core import BaseFragment, Node, Graph
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
-from tangl.story.dispatch import story_dispatch
+from tangl.journal.discourse import BlockFragment
+from tangl.story.dispatch import story_dispatch, on_get_choices
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
 from tangl.vm.runtime import HasEffects
 from .action import Action
+
 
 class Block(Node, HasEffects):
     """
@@ -146,17 +148,32 @@ class Block(Node, HasEffects):
 
         Returns
         -------
-        BaseFragment | None
+        BlockFragment | None
         """
+        choice_receipts = story_dispatch.dispatch(self, ctx=ctx, task="on_get_choices")
+        choices = []
+        for receipt in choice_receipts:
+            fragments = receipt.result
+            if fragments is None:
+                continue
+            elif isinstance(fragments, list):
+                choices.extend(fragments)
+            elif isinstance(fragments, BaseFragment):
+                choices.append(fragments)
+            else:
+                raise f"Got an unknown choice result: {fragments!r}"
+
+        # todo: eventually content should be extensible by the same mechanism as choices
+        #       i.e., on_get_content or somesuch, allowing for different content renders
+        #       for different block types, affordances, scenes, etc.
         content = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
         if content:
-            return BaseFragment(
+            return BlockFragment(
                 content=content,
+                choices=choices,
                 source_id=self.uid,
-                source_label=self.label,
-                fragment_type="block",
+                source_label=self.label
             )
-        # todo: the Block fragment type actually expects a list of 'choice' fragments as a parameter, we can consider that later
 
     @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
     def describe_concepts(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
@@ -174,14 +191,15 @@ class Block(Node, HasEffects):
                 fragments.append(fragment)
         return fragments or None
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.LATE)
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
+    @on_get_choices(priority=Prio.EARLY)
     def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
         """
         JOURNAL (LATE): collect "choice" fragments for outgoing actions.
 
         Returns
         -------
-        list[BaseFragment] | None
+        list[ChoiceFragment] | None
         """
         fragments: list[BaseFragment] = []
         for choice in self.edges_out(is_instance=Action, trigger_phase=None):

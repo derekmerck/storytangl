@@ -4,8 +4,8 @@ from typing import Optional, Any
 
 from tangl.core import Node, BaseFragment, Graph
 from tangl.journal.discourse import ChoiceFragment
-from tangl.vm import ChoiceEdge, Context
 from tangl.story.runtime import ContentRenderer
+from tangl.vm import ChoiceEdge, Context
 from tangl.vm.runtime import HasConditions, HasEffects
 from tangl.vm.provision import Dependency
 

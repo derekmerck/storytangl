@@ -24,6 +24,7 @@ on_scout_location = partial(story_dispatch.register, task="link", is_instance='S
 on_render = partial(story_dispatch.register, task="render")      # produce fragments
 on_describe = partial(story_dispatch.register, task="describe")  # produce strings
 on_relationship_change = partial(story_dispatch.register, task="relationship_change")
+on_get_choices = partial(story_dispatch.register, task="get_choices")
 
 # story application-level dispatch
 def do_describe(concept: Concept, *,
