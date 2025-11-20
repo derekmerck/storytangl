@@ -15,7 +15,7 @@ from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_tes
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
-from conftest import extract_choices_from_fragments
+from helpers_server.json_fragment_helpers import extract_choices_from_fragments
 
 
 DEMO_SCRIPT = (
