@@ -53,43 +53,76 @@ class StoryController(CommandSet):
         for fragment in self._current_story_update:
             self._cmd.poutput(_fragment_text(fragment))
 
-        choice_fragments = [
-            fragment
-            for fragment in self._current_story_update
-            if getattr(fragment, "fragment_type", None) == "choice"
-        ]
-
-        if not choice_fragments:
+        if not self._current_choices:
             self._cmd.poutput("No available choices.")
             return
 
         self._cmd.poutput("Choices:")
         active_index = 1
-        for fragment in choice_fragments:
-            is_active = getattr(fragment, "active", True)
-            reason = getattr(fragment, "unavailable_reason", None)
+        for choice in self._current_choices:
+            label = choice.label or str(choice.uid)
+            is_active = getattr(choice, "active", True)
+            reason = getattr(choice, "unavailable_reason", None)
             if is_active:
-                self._cmd.poutput(f"{active_index}. {_fragment_text(fragment)}")
+                self._cmd.poutput(f"{active_index}. {label}")
                 active_index += 1
                 continue
             reason_text = f" [locked: {reason}]" if reason else " [locked]"
-            self._cmd.poutput(f"x) {_fragment_text(fragment)}{reason_text}")
+            self._cmd.poutput(f"x) {label}{reason_text}")
 
-    def _load_choices(self) -> list[SimpleNamespace]:
-        parsed: list[SimpleNamespace] = []
-        choice_fragments = [
-            fragment
-            for fragment in self._current_story_update
-            if getattr(fragment, "fragment_type", None) == "choice"
-            and getattr(fragment, "active", True)
-        ]
+    def _load_choices_from_fragments(self) -> list[SimpleNamespace]:
+        """Extract choices from fragment stream (from blocks or loose)."""
 
-        for fragment in choice_fragments:
-            uid = getattr(fragment, "source_id", None)
-            label = _fragment_text(fragment)
-            if uid:
-                parsed.append(SimpleNamespace(uid=UUID(str(uid)), label=label.replace("_", " ")))
-        return parsed
+        choices: list[SimpleNamespace] = []
+
+        for fragment in self._current_story_update:
+            ftype = getattr(fragment, "fragment_type", None)
+
+            if ftype == "block":
+                embedded = getattr(fragment, "choices", None) or []
+                for choice_frag in embedded:
+                    uid = getattr(choice_frag, "source_id", None) or getattr(
+                        choice_frag, "uid", None
+                    )
+                    label = (
+                        getattr(choice_frag, "label", None)
+                        or getattr(choice_frag, "content", "")
+                        or getattr(choice_frag, "source_label", "")
+                    )
+                    active = getattr(choice_frag, "active", True)
+                    reason = getattr(choice_frag, "unavailable_reason", None)
+
+                    if uid:
+                        choices.append(
+                            SimpleNamespace(
+                                uid=UUID(str(uid)),
+                                label=label.replace("_", " "),
+                                active=active,
+                                unavailable_reason=reason,
+                            )
+                        )
+
+            elif ftype == "choice":
+                uid = getattr(fragment, "source_id", None) or getattr(fragment, "uid", None)
+                label = (
+                    getattr(fragment, "label", None)
+                    or getattr(fragment, "content", "")
+                    or getattr(fragment, "source_label", "")
+                )
+                active = getattr(fragment, "active", True)
+                reason = getattr(fragment, "unavailable_reason", None)
+
+                if uid:
+                    choices.append(
+                        SimpleNamespace(
+                            uid=UUID(str(uid)),
+                            label=label.replace("_", " "),
+                            active=active,
+                            unavailable_reason=reason,
+                        )
+                    )
+
+        return choices
 
     # ------------------------------------------------------------------
     # commands
@@ -123,6 +156,7 @@ class StoryController(CommandSet):
 
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
+            limit=10,
         )
         self._current_story_update = list(fragments)
 
@@ -132,12 +166,19 @@ class StoryController(CommandSet):
                 self._cmd.poutput(_fragment_text(fragment))
             self._cmd.poutput()
 
-        self._current_choices = self._load_choices()
+        self._current_choices = self._load_choices_from_fragments()
         if self._current_choices:
             self._cmd.poutput("Choices:")
-            for idx, choice in enumerate(self._current_choices, start=1):
+            active_index = 1
+            for choice in self._current_choices:
                 label = choice.label or str(choice.uid)
-                self._cmd.poutput(f"{idx}. {label}")
+                if getattr(choice, "active", True):
+                    self._cmd.poutput(f"{active_index}. {label}")
+                    active_index += 1
+                    continue
+                reason = getattr(choice, "unavailable_reason", None)
+                reason_text = f" [locked: {reason}]" if reason else " [locked]"
+                self._cmd.poutput(f"x) {label}{reason_text}")
         else:
             self._cmd.poutput("(No choices available)")
 
@@ -149,9 +190,10 @@ class StoryController(CommandSet):
 
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
+            limit=10,
         )
         self._current_story_update = list(fragments)
-        self._current_choices = self._load_choices()
+        self._current_choices = self._load_choices_from_fragments()
         self._render_current_story_update()
 
     choose_parser = argparse.ArgumentParser()
@@ -162,25 +204,29 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        if not self._current_choices:
+        active_choices = [
+            choice for choice in self._current_choices if getattr(choice, "active", True)
+        ]
+        if not active_choices:
             self._cmd.poutput("No cached choices. Run `story` to refresh choices first.")
             return
 
         index = args.action
-        if index < 1 or index > len(self._current_choices):
+        if index < 1 or index > len(active_choices):
             self._cmd.poutput("Choice out of range.")
             return
 
-        choice = self._current_choices[index - 1]
+        choice = active_choices[index - 1]
         self._cmd.call_endpoint(
             "RuntimeController.resolve_choice",
             choice_id=choice.uid,
         )
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
+            limit=10,
         )
         self._current_story_update = list(fragments)
-        self._current_choices = self._load_choices()
+        self._current_choices = self._load_choices_from_fragments()
         self._render_current_story_update()
 
     drop_story_parser = argparse.ArgumentParser()

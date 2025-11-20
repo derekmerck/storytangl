@@ -12,6 +12,7 @@ from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_tes
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
+from conftest import extract_choices_from_fragments
 
 LINEAR_SCRIPT = (
     Path(__file__).resolve().parents[3] / "engine" / "tests" / "resources" / "linear_script.yaml"
@@ -58,25 +59,35 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     update = client.get("story/update", headers=headers)
     assert update.status_code == 200
     payload = update.json()
-    assert _fragment_contains(payload["fragments"], "You begin your journey at dawn.")
-    assert payload["choices"], "Expected an initial choice to be available"
+    fragments = payload["fragments"]
+    assert _fragment_contains(fragments, "You begin your journey at dawn.")
 
-    first_choice = payload["choices"][0]["uid"]
+    choices = extract_choices_from_fragments(fragments)
+    assert choices, "Expected an initial choice to be available"
+
+    first_choice = choices[0].get("uid") or choices[0].get("source_id")
     resolve_first = client.post("story/do", json={"uid": first_choice}, headers=headers)
     assert resolve_first.status_code == 200
 
     update_two = client.get("story/update", headers=headers)
     assert update_two.status_code == 200
     payload_two = update_two.json()
-    assert _fragment_contains(payload_two["fragments"], "The path winds through ancient woods.")
-    assert payload_two["choices"], "Expected a continuation choice after the middle block"
+    fragments_two = payload_two["fragments"]
+    assert _fragment_contains(
+        fragments_two,
+        "The path winds through ancient woods.",
+    )
 
-    second_choice = payload_two["choices"][0]["uid"]
+    choices_two = extract_choices_from_fragments(fragments_two)
+    assert choices_two, "Expected a continuation choice after the middle block"
+
+    second_choice = choices_two[0].get("uid") or choices_two[0].get("source_id")
     resolve_second = client.post("story/do", json={"uid": second_choice}, headers=headers)
     assert resolve_second.status_code == 200
 
     update_three = client.get("story/update", headers=headers)
     assert update_three.status_code == 200
     payload_three = update_three.json()
-    assert _fragment_contains(payload_three["fragments"], "You arrive at the village.")
-    assert payload_three["choices"] == []
+    fragments_three = payload_three["fragments"]
+    assert _fragment_contains(fragments_three, "You arrive at the village.")
+    assert extract_choices_from_fragments(fragments_three) == []

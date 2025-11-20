@@ -12,6 +12,7 @@ from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_tes
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
+from conftest import extract_choices_from_fragments
 
 
 BRANCHING_SCRIPT = (
@@ -66,11 +67,14 @@ def test_branching_story_left_path_rest(branching_story_client: tuple[TestClient
     update = client.get("story/update", headers=headers)
     assert update.status_code == 200
     payload = update.json()
+    fragments = payload["fragments"]
 
-    assert _fragment_contains(payload["fragments"], "You stand at a crossroads in the forest.")
-    assert len(payload["choices"]) == 3
+    assert _fragment_contains(fragments, "You stand at a crossroads in the forest.")
 
-    left_choice = _find_choice(payload["choices"], "left")
+    choices = extract_choices_from_fragments(fragments)
+    assert len(choices) == 3
+
+    left_choice = _find_choice(choices, "left")
     resolve_left = client.post("story/do", json={"uid": left_choice["uid"]}, headers=headers)
     assert resolve_left.status_code == 200
 
@@ -78,8 +82,9 @@ def test_branching_story_left_path_rest(branching_story_client: tuple[TestClient
     assert update_two.status_code == 200
     payload_two = update_two.json()
 
-    assert _fragment_contains(payload_two["fragments"], "peaceful garden")
-    assert payload_two["choices"] == []
+    fragments_two = payload_two["fragments"]
+    assert _fragment_contains(fragments_two, "peaceful garden")
+    assert extract_choices_from_fragments(fragments_two) == []
 
 
 def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
@@ -89,28 +94,33 @@ def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClien
 
     first_update = client.get("story/update", headers=headers)
     payload = first_update.json()
+    fragments = payload["fragments"]
 
-    right_choice = _find_choice(payload["choices"], "right")
+    choices = extract_choices_from_fragments(fragments)
+    right_choice = _find_choice(choices, "right")
     resolve_right = client.post("story/do", json={"uid": right_choice["uid"]}, headers=headers)
     assert resolve_right.status_code == 200
 
     second_update = client.get("story/update", headers=headers)
     payload_two = second_update.json()
+    fragments_two = payload_two["fragments"]
 
-    assert _fragment_contains(payload_two["fragments"], "dark cave")
-    assert len(payload_two["choices"]) == 2
-    assert _find_choice(payload_two["choices"], "enter")
-    assert _find_choice(payload_two["choices"], "back")
+    assert _fragment_contains(fragments_two, "dark cave")
+    choices_two = extract_choices_from_fragments(fragments_two)
+    assert len(choices_two) == 2
+    assert _find_choice(choices_two, "enter")
+    assert _find_choice(choices_two, "back")
 
-    enter_choice = _find_choice(payload_two["choices"], "enter")
+    enter_choice = _find_choice(choices_two, "enter")
     resolve_enter = client.post("story/do", json={"uid": enter_choice["uid"]}, headers=headers)
     assert resolve_enter.status_code == 200
 
     third_update = client.get("story/update", headers=headers)
     payload_three = third_update.json()
 
-    assert _fragment_contains(payload_three["fragments"], "deeper than you thought")
-    assert payload_three["choices"] == []
+    fragments_three = payload_three["fragments"]
+    assert _fragment_contains(fragments_three, "deeper than you thought")
+    assert extract_choices_from_fragments(fragments_three) == []
 
 
 def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
@@ -119,11 +129,13 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
     client.post("story/story/create", params={"world_id": "the_crossroads"}, headers=headers)
 
     first_update = client.get("story/update", headers=headers).json()
-    right_choice = _find_choice(first_update["choices"], "right")
+    first_choices = extract_choices_from_fragments(first_update["fragments"])
+    right_choice = _find_choice(first_choices, "right")
     client.post("story/do", json={"uid": right_choice["uid"]}, headers=headers)
 
     second_update = client.get("story/update", headers=headers).json()
-    back_choice = _find_choice(second_update["choices"], "back")
+    second_choices = extract_choices_from_fragments(second_update["fragments"])
+    back_choice = _find_choice(second_choices, "back")
     resolve_back = client.post("story/do", json={"uid": back_choice["uid"]}, headers=headers)
     assert resolve_back.status_code == 200
 
@@ -131,8 +143,13 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
     assert third_update.status_code == 200
     payload_three = third_update.json()
 
-    assert _fragment_contains(payload_three["fragments"], "You stand at a crossroads in the forest.")
-    assert len(payload_three["choices"]) == 3
-    assert _find_choice(payload_three["choices"], "guide")
-    assert _find_choice(payload_three["choices"], "left")
-    assert _find_choice(payload_three["choices"], "right")
+    fragments_three = payload_three["fragments"]
+    assert _fragment_contains(
+        fragments_three,
+        "You stand at a crossroads in the forest.",
+    )
+    choices_three = extract_choices_from_fragments(fragments_three)
+    assert len(choices_three) == 3
+    assert _find_choice(choices_three, "guide")
+    assert _find_choice(choices_three, "left")
+    assert _find_choice(choices_three, "right")

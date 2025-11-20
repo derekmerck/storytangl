@@ -31,12 +31,18 @@ class RecordingCLI(cmd2.Cmd):
         self.calls.append((endpoint, params))
         if endpoint.endswith("get_journal_entries"):
             return [
-                SimpleNamespace(content="start"),
                 SimpleNamespace(
-                    fragment_type="choice",
-                    content="Go",
-                    active=True,
-                    source_id=self.choice_id,
+                    fragment_type="block",
+                    content="start",
+                    choices=[
+                        SimpleNamespace(
+                            fragment_type="choice",
+                            uid=self.choice_id,
+                            source_id=self.choice_id,
+                            label="Go",
+                            active=True,
+                        )
+                    ],
                 ),
             ]
         if endpoint.endswith("resolve_choice"):
@@ -82,18 +88,18 @@ def test_cli_shows_locked_choices_with_reason(story_controller: StoryController)
         content="Open vault",
         active=False,
         unavailable_reason="Requires keycard",
-        source_id=uuid4(),
+        uid=uuid4(),
     )
     active_fragment = SimpleNamespace(
         fragment_type="choice",
         content="Go north",
         active=True,
-        source_id=uuid4(),
+        uid=uuid4(),
     )
 
     cli.outputs.clear()
     story_controller._current_story_update = [locked_fragment, active_fragment]
-    story_controller._current_choices = story_controller._load_choices()
+    story_controller._current_choices = story_controller._load_choices_from_fragments()
 
     story_controller._render_current_story_update()
 
