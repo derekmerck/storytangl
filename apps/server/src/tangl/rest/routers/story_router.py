@@ -53,24 +53,6 @@ def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
     return orchestrator.execute(endpoint, **params)
 
 
-def _normalize_choice_fragment(fragment: Any) -> dict[str, Any]:
-    if hasattr(fragment, "model_dump"):
-        data: dict[str, Any] = fragment.model_dump(mode="python")
-    elif isinstance(fragment, dict):
-        data = dict(fragment)
-    else:
-        data = {"content": _serialize(fragment)}
-
-    source_id = data.get("source_id")
-    if source_id is not None:
-        data["uid"] = source_id
-
-    if "label" not in data and "source_label" in data:
-        data["label"] = data["source_label"]
-
-    return data
-
-
 @router.post("/story/create")
 async def create_story(
     world_id: str = Query(..., description="World template to instantiate"),
@@ -114,7 +96,7 @@ async def get_story_update(
         description="Exclusive end marker for a marker range.",
     ),
 ) -> dict[str, Any]:
-    """Return journal fragments and available choices for the active user."""
+    """Return journal fragments (including atomic blocks with embedded choices)."""
 
     user_id = uuid_for_key(api_key)
     fragments = _call(
@@ -126,11 +108,7 @@ async def get_story_update(
         start_marker=start_marker,
         end_marker=end_marker,
     )
-    choice_fragments = [
-        fragment for fragment in fragments if getattr(fragment, "fragment_type", None) == "choice"
-    ]
-    choice_payloads = [_normalize_choice_fragment(fragment) for fragment in choice_fragments]
-    return {"fragments": _serialize(fragments), "choices": _serialize(choice_payloads)}
+    return {"fragments": _serialize(fragments)}
 
 
 @router.post("/do")

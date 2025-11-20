@@ -15,6 +15,7 @@ from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_tes
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
+from helpers_server.json_fragment_helpers import extract_choices_from_fragments
 
 
 DEMO_SCRIPT = (
@@ -155,14 +156,16 @@ def test_multi_world_switching_flow(
     update_one = client.get("story/update", headers=headers)
     assert update_one.status_code == 200
     payload_one = update_one.json()
-    assert _fragment_contains(payload_one["fragments"], "crossroads")
-    assert len(payload_one["choices"]) >= 2
+    fragments_one = payload_one["fragments"]
+    assert _fragment_contains(fragments_one, "crossroads")
+    assert len(extract_choices_from_fragments(fragments_one)) >= 2
 
     status_before = client.get("story/status", headers=headers)
     assert status_before.status_code == 200
     step_before = status_before.json()["step"]
 
-    first_choice = payload_one["choices"][0]["uid"]
+    first_choice_frag = extract_choices_from_fragments(fragments_one)[0]
+    first_choice = first_choice_frag.get("uid") or first_choice_frag.get("source_id")
     choose_resp = client.post("story/do", json={"uid": first_choice}, headers=headers)
     assert choose_resp.status_code == 200
 
@@ -198,10 +201,12 @@ def test_multi_world_switching_flow(
     update_three = client.get("story/update", headers=headers)
     assert update_three.status_code == 200
     payload_three = update_three.json()
-    assert _fragment_contains(payload_three["fragments"], "journey at dawn")
-    assert len(payload_three["choices"]) == 1
+    fragments_three = payload_three["fragments"]
+    assert _fragment_contains(fragments_three, "journey at dawn")
+    third_choices = extract_choices_from_fragments(fragments_three)
+    assert len(third_choices) == 1
 
-    continue_choice = payload_three["choices"][0]["uid"]
+    continue_choice = third_choices[0].get("uid") or third_choices[0].get("source_id")
     continue_resp = client.post("story/do", json={"uid": continue_choice}, headers=headers)
     assert continue_resp.status_code == 200
 

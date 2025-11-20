@@ -117,7 +117,8 @@ testpaths = [
 pythonpath = [
     "engine/src/",
     "apps/cli/src/",
-    "apps/server/src"
+    "apps/server/src",
+    "apps/server/tests"
 ]
 norecursedirs = [
     "tmp",

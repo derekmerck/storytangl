@@ -22,4 +22,3 @@ def world():
 @pytest.fixture
 def client():
     return TestClient(app, base_url="http://test/api/v2/")
-
