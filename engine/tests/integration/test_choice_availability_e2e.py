@@ -1,8 +1,11 @@
+import logging
+
 from tangl.story.episode import Action, Block
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import Frame, ResolutionPhase as P
 from tangl.vm.provision import Dependency, ProvisioningPolicy, Requirement
 
+from helpers.fragment_helpers import (extract_fragments, extract_choices_from_block, count_fragments_by_type, extract_all_choices)
 
 def test_locked_choice_surfaces_to_journal() -> None:
     graph = StoryGraph(label="choice_availability")
@@ -39,7 +42,23 @@ def test_locked_choice_surfaces_to_journal() -> None:
     frame = Frame(graph=graph, cursor_id=graph.initial_cursor_id)
     fragments = frame.run_phase(P.JOURNAL)
 
-    choice_fragments = [fragment for fragment in fragments if fragment.fragment_type == "choice"]
+    logging.debug( fragments )
+    counts = count_fragments_by_type(fragments)
+    logging.debug(counts)
+
+    # grab block and then choices
+    block_fragments = extract_fragments(fragments, "block")
+    block = block_fragments[0]
+    print( block )
+    choice_fragments = extract_choices_from_block(block_fragments[0])
+    assert len(choice_fragments) == 2
+    assert count_fragments_by_type(fragments)['choice'] == 2
+
+    # grab choices from anywhere
+    choice_fragments2 = extract_all_choices(fragments)
+    assert choice_fragments2 == choice_fragments
+
+    # choice_fragments = [fragment for fragment in fragments if fragment.fragment_type == "choice"]
     assert len(choice_fragments) == 2
 
     active = [fragment for fragment in choice_fragments if fragment.active]

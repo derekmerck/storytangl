@@ -12,6 +12,7 @@ import functools
 from dataclasses import dataclass, field
 from random import Random
 import logging
+from contextlib import contextmanager
 
 from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
@@ -141,6 +142,15 @@ class Context:
                 return concept
         return None
 
+    @contextmanager
+    def _fresh_call_receipts(self):
+        from copy import copy
+        _call_receipts = copy(self.call_receipts)
+        self.call_receipts.clear()
+        yield self
+        self.call_receipts.clear()
+        self.call_receipts.extend(_call_receipts)
+
     # Composite phase helpers and storage
     # Composite phases invoke subphases and store intermediate results.
     # The gather-namespace subphase is so frequently used that it has
@@ -157,38 +167,41 @@ class Context:
             # todo: this is super-hacky, but a quick patch for nested get_ns
             #       corrupting call receipts
             # stash current call receipts
-            from copy import copy
-            call_receipts = copy(self.call_receipts)
 
-            raw_ns = do_get_ns(node, ctx=self)
+            with self._fresh_call_receipts():
 
-            composed_maps: list[Mapping[str, Any]] = []
-            graph_locals = getattr(self.graph, "locals", None)
-            if isinstance(graph_locals, dict):
-                composed_maps.append(graph_locals)
-            elif graph_locals is not None:
-                composed_maps.append(graph_locals)
+                # from copy import copy
+                # call_receipts = copy(self.call_receipts)
 
-            base_ns: dict[str, Any] = {
-                "cursor": node,
-                "graph": self.graph,
-                "ctx": self,
-            }
-            composed_maps.append(base_ns)
+                raw_ns = do_get_ns(node, ctx=self)
 
-            if isinstance(raw_ns, ChainMap):
-                for existing in raw_ns.maps:
-                    if any(existing is candidate for candidate in composed_maps):
-                        continue
-                    composed_maps.append(existing)
-            else:  # pragma: no cover - defensive
-                composed_maps.append(raw_ns)  # type: ignore[arg-type]
+                composed_maps: list[Mapping[str, Any]] = []
+                graph_locals = getattr(self.graph, "locals", None)
+                if isinstance(graph_locals, dict):
+                    composed_maps.append(graph_locals)
+                elif graph_locals is not None:
+                    composed_maps.append(graph_locals)
 
-            self._ns_cache[node.uid] = ChainMap(*composed_maps)
+                base_ns: dict[str, Any] = {
+                    "cursor": node,
+                    "graph": self.graph,
+                    "ctx": self,
+                }
+                composed_maps.append(base_ns)
 
-            # restore
-            self.call_receipts.clear()
-            self.call_receipts.extend(call_receipts)
+                if isinstance(raw_ns, ChainMap):
+                    for existing in raw_ns.maps:
+                        if any(existing is candidate for candidate in composed_maps):
+                            continue
+                        composed_maps.append(existing)
+                else:  # pragma: no cover - defensive
+                    composed_maps.append(raw_ns)  # type: ignore[arg-type]
+
+                self._ns_cache[node.uid] = ChainMap(*composed_maps)
+
+                # restore
+                # self.call_receipts.clear()
+                # self.call_receipts.extend(call_receipts)
 
         return self._ns_cache[node.uid]
 

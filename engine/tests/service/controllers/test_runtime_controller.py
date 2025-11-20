@@ -1,17 +1,5 @@
 from __future__ import annotations
-
-from pathlib import Path
 from types import SimpleNamespace
-from uuid import UUID, uuid4
-
-import pytest
-import yaml
-
-from tangl.core import StreamRegistry
-from tangl.journal.content import ContentFragment
-from tangl.service.controllers import RuntimeController
-from tangl.service.user.user import User
-from tangl.vm import ChoiceEdge, Frame, ResolutionPhase, Ledger
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -27,6 +15,8 @@ from tangl.story.story_graph import StoryGraph
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm import ChoiceEdge, Frame, Ledger, ResolutionPhase
+
+from helpers.fragment_helpers import extract_all_choices
 
 
 @pytest.fixture()
@@ -312,7 +302,7 @@ def test_choices_come_from_journal_stream(
     ledger.records.push_records(*fragments, marker_type="fragment")
 
     fragments = runtime_controller.get_journal_entries(ledger, limit=10)
-    choice_fragments = [fragment for fragment in fragments if fragment.fragment_type == "choice"]
+    choice_fragments = extract_all_choices(fragments)
 
     assert len(choice_fragments) == 1
     assert choice_fragments[0].content == "go"

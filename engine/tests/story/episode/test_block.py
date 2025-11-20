@@ -9,9 +9,11 @@ from tangl.story.concepts import Concept
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase as P
 
+from helpers.fragment_helpers import extract_fragments, extract_choices_from_block, extract_all_choices, extract_blocks_with_choices
 
-def _by_fragment_type(fragments: list[BaseFragment], fragment_type: str) -> list[BaseFragment]:
-    return [f for f in fragments if isinstance(f, BaseFragment) and f.fragment_type == fragment_type]
+
+# def _by_fragment_type(fragments: list[BaseFragment], fragment_type: str) -> list[BaseFragment]:
+#     return [f for f in fragments if isinstance(f, BaseFragment) and f.fragment_type == fragment_type]
 
 
 def test_block_stores_inline_content() -> None:
@@ -58,7 +60,7 @@ def test_block_journal_renders_inline_content() -> None:
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    inline = _by_fragment_type(fragments, "block")
+    inline = extract_fragments(fragments, "block")
     assert len(inline) == 1
     assert "Inline text" in inline[0].content
 
@@ -74,7 +76,7 @@ def test_block_journal_renders_child_concepts() -> None:
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    concept_frags = _by_fragment_type(fragments, "concept")
+    concept_frags = extract_fragments(fragments, "concept")
     assert len(concept_frags) == 2
     contents = {f.content for f in concept_frags}
     assert {"First", "Second"} <= contents
@@ -91,7 +93,7 @@ def test_block_journal_renders_choice_menu() -> None:
     frame = Frame(graph=g, cursor_id=start.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    menus = _by_fragment_type(fragments, "choice")
+    menus = extract_all_choices(fragments)
     assert len(menus) == 2
     assert menus[0].content == "Left"
     assert menus[1].content == "Right"
@@ -116,7 +118,7 @@ def test_block_journal_includes_locked_choices() -> None:
     frame = Frame(graph=g, cursor_id=start.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    choice_fragments = _by_fragment_type(fragments, "choice")
+    choice_fragments = extract_all_choices(fragments)
     assert len(choice_fragments) == 2
 
     active = [fragment for fragment in choice_fragments if fragment.active]

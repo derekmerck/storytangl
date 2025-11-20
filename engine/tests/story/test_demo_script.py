@@ -11,6 +11,8 @@ from tangl.story.fabula.world import World
 from tangl.vm.ledger import Ledger
 from tangl.core import StreamRegistry
 
+from helpers.fragment_helpers import extract_fragments, extract_all_choices
+
 @pytest.fixture(autouse=True)
 def _clear_worlds():
     World.clear_instances()
@@ -99,10 +101,10 @@ def test_load_linear_script(resources_dir) -> None:
     assert frame.cursor.label == "start"
 
     def get_blocks(_fragments):
-        return list(filter(lambda f: f.fragment_type == "block", _fragments))
+        return extract_fragments(_fragments, "block")
 
     def get_choices(_fragments):
-        return list(filter(lambda f: f.fragment_type == "choice", _fragments))
+        return extract_all_choices(_fragments)
 
     def render_step(step, _fragments):
         print(f"------- step {step} --------")

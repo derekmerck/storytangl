@@ -13,6 +13,8 @@ from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
 from tangl.vm.ledger import Ledger
 
+from helpers.fragment_helpers import extract_fragments, extract_all_choices
+
 
 def _load_branching_ledger(resources_dir: Path, label: str) -> tuple[Ledger, Frame]:
     script_path = resources_dir / "demo_script.yaml"
@@ -44,11 +46,11 @@ def _step_fragments(ledger: Ledger, step_index: int) -> list[BaseFragment]:
 def _fragments_of_type(
     fragments: Iterable[BaseFragment], fragment_type: str
 ) -> list[BaseFragment]:
-    return [fragment for fragment in fragments if fragment.fragment_type == fragment_type]
+    return extract_fragments(fragments, fragment_type)
 
 
 def _choice_contents(fragments: Iterable[BaseFragment]) -> Sequence[str]:
-    return [fragment.content for fragment in _fragments_of_type(fragments, "choice")]
+    return [f.content for f in extract_all_choices(fragments)]
 
 
 @pytest.fixture(autouse=True)

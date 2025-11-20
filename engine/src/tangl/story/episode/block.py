@@ -13,10 +13,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
+import logging
 
 from pydantic import Field
 
-from tangl.core import BaseFragment, Node, Graph
+from tangl.core import BaseFragment, Node, Graph, CallReceipt
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.discourse import BlockFragment
@@ -26,6 +27,7 @@ from tangl.story.concepts import Concept
 from tangl.vm.runtime import HasEffects
 from .action import Action
 
+logger = logging.getLogger(__name__)
 
 class Block(Node, HasEffects):
     """
@@ -150,27 +152,21 @@ class Block(Node, HasEffects):
         -------
         BlockFragment | None
         """
-        choice_receipts = story_dispatch.dispatch(self, ctx=ctx, task="on_get_choices")
-        choices = []
-        for receipt in choice_receipts:
-            fragments = receipt.result
-            if fragments is None:
-                continue
-            elif isinstance(fragments, list):
-                choices.extend(fragments)
-            elif isinstance(fragments, BaseFragment):
-                choices.append(fragments)
-            else:
-                raise f"Got an unknown choice result: {fragments!r}"
+
+        with ctx._fresh_call_receipts():
+            choice_receipts = story_dispatch.dispatch(self, ctx=ctx, task="get_choices")
+            choices = CallReceipt.merge_results(*choice_receipts)
+
+        logger.debug( choices )
 
         # todo: eventually content should be extensible by the same mechanism as choices
         #       i.e., on_get_content or somesuch, allowing for different content renders
         #       for different block types, affordances, scenes, etc.
         content = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
-        if content:
+        if content or choices:
             return BlockFragment(
                 content=content,
-                choices=choices,
+                choices=choices or [],
                 source_id=self.uid,
                 source_label=self.label
             )
@@ -191,7 +187,7 @@ class Block(Node, HasEffects):
                 fragments.append(fragment)
         return fragments or None
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
+    # @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
     @on_get_choices(priority=Prio.EARLY)
     def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
         """
