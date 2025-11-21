@@ -13,7 +13,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from tangl.type_hints import UniqueLabel, StringMap
+from tangl.type_hints import Hash, StringMap, UniqueLabel
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from .scene_script_models import SceneScript, BlockScript, MenuBlockScript
 from .actor_script_models import ActorScript, RoleScript
@@ -58,10 +58,14 @@ class ScopeSelector(BaseModel):
         )
 
 
-ActorScript.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
-LocationScript.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
-RoleScript.model_rebuild(_types_namespace={"ActorScript": ActorScript})
-SettingScript.model_rebuild(_types_namespace={"LocationScript": LocationScript})
+_types_namespace = {"ScopeSelector": ScopeSelector, "Hash": Hash}
+
+ActorScript.model_rebuild(_types_namespace=_types_namespace)
+LocationScript.model_rebuild(_types_namespace=_types_namespace)
+RoleScript.model_rebuild(_types_namespace={"ActorScript": ActorScript, "Hash": Hash})
+SettingScript.model_rebuild(
+    _types_namespace={"LocationScript": LocationScript, "Hash": Hash}
+)
 BlockScript.model_rebuild()
 MenuBlockScript.model_rebuild()
 SceneScript.model_rebuild()

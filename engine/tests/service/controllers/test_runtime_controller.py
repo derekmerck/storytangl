@@ -10,7 +10,7 @@ from tangl.core import StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.exceptions import InvalidOperationError
-from tangl.service.response import RuntimeInfo, StoryInfo
+from tangl.service.response import ChoiceInfo, RuntimeInfo, StoryInfo
 from tangl.service.user.user import User
 from tangl.story.episode import Action, Block
 from tangl.story.story_graph import StoryGraph
@@ -293,6 +293,31 @@ def test_get_story_info_reports_metadata(runtime_controller: RuntimeController, 
     assert info.cursor_id == ledger.cursor_id
     assert info.journal_size == 0
     assert info.title == ledger.graph.label
+    assert info.cursor_label == "start"
+
+
+def test_get_available_choices_returns_choice_info_models(
+    runtime_controller: RuntimeController,
+    ledger: Ledger,
+) -> None:
+    graph = ledger.graph
+    start = graph.get(ledger.cursor_id)
+    end = graph.add_node(label="end")
+    choice = ChoiceEdge(
+        graph=graph,
+        source_id=start.uid,
+        destination_id=end.uid,
+        label="go",
+    )
+
+    result = runtime_controller.get_available_choices(ledger)
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert isinstance(result[0], ChoiceInfo)
+    assert result[0].uid == choice.uid
+    assert result[0].label == "go"
+    assert result[0].active is True
 
 
 def test_choices_come_from_journal_stream(
