@@ -37,8 +37,26 @@ class WorldController(CommandSet):
         import yaml
         script_data = yaml.safe_load(args.script_path.read_text())
         from tangl.story.fabula.world import World
-        world: World = self._cmd.call_endpoint("WorldController.load_world", script_data=script_data)
-        out = f"Loaded world: {world.script_manager.get_story_metadata().get('title')}"
+        result = self._cmd.call_endpoint(
+            "WorldController.load_world",
+            script_data=script_data,
+        )
+
+        if getattr(result, "status", None) == "error":
+            self._cmd.perror(result.message or "Failed to load world")
+            return
+
+        world_label = None
+        if hasattr(result, "details") and result.details:
+            world_label = result.details.get("world_label")
+        world = World.get_instance(world_label) if world_label else None
+
+        title = None
+        if world is not None and world.script_manager is not None:
+            title = world.script_manager.get_story_metadata().get("title")
+
+        title_text = title or world_label or "<unknown>"
+        out = f"Loaded world: {title_text}"
         self._cmd.poutput(pformat(out))
 
     create_story_parser = argparse.ArgumentParser()
