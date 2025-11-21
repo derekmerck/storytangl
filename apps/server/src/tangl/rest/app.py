@@ -37,6 +37,7 @@ from starlette.responses import RedirectResponse
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator
 from tangl.service import Orchestrator
+from tangl.service.response import RuntimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +45,35 @@ logger = logging.getLogger(__name__)
 # todo: this is a placeholder that creates a default user for testing
 def get_user_credentials(orchestrator: Orchestrator) -> UUID:
     secret = settings.client.secret
-    user = orchestrator.execute("UserController.create_user", secret=secret)
-    logger.debug("Created dev user via orchestrator", extra={"user": user})
-    user_id = getattr(user, "uid", None)
+    result = orchestrator.execute("UserController.create_user", secret=secret)
+    logger.debug("Created dev user via orchestrator", extra={"user": result})
+
+    user_id: UUID | None = None
+    user_obj = None
+
+    if isinstance(result, RuntimeInfo):
+        if result.status != "ok":
+            raise RuntimeError("Orchestrator failed to create dev user")
+        details = result.details or {}
+        user_obj = details.get("user")
+        raw_user_id = details.get("user_id")
+        try:
+            user_id = UUID(str(raw_user_id)) if raw_user_id is not None else None
+        except (TypeError, ValueError):
+            user_id = None
+        if user_id is None and hasattr(user_obj, "uid"):
+            user_id = getattr(user_obj, "uid")
+    else:
+        # Backward compatibility with previous create_user return type
+        user_obj = result
+        user_id = getattr(result, "uid", None)
+
     if user_id is None:
         raise RuntimeError("Orchestrator failed to return a user identifier")
 
     persistence = getattr(orchestrator, "persistence", None)
-    if persistence is not None:
-        persistence.save(user)
+    if persistence is not None and user_obj is not None:
+        persistence.save(user_obj)
     else:
         logger.warning("Skipping user persistence: orchestrator missing persistence manager")
 

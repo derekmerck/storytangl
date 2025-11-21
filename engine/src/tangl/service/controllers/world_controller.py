@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 from tangl.service.response import RuntimeInfo
 from tangl.service.response.info_response.world_info import WorldList
+from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 from tangl.type_hints import Identifier, UnstructuredData
 
 from tangl.core import BaseFragment, Graph
@@ -72,7 +73,14 @@ class WorldController(HasApiEndpoints):
         # It is not strictly necessary, as the available worlds can be learned from
         # system_info, and each world could be queried for info to determine its branding
         # style.  This is a convenience function that provides that info as a single call.
-        return [WorldList(key=world.label, value=world.name) for world in World.all_instances()]
+        fragments: list[BaseFragment] = []
+        for world in World.all_instances():
+            content = OrderedTupleDict({
+                "key": (world.label,),
+                "value": (world.name,),
+            })
+            fragments.append(WorldList(content=content))
+        return fragments
 
     @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],

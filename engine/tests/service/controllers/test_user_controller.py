@@ -79,3 +79,16 @@ def test_drop_user_unlinks_all_stories() -> None:
     assert result.status == "ok"
     assert set(result.details.get("story_ids", [])) == {str(item) for item in expected_story_ids}
     assert user._story_ids == []
+
+
+def test_create_user_returns_runtime_details() -> None:
+    controller = UserController()
+
+    result = controller.create_user(secret="dev-secret")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    details = result.details or {}
+    user = details.get("user")
+    assert user is not None and hasattr(user, "uid")
+    assert details.get("user_id") == str(user.uid)

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator, get_user_locks
 from tangl.service import Orchestrator
+from tangl.service.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret, uuid_for_key
 
@@ -39,6 +40,8 @@ def _serialize(value: Any) -> Any:
         return [_serialize(item) for item in sorted(value, key=str)]
     if isinstance(value, type):
         return value.__name__
+    if callable(value):
+        return repr(value)
     if isinstance(value, list):
         return [_serialize(item) for item in value]
     if isinstance(value, dict):
@@ -67,12 +70,18 @@ async def create_story(
     if story_label:
         kwargs["story_label"] = story_label
     result = _call(orchestrator, "RuntimeController.create_story", user_id=user_id, **kwargs)
-    ledger_obj = result.get("ledger") if isinstance(result, dict) else None
-    if ledger_obj is not None and orchestrator.persistence is not None:
-        orchestrator.persistence.save(ledger_obj)
-        result = dict(result)
-        result.pop("ledger", None)
-    return result
+    if isinstance(result, RuntimeInfo):
+        details = dict(result.details or {})
+        ledger_obj = details.pop("ledger", None)
+        if ledger_obj is not None and orchestrator.persistence is not None:
+            orchestrator.persistence.save(ledger_obj)
+        result = result.model_copy(update={"details": details})
+        payload = result.model_dump(mode="python", exclude_none=True)
+        if isinstance(payload.get("details"), dict):
+            details_payload = payload.pop("details")
+            payload.update(details_payload)
+        return _serialize(payload)
+    return _serialize(result)
 
 
 # todo: maybe "journal" since update is used as a phase?
@@ -160,7 +169,9 @@ async def get_story_status(
     """Return a lightweight summary of the current story state."""
 
     user_id = uuid_for_key(api_key)
-    return _call(orchestrator, "RuntimeController.get_story_info", user_id=user_id)
+    return _serialize(
+        _call(orchestrator, "RuntimeController.get_story_info", user_id=user_id)
+    )
 
 
 @router.delete("/drop")
@@ -186,5 +197,14 @@ async def reset_story(
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if isinstance(result, RuntimeInfo):
+        payload = result.model_dump(mode="python", exclude_none=True)
+        if isinstance(payload.get("details"), dict):
+            details_payload = payload.pop("details")
+            payload.update(details_payload)
+        if payload.get("message") == "Story dropped":
+            payload["status"] = "dropped"
+        return _serialize(payload)
 
     return _serialize(result)
