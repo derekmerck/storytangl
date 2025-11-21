@@ -130,10 +130,18 @@ class ScriptManager:
     def _dump_item(item: Any) -> dict[str, Any]:
         if isinstance(item, dict):
             return dict(item)
-        if isinstance(item, BaseModel):
-            return item.model_dump()
+
         if hasattr(item, "model_dump"):
-            return item.model_dump()  # pragma: no cover - duck-typed models
+            rebuild = getattr(item.__class__, "model_rebuild", None)
+            if callable(rebuild):
+                rebuild()
+            try:
+                payload = item.model_dump(exclude_none=True, exclude_defaults=True)
+            except TypeError:
+                payload = dict(item.__dict__)
+
+            return {key: value for key, value in payload.items() if value is not None}
+
         return dict(item)
 
     @classmethod
