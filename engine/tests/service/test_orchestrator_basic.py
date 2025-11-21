@@ -17,7 +17,7 @@ from tangl.service import (
     Orchestrator,
     ResponseType,
 )
-from tangl.service.controllers import RuntimeController
+from tangl.service.controllers import RuntimeController, UserController
 from tangl.service.response import InfoModel, RuntimeInfo
 from tangl.service.user.user import User
 from tangl.story.fabula.script_manager import ScriptManager
@@ -119,6 +119,18 @@ def test_orchestrator_registers_endpoints(fake_persistence: FakePersistence) -> 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(SimpleController)
     assert "SimpleController.get_value" in orchestrator._endpoints
+
+
+def test_public_endpoint_runs_without_user(fake_persistence: FakePersistence) -> None:
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(UserController)
+
+    result = orchestrator.execute("UserController.create_user", secret="dev-secret")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.details is not None
+    assert "user_id" in result.details
 
 
 def test_orchestrator_hydrates_user_and_ledger(

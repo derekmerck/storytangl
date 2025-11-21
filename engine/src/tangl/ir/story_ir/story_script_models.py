@@ -13,7 +13,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from tangl.type_hints import Hash, StringMap, UniqueLabel
+from tangl.type_hints import Hash, UniqueLabel, StringMap
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from .scene_script_models import SceneScript, BlockScript, MenuBlockScript
 from .actor_script_models import ActorScript, RoleScript
