@@ -95,9 +95,8 @@ def test_full_choice_resolution_flow() -> None:
         choice_id=choice_id,
     )
 
-    assert result["cursor_id"] != initial_cursor
-    assert "fragments" not in result
-    assert result["status"] == "resolved"
+    assert result.cursor_id != initial_cursor
+    assert result.status == "ok"
 
     saved_payload = persistence.saved_payloads[-1]
     if isinstance(saved_payload, Ledger):

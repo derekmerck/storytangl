@@ -4,6 +4,7 @@ import base64
 from uuid import UUID, uuid4
 
 from tangl.service.controllers import ApiKeyInfo, UserController
+from tangl.service.response import RuntimeInfo
 from tangl.utils.hash_secret import key_for_secret
 
 
@@ -53,10 +54,12 @@ def test_update_user_returns_api_key_info() -> None:
     controller = UserController()
     user = _StubUser()
     result = controller.update_user(user, display_name="Player")
-    assert isinstance(result, ApiKeyInfo)
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
     assert user.updated_kwargs == {"display_name": "Player"}
     expected = key_for_secret(user.secret)
-    assert result.api_key == expected
+    assert result.details is not None
+    assert result.details.get("api_key") == expected
 
 
 def test_get_user_media_resolves_identifier() -> None:
@@ -72,6 +75,20 @@ def test_drop_user_unlinks_all_stories() -> None:
     user = _StubUser()
     expected_story_ids = set(user._story_ids)
     result = controller.drop_user(user)
-    assert result[0] == user.uid
-    assert set(result[1:]) == expected_story_ids
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert set(result.details.get("story_ids", [])) == {str(item) for item in expected_story_ids}
     assert user._story_ids == []
+
+
+def test_create_user_returns_runtime_details() -> None:
+    controller = UserController()
+
+    result = controller.create_user(secret="dev-secret")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    details = result.details or {}
+    user = details.get("user")
+    assert user is not None and hasattr(user, "uid")
+    assert details.get("user_id") == str(user.uid)

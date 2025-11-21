@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
+from tangl.service.response import RuntimeInfo
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
@@ -21,14 +22,34 @@ class UserController(CommandSet):
 
     @with_argparser(create_user_parser)
     def do_create_user(self, args: argparse.Namespace) -> None:
-        user = self._cmd.call_endpoint("UserController.create_user", secret=args.secret)
-        if hasattr(user, "uid"):
-            self._cmd.set_user(user.uid)
-        if self._cmd.persistence is not None:
-            self._cmd.persistence.save(user)
+        result = self._cmd.call_endpoint("UserController.create_user", secret=args.secret)
+        user_id: UUID | None = None
+        user_obj: object | None = None
+
+        if isinstance(result, RuntimeInfo):
+            if result.status != "ok":
+                self._cmd.perror(f"Failed to create user: {result.message or result.code}")
+                return
+            details = result.details or {}
+            user_obj = details.get("user")
+            raw_user_id = details.get("user_id")
+            try:
+                user_id = UUID(str(raw_user_id)) if raw_user_id is not None else None
+            except (TypeError, ValueError):
+                user_id = None
+            if user_id is None and hasattr(user_obj, "uid"):
+                user_id = getattr(user_obj, "uid")
+        else:
+            user_obj = result
+            user_id = getattr(result, "uid", None)
+
+        if user_id is not None:
+            self._cmd.set_user(user_id)
+        if self._cmd.persistence is not None and user_obj is not None:
+            self._cmd.persistence.save(user_obj)
         self._cmd.poutput(f"User created with secret '{args.secret}'.")
-        if hasattr(user, "uid"):
-            self._cmd.poutput(f"Active user id: {user.uid}")
+        if user_id is not None:
+            self._cmd.poutput(f"Active user id: {user_id}")
 
     use_user_parser = argparse.ArgumentParser()
     use_user_parser.add_argument("user_id", type=str, help="Existing user identifier")
@@ -87,9 +108,20 @@ class UserController(CommandSet):
         if self._cmd.user_id is None:
             self._cmd.poutput("No active user.")
             return
-        identifiers = self._cmd.call_endpoint("UserController.drop_user")
-        if isinstance(identifiers, tuple):
-            self._cmd.remove_resources(identifier for identifier in identifiers if isinstance(identifier, UUID))
+        result = self._cmd.call_endpoint("UserController.drop_user")
+        removed_ids: list[UUID] = []
+
+        if isinstance(result, RuntimeInfo):
+            if result.status != "ok":
+                self._cmd.perror(f"Failed to drop user: {result.message or result.code}")
+                return
+            details = result.details or {}
+            removed_ids = [UUID(story_id) for story_id in details.get("story_ids", []) if story_id]
+        elif isinstance(result, tuple):
+            removed_ids = [identifier for identifier in result if isinstance(identifier, UUID)]
+
+        if removed_ids:
+            self._cmd.remove_resources(removed_ids)
         self._cmd.poutput("User removed. Active user cleared.")
         self._cmd.set_user(None)
         self._cmd.set_ledger(None)

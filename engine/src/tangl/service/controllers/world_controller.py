@@ -5,12 +5,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
+from tangl.service.response import RuntimeInfo
 from tangl.service.response.info_response.world_info import WorldList
+from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 from tangl.type_hints import Identifier, UnstructuredData
 
-from tangl.core import Graph
+from tangl.core import BaseFragment, Graph
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
-# from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
 from tangl.story.story_graph import StoryGraph
 from tangl.story.fabula.world import World
 from tangl.service.response.info_response import WorldInfo
@@ -65,24 +67,33 @@ class WorldController(HasApiEndpoints):
         method_type=MethodType.READ,
         response_type=ResponseType.CONTENT,
         group="system")
-    def list_worlds(self) -> list[WorldList]:
+    def list_worlds(self) -> list[BaseFragment]:
         # The world list is formatted as content fragments and can be interpreted
         # as an ordered, styled list
         # It is not strictly necessary, as the available worlds can be learned from
         # system_info, and each world could be queried for info to determine its branding
         # style.  This is a convenience function that provides that info as a single call.
-        return { v.label: v.name for v in World.all_instances() }
+        fragments: list[BaseFragment] = []
+        for world in World.all_instances():
+            content = OrderedTupleDict({
+                "key": (world.label,),
+                "value": (world.name,),
+            })
+            fragments.append(WorldList(content=content))
+        return fragments
 
     @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
-        access_level=AccessLevel.PUBLIC)
+        access_level=AccessLevel.PUBLIC,
+        response_type=ResponseType.INFO)
     def get_world_info(self, world: World, **kwargs) -> WorldInfo:
         logger.debug(f"Looking for world info {world}")
         return WorldInfo.from_world(world, **kwargs)
 
     @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
-        access_level=AccessLevel.PUBLIC)
+        access_level=AccessLevel.PUBLIC,
+        response_type=ResponseType.MEDIA)
     def get_world_media(self, world: World, media: MediaRIT | Identifier, **kwargs) -> MediaDataType:
         if isinstance(media, Identifier):
             media = world.media_registry.find_one(alias=media)
@@ -96,11 +107,19 @@ class WorldController(HasApiEndpoints):
     @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
         access_level=AccessLevel.USER,
-        group="user")
-    def create_story(self, world: World, user: User = None, **kwargs) -> Graph:
+        group="user",
+        response_type=ResponseType.RUNTIME)
+    def create_story(self, world: World, user: User = None, **kwargs) -> RuntimeInfo:
         # explicitly including the user kwarg is redundant, but it signals the
         # service manager logic to dereference a calling user for this method.
-        return world.create_story(user=user, **kwargs)
+        graph = world.create_story(user=user, **kwargs)
+        return RuntimeInfo.ok(
+            cursor_id=graph.initial_cursor_id,
+            step=0,
+            message="Story graph created",
+            world_label=world.label,
+            story_label=graph.label,
+        )
 
 
     ###########################################################################
@@ -109,9 +128,10 @@ class WorldController(HasApiEndpoints):
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,
-        method_type=MethodType.CREATE
+        method_type=MethodType.CREATE,
+        response_type=ResponseType.RUNTIME,
     )
-    def load_world(self, *, script_path: str | Path = None, script_data: UnstructuredData = None) -> dict[str, str]:
+    def load_world(self, *, script_path: str | Path = None, script_data: UnstructuredData = None) -> RuntimeInfo:
         """Load a world from a script file path."""
         import yaml
 
@@ -129,10 +149,13 @@ class WorldController(HasApiEndpoints):
         if title is None:
             raise ValueError("World scripts _must_ contain a label or a metadata section with a title")
         label = sanitise_str(title).lower()
-        return World(label=label, script_manager=script_manager)
+        world = World(label=label, script_manager=script_manager)
+        return RuntimeInfo.ok(message="World loaded", world_label=world.label)
 
     @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
-        access_level=AccessLevel.RESTRICTED)
-    def unload_world(self, world: World):
+        access_level=AccessLevel.RESTRICTED,
+        response_type=ResponseType.RUNTIME)
+    def unload_world(self, world: World) -> RuntimeInfo:
         World.clear_instance(world.label)
+        return RuntimeInfo.ok(message="World unloaded", world_label=world.label)

@@ -1,7 +1,14 @@
-from tangl.journal.content import KvFragment
+"""Ledger metadata response."""
 
-from tangl.service.response import BaseResponse
+from __future__ import annotations
 
-# This can be whatever the author wants...
-class StoryInfo(BaseResponse):
-    info: KvFragment = None
+from uuid import UUID
+
+from tangl.service.response.native_response import InfoModel
+
+
+class StoryInfo(InfoModel):
+    title: str
+    step: int
+    cursor_id: UUID
+    journal_size: int

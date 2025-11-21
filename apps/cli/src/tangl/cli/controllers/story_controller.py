@@ -142,17 +142,28 @@ class StoryController(CommandSet):
             kwargs["story_label"] = args.label
 
         result = self._cmd.call_endpoint("RuntimeController.create_story", **kwargs)
+        if getattr(result, "status", None) == "error":
+            self._cmd.perror(result.message or "Failed to create story")
+            return
 
-        ledger_obj = result.get("ledger")
+        details = getattr(result, "details", None) or {}
+        ledger_obj = details.get("ledger")
+        ledger_id_value = details.get("ledger_id")
+        ledger_id = UUID(ledger_id_value) if ledger_id_value is not None else None
+
         if ledger_obj is not None and self._cmd.persistence is not None:
             self._cmd.persistence.save(ledger_obj)
 
-        ledger_id = UUID(result["ledger_id"])
-        self._cmd.set_ledger(ledger_id)
+        if ledger_id is not None:
+            self._cmd.set_ledger(ledger_id)
 
-        self._cmd.poutput(f"\nCreated story: {result['title']}")
-        self._cmd.poutput(f"Starting at: {result['cursor_label']}")
-        self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
+        title = details.get("title") or "<unknown>"
+        cursor_label = details.get("cursor_label") or "<unknown>"
+
+        self._cmd.poutput(f"\nCreated story: {title}")
+        self._cmd.poutput(f"Starting at: {cursor_label}")
+        if ledger_id is not None:
+            self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
 
         fragments = self._cmd.call_endpoint(
             "RuntimeController.get_journal_entries",
@@ -255,29 +266,47 @@ class StoryController(CommandSet):
         self._current_story_update.clear()
         self._current_choices.clear()
 
-        if isinstance(result, dict):
-            status = result.get("status", "dropped")
-            self._cmd.poutput(f"Story {status}.")
-            dropped_ledger_id = result.get("dropped_ledger_id")
-            if dropped_ledger_id:
-                self._cmd.poutput(f"Dropped ledger: {dropped_ledger_id}")
-            archived = bool(result.get("archived", False))
-            self._cmd.poutput(f"Archived: {archived}")
-            if "persistence_deleted" in result:
-                self._cmd.poutput(
-                    f"Persistence deleted: {bool(result['persistence_deleted'])}"
-                )
+        if getattr(result, "status", None) == "error":
+            self._cmd.perror(result.message or "Failed to drop story")
             return
 
-        self._cmd.poutput("Story dropped.")
+        if hasattr(result, "model_dump"):
+            payload = result.model_dump()
+        elif isinstance(result, dict):
+            payload = dict(result)
+        else:
+            payload = {}
+
+        details = payload.get("details") or {}
+        status = payload.get("status") or getattr(result, "status", "dropped")
+        dropped_ledger_id = (
+            payload.get("dropped_ledger_id")
+            or details.get("dropped_ledger_id")
+            or details.get("ledger_id")
+        )
+        archived = bool(payload.get("archived", details.get("archived", False)))
+        persistence_deleted = payload.get(
+            "persistence_deleted", details.get("persistence_deleted")
+        )
+
+        self._cmd.poutput(f"Story {status}.")
+        if dropped_ledger_id:
+            self._cmd.poutput(f"Dropped ledger: {dropped_ledger_id}")
+        self._cmd.poutput(f"Archived: {archived}")
+        if persistence_deleted is not None:
+            self._cmd.poutput(f"Persistence deleted: {bool(persistence_deleted)}")
 
     def do_status(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if not self._require_story_context():
             return
 
         info = self._cmd.call_endpoint("RuntimeController.get_story_info")
-        if isinstance(info, dict):
-            for key, value in info.items():
-                self._cmd.poutput(f"{key}: {value}")
-            return
-        self._cmd.poutput(info)
+        if hasattr(info, "model_dump"):
+            payload = info.model_dump()
+        elif isinstance(info, dict):
+            payload = info
+        else:
+            payload = {"info": str(info)}
+
+        for key, value in payload.items():
+            self._cmd.poutput(f"{key}: {value}")

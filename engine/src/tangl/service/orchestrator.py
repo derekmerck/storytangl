@@ -7,7 +7,10 @@ import inspect
 from typing import Any, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
 from uuid import UUID
 
-from .api_endpoint import ApiEndpoint, HasApiEndpoints, MethodType
+from .api_endpoint import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
+from tangl.core import BaseFragment
+from tangl.service.exceptions import ServiceError
+from tangl.service.response import InfoModel, NativeResponse, RuntimeInfo
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
     from tangl.vm.frame import Frame
@@ -37,24 +40,45 @@ class Orchestrator:
             key = f"{instance.__class__.__name__}.{name}"
             self._endpoints[key] = (instance, endpoint)
 
-    def execute(self, endpoint_name: str, *, user_id: UUID | None = None, **params: Any) -> Any:
+    def execute(
+        self,
+        endpoint_name: str,
+        *,
+        user_id: UUID | None = None,
+        **params: Any,
+    ) -> NativeResponse:
         if endpoint_name not in self._endpoints:
             raise KeyError(f"Unknown endpoint: {endpoint_name}")
 
         controller, endpoint = self._endpoints[endpoint_name]
         self._resource_cache = {}
         resolved_params = self._hydrate_resources(endpoint, user_id, params)
-        result = endpoint(controller, **resolved_params)
-        result = self._handle_result_cleanup(result)
 
-        if endpoint.method_type in {MethodType.CREATE, MethodType.UPDATE, MethodType.DELETE}:
-            for entry in self._resource_cache.values():
-                entry.dirty = True
-            self._write_back_resources()
-        else:
+        try:
+            result = endpoint(controller, **resolved_params)
+            self._validate_response(endpoint, result)
+            result = self._handle_result_cleanup(result)
+
+            if endpoint.method_type in {MethodType.CREATE, MethodType.UPDATE, MethodType.DELETE}:
+                for entry in self._resource_cache.values():
+                    entry.dirty = True
+                self._write_back_resources()
+            else:
+                self._resource_cache.clear()
+
+            return result
+
+        except ServiceError as exc:
+            ledger = resolved_params.get("ledger")
+            cursor_id = getattr(ledger, "cursor_id", None)
+            step = getattr(ledger, "step", None)
             self._resource_cache.clear()
-
-        return result
+            return RuntimeInfo.error(
+                code=exc.code,
+                message=str(exc),
+                cursor_id=cursor_id,
+                step=step,
+            )
 
     def _hydrate_resources(
         self,
@@ -149,6 +173,25 @@ class Orchestrator:
         raise TypeError("Unsupported ledger payload")
 
     def _handle_result_cleanup(self, result: Any) -> Any:
+        if isinstance(result, RuntimeInfo):
+            details = dict(result.details or {})
+            raw_ledger_id = details.pop("_delete_ledger_id", None)
+            if raw_ledger_id is None:
+                result.details = details or None
+                return result
+
+            try:
+                ledger_id = UUID(str(raw_ledger_id))
+            except (TypeError, ValueError):
+                self._update_runtime_details(result, persistence_deleted=False)
+                return result
+
+            self._resource_cache.pop(ledger_id, None)
+            deleted = self._delete_from_persistence(ledger_id)
+            details["persistence_deleted"] = deleted
+            result.details = details
+            return result
+
         if not isinstance(result, MutableMapping):
             return result
 
@@ -166,6 +209,50 @@ class Orchestrator:
         deleted = self._delete_from_persistence(ledger_id)
         result["persistence_deleted"] = deleted
         return result
+
+    def _validate_response(self, endpoint: ApiEndpoint, result: Any) -> None:
+        """Ensure controller return type matches the declared :class:`ResponseType`."""
+
+        response_type = getattr(endpoint, "response_type", None)
+        if response_type is None:
+            return
+
+        if response_type == ResponseType.CONTENT:
+            if not isinstance(result, list):
+                raise TypeError(
+                    f"{endpoint.func.__qualname__} declared ResponseType.CONTENT "
+                    f"but returned {type(result).__name__}."
+                )
+            if result and not all(isinstance(item, BaseFragment) for item in result):
+                raise TypeError(
+                    f"{endpoint.func.__qualname__} declared ResponseType.CONTENT "
+                    "but returned a list with non-BaseFragment items."
+                )
+
+        elif response_type == ResponseType.INFO:
+            if not isinstance(result, InfoModel):
+                raise TypeError(
+                    f"{endpoint.func.__qualname__} declared ResponseType.INFO "
+                    f"but returned {type(result).__name__}, expected InfoModel."
+                )
+
+        elif response_type == ResponseType.RUNTIME:
+            if not isinstance(result, RuntimeInfo):
+                raise TypeError(
+                    f"{endpoint.func.__qualname__} declared ResponseType.RUNTIME "
+                    f"but returned {type(result).__name__}, expected RuntimeInfo."
+                )
+
+        elif response_type == ResponseType.MEDIA:
+            # Media validation is deferred until MEDIA endpoints stabilize.
+            return
+
+    @staticmethod
+    def _update_runtime_details(result: RuntimeInfo, **updates: Any) -> None:
+        details = dict(result.details or {})
+        details.pop("_delete_ledger_id", None)
+        details.update(updates)
+        result.details = details
 
     def _delete_from_persistence(self, ledger_id: UUID) -> bool:
         if self.persistence is None:

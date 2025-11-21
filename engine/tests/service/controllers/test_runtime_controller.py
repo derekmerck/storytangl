@@ -9,6 +9,8 @@ import yaml
 from tangl.core import StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.exceptions import InvalidOperationError
+from tangl.service.response import RuntimeInfo, StoryInfo
 from tangl.service.user.user import User
 from tangl.story.episode import Action, Block
 from tangl.story.story_graph import StoryGraph
@@ -184,10 +186,12 @@ def test_resolve_choice_returns_status_not_fragments(
         choice_id=choice.uid,
     )
 
-    assert result["status"] == "resolved"
-    assert result["cursor_id"] == str(end.uid)
-    assert result["step"] == ledger.step == frame.step
-    assert "fragments" not in result
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.cursor_id == end.uid
+    assert result.step == ledger.step == frame.step
+    assert result.details is not None
+    assert result.details["choice_label"] == choice.label
 
     fragments = runtime_controller.get_journal_entries(ledger, limit=1)
     assert fragments and "sp:cursor:end" in [f.content for f in fragments]
@@ -210,7 +214,7 @@ def test_only_get_journal_returns_fragments(
     assert fragments
     assert all(hasattr(fragment, "content") for fragment in fragments)
 
-    assert "fragments" not in result
+    assert isinstance(result, RuntimeInfo)
 
 
 def test_jump_to_node_teleports_cursor(
@@ -222,10 +226,11 @@ def test_jump_to_node_teleports_cursor(
 
     result = runtime_controller.jump_to_node(ledger=ledger, node_id=target.uid)
 
-    assert result["status"] == "jumped"
-    assert result["cursor_id"] == str(target.uid)
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.cursor_id == target.uid
     assert ledger.cursor_id == target.uid
-    assert ledger.step == result["step"]
+    assert ledger.step == result.step
 
 
 def test_jump_to_node_marks_destination_dirty(
@@ -278,15 +283,16 @@ def test_jump_to_node_returns_status_not_fragments(
 
     result = runtime_controller.jump_to_node(ledger=ledger, node_id=target.uid)
 
-    assert "fragments" not in result
-    assert result["status"] == "jumped"
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
 
 
 def test_get_story_info_reports_metadata(runtime_controller: RuntimeController, ledger: Ledger) -> None:
     info = runtime_controller.get_story_info(ledger)
-    assert info["cursor_id"] == ledger.cursor_id
-    assert info["journal_size"] == 0
-    assert info["title"] == ledger.graph.label
+    assert isinstance(info, StoryInfo)
+    assert info.cursor_id == ledger.cursor_id
+    assert info.journal_size == 0
+    assert info.title == ledger.graph.label
 
 
 def test_choices_come_from_journal_stream(
@@ -322,7 +328,7 @@ def test_resolve_choice_requires_choice(
     ledger: Ledger,
 ) -> None:
     frame = ledger.get_frame()
-    with pytest.raises(ValueError, match="Choice"):
+    with pytest.raises(InvalidOperationError, match="Choice"):
         runtime_controller.resolve_choice(ledger=ledger, frame=frame, choice_id=uuid4())
 
 
@@ -334,15 +340,18 @@ def test_create_story_materializes_ledger(
 
     result = runtime_controller.create_story(user=user, world_id=demo_world.label)
 
-    ledger_id = UUID(result["ledger_id"])
-    assert result["status"] == "created"
-    assert user.current_ledger_id == ledger_id
-    assert result["world_id"] == demo_world.label
-    assert result["title"].startswith("story_")
-    assert result["cursor_label"]
-    assert result["step"] >= 1
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.details is not None
 
-    ledger_obj = result.get("ledger")
+    ledger_id = UUID(result.details["ledger_id"])
+    assert user.current_ledger_id == ledger_id
+    assert result.details["world_id"] == demo_world.label
+    assert result.details["title"].startswith("story_")
+    assert result.details["cursor_label"]
+    assert result.step is not None and result.step >= 1
+
+    ledger_obj = result.details.get("ledger")
     assert isinstance(ledger_obj, Ledger)
     assert ledger_obj.uid == ledger_id
     assert ledger_obj.step >= 1
@@ -373,7 +382,10 @@ def test_create_story_handles_prereq_redirects(
     user = User(label="player")
     result = runtime_controller.create_story(user=user, world_id="stub_world")
 
-    ledger_obj = result["ledger"]
+    assert isinstance(result, RuntimeInfo)
+    assert result.details is not None
+
+    ledger_obj = result.details["ledger"]
     cursor_node = ledger_obj.graph.get(ledger_obj.cursor_id)
     assert cursor_node is not None
     assert cursor_node.label == "redirected_destination"
@@ -389,10 +401,12 @@ def test_drop_story_clears_active_ledger(
     result = runtime_controller.drop_story(user=user_with_ledger, ledger=ledger)
 
     assert user_with_ledger.current_ledger_id is None
-    assert result["status"] == "dropped"
-    assert result["archived"] is False
-    assert result["dropped_ledger_id"] == str(ledger.uid)
-    assert result["_delete_ledger_id"] == str(ledger.uid)
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.details is not None
+    assert result.details["archived"] is False
+    assert result.details["dropped_ledger_id"] == str(ledger.uid)
+    assert result.details["_delete_ledger_id"] == str(ledger.uid)
 
 
 def test_drop_story_archive_skips_deletion_marker(
@@ -402,8 +416,10 @@ def test_drop_story_archive_skips_deletion_marker(
 ) -> None:
     result = runtime_controller.drop_story(user=user_with_ledger, ledger=ledger, archive=True)
 
-    assert result["archived"] is True
-    assert "_delete_ledger_id" not in result
+    assert isinstance(result, RuntimeInfo)
+    assert result.details is not None
+    assert result.details["archived"] is True
+    assert "_delete_ledger_id" not in result.details
 
 
 def test_drop_story_without_active_story_raises(runtime_controller: RuntimeController) -> None:

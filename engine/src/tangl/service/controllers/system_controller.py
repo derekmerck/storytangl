@@ -7,6 +7,7 @@ from tangl.info import __version__, __title__, __url__
 from tangl.utils.app_uptime import app_uptime
 # todo: Be sure to import app uptime on startup so the clock starts running
 from tangl.service.api_endpoint import HasApiEndpoints, ApiEndpoint, AccessLevel, MethodType, ResponseType
+from tangl.service.response import RuntimeInfo
 from tangl.service.response.info_response import SystemInfo
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class SystemController(HasApiEndpoints):
     # System Public API
     ###########################################################################
 
-    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC)
+    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, response_type=ResponseType.INFO)
     @staticmethod
     def get_system_info(self, **kwargs) -> SystemInfo:
         try:
@@ -58,7 +59,7 @@ class SystemController(HasApiEndpoints):
                           method_type=MethodType.UPDATE,
                           response_type=ResponseType.RUNTIME)
     @staticmethod
-    def reset_system(hard: bool = False):
+    def reset_system(hard: bool = False) -> RuntimeInfo:
         """
         Reload all worlds.
 
