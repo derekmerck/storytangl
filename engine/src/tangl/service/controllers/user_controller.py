@@ -43,7 +43,7 @@ class ApiKeyInfo(InfoModel):
 class UserController(HasApiEndpoints):
     """Operations that mutate or inspect :class:`~tangl.service.user.user.User`."""
 
-    @ApiEndpoint.annotate(access_level=AccessLevel.USER)
+    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC)
     def create_user(self, **kwargs: Hash) -> RuntimeInfo:
         """Instantiate a new user model from keyword arguments."""
 
