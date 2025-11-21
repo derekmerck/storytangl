@@ -4,6 +4,7 @@ import base64
 from uuid import UUID, uuid4
 
 from tangl.service.controllers import ApiKeyInfo, UserController
+from tangl.service.user.user import User
 from tangl.service.response import RuntimeInfo
 from tangl.utils.hash_secret import key_for_secret
 
@@ -92,3 +93,17 @@ def test_create_user_returns_runtime_details() -> None:
     user = details.get("user")
     assert user is not None and hasattr(user, "uid")
     assert details.get("user_id") == str(user.uid)
+
+
+def test_set_active_story_sets_current_ledger() -> None:
+    controller = UserController()
+    user = User(label="tester")
+    ledger_id = uuid4()
+
+    result = controller.set_active_story(user, ledger_id)
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert user.current_ledger_id == ledger_id
+    assert result.details is not None
+    assert result.details.get("ledger_id") == str(ledger_id)

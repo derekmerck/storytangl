@@ -1,4 +1,5 @@
 from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,14 @@ import pytest
 import yaml
 
 from tangl.core import Graph, StreamRegistry
-from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator, ResponseType
+from tangl.service import (
+    AccessLevel,
+    ApiEndpoint,
+    HasApiEndpoints,
+    MethodType,
+    Orchestrator,
+    ResponseType,
+)
 from tangl.service.controllers import RuntimeController
 from tangl.service.response import InfoModel, RuntimeInfo
 from tangl.service.user.user import User
@@ -42,12 +50,6 @@ class FakePersistence(dict):
         super().__delitem__(key)
 
 
-class StubUser:
-    def __init__(self, uid: UUID, ledger_id: UUID) -> None:
-        self.uid = uid
-        self.current_ledger_id = ledger_id
-
-
 class SimpleAck(RuntimeInfo):
     value: str
 
@@ -64,10 +66,10 @@ class CursorInfo(InfoModel):
 
 class LedgerController(HasApiEndpoints):
     def __init__(self) -> None:
-        self.last_call: tuple[StubUser, Ledger] | None = None
+        self.last_call: tuple[User, Ledger] | None = None
 
     @ApiEndpoint.annotate(response_type=ResponseType.INFO)
-    def get_cursor(self, user: StubUser, ledger: Ledger) -> CursorInfo:
+    def get_cursor(self, user: User, ledger: Ledger) -> CursorInfo:
         self.last_call = (user, ledger)
         return CursorInfo(cursor_id=ledger.cursor_id)
 
@@ -80,21 +82,21 @@ class FrameController(HasApiEndpoints):
     def __init__(self) -> None:
         self.frames: list[Frame] = []
 
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
+    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, response_type=ResponseType.INFO)
     def get_frame_data(self, ledger: Ledger, frame: Frame) -> FrameInfo:
         self.frames.append(frame)
         return FrameInfo(cursor_id=frame.cursor_id)
 
 
 class UpdateController(HasApiEndpoints):
-    @ApiEndpoint.annotate(method_type=MethodType.UPDATE)
+    @ApiEndpoint.annotate(access_level=AccessLevel.USER, method_type=MethodType.UPDATE)
     def update_step(self, ledger: Ledger) -> RuntimeInfo:
         ledger.step += 1
         return RuntimeInfo.ok(step=ledger.step)
 
 
 class ReadController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
+    @ApiEndpoint.annotate(access_level=AccessLevel.USER, response_type=ResponseType.INFO)
     def get_cursor(self, ledger: Ledger) -> CursorInfo:
         return CursorInfo(cursor_id=ledger.cursor_id)
 
@@ -124,16 +126,15 @@ def test_orchestrator_hydrates_user_and_ledger(
 ) -> None:
     ledger = minimal_ledger
     ledger_id = ledger.uid
-    user_id = uuid4()
-    user = StubUser(user_id, ledger_id)
+    user = User(label="test_user", current_ledger_id=ledger_id, privileged=True)
 
-    fake_persistence[user_id] = user
+    fake_persistence[user.uid] = user
     fake_persistence[ledger_id] = ledger.unstructure()
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(LedgerController)
 
-    result = orchestrator.execute("LedgerController.get_cursor", user_id=user_id)
+    result = orchestrator.execute("LedgerController.get_cursor", user_id=user.uid)
 
     assert isinstance(result, CursorInfo)
     assert result.cursor_id == ledger.cursor_id
@@ -156,8 +157,45 @@ def test_orchestrator_requires_user_id_for_user_hydration(
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(LedgerController)
 
-    with pytest.raises(ValueError, match="user_id is required"):
-        orchestrator.execute("LedgerController.get_cursor")
+    result = orchestrator.execute("LedgerController.get_cursor")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "error"
+    assert result.code == "ACCESS_DENIED"
+
+
+def test_orchestrator_blocks_insufficient_access(
+    fake_persistence: FakePersistence, minimal_ledger: Ledger
+) -> None:
+    ledger_id = minimal_ledger.uid
+    user = User(label="player", current_ledger_id=ledger_id)
+    fake_persistence[user.uid] = user
+    fake_persistence[ledger_id] = minimal_ledger.unstructure()
+
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(LedgerController)
+
+    result = orchestrator.execute("LedgerController.get_cursor", user_id=user.uid)
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "error"
+    assert result.code == "ACCESS_DENIED"
+
+
+def test_orchestrator_requires_active_story_for_inference(
+    fake_persistence: FakePersistence,
+) -> None:
+    user = User(label="storyless")
+    fake_persistence[user.uid] = user
+
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(ReadController)
+
+    result = orchestrator.execute("ReadController.get_cursor", user_id=user.uid)
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "error"
+    assert result.code == "NO_ACTIVE_STORY"
 
 
 def test_orchestrator_reuses_cached_ledger_for_frame(
@@ -215,6 +253,7 @@ def test_orchestrator_pipeline_smoke(
             self.last_frame: Frame | None = None
 
         @ApiEndpoint.annotate(
+            access_level=AccessLevel.USER,
             preprocessors=[pre_one, pre_two],
             postprocessors=[post_one, post_two],
             method_type=MethodType.UPDATE,
@@ -242,8 +281,12 @@ def test_orchestrator_pipeline_smoke(
     orchestrator.register_controller(controller)
 
     fake_persistence[ledger.uid] = ledger.unstructure()
+    user = User(label="pipeline-user", current_ledger_id=ledger.uid)
+    fake_persistence[user.uid] = user
 
-    result = orchestrator.execute("PipelineController.resolve", ledger_id=ledger.uid)
+    result = orchestrator.execute(
+        "PipelineController.resolve", user_id=user.uid, ledger_id=ledger.uid
+    )
 
     assert calls == [("pre", 1), ("pre", 2), ("post", 1), ("post", 2)]
     assert isinstance(result, RuntimeInfo)
@@ -268,12 +311,16 @@ def test_orchestrator_persists_mutations(
 ) -> None:
     ledger_id = minimal_ledger.uid
     fake_persistence[ledger_id] = minimal_ledger.unstructure()
+    user = User(label="mutator", current_ledger_id=ledger_id)
+    fake_persistence[user.uid] = user
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(UpdateController)
 
     fake_persistence.saved.clear()
-    orchestrator.execute("UpdateController.update_step", ledger_id=ledger_id)
+    orchestrator.execute(
+        "UpdateController.update_step", user_id=user.uid, ledger_id=ledger_id
+    )
 
     assert fake_persistence.saved
     saved_payload = fake_persistence.saved[-1]
@@ -285,12 +332,14 @@ def test_read_endpoint_does_not_write_back(
 ) -> None:
     ledger_id = minimal_ledger.uid
     fake_persistence[ledger_id] = minimal_ledger.unstructure()
+    user = User(label="reader", current_ledger_id=ledger_id)
+    fake_persistence[user.uid] = user
 
     orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(ReadController)
 
     fake_persistence.saved.clear()
-    orchestrator.execute("ReadController.get_cursor", ledger_id=ledger_id)
+    orchestrator.execute("ReadController.get_cursor", user_id=user.uid, ledger_id=ledger_id)
     assert not fake_persistence.saved
 
 

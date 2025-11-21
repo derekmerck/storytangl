@@ -1,28 +1,41 @@
 # Exception Policy
 
-**ServiceError subclasses**: Become RuntimeInfo(status="error", code=..., message=...)
-- Used for expected failure modes (not found, invalid state, etc.)
-- CLI catches and displays nicely
-- REST maps to appropriate HTTP status + RuntimeInfo body
+The service layer raises :class:`~tangl.service.exceptions.ServiceError` subclasses
+for expected failure modes. The orchestrator converts them into
+``RuntimeInfo(status="error", code=..., message=...)`` objects so transports can
+present consistent error payloads.
 
-**Other exceptions**: True bugs/unexpected conditions
-- ValueError, TypeError, etc. from bad code
-- CLI lets them bubble (traceback helps debug)
-- REST catches as 500 + generic error RuntimeInfo
+- Use :class:`AccessDeniedError` when authentication or authorization fails.
+- Use :class:`ResourceNotFoundError` when a referenced ledger, user, or world
+  cannot be located.
+- Use :class:`InvalidOperationError` when the request conflicts with the current
+  state (e.g., resolving an unavailable choice).
+- Use :class:`ValidationError` for input problems that pass basic type coercion
+  but violate business rules.
+- Use :class:`NoActiveStoryError` when the user has no active ledger and the
+  orchestrator cannot infer one.
+
+Other exception types (``ValueError``, ``TypeError``, etc.) signal unexpected
+bugs and should propagate. They appear as tracebacks in CLI contexts and become
+HTTP 500 responses in REST.
 
 ## Usage
 
 ```python
-# In controller
-if choice_id not in available:
-    raise InvalidOperationError(f"Choice {choice_id} not available")
+from tangl.service.exceptions import InvalidOperationError
 
-# NOT this:
-if choice_id not in available:
-    return RuntimeInfo(status="error", code="INVALID_CHOICE", ...)
+def resolve_choice(choice_id: UUID, available: set[UUID]) -> None:
+    if choice_id not in available:
+        raise InvalidOperationError(f"Choice {choice_id} not available")
 ```
 
-## Rationale
+## Transport mappings
 
-Exceptions allow early exit and cleaner control flow. The orchestrator and
-transport layers decide how to present them to users.
+- The orchestrator wraps ``ServiceError`` instances as ``RuntimeInfo`` errors and
+  includes cursor metadata when available.
+- FastAPI exception handlers (``tangl.rest.api_server``) map ``ServiceError``
+  subclasses to HTTP 400/403/404/422 responses while preserving the ``code``
+  field in the JSON payload.
+
+Exceptions allow early exit and keep controllers focused on domain logic while
+transports handle presentation.

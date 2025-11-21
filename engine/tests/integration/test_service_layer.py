@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -11,13 +10,8 @@ from tangl.core import BaseFragment, Graph, StreamRegistry
 from tangl.journal.content import ContentFragment
 from tangl.service import Orchestrator
 from tangl.service.controllers import RuntimeController
+from tangl.service.user.user import User
 from tangl.vm import ChoiceEdge, ResolutionPhase, Ledger
-
-
-@dataclass
-class _StubUser:
-    uid: UUID
-    current_ledger_id: UUID
 
 
 class _InMemoryPersistence(dict[UUID, Any]):
@@ -43,7 +37,7 @@ class _InMemoryPersistence(dict[UUID, Any]):
 class _ReadOnlyPersistence:
     """Minimal mapping that mimics :class:`~tangl.persistence.PersistenceManager`."""
 
-    def __init__(self, user: _StubUser, ledger_payload: Any) -> None:
+    def __init__(self, user: User, ledger_payload: Any) -> None:
         self._store: dict[UUID, Any] = {user.uid: user}
         if hasattr(ledger_payload, "uid"):
             self._store[ledger_payload.uid] = ledger_payload
@@ -78,7 +72,7 @@ def _build_ledger_with_choice() -> tuple[Ledger, UUID]:
 def test_full_choice_resolution_flow() -> None:
     persistence = _InMemoryPersistence()
     ledger, choice_id = _build_ledger_with_choice()
-    user = _StubUser(uid=uuid4(), current_ledger_id=ledger.uid)
+    user = User(uid=uuid4(), current_ledger_id=ledger.uid)
 
     persistence[user.uid] = user
     persistence[ledger.uid] = ledger
@@ -121,7 +115,7 @@ def test_full_choice_resolution_flow() -> None:
 
 def test_read_only_endpoint_does_not_persist() -> None:
     ledger, _ = _build_ledger_with_choice()
-    user = _StubUser(uid=uuid4(), current_ledger_id=ledger.uid)
+    user = User(uid=uuid4(), current_ledger_id=ledger.uid)
     ledger_payload = ledger.unstructure()
 
     persistence = _ReadOnlyPersistence(user, ledger_payload)
