@@ -4,7 +4,14 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator, ResponseType
+from tangl.service import (
+    AccessLevel,
+    ApiEndpoint,
+    HasApiEndpoints,
+    MethodType,
+    Orchestrator,
+    ResponseType,
+)
 from tangl.service.exceptions import InvalidOperationError
 from tangl.service.response import InfoModel, RuntimeInfo
 
@@ -14,19 +21,31 @@ class _SampleInfo(InfoModel):
 
 
 class _GoodController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+    @ApiEndpoint.annotate(
+        response_type=ResponseType.INFO,
+        method_type=MethodType.READ,
+        access_level=AccessLevel.PUBLIC,
+    )
     def info(self) -> _SampleInfo:
         return _SampleInfo(value="ok")
 
 
 class _BadController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.UPDATE)
+    @ApiEndpoint.annotate(
+        response_type=ResponseType.RUNTIME,
+        method_type=MethodType.UPDATE,
+        access_level=AccessLevel.PUBLIC,
+    )
     def broken(self) -> RuntimeInfo:
         return {"oops": True}  # type: ignore[return-value]
 
 
 class _FailingController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.UPDATE)
+    @ApiEndpoint.annotate(
+        response_type=ResponseType.RUNTIME,
+        method_type=MethodType.UPDATE,
+        access_level=AccessLevel.PUBLIC,
+    )
     def failing(self) -> RuntimeInfo:
         raise InvalidOperationError("nope")
 
@@ -59,7 +78,11 @@ def test_orchestrator_maps_service_errors(orchestrator: Orchestrator) -> None:
 
 def test_orchestrator_bubbles_non_service_errors(orchestrator: Orchestrator) -> None:
     class _BuggyController(HasApiEndpoints):
-        @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.UPDATE)
+        @ApiEndpoint.annotate(
+            response_type=ResponseType.RUNTIME,
+            method_type=MethodType.UPDATE,
+            access_level=AccessLevel.PUBLIC,
+        )
         def buggy(self) -> RuntimeInfo:
             raise ValueError("boom")
 

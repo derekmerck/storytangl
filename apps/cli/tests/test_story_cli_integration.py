@@ -100,8 +100,11 @@ def test_create_story_with_missing_world(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
 
-    with pytest.raises(ValueError):
-        app.onecmd("create_story missing")
+    app.onecmd("create_story missing")
+    output = _capture_output(app)
+
+    assert "Failed to create story" in output
+    assert "World 'missing' not found" in output
 
 
 def test_linear_story_initializes_and_lists_choices(tangl_cli: TanglShell) -> None:
