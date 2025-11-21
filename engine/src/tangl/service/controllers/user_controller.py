@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 import base64
+from uuid import UUID
 from typing import TYPE_CHECKING
 from pydantic import computed_field
 
 from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
-from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, ResponseType
+from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
 from tangl.service.response import RuntimeInfo
 from tangl.service.response.native_response import InfoModel
 from tangl.type_hints import Hash, Identifier
@@ -94,6 +95,17 @@ class UserController(HasApiEndpoints):
             message="User dropped",
             user_id=str(user.uid),
             story_ids=[str(story_id) for story_id in story_ids],
+        )
+
+    @ApiEndpoint.annotate(access_level=AccessLevel.USER, method_type=MethodType.UPDATE)
+    def set_active_story(self, user: User, ledger_id: UUID) -> RuntimeInfo:
+        """Switch the user's active story session to ``ledger_id``."""
+
+        user.current_ledger_id = ledger_id
+        return RuntimeInfo.ok(
+            message="Active story updated",
+            user_id=str(user.uid),
+            ledger_id=str(ledger_id),
         )
 
     @ApiEndpoint.annotate(

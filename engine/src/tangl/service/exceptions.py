@@ -34,3 +34,9 @@ class ValidationError(ServiceError):
     """Input validation failed for the request."""
 
     code = "VALIDATION_ERROR"
+
+
+class NoActiveStoryError(ServiceError):
+    """User lacks an active story to fulfill the request."""
+
+    code = "NO_ACTIVE_STORY"

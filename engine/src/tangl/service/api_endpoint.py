@@ -24,6 +24,11 @@ class AccessLevel(IntEnum):
     USER       = 50
     RESTRICTED = 100
 
+    def allows(self, required: "AccessLevel") -> bool:
+        """Return ``True`` when this level meets or exceeds ``required``."""
+
+        return self >= required
+
 class MethodType(Enum):
     """
     Represents the primary HTTP-like verb or action for the endpoint.

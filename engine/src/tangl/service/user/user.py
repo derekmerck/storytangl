@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator, field_serializer
 
+from tangl.service.api_endpoint import AccessLevel
 from tangl.type_hints import UniqueLabel, StringMap, Hash
 from tangl.utils.hash_secret import hash_for_secret
 from tangl.core.entity import Entity
@@ -64,6 +65,12 @@ class User(Entity):
     privileged: bool = False  # User is authorized to use dev controllers
 
     current_ledger_id: UUID | None = None
+
+    @property
+    def access_level(self) -> AccessLevel:
+        """Map :attr:`privileged` to the corresponding :class:`AccessLevel`."""
+
+        return AccessLevel.RESTRICTED if self.privileged else AccessLevel.USER
 
     # @property
     # def current_story(self):

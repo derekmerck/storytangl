@@ -14,7 +14,7 @@ from tangl.service.api_endpoint import (
     MethodType,
     ResponseType,
 )
-from tangl.service.exceptions import InvalidOperationError
+from tangl.service.exceptions import InvalidOperationError, ResourceNotFoundError
 from tangl.service.response import RuntimeInfo, StoryInfo
 from tangl.vm.frame import ChoiceEdge, Frame
 from tangl.vm.ledger import Ledger
@@ -201,7 +201,7 @@ class RuntimeController(HasApiEndpoints):
 
         world = World.get_instance(world_id)
         if world is None:
-            raise ValueError(f"World '{world_id}' not found. Load it first.")
+            raise ResourceNotFoundError(f"World '{world_id}' not found")
 
         story_label = kwargs.get("story_label") or f"story_{user.uid}"
         story_graph = world.create_story(story_label, mode="full")
@@ -218,7 +218,7 @@ class RuntimeController(HasApiEndpoints):
         ledger.push_snapshot()
         ledger.init_cursor()
 
-        user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
+        user.current_ledger_id = ledger.uid
 
         cursor_node = story_graph.get(ledger.cursor_id)
         cursor_label = cursor_node.label if cursor_node is not None else "unknown"

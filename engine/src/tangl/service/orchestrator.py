@@ -7,9 +7,14 @@ import inspect
 from typing import Any, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
 from uuid import UUID
 
-from .api_endpoint import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
+from .api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
 from tangl.core import BaseFragment
-from tangl.service.exceptions import ServiceError
+from tangl.service.exceptions import (
+    AccessDeniedError,
+    NoActiveStoryError,
+    ResourceNotFoundError,
+    ServiceError,
+)
 from tangl.service.response import InfoModel, NativeResponse, RuntimeInfo
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
@@ -52,9 +57,10 @@ class Orchestrator:
 
         controller, endpoint = self._endpoints[endpoint_name]
         self._resource_cache = {}
-        resolved_params = self._hydrate_resources(endpoint, user_id, params)
-
+        resolved_params: dict[str, Any] = {}
         try:
+            user = self._check_access(endpoint, user_id)
+            resolved_params = self._hydrate_resources(endpoint, user, params)
             result = endpoint(controller, **resolved_params)
             self._validate_response(endpoint, result)
             result = self._handle_result_cleanup(result)
@@ -80,10 +86,29 @@ class Orchestrator:
                 step=step,
             )
 
+    def _check_access(self, endpoint: ApiEndpoint, user_id: UUID | None) -> "User | None":
+        """Ensure the caller satisfies the endpoint's access requirements."""
+
+        if endpoint.access_level == AccessLevel.PUBLIC:
+            if user_id is None:
+                return None
+            return self._get_or_load_user(user_id)
+
+        if user_id is None:
+            raise AccessDeniedError("Authentication required")
+
+        user = self._get_or_load_user(user_id)
+        if not user.access_level.allows(endpoint.access_level):
+            raise AccessDeniedError(
+                f"Insufficient permissions: {user.access_level.name} < {endpoint.access_level.name}"
+            )
+
+        return user
+
     def _hydrate_resources(
         self,
         endpoint: ApiEndpoint,
-        user_id: UUID | None,
+        user: "User | None",
         params: MutableMapping[str, Any],
     ) -> dict[str, Any]:
         provided = dict(params)
@@ -102,15 +127,15 @@ class Orchestrator:
                 continue
 
             if self._is_user_type(annotation):
-                if user_id is None:
-                    raise ValueError("user_id is required to hydrate user parameter")
-                resolved[name] = self._get_or_load_user(user_id)
+                if user is None:
+                    raise AccessDeniedError("User required but not authenticated")
+                resolved[name] = user
                 continue
 
             if self._is_ledger_type(annotation):
                 ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
                 if ledger_id is None:
-                    ledger_id = self._infer_ledger_id(user_id)
+                    ledger_id = self._infer_ledger_id(user)
                     computed_ledger_id = ledger_id
                 ledger = self._get_or_load_ledger(ledger_id)
                 hydrated_ledger = ledger
@@ -122,7 +147,7 @@ class Orchestrator:
                 if ledger is None:
                     ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
                     if ledger_id is None:
-                        ledger_id = self._infer_ledger_id(user_id)
+                        ledger_id = self._infer_ledger_id(user)
                         computed_ledger_id = ledger_id
                     ledger = self._get_or_load_ledger(ledger_id)
                     hydrated_ledger = ledger
@@ -130,13 +155,13 @@ class Orchestrator:
 
         return resolved
 
-    def _infer_ledger_id(self, user_id: UUID | None) -> UUID:
-        if user_id is None:
-            raise ValueError("ledger_id required when no user context")
-        user = self._get_or_load_user(user_id)
+    def _infer_ledger_id(self, user: "User | None") -> UUID:
+        if user is None:
+            raise NoActiveStoryError("Cannot infer ledger without user context")
         ledger_id = getattr(user, "current_ledger_id", None)
         if ledger_id is None:
-            raise ValueError("User has no active ledger")
+            label = getattr(user, "label", None) or getattr(user, "uid", "<unknown>")
+            raise NoActiveStoryError(f"User {label} has no active story")
         return ledger_id
 
     def _get_or_load_user(self, user_id: UUID) -> Any:
@@ -146,7 +171,7 @@ class Orchestrator:
 
         user = self._fetch_from_persistence(user_id)
         if user is None:
-            raise ValueError(f"User {user_id} not found")
+            raise ResourceNotFoundError(f"User {user_id} not found")
         self._resource_cache[user_id] = _CacheEntry(user)
         return user
 
@@ -157,7 +182,7 @@ class Orchestrator:
 
         data = self._fetch_from_persistence(ledger_id)
         if data is None:
-            raise ValueError(f"Ledger {ledger_id} not found")
+            raise ResourceNotFoundError(f"Ledger {ledger_id} not found")
 
         ledger = self._build_ledger(data)
         self._resource_cache[ledger_id] = _CacheEntry(ledger)
