@@ -62,7 +62,8 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     fragments = payload["fragments"]
     assert _fragment_contains(fragments, "You begin your journey at dawn.")
 
-    choices = extract_choices_from_fragments(fragments)
+    choices = payload["choices"]
+    assert choices == extract_choices_from_fragments(fragments)
     assert choices, "Expected an initial choice to be available"
 
     first_choice = choices[0].get("uid") or choices[0].get("source_id")
@@ -78,7 +79,8 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
         "The path winds through ancient woods.",
     )
 
-    choices_two = extract_choices_from_fragments(fragments_two)
+    choices_two = payload_two["choices"]
+    assert choices_two == extract_choices_from_fragments(fragments_two)
     assert choices_two, "Expected a continuation choice after the middle block"
 
     second_choice = choices_two[0].get("uid") or choices_two[0].get("source_id")
@@ -90,4 +92,4 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     payload_three = update_three.json()
     fragments_three = payload_three["fragments"]
     assert _fragment_contains(fragments_three, "You arrive at the village.")
-    assert extract_choices_from_fragments(fragments_three) == []
+    assert payload_three["choices"] == []
