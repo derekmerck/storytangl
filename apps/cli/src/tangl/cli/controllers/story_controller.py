@@ -270,11 +270,24 @@ class StoryController(CommandSet):
             self._cmd.perror(result.message or "Failed to drop story")
             return
 
-        details = getattr(result, "details", None) or {}
-        status = result.status if hasattr(result, "status") else "dropped"
-        dropped_ledger_id = details.get("dropped_ledger_id")
-        archived = bool(details.get("archived", False))
-        persistence_deleted = details.get("persistence_deleted")
+        if hasattr(result, "model_dump"):
+            payload = result.model_dump()
+        elif isinstance(result, dict):
+            payload = dict(result)
+        else:
+            payload = {}
+
+        details = payload.get("details") or {}
+        status = payload.get("status") or getattr(result, "status", "dropped")
+        dropped_ledger_id = (
+            payload.get("dropped_ledger_id")
+            or details.get("dropped_ledger_id")
+            or details.get("ledger_id")
+        )
+        archived = bool(payload.get("archived", details.get("archived", False)))
+        persistence_deleted = payload.get(
+            "persistence_deleted", details.get("persistence_deleted")
+        )
 
         self._cmd.poutput(f"Story {status}.")
         if dropped_ledger_id:
