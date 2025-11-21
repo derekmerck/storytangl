@@ -4,12 +4,12 @@
 from __future__ import annotations
 import base64
 from typing import TYPE_CHECKING
-from uuid import UUID
-
-from pydantic import BaseModel, computed_field
+from pydantic import computed_field
 
 from tangl.media import MediaDataType, MediaResourceInventoryTag as MediaRIT
-from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints
+from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, ResponseType
+from tangl.service.response import RuntimeInfo
+from tangl.service.response.native_response import InfoModel
 from tangl.type_hints import Hash, Identifier
 from tangl.utils.hash_secret import key_for_secret
 
@@ -24,7 +24,7 @@ else:  # pragma: no cover - runtime imports to avoid circulars
         ...
 
 
-class ApiKeyInfo(BaseModel):
+class ApiKeyInfo(InfoModel):
     """Encoded API key metadata returned after user updates."""
 
     secret: str
@@ -43,19 +43,24 @@ class UserController(HasApiEndpoints):
     """Operations that mutate or inspect :class:`~tangl.service.user.user.User`."""
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
-    def create_user(self, **kwargs: Hash) -> User:
+    def create_user(self, **kwargs: Hash) -> RuntimeInfo:
         """Instantiate a new user model from keyword arguments."""
 
         from tangl.service.user.user import User  # imported lazily to avoid cycles
 
-        return User(**kwargs)
+        user = User(**kwargs)
+        return RuntimeInfo.ok(message="User created", user=user, user_id=str(user.uid))
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
-    def update_user(self, user: User, **kwargs: Hash) -> ApiKeyInfo:
+    def update_user(self, user: User, **kwargs: Hash) -> RuntimeInfo:
         """Update mutable user fields and surface the secret metadata."""
 
         user.update(**kwargs)
-        return ApiKeyInfo(secret=user.secret)
+        return RuntimeInfo.ok(
+            message="User updated",
+            user_id=str(user.uid),
+            api_key=key_for_secret(user.secret),
+        )
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
     def get_user_info(self, user: User, **kwargs: Hash) -> "UserInfo":
@@ -79,18 +84,22 @@ class UserController(HasApiEndpoints):
         return media.get_content(**kwargs)
 
     @ApiEndpoint.annotate(access_level=AccessLevel.USER)
-    def drop_user(self, user: User, **kwargs: Hash) -> tuple[UUID, ...]:
+    def drop_user(self, user: User, **kwargs: Hash) -> RuntimeInfo:
         """Unlink all stories from the user and return identifiers to purge."""
 
         story_ids = tuple(user.get_story_ids())
         for story_id in story_ids:
             user.unlink_story(story_id)
-        return (user.uid, *story_ids)
+        return RuntimeInfo.ok(
+            message="User dropped",
+            user_id=str(user.uid),
+            story_ids=[str(story_id) for story_id in story_ids],
+        )
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         group="system",
-        response_type="info",
+        response_type=ResponseType.INFO,
     )
     def get_key_for_secret(self, secret: str, **_: Hash) -> ApiKeyInfo:
         """Utility endpoint that encodes ``secret`` for API clients."""

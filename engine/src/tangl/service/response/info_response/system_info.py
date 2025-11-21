@@ -1,21 +1,17 @@
-# tangl/system/system_info_model.py
-from typing import Any, Optional
+"""Native system metadata response model."""
+
+from __future__ import annotations
 
 from pydantic import AnyUrl
 
 from tangl.info import __url__
-from tangl.service.response import BaseResponse
+from tangl.service.response.native_response import InfoModel
 
-class SystemInfo(BaseResponse):
+
+class SystemInfo(InfoModel):
     engine: str
     version: str
     uptime: str
     worlds: list[str] | int
     num_users: int
     homepage_url: AnyUrl = __url__
-    # media: Optional[list[MediaRecord | JournalMediaFragment]] = None
-
-    # these are set by the server
-    app_url: Optional[AnyUrl] = None
-    api_url: Optional[AnyUrl] = None
-    guide_url: Optional[AnyUrl] = None

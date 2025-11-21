@@ -14,6 +14,8 @@ from tangl.service.api_endpoint import (
     MethodType,
     ResponseType,
 )
+from tangl.service.exceptions import InvalidOperationError
+from tangl.service.response import RuntimeInfo, StoryInfo
 from tangl.vm.frame import ChoiceEdge, Frame
 from tangl.vm.ledger import Ledger
 from tangl.service.user.user import User
@@ -126,44 +128,46 @@ class RuntimeController(HasApiEndpoints):
         ledger: Ledger,
         frame: Frame,
         choice_id: UUID,
-    ) -> dict[str, Any]:
+    ) -> RuntimeInfo:
         """Resolve a player choice and update the ledger cursor."""
 
         choice = frame.graph.get(choice_id)
         if not isinstance(choice, ChoiceEdge):
-            raise ValueError(f"Choice {choice_id} not found")
+            raise InvalidOperationError(f"Choice {choice_id} not found")
 
         frame.resolve_choice(choice)
 
         ledger.cursor_id = frame.cursor_id
         ledger.step = frame.step
 
-        return {
-            "status": "resolved",
-            "cursor_id": str(ledger.cursor_id),
-            "step": ledger.step,
-        }
+        return RuntimeInfo.ok(
+            cursor_id=ledger.cursor_id,
+            step=ledger.step,
+            message="Choice resolved",
+            choice_label=choice.label,
+            choice_id=str(choice_id),
+        )
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         response_type=ResponseType.INFO,
     )
-    def get_story_info(self, ledger: Ledger) -> dict[str, Any]:
+    def get_story_info(self, ledger: Ledger) -> StoryInfo:
         """Summarize the current ledger state for diagnostics."""
 
-        return {
-            "title": ledger.graph.label,
-            "step": ledger.step,
-            "cursor_id": ledger.cursor_id,
-            "journal_size": sum(1 for _ in ledger.records.iter_channel("fragment")),
-        }
+        return StoryInfo(
+            title=ledger.graph.label,
+            step=ledger.step,
+            cursor_id=ledger.cursor_id,
+            journal_size=sum(1 for _ in ledger.records.iter_channel("fragment")),
+        )
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
     )
-    def jump_to_node(self, ledger: Ledger, node_id: UUID) -> dict[str, Any]:
+    def jump_to_node(self, ledger: Ledger, node_id: UUID) -> RuntimeInfo:
         """Teleport the ledger cursor to ``node_id`` for debugging purposes."""
 
         destination = ledger.graph.get(node_id)
@@ -179,18 +183,18 @@ class RuntimeController(HasApiEndpoints):
         ledger.cursor_id = frame.cursor_id
         ledger.step = frame.step
 
-        return {
-            "status": "jumped",
-            "cursor_id": str(ledger.cursor_id),
-            "step": ledger.step,
-            "dirty": True,
-        }
+        return RuntimeInfo.ok(
+            cursor_id=ledger.cursor_id,
+            step=ledger.step,
+            message="Jumped",
+            dirty=True,
+        )
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.CREATE,
     )
-    def create_story(self, user: User, world_id: str, **kwargs: Any) -> dict[str, Any]:
+    def create_story(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
         """Create a fully-materialized story ledger for ``user``."""
 
         from tangl.story.fabula.world import World
@@ -219,16 +223,16 @@ class RuntimeController(HasApiEndpoints):
         cursor_node = story_graph.get(ledger.cursor_id)
         cursor_label = cursor_node.label if cursor_node is not None else "unknown"
 
-        return {
-            "status": "created",
-            "ledger_id": str(ledger.uid),
-            "world_id": world_id,
-            "title": story_graph.label,
-            "cursor_id": str(ledger.cursor_id),
-            "cursor_label": cursor_label,
-            "step": ledger.step,
-            "ledger": ledger,
-        }
+        return RuntimeInfo.ok(
+            cursor_id=ledger.cursor_id,
+            step=ledger.step,
+            message="Story created",
+            ledger_id=str(ledger.uid),
+            world_id=world_id,
+            title=story_graph.label,
+            cursor_label=cursor_label,
+            ledger=ledger,
+        )
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
@@ -241,7 +245,7 @@ class RuntimeController(HasApiEndpoints):
         ledger: Ledger | None = None,
         *,
         archive: bool = False,
-    ) -> dict[str, Any]:
+    ) -> RuntimeInfo:
         """Clear the user's active story and optionally schedule ledger deletion."""
 
         current_ledger_id = getattr(user, "current_ledger_id", None)
@@ -250,16 +254,20 @@ class RuntimeController(HasApiEndpoints):
 
         user.current_ledger_id = None
 
-        result: dict[str, Any] = {
-            "status": "dropped",
+        details: dict[str, Any] = {
             "dropped_ledger_id": str(current_ledger_id),
             "archived": archive,
         }
 
         if not archive:
-            result["_delete_ledger_id"] = str(current_ledger_id)
+            details["_delete_ledger_id"] = str(current_ledger_id)
 
-        return result
+        return RuntimeInfo.ok(
+            cursor_id=getattr(ledger, "cursor_id", None),
+            step=getattr(ledger, "step", None),
+            message="Story dropped",
+            **details,
+        )
 
     @staticmethod
     def _latest_step_slice(fragments: list[BaseFragment]) -> list[BaseFragment]:

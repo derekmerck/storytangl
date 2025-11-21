@@ -10,6 +10,7 @@ import yaml
 from tangl.core import Graph, StreamRegistry
 from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator, ResponseType
 from tangl.service.controllers import RuntimeController
+from tangl.service.response import InfoModel, RuntimeInfo
 from tangl.service.user.user import User
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
@@ -47,10 +48,18 @@ class StubUser:
         self.current_ledger_id = ledger_id
 
 
+class SimpleAck(RuntimeInfo):
+    value: str
+
+
 class SimpleController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
-    def get_value(self) -> str:
-        return "ok"
+    @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME)
+    def get_value(self) -> RuntimeInfo:
+        return RuntimeInfo.ok(message="ok", value="ok")
+
+
+class CursorInfo(InfoModel):
+    cursor_id: UUID
 
 
 class LedgerController(HasApiEndpoints):
@@ -58,32 +67,36 @@ class LedgerController(HasApiEndpoints):
         self.last_call: tuple[StubUser, Ledger] | None = None
 
     @ApiEndpoint.annotate(response_type=ResponseType.INFO)
-    def get_cursor(self, user: StubUser, ledger: Ledger) -> UUID:
+    def get_cursor(self, user: StubUser, ledger: Ledger) -> CursorInfo:
         self.last_call = (user, ledger)
-        return ledger.cursor_id
+        return CursorInfo(cursor_id=ledger.cursor_id)
+
+
+class FrameInfo(InfoModel):
+    cursor_id: UUID
 
 
 class FrameController(HasApiEndpoints):
     def __init__(self) -> None:
         self.frames: list[Frame] = []
 
-    @ApiEndpoint.annotate(response_type=ResponseType.CONTENT)
-    def get_frame_data(self, ledger: Ledger, frame: Frame) -> Frame:
+    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
+    def get_frame_data(self, ledger: Ledger, frame: Frame) -> FrameInfo:
         self.frames.append(frame)
-        return frame
+        return FrameInfo(cursor_id=frame.cursor_id)
 
 
 class UpdateController(HasApiEndpoints):
     @ApiEndpoint.annotate(method_type=MethodType.UPDATE)
-    def update_step(self, ledger: Ledger) -> int:
+    def update_step(self, ledger: Ledger) -> RuntimeInfo:
         ledger.step += 1
-        return ledger.step
+        return RuntimeInfo.ok(step=ledger.step)
 
 
 class ReadController(HasApiEndpoints):
     @ApiEndpoint.annotate(response_type=ResponseType.INFO)
-    def get_cursor(self, ledger: Ledger) -> UUID:
-        return ledger.cursor_id
+    def get_cursor(self, ledger: Ledger) -> CursorInfo:
+        return CursorInfo(cursor_id=ledger.cursor_id)
 
 
 @pytest.fixture
@@ -122,7 +135,8 @@ def test_orchestrator_hydrates_user_and_ledger(
 
     result = orchestrator.execute("LedgerController.get_cursor", user_id=user_id)
 
-    assert result == ledger.cursor_id
+    assert isinstance(result, CursorInfo)
+    assert result.cursor_id == ledger.cursor_id
     controller_instance = orchestrator._endpoints["LedgerController.get_cursor"][0]
     assert controller_instance.last_call is not None
     hydrated_user, hydrated_ledger = controller_instance.last_call
@@ -188,15 +202,13 @@ def test_orchestrator_pipeline_smoke(
 
     def post_one(result):
         calls.append(("post", 1))
-        payload = dict(result)
-        payload["post1"] = True
-        return payload
+        assert isinstance(result, RuntimeInfo)
+        return result.model_copy(update={"details": {**(result.details or {}), "post1": True}})
 
     def post_two(result):
         calls.append(("post", 2))
-        payload = dict(result)
-        payload["post2"] = True
-        return payload
+        assert isinstance(result, RuntimeInfo)
+        return result.model_copy(update={"details": {**(result.details or {}), "post2": True}})
 
     class PipelineController(HasApiEndpoints):
         def __init__(self) -> None:
@@ -208,7 +220,7 @@ def test_orchestrator_pipeline_smoke(
             method_type=MethodType.UPDATE,
             response_type=ResponseType.RUNTIME,
         )
-        def resolve(self, ledger: Ledger, frame: Frame) -> dict[str, Any]:
+        def resolve(self, ledger: Ledger, frame: Frame) -> RuntimeInfo:
             self.last_frame = frame
             edge = ledger.graph.find_edge(source=ledger.graph.get(ledger.cursor_id), destination=destination)
             frame.resolve_choice(edge or ChoiceEdge(
@@ -218,7 +230,12 @@ def test_orchestrator_pipeline_smoke(
             ))
             ledger.cursor_id = frame.cursor_id
             ledger.step = frame.step
-            return {"cursor": str(ledger.cursor_id), "step": ledger.step}
+            return RuntimeInfo.ok(
+                cursor_id=ledger.cursor_id,
+                step=ledger.step,
+                cursor=str(ledger.cursor_id),
+                step_value=ledger.step,
+            )
 
     controller = PipelineController()
     orchestrator = Orchestrator(fake_persistence)
@@ -229,8 +246,10 @@ def test_orchestrator_pipeline_smoke(
     result = orchestrator.execute("PipelineController.resolve", ledger_id=ledger.uid)
 
     assert calls == [("pre", 1), ("pre", 2), ("post", 1), ("post", 2)]
-    assert result["cursor"] == str(destination.uid)
-    assert result["post1"] is True and result["post2"] is True
+    assert isinstance(result, RuntimeInfo)
+    assert result.cursor_id == destination.uid
+    assert result.details is not None
+    assert result.details.get("post1") is True and result.details.get("post2") is True
     persisted_ledger = fake_persistence[ledger.uid]
     assert getattr(persisted_ledger, "cursor_id") == destination.uid
     assert getattr(persisted_ledger, "step") > 0
@@ -297,10 +316,13 @@ def test_create_story_via_orchestrator_persists_ledger(
         world_id=world.label,
     )
 
-    ledger_id = UUID(result["ledger_id"])
+    assert isinstance(result, RuntimeInfo)
+    assert result.details is not None
+
+    ledger_id = UUID(result.details["ledger_id"])
     current_ledger_id = user.current_ledger_id
     assert current_ledger_id == ledger_id
-    ledger_obj = result["ledger"]
+    ledger_obj = result.details["ledger"]
 
     fake_persistence.save(ledger_obj)
 
@@ -334,10 +356,12 @@ def test_orchestrator_drop_story_deletes_ledger(
 
     result = orchestrator.execute("RuntimeController.drop_story", user_id=user_id)
 
-    assert result["status"] == "dropped"
-    assert result["archived"] is False
-    assert result.get("persistence_deleted") is True
-    assert "_delete_ledger_id" not in result
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.details is not None
+    assert result.details.get("archived") is False
+    assert result.details.get("persistence_deleted") is True
+    assert "_delete_ledger_id" not in result.details
     assert ledger_id in fake_persistence.deleted
     assert ledger_id not in fake_persistence
     persisted_user = fake_persistence[user_id]
