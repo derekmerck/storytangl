@@ -155,12 +155,38 @@ class RuntimeController(HasApiEndpoints):
     def get_story_info(self, ledger: Ledger) -> StoryInfo:
         """Summarize the current ledger state for diagnostics."""
 
+        cursor_node = ledger.graph.get(ledger.cursor_id)
+
         return StoryInfo(
             title=ledger.graph.label,
             step=ledger.step,
             cursor_id=ledger.cursor_id,
             journal_size=sum(1 for _ in ledger.records.iter_channel("fragment")),
+            cursor_label=cursor_node.label if cursor_node else None,
         )
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.PUBLIC,
+        response_type=ResponseType.INFO,
+    )
+    def get_available_choices(self, ledger: Ledger) -> list[ChoiceInfo]:
+        """Return available choices from the ledger cursor."""
+
+        cursor = ledger.graph.get(ledger.cursor_id)
+        if cursor is None:
+            return []
+
+        choices: list[ChoiceInfo] = []
+        for edge in cursor.edges_out(is_instance=ChoiceEdge):
+            choices.append(
+                ChoiceInfo(
+                    uid=edge.uid,
+                    label=edge.label or "unnamed",
+                    active=True,
+                )
+            )
+
+        return choices
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,

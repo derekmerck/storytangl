@@ -52,6 +52,43 @@ def _serialize(value: Any) -> Any:
     return value
 
 
+def _extract_choices_from_fragments(fragments: list[Any]) -> list[dict[str, Any]]:
+    """Extract choice fragments from a fragment stream for REST responses."""
+
+    def _normalize(choice: Any) -> dict[str, Any]:
+        normalized = choice if isinstance(choice, dict) else _serialize(choice)
+
+        if not isinstance(normalized, dict):
+            return {"value": normalized}
+
+        result = dict(normalized)
+        if "source_id" in result:
+            result["uid"] = result["source_id"]
+        elif "uid" in result:
+            result["uid"] = result["uid"]
+        if result.get("source_label") and not result.get("label"):
+            result["label"] = result["source_label"]
+        if result.get("content") and not result.get("label"):
+            result["label"] = result["content"]
+        result.pop("obj_cls", None)
+        return result
+
+    choices: list[dict[str, Any]] = []
+
+    for fragment in fragments:
+        fragment_data = fragment if isinstance(fragment, dict) else _serialize(fragment)
+        fragment_type = fragment_data.get("fragment_type")
+        embedded = fragment_data.get("choices")
+
+        if fragment_type == "block":
+            if embedded:
+                choices.extend(_normalize(choice) for choice in embedded)
+        elif fragment_type == "choice":
+            choices.append(_normalize(fragment_data))
+
+    return choices
+
+
 def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
     return orchestrator.execute(endpoint, **params)
 
@@ -117,7 +154,11 @@ async def get_story_update(
         start_marker=start_marker,
         end_marker=end_marker,
     )
-    return {"fragments": _serialize(fragments)}
+    serialized_fragments = _serialize(fragments)
+    return {
+        "fragments": serialized_fragments,
+        "choices": _extract_choices_from_fragments(serialized_fragments),
+    }
 
 
 @router.post("/do")

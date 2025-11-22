@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import TypeVar, Generic, Literal
+from typing import Generic, Literal, Optional, TypeVar
 import logging
 from copy import deepcopy
 
 from tangl.core.entity import Entity
+from tangl.type_hints import Hash
 from .content_addressable import ContentAddressable
 from .record import Record
 
@@ -64,4 +65,7 @@ class Snapshot(Record, ContentAddressable, Generic[EntityT]):
         if verify and item._state_hash() != self.content_hash:
             raise RuntimeError("Recovered item state does not match item state hash.")
         return item
+
+
+Snapshot.model_rebuild()
 

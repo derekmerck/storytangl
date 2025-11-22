@@ -404,6 +404,7 @@ class World(Singleton):
         for scene_label, scene_data in scenes.items():
             blocks = self._normalize_section(scene_data.get("blocks"))
             for block_label, block_data in blocks.items():
+                block_data = block_data or {}
                 qualified_label = f"{scene_label}.{block_label}"
                 cls = self.domain_manager.resolve_class(
                     block_data.get("obj_cls") or block_data.get("block_cls")
@@ -412,7 +413,7 @@ class World(Singleton):
                 scripts = {
                     key: [
                         self._normalize_action_entry(self._to_dict(entry))
-                        for entry in block_data.get(key, [])
+                        for entry in (block_data.get(key) or [])
                     ]
                     for key in ("actions", "continues", "redirects")
                 }
