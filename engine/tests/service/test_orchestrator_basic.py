@@ -103,6 +103,13 @@ class ReadController(HasApiEndpoints):
         return CursorInfo(cursor_id=ledger.cursor_id)
 
 
+class AttachController(HasApiEndpoints):
+    @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, method_type=MethodType.UPDATE)
+    def attach_ledger(self, user: User, ledger: Ledger) -> RuntimeInfo:
+        user.current_ledger_id = ledger.uid
+        return RuntimeInfo.ok(ledger_id=str(ledger.uid))
+
+
 @pytest.fixture
 def fake_persistence() -> FakePersistence:
     return FakePersistence()
@@ -438,3 +445,36 @@ def test_orchestrator_drop_story_deletes_ledger(
     persisted_user = fake_persistence[user_id]
     assert getattr(persisted_user, "current_ledger_id", None) is None
     assert any(isinstance(saved, User) and saved.uid == user_id for saved in fake_persistence.saved)
+
+
+def test_default_user_persists_drop_story(fake_persistence: FakePersistence, minimal_ledger: Ledger) -> None:
+    ledger = minimal_ledger
+    ledger_id = ledger.uid
+    fake_persistence[ledger_id] = ledger.unstructure()
+
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(AttachController)
+    orchestrator.register_controller(RuntimeController)
+
+    orchestrator.execute("AttachController.attach_ledger", ledger_id=ledger_id)
+
+    default_user_id = orchestrator._default_user_id
+    assert default_user_id is not None
+    persisted_user = fake_persistence[default_user_id]
+    assert getattr(persisted_user, "current_ledger_id", None) == ledger_id
+
+    fake_persistence.saved.clear()
+    fake_persistence.deleted.clear()
+
+    result = orchestrator.execute("RuntimeController.drop_story")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert ledger_id in fake_persistence.deleted
+
+    updated_user = fake_persistence[default_user_id]
+    assert getattr(updated_user, "current_ledger_id", None) is None
+    assert any(
+        isinstance(saved, User) and getattr(saved, "current_ledger_id", "sentinel") is None
+        for saved in fake_persistence.saved
+    )

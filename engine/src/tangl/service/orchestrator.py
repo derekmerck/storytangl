@@ -107,6 +107,11 @@ class Orchestrator:
 
         if self.config.auth_mode is AuthMode.OFF:
             if self._default_user is not None:
+                self._default_user_id = getattr(self._default_user, "uid", self._default_user_id)
+                if self._default_user_id is not None:
+                    self._resource_cache.setdefault(
+                        self._default_user_id, _CacheEntry(self._default_user)
+                    )
                 return self._default_user
 
             cached_default = self._get_cached_user(self._default_user_id)
