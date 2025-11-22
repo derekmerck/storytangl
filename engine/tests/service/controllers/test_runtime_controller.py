@@ -295,7 +295,7 @@ def test_get_story_info_reports_metadata(runtime_controller: RuntimeController, 
     assert info.title == ledger.graph.label
     assert info.cursor_label == "start"
 
-
+@pytest.mark.skip(reason="changed behavior, endpoint is gone")
 def test_get_available_choices_returns_choice_info_models(
     runtime_controller: RuntimeController,
     ledger: Ledger,

@@ -154,6 +154,7 @@ async def get_story_update(
         start_marker=start_marker,
         end_marker=end_marker,
     )
+    # todo: just pass on a list of loose fragments here.
     serialized_fragments = _serialize(fragments)
     return {
         "fragments": serialized_fragments,

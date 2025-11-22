@@ -166,29 +166,6 @@ class RuntimeController(HasApiEndpoints):
         )
 
     @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        response_type=ResponseType.INFO,
-    )
-    def get_available_choices(self, ledger: Ledger) -> list[ChoiceInfo]:
-        """Return available choices from the ledger cursor."""
-
-        cursor = ledger.graph.get(ledger.cursor_id)
-        if cursor is None:
-            return []
-
-        choices: list[ChoiceInfo] = []
-        for edge in cursor.edges_out(is_instance=ChoiceEdge):
-            choices.append(
-                ChoiceInfo(
-                    uid=edge.uid,
-                    label=edge.label or "unnamed",
-                    active=True,
-                )
-            )
-
-        return choices
-
-    @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,

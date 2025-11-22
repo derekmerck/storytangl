@@ -1,4 +1,4 @@
-# tangl.core.fragment.group_fragment.py
+# tangl.core.journal.content.group_fragment.py
 from typing import Literal, Any, Optional, Collection
 from uuid import UUID
 from enum import Enum
