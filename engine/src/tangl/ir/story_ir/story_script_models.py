@@ -63,9 +63,7 @@ _types_namespace = {"ScopeSelector": ScopeSelector, "Hash": Hash}
 ActorScript.model_rebuild(_types_namespace=_types_namespace)
 LocationScript.model_rebuild(_types_namespace=_types_namespace)
 RoleScript.model_rebuild(_types_namespace={"ActorScript": ActorScript, "Hash": Hash})
-SettingScript.model_rebuild(
-    _types_namespace={"LocationScript": LocationScript, "Hash": Hash}
-)
+SettingScript.model_rebuild(_types_namespace={"LocationScript": LocationScript, "Hash": Hash})
 BlockScript.model_rebuild()
 MenuBlockScript.model_rebuild()
 SceneScript.model_rebuild()
