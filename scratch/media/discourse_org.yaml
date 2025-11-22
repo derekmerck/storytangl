@@ -1,6 +1,0 @@
-# Discourse Subpackage
-# --------------------
-deps: [core, story, utils]
-classes:
-  - NarrativeCreator:  # give it content and params, it returns narrative fragments
-

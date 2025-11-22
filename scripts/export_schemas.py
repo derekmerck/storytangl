@@ -2,7 +2,7 @@
 Generate json schemas for the tangl-script object types.
 
 Usage:
-$ python tangl.script.export_schema > tangl_schema.json
+$ python scripts/export_schemas.py > tangl_schema.json
 
 Individual files for multi-file scripts are additionally written to the
 package directory `extras/schemas`.  They can then be associated with
@@ -18,7 +18,8 @@ from typing import Type
 from tangl.ir.core_ir import MasterScript, BaseScriptItem, ScriptMetadata
 from tangl.ir.story_ir import ActorScript, LocationScript, SceneScript, StoryScript
 
-EXTRAS_DIR = Path(__file__).parent.parent / "extras/schemas"
+project_root = Path(__file__).parent.parent
+EXTRAS_DIR = project_root / "extras/schemas"
 
 def update_schemas():
 

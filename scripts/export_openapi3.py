@@ -8,7 +8,8 @@ import json
 
 from fastapi.openapi.utils import get_openapi
 
-EXTRAS_DIR = Path(__file__).parent.parent / "extras/api"
+project_root = Path(__file__).parent.parent
+EXTRAS_DIR = project_root / "extras/api"
 
 def get_openapi_for_app(app):
     return get_openapi(

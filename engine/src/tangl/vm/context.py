@@ -164,14 +164,9 @@ class Context:
         if nocache or node.uid not in self._ns_cache:
             logger.debug(f"getting fresh ns for {node!r}")
 
-            # todo: this is super-hacky, but a quick patch for nested get_ns
-            #       corrupting call receipts
-            # stash current call receipts
 
             with self._fresh_call_receipts():
-
-                # from copy import copy
-                # call_receipts = copy(self.call_receipts)
+                # stash current call receipts so they aren't affected by the subdispatch
 
                 raw_ns = do_get_ns(node, ctx=self)
 

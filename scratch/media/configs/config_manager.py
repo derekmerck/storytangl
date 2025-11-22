@@ -5,7 +5,7 @@ import math
 import jinja2
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
-from tangl.entity import SingletonEntity
+from tangl.core.singleton import Singleton
 from tangl.type_hints import Primitive, UniqueLabel
 from tangl.utils.rejinja import DereferencingTemplate  # requires "python-box"
 from tangl.utils.dict_product import dict_product
@@ -99,7 +99,7 @@ class ConfigTemplate(BaseModel):
     #     # todo: find all jinja expressions, make sure the names are in self.default_vars
     #     return self
 
-class Config(SingletonEntity):
+class Config(Singleton):
     template_key: str = Field(..., alias="template")
     merge_keys: dict[str, str | None | list] = Field(default_factory=dict)
     local_vars: dict[str, Primitive | dict | list] = Field(default_factory=dict)
