@@ -8,7 +8,7 @@ from uuid import UUID
 import cmd2
 
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service import Orchestrator
+from tangl.service import AccessLevel, AuthMode, Orchestrator, ServiceConfig
 from tangl.service.controllers import (
     RuntimeController as RuntimeServiceController,
     SystemController as SystemServiceController,
@@ -99,7 +99,12 @@ def create_cli_app() -> StoryTanglCLI:
     """Instantiate the CLI, orchestrator, and persistence plumbing."""
 
     persistence = PersistenceManagerFactory.create_persistence_manager()
-    orchestrator = Orchestrator(persistence)
+    config = ServiceConfig(
+        auth_mode=AuthMode.OFF,
+        default_user_label="cli",
+        default_access_level=AccessLevel.ADMIN,
+    )
+    orchestrator = Orchestrator(persistence, config=config)
     for controller in (
         RuntimeServiceController,
         UserServiceController,

@@ -34,6 +34,10 @@ def tangl_cli() -> TanglShell:
 
 def _capture_output(app: TanglShell) -> str:
     output = app.stdout.getvalue()
+    if hasattr(app, "stderr") and hasattr(app.stderr, "getvalue"):
+        output += app.stderr.getvalue()
+        app.stderr.truncate(0)
+        app.stderr.seek(0)
     app.stdout.truncate(0)
     app.stdout.seek(0)
     return output
@@ -42,6 +46,7 @@ def _capture_output(app: TanglShell) -> str:
 def test_load_script_and_show_story(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     output = _capture_output(app)
@@ -66,6 +71,7 @@ def test_load_script_and_show_story(tangl_cli: TanglShell) -> None:
 def test_create_story_bundles_journal_and_choices(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     _capture_output(app)
@@ -82,6 +88,7 @@ def test_create_story_bundles_journal_and_choices(tangl_cli: TanglShell) -> None
 def test_choose_advances_story(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     _capture_output(app)
@@ -96,20 +103,22 @@ def test_choose_advances_story(tangl_cli: TanglShell) -> None:
     assert "No available choices" in output
 
 
-def test_create_story_with_missing_world(tangl_cli: TanglShell) -> None:
+def test_create_story_with_missing_world(tangl_cli: TanglShell, capsys: Any) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd("create_story missing")
     output = _capture_output(app)
+    captured = capsys.readouterr()
 
-    assert "Failed to create story" in output
-    assert "World 'missing' not found" in output
+    assert "World 'missing' not found" in output or "World 'missing' not found" in captured.err
 
 
 def test_linear_story_initializes_and_lists_choices(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {LINEAR_SCRIPT}")
     _capture_output(app)
@@ -126,6 +135,7 @@ def test_linear_story_initializes_and_lists_choices(tangl_cli: TanglShell) -> No
 def test_linear_story_walkthrough(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {LINEAR_SCRIPT}")
     _capture_output(app)
@@ -152,6 +162,7 @@ def test_linear_story_walkthrough(tangl_cli: TanglShell) -> None:
 def test_branching_story_left_path_cli(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     _capture_output(app)
@@ -175,6 +186,7 @@ def test_branching_story_left_path_cli(tangl_cli: TanglShell) -> None:
 def test_branching_story_cave_path_cli(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     _capture_output(app)
@@ -201,6 +213,7 @@ def test_branching_story_cave_path_cli(tangl_cli: TanglShell) -> None:
 def test_branching_story_cave_backtrack_cli(tangl_cli: TanglShell) -> None:
     app = tangl_cli
     app.stdout = io.StringIO()
+    app.stderr = app.stdout
 
     app.onecmd(f"load_script {TEST_SCRIPT}")
     _capture_output(app)

@@ -7,7 +7,7 @@ from collections import defaultdict
 from uuid import UUID
 
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service import Orchestrator
+from tangl.service import AccessLevel, AuthMode, Orchestrator, ServiceConfig
 from tangl.service.controllers import (
     RuntimeController,
     SystemController,
@@ -21,7 +21,12 @@ _user_locks: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 def _build_orchestrator() -> Orchestrator:
     persistence = PersistenceManagerFactory.create_persistence_manager()
-    orchestrator = Orchestrator(persistence)
+    config = ServiceConfig(
+        auth_mode=AuthMode.OFF,
+        default_user_label="rest",
+        default_access_level=AccessLevel.ADMIN,
+    )
+    orchestrator = Orchestrator(persistence, config=config)
     for controller in (
         RuntimeController,
         UserController,

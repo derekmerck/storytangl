@@ -1,33 +1,18 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from enum import Enum, IntEnum
+from enum import Enum
 from typing import Callable, Any, Type, get_type_hints, Mapping
 import functools
 import inspect
 
 from pydantic import BaseModel, model_validator, Field
 
+from tangl.service.auth import AccessLevel
+
 import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
-
-class AccessLevel(IntEnum):
-    """
-    Defines the access level for an API endpoint or user.
-
-    :cvar PUBLIC: Minimal access required, does not need user credentials.
-    :cvar USER: Standard user access. Requires valid user.
-    :cvar RESTRICTED: Elevated or admin-like access level.
-    """
-    PUBLIC     = 10
-    USER       = 50
-    RESTRICTED = 100
-
-    def allows(self, required: "AccessLevel") -> bool:
-        """Return ``True`` when this level meets or exceeds ``required``."""
-
-        return self >= required
 
 class MethodType(Enum):
     """

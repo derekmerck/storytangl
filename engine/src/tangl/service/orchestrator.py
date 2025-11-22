@@ -7,7 +7,9 @@ import inspect
 from typing import Any, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
 from uuid import UUID
 
-from .api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
+from tangl.service.auth import AccessLevel, AuthMode
+from tangl.service.config import ServiceConfig
+from .api_endpoint import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
 from tangl.core import BaseFragment
 from tangl.service.exceptions import (
     AccessDeniedError,
@@ -34,10 +36,18 @@ class _CacheEntry:
 class Orchestrator:
     """Coordinates endpoint execution with lightweight resource hydration."""
 
-    def __init__(self, persistence_manager: Any | None = None) -> None:
+    def __init__(
+        self,
+        persistence_manager: Any | None = None,
+        *,
+        config: ServiceConfig | None = None,
+    ) -> None:
         self.persistence = persistence_manager
+        self.config = config or ServiceConfig()
         self._endpoints: dict[str, tuple[HasApiEndpoints, ApiEndpoint]] = {}
         self._resource_cache: dict[Any, _CacheEntry] = {}
+        self._default_user_id: UUID | None = None
+        self._default_user: "User | None" = None
 
     def register_controller(self, controller: HasApiEndpoints | type[HasApiEndpoints]) -> None:
         instance = controller() if inspect.isclass(controller) else controller
@@ -59,7 +69,10 @@ class Orchestrator:
         self._resource_cache = {}
         resolved_params: dict[str, Any] = {}
         try:
-            user = self._check_access(endpoint, user_id)
+            user = self._resolve_user(user_id)
+            if self.config.auth_mode is AuthMode.ENFORCED:
+                self._enforce_access(endpoint, user)
+
             resolved_params = self._hydrate_resources(endpoint, user, params)
             result = endpoint(controller, **resolved_params)
             self._validate_response(endpoint, result)
@@ -86,24 +99,54 @@ class Orchestrator:
                 step=step,
             )
 
-    def _check_access(self, endpoint: ApiEndpoint, user_id: UUID | None) -> "User | None":
-        """Ensure the caller satisfies the endpoint's access requirements."""
+    def _resolve_user(self, user_id: UUID | None) -> "User | None":
+        """Resolve the user context for this request."""
 
-        if endpoint.access_level == AccessLevel.PUBLIC:
-            if user_id is None:
-                return None
+        if user_id is not None:
             return self._get_or_load_user(user_id)
 
-        if user_id is None:
-            raise AccessDeniedError("Authentication required")
+        if self.config.auth_mode is AuthMode.OFF:
+            if self._default_user is not None:
+                return self._default_user
 
-        user = self._get_or_load_user(user_id)
-        if not user.access_level.allows(endpoint.access_level):
+            cached_default = self._get_cached_user(self._default_user_id)
+            if cached_default is not None:
+                return cached_default
+
+            if self._default_user_id is not None:
+                try:
+                    user = self._get_or_load_user(self._default_user_id)
+                except ResourceNotFoundError:
+                    self._default_user_id = None
+                else:
+                    self._default_user = user
+                    return user
+
+            user = self._build_default_user()
+            self._default_user_id = user.uid
+            self._default_user = user
+            self._resource_cache[user.uid] = _CacheEntry(user)
+            if self.persistence is not None:
+                self._call_persistence_save(user)
+            return user
+
+        return None
+
+    def _effective_access_level(self, user: "User | None") -> AccessLevel:
+        if self.config.auth_mode is AuthMode.OFF:
+            return AccessLevel.ADMIN
+        if user is None:
+            return AccessLevel.ANON
+        return user.access_level
+
+    def _enforce_access(self, endpoint: ApiEndpoint, user: "User | None") -> None:
+        """Ensure the caller satisfies the endpoint's access requirements."""
+
+        effective = self._effective_access_level(user)
+        if not effective.allows(endpoint.access_level):
             raise AccessDeniedError(
-                f"Insufficient permissions: {user.access_level.name} < {endpoint.access_level.name}"
+                f"Insufficient permissions: {effective.name} < {endpoint.access_level.name}"
             )
-
-        return user
 
     def _hydrate_resources(
         self,
@@ -164,6 +207,12 @@ class Orchestrator:
             raise NoActiveStoryError(f"User {label} has no active story")
         return ledger_id
 
+    def _get_cached_user(self, user_id: UUID | None) -> "User | None":
+        if user_id is None:
+            return None
+        entry = self._resource_cache.get(user_id)
+        return None if entry is None else entry.resource
+
     def _get_or_load_user(self, user_id: UUID) -> Any:
         entry = self._resource_cache.get(user_id)
         if entry is not None:
@@ -174,6 +223,12 @@ class Orchestrator:
             raise ResourceNotFoundError(f"User {user_id} not found")
         self._resource_cache[user_id] = _CacheEntry(user)
         return user
+
+    def _build_default_user(self) -> "User":
+        from tangl.service.user.user import User
+
+        privileged = self.config.default_access_level is AccessLevel.ADMIN
+        return User(label=self.config.default_user_label, privileged=privileged)
 
     def _get_or_load_ledger(self, ledger_id: UUID) -> Any:
         entry = self._resource_cache.get(ledger_id)

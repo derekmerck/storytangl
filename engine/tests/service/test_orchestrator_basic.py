@@ -12,10 +12,12 @@ from tangl.core import Graph, StreamRegistry
 from tangl.service import (
     AccessLevel,
     ApiEndpoint,
+    AuthMode,
     HasApiEndpoints,
     MethodType,
     Orchestrator,
     ResponseType,
+    ServiceConfig,
 )
 from tangl.service.controllers import RuntimeController, UserController
 from tangl.service.response import InfoModel, RuntimeInfo
@@ -107,6 +109,16 @@ def fake_persistence() -> FakePersistence:
 
 
 @pytest.fixture
+def orchestrator_with_acl(fake_persistence: FakePersistence) -> Orchestrator:
+    config = ServiceConfig(
+        auth_mode=AuthMode.ENFORCED,
+        default_user_label="test",
+        default_access_level=AccessLevel.USER,
+    )
+    return Orchestrator(fake_persistence, config=config)
+
+
+@pytest.fixture
 def minimal_ledger() -> Ledger:
     graph = Graph()
     start = graph.add_node(label="start")
@@ -161,15 +173,14 @@ def test_orchestrator_hydrates_user_and_ledger(
 
 
 def test_orchestrator_requires_user_id_for_user_hydration(
-    fake_persistence: FakePersistence, minimal_ledger: Ledger
+    orchestrator_with_acl: Orchestrator, fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
     ledger_id = minimal_ledger.uid
     fake_persistence[ledger_id] = minimal_ledger.unstructure()
 
-    orchestrator = Orchestrator(fake_persistence)
-    orchestrator.register_controller(LedgerController)
+    orchestrator_with_acl.register_controller(LedgerController)
 
-    result = orchestrator.execute("LedgerController.get_cursor")
+    result = orchestrator_with_acl.execute("LedgerController.get_cursor")
 
     assert isinstance(result, RuntimeInfo)
     assert result.status == "error"
@@ -177,17 +188,16 @@ def test_orchestrator_requires_user_id_for_user_hydration(
 
 
 def test_orchestrator_blocks_insufficient_access(
-    fake_persistence: FakePersistence, minimal_ledger: Ledger
+    orchestrator_with_acl: Orchestrator, fake_persistence: FakePersistence, minimal_ledger: Ledger
 ) -> None:
     ledger_id = minimal_ledger.uid
     user = User(label="player", current_ledger_id=ledger_id)
     fake_persistence[user.uid] = user
     fake_persistence[ledger_id] = minimal_ledger.unstructure()
 
-    orchestrator = Orchestrator(fake_persistence)
-    orchestrator.register_controller(LedgerController)
+    orchestrator_with_acl.register_controller(LedgerController)
 
-    result = orchestrator.execute("LedgerController.get_cursor", user_id=user.uid)
+    result = orchestrator_with_acl.execute("LedgerController.get_cursor", user_id=user.uid)
 
     assert isinstance(result, RuntimeInfo)
     assert result.status == "error"
