@@ -1,7 +1,7 @@
 import typing as typ
 from enum import Enum, auto
 
-from tangl.utils.enum_utils import EnumUtils
+from tangl.utils.enum_plus import EnumPlusMixin as EnumUtils
 
 
 class PsychosomaticDomains( EnumUtils, Enum ):

@@ -50,7 +50,7 @@ import math
 from typing import ClassVar
 
 from .base_stat import StatHandler, Stat, Statlike
-from ..type_hints import *
+from ...type_hints import *
 
 ExpValue = float  # range 1-5
 
