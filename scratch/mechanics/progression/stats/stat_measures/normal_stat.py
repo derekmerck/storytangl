@@ -2,7 +2,7 @@ import random
 from statistics import NormalDist
 
 from .base_stat import StatHandler, Stat
-from ..type_hints import *
+from ...type_hints import *
 
 class NormalStatHandler(StatHandler):
     # the mapping from value to tier and the probability function both approximate

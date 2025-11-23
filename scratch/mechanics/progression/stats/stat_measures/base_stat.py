@@ -1,8 +1,8 @@
 from typing import ClassVar
 import functools
 
-from ..type_hints import *
-from ..measures import Quality, measure_of
+from ...type_hints import *
+from .measures import Quality, measure_of
 
 class StatHandler:
     # Stats have 20 incremental values (float, fv) and a 5-level "measure" (int, qv)

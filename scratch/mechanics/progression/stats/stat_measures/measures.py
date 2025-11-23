@@ -2,7 +2,7 @@ import types
 
 from enum import IntEnum
 
-from tangl.utils.enum_utils import EnumUtils  # Provides casting by value
+from tangl.utils.enum_plus import EnumPlusMixin as EnumUtils  # Provides casting by value
 
 
 class Quality(EnumUtils, IntEnum):
