@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import math
 
-from mechanics.progression.handlers.probit import ProbitStatHandler
-from mechanics.progression.handlers.linear import LinearStatHandler
-from mechanics.progression.handlers.logint import LogIntStatHandler
+from tangl.mechanics.progression.handlers.probit import ProbitStatHandler
+from tangl.mechanics.progression.handlers.linear import LinearStatHandler
+from tangl.mechanics.progression.handlers.logint import LogIntStatHandler
 
 
 def test_probit_fv_qv_roundtrip_basic():

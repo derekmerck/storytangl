@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
-from mechanics.progression.entity.has_stats import HasStats
-from mechanics.progression.measures import Quality
-from mechanics.progression.stats.stat import Stat
+from tangl.mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
+from tangl.mechanics.progression.entity.has_stats import HasStats
+from tangl.mechanics.progression.measures import Quality
+from tangl.mechanics.progression.stats.stat import Stat
 
 
 def _example_system() -> StatSystemDefinition:

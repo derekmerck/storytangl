@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from mechanics.progression.effects import (
+from tangl.mechanics.progression.effects import (
     SituationalEffect,
     aggregate_modifiers,
     gather_applicable_effects,
 )
-from mechanics.progression.handlers.linear import LinearStatHandler
-from mechanics.progression.handlers.probit import ProbitStatHandler
+from tangl.mechanics.progression.handlers.linear import LinearStatHandler
+from tangl.mechanics.progression.handlers.probit import ProbitStatHandler
 
 
 def test_situational_effect_basic_matching_on_tags_and_stats():

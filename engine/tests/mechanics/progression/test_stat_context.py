@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from mechanics.progression.context.stat_context import StatContext
-from mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
-from mechanics.progression.measures import Quality
+from tangl.mechanics.progression.context.stat_context import StatContext
+from tangl.mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
+from tangl.mechanics.progression.measures import Quality
 
 
 def _simple_system() -> StatSystemDefinition:

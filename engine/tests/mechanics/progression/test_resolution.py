@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
-from mechanics.progression.entity.has_stats import HasStats
-from mechanics.progression.entity.has_wallet import HasWallet
-from mechanics.progression.effects import SituationalEffect
-from mechanics.progression.outcomes import Outcome
-from mechanics.progression.tasks.resolution import compute_delta, resolve_task
-from mechanics.progression.tasks.task import Task
+from tangl.mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
+from tangl.mechanics.progression.entity.has_stats import HasStats
+from tangl.mechanics.progression.entity.has_wallet import HasWallet
+from tangl.mechanics.progression.effects import SituationalEffect
+from tangl.mechanics.progression.outcomes import Outcome
+from tangl.mechanics.progression.tasks.resolution import compute_delta, resolve_task
+from tangl.mechanics.progression.tasks.task import Task
 
 
 def _combat_system() -> StatSystemDefinition:

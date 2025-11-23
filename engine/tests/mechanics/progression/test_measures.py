@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mechanics.progression.measures import Quality
+from tangl.mechanics.progression.measures import Quality
 
 
 def test_quality_values_and_aliases():

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from mechanics.progression.measures import Quality
-from mechanics.progression.stats.stat import Stat
-from mechanics.progression.handlers.linear import LinearStatHandler
+from tangl.mechanics.progression.measures import Quality
+from tangl.mechanics.progression.stats.stat import Stat
+from tangl.mechanics.progression.handlers.linear import LinearStatHandler
 
 
 def test_stat_construct_from_fv_int_quality_str():

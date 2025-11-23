@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
-from mechanics.progression.entity.has_wallet import HasWallet
+from tangl.mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
+from tangl.mechanics.progression.entity.has_wallet import HasWallet
 
 
 def _currency_system() -> StatSystemDefinition:

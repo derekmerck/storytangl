@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from __future__ import annotations
 
-from mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
-from mechanics.progression.tasks.task import Task
+from tangl.mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
+from tangl.mechanics.progression.tasks.task import Task
 
 
 def _example_system() -> StatSystemDefinition:

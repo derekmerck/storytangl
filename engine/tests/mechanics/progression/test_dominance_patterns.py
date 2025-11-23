@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mechanics.progression.dominance import CircularDominance
+from tangl.mechanics.progression.dominance import CircularDominance
 
 
 def test_circular_dominance_basic_rps():

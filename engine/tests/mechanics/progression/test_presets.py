@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from mechanics.progression.presets.registry import all_presets, get_preset
-from mechanics.progression.presets import cyberpunk, fantasy  # noqa: F401
+from tangl.mechanics.progression.presets.registry import all_presets, get_preset
+from tangl.mechanics.progression.presets import cyberpunk, fantasy  # noqa: F401
 
 
 def test_fantasy_presets_registered_and_shape():

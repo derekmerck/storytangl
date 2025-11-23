@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mechanics.progression.outcomes import Outcome, sample_outcome
+from tangl.mechanics.progression.outcomes import Outcome, sample_outcome
 
 
 def test_sample_outcome_bounds_and_types():
