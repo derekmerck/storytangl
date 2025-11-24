@@ -51,30 +51,31 @@ def test_basic_storage_storage_funcs(storage):
     # Assert that storage is empty
     assert not storage, f"The storage storage should be empty ({len(storage)})."
 
+    test_key = uuid.uuid4()
     # Store data in storage
-    storage["test"] = "data"
+    storage[test_key] = "data"
     assert storage
 
     # Assert that data is in storage
 
     if isinstance(storage, FileStorage):
-        fn = storage.get_fn("test")
+        fn = storage.get_fn(str(test_key))
         print( fn )
-        fp = storage.base_path / storage.get_fn("test")
+        fp = storage.base_path / storage.get_fn(str(test_key))
         print( fp, fp.exists() )
 
-    assert "test" in storage, "key should be in db"
-    assert compare_as_strings(storage["test"], "data"), "value should be as set"
+    assert test_key in storage, "key should be in db"
+    assert compare_as_strings(storage[test_key], "data"), "value should be as set"
 
     # Assert that getting non-existing data raises KeyError
     with pytest.raises(KeyError):
-        storage["non-existing"]
+        storage[uuid.uuid4()]
 
     # Delete data
-    del storage["test"]
+    del storage[test_key]
 
     # Assert that data is not in storage anymore
-    assert "test" not in storage
+    assert test_key not in storage
     assert not storage
 
     # Assert that deleting non-existing data raises KeyError

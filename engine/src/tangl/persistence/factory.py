@@ -7,7 +7,7 @@ try:
     from tangl.config import settings
 except ImportError:
     settings = {}
-from .storage import InMemoryStorage, FileStorage, RedisStorage, MongoStorage
+from .storage import InMemoryStorage, FileStorage, RedisStorage, MongoStorage, SQLiteStorage
 from .serializers import PickleSerializationHandler, JsonSerializationHandler, YamlSerializationHandler, BsonSerializationHandler
 from .structuring import StructuringHandler
 
@@ -22,7 +22,9 @@ PersistenceManagerName = Literal[
     "json_file",
     "yaml_file",
     "bson_file",
-    "bson_mongo"
+    "bson_mongo",
+    "sqlite_in_mem",
+    "sqlite_file",
 ]
 
 DEFAULT_PERSISTENCE_MGR = settings.get('service.persistence', 'native_in_mem')  # type: PersistenceManagerName
@@ -94,6 +96,14 @@ class PersistenceManagerFactory:
                 return cls.bson_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
             case "bson_mongo":
                 return cls.bson_mongo(manager_cls=manager_cls, structuring=structuring, url=mongo_url)
+            case "sqlite_in_mem":
+                return cls.sqlite_json(manager_cls=manager_cls,
+                                       structuring=structuring,
+                                       path=':memory:')
+            case "sqlite_file":
+                return cls.sqlite_json(manager_cls=manager_cls,
+                                       structuring=structuring,
+                                       path=user_data_path / 'sqlite.db')
             case _:
                 raise ValueError(f"Unknown persistence mgr type: {manager_name}")
 
@@ -175,6 +185,16 @@ class PersistenceManagerFactory:
         return manager_cls(
             storage=FileStorage(base_path=base_path, ext="yaml", binary_rw=False),
             serializer=YamlSerializationHandler,
+            structuring=structuring
+        )
+
+    @staticmethod
+    def sqlite_json(manager_cls: Type[ManagerT] = PersistenceManager,
+                    path: Path = ":memory:",
+                    structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+        return manager_cls(
+            storage=SQLiteStorage(path=path, binary_rw=False),
+            serializer=JsonSerializationHandler,
             structuring=structuring
         )
 

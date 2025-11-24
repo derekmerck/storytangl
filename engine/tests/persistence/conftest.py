@@ -25,7 +25,7 @@ def get_serializer(serializer_cls):
 def serializer(request):
     return get_serializer(request.param)
 
-storage_backends = [InMemoryStorage, FileStorage, RedisStorage, MongoStorage]
+storage_backends = [InMemoryStorage, FileStorage, RedisStorage, MongoStorage, SQLiteStorage]
 
 def get_storage(storage_cls, base_path: Path = None, is_binary: bool = False):
     if storage_cls is RedisStorage:
@@ -44,6 +44,10 @@ def get_storage(storage_cls, base_path: Path = None, is_binary: bool = False):
             return storage
     elif storage_cls is FileStorage:
         return storage_cls(base_path=base_path, binary_rw=is_binary)
+    elif storage_cls is SQLiteStorage:
+        # assume file storage for now, could use :memory: too
+        db_path = base_path / "test.db"
+        return storage_cls(path=db_path)
     else:
         return storage_cls()
 
@@ -62,7 +66,8 @@ manager_configs = [
     (JsonSerializationHandler,   StructuringHandler, FileStorage),      # json_file
     (YamlSerializationHandler,   StructuringHandler, FileStorage),      # yaml_file
     (BsonSerializationHandler,   StructuringHandler, FileStorage),      # bson_file
-    (BsonSerializationHandler,   StructuringHandler, MongoStorage)      # bson_mongo
+    (BsonSerializationHandler,   StructuringHandler, MongoStorage),      # bson_mongo
+    (JsonSerializationHandler,   StructuringHandler, SQLiteStorage)     # sqlite_json
 ]
 
 @pytest.fixture(params=manager_configs)
