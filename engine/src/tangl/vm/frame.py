@@ -156,6 +156,8 @@ class Frame:
 
         return outcome
 
+    cursor_history: list[UUID] = field(default_factory=list)
+
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
 
@@ -200,6 +202,7 @@ class Frame:
             else:
                 raise RuntimeError(f"Proposed prereq jump is not a valid edge {type(nxt)}!")
 
+        self.cursor_history.append(self.cursor_id)
         self.run_phase(P.UPDATE)         # No-op for now
 
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
