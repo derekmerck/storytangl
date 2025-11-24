@@ -175,7 +175,10 @@ def resolve_task(
         wallet.spend(dict(task.cost))
 
     # Compute delta
-    effective_tags = context_tags or task.tags
+    if context_tags is None:
+        effective_tags = task.tags
+    else:
+        effective_tags = context_tags
     delta = compute_delta(
         task,
         entity,

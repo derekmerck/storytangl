@@ -159,6 +159,40 @@ def test_resolve_task_outcome_distribution_with_fixed_roll():
     # Easier task should not produce a worse outcome than the harder one.
     assert outcome_easy.value >= outcome_hard.value
 
+
+def test_resolve_task_respects_empty_context_tags():
+    system = _combat_system()
+    fighter, _ = _fighter_and_mage(system)
+
+    task = Task(
+        name="Forest strike",
+        domain="sword",
+        difficulty={"sword": 12.0},
+        tags={"forest"},
+    )
+
+    roll = 0.65
+
+    outcome_with_default_tags = resolve_task(
+        task,
+        fighter,
+        system=system,
+        # Explicitly omit context tags to use task tags
+        context_tags=None,
+        roll=roll,
+    )
+    outcome_without_tags = resolve_task(
+        task,
+        fighter,
+        system=system,
+        # Explicitly pass empty set to disable tag-driven effects
+        context_tags=set(),
+        roll=roll,
+    )
+
+    assert outcome_with_default_tags == Outcome.SUCCESS
+    assert outcome_without_tags == Outcome.FAILURE
+
 @pytest.mark.skip("Re-enable when HasWallet in asset is working/tested")
 def test_resolve_task_with_wallet_integration():
     system = _combat_system()
