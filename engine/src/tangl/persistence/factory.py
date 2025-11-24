@@ -23,8 +23,9 @@ PersistenceManagerName = Literal[
     "yaml_file",
     "bson_file",
     "bson_mongo",
-    "sqlite_in_mem",
-    "sqlite_file",
+    "json_sqlite_in_mem",
+    "json_sqlite_file",
+    "pickle_sqlite_file"
 ]
 
 DEFAULT_PERSISTENCE_MGR = settings.get('service.persistence', 'native_in_mem')  # type: PersistenceManagerName
@@ -84,6 +85,13 @@ class PersistenceManagerFactory:
                 return cls.pickle_file(manager_cls=manager_cls, base_path=user_data_path)
             case "pickle_redis":
                 return cls.pickle_redis(manager_cls=manager_cls, url=redis_url)
+            case "pickle_sqlite_in_mem":
+                return cls.pickle_sqlite(manager_cls=manager_cls,
+                                         structuring=structuring)
+            case "pickle_sqlite_file":
+                return cls.pickle_sqlite(manager_cls=manager_cls,
+                                         structuring=structuring,
+                                         base_path=user_data_path)
 
             # Unstructured data
             case "json_redis":
@@ -96,14 +104,12 @@ class PersistenceManagerFactory:
                 return cls.bson_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
             case "bson_mongo":
                 return cls.bson_mongo(manager_cls=manager_cls, structuring=structuring, url=mongo_url)
-            case "sqlite_in_mem":
-                return cls.sqlite_json(manager_cls=manager_cls,
+            case "json_sqlite_in_mem":
+                return cls.json_sqlite(manager_cls=manager_cls, structuring=structuring)
+            case "json_sqlite_file":
+                return cls.json_sqlite(manager_cls=manager_cls,
                                        structuring=structuring,
-                                       path=':memory:')
-            case "sqlite_file":
-                return cls.sqlite_json(manager_cls=manager_cls,
-                                       structuring=structuring,
-                                       path=user_data_path / 'sqlite.db')
+                                       base_path=user_data_path)
             case _:
                 raise ValueError(f"Unknown persistence mgr type: {manager_name}")
 
@@ -152,6 +158,20 @@ class PersistenceManagerFactory:
             serializer=PickleSerializationHandler
         )
 
+    @staticmethod
+    def pickle_sqlite(manager_cls: Type[ManagerT] = PersistenceManager,
+                      base_path: Path = None,
+                      structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+        if base_path is None:
+            path = ":memory:"
+        else:
+            path = base_path / 'sqlite.db'
+        return manager_cls(
+            storage=SQLiteStorage(path=path, binary_rw=True),
+            serializer=PickleSerializationHandler,
+            structuring=structuring
+        )
+
     # ------------------------
     # Unstructured text, requires both structuring and serialization handlers
     # ------------------------
@@ -189,9 +209,13 @@ class PersistenceManagerFactory:
         )
 
     @staticmethod
-    def sqlite_json(manager_cls: Type[ManagerT] = PersistenceManager,
-                    path: Path = ":memory:",
+    def json_sqlite(manager_cls: Type[ManagerT] = PersistenceManager,
+                    base_path: Path = None,
                     structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+        if base_path is None:
+            path = ":memory:"
+        else:
+            path = base_path / 'sqlite.db'
         return manager_cls(
             storage=SQLiteStorage(path=path, binary_rw=False),
             serializer=JsonSerializationHandler,
