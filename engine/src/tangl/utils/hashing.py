@@ -11,7 +11,7 @@ try:
     HASHING_SALT = settings.service.salt.encode('utf-8')
 except (ImportError, AttributeError):
     # Fallback
-    HASHING_SALT = b'<!--2t0ryT4n5L--/>'
+    HASHING_SALT = b'==$t0ryT4nG1-3=='
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -27,6 +27,8 @@ def hashing_func(*data, salt: bytes = HASHING_SALT, digest_size = None) -> Hash:
         hasher.update(salt)
     else:
         # provides digest size for creating ints or uids without truncating
+        if len(salt) > 16:
+            salt = salt[:16]
         hasher = blake2b(digest_size=digest_size, salt=salt)
 
     for item in data:

@@ -13,19 +13,22 @@ from .structuring import StructuringHandler
 
 from .manager import PersistenceManager
 
+# all "in-mem" is ephemeral, useful primarily for testing
+
 PersistenceManagerName = Literal[
     "native_in_mem",
     "unstructured_in_mem",
     "pickle_in_mem",
     "pickle_file",
     "pickle_redis",
+    "pickle_sqlite_file",
+    "pickle_sqlite_in_mem",
     "json_file",
+    "json_sqlite_in_mem",
+    "json_sqlite_file",
     "yaml_file",
     "bson_file",
     "bson_mongo",
-    "json_sqlite_in_mem",
-    "json_sqlite_file",
-    "pickle_sqlite_file"
 ]
 
 DEFAULT_PERSISTENCE_MGR = settings.get('service.persistence', 'native_in_mem')  # type: PersistenceManagerName
@@ -98,18 +101,18 @@ class PersistenceManagerFactory:
                 return cls.json_redis(manager_cls=manager_cls, structuring=structuring, url=redis_url)
             case "json_file":
                 return cls.json_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
-            case "yaml_file":
-                return cls.yaml_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
-            case "bson_file":
-                return cls.bson_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
-            case "bson_mongo":
-                return cls.bson_mongo(manager_cls=manager_cls, structuring=structuring, url=mongo_url)
             case "json_sqlite_in_mem":
                 return cls.json_sqlite(manager_cls=manager_cls, structuring=structuring)
             case "json_sqlite_file":
                 return cls.json_sqlite(manager_cls=manager_cls,
                                        structuring=structuring,
                                        base_path=user_data_path)
+            case "yaml_file":
+                return cls.yaml_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
+            case "bson_file":
+                return cls.bson_file(manager_cls=manager_cls, structuring=structuring, base_path=user_data_path)
+            case "bson_mongo":
+                return cls.bson_mongo(manager_cls=manager_cls, structuring=structuring, url=mongo_url)
             case _:
                 raise ValueError(f"Unknown persistence mgr type: {manager_name}")
 

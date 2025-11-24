@@ -23,16 +23,20 @@ secret = "None"                         # default user
 # ---------------------
 [service]
 default_world = "None"                  # for new users
-salt = "==$t0ryT4nG1-3=="               # for hashing secrets
+salt = "==$t0ryT4nG1-3=="               # for hashing secrets (max 16-bytes)
 complexify_secret = false               # enable to expand the default code-name space
 persistence = "native_in_mem"           # native objects in memory, ephemeral
 #persistence = "pickle_file"             # pickled native objects in binary files
 #persistence = "pickle_redis"            # pickled native objects in db
+#persistence = "pickle_sqlite_file"      # pickled native objects in db file
+#persistence = "pickle_sqlite_in_mem"    # pickled native objects in db in mem, ephemeral
 #persistence = "json_redis"              # json text in db
 #persistence = "json_file"               # json text files
+#persistence = "json_sqlite_file"        # json in db file
+#persistence = "json_sqlite_in_mem"      # json in db in memory, ephemeral
 #persistence = "yaml_file"               # yaml text files
-#persistence = "bson_file"               # bson data in binary files
-#persistence = "bson_mongo"              # bson data in db
+#persistence = "bson_file"               # bson binary files
+#persistence = "bson_mongo"              # bson binary in db
 
 # URLs for integrated REST service
 [service.rest]
