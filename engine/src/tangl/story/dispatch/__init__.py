@@ -3,6 +3,7 @@ from .story_dispatch import (
 
     # journaling
     on_render,
+    on_journal_content,
     on_describe,
     on_get_choices,
 
@@ -10,5 +11,5 @@ from .story_dispatch import (
     on_cast_actor,
     on_scout_location,
 
-    on_relationship_change
-    )
+    on_relationship_change,
+)

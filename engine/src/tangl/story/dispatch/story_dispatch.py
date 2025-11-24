@@ -23,6 +23,7 @@ on_scout_location = partial(story_dispatch.register, task="link", is_instance='S
 # Create story-layer sub-tasks, author layer can interact with these
 on_render = partial(story_dispatch.register, task="render")      # produce fragments
 on_describe = partial(story_dispatch.register, task="describe")  # produce strings
+on_journal_content = partial(story_dispatch.register, task="journal_content")
 on_relationship_change = partial(story_dispatch.register, task="relationship_change")
 on_get_choices = partial(story_dispatch.register, task="get_choices")
 

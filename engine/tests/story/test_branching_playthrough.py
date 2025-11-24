@@ -46,7 +46,8 @@ def _step_fragments(ledger: Ledger, step_index: int) -> list[BaseFragment]:
 def _fragments_of_type(
     fragments: Iterable[BaseFragment], fragment_type: str
 ) -> list[BaseFragment]:
-    return extract_fragments(fragments, fragment_type)
+    mapped_type = "content" if fragment_type == "block" else fragment_type
+    return extract_fragments(fragments, mapped_type)
 
 
 def _choice_contents(fragments: Iterable[BaseFragment]) -> Sequence[str]:
