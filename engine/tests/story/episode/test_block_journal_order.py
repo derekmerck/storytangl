@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from helpers.fragment_helpers import extract_fragments
 from tangl.core import StreamRegistry
 from tangl.story.concepts import Concept
 from tangl.story.episode.action import Action
@@ -30,20 +29,22 @@ def test_block_journal_orders_block_concept_choice() -> None:
 
     fragments = list(ledger.get_journal("step-0001"))
 
-    # this is the first fragment
-    text_fragments = extract_fragments(fragments, "text")
-
-    assert [fragment.fragment_type for fragment in fragments[1:]] == [
-        "block",
-        "concept",
-        # "choice",  # embedded in block now
+    non_text = [
+        fragment
+        for fragment in fragments
+        if getattr(fragment, "fragment_type", None) != "text"
     ]
-    assert [fragment.content for fragment in fragments[1:]] == [
+
+    assert [fragment.fragment_type for fragment in non_text] == [
+        "content",
+        "concept",
+        "choice",
+    ]
+    assert [fragment.content for fragment in non_text] == [
         "Start text",
         "Concept text",
+        "Continue",
     ]
-
-    assert fragments[1].choices[0].content == "Continue"
 
 
 
@@ -101,18 +102,18 @@ def test_block_journal_places_all_concepts_before_choices() -> None:
     ]
 
     assert [fragment.fragment_type for fragment in fragments] == [
-        "block",
+        "content",
         "concept",
         "concept",
-        # "choice",
-        # "choice",
+        "choice",
+        "choice",
     ]
     assert fragments[0].content == "You enter the tavern."
     assert {fragments[1].content, fragments[2].content} == {
         "It smells of ale.",
         "Music plays softly.",
     }
-    assert [fragment.content for fragment in fragments[0].choices] == [
+    assert [fragment.content for fragment in fragments[3:]] == [
         "Approach bar",
         "Find corner",
     ]

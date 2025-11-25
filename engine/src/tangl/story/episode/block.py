@@ -2,10 +2,10 @@
 """
 Block: cursor node that orchestrates JOURNAL fragments.
 
-Three JOURNAL handlers (same task, different priorities):
-1) block_fragment (EARLY): render inline block content → "block" fragment
+JOURNAL handlers (same task, different priorities):
+1) block_fragment (EARLY): render inline block content → content fragments
 2) describe_concepts (NORMAL): render child concepts → "concept" fragments
-3) provide_choices (LATE): render outgoing actions → "choice" fragments
+3) collect_choices (LATE): gather outgoing actions → "choice" fragments
 
 Only blocks register JOURNAL handlers; other nodes contribute fragments on request.
 """
@@ -17,11 +17,12 @@ import logging
 
 from pydantic import Field
 
-from tangl.core import BaseFragment, Node, Graph, CallReceipt
+from tangl.core import BaseFragment, Node, CallReceipt
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
-from tangl.journal.discourse import BlockFragment
-from tangl.story.dispatch import story_dispatch, on_get_choices
+from tangl.journal.content import ContentFragment
+from tangl.story.discourse import DialogHandler
+from tangl.story.dispatch import on_get_choices, on_journal_content, story_dispatch
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
 from tangl.vm.runtime import HasEffects
@@ -144,32 +145,49 @@ class Block(Node, HasEffects):
         return choices
 
     @story_dispatch.register(task=P.JOURNAL, priority=Prio.EARLY)
-    def block_fragment(self: Block, *, ctx: Context, **locals_: Any) -> BaseFragment | None:
+    def block_fragment(
+        self: Block, *, ctx: Context, **locals_: Any
+    ) -> list[BaseFragment] | None:
         """
-        JOURNAL (EARLY): render `content` and choices and wrap as a "block" fragment.
+        JOURNAL (EARLY): render inline content via ``journal_content`` handlers.
 
         Returns
         -------
-        BlockFragment | None
+        list[BaseFragment] | None
         """
 
         with ctx._fresh_call_receipts():
-            choice_receipts = story_dispatch.dispatch(self, ctx=ctx, task="get_choices")
-            choices = CallReceipt.merge_results(*choice_receipts)
-
-        logger.debug( choices )
-
-        # todo: eventually content should be extensible by the same mechanism as choices
-        #       i.e., on_get_content or somesuch, allowing for different content renders
-        #       for different block types, affordances, scenes, etc.
-        content = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
-        if content or choices:
-            return BlockFragment(
-                content=content,
-                choices=choices or [],
-                source_id=self.uid,
-                source_label=self.label
+            content_receipts = story_dispatch.dispatch(
+                self, ctx=ctx, task="journal_content"
             )
+            content_fragments = CallReceipt.merge_results(*content_receipts)
+
+        return content_fragments or None
+
+    @on_journal_content(priority=Prio.NORMAL)
+    def render_inline_content(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]:
+        """
+        journal_content (NORMAL): render the inline ``content`` field.
+
+        Checks for dialog syntax and emits attributed fragments when detected.
+        """
+
+        if not self.content:
+            return []
+
+        rendered = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
+
+        if DialogHandler.has_mu_blocks(rendered):
+            mu_blocks = DialogHandler.parse(rendered, source_id=self.uid)
+            return DialogHandler.render(mu_blocks)
+
+        return [
+            ContentFragment(
+                content=rendered,
+                source_id=self.uid,
+                tags={f"source_label:{self.label}"} if self.label else None,
+            )
+        ]
 
     @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
     def describe_concepts(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
@@ -191,7 +209,7 @@ class Block(Node, HasEffects):
     @on_get_choices(priority=Prio.EARLY)
     def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
         """
-        JOURNAL (LATE): collect "choice" fragments for outgoing actions.
+        get_choices (EARLY): collect "choice" fragments for outgoing actions.
 
         Returns
         -------
@@ -203,3 +221,15 @@ class Block(Node, HasEffects):
             if f:
                 fragments.append(f)
         return fragments or None
+
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.LATE)
+    def collect_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+        """
+        JOURNAL (LATE): merge choice fragments provided by ``get_choices`` handlers.
+        """
+
+        with ctx._fresh_call_receipts():
+            choice_receipts = story_dispatch.dispatch(self, ctx=ctx, task="get_choices")
+            choices = CallReceipt.merge_results(*choice_receipts)
+
+        return choices or None
