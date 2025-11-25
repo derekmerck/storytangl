@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import PrivateAttr
 
-from tangl.core import Graph, Node
+from tangl.core import Graph, Node  # noqa
 from tangl.core.behavior import HasBehaviors
 from tangl.vm.dispatch import on_get_ns
 from tangl.vm.traversal import TraversableSubgraph

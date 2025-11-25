@@ -6,5 +6,4 @@ Contribution Guide
 
    coding_style
    docstring_style
-   TEMPLATES
-
+   exception_policy

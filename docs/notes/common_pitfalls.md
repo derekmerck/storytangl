@@ -66,15 +66,7 @@ node = Node(label="test")  # No graph
 # Later access to node.parent crashes
 ```
 
-**Workaround**: Always use `Graph.add()` for explicit attachment.
-
-```python
-# ✅ Explicit pattern
-node = Node(label="test")
-graph.add(node)  # Sets node.graph = self, then registers
-```
-
-**Future**: Consider removing auto-registration validator and making `Graph.add()` the only attachment point.
+**Why**: Nodes are GraphItems, all graph items are defined as being attached to a graph.  They are inert without a graph, so just assign it at creation time.
 
 ---
 
@@ -125,79 +117,9 @@ parent3 = node.parent  # Now sg2
 ```python
 edge = g.add_edge(node1, node2)
 edge.destination = node3  # Mutates in-place
-
-# Is this intentional or should edges be immutable post-add?
 ```
 
-**Current status**: Mutation is allowed but not clearly documented.
-
-**Decision needed**: Either document mutation semantics or enforce immutability after `Graph.add()`.
-
----
-
-## `is_dirty` Not Set Automatically
-
-**Problem**: `Entity.is_dirty` is a flag, but nothing automatically sets it.
-
-```python
-# Manual marking required
-entity.mark_dirty("Forced state mutation via eval()")
-
-# Check at collection level
-if registry.any_dirty():
-    logger.warning("Graph contains non-reproducible mutations")
-```
-
-**Future**: Integrate with `WatchedRegistry` to auto-mark dirty on certain operations (eval, exec, forced jumps).
-
----
-
-## Structure/Unstructure Recursion
-
-**Problem**: Subclasses that override `structure()` can cause infinite recursion if not careful.
-
-```python
-# ❌ Bug: infinite recursion
-class MyEntity(Entity):
-    @classmethod
-    def structure(cls, data):
-        obj = super().structure(data)  # Calls Entity.structure
-        # ... but Entity.structure may call MyEntity.structure
-        return obj
-```
-
-**Correct pattern**: Just call super().structure(data) first to dereference the correct entity class. 
-
-```python
-# ✅ Correct: hook pattern
-class MyEntity(Entity):
-    @classmethod
-    def structure(cls, data):
-        foo = data.pop('foo', 0) + 1
-        obj = super().structure(data)
-        assert object.foo == foo
-        return obj
-```
-
-**Applies to**: `_structure_post`, `_unstructure_post` hooks (see [Section 3](coding_style.md#3-class-design)).
-
----
-
-## Missing Type Hints on Queries
-
-**Problem**: Using `Iterable[T]` instead of `Iterator[T]` masks single-use semantics.
-
-```python
-# ❌ Vague: implies reusable
-def members(self) -> Iterable[GraphItem]:
-    return (self.graph.get(uid) for uid in self.member_ids)
-
-# ✅ Precise: signals single-use
-def members(self) -> Iterator[GraphItem]:
-    return (self.graph.get(uid) for uid in self.member_ids)
-```
-
-**Rule**: Use `Iterator[T]` for all query methods that return generators.
+**Why**: Destination and source are state properties, edges serve a semantic relationship purpose beyond linkage, the endpoints merely represent providers.
 
 ---
 
@@ -240,7 +162,7 @@ data = entity.unstructure()
 json.dumps(data)  # TypeError: not JSON serializable
 ```
 
-**Workaround**: Use a proper 2-phase serialization layer that clearly distinguishes between structure/unstructure and flatten/unflatten for the target protocol.  Flatteners for various types (date-time, uuid, types) and backends (pickle, json, yaml, bson) are included in the `tangl.persistence` library.  For json in particular, you can just grab the serialize/deserialize hook classes from there if you insist on using your own data controller.
+**Why**: This is intentional.  Use a proper 2-phase serialization layer that clearly distinguishes between structure/unstructure and flatten/unflatten for the target protocol.  Flatteners for various types (date-time, uuid, types) and backends (pickle, json, yaml, bson) are included in the `tangl.persistence` library.  For json in particular, you can just grab the serialize/deserialize hook classes from there if you insist on using your own data controller.
 
 ---
 
@@ -248,12 +170,7 @@ json.dumps(data)  # TypeError: not JSON serializable
 
 **Problem**: Tests marked `xfail` or `skip` indicate incomplete features or known bugs.
 
-**Rule**: Reference releases should have **zero failing tests**.  For non-release versions, use `xfail` markers to track known bugs and `skip` to hide tests completely.  Since we use `xfail=strict`, inadvertently fixing a marked bug will result in an error, which indicates that the xfail can be lifted.
-
-**Generally before release**:
-1. Review all `xfail`/`skip` markers
-2. Fix implementation to pass test, OR
-3. Delete test if feature is not planned
+**Rule**:  Since we use `xfail=strict`, inadvertently fixing a marked bug will result in an error, which indicates that the xfail can be lifted and associated issues should be reviewed and closed.
 
 ---
 
