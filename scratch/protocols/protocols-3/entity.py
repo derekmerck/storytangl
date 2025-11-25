@@ -14,7 +14,7 @@ from enum import IntEnum
 
 from pydantic import BaseModel
 
-from .type_hints import StringSet, StringMap, UniqueString, Identifier
+from tangl.type_hints import StringSet, StringMap, UniqueLabel, Identifier
 
 # ---------------
 # Entity-related type hints
@@ -48,7 +48,7 @@ class TaskHandler(Protocol):
     instanced handlers that wrap a specific entity and may provide additional state.
     """
 
-    _strategies: dict[UniqueString, set[TaskHandlerStrategy]]  # task_id: { strategies }
+    _strategies: dict[UniqueLabel, set[TaskHandlerStrategy]]  # task_id: { strategies }
 
     def add_strategy(self, task: Identifier, strategy: TaskHandlerStrategy): ...
 

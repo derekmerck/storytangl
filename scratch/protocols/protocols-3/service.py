@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from .type_hints import StringMap, Identifier, UniqueString
+from tangl.type_hints import StringMap, Identifier, UniqueLabel
 from .entity import TaskHandler, TextFragment
 from .system import SystemHandler
 from .persistence import PersistenceManager
@@ -162,7 +162,7 @@ class UnifiedServiceManager(SystemHandler,
     ...
 # Otherwise can pass a shared persistence manager to service handlers
 
-ClientFeature = UniqueString
+ClientFeature = UniqueLabel
 # HTML text, include media / media format preference
 
 RV = TypeVar('RV')

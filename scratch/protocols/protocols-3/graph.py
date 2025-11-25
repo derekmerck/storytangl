@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Type, TypeVar, Iterable, Generic, Optional
 
-from .type_hints import Identifier, StringMap
+from tangl.type_hints import Identifier, StringMap
 from .entity import Entity, Registry, Singleton, TaskHandler, Criteria, EntityMixin
 
 # -----------------

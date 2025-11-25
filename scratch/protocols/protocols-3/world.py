@@ -3,7 +3,7 @@ from typing import Union, Protocol, TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from .type_hints import Identifier, UniqueString, StringMap
+from tangl.type_hints import Identifier, UniqueLabel, StringMap
 from .entity import TaskHandler, Registry, Singleton, Renderable, HasConditions
 from .graph import NodeTemplate
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 # Story-World-related Type Hints
 # ----------------
 WorldId = Identifier
-WorldFeature = UniqueString    # ui branding, media, supports history
+WorldFeature = UniqueLabel    # ui branding, media, supports history
 AchievementId = Identifier
 
 # ----------------

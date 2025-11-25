@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional, Iterable, Union, TypeVar, Generic, L
 
 from pydantic import BaseModel
 
-from .type_hints import Identifier, StringMap
+from tangl.type_hints import Identifier, StringMap
 from .entity import HasConditions, HasEffects, Singleton, TaskHandler, TextFragment
 from .graph import NodeMixin, VisitableNode, TransitEdge, DynamicEdge, HasAssociates, HasDynamicAssociates, DynamicallyAssociatingEntity, WrappedSingletonNode
 from .story import Story, StoryId

@@ -1,11 +1,11 @@
 from __future__ import annotations
-
+import logging
 import base64
 from uuid import UUID, uuid4
 
 from tangl.service.controllers import ApiKeyInfo, UserController
 from tangl.service.response import RuntimeInfo
-from tangl.utils.hash_secret import key_for_secret
+from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 
 
 class _StubMedia:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from uuid import UUID
 
-from .type_hints import StringMap
+from tangl.type_hints import StringMap
 from .entity import Entity, TaskHandler
 from .graph import Graph
 

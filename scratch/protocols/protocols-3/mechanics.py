@@ -2,7 +2,7 @@ from typing import Protocol, Callable, Tuple, Any
 from enum import Enum
 from collections import Counter
 
-from .type_hints import UniqueString
+from tangl.type_hints import UniqueLabel
 from .entity import HasContext, Entity, Registry, TaskHandler, HasConditions, Criteria, EntityMixin
 from .story_nodes import Block, DynamicAsset, TradeManager, FungibleAsset, AssetType, HasFungibleAssets
 
@@ -17,7 +17,7 @@ class Game(HasContext, Entity):
     strategy_registry: Registry[GameStrategy]
 
     def reset_game_state(self): ...
-    def set_opponent_strategy(self, strategy: UniqueString): ...
+    def set_opponent_strategy(self, strategy: UniqueLabel): ...
     def get_player_moves(self) -> list[GameMove]: ...
     def do_player_move(self, move: GameMove, **move_kwargs): ...
 

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel
 
-from .type_hints import UniqueString, Identifier
+from tangl.type_hints import UniqueLabel, Identifier
 
 if TYPE_CHECKING:
     from .world import WorldId
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # ----------------
 # System Type Hints
 # ----------------
-SystemFeature = UniqueString   # world list, federated services, media server
+SystemFeature = UniqueLabel   # world list, federated services, media server
 
 # ----------------
 # System Info

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from .type_hints import UniqueString, Identifier
+from tangl.type_hints import UniqueLabel, Identifier
 from .entity import TaskHandler, Registry, EntityMixin
 from .content import MediaFragment
 
@@ -13,7 +13,7 @@ class BookmarkMetadata(BaseModel):
     uid: UUID
     journal_fragment_id: UUID
     graph_history_id: UUID
-    label: UniqueString = None
+    label: UniqueLabel = None
     chapter: str | None = None
     location: str | None = None
     text: str = None             # preview comment
@@ -44,7 +44,7 @@ class BookmarkInfo(BaseModel):
     step_id: UUID
     timestamp: datetime
     automatic: bool = False
-    label: UniqueString = None
+    label: UniqueLabel = None
     chapter: str | None = None
     location: str | None = None
     text: str = None             # preview comment

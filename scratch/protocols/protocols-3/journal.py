@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Union, Protocol, TYPE_CHECKING
 
-from .type_hints import UniqueString, StringMap, StyledStringMap
+from tangl.type_hints import UniqueLabel, StringMap, StyledStringMap
 from .entity import TaskHandler, Renderable
 
 if TYPE_CHECKING:
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 # ----------------
 # Journal-related Type Hints
 # ----------------
-JournalFeature = UniqueString  # format, dialog avatars, media, styled dialog, html, etc
+JournalFeature = UniqueLabel  # format, dialog avatars, media, styled dialog, html, etc
 
 # ----------------
 # Journal

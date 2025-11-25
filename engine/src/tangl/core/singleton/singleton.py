@@ -53,6 +53,8 @@ class Singleton(Entity):
         super().__init_subclass__()
 
     def __init__(self, *, label: str, **kwargs):
+        if not label:
+            raise ValueError(f"Truthy label is required ({label})")
         if self.get_instance(label) is not None:
             raise ValueError(f"Singleton with label {label} already exists")
         super().__init__(label=label, **kwargs)
@@ -66,6 +68,10 @@ class Singleton(Entity):
         elif isinstance(key, UniqueLabel):
             return cls.find_instance(label=key)
         raise ValueError(f"Unexpected key type for get instance {key}")
+
+    @classmethod
+    def has_instance(cls, key: UUID | UniqueLabel) -> bool:
+        return bool(cls.get_instance(key))
 
     @classmethod
     def find_instance(cls, **criteria) -> Optional[Self]:

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from .type_hints import UniqueString
+from tangl.type_hints import UniqueLabel
 from .journal import MediaFragment
 from .entity import TaskHandler, Registry, Identifier
 from .graph import Graph
@@ -35,7 +35,7 @@ class GraphTransitionStep(BaseModel):
 class BookmarkMetadata(BaseModel):
     step_id: UUID
     automatic: bool = False
-    label: UniqueString = None
+    label: UniqueLabel = None
     chapter: str | None = None
     location: str | None = None
     text: str = None             # preview comment

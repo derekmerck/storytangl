@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL.Image import Image
 from pydantic import AnyUrl, BaseModel
 
-from .type_hints import StringMap
+from tangl.type_hints import StringMap
 from .entity import DataSingleton, Tags, EntityMixin, Registry, TaskHandler
 
 # ---------------

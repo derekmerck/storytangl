@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from .type_hints import UniqueString, StringMap, Identifier
+from tangl.type_hints import UniqueLabel, StringMap, Identifier
 from .entity import HasContext, Registry, Entity
 from .graph import Graph
 from .bookmark import BookmarkInfo
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # Story-related Type Hints
 # ----------------
 StoryId = UUID
-StoryFeature = UniqueString    # maps, stats, inv, etc.
+StoryFeature = UniqueLabel    # maps, stats, inv, etc.
 
 # ----------------
 # Story Model

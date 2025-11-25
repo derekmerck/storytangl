@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from .type_hints import UniqueString, Identifier
+from tangl.type_hints import UniqueLabel, Identifier
 from .entity import Entity, Registry, TaskHandler
 
 if TYPE_CHECKING:
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # User-Account-related Type Hints
 # ----------------
 UserId = UUID
-UserFeature = UniqueString  # achievements, privilege levels, content-warnings, prefs
+UserFeature = UniqueLabel  # achievements, privilege levels, content-warnings, prefs
 
 
 # ----------------
