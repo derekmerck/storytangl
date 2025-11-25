@@ -17,7 +17,7 @@ import logging
 
 from pydantic import Field
 
-from tangl.core import BaseFragment, Node, CallReceipt
+from tangl.core import BaseFragment, Node, CallReceipt, Graph  # noqa
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment

@@ -4,7 +4,7 @@ import logging
 from pydantic import Field, field_validator
 
 from tangl.type_hints import Tag, ClassName, Typelike
-from tangl.core.entity import Entity
+from tangl.core import Entity, Graph  # noqa
 from .block import Block
 from .action import Action
 
@@ -20,7 +20,7 @@ logger.setLevel(logging.WARNING)
 # 'Selectable' class.
 
 # class domain behaviors for menu blocks
-class MenuActionHandler():
+class MenuActionHandler:
 
     @classmethod
     def _unlink_dynamic_actions(cls, node: Block):
