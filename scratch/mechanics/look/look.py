@@ -112,7 +112,7 @@ class FantasticLook(Look):
     wing_type: str = None  # bug, dragonfly, butterfly, bird/feathered, bat/leather, robotic
     wing_palette: str = None
 
-    tail_count = 0
+    tail_count: int = 0
     tail_type: str = None  # catlike, spaded, forked, prehensile
     tail_color: str = None
 

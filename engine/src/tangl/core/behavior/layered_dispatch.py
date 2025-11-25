@@ -106,6 +106,10 @@ class LayeredDispatch(BehaviorRegistry):
             locs = caller.local_behaviors
             if locs:
                 layers.add(locs)
+        if hasattr(caller.__class__, "cls_behaviors"):
+            locs = caller.cls_behaviors
+            if locs:
+                layers.add(locs)
         # extra handlers are passed along and act as the INLINE layer
 
         logger.debug(f"Dispatch layers: {layers!r}")

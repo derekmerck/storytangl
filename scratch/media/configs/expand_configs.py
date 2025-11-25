@@ -8,7 +8,7 @@ given a product of all possible variable configurations.
 - expand_configs( templates, vars, configs ) -> list( dict )
 - create_config( template, vars ) -> list( dict )
 
-Depends on `tangl.rejinja` and `tangl.utils.dict_prod`
+Depends on `tangl.utils.rejinja` and `tangl.utils.dict_prod`
 
 Specifically used in generating media 'shot lists' for various conditions
 """

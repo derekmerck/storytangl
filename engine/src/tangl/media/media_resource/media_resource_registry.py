@@ -5,10 +5,11 @@ from uuid import UUID
 from pydantic import model_validator
 
 from tangl.core.registry import Registry
+from tangl.core.dispatch import HookedRegistry
 from tangl.core.behavior import BehaviorRegistry, Behavior
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
-class MediaResourceRegistry(Registry[MediaRIT]):
+class MediaResourceRegistry(HookedRegistry[MediaRIT]):
     """
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
@@ -19,9 +20,9 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     @model_validator(mode="after")
     def _default_on_index(self):
         if not self.on_index:
-            self.on_index = BehaviorRegistry (
-            label=f"{self.label}_indexer",
-            aggregation_strategy="gather"
+            self.on_index = BehaviorRegistry(
+                label=f"{self.label}_indexer"
+                # aggregation_strategy="gather"
         )
         return self
 

@@ -4,8 +4,6 @@ from scratch.progression.measured_domains import MeasuredDomain
 from scratch.progression.quality import Quality
 from scratch.progression.activity import ActivityMixin, ActivatorMixinABC, ActivityHandler
 
-import pytest
-
 from conftest import TestActivator
 
 def test_activity_handler():
