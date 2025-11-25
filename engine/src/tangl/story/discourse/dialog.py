@@ -12,14 +12,15 @@ Leading ``>`` markers denote dialog paragraphs; non-dialog paragraphs are
 emitted as narration micro-blocks.
 """
 import re
-
-from tangl.core import Graph
+from dataclasses import dataclass
+from uuid import UUID
 from tangl.journal.discourse import AttributedFragment
 from tangl.journal.content import ContentFragment
 
 from .mu_block import MuBlock, MuBlockHandler
 
 
+@dataclass(slots=True)
 class DialogMuBlock(MuBlock):
     """Dialog utterance with optional speaker metadata."""
 
@@ -35,7 +36,7 @@ class DialogMuBlock(MuBlock):
             who=self.label or "narrator",
             how=self.dialog_class,
             media="",
-            source_id=self.uid,
+            source_id=self.source_id,
             tags=tags,
         )
 
@@ -50,27 +51,33 @@ class DialogHandler(MuBlockHandler):
         return bool(cls.DIALOG_PATTERN.search(text))
 
     @classmethod
-    def parse(cls, text: str, *, graph: Graph, **_: object) -> list[DialogMuBlock]:
+    def parse(
+        cls, text: str, *, source_id: UUID | None = None, **_: object
+    ) -> list[DialogMuBlock]:
         paragraphs = re.split(r"\n{2,}", text.strip()) if text.strip() else []
         mu_blocks: list[DialogMuBlock] = []
 
         for paragraph in paragraphs:
             if paragraph.startswith(">"):
-                mu_blocks.append(cls._parse_dialog_paragraph(paragraph, graph=graph))
+                mu_blocks.append(
+                    cls._parse_dialog_paragraph(paragraph, source_id=source_id)
+                )
             else:
                 mu_blocks.append(
                     DialogMuBlock(
-                        graph=graph,
                         text=paragraph.strip(),
                         label=None,
                         dialog_class="narration",
+                        source_id=source_id,
                     )
                 )
 
         return mu_blocks
 
     @classmethod
-    def _parse_dialog_paragraph(cls, paragraph: str, *, graph: Graph) -> DialogMuBlock:
+    def _parse_dialog_paragraph(
+        cls, paragraph: str, *, source_id: UUID | None
+    ) -> DialogMuBlock:
         lines = [line for line in paragraph.split("\n") if line.strip()]
         header = lines[0]
         header_match = re.match(r">\s*\[!([\w\.-]+)\s*]\s*(\w.*)?", header)
@@ -83,10 +90,10 @@ class DialogHandler(MuBlockHandler):
         body_text = " ".join(filter(None, body_lines))
 
         return DialogMuBlock(
-            graph=graph,
             text=body_text,
             label=label,
             dialog_class=dialog_class,
+            source_id=source_id,
         )
 
     @staticmethod

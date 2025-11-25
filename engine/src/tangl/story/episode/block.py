@@ -178,7 +178,7 @@ class Block(Node, HasEffects):
         rendered = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
 
         if DialogHandler.has_mu_blocks(rendered):
-            mu_blocks = DialogHandler.parse(rendered, graph=self.graph)
+            mu_blocks = DialogHandler.parse(rendered, source_id=self.uid)
             return DialogHandler.render(mu_blocks)
 
         return [

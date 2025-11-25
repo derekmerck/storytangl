@@ -8,24 +8,33 @@ They are created during rendering to translate inline content into structured
 fragments with styling hints (e.g., dialog speakers or cards).
 """
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
-from tangl.core import Graph, Node
 from tangl.journal.content import ContentFragment
 
 
-class MuBlock(Node):
+@dataclass(slots=True)
+class MuBlock:
     """
     MuBlock(text: str = "", label: str | None = None)
 
     Transient parsing artifact used to produce content fragments with optional
     styling or attribution metadata.
+
+    Notes
+    -----
+    Micro-blocks are intentionally **not** graph entities. They carry just
+    enough context (e.g., ``source_id``) to annotate the resulting fragments
+    without registering themselves in the persistent story graph.
     """
 
     text: str = ""
     label: str | None = None
     style_cls: str | None = None
     style_dict: dict[str, str] | None = None
+    source_id: UUID | None = field(default=None)
 
     def to_fragment(self) -> ContentFragment:
         """Convert this micro-block into a content fragment."""
@@ -43,7 +52,7 @@ class MuBlockHandler(ABC):
 
     @classmethod
     @abstractmethod
-    def parse(cls, text: str, *, graph: Graph, **ctx: Any) -> list[MuBlock]:
+    def parse(cls, text: str, *, source_id: UUID | None = None, **ctx: Any) -> list[MuBlock]:
         """Parse ``text`` into micro-block instances."""
 
     @classmethod
