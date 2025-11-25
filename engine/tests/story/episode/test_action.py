@@ -83,7 +83,7 @@ def test_choice_fragment_serialization_preserves_class_metadata() -> None:
 
     assert fragment is not None
     serialized = fragment.model_dump(mode="python")
-    assert serialized.get("obj_cls") == fragment.__class__.__name__
+    assert serialized.get("obj_cls") == fragment.__class__
     assert serialized["fragment_type"] == "choice"
 
 
