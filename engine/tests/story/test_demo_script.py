@@ -101,7 +101,7 @@ def test_load_linear_script(resources_dir) -> None:
     assert frame.cursor.label == "start"
 
     def get_blocks(_fragments):
-        return extract_fragments(_fragments, "block")
+        return extract_fragments(_fragments, "content")
 
     def get_choices(_fragments):
         return extract_all_choices(_fragments)

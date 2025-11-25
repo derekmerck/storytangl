@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from tangl.core import BaseFragment
-from tangl.core import BaseFragment
 from tangl.story.episode import Block, Action
 from tangl.story.concepts import Concept
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase as P
 
-from helpers.fragment_helpers import extract_fragments, extract_choices_from_block, extract_all_choices, extract_blocks_with_choices
+from helpers.fragment_helpers import extract_all_choices, extract_fragments
 
 
 # def _by_fragment_type(fragments: list[BaseFragment], fragment_type: str) -> list[BaseFragment]:
@@ -60,7 +59,7 @@ def test_block_journal_renders_inline_content() -> None:
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    inline = extract_fragments(fragments, "block")
+    inline = extract_fragments(fragments, "content")
     assert len(inline) == 1
     assert "Inline text" in inline[0].content
 

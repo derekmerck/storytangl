@@ -70,7 +70,6 @@ def _extract_choices_from_fragments(fragments: list[Any]) -> list[dict[str, Any]
             result["label"] = result["source_label"]
         if result.get("content") and not result.get("label"):
             result["label"] = result["content"]
-        result.pop("obj_cls", None)
         return result
 
     choices: list[dict[str, Any]] = []
