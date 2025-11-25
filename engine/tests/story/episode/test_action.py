@@ -69,6 +69,24 @@ def test_choice_fragment_defaults_to_continue() -> None:
     assert fragment.source_id == action.uid
 
 
+def test_choice_fragment_serialization_preserves_class_metadata() -> None:
+    graph, source, destination = _make_graph()
+    action = Action(
+        graph=graph,
+        source_id=source.uid,
+        destination_id=destination.uid,
+        label="metadata_choice",
+    )
+    ctx = Context(graph=graph, cursor_id=source.uid, step=4)
+
+    fragment = action.choice_fragment(ctx=ctx)
+
+    assert fragment is not None
+    serialized = fragment.model_dump(mode="python")
+    assert serialized.get("obj_cls") == fragment.__class__.__name__
+    assert serialized["fragment_type"] == "choice"
+
+
 def test_action_is_available_inherits_block_namespace() -> None:
     story = StoryGraph(label="action_namespace")
     start = story.add_node(obj_cls=Block, label="start")
