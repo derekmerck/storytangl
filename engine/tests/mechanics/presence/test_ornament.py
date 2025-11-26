@@ -1,6 +1,6 @@
 
 from tangl.lang.body_parts import BodyPart
-from tangl.mechanics.presence.ornaments import Ornamentation, Ornament, OrnamentType
+from scratch.mechanics.look.ornaments import Ornamentation, Ornament, OrnamentType
 
 import pytest
 
