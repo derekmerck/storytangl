@@ -1,13 +1,17 @@
-from typing import ClassVar
+from __future__ import annotations
 
-from pydantic import ConfigDict, model_validator, Field
+from typing import TYPE_CHECKING, ClassVar
+
+from pydantic import ConfigDict, Field, model_validator
 
 from tangl.type_hints import Identifier
 from tangl.vm.provision import Dependency
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
-from tangl.vm.planning import MediaRequirement
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard for type checking only
+    from tangl.vm.planning.media_requirement import MediaRequirement
 
 # todo: probably want a media requirement subclass, then use that in a dependency and affordance subclass, media affordances are pre-decided media objects that can be attached as appropriate, first time you see a char etc.
 
@@ -32,6 +36,8 @@ class MediaDep(Dependency[MediaRIT]):
     @model_validator(mode="before")
     @classmethod
     def _pre_resolve(cls, data):
+        from tangl.vm.planning.media_requirement import MediaRequirement
+
         if isinstance(data, dict) and isinstance(data.get("requirement"), MediaRequirement):
             return data
         # Does the linked rit resolve the type?

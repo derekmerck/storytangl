@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, TYPE_CHECKING
 
-from tangl.vm import Context
+from tangl.vm.context import Context
 from tangl.vm.provision import DependencyOffer, ProvisionCost, Provisioner, ProvisioningPolicy
 from tangl.media.media_data_type import MediaDataType
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from .media_resource_registry import MediaResourceRegistry
-from tangl.vm.planning import MediaRequirement
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only to avoid import cycles
+    from tangl.vm.planning.media_requirement import MediaRequirement
 
 
 class MediaProvisioner(Provisioner):
@@ -51,6 +53,8 @@ class MediaProvisioner(Provisioner):
         *,
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
+        from tangl.vm.planning.media_requirement import MediaRequirement
+
         if not isinstance(requirement, MediaRequirement):
             return iter(())
 

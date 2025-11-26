@@ -54,7 +54,7 @@ def mount_media_for_world(world_id: str, world_path: Path) -> None:
 def initialize_media_mounts() -> None:
     """Mount media directories for all loaded :class:`~tangl.story.fabula.world.World` instances."""
 
-    for world_id, world in World._instances.items():
+    for world_id, world in World._instances.data.items():
         source_path = getattr(world, "source_path", None)
         if source_path is None:
             continue
