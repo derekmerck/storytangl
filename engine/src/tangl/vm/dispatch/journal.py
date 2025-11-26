@@ -4,7 +4,6 @@ from functools import partial
 import logging
 
 from tangl.core import Node, BaseFragment
-from tangl.journal.content import ContentFragment
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm.resolution_phase import ResolutionPhase as P
 from .vm_dispatch import vm_dispatch
@@ -21,11 +20,15 @@ on_journal  = partial(vm_dispatch.register, task=P.JOURNAL)
 @on_journal(priority=Prio.EARLY)
 # todo: we can move this to journal/io when that gets implemented
 def journal_line(cursor: Node, *, ctx: Context, **kwargs):
-    """Emit a simple textual line describing the current step/cursor (reference output)."""
+    """Emit a marker fragment for the current step."""
+
+    if cursor.has_tags("domain:local_domain"):
+        return None
+
     step = ctx.step
     line = f"[step {step:04d}]: cursor at {cursor.get_label()}"
     logger.debug(f"JOURNAL: Outputting journal line: {line}")
-    return ContentFragment(content=line)
+    return BaseFragment(content=line, fragment_type="marker")
 
 @on_journal(priority=Prio.LAST)
 def coerce_to_fragments(*_, ctx: Context, **__):
@@ -49,7 +52,20 @@ def coerce_to_fragments(*_, ctx: Context, **__):
             return
         fragments.append(BaseFragment(content=str(value), fragment_type="text"))
 
+    receipt_count = len(ctx.call_receipts)
+
     for receipt in ctx.call_receipts:
         _extend(receipt.result)
-    logger.debug(f"JOURNAL: Outputting fragments: {fragments}")
-    return fragments
+
+    non_marker = [fragment for fragment in fragments if fragment.fragment_type != "marker"]
+    explicit_empty = any(receipt.result == [] for receipt in ctx.call_receipts)
+
+    if explicit_empty and not non_marker:
+        output: list[BaseFragment] = []
+    elif not non_marker and receipt_count > 1:
+        output = []
+    else:
+        output = non_marker or fragments
+
+    logger.debug(f"JOURNAL: Outputting fragments: {output}")
+    return output

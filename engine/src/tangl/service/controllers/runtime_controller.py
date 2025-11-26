@@ -241,8 +241,8 @@ class RuntimeController(HasApiEndpoints):
             ledger=ledger,
         )
 
-    def _dereference_media_fragment(self, fragment: MediaFragment, world_id: str) -> MediaFragment:
-        """Translate a :class:`MediaFragment` into a URL-backed fragment."""
+    def _dereference_media_fragment(self, fragment: MediaFragment, world_id: str) -> dict[str, object]:
+        """Translate a :class:`MediaFragment` into a URL-backed payload."""
 
         rit = fragment.content
         if isinstance(rit, MediaRIT) and rit.path is not None:
@@ -252,7 +252,13 @@ class RuntimeController(HasApiEndpoints):
 
         media_url = f"/media/world/{world_id}/{filename}"
 
-        return fragment.model_copy(update={"content": media_url, "content_type": MediaDataType.IMAGE})
+        return {
+            "fragment_type": "media",
+            "media_role": fragment.media_role,
+            "url": media_url,
+            "source_id": fragment.source_id,
+            "content_type": fragment.content_type,
+        }
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
