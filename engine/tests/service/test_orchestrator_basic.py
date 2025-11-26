@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,6 +12,7 @@ from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, Orchestrator
 from tangl.service.controllers import RuntimeController
 from tangl.service.response import InfoModel, RuntimeInfo
 from tangl.service.user.user import User
+from tangl.service.orchestrator import _CacheEntry
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase, Ledger
@@ -53,7 +54,7 @@ class SimpleAck(RuntimeInfo):
 
 
 class SimpleController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME)
+    @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.READ)
     def get_value(self) -> RuntimeInfo:
         return RuntimeInfo.ok(message="ok", value="ok")
 
@@ -66,7 +67,7 @@ class LedgerController(HasApiEndpoints):
     def __init__(self) -> None:
         self.last_call: tuple[StubUser, Ledger] | None = None
 
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
+    @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
     def get_cursor(self, user: StubUser, ledger: Ledger) -> CursorInfo:
         self.last_call = (user, ledger)
         return CursorInfo(cursor_id=ledger.cursor_id)
@@ -80,7 +81,7 @@ class FrameController(HasApiEndpoints):
     def __init__(self) -> None:
         self.frames: list[Frame] = []
 
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
+    @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
     def get_frame_data(self, ledger: Ledger, frame: Frame) -> FrameInfo:
         self.frames.append(frame)
         return FrameInfo(cursor_id=frame.cursor_id)
@@ -94,7 +95,7 @@ class UpdateController(HasApiEndpoints):
 
 
 class ReadController(HasApiEndpoints):
-    @ApiEndpoint.annotate(response_type=ResponseType.INFO)
+    @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
     def get_cursor(self, ledger: Ledger) -> CursorInfo:
         return CursorInfo(cursor_id=ledger.cursor_id)
 
@@ -367,3 +368,140 @@ def test_orchestrator_drop_story_deletes_ledger(
     persisted_user = fake_persistence[user_id]
     assert getattr(persisted_user, "current_ledger_id", None) is None
     assert any(isinstance(saved, User) and saved.uid == user_id for saved in fake_persistence.saved)
+
+
+def test_orchestrator_build_ledger_passes_through_hydrated(
+    fake_persistence: FakePersistence, minimal_ledger: Ledger
+) -> None:
+    hydrated = minimal_ledger
+    fake_persistence[hydrated.uid] = hydrated
+
+    orchestrator = Orchestrator(fake_persistence)
+
+    class _LedgerEcho(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+        def echo_cursor(self, ledger: Ledger) -> CursorInfo:
+            return CursorInfo(cursor_id=ledger.cursor_id)
+
+    orchestrator.register_controller(_LedgerEcho)
+
+    result = orchestrator.execute("_LedgerEcho.echo_cursor", ledger_id=hydrated.uid)
+    assert isinstance(result, CursorInfo)
+    assert result.cursor_id == hydrated.cursor_id
+
+
+def test_orchestrator_build_ledger_rejects_unsupported_payload(
+    fake_persistence: FakePersistence,
+) -> None:
+    bogus_id = uuid4()
+    fake_persistence[bogus_id] = object()
+
+    orchestrator = Orchestrator(fake_persistence)
+
+    class _LedgerUser(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+        def needs_ledger(self, ledger: Ledger) -> CursorInfo:
+            return CursorInfo(cursor_id=ledger.cursor_id)
+
+    orchestrator.register_controller(_LedgerUser)
+
+    with pytest.raises(TypeError, match="Unsupported ledger payload"):
+        orchestrator.execute("_LedgerUser.needs_ledger", ledger_id=bogus_id)
+
+
+def test_orchestrator_infer_ledger_id_requires_active_ledger(
+    fake_persistence: FakePersistence,
+) -> None:
+    user_id = uuid4()
+    user = StubUser(user_id, ledger_id=uuid4())
+    user.current_ledger_id = None
+
+    fake_persistence[user_id] = user
+
+    orchestrator = Orchestrator(fake_persistence)
+
+    class _NeedsLedger(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+        def get_cursor(self, ledger: Ledger) -> CursorInfo:
+            return CursorInfo(cursor_id=ledger.cursor_id)
+
+    orchestrator.register_controller(_NeedsLedger)
+
+    with pytest.raises(ValueError, match="User has no active ledger"):
+        orchestrator.execute("_NeedsLedger.get_cursor", user_id=user_id)
+
+
+def test_orchestrator_requires_persistence_for_ledger_hydration(minimal_ledger: Ledger) -> None:
+    orchestrator = Orchestrator(persistence_manager=None)
+
+    class _NeedsLedger(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+        def needs_ledger(self, ledger: Ledger) -> CursorInfo:
+            return CursorInfo(cursor_id=ledger.cursor_id)
+
+    orchestrator.register_controller(_NeedsLedger)
+
+    with pytest.raises(RuntimeError, match="Persistence manager required for resource hydration"):
+        orchestrator.execute("_NeedsLedger.needs_ledger", ledger_id=minimal_ledger.uid)
+
+
+def test_orchestrator_persists_with_plain_mapping(minimal_ledger: Ledger) -> None:
+    store: dict[Any, Any] = {}
+    store[minimal_ledger.uid] = minimal_ledger.unstructure()
+
+    orchestrator = Orchestrator(store)
+    orchestrator.register_controller(UpdateController)
+
+    orchestrator.execute("UpdateController.update_step", ledger_id=minimal_ledger.uid)
+
+    saved = store[minimal_ledger.uid]
+    assert isinstance(saved, Ledger)
+    assert getattr(saved, "uid", None) == minimal_ledger.uid
+
+
+def test_orchestrator_persists_mapping_payload() -> None:
+    store: dict[Any, Any] = {}
+
+    class _SavesMapping(HasApiEndpoints):
+        @ApiEndpoint.annotate(method_type=MethodType.UPDATE)
+        def save_mapping(self) -> RuntimeInfo:
+            return RuntimeInfo.ok(ledger={"ledger_uid": uuid4()})
+
+    orch = Orchestrator(store)
+    orch.register_controller(_SavesMapping)
+
+    payload = {"ledger_uid": uuid4()}
+    orch._resource_cache["dummy"] = _CacheEntry(resource=payload, dirty=True)
+
+    orch._write_back_resources()
+    assert any(isinstance(key, UUID) or isinstance(value, dict) for key, value in store.items())
+
+
+class OptionalUserController(HasApiEndpoints):
+    def __init__(self) -> None:
+        self.seen_user: StubUser | None = None
+
+    @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+    def who(self, user: Union[StubUser, None]) -> InfoModel:
+        self.seen_user = user
+        return InfoModel(message="ok")
+
+
+def test_orchestrator_resolves_union_user_type(fake_persistence: FakePersistence) -> None:
+    user_id = uuid4()
+    ledger_id = uuid4()
+    user = StubUser(user_id, ledger_id)
+    fake_persistence[user_id] = user
+    fake_persistence[ledger_id] = {
+        "ledger_uid": ledger_id,
+        "graph": None,
+        "cursor_id": None,
+        "records": {},
+    }
+
+    controller = OptionalUserController()
+    orchestrator = Orchestrator(fake_persistence)
+    orchestrator.register_controller(controller)
+
+    orchestrator.execute("OptionalUserController.who", user_id=user_id)
+    assert controller.seen_user is user
