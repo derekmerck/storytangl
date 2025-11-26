@@ -6,66 +6,68 @@
 #  - redis on 6379 (locking, data storage)
 
 # req .env:
-#  - TANGL_BASE_URL (path from _browser_, default to http:127.0.0.1:5000)
-#  - TANGL_REDIS_URL (if using other redis service, defaults to this)
-#  - TANGL_DOMAIN_NAME  (if using a fqdn and traefik rev-proxy)
+#  - TANGL_VERSION (image tag for the api service)
+#  - TANGL_DOMAIN_NAME (base domain, e.g. example.com)
+#  - TANGL_API_HOST (e.g. api.${TANGL_DOMAIN_NAME})
+#  - TANGL_APP_HOST (e.g. app.${TANGL_DOMAIN_NAME})
+#  - TANGL_REDIS_URL (optional override; defaults to internal redis service)
 
 # Includes Docker labels and shared network for traefik reverse proxy:
 #  $ docker network create frontend
-#  $ docker-compose up
-#  $ docker-compose -f deployment/docker-compose.yaml -s traefik up
+#  $ docker compose up
 
-version: "3.3"
+version: "3.9"
 
 services:
 
   api:
-    image: story-tangl:${TANGLE_VERSION}
+    image: story-tangl:${TANGL_VERSION}
     build:
       context: .
-      args:
-        API_BASE_URL: http://api.${TANGL_DOMAIN_NAME}
-
+    restart: unless-stopped
+    environment:
+      - TZ=UTC
+      - API_BASE_URL=https://${TANGL_API_HOST:-api.localhost}
+      - TANGL_REDIS_URL=${TANGL_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - data:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
     ports:
       - 5000:5000
     labels:
       - traefik.enable=true
-      - traefik.http.routers.tangl_api.rule=Host(`api.${TANGL_DOMAIN_NAME}`)
+      - traefik.http.routers.tangl_api.rule=Host(`${TANGL_API_HOST}`)
       - traefik.http.routers.tangl_api.entrypoints=websecure
-      - traefik.docker.network=frontend
       # change to prodresolver for signed cert
       - traefik.http.routers.tangl_api.tls.certresolver=stagingresolver
       - traefik.http.services.tangl_api.loadbalancer.server.port=5000
+      - traefik.docker.network=frontend
     networks:
       - frontend
       - backend
 
   app:
     image: nginx
-    volumes:
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+#    # TODO: mount static content and nginx config here
+#    volumes:
+#      - ./static:/usr/share/nginx/html:ro
+#      - ./nginx.conf:/etc/nginx/nginx.conf:ro
 #    ports:
 #      - 9000:80
     labels:
       - traefik.enable=true
-      - traefik.http.routers.tangl_app.rule=Host(`app.${TANGL_BASE_URL}`)
+      - traefik.http.routers.tangl_app.rule=Host(`${TANGL_APP_HOST}`)
       - traefik.http.routers.tangl_app.entrypoints=websecure
       # change to 'prodresolver' for signed cert
       - traefik.http.routers.tangl_app.tls.certresolver=stagingresolver
       - traefik.http.services.tangl_app.loadbalancer.server.port=80
+      - traefik.docker.network=frontend
     networks:
       - frontend
 
   redis:
-    image: redis:latest
-    volumes:
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
+    image: redis:7-alpine
+    restart: unless-stopped
     networks:
       - backend
 
