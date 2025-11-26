@@ -4,6 +4,7 @@ from functools import partial
 import logging
 
 from tangl.core import Node, BaseFragment
+from tangl.journal.content import ContentFragment
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm.resolution_phase import ResolutionPhase as P
 from .vm_dispatch import vm_dispatch
@@ -24,7 +25,7 @@ def journal_line(cursor: Node, *, ctx: Context, **kwargs):
     step = ctx.step
     line = f"[step {step:04d}]: cursor at {cursor.get_label()}"
     logger.debug(f"JOURNAL: Outputting journal line: {line}")
-    return line
+    return ContentFragment(content=line)
 
 @on_journal(priority=Prio.LAST)
 def coerce_to_fragments(*_, ctx: Context, **__):

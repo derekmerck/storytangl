@@ -20,7 +20,7 @@ from tangl.ir.story_ir.location_script_models import LocationScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
-from tangl.media.media_resource import MediaDep, MediaResourceRegistry
+from tangl.media.media_resource import MediaDep
 from tangl.vm.planning import MediaRequirement
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.provision.open_edge import Dependency
@@ -298,7 +298,6 @@ class World(Singleton):
         from tangl.story.concepts.item import Item, Flag
         from tangl.story.story_graph import StoryGraph
         graph = StoryGraph(label=story_label, world=self)
-        graph.media_registry = MediaResourceRegistry()
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)

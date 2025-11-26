@@ -145,6 +145,23 @@ class Frame:
         agg_func, result_type = phase.properties()
         outcome = agg_func(*receipts)
 
+        if phase is P.JOURNAL and outcome is not None:
+            if not isinstance(outcome, list):
+                outcome = list(outcome)
+
+            fragments: list[BaseFragment] | None = None
+            for fragment in reversed(outcome):
+                if isinstance(fragment, Iterable):
+                    candidates = [f for f in fragment if isinstance(f, BaseFragment)]
+                    if candidates:
+                        fragments = candidates
+                        break
+
+            if fragments is None:
+                fragments = [f for f in outcome if isinstance(f, BaseFragment)]
+
+            outcome = fragments
+
         logger.debug(f'Ran {len(receipts)} handlers with final outcome {outcome} under {agg_func.__name__}')
 
         # stash results for review/compositing

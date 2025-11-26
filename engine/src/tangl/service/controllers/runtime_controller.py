@@ -9,6 +9,7 @@ from uuid import UUID
 
 from tangl.core import BaseFragment, StreamRegistry
 from tangl.journal.media import MediaFragment
+from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.service.api_endpoint import (
     AccessLevel,
@@ -240,8 +241,8 @@ class RuntimeController(HasApiEndpoints):
             ledger=ledger,
         )
 
-    def _dereference_media_fragment(self, fragment: MediaFragment, world_id: str) -> dict[str, Any]:
-        """Translate a :class:`MediaFragment` into a serializable payload."""
+    def _dereference_media_fragment(self, fragment: MediaFragment, world_id: str) -> MediaFragment:
+        """Translate a :class:`MediaFragment` into a URL-backed fragment."""
 
         rit = fragment.content
         if isinstance(rit, MediaRIT) and rit.path is not None:
@@ -251,39 +252,28 @@ class RuntimeController(HasApiEndpoints):
 
         media_url = f"/media/world/{world_id}/{filename}"
 
-        return {
-            "fragment_type": "media",
-            "media_role": fragment.media_role,
-            "url": media_url,
-            "source_id": fragment.source_id,
-        }
+        return fragment.model_copy(update={"content": media_url, "content_type": MediaDataType.IMAGE})
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.CONTENT,
     )
-    def get_story_update(self, *, ledger: Ledger, frame: Frame, **_: Any) -> dict[str, Any]:
+    def get_story_update(self, *, ledger: Ledger, frame: Frame, **_: Any) -> list[BaseFragment]:
         """Return the latest journal fragments with media URLs dereferenced."""
 
         world_id = getattr(getattr(ledger.graph, "world", None), "uid", None) or "world"
         fragments = list(ledger.records.iter_channel("fragment"))
         fragments = self._latest_step_slice(fragments)
 
-        output_fragments: list[dict[str, Any]] = []
+        output_fragments: list[BaseFragment] = []
         for fragment in fragments:
             if isinstance(fragment, MediaFragment):
                 output_fragments.append(self._dereference_media_fragment(fragment, str(world_id)))
-            elif hasattr(fragment, "model_dump"):
-                output_fragments.append(fragment.model_dump())
-            else:  # pragma: no cover - defensive fallback
-                output_fragments.append(dict(fragment))
+            else:
+                output_fragments.append(fragment)
 
-        return {
-            "fragments": output_fragments,
-            "cursor_id": frame.cursor_id,
-            "step": ledger.step,
-        }
+        return output_fragments
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,

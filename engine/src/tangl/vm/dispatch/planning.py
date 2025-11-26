@@ -53,12 +53,6 @@ def _inject_default_provisioners(caller: Entity, *, ctx: Context, **_):
         TemplateProvisioner(template_registry=None, layer="local"),
     ]
 
-    media_registry = getattr(registry, "media_registry", None)
-    if media_registry is not None:
-        from tangl.media.media_resource.media_provisioning import MediaProvisioner
-
-        provisioners.append(MediaProvisioner(media_registry=media_registry, layer="local"))
-
     return provisioners
 
 
