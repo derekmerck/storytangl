@@ -46,12 +46,20 @@ def _inject_default_provisioners(caller: Entity, *, ctx: Context, **_):
         return []
 
     registry = ctx.graph
-    return [
+    provisioners: list[Provisioner] = [
         GraphProvisioner(node_registry=registry, layer="local"),
         UpdatingProvisioner(node_registry=registry, layer="local"),
         CloningProvisioner(node_registry=registry, layer="local"),
         TemplateProvisioner(template_registry=None, layer="local"),
     ]
+
+    media_registry = getattr(registry, "media_registry", None)
+    if media_registry is not None:
+        from tangl.media.media_resource.media_provisioning import MediaProvisioner
+
+        provisioners.append(MediaProvisioner(media_registry=media_registry, layer="local"))
+
+    return provisioners
 
 
 @on_get_provisioners(priority=Prio.LATE)

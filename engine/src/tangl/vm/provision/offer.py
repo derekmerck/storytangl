@@ -48,6 +48,7 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.core import CallReceipt, Edge, Entity, Node, Record, Registry
+from tangl.core.graph import GraphItem
 from tangl.type_hints import StringMap
 from .requirement import ProvisioningPolicy, Requirement
 
@@ -132,7 +133,7 @@ class DependencyOffer(ProvisionOffer):
 
     def accept(self, *, ctx: "Context") -> Node:
         provider = self.accept_func(ctx)
-        if provider not in ctx.graph:
+        if isinstance(provider, GraphItem) and provider not in ctx.graph:
             ctx.graph.add(provider)
         return provider
 

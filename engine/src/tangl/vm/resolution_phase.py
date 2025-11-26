@@ -57,7 +57,7 @@ class ResolutionPhase(IntEnum):
             self.PLANNING: (CallReceipt.last_result,  CallReceipt),  # actually a PlanningReceipt
             self.PREREQS:  (CallReceipt.first_result, Edge),     # check for any available jmp/jr
             self.UPDATE:   (CallReceipt.gather_results, Any),
-            self.JOURNAL:  (CallReceipt.last_result,  list[BaseFragment]), # pipe and compose a list of Fragments
+            self.JOURNAL:  (CallReceipt.gather_results,  list[BaseFragment]), # pipe and compose a list of Fragments
             self.FINALIZE: (CallReceipt.last_result,  Patch),    # pipe and compose a Patch (if event sourced)
             self.POSTREQS: (CallReceipt.first_result, Edge)      # check for any available jmp/jr
         }

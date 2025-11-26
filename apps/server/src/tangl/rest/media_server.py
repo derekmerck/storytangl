@@ -1,24 +1,22 @@
-"""
-FastAPI server for StoryTangl media.
-"""
-# todo: We need 2 media servers:
-#   - Static media, which could be swapped for a CDN
-#   - Dynamic media that is created or selected for specific stories and story-states
+"""FastAPI server for StoryTangl media."""
+from __future__ import annotations
 
+from pathlib import Path
 import logging
-logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from tangl.config import settings
-from tangl.info import __title__, __version__, __author__, __author_email__, __url__, __desc__
+from tangl.info import __author__, __author_email__, __desc__, __title__, __url__, __version__
 from tangl.story.fabula.world import World
+
+logger = logging.getLogger(__name__)
 
 description = f"Media server for {__desc__.lower()}"
 
 DEFAULT_APP_URL = "localhost:8000"
-__app_url__ = settings.get("app.url", "localhost:8000")
+__app_url__ = settings.get("app.url", DEFAULT_APP_URL)
 
 app = FastAPI(
     title=f"{__title__} Media Server",
@@ -28,29 +26,42 @@ app = FastAPI(
         {"url": f"{__app_url__}/media", "description": "Reference Media"},
     ],
     contact={
-        "name":  __author__,
-        "url":   __url__,
+        "name": __author__,
+        "url": __url__,
         "email": __author_email__,
     },
     docs_url=None,
-    redoc_url=None
+    redoc_url=None,
 )
-def mount_media_for( world_id ):
-    media_files = StaticFiles(html=True,
-                              packages=[(f'{world_id}.resources', 'media')])
-    app.mount(f"/world/{world_id}", media_files, name=world_id)
 
-for uid in World._instances:
+
+def mount_media_for_world(world_id: str, world_path: Path) -> None:
+    """Mount the ``media`` directory for ``world_id`` if it exists."""
+
+    media_dir = world_path / "media"
+    if not media_dir.exists():
+        logger.info("No media directory for world %s", world_id)
+        return
+
     try:
-        mount_media_for(uid)
-        # logger.debug( f"mounted {'uid'}.resources media" )
-    except AssertionError as e:
-        logger.warning(f"Could not find resources media", exc_info=True)
-        pass
-    except ModuleNotFoundError as e:
-        logger.warning(f"Could not find module", exc_info=True)
-        # This is an error, but it's ok if it happens during testing
-        pass
+        media_files = StaticFiles(directory=str(media_dir))
+        app.mount(f"/world/{world_id}", media_files, name=f"media-{world_id}")
+        logger.info("Mounted media for %s at /media/world/%s/", world_id, world_id)
+    except Exception:  # pragma: no cover - defensive logging only
+        logger.warning("Failed to mount media for %s", world_id, exc_info=True)
+
+
+def initialize_media_mounts() -> None:
+    """Mount media directories for all loaded :class:`~tangl.story.fabula.world.World` instances."""
+
+    for world_id, world in World._instances.items():
+        source_path = getattr(world, "source_path", None)
+        if source_path is None:
+            continue
+        mount_media_for_world(world_id, Path(source_path).parent)
+
+
+initialize_media_mounts()
 
 # Middleware translation by resource manager
 # from fastapi import FastAPI, Request

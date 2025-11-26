@@ -20,6 +20,8 @@ from tangl.ir.story_ir.location_script_models import LocationScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
+from tangl.media.media_resource import MediaDep, MediaResourceRegistry
+from tangl.vm.planning import MediaRequirement
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.provision.open_edge import Dependency
 
@@ -296,6 +298,7 @@ class World(Singleton):
         from tangl.story.concepts.item import Item, Flag
         from tangl.story.story_graph import StoryGraph
         graph = StoryGraph(label=story_label, world=self)
+        graph.media_registry = MediaResourceRegistry()
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
@@ -429,6 +432,20 @@ class World(Singleton):
 
                 block = cls.structure(payload)
                 node_map[qualified_label] = block.uid
+
+                media_entries = block_data.get("media") or []
+                for media_spec in media_entries:
+                    media_data = self._to_dict(media_spec)
+                    requirement = MediaRequirement(
+                        graph=graph,
+                        template={
+                            "media_path": media_data.get("media_path"),
+                            "media_role": media_data.get("media_role", "narrative_im"),
+                            "world_id": str(self.uid),
+                        },
+                        policy=ProvisioningPolicy.ANY,
+                    )
+                    MediaDep(graph=graph, source_id=block.uid, requirement=requirement)
 
         return node_map, action_scripts
 

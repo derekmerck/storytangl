@@ -58,5 +58,5 @@ class MediaResourceRegistry(HookedRegistry[MediaRIT]):
     def __contains__(self, item: MediaRIT | UUID) -> bool:
         """Find existing record with matching content hash"""
         if isinstance(item, MediaRIT):
-            return bool( self.find_one(alias=item.content_hash) )
+            return bool(self.find_one(alias=item.content_hash) or super().__contains__(item))
         return super().__contains__(item)

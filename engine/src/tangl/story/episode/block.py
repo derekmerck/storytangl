@@ -21,12 +21,14 @@ from tangl.core import BaseFragment, Node, CallReceipt, Graph  # noqa
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
+from tangl.journal.media import MediaFragment
 from tangl.story.discourse import DialogHandler
 from tangl.story.dispatch import on_get_choices, on_journal_content, story_dispatch
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
 from tangl.vm.runtime import HasEffects
 from .action import Action
+from tangl.media.media_resource import MediaDep
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +205,27 @@ class Block(Node, HasEffects):
             fragment = concept.concept_fragment(ctx=ctx)
             if fragment:
                 fragments.append(fragment)
+        return fragments or None
+
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
+    def emit_media_fragments(self: Block, *, ctx: Context, **_: Any) -> list[MediaFragment] | None:
+        """JOURNAL (NORMAL): emit media fragments for provisioned dependencies."""
+
+        fragments: list[MediaFragment] = []
+        for edge in self.edges_out(is_instance=MediaDep):
+            destination = edge.destination
+            if destination is None:
+                continue
+            fragments.append(
+                MediaFragment(
+                    content=destination,
+                    content_format="rit",
+                    content_type=getattr(destination, "data_type", None),
+                    media_role=edge.requirement.media_role,
+                    source_id=self.uid,
+                )
+            )
+
         return fragments or None
 
     # @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)

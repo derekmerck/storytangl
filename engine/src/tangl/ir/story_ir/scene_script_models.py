@@ -170,12 +170,21 @@ class ActionScript(BaseScriptItem):
     )
 
 
+class MediaScript(BaseScriptItem):
+    """Media attachment declared on a block."""
+
+    media_path: str = Field(..., description="Filename within the world's media directory.")
+    media_role: str = Field("narrative_im", description="Intended role for the media asset.")
+
+
 class BlockScript(BaseScriptItem):
 
     obj_cls: ClassName = Field(None, alias='block_cls')
     # todo: suggest known block class descendents in schema but allow any
 
-    # media: list[MediaItemScript] = None
+    media: list[MediaScript] | None = Field(
+        None, description="Media attachments relative to the world's media directory."
+    )
 
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.")
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.")

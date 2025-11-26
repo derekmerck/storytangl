@@ -39,7 +39,10 @@ class MediaResourceInventoryTag(Entity):
                 content_hash = compute_data_hash(data['data'])
             elif 'path' in data:
                 path = Path(data['path'])
-                content_hash = compute_data_hash(path)
+                try:
+                    content_hash = compute_data_hash(path)
+                except ValueError:
+                    content_hash = compute_data_hash(str(path))
             else:
                 raise ValueError("Must include a content hash, data, or a path in constructor.")
             data['content_hash'] = content_hash
