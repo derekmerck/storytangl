@@ -80,16 +80,29 @@ def plan_media(cursor: Node, *, ctx: Context, **_: Any) -> None:
                 alias = _media_dep_alias_from_requirement(edge)
                 if alias is None:
                     continue
-                rit = resource_manager.get_rit(alias)
-                if rit is None:
+                managers = [(resource_manager, "world")]
+                system_manager = getattr(world, "system_resource_manager", None)
+                if system_manager is not None:
+                    managers.append((system_manager, "sys"))
+
+                resolved = None
+                for manager, scope in managers:
+                    rit = manager.get_rit(alias) if manager is not None else None
+                    if rit is None:
+                        continue
+                    resolved = rit
+                    edge.scope = scope
+                    break
+
+                if resolved is None:
                     logger.warning(
-                        "MediaDep on block %s could not resolve '%s' in world '%s'",
+                        "MediaDep on block %s could not resolve '%s' in available registries",
                         block.uid,
                         alias,
-                        getattr(world, "name", ""),
                     )
                     continue
-                edge.destination = rit
+
+                edge.destination = resolved
                 continue
 
             if kind in {"template", "id"}:

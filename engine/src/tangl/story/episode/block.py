@@ -265,6 +265,7 @@ def emit_media_fragments(block: Block, *, ctx: Context, **_: Any) -> list[BaseFr
                 media_role=edge.media_role,
                 text=getattr(edge, "caption", None),
                 source_id=block.uid,
+                scope=getattr(edge, "scope", "world"),
             )
         )
 

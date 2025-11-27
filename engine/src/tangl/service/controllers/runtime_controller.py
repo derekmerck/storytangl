@@ -125,13 +125,13 @@ class RuntimeController(HasApiEndpoints):
     def _world_id_for_ledger(self, ledger: Ledger) -> str:
         """Return the stable world identifier for URL construction."""
 
-        world = getattr(ledger, "graph", None)
-        if world is None:
-            return "unknown"
-
-        world_obj = getattr(world, "world", None)
+        world_obj = getattr(ledger, "world", None)
         if world_obj is None:
-            return getattr(world, "label", "unknown")
+            graph = getattr(ledger, "graph", None)
+            world_obj = getattr(graph, "world", graph)
+
+        if world_obj is None:
+            return "unknown"
 
         return getattr(world_obj, "uid", None) or getattr(world_obj, "label", "unknown")
 
@@ -154,7 +154,13 @@ class RuntimeController(HasApiEndpoints):
         if not filename:
             raise ValueError(f"Cannot determine filename for MediaRIT {rit!r}")
 
-        url = f"/media/world/{world_id}/{filename}"
+        scope = getattr(fragment, "scope", None) or "world"
+        if scope == "sys":
+            url_prefix = "/media/sys"
+        else:
+            url_prefix = f"/media/world/{world_id}"
+
+        url = f"{url_prefix}/{filename}"
 
         return {
             "fragment_type": "media",
@@ -163,6 +169,7 @@ class RuntimeController(HasApiEndpoints):
             "media_type": rit.data_type.value if rit.data_type else None,
             "text": fragment.text,
             "source_id": str(fragment.source_id),
+            "scope": scope,
         }
 
     @ApiEndpoint.annotate(

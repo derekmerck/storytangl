@@ -61,3 +61,4 @@ class MediaDep(Dependency[MediaRIT]):
     media_spec: MediaSpec | None = Field(default=None, init_var=True)
     media_role: str | None = None
     caption: str | None = None
+    scope: str | None = None
