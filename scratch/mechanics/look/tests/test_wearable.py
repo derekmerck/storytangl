@@ -1,6 +1,6 @@
 import pytest
 
-from scratch.mechanics.look.wearable import Wearable, WearableType
+from tangl.mechanics.look.wearable import Wearable, WearableType
 
 pytest.skip(allow_module_level=True)
 

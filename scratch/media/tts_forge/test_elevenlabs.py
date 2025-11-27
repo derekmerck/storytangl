@@ -34,3 +34,7 @@ def test_elevenlabs():
             print("synthesized test string")
     except KeyError:
         pass
+
+
+if __name__ == "__main__":
+    test_elevenlabs()

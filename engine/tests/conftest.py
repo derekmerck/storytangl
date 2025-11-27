@@ -77,3 +77,17 @@ from pathlib import Path
 def resources_dir():
     return Path(__file__).resolve().parent / "resources"
 
+
+@pytest.fixture
+def media_mvp_path() -> Path:
+    """Path to media_mvp test world directory."""
+
+    return Path(__file__).parent / "resources" / "worlds" / "media_mvp"
+
+
+@pytest.fixture
+def media_mvp_root() -> Path:
+    """Root directory containing media_mvp (for discovery tests)."""
+
+    return Path(__file__).parent / "resources" / "worlds"
+

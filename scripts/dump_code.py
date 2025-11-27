@@ -151,6 +151,7 @@ if __name__ == "__main__":
                       include_notes=True)
     process_directory(pkg_root / 'ir', "tangl37_ir_archive.py")
     process_directory(pkg_root / 'journal', "tangl37_journal_archive.py")
+    process_directory(pkg_root / 'media', "tangl37_media_archive.py")
 
     process_directory(apps_root / "server/src/tangl/rest",
                       "tangl37_server_archive.py",
