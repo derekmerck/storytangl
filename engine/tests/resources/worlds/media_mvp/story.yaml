@@ -1,0 +1,13 @@
+label: "Media MVP Story"
+metadata:
+  title: "Media MVP"
+  author: "StoryTangl"
+scenes:
+  intro:
+    blocks:
+      start:
+        content: "A simple starting block for loader tests."
+        media:
+          - media_path: media/test_image.svg
+            media_role: narrative_im
+            media_type: IMAGE

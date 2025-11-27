@@ -48,3 +48,6 @@ start_node = story.get(story.initial_cursor_id)
 """
 
 from .world import World
+from .world_bundle import WorldBundle
+from .world_loader import WorldLoader
+from .world_manifest import WorldManifest

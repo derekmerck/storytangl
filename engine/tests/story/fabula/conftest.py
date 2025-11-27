@@ -1,9 +1,13 @@
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph
+from pathlib import Path
+import pytest
+
+from tangl.core.graph.edge import Edge
 from tangl.core.graph.node import Node
-from tangl.story.fabula.world import World
-from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.episode.block import Block as ReferenceBlock
+from tangl.story.fabula.script_manager import ScriptManager
+from tangl.story.fabula.world import World
 from tangl.vm.frame import ChoiceEdge
 
 class SimpleBlock(Node):
@@ -34,3 +38,8 @@ def _base_script() -> dict:
             "town": {"obj_cls": "tangl.core.graph.node.Node"},
         },
     }
+
+
+@pytest.fixture
+def media_mvp_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "resources" / "worlds" / "media_mvp"

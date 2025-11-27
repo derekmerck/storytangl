@@ -6,25 +6,28 @@ from pathlib import Path
 from tangl.utils.enum_plus import EnumPlusMixin
 
 class MediaDataType(EnumPlusMixin, Enum):
-    MEDIA  = "media"   # generic default
-    IMAGE  = "image"   # a PIL image
+    MEDIA = "media"  # generic default
+    IMAGE = "image"  # a PIL image
     VECTOR = "vector"  # an lxml document
 
-    AUDIO  = "audio"   # generic audio default, mp3
-    SFX    = "sound_fx"  # sfx audio
-    VOICE  = "voice"   # voice over audio
-    MUSIC  = "music"   # music audio
+    AUDIO = "audio"  # generic audio default, mp3
+    SFX = "sound_fx"  # sfx audio
+    VOICE = "voice"  # voice over audio
+    MUSIC = "music"  # music audio
 
-    VIDEO  = "video"   # generic video default, mp4
+    VIDEO = "video"  # generic video default, mp4
+    OTHER = "other"  # unrecognized media type
 
     ANIMATION = "animation"
 
     @classmethod
     def extension_map(cls):
-        return {cls.IMAGE:  ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
-                cls.VECTOR: ["svg", "ai"],
-                cls.AUDIO:  ["mp3"],
-                cls.VIDEO:  ["mp4", "mkv", "webm"]}
+        return {
+            cls.IMAGE: ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
+            cls.VECTOR: ["svg", "ai"],
+            cls.AUDIO: ["mp3"],
+            cls.VIDEO: ["mp4", "mkv", "webm"],
+        }
 
     @classmethod
     def inv_ext_map(cls):
@@ -36,6 +39,7 @@ class MediaDataType(EnumPlusMixin, Enum):
             value = value.strip('.')
         if value in cls.inv_ext_map():
             return cls.inv_ext_map()[value]
+        return cls.OTHER
 
     @classmethod
     def from_path(cls, path: str | Path) -> Self:
