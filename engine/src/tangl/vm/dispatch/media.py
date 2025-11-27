@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, TYPE_CHECKING
 
-from tangl.core.graph.node import Node
 from tangl.core.behavior import HandlerPriority as Prio
+from tangl.core.graph.node import Node
 from tangl.media.media_resource.media_provisioning import MediaProvisioner
+from tangl.media.media_resource.resource_manager import ResourceManager
+from tangl.media.system_media import get_system_resource_manager
 from tangl.vm import ChoiceEdge, ResolutionPhase as P
 from tangl.vm.context import Context
 from tangl.vm.dispatch.vm_dispatch import vm_dispatch
@@ -62,8 +64,16 @@ def plan_media(cursor: Node, *, ctx: Context, **_: Any) -> None:
     from tangl.media.media_resource.media_dependency import MediaDep
 
     world = getattr(ctx.graph, "world", None)
-    resource_manager = getattr(world, "resource_manager", None)
-    if resource_manager is None:
+    world_manager = getattr(world, "resource_manager", None)
+    system_manager = get_system_resource_manager()
+
+    managers: list[tuple[ResourceManager, str]] = []
+    if world_manager is not None:
+        managers.append((world_manager, "world"))
+    if system_manager is not None:
+        managers.append((system_manager, "sys"))
+
+    if not managers:
         return
 
     frontier_blocks = _iter_frontier_blocks(cursor)
@@ -80,14 +90,9 @@ def plan_media(cursor: Node, *, ctx: Context, **_: Any) -> None:
                 alias = _media_dep_alias_from_requirement(edge)
                 if alias is None:
                     continue
-                managers = [(resource_manager, "world")]
-                system_manager = getattr(world, "system_resource_manager", None)
-                if system_manager is not None:
-                    managers.append((system_manager, "sys"))
-
                 resolved = None
                 for manager, scope in managers:
-                    rit = manager.get_rit(alias) if manager is not None else None
+                    rit = manager.get_rit(alias)
                     if rit is None:
                         continue
                     resolved = rit
@@ -106,9 +111,16 @@ def plan_media(cursor: Node, *, ctx: Context, **_: Any) -> None:
                 continue
 
             if kind in {"template", "id"}:
+                if world_manager is None:
+                    logger.debug(
+                        "Skipping media provisioning for %s because no world resource manager is available",
+                        block.uid,
+                    )
+                    continue
+
                 provisioner = MediaProvisioner(
                     requirement=edge.requirement,
-                    registries=[resource_manager.registry],
+                    registries=[world_manager.registry],
                 )
                 offers = provisioner.generate_offers(ctx=ctx)
                 for offer in offers:

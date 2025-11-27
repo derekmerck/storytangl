@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest
@@ -24,7 +22,9 @@ def test_get_system_resource_manager_indexes(monkeypatch: pytest.MonkeyPatch, tm
     rit = manager.get_rit("asset.txt")
     assert rit is not None
     assert rit.path == asset
-    assert system_media.get_system_resource_manager() is manager
+
+    cached = system_media.get_system_resource_manager()
+    assert cached is manager
 
 
 def test_get_system_resource_manager_handles_missing(monkeypatch: pytest.MonkeyPatch) -> None:

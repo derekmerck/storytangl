@@ -8,11 +8,12 @@ from tangl.media.media_resource.resource_manager import ResourceManager
 
 @lru_cache(maxsize=1)
 def get_system_resource_manager() -> ResourceManager | None:
-    """Return a cached resource manager for shared system media, if configured."""
+    """Return the cached system-level :class:`ResourceManager` if configured."""
 
     root = get_sys_media_dir()
     if root is None:
         return None
+
     manager = ResourceManager(resource_path=root)
     manager.index_directory(".")
     return manager

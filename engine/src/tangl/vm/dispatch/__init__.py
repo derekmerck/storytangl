@@ -23,4 +23,3 @@ from .update import on_update, on_finalize
 from .redirect import on_prereq, on_postreq
 from .journal import on_journal
 from .media import plan_media
-from .media import plan_media
