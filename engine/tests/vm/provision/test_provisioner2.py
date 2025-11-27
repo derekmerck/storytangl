@@ -104,7 +104,12 @@ def test_graph_provisioner_returns_empty_if_not_found():
     assert len(offers) == 0
 
 import pydantic
-LockableNode = pydantic.create_model('LockableNode', __base__=Node, locked=bool)
+
+LockableNode = pydantic.create_model(
+    "LockableNode",
+    __base__=Node,
+    locked=(bool, False),
+)
 
 def test_template_provisioner_creates_from_template():
     """TemplateProvisioner should offer CREATE with template."""

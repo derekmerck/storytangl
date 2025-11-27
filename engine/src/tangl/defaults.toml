@@ -51,6 +51,7 @@ docs =          "@path /app/docs/"          # package docs and user guide
 user_data =     "@path /app/data/user/"     # user/story data storage for file-based persistence
 story_media =   "@path /app/data/media/"    # user/story media files
 cache_data =    "@path /app/cache/"         # file loc shelve and pickle cache data
+system_media =  "@path /app/media/sys/"     # shared/system media
 
 # Backend persistence services
 [service.apis.redis]
