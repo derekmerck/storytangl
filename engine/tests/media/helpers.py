@@ -39,6 +39,7 @@ def build_world_with_logo_media_block(world_media_dir: Path | None = None) -> Me
     media_root = world_media_dir or Path(".")
     media_root.mkdir(parents=True, exist_ok=True)
     resource_manager = ResourceManager(media_root)
+    resource_manager.index_directory(".")
 
     story = StoryGraph(label="system-media-story")
     block = story.add_node(obj_cls=Block, label="intro")

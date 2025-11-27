@@ -8,7 +8,6 @@ import yaml
 
 from tangl.config import get_world_dirs
 from tangl.media.media_resource.resource_manager import ResourceManager
-from tangl.media.system_media import get_system_resource_manager
 
 from .script_manager import ScriptManager
 from .world import World
@@ -88,6 +87,4 @@ class WorldLoader:
         world.uid = bundle.manifest.uid
         world._bundle = bundle  # noqa: SLF001 - temporary private slot for bundle access
         world.media_registry = resource_manager.registry
-        world.system_resource_manager = get_system_resource_manager()
-
         return world
