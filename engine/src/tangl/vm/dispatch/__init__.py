@@ -22,3 +22,5 @@ from .planning import on_planning, on_get_provisioners, do_get_provisioners
 from .update import on_update, on_finalize
 from .redirect import on_prereq, on_postreq
 from .journal import on_journal
+from .media import plan_media
+from .media import plan_media

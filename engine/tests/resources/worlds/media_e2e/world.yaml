@@ -1,0 +1,10 @@
+uid: media_e2e
+label: "Media E2E Test"
+version: "1.0"
+
+scripts: story.yaml
+media_dir: media
+
+metadata:
+  title: "Media E2E Test"
+  author: "Test Suite"

@@ -1,0 +1,5 @@
+uid: media_mvp
+label: "Media MVP"
+scripts: story.yaml
+media_dir: media
+author: "StoryTangl"
