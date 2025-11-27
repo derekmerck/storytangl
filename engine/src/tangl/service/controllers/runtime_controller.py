@@ -176,7 +176,7 @@ class RuntimeController(HasApiEndpoints):
         access_level=AccessLevel.PUBLIC,
         response_type=ResponseType.RUNTIME,
     )
-    def get_story_update(self, *, ledger: Ledger, frame: Frame, **_: Any) -> dict:
+    def get_story_update(self, *, ledger: Ledger, frame: Frame, **_: Any) -> RuntimeInfo:
         """Return the current story update, dereferencing media fragments to URLs."""
 
         world_id = self._world_id_for_ledger(ledger)
@@ -194,11 +194,12 @@ class RuntimeController(HasApiEndpoints):
             else:
                 output_fragments.append({"content": str(fragment)})
 
-        return {
-            "fragments": output_fragments,
-            "cursor_id": str(frame.cursor_id),
-            "step": ledger.step,
-        }
+        return RuntimeInfo.ok(
+            cursor_id=frame.cursor_id,
+            step=ledger.step,
+            message="Story update",
+            fragments=output_fragments,
+        )
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
