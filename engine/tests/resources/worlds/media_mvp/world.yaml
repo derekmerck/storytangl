@@ -1,0 +1,15 @@
+uid: media_mvp
+label: "Media MVP Demo"
+version: "1.0"
+
+scripts: story.yaml
+media_dir: media
+
+metadata:
+  title: "Media MVP Demo"
+  author: "Derek"
+  summary: "Simple world for testing static media."
+
+tags: [demo, media, test]
+python_packages: []
+plugins: {}

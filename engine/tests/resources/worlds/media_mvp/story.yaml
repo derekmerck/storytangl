@@ -1,0 +1,20 @@
+label: media_mvp
+uid: "00000000-0000-0000-0000-000000000001"
+metadata:
+  title: "Media MVP Demo"
+  author: "Derek"
+  summary: "Simple world for testing static media."
+
+scenes:
+  - label: intro
+    blocks:
+      - label: tavern_entrance
+        text: "You enter the dimly lit tavern."
+        media:
+          - name: tavern.png
+            media_role: narrative_im
+      - label: forest_path
+        text: "You step onto a shadowy forest path."
+        media:
+          - name: test_image.png
+            media_role: narrative_im

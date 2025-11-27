@@ -6,25 +6,29 @@ from pathlib import Path
 from tangl.utils.enum_plus import EnumPlusMixin
 
 class MediaDataType(EnumPlusMixin, Enum):
-    MEDIA  = "media"   # generic default
-    IMAGE  = "image"   # a PIL image
+    MEDIA = "media"  # generic default
+    IMAGE = "image"  # a PIL image
     VECTOR = "vector"  # an lxml document
 
-    AUDIO  = "audio"   # generic audio default, mp3
-    SFX    = "sound_fx"  # sfx audio
-    VOICE  = "voice"   # voice over audio
-    MUSIC  = "music"   # music audio
+    AUDIO = "audio"  # generic audio default, mp3
+    SFX = "sound_fx"  # sfx audio
+    VOICE = "voice"  # voice over audio
+    MUSIC = "music"  # music audio
 
-    VIDEO  = "video"   # generic video default, mp4
+    VIDEO = "video"  # generic video default, mp4
+    OTHER = "other"  # fallback bucket for unknown extensions
 
     ANIMATION = "animation"
 
     @classmethod
     def extension_map(cls):
-        return {cls.IMAGE:  ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
-                cls.VECTOR: ["svg", "ai"],
-                cls.AUDIO:  ["mp3"],
-                cls.VIDEO:  ["mp4", "mkv", "webm"]}
+        return {
+            cls.IMAGE: ["png", "webp", "jpg", "jpeg", "gif", "bmp"],
+            cls.VECTOR: ["svg", "ai"],
+            cls.AUDIO: ["mp3"],
+            cls.VIDEO: ["mp4", "mkv", "webm"],
+            cls.OTHER: ["bin"],
+        }
 
     @classmethod
     def inv_ext_map(cls):
