@@ -5,7 +5,6 @@ from typing import Any, TYPE_CHECKING
 
 from tangl.core.graph.node import Node
 from tangl.core.behavior import HandlerPriority as Prio
-from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.media.media_resource.media_provisioning import MediaProvisioner
 from tangl.vm import ChoiceEdge, ResolutionPhase as P
 from tangl.vm.context import Context
@@ -13,6 +12,7 @@ from tangl.vm.dispatch.vm_dispatch import vm_dispatch
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
     from tangl.story.episode.block import Block
+    from tangl.media.media_resource.media_dependency import MediaDep
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,7 @@ def plan_media(cursor: Node, *, ctx: Context, **_: Any) -> None:
     """Bind or provision media dependencies during planning."""
 
     from tangl.story.episode.block import Block  # local import to avoid cycles
+    from tangl.media.media_resource.media_dependency import MediaDep
 
     world = getattr(ctx.graph, "world", None)
     resource_manager = getattr(world, "resource_manager", None)
