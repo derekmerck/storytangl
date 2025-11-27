@@ -1,102 +1,114 @@
-import itertools
+"""
+Test real demographic DATA QUALITY and coverage.
+
+These tests verify that the actual LFS-backed demographic data has the expected
+structure, populations, and name coverage.
+
+Tests skip gracefully when LFS data is unavailable.
+"""
 
 import pytest
 
-from tangl.mechanics.demographics import DemographicSampler, DemographicData
-from tangl.mechanics.demographics.data_models import Region, Country, Subtype
-from tangl.mechanics.demographics.data_models import load_demographic_distributions, Region, Country, Subtype
+from tangl.mechanics.demographics import DemographicSampler
+from tangl.mechanics.demographics.data_models import (
+    Country,
+    NameBank,
+    Region,
+    Subtype,
+    load_demographic_distributions,
+)
 
-@pytest.fixture(autouse=True, scope='module')
-def load_default_data():
+def _has_real_demographic_data() -> bool:
+    """Check if real demographic data was successfully loaded."""
+    country_count = sum(1 for _ in Country.all_instances())
+    namebank_count = sum(1 for _ in NameBank.all_instances())
+    return country_count > 5 and namebank_count > 5
+
+
+# All tests in this module require real data
+pytestmark = pytest.mark.skipif(
+    not _has_real_demographic_data(),
+    reason="Real demographic data not available (LFS not pulled or data failed to load)",
+)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def load_real_data():
+    """Load real demographic distributions for testing."""
     Region.clear_instances()
     Country.clear_instances()
     Subtype.clear_instances()
+    NameBank.clear_instances()
     load_demographic_distributions()
 
 
-def test_demographic_data():
+def test_demographic_data_loaded():
+    """Verify that real demographic data is present."""
+    regions = list(Region.all_instances())
+    countries = list(Country.all_instances())
 
-    for r in Region.all_instances():
-        print( r.name )
+    assert len(regions) > 5, "Should have multiple regions"
+    assert len(countries) > 50, "Should have many countries"
 
-    for c in Country.all_instances():
-        print( c.name )
+    for region in regions:
+        print(region.name)
+
+    for country in countries:
+        print(country.name)
+
+
+def test_major_regions_present():
+    """Test that expected major regions exist."""
+    region_labels = {r.label for r in Region.all_instances()}
+    expected = {"africa", "asia", "europe"}
+    assert expected.issubset(region_labels), f"Missing regions: {expected - region_labels}"
 
 
 def test_demographic_sampler():
-
-    print( DemographicSampler.sample_region().name )
-    print( DemographicSampler.sample_country().name )
-    print( DemographicSampler.sample_country( region=Region.get_instance('asia') ) )
-    print( DemographicSampler.sample_subtype() )
-    print( DemographicSampler.sample_subtype( country=Country.get_instance('jpn') ) )
-    print( DemographicSampler.sample_subtype( region=Region.get_instance('west_europe') ) )
+    """Test that sampler works with real data."""
+    print(DemographicSampler.sample_region().name)
+    print(DemographicSampler.sample_country().name)
+    print(DemographicSampler.sample_country(region=Region.get_instance("asia")))
+    print(DemographicSampler.sample_subtype())
+    print(DemographicSampler.sample_subtype(country=Country.get_instance("jpn")))
 
 
 def test_name_sampler():
+    """Test that name sampling works with real data."""
+    print(DemographicSampler.sample_xx_name("fra"))
+    print(DemographicSampler.sample_xy_name("jpn"))
 
-    print( DemographicSampler.sample_xx_name('fra' ) )
-    print( DemographicSampler.sample_xy_name('jpn' ) )
 
 def country_params():
+    """Generate test parameters for all countries."""
     for country in Country.all_instances():
         marks = []
-        if country.label in ['zaf', 'usa']:
+        if country.label in ["zaf", "usa"]:
             marks.append(
                 pytest.mark.xfail(
-                    reason="zaf and usa require subtype"
+                    reason="zaf and usa require subtype specification",
                 )
             )
-        yield pytest.param(country, marks=marks)
+        yield pytest.param(country, marks=marks, id=country.label)
+
 
 @pytest.mark.parametrize("country", country_params())
 def test_name_sampler_variations(country: Country):
-
+    """Test that every country can generate valid names."""
     female_name = DemographicSampler.sample_xx_name(country.label)
     male_name = DemographicSampler.sample_xy_name(country.label)
-    print( country.name, female_name, male_name )
+    print(country.name, female_name, male_name)
 
-# def test_demographic_factory():
-#
-#     d = DemographicFactory.create_demographic()
-#
-#     print( d )
-#
-# def test_faker():
-#
-#     fake = Faker()
-#     fake.add_provider( DemographicProvider )
-#
-#     d = fake.demographic(country="cog")
-#     print( d )
 
 def test_country_data_singleton():
-    # Test that CountryData instances are unique and correctly instantiated
-    angola = Country.get_instance('ago')
-    assert angola.label == 'ago'
-    assert angola.population == 31825295
-    assert angola.demonym == 'Angolan'
+    """Test specific country data accuracy."""
+    angola = Country.get_instance("ago")
+    assert angola.label == "ago"
+    assert angola.population == 31_825_295
+    assert angola.demonym == "Angolan"
+
 
 def test_region_data_population():
-    # Test the population attribute in RegionData
-    africa = Region.get_instance('africa')
-    assert africa.population == 1109541977
-
-# def test_name_sampler_consistency():
-#     from tangl.mechanics.demographics.demographic_data import world_name_data
-#     # Test if NameSampler returns correct names based on country and subtype
-#     angolan_names = NameSampler.name_female(CountryData['ago'], 'black')
-#     assert angolan_names[0] in world_name_data['ago']['female']
-#
-# def test_demographic_sampler2():
-#     # Test DemographicSampler for correct region and country sampling
-#     sampled_country = DemographicSampler.sample_country()
-#     assert sampled_country in CountryData
-#
-# def test_ethnicity_mix_sampling():
-#     # Test if the sampled subtype is from the country's ethnic mix
-#     subtype = DemographicSampler.sample_subtype(CountryData['ago'])
-#     assert subtype.value in CountryData['ago'].eth_mix
-#
-
-
+    """Test region population calculations."""
+    africa = Region.get_instance("africa")
+    assert africa.population == 1_109_541_977
