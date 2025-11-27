@@ -5,6 +5,8 @@ from typing import Any, TYPE_CHECKING
 
 from tangl.core.graph.node import Node
 from tangl.core.behavior import HandlerPriority as Prio
+from tangl.core.behavior import CallReceipt
+from tangl.media.dispatch import MediaTask, media_dispatch
 from tangl.media.media_resource.media_provisioning import MediaProvisioner
 from tangl.vm import ChoiceEdge, ResolutionPhase as P
 from tangl.vm.context import Context
@@ -16,6 +18,29 @@ if TYPE_CHECKING:  # pragma: no cover - hinting only
 
 
 logger = logging.getLogger(__name__)
+
+
+@vm_dispatch.register(task=P.INIT, priority=Prio.EARLY)
+def attach_system_media_manager(cursor: Node, *, ctx: Context, **_: Any) -> None:
+    """Attach the shared system media manager to the world if available."""
+
+    world = getattr(ctx.graph, "world", None)
+    if world is None:
+        return
+
+    if getattr(world, "system_resource_manager", None) is not None:
+        return
+
+    receipts = list(
+        media_dispatch.dispatch(
+            task=MediaTask.GET_SYSTEM_RESOURCE_MANAGER,
+            caller=world,
+            ctx=ctx,
+        )
+    )
+    system_manager = CallReceipt.first_result(*receipts)
+    if system_manager is not None:
+        world.system_resource_manager = system_manager
 
 
 def _iter_frontier_blocks(cursor: Node) -> list[Block]:
