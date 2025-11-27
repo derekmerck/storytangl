@@ -6,6 +6,7 @@ from typing import Any, TYPE_CHECKING
 from tangl.core.graph.node import Node
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.media.media_resource.media_dependency import MediaDep
+from tangl.media.media_resource.media_provisioning import MediaProvisioner
 from tangl.vm import ChoiceEdge, ResolutionPhase as P
 from tangl.vm.context import Context
 from tangl.vm.dispatch.vm_dispatch import vm_dispatch
@@ -37,9 +38,25 @@ def _media_dep_alias_from_requirement(dep: MediaDep) -> str | None:
     return None
 
 
+def media_dep_kind(dep: MediaDep) -> str:
+    """Classify the dependency based on available requirement data."""
+
+    requirement = dep.requirement
+    criteria = getattr(requirement, "criteria", None)
+    template = getattr(requirement, "template", None) or {}
+
+    if isinstance(criteria, dict) and "path" in criteria:
+        return "path"
+    if "data" in template or "spec" in template:
+        return "template"
+    if getattr(requirement, "identifier", None) is not None:
+        return "id"
+    return "unknown"
+
+
 @vm_dispatch.register(task=P.PLANNING, priority=Prio.NORMAL)
-def bind_media_deps(cursor: Node, *, ctx: Context, **_: Any) -> None:
-    """Bind block media dependencies to indexed media resources if available."""
+def plan_media(cursor: Node, *, ctx: Context, **_: Any) -> None:
+    """Bind or provision media dependencies during planning."""
 
     from tangl.story.episode.block import Block  # local import to avoid cycles
 
@@ -57,18 +74,32 @@ def bind_media_deps(cursor: Node, *, ctx: Context, **_: Any) -> None:
             if not isinstance(edge, MediaDep) or edge.destination is not None:
                 continue
 
-            alias = _media_dep_alias_from_requirement(edge)
-            if alias is None:
+            kind = media_dep_kind(edge)
+            if kind == "path":
+                alias = _media_dep_alias_from_requirement(edge)
+                if alias is None:
+                    continue
+                rit = resource_manager.get_rit(alias)
+                if rit is None:
+                    logger.warning(
+                        "MediaDep on block %s could not resolve '%s' in world '%s'",
+                        block.uid,
+                        alias,
+                        getattr(world, "name", ""),
+                    )
+                    continue
+                edge.destination = rit
                 continue
 
-            rit = resource_manager.get_rit(alias)
-            if rit is None:
-                logger.warning(
-                    "MediaDep on block %s could not resolve '%s' in world '%s'",
-                    block.uid,
-                    alias,
-                    getattr(world, "name", ""),
+            if kind in {"template", "id"}:
+                provisioner = MediaProvisioner(
+                    requirement=edge.requirement,
+                    registries=[resource_manager.registry],
                 )
-                continue
-
-            edge.destination = rit
+                offers = provisioner.generate_offers(ctx=ctx)
+                for offer in offers:
+                    provider = offer.accept(ctx=ctx)
+                    if provider is None:
+                        continue
+                    edge.destination = provider
+                    break
