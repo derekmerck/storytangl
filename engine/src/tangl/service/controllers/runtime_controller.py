@@ -6,7 +6,11 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from pathlib import Path
+
 from tangl.core import BaseFragment, StreamRegistry
+from tangl.journal.media import MediaFragment
+from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,
@@ -117,6 +121,77 @@ class RuntimeController(HasApiEndpoints):
             fragments = fragments[-limit:]
 
         return fragments
+
+    def _world_id_for_ledger(self, ledger: Ledger) -> str:
+        """Return the stable world identifier for URL construction."""
+
+        world = getattr(ledger, "graph", None)
+        if world is None:
+            return "unknown"
+
+        world_obj = getattr(world, "world", None)
+        if world_obj is None:
+            return getattr(world, "label", "unknown")
+
+        return getattr(world_obj, "uid", None) or getattr(world_obj, "label", "unknown")
+
+    def _dereference_media(self, fragment: MediaFragment, world_id: str) -> dict:
+        """Convert a :class:`MediaFragment` containing a :class:`MediaRIT` into a JSON-ready mapping."""
+
+        rit = fragment.content
+        if not isinstance(rit, MediaRIT):
+            raise TypeError(
+                f"Expected MediaRIT in MediaFragment.content, got {type(rit)}"
+            )
+
+        filename: str | None = None
+        path_value = getattr(rit, "path", None)
+        if isinstance(path_value, Path):
+            filename = path_value.name
+        elif rit.label:
+            filename = rit.label
+
+        if not filename:
+            raise ValueError(f"Cannot determine filename for MediaRIT {rit!r}")
+
+        url = f"/media/world/{world_id}/{filename}"
+
+        return {
+            "fragment_type": "media",
+            "media_role": fragment.media_role,
+            "url": url,
+            "media_type": rit.data_type.value if rit.data_type else None,
+            "text": fragment.text,
+            "source_id": str(fragment.source_id),
+        }
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.PUBLIC,
+        response_type=ResponseType.RUNTIME,
+    )
+    def get_story_update(self, *, ledger: Ledger, frame: Frame, **_: Any) -> dict:
+        """Return the current story update, dereferencing media fragments to URLs."""
+
+        world_id = self._world_id_for_ledger(ledger)
+        fragments = list(ledger.records.iter_channel("fragment"))
+        fragments = self._latest_step_slice(fragments)
+
+        output_fragments: list[dict] = []
+        for fragment in fragments:
+            if isinstance(fragment, MediaFragment) and fragment.content_format == "rit":
+                output_fragments.append(self._dereference_media(fragment, world_id))
+                continue
+
+            if hasattr(fragment, "model_dump"):
+                output_fragments.append(fragment.model_dump())
+            else:
+                output_fragments.append({"content": str(fragment)})
+
+        return {
+            "fragments": output_fragments,
+            "cursor_id": str(frame.cursor_id),
+            "step": ledger.step,
+        }
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,

@@ -21,11 +21,17 @@ from tangl.core import BaseFragment, Node, CallReceipt, Graph  # noqa
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
+from tangl.journal.media import MediaFragment
 from tangl.story.discourse import DialogHandler
 from tangl.story.dispatch import on_get_choices, on_journal_content, story_dispatch
 from tangl.story.fabula.media import attach_media_deps_for_block
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
+from tangl.media.media_data_type import MediaDataType
+from tangl.media.media_resource.media_dependency import MediaDep
+from tangl.media.media_resource.media_resource_inv_tag import (
+    MediaResourceInventoryTag as MediaRIT,
+)
 from tangl.vm.runtime import HasEffects
 from .action import Action
 
@@ -234,6 +240,35 @@ class Block(Node, HasEffects):
             choices = CallReceipt.merge_results(*choice_receipts)
 
         return choices or None
+
+
+@story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
+def emit_media_fragments(block: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+    """JOURNAL: emit media fragments for resolved media dependencies."""
+
+    fragments: list[MediaFragment] = []
+
+    for edge in block.edges_out():
+        if not isinstance(edge, MediaDep):
+            continue
+        if edge.destination is None:
+            continue
+
+        rit: MediaRIT = edge.destination
+        content_type = rit.data_type or MediaDataType.MEDIA
+
+        fragments.append(
+            MediaFragment(
+                content=rit,
+                content_format="rit",
+                content_type=content_type,
+                media_role=edge.media_role,
+                text=getattr(edge, "caption", None),
+                source_id=block.uid,
+            )
+        )
+
+    return fragments or None
 
 
 @story_dispatch.register(task=P.INIT, priority=Prio.NORMAL)

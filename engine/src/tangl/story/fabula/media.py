@@ -23,7 +23,13 @@ def attach_media_deps_for_block(*, graph: "StoryGraph", block: "Block", script: 
     for media_item in script.media:
         media_name = getattr(media_item, "name", None)
         if media_name:
-            MediaDep(graph=graph, source_id=block.uid, media_path=str(media_name))
+            MediaDep(
+                graph=graph,
+                source_id=block.uid,
+                media_path=str(media_name),
+                media_role=getattr(media_item, "media_role", None),
+                caption=getattr(media_item, "text", None),
+            )
             continue
 
         logger.debug("Skipping media entry on %s without a name", block.get_label())
