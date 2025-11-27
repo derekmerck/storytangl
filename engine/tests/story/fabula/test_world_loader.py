@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.story.fabula.world_bundle import WorldBundle
 from tangl.story.fabula.world_loader import WorldLoader
 
@@ -56,7 +55,10 @@ def test_loader_creates_world_with_media_registry(media_mvp_path: Path) -> None:
 
     assert getattr(world, "uid", None) == "media_mvp"
     assert hasattr(world, "_bundle")
-    assert isinstance(world.media_registry, MediaResourceRegistry)
+    assert world.resource_manager.registry
+
+    rit = world.resource_manager.get_rit("test_image.svg")
+    assert rit is not None
 
     with pytest.raises(ValueError):
         loader.load_world("missing_world")

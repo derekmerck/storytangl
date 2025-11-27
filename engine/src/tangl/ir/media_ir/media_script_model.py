@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 from typing import Optional
 
-from pydantic import BaseModel, model_validator, AnyUrl
+from pydantic import AnyUrl, BaseModel, model_validator
 
+from tangl.media.media_role import MediaRole
+from tangl.media.type_hints import Media
 from tangl.type_hints import UniqueLabel
-from .type_hints import MediaResource
-from .enums import MediaRole
-from .media_spec import MediaSpecification
 
 # language:yaml
 """
@@ -32,7 +33,7 @@ class MediaItemScript(BaseModel, arbitrary_types_allowed=True):
     """
     # Embedded or external resources and can be passed along directly
     url: Optional[AnyUrl] = None  # external link
-    data: Optional[MediaResource] = None    # inline svg or b64 encoded image
+    data: Optional[Media] = None    # inline svg or b64 encoded image
 
     # This requires a registry lookup for name
     name: Optional[UniqueLabel] = None  # backend file name or other media_id

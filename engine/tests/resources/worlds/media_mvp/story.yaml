@@ -8,6 +8,5 @@ scenes:
       start:
         content: "A simple starting block for loader tests."
         media:
-          - media_path: media/test_image.svg
+          - name: test_image.svg
             media_role: narrative_im
-            media_type: IMAGE

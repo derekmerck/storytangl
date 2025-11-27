@@ -1,6 +1,3 @@
-from tangl.core.graph.edge import Edge
-from tangl.core.graph.graph import Graph
-from pathlib import Path
 import pytest
 
 from tangl.core.graph.edge import Edge
@@ -40,6 +37,3 @@ def _base_script() -> dict:
     }
 
 
-@pytest.fixture
-def media_mvp_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "resources" / "worlds" / "media_mvp"

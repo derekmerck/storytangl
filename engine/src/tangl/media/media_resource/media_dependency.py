@@ -4,6 +4,7 @@ from pydantic import ConfigDict, model_validator, Field
 
 from tangl.type_hints import Identifier
 from tangl.vm.provision import Dependency, Requirement
+from tangl.vm.provision.requirement import ProvisioningPolicy
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
@@ -44,11 +45,17 @@ class MediaDep(Dependency[MediaRIT]):
             # create on demand
             req_kwargs["template"] = {'spec': data.pop("media_spec")}
 
-        requirement = Requirement(**req_kwargs)
+        requirement = Requirement.model_construct(
+            graph=data.get("graph"),
+            policy=req_kwargs.get("policy", ProvisioningPolicy.ANY),
+            identifier=req_kwargs.get("identifier"),
+            criteria=req_kwargs.get("criteria"),
+            template=req_kwargs.get("template"),
+        )
         data['requirement'] = requirement
         return data
 
-    media_id: Identifier = Field(init_var=True)
-    media_path: str = Field(init_var=True)
-    media_data: Media = Field(init_var=True)
-    media_spec: MediaSpec = Field(init_var=True)
+    media_id: Identifier | None = Field(default=None, init_var=True)
+    media_path: str | None = Field(default=None, init_var=True)
+    media_data: Media | None = Field(default=None, init_var=True)
+    media_spec: MediaSpec | None = Field(default=None, init_var=True)

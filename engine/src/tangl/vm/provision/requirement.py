@@ -12,7 +12,7 @@ from typing import Optional, Generic, TypeVar
 from uuid import UUID
 from copy import deepcopy
 
-from pydantic import Field, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.type_hints import StringMap, UnstructuredData, Identifier
 from tangl.core.graph import GraphItem, Node, Graph
@@ -101,6 +101,8 @@ class Requirement(GraphItem, Generic[NodeT]):
     satisfied_at_scope_id: Optional[UUID] = None
     """Scope identifier where the requirement was satisfied."""
 
+    _provider_obj: Optional[NodeT] = PrivateAttr(default=None)
+
     @model_validator(mode="after")
     def _validate_policy(self):
         # todo: this validates that the req is _independently_ complete.
@@ -155,21 +157,32 @@ class Requirement(GraphItem, Generic[NodeT]):
     def provider(self) -> Optional[NodeT]:
         # This needs to be a graph item rather than a component
         # to ensure that we have access to the graph
+        if self.graph is None:
+            return self._provider_obj
         if self.provider_id is not None:
-            return self.graph.get(self.provider_id)
+            return self.graph.get(self.provider_id) or self._provider_obj
+        return self._provider_obj
 
     @provider.setter
     def provider(self, value: NodeT) -> None:
         if value is None:
+            self._provider_obj = None
             self.provider_id = None
             return
-        if value.graph is not None and value.graph is not self.graph:
+        provider_graph = getattr(value, "graph", None)
+        if provider_graph is None or self.graph is None:
+            self._provider_obj = value
+            self.provider_id = getattr(value, "uid", None)
+            return
+        if provider_graph is not None and provider_graph is not self.graph:
             self.provider_id = value.uid
+            self._provider_obj = value
             return
         if value not in self.graph:
             self.graph.add(value)
         self.graph._validate_linkable(value)  # redundant check that it's in the graph
         self.provider_id = value.uid
+        self._provider_obj = value
 
     @property
     def satisfied(self):

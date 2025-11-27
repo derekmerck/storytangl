@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
+from tangl.media.media_resource.resource_manager import ResourceManager
 
 from .script_manager import ScriptManager
 from .world import World
@@ -73,11 +73,17 @@ class WorldLoader:
         script_data = self._load_scripts(bundle)
         script_manager = ScriptManager.from_data(script_data)
 
-        world = World(label=bundle.manifest.label, script_manager=script_manager, **kwargs)
+        resource_manager = ResourceManager(resource_path=bundle.media_dir)
+        resource_manager.index_directory(".")
+
+        world = World(
+            label=bundle.manifest.label,
+            script_manager=script_manager,
+            resource_manager=resource_manager,
+            **kwargs,
+        )
         world.uid = bundle.manifest.uid
         world._bundle = bundle  # noqa: SLF001 - temporary private slot for bundle access
-
-        if not hasattr(world, "media_registry"):
-            world.media_registry = MediaResourceRegistry(label=f"{world.uid}_media")
+        world.media_registry = resource_manager.registry
 
         return world

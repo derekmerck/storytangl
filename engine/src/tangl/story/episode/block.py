@@ -23,6 +23,7 @@ from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
 from tangl.story.discourse import DialogHandler
 from tangl.story.dispatch import on_get_choices, on_journal_content, story_dispatch
+from tangl.story.fabula.media import attach_media_deps_for_block
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
 from tangl.vm.runtime import HasEffects
@@ -233,3 +234,21 @@ class Block(Node, HasEffects):
             choices = CallReceipt.merge_results(*choice_receipts)
 
         return choices or None
+
+
+@story_dispatch.register(task=P.INIT, priority=Prio.NORMAL)
+def init_block_media(block: Block, *, ctx: Context, **_: Any) -> None:
+    """INIT: attach static media dependencies declared on the block script."""
+
+    world = getattr(ctx.graph, "world", None)
+    if world is None:
+        return
+
+    block_script = None
+    if hasattr(world, "get_block_script"):
+        block_script = world.get_block_script(block.uid)
+
+    if block_script is None:
+        return
+
+    attach_media_deps_for_block(graph=ctx.graph, block=block, script=block_script)
