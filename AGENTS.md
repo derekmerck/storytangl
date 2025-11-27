@@ -102,6 +102,43 @@ one of the above base types.
   for tests and demos. Maintain schema consistency and keep narrative examples
   inclusive and lore-friendly.
 
+## Configuration
+- StoryTangl uses Dynaconf via ``tangl.config.settings`` and ``defaults.toml``.
+- Paths (worlds, media, etc.) live under ``[service.paths]`` and use ``@path`` casting.
+- New code should read configuration through ``tangl.config.settings`` or helpers like
+  ``get_world_dirs()`` / ``get_sys_media_dir()``.
+- Do not introduce new settings systems (no extra Pydantic ``BaseSettings`` for core
+  config).
+
+### Media & Binary Assets (PNG / LFS safety)
+
+StoryTangl uses Git LFS for binary media files such as `.png` and `.jpg`.  
+To avoid corrupting the repository, all agents MUST follow these rules:
+
+1. **Never create or propose new PNG/JPG files inside the repository.**  
+   - Do NOT generate placeholder `.png` files.  
+   - Do NOT suggest adding new media files under `worlds/` or `engine/tests/resources/`.  
+   - Do NOT modify `.gitattributes` or any Git LFS configuration.
+
+2. **For examples and test worlds, always use safe SVG primitives.**  
+   - Use `.svg` files containing a simple shape (circle, square, etc.).  
+   - SVG is text-based and does NOT trigger Git LFS filters.  
+   - Example media files in documentation may reference imaginary SVG filenames, but
+     **do not create the files**; these are logical examples only.
+
+3. **For automated tests, create SVG files only inside temporary directories**  
+   (e.g., pytest `tmp_path`) rather than inside the repo.  
+   - Example:
+     ```python
+     (tmp_path / "circle.svg").write_text(
+         '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
+         '<circle cx="16" cy="16" r="14" fill="red"/></svg>'
+     )
+     ```
+
+These rules ensure the media pipeline can be tested safely without introducing
+invalid or untracked binary files into the repository.
+
 ## Miscellaneous guidelines
 - Avoid try/except around imports. Feature-detect capabilities with optional imports
   only when the feature is genuinely optional; otherwise declare dependencies in
@@ -112,13 +149,5 @@ one of the above base types.
   Pydantic instead of manual dict munging when possible.
 - When adding enums or user-facing strings, sanitize labels via `sanitize_str` and
   respect identifier/tag casing conventions.
-
-## Configuration
-- StoryTangl uses Dynaconf via ``tangl.config.settings`` and ``defaults.toml``.
-- Paths (worlds, media, etc.) live under ``[service.paths]`` and use ``@path`` casting.
-- New code should read configuration through ``tangl.config.settings`` or helpers like
-  ``get_world_dirs()`` / ``get_sys_media_dir()``.
-- Do not introduce new settings systems (no extra Pydantic ``BaseSettings`` for core
-  config).
 
 Thanks for contributing to StoryTangl!
