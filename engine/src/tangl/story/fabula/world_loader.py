@@ -6,7 +6,9 @@ from typing import Any
 
 import yaml
 
+from tangl.config import get_world_dirs
 from tangl.media.media_resource.resource_manager import ResourceManager
+from tangl.media.system_media import get_system_resource_manager
 
 from .script_manager import ScriptManager
 from .world import World
@@ -18,8 +20,9 @@ logger = logging.getLogger(__name__)
 class WorldLoader:
     """Discover and load world bundles from configured directories."""
 
-    def __init__(self, world_dirs: list[Path]) -> None:
-        self.world_dirs = world_dirs
+    def __init__(self, world_dirs: list[Path] | None = None) -> None:
+        # Use configured dirs by default, but allow tests to override
+        self.world_dirs = world_dirs or get_world_dirs()
         self._bundles: dict[str, WorldBundle] = {}
 
     def discover_bundles(self) -> dict[str, WorldBundle]:
@@ -85,5 +88,6 @@ class WorldLoader:
         world.uid = bundle.manifest.uid
         world._bundle = bundle  # noqa: SLF001 - temporary private slot for bundle access
         world.media_registry = resource_manager.registry
+        world.system_resource_manager = get_system_resource_manager()
 
         return world

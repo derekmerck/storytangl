@@ -113,4 +113,12 @@ one of the above base types.
 - When adding enums or user-facing strings, sanitize labels via `sanitize_str` and
   respect identifier/tag casing conventions.
 
+## Configuration
+- StoryTangl uses Dynaconf via ``tangl.config.settings`` and ``defaults.toml``.
+- Paths (worlds, media, etc.) live under ``[service.paths]`` and use ``@path`` casting.
+- New code should read configuration through ``tangl.config.settings`` or helpers like
+  ``get_world_dirs()`` / ``get_sys_media_dir()``.
+- Do not introduce new settings systems (no extra Pydantic ``BaseSettings`` for core
+  config).
+
 Thanks for contributing to StoryTangl!
