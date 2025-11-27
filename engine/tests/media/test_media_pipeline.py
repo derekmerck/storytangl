@@ -116,3 +116,23 @@ def test_runtime_controller_dereferences_media(tmp_path: Path) -> None:
 
     assert payload["url"].endswith("/demo/story.png")
     assert payload["fragment_type"] == "media"
+
+
+def test_runtime_controller_preserves_relative_media_path() -> None:
+    controller = RuntimeController()
+    rit = MediaRIT(path="scenes/story.png")
+    fragment = MediaFragment(
+        content=rit,
+        content_format="rit",
+        media_role="narrative_im",
+        content_type=MediaDataType.IMAGE,
+        source_id=None,
+    )
+
+    payload = controller._dereference_media_fragment(  # pylint: disable=protected-access
+        fragment=fragment,
+        world_id="demo",
+    )
+
+    assert payload["url"].endswith("/demo/scenes/story.png")
+    assert payload["fragment_type"] == "media"

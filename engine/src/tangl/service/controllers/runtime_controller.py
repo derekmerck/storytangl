@@ -246,11 +246,13 @@ class RuntimeController(HasApiEndpoints):
 
         rit = fragment.content
         if isinstance(rit, MediaRIT) and rit.path is not None:
-            filename = Path(rit.path).name
+            path = Path(rit.path)
+            relative_path = path.name if path.is_absolute() else path.as_posix()
+            relative_path = relative_path.lstrip("./")
         else:  # pragma: no cover - defensive fallback
-            filename = f"{getattr(rit, 'uid', 'media')}"
+            relative_path = f"{getattr(rit, 'uid', 'media')}"
 
-        media_url = f"/media/world/{world_id}/{filename}"
+        media_url = f"/media/world/{world_id}/{relative_path}"
 
         return {
             "fragment_type": "media",
