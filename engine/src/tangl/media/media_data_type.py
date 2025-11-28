@@ -16,7 +16,7 @@ class MediaDataType(EnumPlusMixin, Enum):
     MUSIC = "music"  # music audio
 
     VIDEO = "video"  # generic video default, mp4
-    OTHER = "other"  # fallback bucket for unknown extensions
+    OTHER = "other"  # unrecognized media type
 
     ANIMATION = "animation"
 
@@ -27,7 +27,6 @@ class MediaDataType(EnumPlusMixin, Enum):
             cls.VECTOR: ["svg", "ai"],
             cls.AUDIO: ["mp3"],
             cls.VIDEO: ["mp4", "mkv", "webm"],
-            cls.OTHER: ["bin"],
         }
 
     @classmethod
@@ -40,6 +39,7 @@ class MediaDataType(EnumPlusMixin, Enum):
             value = value.strip('.')
         if value in cls.inv_ext_map():
             return cls.inv_ext_map()[value]
+        return cls.OTHER
 
     @classmethod
     def from_path(cls, path: str | Path) -> Self:

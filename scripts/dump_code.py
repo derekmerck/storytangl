@@ -135,6 +135,9 @@ def process_directory(root: Path,
 
 if __name__ == "__main__":
     # current
+    process_directory(pkg_root,
+                      "tangl37_full_archive.py",
+                      include_notes=False)
     process_directory(pkg_root / "core",
                       "tangl37_core_archive.py",
                       include_notes=True,
@@ -151,7 +154,6 @@ if __name__ == "__main__":
                       include_notes=True)
     process_directory(pkg_root / 'ir', "tangl37_ir_archive.py")
     process_directory(pkg_root / 'journal', "tangl37_journal_archive.py")
-    process_directory(pkg_root / 'media', "tangl37_media_archive.py")
 
     process_directory(apps_root / "server/src/tangl/rest",
                       "tangl37_server_archive.py",
@@ -191,7 +193,7 @@ if __name__ == "__main__":
     process_directory(legacy_root / "vm/vm-34",     "tangl34_vm_archive.py")
     process_directory(legacy_root / "core/core-35", "tangl35_core_archive.py")
     process_directory(legacy_root / "core/core-36", "tangl36_core_archive.py")
-    process_directory(legacy_root / "vm/vm-36",     "tangl36_vm_archive.py")
+    # process_directory(legacy_root / "vm/vm-36",     "tangl36_vm_archive.py")
 
     process_directory(scratch_root / "mechanics/progression", "tangl3x_progression_archive.py", include_notes=True)
     process_directory(scratch_root / "compilers/md2yaml", "tangl3x_md2yaml_archive.py", include_notes=True)

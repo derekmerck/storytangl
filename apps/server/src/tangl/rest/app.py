@@ -36,6 +36,7 @@ from starlette.responses import RedirectResponse
 
 from tangl.config import settings
 from tangl.rest.dependencies import get_orchestrator
+from tangl.rest.media_mounts import mount_system_media
 from tangl.service import Orchestrator
 from tangl.service.response import RuntimeInfo
 
@@ -107,6 +108,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+mount_system_media(app)
 
 # @app.exception_handler(StoryAccessError)
 # def handle_unavailable(request: Request, exc: StoryAccessError):

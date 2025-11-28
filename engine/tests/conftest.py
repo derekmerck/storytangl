@@ -29,7 +29,7 @@ except ModuleNotFoundError:  # pragma: no cover - executed in CI environment
     stub = types.SimpleNamespace(ObjectProxy=_ObjectProxy)
     sys.modules["wrapt"] = stub
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 logging.getLogger("markdown_it").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
@@ -76,18 +76,4 @@ from pathlib import Path
 @pytest.fixture(scope="session")
 def resources_dir():
     return Path(__file__).resolve().parent / "resources"
-
-
-@pytest.fixture
-def media_mvp_path() -> Path:
-    """Path to media_mvp test world directory."""
-
-    return Path(__file__).parent / "resources" / "worlds" / "media_mvp"
-
-
-@pytest.fixture
-def media_mvp_root() -> Path:
-    """Root directory containing media_mvp (for discovery tests)."""
-
-    return Path(__file__).parent / "resources" / "worlds"
 

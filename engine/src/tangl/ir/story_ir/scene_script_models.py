@@ -9,6 +9,7 @@ from pydantic import Field, model_validator, ConfigDict
 
 from tangl.type_hints import UniqueLabel, Tag, ClassName
 from tangl.ir.core_ir import BaseScriptItem
+from tangl.ir.media_ir.media_script_model import MediaItemScript
 from .actor_script_models import RoleScript
 from .location_script_models import SettingScript
 from .asset_script_models import AssetsScript
@@ -175,7 +176,7 @@ class BlockScript(BaseScriptItem):
     obj_cls: ClassName = Field(None, alias='block_cls')
     # todo: suggest known block class descendents in schema but allow any
 
-    # media: list[MediaItemScript] = None
+    media: list[MediaItemScript] | None = None
 
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.")
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.")

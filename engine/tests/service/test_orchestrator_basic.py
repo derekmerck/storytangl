@@ -369,65 +369,6 @@ def test_orchestrator_drop_story_deletes_ledger(
     assert getattr(persisted_user, "current_ledger_id", None) is None
     assert any(isinstance(saved, User) and saved.uid == user_id for saved in fake_persistence.saved)
 
-def test_orchestrator_build_ledger_passes_through_hydrated(fake_persistence: FakePersistence, minimal_ledger: Ledger) -> None:
-    # Persistence returns something that already looks like a Ledger
-    hydrated = minimal_ledger
-    fake_persistence[hydrated.uid] = hydrated
-
-    orchestrator = Orchestrator(fake_persistence)
-
-    class _LedgerEcho(HasApiEndpoints):
-        @ApiEndpoint.annotate(method_type="read", response_type=ResponseType.INFO)
-        def echo_cursor(self, ledger: Ledger) -> CursorInfo:
-            return CursorInfo(cursor_id=ledger.cursor_id)
-
-    orchestrator.register_controller(_LedgerEcho)
-
-    result = orchestrator.execute("_LedgerEcho.echo_cursor", ledger_id=hydrated.uid)
-    assert isinstance(result, CursorInfo)
-    assert result.cursor_id == hydrated.cursor_id
-
-def test_orchestrator_build_ledger_rejects_unsupported_payload(fake_persistence: FakePersistence) -> None:
-    bogus_id = uuid4()
-    fake_persistence[bogus_id] = object()  # not Mapping, no get_frame/unstructure
-
-    orchestrator = Orchestrator(fake_persistence)
-
-    class _LedgerUser(HasApiEndpoints):
-        @ApiEndpoint.annotate(method_type="read",
-            response_type=ResponseType.INFO)
-        def needs_ledger(self, ledger: Ledger) -> CursorInfo:
-            # never reached
-            return CursorInfo(cursor_id=ledger.cursor_id)
-
-    orchestrator.register_controller(_LedgerUser)
-
-    with pytest.raises(TypeError, match="Unsupported ledger payload"):
-        orchestrator.execute("_LedgerUser.needs_ledger", ledger_id=bogus_id)
-
-def test_orchestrator_infer_ledger_id_requires_active_ledger(fake_persistence: FakePersistence) -> None:
-    user_id = uuid4()
-    # Minimal user with no current_ledger_id
-    user = StubUser(user_id, ledger_id=uuid4())
-    user.current_ledger_id = None  # explicitly clear it
-
-    fake_persistence[user_id] = user
-
-    orchestrator = Orchestrator(fake_persistence)
-
-    class _NeedsLedger(HasApiEndpoints):
-        @ApiEndpoint.annotate(
-            method_type="read",
-            response_type=ResponseType.INFO)
-        def get_cursor(self, ledger: Ledger) -> CursorInfo:
-            return CursorInfo(cursor_id=ledger.cursor_id)
-
-    orchestrator.register_controller(_NeedsLedger)
-
-    with pytest.raises(ValueError, match="User has no active ledger"):
-        orchestrator.execute("_NeedsLedger.get_cursor", user_id=user_id)
-
-
 
 def test_orchestrator_build_ledger_passes_through_hydrated(
     fake_persistence: FakePersistence, minimal_ledger: Ledger

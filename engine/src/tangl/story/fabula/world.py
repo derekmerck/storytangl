@@ -17,6 +17,7 @@ from tangl.core.singleton import Singleton
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
+from tangl.ir.story_ir.scene_script_models import BlockScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
@@ -27,6 +28,7 @@ from tangl.vm.provision.open_edge import Dependency
 from .domain_manager import DomainManager  # behaviors and classes
 from .script_manager import ScriptManager  # concept templates
 from .asset_manager import AssetManager    # platonic objects
+from .media import attach_media_deps_for_block
 
 # from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
 
@@ -96,6 +98,7 @@ class World(Singleton):
         self.name = self.metadata.get("title", label)
 
         self.template_registry = Registry(label=f"{label}_templates")
+        self._block_scripts: dict[UUID, BlockScript] = {}
 
         self._setup_default_assets()
         self._compile_templates()
@@ -291,6 +294,11 @@ class World(Singleton):
 
         return self.template_registry.find_one(label=label)
 
+    def get_block_script(self, block_uid: UUID) -> BlockScript | None:
+        """Return the :class:`BlockScript` backing ``block_uid`` if cached."""
+
+        return self._block_scripts.get(block_uid)
+
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
         from tangl.story.concepts.item import Item, Flag
@@ -419,16 +427,24 @@ class World(Singleton):
                 }
                 action_scripts[qualified_label] = scripts
 
+                block_script = BlockScript.model_validate(block_data)
+
                 payload = self._prepare_payload(
                     cls,
                     block_data,
                     graph,
-                    drop_keys=("actions", "continues", "redirects"),
+                    drop_keys=("actions", "continues", "redirects", "media"),
                 )
                 payload.setdefault("label", block_label)
 
                 block = cls.structure(payload)
                 node_map[qualified_label] = block.uid
+                self._block_scripts[block.uid] = block_script
+                attach_media_deps_for_block(
+                    graph=graph,
+                    block=block,
+                    script=block_script,
+                )
 
         return node_map, action_scripts
 

@@ -1,0 +1,24 @@
+label: demo_story
+metadata:
+  title: "A Simple Choice"
+  author: "Demo Author"
+
+scenes:
+  start_scene:
+    tags: [is_entry]
+    blocks:
+      start:
+        text: "You stand at a crossroads."
+        actions:
+          - text: "Take the left path"
+            successor: left_path
+          - text: "Take the right path"
+            successor: right_path
+
+      left_path:
+        text: "The left path leads to a peaceful garden."
+        effects: ["player.tags.add('peaceful')"]
+
+      right_path:
+        text: "The right path leads to an ancient ruin."
+        effects: ["player.tags.add('adventurous')"]

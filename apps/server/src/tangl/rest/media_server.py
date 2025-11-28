@@ -1,23 +1,22 @@
-"""
-FastAPI server for StoryTangl media.
-"""
-# todo: We need 2 media servers:
-#   - Static media, which could be swapped for a CDN
-#   - Dynamic media that is created or selected for specific stories and story-states
+"""FastAPI sub-application for serving world media assets."""
+
+from __future__ import annotations
 
 import logging
-logger = logging.getLogger(__name__)
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from tangl.config import settings
-from tangl.info import __title__, __version__, __author__, __author_email__, __url__, __desc__
-from tangl.story.fabula.world import World
+from tangl.info import __author__, __author_email__, __desc__, __title__, __url__, __version__
+from tangl.rest.media_mounts import mount_system_media
+from tangl.story.fabula.world_loader import WorldLoader
+
+logger = logging.getLogger(__name__)
 
 description = f"Media server for {__desc__.lower()}"
 
-DEFAULT_APP_URL = "localhost:8000"
 __app_url__ = settings.get("app.url", "localhost:8000")
 
 app = FastAPI(
@@ -28,45 +27,41 @@ app = FastAPI(
         {"url": f"{__app_url__}/media", "description": "Reference Media"},
     ],
     contact={
-        "name":  __author__,
-        "url":   __url__,
+        "name": __author__,
+        "url": __url__,
         "email": __author_email__,
     },
     docs_url=None,
-    redoc_url=None
+    redoc_url=None,
 )
-def mount_media_for( world_id ):
-    media_files = StaticFiles(html=True,
-                              packages=[(f'{world_id}.resources', 'media')])
-    app.mount(f"/world/{world_id}", media_files, name=world_id)
 
-for uid in World._instances:
-    try:
-        mount_media_for(uid)
-        # logger.debug( f"mounted {'uid'}.resources media" )
-    except AssertionError as e:
-        logger.warning(f"Could not find resources media", exc_info=True)
-        pass
-    except ModuleNotFoundError as e:
-        logger.warning(f"Could not find module", exc_info=True)
-        # This is an error, but it's ok if it happens during testing
-        pass
 
-# Middleware translation by resource manager
-# from fastapi import FastAPI, Request
-# from starlette.middleware.base import BaseHTTPMiddleware
-# from starlette.responses import Response
-#
-# class AliasMiddleware(BaseHTTPMiddleware):
-#     async def dispatch(self, request: Request, call_next):
-#         path = request.url.path
-#         # Logic to translate alias in path
-#         # Example: /world/{world_id}/abc123 -> /world/{world_id}/actual_file.png
-#
-#         # Modify request here if necessary...
-#
-#         response = await call_next(request)
-#         return response
-#
-# # Add middleware to the app
-# app.add_middleware(AliasMiddleware)
+def mount_world_media(app: FastAPI, world_id: str, media_dir: Path) -> None:
+    """Mount static files for a world's media directory."""
+
+    if not media_dir.exists():
+        logger.warning("Media directory %s does not exist", media_dir)
+        return
+
+    mount_path = f"/world/{world_id}"
+    for route in app.router.routes:
+        if getattr(route, "path", None) == mount_path or getattr(route, "prefix", None) == mount_path:
+            logger.info("Media already mounted for world '%s'", world_id)
+            return
+
+    app.mount(
+        mount_path,
+        StaticFiles(directory=str(media_dir)),
+        name=f"media-world-{world_id}",
+    )
+    logger.info("Mounted media for world '%s' at /media/world/%s", world_id, world_id)
+
+def initialize_media_mounts(app: FastAPI, world_loader: WorldLoader) -> None:
+    """Mount media directories for all discovered worlds at startup."""
+
+    bundles = world_loader.discover_bundles()
+    for world_id, bundle in bundles.items():
+        mount_world_media(app, world_id, bundle.media_dir)
+
+
+mount_system_media(app, mount_path="/sys")

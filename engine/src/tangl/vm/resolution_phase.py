@@ -35,14 +35,13 @@ class ResolutionPhase(IntEnum):
     """
 
     INIT = 0         # Does not run, just indicates not started
-    DISCOVER = 10    # build context, discover capabilities in scope
-    VALIDATE = 20    # check avail new cursor Predicate, return ALL true or None
-    PLANNING = 30    # resolve Dependencies and Affordances; updates graph/data on frontier in place and GATHERS receipts
-    PREREQS = 40     # return ANY (first) avail prereq edge to a provisioned node to break and redirect
-    UPDATE = 50      # mutates graph/data in place and GATHERS receipts
-    JOURNAL = 60     # return PIPES receipts to compose a list of FRAGMENTS
-    FINALIZE = 70    # cleanup, commit events, consume resources, etc.; updates graph/data in place and PIPE receipts to compose a Patch
-    POSTREQS = 80    # return ANY (first) avail postreq edge to avail, provisioned node to break and redirect
+    VALIDATE = 10    # check avail new cursor Predicate, return ALL true or None
+    PLANNING = 20    # resolve Dependencies and Affordances; updates graph/data on frontier in place and GATHERS receipts
+    PREREQS = 30     # return ANY (first) avail prereq edge to a provisioned node to break and redirect
+    UPDATE = 40      # mutates graph/data in place and GATHERS receipts
+    JOURNAL = 50     # return PIPES receipts to compose a list of FRAGMENTS
+    FINALIZE = 60    # cleanup, commit events, consume resources, etc.; updates graph/data in place and PIPE receipts to compose a Patch
+    POSTREQS = 70    # return ANY (first) avail postreq edge to avail, provisioned node to break and redirect
 
     @classmethod
     def ordered_phases(cls) -> list[Self]:

@@ -5,9 +5,8 @@ from typing import Optional, Any
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_serializer, field_validator, model_validator
 
-from tangl.type_hints import Hash
 from tangl.utils.shelved2 import shelved, clear_shelf
 from tangl.utils.hashing import compute_data_hash
 from tangl.core.entity import Entity
@@ -29,7 +28,25 @@ class MediaResourceInventoryTag(Entity):
     path: Optional[Path] = None
     data: Optional[Any] = None
     # Must have one or the other if no pre-computed content hash
-    content_hash: Hash = Field(None, json_schema_extra={'is_identifier': True})
+    content_hash: bytes | None = Field(None, json_schema_extra={'is_identifier': True})
+
+    @field_serializer("content_hash")
+    def serialize_hash(self, value: bytes | None) -> str | None:
+        return value.hex() if value is not None else None
+
+    @field_validator("content_hash", mode="before")
+    @classmethod
+    def parse_hash(cls, value: Any) -> bytes | None:
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return None
+            try:
+                return bytes.fromhex(value)
+            except ValueError as exc:
+                msg = f"Invalid hex content_hash: {value!r}"
+                raise ValueError(msg) from exc
+        return value
 
     @model_validator(mode="before")
     @classmethod

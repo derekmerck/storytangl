@@ -29,7 +29,6 @@ Repository    = "https://github.com/tangldev/storytangl"
 [tool.poetry.dependencies]
 python = "^3.13"
 pydantic = "^2.10.6"
-pydantic-settings = "^2.6.0"
 shortuuid = "^1.0.13"
 dynaconf = "^3.2.7"
 pyyaml = "^6.0.2"
