@@ -271,20 +271,20 @@ def emit_media_fragments(block: Block, *, ctx: Context, **_: Any) -> list[BaseFr
 
     return fragments or None
 
-
-@story_dispatch.register(task=P.INIT, priority=Prio.NORMAL)
-def init_block_media(block: Block, *, ctx: Context, **_: Any) -> None:
-    """INIT: attach static media dependencies declared on the block script."""
-
-    world = getattr(ctx.graph, "world", None)
-    if world is None:
-        return
-
-    block_script = None
-    if hasattr(world, "get_block_script"):
-        block_script = world.get_block_script(block.uid)
-
-    if block_script is None:
-        return
-
-    attach_media_deps_for_block(graph=ctx.graph, block=block, script=block_script)
+# todo: this is never invoked, but it's a good idea to move it from world to planning AND to use init for actual graph initialization tasks.
+# @story_dispatch.register(task=P.INIT, priority=Prio.NORMAL)
+# def init_block_media(block: Block, *, ctx: Context, **_: Any) -> None:
+#     """INIT: attach static media dependencies declared on the block script."""
+#
+#     world = getattr(ctx.graph, "world", None)
+#     if world is None:
+#         return
+#
+#     block_script = None
+#     if hasattr(world, "get_block_script"):
+#         block_script = world.get_block_script(block.uid)
+#
+#     if block_script is None:
+#         return
+#
+#     attach_media_deps_for_block(graph=ctx.graph, block=block, script=block_script)
