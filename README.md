@@ -106,25 +106,25 @@ Requirements distinguish between hard dependencies (gates choice availability) a
 
 ```bash
 # Clone the repository
-git clone https://github.com/derekmerck/storytangl.git
-cd storytangl
+$ git clone https://github.com/derekmerck/storytangl.git
+$ cd storytangl
 
 # Install with Poetry
-poetry install
+$ poetry install
 
 # Or install specific extras
-poetry install -E server  # Includes FastAPI, Redis, MongoDB
-poetry install -E cli     # Just the command-line interface
+$ poetry install -E server  # Includes FastAPI, Redis, MongoDB
+$ poetry install -E cli     # Just the command-line interface
 ```
 
 ### Run a Story (CLI)
 
 ```bash
 # Start the interactive CLI
-poetry run tangl-cli
+$ poetry run tangl-cli
 
 # Or use the console script
-tangl-cli
+$ tangl-cli
 
 # In the CLI:
 > load_script path/to/your_story.yaml
@@ -137,13 +137,13 @@ tangl-cli
 
 ```bash
 # Start the REST API server
-poetry run tangl-serve
+$ poetry run tangl-serve
 # Or: uvicorn tangl.rest.main:app --reload
 
 # In another terminal, start the web client
-cd apps/web
-yarn install
-yarn dev
+$ cd apps/web
+$ yarn install
+$ yarn dev
 ```
 
 The web client will open at `http://localhost:5173` and connect to the API at `http://localhost:8000`.
@@ -152,14 +152,14 @@ The web client will open at `http://localhost:5173` and connect to the API at `h
 
 ```bash
 # Build the image
-docker build -t storytangl:3.7 .
+$ docker build -t storytangl:3.7 .
 
 # Run the server (includes API + docs)
-docker run -p 8000:8000 storytangl:3.7
+$ docker run -p 8000:8000 storytangl:3.7
 # optionally mount an external 'worlds' directory with story content
 
 # For the CLI instead, just override the entrypoint
-docker run -it storytangl:3.7 tangl-cli
+$ docker run -it storytangl:3.7 tangl-cli
 ```
 
 ---
@@ -235,26 +235,26 @@ StoryTangl follows strict principles:
 
 ```bash
 # All tests
-poetry run pytest
+$ poetry run pytest
 
 # Specific layers
-poetry run pytest engine/tests/core
-poetry run pytest engine/tests/vm
-poetry run pytest engine/tests/story
+$ poetry run pytest engine/tests/core
+$ poetry run pytest engine/tests/vm
+$ poetry run pytest engine/tests/story
 
 # With coverage
-poetry run pytest --cov=tangl --cov-report=html
+$ poetry run pytest --cov=tangl --cov-report=html
 
 # Watch mode
-poetry run pytest --watch
+$ poetry run pytest --watch
 ```
 
 ### Documentation
 
 ```bash
 # Build Sphinx docs
-cd docs
-poetry run make html
+$ cd docs
+$ poetry run make html
 
 # View at docs/build/html/index.html
 ```

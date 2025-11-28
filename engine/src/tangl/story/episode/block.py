@@ -22,9 +22,8 @@ from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
 from tangl.journal.media import MediaFragment
-from tangl.story.discourse import DialogHandler
+from tangl.discourse import DialogHandler
 from tangl.story.dispatch import on_get_choices, on_journal_content, story_dispatch
-from tangl.story.fabula.media import attach_media_deps_for_block
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
 from tangl.media.media_data_type import MediaDataType

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tangl.journal.discourse import AttributedFragment
-from tangl.story.discourse import DialogHandler, DialogMuBlock
+from tangl.discourse import DialogHandler, DialogMuBlock
 
 
 def test_dialog_handler_detects_format() -> None:
