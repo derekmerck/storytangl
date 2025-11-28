@@ -1,0 +1,74 @@
+label: test_script
+
+metadata:
+  title: My Test Script
+  author: tangldev
+  date: Summer, 2024
+  version: '1.0.x-test'
+  summary: |
+    A test script
+  url: https://test.storytan.gl
+  ui_config:
+    brand_color: orange
+    brand_font:  roboto
+
+globals:
+  foo: bar
+
+actors:
+  - label: actor1
+    actor_cls: CustomActor
+    name: My Actor
+
+places:
+  - label: place1
+    name: My Place
+
+scenes:
+
+  first_scene:
+    tags: [ is_entry ]  # indicates entry scene
+    locations:
+      - place_ref: place1
+    roles:
+      - actor_ref: actor1
+    blocks:
+      start:
+        text: This is the first block of the first scene
+        continues:
+          - successor: second_block
+      second_block:
+        text: This is the second block
+        actions:
+          - text: Continue
+            successor: third_block
+      third_block:
+        test: This is the third block
+
+  second_scene:
+#    scene_cls: MyScene
+    roles:
+      actor2:
+        actor_template:
+          name: My Other Actor
+    blocks:
+      start:
+        text: This is the second scene menu
+        wants_tags: [ menu_item ]
+      menu_item1:
+#        block_cls: MenuBlock
+        locals:
+          action_text: Goto menu item 1
+        text: This is scene 2 menu item 1
+        tags: [ menu item ]
+
+assets:
+  - asset_cls: DiscreteAsset
+    assets:
+      sword:
+        tags: [ '@fight' ]
+        text: A long sword
+  - asset_cls: FungibleAsset
+    assets:
+      gold:
+        value: 10.0

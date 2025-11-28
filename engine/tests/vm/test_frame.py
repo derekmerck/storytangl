@@ -1,5 +1,7 @@
 import uuid
 
+import pytest
+
 from tangl.core import Node, Graph, CallReceipt, BehaviorRegistry
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm.resolution_phase import ResolutionPhase as P
@@ -10,8 +12,8 @@ from tangl.vm.provision import Requirement, ProvisioningPolicy, Dependency
 def test_phase_order_is_total_and_strict(frame: Frame):
     """Phases execute in defined order with no gaps."""
     phases = P.ordered_phases()
-    assert len(phases) == 9
-    assert len(P) == 9
+    assert len(phases) == 8
+    assert len(P) == 8
     assert phases[0] == P.INIT
     assert phases[-1] == P.POSTREQS
 
@@ -33,8 +35,8 @@ def test_phase_order_is_total_and_strict(frame: Frame):
     frame._invalidate_context()
 
     frame.follow_edge(AnonymousEdge(destination=frame.cursor))
-    assert executed == phases[2:]  # P.INIT and P.DISCOVER doen't count currently
-import pytest
+    assert executed == phases[1:]  # P.INIT doesn't count currently
+
 @pytest.mark.skip()
 def test_global_handlers_visible_in_scope():
     g = Graph(label="x")
