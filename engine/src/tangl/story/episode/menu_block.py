@@ -17,7 +17,7 @@ logger.setLevel(logging.WARNING)
 # re-entered repeatedly and always provides only currently open choices.
 
 # Prior version uses an ad-hoc selector.  Probably should leverage functions from the
-# 'Selectable' class.
+# 'Selectable' class with 'selection_criteria', which is a superset of has_cls and has_tags
 
 # class domain behaviors for menu blocks
 class MenuActionHandler:

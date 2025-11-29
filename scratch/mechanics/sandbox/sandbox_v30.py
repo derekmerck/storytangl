@@ -21,11 +21,11 @@ from tangl.entity.mixins import AvailabilityHandler, NamespaceHandler
 from tangl.graph import Node
 from tangl.graph.mixins.traversal import TraversalHandler
 from tangl.story.story import StoryNode
-from tangl.story.scene import Scene, Action
-from tangl.story.actor import Role
-from tangl.story.place import Location
-from tangl.story.scene.menu import MenuActionHandler
-from tangl.type_hints import Uid, Tags, UniqueLabel
+from tangl.story.concepts import Scene, Action
+from tangl.story.concepts.actor import Role
+from tangl.story.concepts.location import Location
+from tangl.story.episode.menu import MenuActionHandler
+from tangl.type_hints import Identifier, Tag, UniqueLabel
 from tangl.exceptions import StoryAccessError
 
 SandboxTime = int

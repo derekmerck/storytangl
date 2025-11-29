@@ -358,12 +358,12 @@ The FastAPI server provides a clean HTTP interface:
 - `DELETE /story` - End session
 
 **System:**
-- `GET /health` - Health check
-- `GET /openapi.json` - OpenAPI spec
+- `GET /info` - System info and health check
+- `GET /openapi` - OpenAPI spec
 
 See `/docs` endpoint when running the server for interactive API documentation.
 
-The server app also bundles a simple media server for exposing world and system media objects to a story client.
+The server app also bundles a simple static file server for exposing world and system media objects to a story client at `/media`.
 
 ### Python API
 
@@ -448,13 +448,13 @@ This is a bit of navel-gazing, but this architecture has been 30 years in the ma
 
 **Morphological Models:** The story world is a shape model defining the space of valid narratives. Story instances are specific shapes sampled from this space and projected into a representation space as they are unrolled.
 
-And these aren't just weird analogies —- they are the actual design principles that shaped concrete technical choices and referenced in the logic.
+These aren't just esoteric analogies —- they are the actual design principles that shaped concrete technical choices and are used in reasoning about the  logic.
 
 ### Evolution Through Iteration
 
-This is version 3.7, representing the ~37th architectural iteration (4 rewrites with 8-12 iterations each over 5+ years).  Each rewrite has been driven by the evolution of key strategies.
+This is version 3.7, representing the ~37th architectural iteration (4 rewrites with 8-12 iterations each over 5+ years).  Each rewrite has been inspired by evolution of key strategies.
 
-1. **system and domain encapsulation** emerged after multiple  attempts at monolithic systems
+1. **System and domain encapsulation** emerged after multiple  attempts at monolithic systems
 2. **Phase bus** replaced brittle event handlers and task chains
 3. **Event sourcing** solved replay and debugging problems
 4. **Type purity** eliminated subtle serialization bugs
@@ -533,7 +533,7 @@ A: Optimized for clarity, not speed. It is intended as a reference implementatio
 A: If you understand the architecture and have convinced yourself that it's stable enough, sure. But, be aware that it is designed as a reference, not a turn-key solution.  And although the library API has been fairly stable for a couple of years now, it may evolve as new versions require new endpoints. 
 
 **Q: How do I learn more?**  
-A: Read `AGENTS.md` first as it tracks the current state fairly closely.  Then explore `docs/` and study the tests. The codebase itself is heavily documented and meant to be understood by interacting with it.
+A: Read `AGENTS.md` first as it tracks the current state fairly closely.  Then explore `docs/source` and study the tests. The codebase itself is heavily documented and meant to be understood by interacting with it.
 
 ---
 

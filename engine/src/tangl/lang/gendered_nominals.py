@@ -2,7 +2,7 @@ import yaml
 import re
 from functools import partial
 
-# Some neutrals noted when not the masc form
+# Some neutrals noted when _not_ adopting the masc form
 # Words with substrings
 # - man/woman -> person, i.e., chairperson
 # - son/daughter -> child, i.e., grandchild

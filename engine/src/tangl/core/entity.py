@@ -3,6 +3,8 @@ from uuid import UUID, uuid4
 from typing import Optional, Self, Iterator, Type, Callable, Iterable, TypeAlias, TypeVar
 import logging
 from copy import copy
+from enum import Enum
+import re
 
 from pydantic import BaseModel, Field, field_validator
 import shortuuid
@@ -144,6 +146,91 @@ class Entity(BaseModelPlus):
     def is_instance(self, obj_cls: Type[Self]) -> bool:
         # helper func for matches
         return isinstance(self, obj_cls)
+
+    def get_tag_kv(self,
+                   prefix: str | None = None,
+                   enum_type: type | None = None) -> set[Tag]:
+        # actually of -> set[enum_type] if given
+        """
+        Extract tag values for a given key prefix and/or enum_type.
+
+        Tags may be:
+        - string key/value pairs like "foo:bar"
+        - enum members
+        - integers (used for quick filters or numeric locals)
+
+        Semantics
+        ---------
+        - At least one of `prefix` or `enum_type` must be provided.
+        - If only `prefix` is given, values are returned as strings
+          (i.e., `enum_type` is effectively `str`).
+        - If `enum_type` is an Enum subclass, matching string tags are
+          converted to that enum and any existing members of that enum
+          in `self.tags` are included.
+        - If `enum_type` is `int`, matching string tags are parsed as ints.
+        - If `enum_type` is `str`, matching string tags are returned as strings.
+        - If `enum_type` is `str` or `int`, a `prefix` is required; otherwise
+          the use is ambiguous and a TypeError is raised.
+
+        Examples
+        --------
+        enum_type=Foo, tags { "foo:bar", Foo.XYZZY } -> { Foo.BAR, Foo.XYZZY }
+        prefix="age", tags { "age:1", "age:2" } -> { "1", "2" }
+        prefix="age", enum_type=int, tags { "age:1", "age:2" } -> { 1, 2 }
+        """
+
+        if prefix is None and enum_type is None:
+            raise TypeError(...)
+
+        if prefix is None and enum_type in (str, int):
+            raise TypeError(...)
+
+        value_type: type = enum_type or str
+
+        regex = None
+        if prefix is not None:
+            esc_prefix = re.escape(prefix)
+            regex = re.compile(rf"^{esc_prefix}\W(.*)$")
+
+        result: set[Tag] = set()
+
+        for tag in self.tags:
+            # Step 1: pull out the "raw" value if we have a prefix
+            if regex is not None and isinstance(tag, str):
+                m = regex.match(tag)
+                if not m:
+                    continue
+                raw: object = m.group(1)
+            else:
+                raw = tag
+            # Step 2: no enum_type -> just strings
+            if enum_type is None:
+                if isinstance(raw, str):
+                    result.add(raw)
+                continue
+
+            # Step 3: typed conversions
+            if issubclass(value_type, Enum):
+                # Let EnumPlusMixin._missing_ do all the cleverness.
+                try:
+                    result.add(value_type(raw))
+                except (ValueError, TypeError):
+                    continue
+            elif value_type is int:
+                try:
+                    result.add(int(raw))
+                except (ValueError, TypeError):
+                    continue
+            elif value_type is str:
+                if isinstance(raw, str):
+                    result.add(raw)
+            else:
+                try:
+                    result.add(value_type(raw))
+                except Exception:
+                    continue
+
+        return result
 
     @is_identifier
     def short_uid(self) -> str:
