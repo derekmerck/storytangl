@@ -10,6 +10,7 @@ from enum import Enum, IntEnum
 from tangl.utils.enum_plus import EnumPlusMixin
 
 class HairColor(EnumPlusMixin, Enum):
+    # Common
     BLONDE = GOLD = "blonde"
     BRUNETTE = BROWN = "brown"  # n
     DARK = "dark"               # k
@@ -18,6 +19,7 @@ class HairColor(EnumPlusMixin, Enum):
     WHITE = "white"
     AUBURN = "auburn"
 
+    # Exotic
     BLUE = NAVY = "blue"
     PINK = "pink"
     PURPLE = "purple"
@@ -26,6 +28,7 @@ class HairColor(EnumPlusMixin, Enum):
     CANDYFLOSS = "candyfloss"   # pink and periwinkle
     WATERMELON = "watermelon"   # pink and sea green
 
+    # Custom
     HIGHLIGHTS = "highlights"   # use tags to inspect
     MULTICOLOR = "multicolor"   # use tags to inspect
     OTHER = "other"             # use tags to inspect
@@ -37,7 +40,7 @@ class SkinTone(EnumPlusMixin, Enum):
     DARK = "dark"
     ASIAN = "asian"
     EURASIAN = "eurasian"
-    LATINA  = CAFE = "latina"
+    LATIN = CAFE = "latin"
     SEMITIC = "semitic"
     AMERIND = "amerind"
 
@@ -57,18 +60,19 @@ class BodyPhenotype(EnumPlusMixin, Enum):
     TRIANGLE             = PEAR       = "pear"      # 1/1/2, high bmi, low ch
 
     CURVY_PLUS                        = "curvy+"    # 3/1/3, augmented
-    ROUND_PLUS                        = "round+"    # 1/3/1, obese
-    FIT_PLUS = CUT                    = "fit+"      # 3/1/1, jacked
+    ROUND_PLUS                        = "round+"    # 1/3/1, very heavy
+    FIT_PLUS = CUT = SWOLE            = "fit+"      # 3/1/1, jacked
 
     OTHER = "other"                                 # use tags to inspect
 
-class Height(EnumPlusMixin, Enum):
-    VERY_SHORT = "very_short"
-    SHORT = "short"
-    AVERAGE = "average"
-    TALL = "tall"
-    VERY_TALL = "very_tall"
-    OTHER = "other"
+class Height(EnumPlusMixin, IntEnum):
+    # Could map this to a 5-pt fv scale as in progression
+    VERY_SHORT = 1
+    SHORT = 2
+    AVERAGE = 3
+    TALL = 4
+    VERY_TALL = 5
+    OTHER = 6
 
 class EyeColor(EnumPlusMixin, Enum):
     BLUE = "blue"
@@ -97,12 +101,12 @@ class HairStyle(EnumPlusMixin, Enum):
 
     PONY_TAIL = "pony_tail"
     LONG_PONY_TAIL = "long_pony_tail"
-    PIGTAILS = "pigtails"      # double pony, twin tails for double braids
+    PIGTAILS = "pigtails"         # double pony, use "twin tails" for double braids
     LONG_PIGTAILS = "long_pigtails"
 
     BRAID = "braid"
     LONG_BRAID = "long_braid"
-    TWIN_TAILS = "twin_tails"  # double braid, pigtails for double pony
+    TWIN_TAILS = "twin_tails"     # double braid, use pigtails for double pony
     CORNROWS = "cornrows"
 
     BUN = "bun"
@@ -113,6 +117,7 @@ class HairStyle(EnumPlusMixin, Enum):
     OTHER = "other"                                 # use tags to inspect
 
 class PresentingGender(EnumPlusMixin, Enum):
+    # This should map to lang.gender
     XY = MASCULINE = "masculine"
     XX = FEMININE = "feminine"
     XXY = ANDROGYNOUS = "androgynous"

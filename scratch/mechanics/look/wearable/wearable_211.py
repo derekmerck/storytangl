@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 class BodyRegion(EnumPlusMixin, Enum):
+    # this is in body-region now
     HEAD = "head"
     UPPER = TOP = "upper"
     LOWER = BOTTOM = "lower"
@@ -59,9 +60,9 @@ class WearableState(EnumPlusMixin, Enum):
 @functools.total_ordering
 class WearableCondition(EnumPlusMixin, Enum):
 
-    DESTROYED = 1
-    DAMAGED = 2
-    WORN = 3     # or MENDED if previously damaged and repaired
+    DESTROYED = 1  # implies REMOVED but still tracked for state
+    DAMAGED = 2    # implies TORN
+    WORN = 3       # or MENDED if previously damaged and repaired
     # MENDED
     FINE = 4
     NEW = 5

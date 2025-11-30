@@ -3,6 +3,8 @@ from tangl.vm.vm_dispatch import on_get_ns
 from tangl.story.episode import Block, Action
 from tangl.mechanics.games import Game
 
+# "ChallengeBlock" is now reserved for 'stat challenge', interactive games are just "GameBlocks"
+
 class ChallengeBlock(Block):
     """
     Challenge blocks are wrappers for "Game" interactions.

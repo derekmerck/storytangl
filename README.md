@@ -370,7 +370,7 @@ The server app also bundles a simple static file server for exposing world and s
 For direct integration:
 
 ```python
-from uuid import UUID
+import uuid
 
 from tangl.service.orchestrator import Orchestrator
 from tangl.service.controllers.runtime_controller import RuntimeController
@@ -381,7 +381,7 @@ orchestrator = Orchestrator()
 orchestrator.register_controller(WorldController())
 orchestrator.register_controller(RuntimeController())
 
-user_id = UUID("00000000-0000-0000-0000-000000000000")  # Replace with a real user id
+user_id = uuid.uuid4()
 
 # Load a world
 world_info = orchestrator.execute(
@@ -518,7 +518,7 @@ A: No idea.  It's pretty straightforward to create a reference implementation on
 A: Your missing keys are always in the last place you look.
 
 **Q: Why not use [existing IF tool]?**  
-A: Existing tools are great for their use cases. StoryTangl actually emerged from exploring [Inform][], [Twine][]/Sugarcube, [Ink][], [Ren'Py][], kirikiri, [RPGmaker][], and others. and other interactive fiction platforms.  I adopted or hope to adopt many of the strengths of those systems here.  But StoryTangl comes from a fundamentally different design space: graph-native, planning-first, with best-effort separation between the semantic story space representation and the syntactic presentation layer.
+A: Existing tools are great for their use cases. StoryTangl actually emerged from exploring [Inform][], [Twine][]/Sugarcube, [Ink][], [Ren'Py][], kirikiri, [RPGmaker][], and other interactive fiction platforms.  I have adopted or hope to adopt many of the strengths of those systems here.  But StoryTangl comes from a fundamentally different design space: graph-native, planning-first, reproducible, with best-effort separation between the semantic story space representation and the syntactic presentation layer.
 
 [Inform]: https://ganelson.github.io/inform-website/
 [Ink]: https://www.inklestudios.com/ink/
@@ -527,13 +527,13 @@ A: Existing tools are great for their use cases. StoryTangl actually emerged fro
 [RPGMaker]: https://www.rpgmakerweb.com/
 
 **Q: What's the performance like?**  
-A: Optimized for clarity, not speed. It is intended as a reference implementation and platform for theoretical exploration, so I intentionally avoid optimizations that can interfere with simple reasoning about the underlying entities and behaviors. Production systems can borrow the architecture and optimize as needed.
+A: Optimized for _clarity_ and _correctness_, not speed. It is intended as a reference implementation and platform for theoretical exploration, so I intentionally avoid optimizations that might interfere with simple reasoning about the underlying entities and behaviors. Production systems can borrow the architecture and optimize as needed.
 
 **Q: Can I use this for my game?**  
-A: If you understand the architecture and have convinced yourself that it's stable enough, sure. But, be aware that it is designed as a reference, not a turn-key solution.  And although the library API has been fairly stable for a couple of years now, it may evolve as new versions require new endpoints. 
+A: If you understand the architecture and think that it's stable enough, sure. But, be aware that it is designed as a reference, not a turn-key solution.  And although the library API has been fairly stable for a couple of years now, it may evolve as new versions require new endpoints. 
 
 **Q: How do I learn more?**  
-A: Read `AGENTS.md` first as it tracks the current state fairly closely.  Then explore `docs/source` and study the tests. The codebase itself is heavily documented and meant to be understood by interacting with it.
+A: Read `AGENTS.md` first as it tracks the current conventions fairly closely.  Then explore `docs/source` and study the tests. The codebase itself is heavily documented and meant to be understood by interacting with it.
 
 ---
 

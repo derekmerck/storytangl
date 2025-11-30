@@ -38,6 +38,7 @@ dress:
 exclusive_dress:
   from: dress
   tags: [ exclusive ]
+  # exclusive tag means it never appears in a randomly generated collection
 
 undershirt:
   covers: [upper]

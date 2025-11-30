@@ -46,8 +46,7 @@ class Look(Concept):
         ...
 
     # body type vector for more specific stats:
-    sz: float = 0.5      # size scalar for aab gens, f: (0-0.7), m: (0.3-1.0)
-    ch: float = 0.5      # average for age/sex, m: (0-0.2), f: (0.2-1.0+)
+    sz: float = 0.5      # size scalar for relative renders, f: (0-0.7), m: (0.3-1.0)
     fit: float = 0.5     # average bmi, fit < 0.3, heavy > 0.7
 
     # face
@@ -66,7 +65,7 @@ class Look(Concept):
 
     preg: bool = False
 
-    # todo: handle lipstick, makeup?
+    # todo: handle makeup similar to ornament?
 
     # def get_media_spec(self, spec_type: Type[MediaSpec] = MediaSpec) -> MediaSpec:
     #     ...
@@ -87,6 +86,7 @@ class HasLook(Entity):
 
 class FantasticLook(Look):
     # For creatures with unusual features
+    # Quite probably need a BodyPart map for this
 
     body_type: str = None  # human, snakelike, taur, robot
 

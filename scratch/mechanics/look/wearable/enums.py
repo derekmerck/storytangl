@@ -4,6 +4,7 @@ from tangl.utils.enum_plus import EnumPlusMixin
 
 
 class WearableLayer(EnumPlusMixin, IntEnum):
+    # These are just quantized levels on an integer scale
 
     BODY  = 20
     INNER = 40     # hides body
@@ -16,4 +17,4 @@ class WearableState(IntEnum):
     ON   = 100     # being worn
     OPEN = 50      # undone or partially removed
     TORN = 30      # variant for "open"
-    OFF  = 10      # removed
+    OFF  = 10      # removed, but still part of the outfit for tracking
