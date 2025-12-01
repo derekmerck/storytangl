@@ -101,6 +101,10 @@ one of the above base types.
 - Content YAML files under `worlds/` and `engine/src/tangl/mechanics/**` provide data
   for tests and demos. Maintain schema consistency and keep narrative examples
   inclusive and lore-friendly.
+- Default world bundles live under a ``world.yaml`` manifest with optional
+  ``content/``, ``media/``, and ``domain/`` folders. See
+  ``docs/src/designer/world_bundles.rst`` for the baseline layouts and builtin loader
+  formats (`builtin:simple_single_file`, `builtin:simple_tree`).
 
 ## Configuration
 - StoryTangl uses Dynaconf via ``tangl.config.settings`` and ``defaults.toml``.

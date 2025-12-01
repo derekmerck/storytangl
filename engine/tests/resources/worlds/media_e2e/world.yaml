@@ -1,10 +1,19 @@
-uid: media_e2e
-label: "Media E2E Test"
-version: "1.0"
+id: media_e2e
+title: "Media E2E Test"
+kind: test
 
-scripts: story.yaml
-media_dir: media
+domain:
+  module: tangl.story.fabula.world
 
-metadata:
-  title: "Media E2E Test"
-  author: "Test Suite"
+media:
+  roots:
+    - media
+
+scripts:
+  - id: media_e2e
+    label: "Media E2E Story"
+    loader: builtin:simple_single_file
+    source:
+      type: file
+      path: story.yaml
+      entry_label: tavern_entrance

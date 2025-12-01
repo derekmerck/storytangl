@@ -1,0 +1,44 @@
+id: sample_world
+title: "Sample World"
+kind: demo
+
+domain:
+  module: tangl.demo.domain
+  setup: tangl.demo.domain:register_domain
+
+media:
+  roots:
+    - media
+  registry: tangl.demo.media:registry
+
+templates:
+  registry: tangl.story.render.templates:registry
+
+assets:
+  registry: tangl.story.assets:registry
+
+scripts:
+  - id: opening
+    label: "Opening Scene"
+    loader: builtin:simple_single_file
+    source:
+      type: file
+      path: scripts/opening.yaml
+      format: single_file
+      entry_label: start
+  - id: branching
+    label: "Branching Story"
+    loader: module:custom.loader
+    source:
+      type: tree
+      root: scripts/branches
+      entry:
+        block_label: intro
+      conventions:
+        blocks:
+          obj_cls: tangl.story.Block
+          glob: "*.yaml"
+          scope: narrative
+      nested:
+        scenes:
+          obj_cls: tangl.story.Scene

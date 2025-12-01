@@ -1,64 +1,41 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
-from tangl.story.fabula.world_bundle import WorldBundle
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.compilers.world_loader import load_scripts, load_world_config
+from tangl.story.fabula.world_loader import build_world_from_bundle
 
 
-def test_bundle_loads_from_directory(media_mvp_path: Path) -> None:
-    bundle = WorldBundle.load(media_mvp_path)
+def test_load_world_from_bundle(add_worlds_to_sys_path) -> None:
+    cfg, root = load_world_config("media_mvp")
+    assert cfg.id == "media_mvp"
+    assert root.name == "media_mvp"
 
-    assert bundle.manifest.uid == "media_mvp"
-    assert bundle.media_dir.exists()
-    assert len(bundle.script_paths) > 0
+    scripts = load_scripts(cfg, root)
+    script = scripts[cfg.scripts[0].id]
+    assert script.metadata.entry_label == "start"
+    assert "start" in script.blocks
 
-
-def test_loader_discovers_bundles(tmp_path: Path) -> None:
-    (tmp_path / "world1").mkdir()
-    (tmp_path / "world1" / "world.yaml").write_text(
-        """
-        uid: world1
-        label: "World One"
-        scripts: story.yaml
-        """,
-        encoding="utf-8",
-    )
-
-    (tmp_path / "world2").mkdir()
-    (tmp_path / "world2" / "world.yaml").write_text(
-        """
-        uid: world2
-        label: "World Two"
-        scripts: story.yaml
-        """,
-        encoding="utf-8",
-    )
-
-    (tmp_path / "not_a_world").mkdir()
-
-    loader = WorldLoader([tmp_path])
-    bundles = loader.discover_bundles()
-
-    assert len(bundles) == 2
-    assert "world1" in bundles
-    assert "world2" in bundles
-
-
-def test_loader_creates_world_with_media_registry(media_mvp_path: Path) -> None:
-    loader = WorldLoader([media_mvp_path.parent])
-    loader.discover_bundles()
-
-    world = loader.load_world("media_mvp")
-
+    world, graphs = build_world_from_bundle("media_mvp")
     assert getattr(world, "uid", None) == "media_mvp"
-    assert hasattr(world, "_bundle")
-    assert world.resource_manager.registry
-
+    assert graphs[cfg.scripts[0].id].initial_cursor_id is not None
     rit = world.resource_manager.get_rit("test_image.svg")
     assert rit is not None
+    assert world.media_registry is world.resource_manager.registry
 
-    with pytest.raises(ValueError):
-        loader.load_world("missing_world")
+
+def test_build_world_from_demo_bundle(add_worlds_to_sys_path) -> None:
+    cfg, root = load_world_config("demo_world")
+
+    assert cfg.id == "demo_world"
+    assert root.name == "demo_world"
+
+    scripts = load_scripts(cfg, root)
+    assert set(scripts) == {"demo_story"}
+
+    world, graphs = build_world_from_bundle("demo_world")
+
+    assert world.uid == cfg.id
+    assert world.script_manager.master_script.metadata.start_at == "start"
+
+    start_node = graphs["demo_story"].get(graphs["demo_story"].initial_cursor_id)
+    assert start_node is not None
+    assert start_node.label == "start"

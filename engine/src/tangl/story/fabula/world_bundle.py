@@ -1,51 +1,48 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
-import yaml
-
-from .world_manifest import WorldManifest
+from tangl.compilers.world_config import FileSource, WorldConfig
+from tangl.compilers.world_loader import load_world_config
 
 
 class WorldBundle:
-    """Locate resources for a loaded world bundle."""
+    """
+    Locate resources for a loaded world bundle using compiler utilities.
 
-    def __init__(self, bundle_root: Path, manifest: WorldManifest) -> None:
+    This class exists as a lightweight compatibility shim for legacy call
+    sites. New code should prefer :func:`tangl.story.fabula.world_loader.build_world_from_bundle`
+    to construct a :class:`~tangl.story.fabula.world.World` and story graphs
+    directly from the compiler IR.
+    """
+
+    def __init__(self, bundle_root: Path, config: WorldConfig) -> None:
         self.bundle_root = bundle_root
-        self.manifest = manifest
+        self.config = config
 
     @property
-    def media_dir(self) -> Path:
-        """Absolute path to the bundle's media directory."""
+    def media_dir(self) -> Path | None:
+        """Absolute path to the bundle's media directory if configured."""
 
-        return self.bundle_root / self.manifest.media_dir
+        if not self.config.media or not self.config.media.roots:
+            return None
+
+        return self.bundle_root / self.config.media.roots[0]
 
     @property
     def script_paths(self) -> list[Path]:
-        """Absolute paths to all script files declared in the manifest."""
+        """Absolute paths to any file-based scripts declared in the manifest."""
 
-        return [self.bundle_root / script for script in self.manifest.scripts]
+        paths: list[Path] = []
+        for script_cfg in self.config.scripts:
+            source = script_cfg.source
+            if isinstance(source, FileSource):
+                paths.append(self.bundle_root / source.path)
+        return paths
 
     @classmethod
-    def load(cls, bundle_root: Path) -> "WorldBundle":
-        """Load a world bundle from ``bundle_root`` containing ``world.yaml``."""
+    def load(cls, world_pkg: str) -> "WorldBundle":
+        """Load a world bundle using compiler world configuration support."""
 
-        manifest_path = bundle_root / "world.yaml"
-        if not manifest_path.exists():
-            msg = f"No world.yaml at {bundle_root}"
-            raise FileNotFoundError(msg)
-
-        with open(manifest_path, encoding="utf-8") as manifest_file:
-            manifest_data: Any = yaml.safe_load(manifest_file)
-
-        manifest = WorldManifest.model_validate(manifest_data)
-
-        if manifest.uid != bundle_root.name:
-            msg = (
-                f"Manifest uid '{manifest.uid}' must match directory name "
-                f"'{bundle_root.name}'"
-            )
-            raise ValueError(msg)
-
-        return cls(bundle_root, manifest)
+        config, bundle_root = load_world_config(world_pkg)
+        return cls(bundle_root=bundle_root, config=config)

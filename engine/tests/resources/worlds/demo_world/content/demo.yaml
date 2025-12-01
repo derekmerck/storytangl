@@ -1,0 +1,20 @@
+id: demo_story
+title: "Demo Story"
+entry: start
+
+actors:
+  hero:
+    name: "Hero"
+
+locations:
+  town:
+    name: "Town"
+
+blocks:
+  start:
+    text: "You wake up."
+    choices:
+      - to: street
+        text: "Go outside"
+  street:
+    text: "You are in the street."

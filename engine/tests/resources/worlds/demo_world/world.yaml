@@ -1,19 +1,15 @@
-id: media_mvp
-title: "Media MVP"
-kind: test
+id: demo_world
+title: "Demo World"
+kind: example
 
 domain:
   module: tangl.story.fabula.world
 
-media:
-  roots:
-    - media
-
 scripts:
-  - id: media_mvp
-    label: "Media MVP Story"
+  - id: demo_story
+    label: "Demo Story"
     loader: builtin:simple_single_file
     source:
       type: file
-      path: story.yaml
+      path: content/demo.yaml
       entry_label: start

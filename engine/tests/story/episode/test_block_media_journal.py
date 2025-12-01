@@ -1,18 +1,17 @@
 from tangl.journal.media import MediaFragment
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.story.fabula.world_loader import build_world_from_bundle
 from tangl.vm import ResolutionPhase as P
 from tangl.vm.frame import Frame
 
 
-def _load_media_world(media_mvp_path):
-    loader = WorldLoader([media_mvp_path.parent])
-    loader.discover_bundles()
-    return loader.load_world("media_mvp")
+def _load_media_world(add_worlds_to_sys_path):
+    world, _ = build_world_from_bundle("media_mvp")
+    return world
 
 
-def test_block_emits_media_fragment(media_mvp_path):
-    world = _load_media_world(media_mvp_path)
+def test_block_emits_media_fragment(add_worlds_to_sys_path):
+    world = _load_media_world(add_worlds_to_sys_path)
     story = world.create_story("Media MVP Story")
     block = story.get(story.initial_cursor_id)
 

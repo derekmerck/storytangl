@@ -1,18 +1,12 @@
-label: "Media E2E Story"
-metadata:
-  title: "Media E2E Story"
-  author: "Test Suite"
-
-scenes:
-  intro:
-    blocks:
-      tavern_entrance:
-        content: "You enter the warm, bustling tavern."
-        media:
-          - name: tavern.svg
-            media_role: narrative_im
-      forest_path:
-        content: "You step onto a shadowy forest path."
-        media:
-          - name: forest.svg
-            media_role: narrative_im
+entry: tavern_entrance
+blocks:
+  tavern_entrance:
+    content: "You enter the warm, bustling tavern."
+    media:
+      - name: tavern.svg
+        media_role: narrative_im
+  forest_path:
+    content: "You step onto a shadowy forest path."
+    media:
+      - name: forest.svg
+        media_role: narrative_im

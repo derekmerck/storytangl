@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.media.media_resource.resource_manager import ResourceManager
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.story.fabula.world_loader import build_world_from_bundle
 from tangl.story.fabula.world import World
 from tangl.story.episode.block import Block
 from tangl.story.story_graph import StoryGraph
@@ -30,14 +30,13 @@ class _StubWorld:
         return {"name": self.name}
 
 
-def _load_media_world(media_mvp_path: Path) -> World:
-    loader = WorldLoader([media_mvp_path.parent])
-    loader.discover_bundles()
-    return loader.load_world("media_mvp")
+def _load_media_world(add_worlds_to_sys_path) -> World:
+    world, _ = build_world_from_bundle("media_mvp")
+    return world
 
 
-def test_block_media_dependencies_are_attached(media_mvp_path) -> None:
-    world = _load_media_world(media_mvp_path)
+def test_block_media_dependencies_are_attached(add_worlds_to_sys_path) -> None:
+    world = _load_media_world(add_worlds_to_sys_path)
     story = world.create_story("Media MVP Story")
 
     block = story.get(story.initial_cursor_id)
@@ -49,8 +48,8 @@ def test_block_media_dependencies_are_attached(media_mvp_path) -> None:
     assert dep.destination is None
 
 
-def test_planning_binds_media_deps_to_registry(media_mvp_path) -> None:
-    world = _load_media_world(media_mvp_path)
+def test_planning_binds_media_deps_to_registry(add_worlds_to_sys_path) -> None:
+    world = _load_media_world(add_worlds_to_sys_path)
     story = world.create_story("Media MVP Story")
     block = story.get(story.initial_cursor_id)
 

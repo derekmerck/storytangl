@@ -11,7 +11,8 @@ from pydantic import BaseModel, ValidationError
 
 from tangl.type_hints import StringMap, UnstructuredData
 from tangl.ir.core_ir import MasterScript
-from tangl.ir.story_ir import StoryScript
+from tangl.ir.story_ir import StoryScript as StoryScriptModel
+from tangl.story.ir import StoryScript
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -71,11 +72,37 @@ class ScriptManager:
     @classmethod
     def from_data(cls, data: UnstructuredData) -> Self:
         try:
-            ms: MasterScript = StoryScript(**data)
+            ms: MasterScript = StoryScriptModel(**data)
         except ValidationError:
             ms = MasterScript(**data)
         # todo: Want to call "on new script" here too.
         return cls(master_script=ms)
+
+    @classmethod
+    def from_story_script(cls, script: StoryScript) -> Self:
+        """
+        New constructor: no disk I/O, just IR -> graph.
+        For now, delegate to existing constructor / normalization logic.
+        """
+
+        script_data: dict[str, Any] = {
+            "label": script.metadata.label,
+            "metadata": {
+                "title": script.metadata.label,
+                "author": script.metadata.world_id,
+                "start_at": script.metadata.entry_label,
+                "id": script.metadata.id,
+            },
+            "scenes": {"main": {"blocks": script.blocks}},
+        }
+        if script.actors:
+            script_data["actors"] = script.actors
+        if script.locations:
+            script_data["locations"] = script.locations
+        if script.resources:
+            script_data["assets"] = script.resources
+        master_script = StoryScriptModel(**script_data)
+        return cls(master_script=master_script)
 
     @classmethod
     def from_files(cls, fp: Path) -> Self:
