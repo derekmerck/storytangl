@@ -27,7 +27,7 @@ Repository    = "https://github.com/tangldev/storytangl"
 "tangl-docs" = "sphinx.cmd.build:main"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.13"
 pydantic = "^2.10.6"
 shortuuid = "^1.0.13"
 dynaconf = "^3.2.7"

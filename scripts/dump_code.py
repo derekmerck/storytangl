@@ -19,6 +19,8 @@ tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
 scratch_root = project_root / "scratch"
 
+cwx_root = project_root.parent / "carwars-gamebooks/worlds/cwx"
+
 outfile_dir = project_root / "tmp/dumps"
 
 def get_tree(root: Path, include_notes: bool = False):
@@ -43,6 +45,7 @@ def process_directory(root: Path,
     print( root )
     data = {}
     files = list(root.glob("**/*.py"))  # + list(root.glob("**/*.md"))
+    # print( files )
     if include_notes:
         files = files + list(root.glob("**/*.md"))
         files = files + list(root.glob("**/*.yaml"))
@@ -72,11 +75,14 @@ def process_directory(root: Path,
     content_hash_b64 = b64encode(content_hash).decode("utf8").strip("=")
 
     def _fp(fn):
-        result = Path(fn).relative_to(project_root)
-        for p in ['engine/src/', 'engine/tests/', 'scratch/legacy/']:
-            if p in str(result):
-                result = result.relative_to(p)
-        return result
+        try:
+            result = Path(fn).relative_to(project_root)
+            for p in ['engine/src/', 'engine/tests/', 'scratch/legacy/']:
+                if p in str(result):
+                    result = result.relative_to(p)
+            return result
+        except ValueError:
+            return fn
 
         # if 'engine/src/' in str(result):
         #     result = result.relative_to('engine/src/')
@@ -200,3 +206,5 @@ if __name__ == "__main__":
     process_directory(scratch_root / "mechanics/look", "tangl3x_look_archive.py", include_notes=True)
     process_directory(scratch_root / "compilers/md2yaml", "tangl3x_md2yaml_archive.py", include_notes=True)
     process_directory(scratch_root / "old/docs", "tanglxx_docs_archive.py", include_notes=True)
+
+    process_directory(cwx_root / "old", "tangl2x_cwx_archive.py")
