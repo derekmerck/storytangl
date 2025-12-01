@@ -19,7 +19,7 @@ tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
 scratch_root = project_root / "scratch"
 
-cwx_root = project_root.parent / "carwars-gamebooks/worlds/cwx"
+cwx_root = project_root.parent / "carwars-gamebooks/carwars"
 
 outfile_dir = project_root / "tmp/dumps"
 
@@ -62,7 +62,10 @@ def process_directory(root: Path,
                 try:
                     name = f.relative_to(pkg_root)
                 except ValueError:
-                    name = f.relative_to(project_root)
+                    try:
+                        name = f.relative_to(project_root)
+                    except:
+                        name = f
             content = fp.read()
             if f.suffix in [".md", ".csv", ".txt", ".json", ".rst", ".yaml"]:
                 content = '"""\n' + content + '"""\n'
@@ -159,6 +162,9 @@ if __name__ == "__main__":
     process_directory(pkg_root / 'story',
                       "tangl37_story_archive.py",
                       include_notes=True)
+    process_directory(pkg_root / 'story/fabula',
+                      "tangl37_fabula_archive.py",
+                      include_notes=True)
     process_directory(pkg_root / 'ir', "tangl37_ir_archive.py")
     process_directory(pkg_root / 'journal', "tangl37_journal_archive.py")
 
@@ -207,4 +213,5 @@ if __name__ == "__main__":
     process_directory(scratch_root / "compilers/md2yaml", "tangl3x_md2yaml_archive.py", include_notes=True)
     process_directory(scratch_root / "old/docs", "tanglxx_docs_archive.py", include_notes=True)
 
-    process_directory(cwx_root / "old", "tangl2x_cwx_archive.py")
+    process_directory(cwx_root / "domain", "tangl2x_cwx_archive.py",
+                      prepend_files=[cwx_root / 'world.yaml'])

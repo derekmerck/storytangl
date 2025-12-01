@@ -30,7 +30,7 @@ class SystemController(HasApiEndpoints):
 
     @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, response_type=ResponseType.INFO)
     @staticmethod
-    def get_system_info(**kwargs) -> SystemInfo:
+    def get_system_info(*args, **kwargs) -> SystemInfo:
         try:
             from tangl.world import World
             num_worlds = len(World._instances)
@@ -59,7 +59,7 @@ class SystemController(HasApiEndpoints):
                           method_type=MethodType.UPDATE,
                           response_type=ResponseType.RUNTIME)
     @staticmethod
-    def reset_system(hard: bool = False) -> RuntimeInfo:
+    def reset_system(*args, hard: bool = False, **kwargs) -> RuntimeInfo:
         """
         Reload all worlds.
 
