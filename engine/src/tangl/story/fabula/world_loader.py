@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from tangl.compilers.world_loader import load_scripts, load_world_config
 from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
-from tangl.story.story_graph import StoryGraph
+
+if TYPE_CHECKING:
+    from tangl.story.story_graph import StoryGraph
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ def _build_resource_manager(world_root: Path, media_roots: list[str] | None) -> 
     return resource_manager
 
 
-def build_world_from_bundle(world_pkg: str) -> tuple[World, dict[str, StoryGraph]]:
+def build_world_from_bundle(world_pkg: str) -> tuple[World, dict[str, "StoryGraph"]]:
     cfg, world_root = load_world_config(world_pkg)
     scripts_ir = load_scripts(cfg, world_root)
 
