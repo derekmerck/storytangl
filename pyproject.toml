@@ -22,6 +22,7 @@ Documentation = "https://readthedocs.org/tangldev/storytangl/docs"
 Repository    = "https://github.com/tangldev/storytangl"
 
 [tool.poetry.scripts]
+"tangl-info" = "tangl.cl_utils.info:main"
 "tangl-cli" = "tangl.cli.__main__:main"
 "tangl-serve" = "tangl.rest.__main__:main"
 "tangl-docs" = "sphinx.cmd.build:main"

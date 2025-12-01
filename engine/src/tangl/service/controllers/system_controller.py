@@ -30,7 +30,7 @@ class SystemController(HasApiEndpoints):
 
     @ApiEndpoint.annotate(access_level=AccessLevel.PUBLIC, response_type=ResponseType.INFO)
     @staticmethod
-    def get_system_info(self, **kwargs) -> SystemInfo:
+    def get_system_info(**kwargs) -> SystemInfo:
         try:
             from tangl.world import World
             num_worlds = len(World._instances)
