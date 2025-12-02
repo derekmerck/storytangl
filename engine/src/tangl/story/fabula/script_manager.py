@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,9 +9,14 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ValidationError
 
-from tangl.type_hints import StringMap, UnstructuredData
-from tangl.ir.core_ir import MasterScript
+from tangl.core.registry import Registry
+from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from tangl.ir.story_ir import StoryScript
+from tangl.ir.story_ir.actor_script_models import ActorScript
+from tangl.ir.story_ir.location_script_models import LocationScript
+from tangl.ir.story_ir.scene_script_models import BlockScript
+from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.type_hints import StringMap, UnstructuredData
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -67,6 +72,7 @@ class ScriptManager:
                 },
             ),
         }
+        self.template_registry = self._compile_templates()
 
     @classmethod
     def from_data(cls, data: UnstructuredData) -> Self:
@@ -82,6 +88,139 @@ class ScriptManager:
         # todo: implement a file reader
         data = {}
         return cls.from_data(data)
+
+    def _compile_templates(self) -> Registry:
+        script = self.master_script
+        registry = Registry(label=f"{script.label}_templates")
+
+        def _extract_label(default: str | None, item: Any) -> str | None:
+            if isinstance(item, BaseScriptItem):
+                return item.label or item.get_label()
+            if isinstance(item, Mapping):
+                label_value = item.get("label")
+                if isinstance(label_value, str):
+                    return label_value
+            return default
+
+        def _determine_script_cls(payload: Mapping[str, Any]) -> type[BaseScriptItem]:
+            obj_cls = payload.get("obj_cls")
+            if isinstance(obj_cls, type) and issubclass(obj_cls, BaseScriptItem):
+                return obj_cls
+            if isinstance(obj_cls, str):
+                lowered = obj_cls.lower()
+                if "location" in lowered:
+                    return LocationScript
+                if "actor" in lowered:
+                    return ActorScript
+            return ActorScript
+
+        def _parse_template(label: str, raw_data: Any, scope: ScopeSelector | None) -> BaseScriptItem | None:
+            if isinstance(raw_data, BaseScriptItem):
+                template_cls: type[BaseScriptItem] = raw_data.__class__
+                fields_set = getattr(raw_data, "model_fields_set", set())
+                scope_specified = "scope" in fields_set
+                updates: dict[str, Any] = {}
+                if not raw_data.label and label:
+                    updates["label"] = label
+                if (
+                    scope is not None
+                    and not scope_specified
+                    and "scope" in template_cls.model_fields
+                ):
+                    updates["scope"] = scope
+                if updates:
+                    return raw_data.model_copy(update=updates)
+                return raw_data
+            if isinstance(raw_data, Mapping):
+                payload = dict(raw_data)
+                scope_specified = "scope" in raw_data
+            else:
+                logger.warning("Skipping template %s with unsupported payload %r", label, raw_data)
+                return None
+
+            payload.setdefault("label", label)
+            template_cls = _determine_script_cls(payload)
+            if (
+                scope is not None
+                and not scope_specified
+                and "scope" in template_cls.model_fields
+            ):
+                payload.setdefault("scope", scope.model_dump())
+
+            try:
+                template = template_cls.model_validate(payload)
+            except ValidationError as exc:
+                logger.warning("Skipping template %s due to validation error: %s", label, exc)
+                return None
+            return template
+
+        def _add_templates(templates: Mapping[str, Any] | None, scope: ScopeSelector | None) -> None:
+            if not templates:
+                return
+            if not isinstance(templates, Mapping):
+                logger.warning("Expected mapping for templates but received %r", type(templates))
+                return
+            for template_label, template_data in templates.items():
+                label_value = template_label if isinstance(template_label, str) else str(template_label)
+                template = _parse_template(label_value, template_data, scope)
+                if template is None or template.label is None:
+                    continue
+                existing = registry.find_one(label=template.label)
+                if existing is not None:
+                    logger.warning("Duplicate template label %s skipped", template.label)
+                    continue
+                try:
+                    registry.add(template)
+                except ValueError as exc:  # pragma: no cover - Registry guards
+                    logger.warning("Duplicate template %s skipped: %s", template.label, exc)
+
+        world_templates = getattr(script, "templates", None)
+        if isinstance(world_templates, Mapping):
+            _add_templates(world_templates, scope=None)
+        elif world_templates:
+            logger.warning("World templates should be a mapping; received %r", type(world_templates))
+
+        scenes = getattr(script, "scenes", None)
+        if isinstance(scenes, Mapping):
+            scene_items = scenes.items()
+        elif isinstance(scenes, list | tuple):
+            scene_items = ((getattr(scene, "label", None), scene) for scene in scenes)
+        else:
+            scene_items = ()
+
+        for scene_key, scene_obj in scene_items:
+            scene_label = _extract_label(scene_key if isinstance(scene_key, str) else None, scene_obj)
+            if scene_label is None:
+                continue
+            scene_templates = getattr(scene_obj, "templates", None)
+            if isinstance(scene_templates, Mapping):
+                _add_templates(scene_templates, scope=ScopeSelector(parent_label=scene_label))
+            elif scene_templates:
+                logger.warning(
+                    "Scene %s templates should be a mapping; received %r", scene_label, type(scene_templates)
+                )
+
+            blocks = getattr(scene_obj, "blocks", None)
+            if isinstance(blocks, Mapping):
+                block_items = blocks.items()
+            elif isinstance(blocks, list | tuple):
+                block_items = ((getattr(block, "label", None), block) for block in blocks)
+            else:
+                block_items = ()
+
+            for block_key, block_obj in block_items:
+                block_label = _extract_label(block_key if isinstance(block_key, str) else None, block_obj)
+                if block_label is None:
+                    continue
+                block_templates = getattr(block_obj, "templates", None)
+                if isinstance(block_templates, Mapping):
+                    _add_templates(block_templates, scope=ScopeSelector(source_label=block_label))
+                elif block_templates:
+                    logger.warning(
+                        "Block %s templates should be a mapping; received %r", block_label, type(block_templates)
+                    )
+
+        return registry
 
     def get_story_globals(self) -> StringMap:
         if self.master_script.locals:

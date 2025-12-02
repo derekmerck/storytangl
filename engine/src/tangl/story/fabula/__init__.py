@@ -47,10 +47,42 @@ start_node = story.get(story.initial_cursor_id)
 - `world.resource_manager`: Manage media files
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from .asset_manager import AssetManager
+from .domain_manager import DomainManager
+from .script_manager import ScriptManager
 from .world import World
-from .world_bundle import WorldBundle
-from .world_loader import WorldLoader
-from .world_manifest import WorldManifest
-from .world_bundle import WorldBundle
-from .world_loader import WorldLoader
-from .world_manifest import WorldManifest
+
+if TYPE_CHECKING:  # pragma: no cover - import side effects only for typing
+    from tangl.loaders.bundle import WorldBundle
+    from tangl.loaders.manifest import WorldManifest
+    from .world_loader import WorldLoader
+
+__all__ = [
+    "AssetManager",
+    "DomainManager",
+    "ScriptManager",
+    "World",
+    "WorldBundle",
+    "WorldLoader",
+    "WorldManifest",
+]
+
+
+def __getattr__(name: str):
+    if name == "WorldBundle":
+        from tangl.loaders.bundle import WorldBundle as Bundle
+
+        return Bundle
+    if name == "WorldManifest":
+        from tangl.loaders.manifest import WorldManifest as Manifest
+
+        return Manifest
+    if name == "WorldLoader":
+        from .world_loader import WorldLoader as Loader
+
+        return Loader
+    raise AttributeError(name)

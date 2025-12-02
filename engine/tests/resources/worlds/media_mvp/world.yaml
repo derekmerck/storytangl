@@ -1,5 +1,6 @@
-uid: media_mvp
-label: "Media MVP"
+label: media_mvp
 scripts: story.yaml
 media_dir: media
-author: "StoryTangl"
+metadata:
+  title: "Media MVP"
+  author: "StoryTangl"

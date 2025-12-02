@@ -44,7 +44,7 @@ def test_system_media_fallback(tmp_path, monkeypatch):
     media_frag = next(frag for frag in fragments if isinstance(frag, MediaFragment))
 
     controller = RuntimeController()
-    result = controller._dereference_media(media_frag, world_id=str(world.uid))
+    result = controller._dereference_media(media_frag, world_id=str(world.label))
 
     assert result["scope"] == "sys"
     assert result["url"].startswith("/media/sys/")

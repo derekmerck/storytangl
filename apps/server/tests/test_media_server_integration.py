@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from tangl.journal.media import MediaFragment
@@ -35,10 +37,10 @@ def test_media_story_round_trip(client: TestClient) -> None:  # noqa: PT004
     media_frag = next(frag for frag in fragments if isinstance(frag, MediaFragment))
 
     controller = RuntimeController()
-    deref = controller._dereference_media(media_frag, world_id=world.uid)
+    deref = controller._dereference_media(media_frag, world_id=world.label)
     media_url = deref["url"]
 
-    media_server.mount_world_media(media_server.app, bundle.manifest.uid, bundle.media_dir)
+    media_server.mount_world_media(media_server.app, bundle.manifest.label, bundle.media_dir)
 
     response = client.get(f"http://test{media_url}")
 
