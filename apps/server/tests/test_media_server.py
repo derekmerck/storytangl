@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,7 +20,7 @@ def _media_mvp_bundle() -> WorldBundle:
 @pytest.fixture()
 def media_client(client: TestClient) -> TestClient:  # noqa: PT004
     bundle = _media_mvp_bundle()
-    media_server.mount_world_media(media_server.app, bundle.manifest.uid, bundle.media_dir)
+    media_server.mount_world_media(media_server.app, bundle.manifest.label, bundle.media_dir)
     return client
 
 
