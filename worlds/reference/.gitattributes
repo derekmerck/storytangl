@@ -1,0 +1,4 @@
+# Reference world media override
+# Keep demo SVGs as regular text (not LFS)
+# This overrides the root **/media/** LFS rule
+media/**/*.svg -filter -diff -merge text

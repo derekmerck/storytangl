@@ -1,0 +1,22 @@
+label: reference
+
+metadata:
+  title: "The Crossroads Inn"
+  author: "StoryTangl Team"
+  version: "1.0.0"
+  description: >
+    A reference world demonstrating StoryTangl features including
+    multiple scenes, character interactions, state management,
+    and media integration.
+  
+  tags:
+    - reference
+    - tutorial
+    - complete-example
+  
+  ir_schema: "3.7"
+  license: "MIT"
+
+# Convention-based discovery (uncomment to be explicit)
+# scripts: script.yaml
+# media_dir: media

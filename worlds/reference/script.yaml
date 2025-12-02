@@ -1,0 +1,159 @@
+label: crossroads_inn
+
+metadata:
+  title: "The Crossroads Inn"
+  author: "StoryTangl Team"
+
+scenes:
+  prologue:
+    label: prologue
+    
+    templates:
+      aria:
+        obj_cls: "tangl.story.concepts.actor.actor.Actor"
+        name: "Aria"
+        tags: ["companion", "main"]
+    
+    blocks:
+      start:
+        label: start
+        content: |
+          The Crossroads Inn sits at the junction of three ancient roads.
+          Rain patters against the windows as you push open the heavy oak door.
+          
+          The common room is warm and inviting, lit by a crackling fireplace.
+          A few patrons sit scattered at wooden tables.
+        
+        media:
+          - name: tavern.svg
+            media_role: narrative_im
+        
+        locals:
+          companion_trust: 0
+          has_map: false
+        
+        actions:
+          - text: "Approach the fireplace"
+            successor: meet_aria
+          - text: "Talk to the innkeeper"
+            successor: innkeeper
+      
+      meet_aria:
+        label: meet_aria
+        content: |
+          You approach the fireplace. The cloaked figure looks up,
+          revealing sharp eyes and a weathered face.
+          
+          "Aria," she introduces herself simply. "Looking for work,
+          or just passing through?"
+        
+        media:
+          - name: companion.svg
+            media_role: character_portrait
+        
+        actions:
+          - text: "I'm looking for the Northern Pass"
+            successor: request_help
+          
+          - text: "Just warming up before moving on"
+            successor: start
+      
+      request_help:
+        label: request_help
+        content: |
+          Aria's expression softens slightly. "The Northern Pass?
+          Dangerous this time of year." She pauses. "But I know the way.
+          For the right price, I could guide you."
+        
+        actions:
+          - text: "Offer to split any treasure found"
+            successor: chapter1.trail_start
+          
+          - text: "Politely decline"
+            successor: start
+      
+      innkeeper:
+        label: innkeeper
+        content: |
+          The innkeeper, a portly man with a bushy mustache,
+          greets you warmly. "Welcome, traveler! What'll it be?"
+        
+        actions:
+          - text: "Ask about rumors"
+            successor: rumors
+          - text: "Return to the common room"
+            successor: start
+      
+      rumors:
+        label: rumors
+        content: |
+          "Well," the innkeeper leans in conspiratorially, "they say
+          the old fortress in the Northern Pass holds treasure beyond
+          measure. But the way is treacherous, and strange things
+          have been seen in those mountains..."
+        
+        actions:
+          - text: "Thank him and return"
+            successor: start
+  
+  chapter1:
+    label: chapter1
+    
+    blocks:
+      trail_start:
+        label: trail_start
+        content: |
+          You and Aria set out at dawn. The forest path is narrow
+          and overgrown, but she navigates it with practiced ease.
+        
+        media:
+          - name: forest.svg
+            media_role: narrative_im
+        
+        actions:
+          - text: "Continue deeper into the forest"
+            successor: forest_encounter
+      
+      forest_encounter:
+        label: forest_encounter
+        content: |
+          A fork in the path appears ahead. Aria pauses, studying
+          both options carefully.
+        
+        actions:
+          - text: "Take the left path (faster but riskier)"
+            successor: epilogue.left_path
+          - text: "Take the right path (safer but longer)"
+            successor: epilogue.right_path
+  
+  epilogue:
+    label: epilogue
+    
+    blocks:
+      left_path:
+        label: left_path
+        content: |
+          The left path proves treacherous. After a harrowing climb,
+          you reach the Pass, but Aria is impressed by your courage.
+        
+        actions:
+          - text: "Enter the fortress"
+            successor: end
+      
+      right_path:
+        label: right_path
+        content: |
+          The right path is longer but safer. You arrive at the Pass
+          as the sun sets, exhausted but unharmed.
+        
+        actions:
+          - text: "Make camp"
+            successor: end
+      
+      end:
+        label: end
+        content: |
+          The ancient fortress looms before you, silhouetted against
+          the evening sky. Your adventure is just beginning...
+          
+          [To be continued]

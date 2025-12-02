@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect x="50" y="100" width="300" height="150" fill="#8B4513" stroke="#654321" stroke-width="3"/>
+  <polygon points="50,100 200,50 350,100" fill="#A0522D"/>
+  <rect x="150" y="180" width="100" height="70" fill="#3E2723"/>
+  <circle cx="200" cy="215" r="3" fill="#FFD700"/>
+  <rect x="100" y="130" width="50" height="50" fill="#87CEEB" stroke="#654321" stroke-width="2"/>
+  <rect x="250" y="130" width="50" height="50" fill="#87CEEB" stroke="#654321" stroke-width="2"/>
+  <text x="200" y="280" text-anchor="middle" font-size="20" fill="#654321">The Crossroads Inn</text>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#87CEEB"/>
+  <ellipse cx="100" cy="250" rx="80" ry="50" fill="#228B22"/>
+  <rect x="90" y="200" width="20" height="100" fill="#654321"/>
+  <ellipse cx="250" cy="220" rx="100" ry="80" fill="#228B22"/>
+  <rect x="240" y="150" width="20" height="150" fill="#654321"/>
+  <ellipse cx="350" cy="260" rx="60" ry="40" fill="#228B22"/>
+  <rect x="345" y="220" width="10" height="80" fill="#654321"/>
+  <path d="M 50 280 Q 200 250 350 280" fill="none" stroke="#8B7355" stroke-width="30"/>
+  <text x="200" y="290" text-anchor="middle" font-size="16" fill="#333">The Forest Path</text>
+</svg>
