@@ -2,7 +2,7 @@ import pytest
 
 from tangl.journal.media import MediaFragment
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.service.world_registry import WorldRegistry
 from tangl.story.fabula.world import World
 from tangl.vm import ResolutionPhase as P
 from tangl.vm.frame import Frame
@@ -16,9 +16,8 @@ def clear_world_singleton():
 
 
 def _load_media_world(media_mvp_path):
-    loader = WorldLoader([media_mvp_path.parent])
-    loader.discover_bundles()
-    return loader.load_world("media_mvp")
+    registry = WorldRegistry([media_mvp_path.parent])
+    return registry.get_world("media_mvp")
 
 
 def test_block_emits_media_fragment(media_mvp_path):

@@ -6,6 +6,8 @@ from uuid import uuid4
 from tangl.story.concepts.actor.actor import Actor
 from tangl.story.concepts.actor.role import Role
 from tangl.story.episode.scene import Scene
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 
@@ -13,7 +15,14 @@ from tangl.story.fabula.world import World
 def _build_world(script: dict[str, Any]) -> World:
     World.clear_instances()
     manager = ScriptManager.from_data(script)
-    return World(label=f"world_{uuid4().hex}", script_manager=manager)
+    return World(
+        label=f"world_{uuid4().hex}",
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=manager.get_story_metadata(),
+    )
 
 
 def test_scene_roles_materialize_placeholders() -> None:

@@ -3,6 +3,8 @@
 from tangl.ir.core_ir import MasterScript, ScriptMetadata
 from tangl.ir.story_ir import ActorScript, LocationScript, StoryScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 
@@ -15,7 +17,14 @@ def test_world_initializes_template_registry_without_templates() -> None:
     manager = ScriptManager(master_script=master_script)
 
     try:
-        world = World(label="example", script_manager=manager)
+        world = World(
+            label="example",
+            script_manager=manager,
+            domain_manager=DomainManager(),
+            asset_manager=AssetManager(),
+            resource_manager=None,
+            metadata=manager.get_story_metadata(),
+        )
 
         assert world.template_registry.label == "example_templates"
         assert list(world.template_registry.find_all()) == []
@@ -62,7 +71,14 @@ def test_world_compiles_templates_with_scope_inference() -> None:
     manager = ScriptManager(master_script=script)
 
     try:
-        world = World(label="example", script_manager=manager)
+        world = World(
+            label="example",
+            script_manager=manager,
+            domain_manager=DomainManager(),
+            asset_manager=AssetManager(),
+            resource_manager=None,
+            metadata=manager.get_story_metadata(),
+        )
 
         templates = {template.label: template for template in world.template_registry.find_all()}
 

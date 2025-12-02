@@ -14,6 +14,8 @@ from tangl.service.response import ChoiceInfo, RuntimeInfo, StoryInfo
 from tangl.service.user.user import User
 from tangl.story.episode import Action, Block
 from tangl.story.story_graph import StoryGraph
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm import ChoiceEdge, Frame, Ledger, ResolutionPhase
@@ -43,7 +45,14 @@ def demo_world() -> World:
     )
     data = yaml.safe_load(script_path.read_text())
     script_manager = ScriptManager.from_data(data)
-    world = World(label="demo_world", script_manager=script_manager)
+    world = World(
+        label="demo_world",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
     yield world
     World.clear_instances()
 

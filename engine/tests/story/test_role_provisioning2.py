@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from tangl.story.concepts.actor.role import Role
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm.provision import (
@@ -41,7 +43,15 @@ def test_planner_provisions_role_from_existing_affordance() -> None:
     }
 
     World.clear_instances()
-    world = World(label="test", script_manager=ScriptManager.from_data(script))
+    script_manager = ScriptManager.from_data(script)
+    world = World(
+        label="test",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
     graph = world.create_story("story")
 
     bob = graph.find_one(label="bob")
@@ -99,7 +109,15 @@ def test_planner_provisions_role_from_template() -> None:
     }
 
     World.clear_instances()
-    world = World(label="test", script_manager=ScriptManager.from_data(script))
+    script_manager = ScriptManager.from_data(script)
+    world = World(
+        label="test",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
     graph = world.create_story("story")
 
     role = graph.find_one(is_instance=Role, label="bartender")

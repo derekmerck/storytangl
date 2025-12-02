@@ -1,20 +1,16 @@
 from pathlib import Path
 
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
 from tangl.rest import media_server
-from tangl.story.fabula.world_bundle import WorldBundle
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.service.world_registry import WorldRegistry
 
 
-def _media_mvp_bundle() -> WorldBundle:
+def _media_mvp_bundle():
     worlds_root = Path(__file__).resolve().parents[3] / "engine" / "tests" / "resources" / "worlds"
-    loader = WorldLoader([worlds_root])
-    bundles = loader.discover_bundles()
-    return bundles["media_mvp"]
+    registry = WorldRegistry([worlds_root])
+    return registry.bundles["media_mvp"]
 
 
 @pytest.fixture()

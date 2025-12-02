@@ -14,6 +14,8 @@ from tangl.type_hints import Identifier, UnstructuredData
 from tangl.core import BaseFragment, Graph
 from tangl.service.api_endpoint import ApiEndpoint, MethodType, AccessLevel, HasApiEndpoints, ResponseType
 from tangl.story.story_graph import StoryGraph
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.world import World
 from tangl.service.response.info_response import WorldInfo
 
@@ -149,7 +151,14 @@ class WorldController(HasApiEndpoints):
         if title is None:
             raise ValueError("World scripts _must_ contain a label or a metadata section with a title")
         label = sanitise_str(title).lower()
-        world = World(label=label, script_manager=script_manager)
+        world = World(
+            label=label,
+            script_manager=script_manager,
+            domain_manager=DomainManager(),
+            asset_manager=AssetManager(),
+            resource_manager=None,
+            metadata=script_manager.get_story_metadata(),
+        )
         return RuntimeInfo.ok(message="World loaded", world_label=world.label)
 
     @ApiEndpoint.annotate(

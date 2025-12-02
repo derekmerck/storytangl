@@ -146,7 +146,7 @@ class WorldCompiler:
         if bundle.domain_dir is None:
             return None
 
-        if str(bundle.domain_dir) not in sys.path:
-            sys.path.insert(0, str(bundle.domain_dir))
+        if str(bundle.bundle_root) not in sys.path:
+            sys.path.insert(0, str(bundle.bundle_root))
 
         return f"{bundle.manifest.label}.domain"

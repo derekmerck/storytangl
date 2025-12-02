@@ -5,7 +5,7 @@ import pytest
 
 from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.media.media_resource.resource_manager import ResourceManager
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.service.world_registry import WorldRegistry
 from tangl.story.fabula.world import World
 from tangl.story.episode.block import Block
 from tangl.story.story_graph import StoryGraph
@@ -39,9 +39,8 @@ class _StubWorld:
 
 
 def _load_media_world(media_mvp_path: Path) -> World:
-    loader = WorldLoader([media_mvp_path.parent])
-    loader.discover_bundles()
-    return loader.load_world("media_mvp")
+    registry = WorldRegistry([media_mvp_path.parent])
+    return registry.get_world("media_mvp")
 
 
 def test_block_media_dependencies_are_attached(media_mvp_path) -> None:

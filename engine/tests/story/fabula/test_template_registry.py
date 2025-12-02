@@ -10,6 +10,8 @@ import pytest
 from tangl.ir.core_ir.script_metadata_model import ScriptMetadata
 from tangl.ir.story_ir import ActorScript, BlockScript, LocationScript, SceneScript, StoryScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 
@@ -31,7 +33,14 @@ def build_world(story_data: dict[str, Any]) -> World:
 
     script = StoryScript.model_validate(story_data)
     manager = ScriptManager(master_script=script)
-    return World(label=story_data["label"], script_manager=manager)
+    return World(
+        label=story_data["label"],
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=story_data.get("metadata", {}),
+    )
 
 
 def _collect_templates(world: World) -> dict[str, ActorScript | LocationScript]:
@@ -154,7 +163,14 @@ def test_inline_templates_respect_explicit_none_scope() -> None:
     )
 
     manager = ScriptManager(master_script=script)
-    world = World(label="example", script_manager=manager)
+    world = World(
+        label="example",
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=manager.get_story_metadata(),
+    )
     templates = _collect_templates(world)
 
     inline_scene_template = templates["scene_guard"]
@@ -272,7 +288,14 @@ def test_inline_location_template_preserves_concrete_type() -> None:
         scenes={},
     )
     manager = ScriptManager(master_script=script)
-    world = World(label="example", script_manager=manager)
+    world = World(
+        label="example",
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=manager.get_story_metadata(),
+    )
 
     template = world.find_template("hideout")
     assert isinstance(template, LocationScript)

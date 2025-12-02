@@ -104,22 +104,31 @@ def test_resource_manager_index_and_lookup(tmp_path: Path):
         MediaRIT.clear_from_source_cache()
 
 
-def test_world_initializes_managers():
+def test_world_initializes_managers(tmp_path: Path):
     script_data = {
         "label": "test_script",
         "metadata": {"title": "Test Story", "author": "Author"},
     }
     script_manager = ScriptManager.from_data(script_data)
+    domain_manager = DomainManager()
+    asset_manager = AssetManager()
+    resource_manager = ResourceManager(tmp_path)
 
-    world = World(label="test_world", script_manager=script_manager)
+    world = World(
+        label="test_world",
+        script_manager=script_manager,
+        domain_manager=domain_manager,
+        asset_manager=asset_manager,
+        resource_manager=resource_manager,
+        metadata=script_manager.get_story_metadata(),
+    )
 
     try:
         assert world.script_manager is script_manager
-        assert isinstance(world.domain_manager, DomainManager)
-        assert isinstance(world.asset_manager, AssetManager)
-        assert isinstance(world.resource_manager, ResourceManager)
+        assert world.domain_manager is domain_manager
+        assert world.asset_manager is asset_manager
+        assert world.resource_manager is resource_manager
         assert world.metadata["title"] == "Test Story"
         assert world.name == "Test Story"
-        assert "countable" in world.asset_manager.countable_classes
     finally:
         World.clear_instances()

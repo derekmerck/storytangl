@@ -1,18 +1,40 @@
-"""World singleton coordinating managers for story construction."""
+"""World singleton coordinating managers for story construction.
+
+Examples
+--------
+Create worlds through the service registry in normal runtime flows:
+
+.. code-block:: python
+
+    from tangl.service.world_registry import WorldRegistry
+
+    registry = WorldRegistry()
+    world = registry.get_world("my_world")
+
+Tests can compile directly from bundles when bypassing discovery:
+
+.. code-block:: python
+
+    from pathlib import Path
+
+    from tangl.loaders import WorldBundle, WorldCompiler
+
+    bundle = WorldBundle.load(Path("tests/worlds/my_world"))
+    compiler = WorldCompiler()
+    world = compiler.compile(bundle)
+"""
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping
-from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
-from tangl.core.registry import Registry
 from tangl.core.singleton import Singleton
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
@@ -21,6 +43,7 @@ from tangl.ir.story_ir.scene_script_models import BlockScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
+from tangl.type_hints import UniqueLabel
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.provision.open_edge import Dependency
 
@@ -40,12 +63,13 @@ if TYPE_CHECKING:  # pragma: no cover - hinting only
     from tangl.media.media_resource.resource_manager import ResourceManager
     from tangl.story.episode.scene import Scene
     from tangl.story.story_graph import StoryGraph
+    from tangl.loaders import WorldBundle
 else:  # pragma: no cover - runtime alias
     StoryGraph = Graph
 
 
 class World(Singleton):
-    """World(label: str, script_manager: ScriptManager, ...)
+    """World(label: UniqueLabel, script_manager: ScriptManager, ...)
 
     Singleton container that aggregates the managers required to instantiate a
     story from a compiled script.
@@ -58,10 +82,11 @@ class World(Singleton):
 
     Key Features
     ------------
-    * **Four-manager architecture** – exposes script, domain, asset, and
-      resource managers as attributes.
-    * **Metadata capture** – caches script metadata for quick access (e.g. world
-      name).
+    * **Four-manager architecture** – requires explicit script, domain, asset,
+      and resource managers (resource manager may be ``None`` when media is
+      absent).
+    * **Metadata capture** – caches script metadata for quick access (e.g.
+      world name).
     * **Story factory hook** – :meth:`create_story` entry point for generating
       :class:`StoryGraph` instances (full implementation arrives in Phase 2).
 
@@ -82,39 +107,22 @@ class World(Singleton):
     def __init__(
         self,
         *,
-        label: str,
+        label: UniqueLabel,
         script_manager: ScriptManager,
-        domain_manager: Optional[DomainManager] = None,
-        asset_manager: Optional[AssetManager] = None,
-        resource_manager: Optional["ResourceManager"] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        domain_manager: DomainManager,
+        asset_manager: AssetManager,
+        resource_manager: "ResourceManager" | None,
+        metadata: dict[str, Any],
     ) -> None:
         super().__init__(label=label)
         self.script_manager = script_manager
-        self.domain_manager = domain_manager or DomainManager()
-        self.asset_manager = asset_manager or AssetManager()
-        if resource_manager is None:
-            try:
-                from tangl.media.media_resource.resource_manager import ResourceManager
-            except ModuleNotFoundError:  # pragma: no cover - optional media dependency
-                resource_manager = None
-            else:
-                resource_manager = ResourceManager(Path("."))
-
+        self.domain_manager = domain_manager
+        self.asset_manager = asset_manager
         self.resource_manager = resource_manager
+        self.metadata = metadata
+        self.name = metadata.get("title", label)
 
-        if "countable" not in self.asset_manager.countable_classes:
-            try:
-                from tangl.story.concepts.asset import CountableAsset
-            except ModuleNotFoundError:  # pragma: no cover - optional dependency gap
-                pass
-            else:
-                self.asset_manager.register_countable_class("countable", CountableAsset)
-
-        self.metadata = metadata or script_manager.get_story_metadata() or {}
-        self.name = self.metadata.get("title", label)
-
-        self.template_registry = getattr(self.script_manager, "template_registry", Registry(label=f"{label}_templates"))
+        self._bundle: WorldBundle | None = None
         self._block_scripts: dict[UUID, BlockScript] = {}
 
     def create_story(self, story_label: str, mode: str = "full") -> StoryGraph:
@@ -122,6 +130,12 @@ class World(Singleton):
         if mode == "full":
             return self._create_story_full(story_label)
         raise NotImplementedError(f"Mode {mode} not yet implemented")
+
+    @property
+    def template_registry(self):
+        """Alias: :class:`ScriptManager` provides the template registry."""
+
+        return self.script_manager.template_registry
 
     @property
     def actor_templates(self) -> list[ActorScript]:
