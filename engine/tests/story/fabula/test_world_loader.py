@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -195,7 +196,9 @@ def test_compile_anthology_shares_domain_and_media(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    domain_pkg = bundle_root / "domain" / "anthology"
+    (bundle_root / "domain").mkdir()
+
+    domain_pkg = bundle_root / "anthology"
     domain_pkg.mkdir(parents=True)
     (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
     (domain_pkg / "domain.py").write_text(
@@ -229,3 +232,55 @@ class DomainCharacter(Entity):
     assert world_one.metadata["title"] == "Book One"
     assert world_two.metadata["author"] == "Steve"
     assert world_two.metadata["title"] == "book2"
+
+
+def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "domain_world"
+    bundle_root.mkdir()
+    (bundle_root / "domain").mkdir()
+
+    package_dir = bundle_root / "domain_world"
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "domain.py").write_text(
+        """
+from tangl.core.entity import Entity
+
+
+class DomainCharacter(Entity):
+    ...
+        """,
+        encoding="utf-8",
+    )
+
+    (bundle_root / "world.yaml").write_text(
+        """
+label: domain_world
+scripts: script.yaml
+        """,
+        encoding="utf-8",
+    )
+
+    (bundle_root / "script.yaml").write_text(
+        """
+label: domain_world
+metadata:
+  title: Domain World
+  author: Tests
+scenes: {}
+        """,
+        encoding="utf-8",
+    )
+
+    bundle = WorldBundle.load(bundle_root)
+    compiler = WorldCompiler()
+
+    original_sys_path = list(sys.path)
+    try:
+        world = compiler.compile(bundle)
+
+        assert "DomainCharacter" in world.domain_manager.class_registry
+        assert str(bundle_root) in sys.path
+        assert str(bundle.domain_dir) not in sys.path
+    finally:
+        sys.path[:] = original_sys_path

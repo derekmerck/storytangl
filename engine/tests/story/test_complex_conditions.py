@@ -11,6 +11,8 @@ import yaml
 from tangl.core import StreamRegistry
 from tangl.story.concepts.item import Item
 from tangl.story.episode.action import Action
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
@@ -25,7 +27,14 @@ RESOURCE_PATH = (
 def _build_ledger(data: dict[str, Any]) -> Ledger:
     World.clear_instances()
     manager = ScriptManager.from_data(data)
-    world = World(label=f"world_{uuid4().hex}", script_manager=manager)
+    world = World(
+        label=f"world_{uuid4().hex}",
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=manager.get_story_metadata(),
+    )
     story = world.create_story(f"story_{uuid4().hex}")
     ledger = Ledger(
         graph=story,

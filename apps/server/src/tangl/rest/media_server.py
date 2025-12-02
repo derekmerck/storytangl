@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from tangl.config import settings
 from tangl.info import __author__, __author_email__, __desc__, __title__, __url__, __version__
 from tangl.rest.media_mounts import mount_system_media
-from tangl.story.fabula.world_loader import WorldLoader
+from tangl.service.world_registry import WorldRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +56,10 @@ def mount_world_media(app: FastAPI, world_id: str, media_dir: Path) -> None:
     )
     logger.info("Mounted media for world '%s' at /media/world/%s", world_id, world_id)
 
-def initialize_media_mounts(app: FastAPI, world_loader: WorldLoader) -> None:
+def initialize_media_mounts(app: FastAPI, world_registry: WorldRegistry) -> None:
     """Mount media directories for all discovered worlds at startup."""
 
-    bundles = world_loader.discover_bundles()
-    for world_id, bundle in bundles.items():
+    for world_id, bundle in world_registry.bundles.items():
         mount_world_media(app, world_id, bundle.media_dir)
 
 

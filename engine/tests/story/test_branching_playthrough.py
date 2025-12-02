@@ -8,6 +8,8 @@ import pytest
 import yaml
 
 from tangl.core import BaseFragment, StreamRegistry
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm.frame import Frame
@@ -21,7 +23,14 @@ def _load_branching_ledger(resources_dir: Path, label: str) -> tuple[Ledger, Fra
     data = yaml.safe_load(script_path.read_text())
 
     script_manager = ScriptManager.from_data(data)
-    world = World(label=f"{label}_world", script_manager=script_manager)
+    world = World(
+        label=f"{label}_world",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
     story = world.create_story(f"{label}_story")
 
     ledger = Ledger(

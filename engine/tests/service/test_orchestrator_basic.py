@@ -13,9 +13,11 @@ from tangl.service.controllers import RuntimeController
 from tangl.service.response import InfoModel, RuntimeInfo
 from tangl.service.user.user import User
 from tangl.service.orchestrator import _CacheEntry
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
-from tangl.vm import ChoiceEdge, Frame, ResolutionPhase, Ledger
+from tangl.vm import ChoiceEdge, Frame, Ledger, ResolutionPhase
 
 
 class FakePersistence(dict):
@@ -302,7 +304,14 @@ def test_create_story_via_orchestrator_persists_ledger(
     script_path = Path(__file__).resolve().parents[1] / "resources" / "demo_script.yaml"
     data = yaml.safe_load(script_path.read_text())
     script_manager = ScriptManager.from_data(data)
-    world = World(label="demo_world", script_manager=script_manager)
+    world = World(
+        label="demo_world",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
 
     user = User(label="player")
     fake_persistence.save(user)

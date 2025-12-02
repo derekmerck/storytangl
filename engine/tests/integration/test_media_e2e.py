@@ -6,8 +6,8 @@ from tangl.journal.media import MediaFragment
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.world_registry import WorldRegistry
 from tangl.story.episode.block import Block
-from tangl.story.fabula.world_loader import WorldLoader
 from tangl.vm import ResolutionPhase as P
 from tangl.vm.context import Context
 from tangl.vm.frame import Frame
@@ -19,9 +19,8 @@ WORLD_ROOT = Path("engine/tests/resources/worlds")
 def test_media_full_flow_world_scope() -> None:
     """E2E: YAML world -> MediaDeps -> bound RITs -> media fragments with URLs."""
 
-    loader = WorldLoader(world_dirs=[WORLD_ROOT])
-    loader.discover_bundles()
-    world = loader.load_world("media_e2e")
+    registry = WorldRegistry(world_dirs=[WORLD_ROOT])
+    world = registry.get_world("media_e2e")
 
     story = world.create_story("Media E2E Story")
 

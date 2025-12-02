@@ -10,6 +10,8 @@ from tangl.rest.app import app
 def world():
     from tangl.ir.core_ir import ScriptMetadata
     from tangl.ir.story_ir import StoryScript
+    from tangl.story.fabula.asset_manager import AssetManager
+    from tangl.story.fabula.domain_manager import DomainManager
     from tangl.story.fabula.world import World, ScriptManager
     master_script = StoryScript(
         label="test_world",
@@ -17,7 +19,14 @@ def world():
         scenes=[]
     )
     script_manager = ScriptManager(master_script=master_script)
-    return World(label="test_world", script_manager=script_manager)
+    return World(
+        label="test_world",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
 
 @pytest.fixture
 def client():

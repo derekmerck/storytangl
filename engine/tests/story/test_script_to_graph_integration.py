@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from tangl.story.fabula.script_manager import ScriptManager
-from tangl.core.graph import Edge, Node, Graph
+from tangl.core import StreamRegistry
+from tangl.core.graph import Edge, Graph, Node
 from tangl.story.concepts.actor import Actor
+from tangl.story.fabula.asset_manager import AssetManager
+from tangl.story.fabula.domain_manager import DomainManager
+from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm.ledger import Ledger
-from tangl.core import StreamRegistry
 
 
 class NarrativeBlock(Node):
@@ -24,7 +26,14 @@ Actor.model_rebuild()
 def _build_world(script_data: dict) -> World:
     World.clear_instances()
     script_manager = ScriptManager.from_data(script_data)
-    world = World(label="integration_world", script_manager=script_manager)
+    world = World(
+        label="integration_world",
+        script_manager=script_manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_manager.get_story_metadata(),
+    )
     world.domain_manager.register_class("NarrativeBlock", NarrativeBlock)
     world.domain_manager.register_class("NarrativeAction", NarrativeAction)
     return world
