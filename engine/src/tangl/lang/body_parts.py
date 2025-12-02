@@ -8,8 +8,8 @@ class BodyRegion(EnumPlusMixin, Enum):
     """A coarse body region enum."""
     # Basic divisions
     HEAD = auto()
-    TOP = auto()
-    BOTTOM = auto()
+    TOP = UPPER = auto()
+    BOTTOM = LOWER = auto()
 
     ARMS = auto()      # Upper extremities
     HANDS = auto()

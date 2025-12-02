@@ -8,64 +8,22 @@ from pydantic import Field, field_validator, ValidationInfo, field_serializer
 
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.lang.helpers.pattern import is_plural
+from tangl.lang.body_parts import BodyRegion
 from tangl.core.graph import SingletonNode
 from tangl.story.concepts.asset import AssetType
+from .enums import WearableLayer, WearableState
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class BodyRegion(EnumPlusMixin, Enum):
-    # this is in body-region now
-    HEAD = "head"
-    UPPER = TOP = "upper"
-    LOWER = BOTTOM = "lower"
-    HANDS = "hands"
-    FEET = "feet"
-
-
-@functools.total_ordering
-class WearableLayer(EnumPlusMixin, Enum):
-    """
-    An enum representing the layer of clothing that a `Wearable` covers.
-
-    Attributes
-    ----------
-    INNER: int
-        Represents an inner layer of clothing.
-    OUTER: int
-        Represents an outer, visible layer of clothing.
-    OVER: int
-        Represents the outer-most layer of clothing like over coats
-    """
-    INNER = 0  # under clothes
-    OUTER = 1  # clothes
-    OVER = 2   # coats
-
-
-class WearableState(EnumPlusMixin, Enum):
-
-    ON = 1
-    OPEN = 2
-    OFF = 3
-    TORN = 4
-
-    @classmethod
-    def rev_aliases(cls):
-        return {
-            cls.OFF:  ["remove", "strip"],
-            cls.OPEN: ["shifted", "shift"],
-            cls.TORN: ["tear"]
-        }
-
-@functools.total_ordering
-class WearableCondition(EnumPlusMixin, Enum):
-
-    DESTROYED = 1  # implies REMOVED but still tracked for state
-    DAMAGED = 2    # implies TORN
-    WORN = 3       # or MENDED if previously damaged and repaired
-    # MENDED
-    FINE = 4
-    NEW = 5
+# class BodyRegion(EnumPlusMixin, Enum):
+#     # this is in body-region now
+#     HEAD = "head"
+#     UPPER = TOP = "upper"
+#     LOWER = BOTTOM = "lower"
+#     HANDS = "hands"
+#     FEET = "feet"
+#
 
 
 class WearableHandler:
@@ -121,7 +79,7 @@ class WearableType(AssetType):
     @classmethod
     def _set_default_noun(cls, data: str, info: ValidationInfo):
         if data is None:
-            label = info.data['label_']
+            label = info.data['label']
             return label
         return data
 
@@ -172,8 +130,8 @@ class WearableType(AssetType):
         return WearableHandler.render_desc(self)
 
     @classmethod
-    def load_instances_from_yaml(cls, *args, **kwargs):
-        super().load_instances_from_yaml("tangl.story.asset.resources", "wearables.yaml")
+    def load_defaults(cls, *args, **kwargs):
+        super().load_instances_from_yaml("tangl.mechanics.presence.wearable", "wearables.yaml")
 
-WearableType.load_instances_from_yaml()
-Wearable = SingletonNode.create_wrapper_cls("Wearable", WearableType)
+WearableType.load_defaults()
+Wearable = SingletonNode._create_wrapper_cls(WearableType, "Wearable")

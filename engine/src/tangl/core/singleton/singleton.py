@@ -109,3 +109,16 @@ class Singleton(Entity):
 
     def __reduce__(self) -> tuple:
         return self.__class__.get_instance, (self.label,)
+
+    @classmethod
+    def load_instances(cls, data: dict):
+        for label, kwargs in data.items():
+            cls(label=label, **kwargs)
+
+    @classmethod
+    def load_instances_from_yaml(cls, resources_pkg: str, fn: str):
+        import yaml
+        from importlib import resources
+        with resources.open_text(resources_pkg, fn) as f:
+            data = yaml.safe_load(f)
+        cls.load_instances(data)

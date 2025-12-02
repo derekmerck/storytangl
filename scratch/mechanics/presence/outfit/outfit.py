@@ -20,8 +20,8 @@ from tangl.lang.helpers import oxford_join
 # from tangl.core import on_render, Renderable
 # from tangl.story.story_node import StoryNode
 from tangl.lang.body_parts import BodyPart
-from ..wearable.enums import WearableState, WearableLayer
-from ..wearable import Wearable
+from tangl.mechanics.presence.wearable.enums import WearableState, WearableLayer
+from tangl.mechanics.presence.wearable import Wearable
 
 logger = logging.getLogger(__name__)
 
