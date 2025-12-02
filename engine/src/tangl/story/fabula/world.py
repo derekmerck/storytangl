@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 from uuid import UUID
 
@@ -92,7 +93,23 @@ class World(Singleton):
         self.script_manager = script_manager
         self.domain_manager = domain_manager or DomainManager()
         self.asset_manager = asset_manager or AssetManager()
+        if resource_manager is None:
+            try:
+                from tangl.media.media_resource.resource_manager import ResourceManager
+            except ModuleNotFoundError:  # pragma: no cover - optional media dependency
+                resource_manager = None
+            else:
+                resource_manager = ResourceManager(Path("."))
+
         self.resource_manager = resource_manager
+
+        if "countable" not in self.asset_manager.countable_classes:
+            try:
+                from tangl.story.concepts.asset import CountableAsset
+            except ModuleNotFoundError:  # pragma: no cover - optional dependency gap
+                pass
+            else:
+                self.asset_manager.register_countable_class("countable", CountableAsset)
 
         self.metadata = metadata or script_manager.get_story_metadata() or {}
         self.name = self.metadata.get("title", label)

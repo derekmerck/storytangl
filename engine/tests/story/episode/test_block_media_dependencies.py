@@ -1,6 +1,7 @@
 from pathlib import Path
-
 from types import SimpleNamespace
+
+import pytest
 
 from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.media.media_resource.resource_manager import ResourceManager
@@ -10,6 +11,13 @@ from tangl.story.episode.block import Block
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import ResolutionPhase as P
 from tangl.vm.frame import Frame
+
+
+@pytest.fixture(autouse=True)
+def clear_world_singleton():
+    World.clear_instances()
+    yield
+    World.clear_instances()
 
 
 class _MediaGraph(StoryGraph):
