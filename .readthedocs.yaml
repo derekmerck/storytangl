@@ -14,3 +14,8 @@ build:
 sphinx:
   configuration: docs/src/conf.py
   fail_on_warning: true
+
+python:
+  install:
+    - extra_requirements:
+      - sphinx = ^8.1.3,<9

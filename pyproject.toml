@@ -90,7 +90,7 @@ redis = "^5.0.1"
 pymongo = "^4.6.0"
 
 # docs - sphinx now included in testing
-sphinx = "^8.1.3"
+sphinx = "^8.1.3,<9"
 myst-parser = "^4.0.0"
 furo = "^2024.8.6"
 sphinx-markdown-builder = "^0.6.8"
