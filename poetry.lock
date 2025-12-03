@@ -2854,9 +2854,10 @@ files = [
 
 [extras]
 cli = ["cmd2"]
+docs = ["furo", "linkify-it-py", "myst-parser", "sphinx", "sphinx-markdown-builder"]
 server = ["cmd2", "fastapi", "pymongo", "redis", "uvicorn"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4"
-content-hash = "ce6c7437503e23d2b80e7af3091ec071a27f13c6cad9426349829efbff5dcd60"
+content-hash = "9e9018ab3b9ed453c469b7dabfdd782d8fad60a132faa508efc050e299f0e64b"
