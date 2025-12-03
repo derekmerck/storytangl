@@ -1,0 +1,67 @@
+scenes:
+  - uid: scene1
+    title: Scene 1
+    description: This is the first scene
+
+    roles:
+      - uid: antagonist
+        actor:
+          uid: actor1
+          name: John
+
+    blocks:
+      - uid: block1
+        text: You find yourself in a mysterious room.
+        actions:
+          - uid: action1
+            label: Explore the room
+            next_block: block2
+          - uid: action2
+            label: Leave the room
+            next_block: block3
+
+      - uid: block2
+        text: You discover a hidden passage behind a bookshelf.
+        actions:
+          - uid: action3
+            label: Enter the passage
+            next_block: block4
+          - uid: action4
+            label: Stay in the room
+            next_block: block5
+
+  - uid: scene2
+    title: Scene 2
+    description: This is the second scene
+
+    roles:
+      - uid: protagonist
+        actor:
+          uid: actor1
+          name: Mary
+
+    blocks:
+      - uid: block3
+        text: You step outside into a beautiful garden.
+        actions:
+          - uid: action5
+            label: Explore the garden
+            next_block: block6
+          - uid: action6
+            label: Return to the room
+            next_block: block1
+
+      - uid: block4
+        text: You follow the passage and discover a hidden treasure.
+        actions:
+          - uid: action7
+            label: Take the treasure
+            next_block: block7
+          - uid: action8
+            label: Leave the treasure
+            next_block: block6
+
+actors:
+  - uid: actor3
+    name: Kino
+
