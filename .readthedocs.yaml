@@ -15,7 +15,7 @@ sphinx:
   configuration: docs/src/conf.py
   fail_on_warning: true
 
-python:
-  install:
-    - path: .
-      extra_requirements: [docs]
+#python:
+#  install:
+#    - path: .
+#      extra_requirements: [docs]
