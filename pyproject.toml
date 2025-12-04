@@ -8,7 +8,8 @@ packages = [
     { include = "tangl", from = "engine/src" },
     { include = "tangl", from = "apps/cli/src" },
     { include = "tangl", from = "apps/server/src" },
-    { include = "reference", as = "tangle.worlds.reference" }
+    # { include = "reference", as = "tangle.worlds.reference" }
+    # 'as' is not allowed
 ]
 # todo: add reference world in package to default world search path?  per carwars, we actually want 'reference' to be a separate package w custom code at 'reference.domain'
 

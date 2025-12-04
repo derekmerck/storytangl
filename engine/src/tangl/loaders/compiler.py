@@ -124,16 +124,18 @@ class WorldCompiler:
 
         return worlds
 
+    # In tangl/loaders/compiler.py
     def _load_and_merge_scripts(self, script_paths: list[Path]) -> dict[str, Any]:
-        script_data: dict[str, Any] = {}
+        script_data = {}
 
         for script_path in script_paths:
-            with open(script_path, encoding="utf-8") as script_file:
-                data = yaml.safe_load(script_file) or {}
-
-            if not isinstance(data, dict):
-                msg = f"Script at {script_path} must be a mapping"
-                raise ValueError(msg)
+            # Check if compiler has custom loading
+            if hasattr(self.script_compiler, 'load_from_path'):
+                data = self.script_compiler.load_from_path(script_path)
+            else:
+                # Fallback to raw YAML
+                with open(script_path) as f:
+                    data = yaml.safe_load(f)
 
             script_data |= data
 
