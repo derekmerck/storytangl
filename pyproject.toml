@@ -10,7 +10,7 @@ packages = [
     { include = "tangl", from = "apps/server/src" },
     { include = "reference", as = "tangle.worlds.reference" }
 ]
-# todo: add reference world in package to default world search path?
+# todo: add reference world in package to default world search path?  per carwars, we actually want 'reference' to be a separate package w custom code at 'reference.domain'
 
 # todo: build web client and include it as static files with app/server dist
 
