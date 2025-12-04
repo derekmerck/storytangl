@@ -8,8 +8,9 @@ packages = [
     { include = "tangl", from = "engine/src" },
     { include = "tangl", from = "apps/cli/src" },
     { include = "tangl", from = "apps/server/src" },
-#    { include = "sample_world", as = "tangle.worlds.sample_world" }
+    { include = "reference", as = "tangle.worlds.reference" }
 ]
+# todo: add reference world in package to default world search path?
 
 # todo: build web client and include it as static files with app/server dist
 
