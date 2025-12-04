@@ -25,7 +25,6 @@ Tests can compile directly from bundles when bypassing discovery:
 """
 
 from __future__ import annotations
-
 import logging
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
@@ -33,9 +32,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from tangl.type_hints import UniqueLabel
+from tangl.utils.sanitize_str import sanitize_path
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.singleton import Singleton
+from tangl.vm import ProvisioningPolicy
+from tangl.vm.provision.open_edge import Dependency
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
@@ -43,9 +46,6 @@ from tangl.ir.story_ir.scene_script_models import BlockScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
-from tangl.type_hints import UniqueLabel
-from tangl.vm import ProvisioningPolicy
-from tangl.vm.provision.open_edge import Dependency
 
 # Integrated Story Domains
 from .domain_manager import DomainManager  # behaviors and classes
@@ -56,7 +56,7 @@ from .media import attach_media_deps_for_block
 # from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.WARNING)
 
 
 if TYPE_CHECKING:  # pragma: no cover - hinting only
@@ -111,7 +111,7 @@ class World(Singleton):
         script_manager: ScriptManager,
         domain_manager: DomainManager,
         asset_manager: AssetManager,
-        resource_manager: "ResourceManager" | None,
+        resource_manager: "ResourceManager | None",
         metadata: dict[str, Any],
     ) -> None:
         super().__init__(label=label)
@@ -514,6 +514,11 @@ class World(Singleton):
         block_map: dict[str, UUID],
     ) -> UUID:
         """Resolve a successor reference to a block identifier."""
+
+        # successor may not have been given in sanitized form
+        logger.debug(f"resolving successor: {successor}")
+        successor = sanitize_path(successor)
+        logger.debug(f"sanitized successor: {successor}")
 
         if successor in block_map:
             return block_map[successor]

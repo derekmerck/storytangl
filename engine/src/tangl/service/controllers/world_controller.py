@@ -146,11 +146,11 @@ class WorldController(HasApiEndpoints):
 
         from tangl.story.fabula.script_manager import ScriptManager
         script_manager = ScriptManager.from_data(script_data)
-        from tangl.utils.sanitize_str import sanitise_str
+        from tangl.utils.sanitize_str import sanitize_str
         title = script_manager.get_story_metadata().get('title')
         if title is None:
             raise ValueError("World scripts _must_ contain a label or a metadata section with a title")
-        label = sanitise_str(title).lower()
+        label = sanitize_str(title).lower()
         world = World(
             label=label,
             script_manager=script_manager,

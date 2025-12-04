@@ -179,6 +179,10 @@ class Graph(Registry[GraphItem]):
         criteria.setdefault("is_instance", Node)
         return self.find_all(**criteria)
 
+    @property
+    def nodes(self) -> list[Node]:
+        return list(self.find_nodes())
+
     def find_node(self, **criteria) -> Optional[Node]:
         return next(self.find_nodes(**criteria), None)
 
@@ -189,6 +193,10 @@ class Graph(Registry[GraphItem]):
         criteria.setdefault("is_instance", Edge)
         return self.find_all(**criteria)
 
+    @property
+    def edges(self) -> list[Edge]:
+        return list(self.find_edges())
+
     def find_edge(self, **criteria) -> Optional[Edge]:
         return next(self.find_edges(**criteria), None)
 
@@ -196,6 +204,10 @@ class Graph(Registry[GraphItem]):
         from .subgraph import Subgraph
         criteria.setdefault("is_instance", Subgraph)
         return self.find_all(**criteria)
+
+    @property
+    def subgraphs(self) -> list[Subgraph]:
+        return list(self.find_subgraphs())
 
     def find_subgraph(self, **criteria) -> Optional[Subgraph]:
         return next(self.find_subgraphs(**criteria), None)

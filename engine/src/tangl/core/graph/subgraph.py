@@ -39,6 +39,7 @@ class Subgraph(GraphItem):
     subgraph_type: Optional[ str | Enum ] = None  # No need to enumerate this yet
     member_ids: list[UUID] = Field(default_factory=list)
 
+    # todo: properties wrapping 'find' like functions should maybe return iterables not iterators?
     @property
     def members(self) -> Iterator[GraphItem]:
         for member_id in self.member_ids:

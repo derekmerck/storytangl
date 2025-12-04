@@ -12,7 +12,7 @@ import shortuuid
 from tangl.type_hints import StringMap, Tag, Predicate, Identifier
 from tangl.utils.hashing import hashing_func
 from tangl.utils.base_model_plus import BaseModelPlus
-from tangl.utils.sanitize_str import sanitise_str
+from tangl.utils.sanitize_str import sanitize_str
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -72,7 +72,7 @@ class Entity(BaseModelPlus):
     @classmethod
     def _sanitize_label(cls, value):
         if isinstance(value, str):
-            value = sanitise_str(value)
+            value = sanitize_str(value)
         return value
 
     @is_identifier
