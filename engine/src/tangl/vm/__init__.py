@@ -52,7 +52,7 @@ from .replay import Event, EventType, EventWatcher, Patch
 # Resolution step
 from .resolution_phase import ResolutionPhase
 from .context import Context
-from .frame import Frame, ChoiceEdge
+from .frame import Frame, ChoiceEdge, StackFrame
 from .ledger import Ledger
 from .traversal import TraversableSubgraph
 
@@ -86,7 +86,7 @@ __all__ = [
     # events/replay
     "Event", "EventType", "Patch",
     # resolution
-    "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context", "TraversableSubgraph",
+    "Frame", "ChoiceEdge", "StackFrame", "ResolutionPhase", "Ledger", "Context", "TraversableSubgraph",
     # dispatch
     "vm_dispatch",
     # planning

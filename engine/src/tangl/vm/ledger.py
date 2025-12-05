@@ -10,7 +10,7 @@ from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BehaviorRegistry
-from .frame import Frame
+from .frame import Frame, StackFrame
 
 if TYPE_CHECKING:
     from tangl.service.user.user import User
@@ -71,6 +71,8 @@ class Ledger(Entity):
     event_sourced: bool = False
     user: Optional[User] = Field(None, exclude=True)
     cursor_history: list[UUID] = Field(default_factory=list)
+    call_stack: list[StackFrame] = Field(default_factory=list, exclude=True)
+    """Runtime call stack for subroutine jumps (not persisted in snapshots)."""
 
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
@@ -118,6 +120,7 @@ class Ledger(Entity):
             records=self.records,
             event_sourced=self.event_sourced,
             cursor_history=self.cursor_history,
+            call_stack=self.call_stack,
         )
 
     @property

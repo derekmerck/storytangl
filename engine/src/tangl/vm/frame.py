@@ -23,6 +23,39 @@ from .resolution_phase import ResolutionPhase as P
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
+
+@dataclass
+class StackFrame:
+    """
+    One subroutine call on the call stack.
+
+    Stores structural metadata only (no world state like locals). World state
+    mutations are captured by the graph and event stream.
+
+    Attributes
+    ----------
+    return_cursor_id:
+        Node to jump back to when this frame completes.
+    call_site_label:
+        Human-readable name of the calling node (for debugging).
+    call_type:
+        Category of call: "cycle", "flashback", "investigation", etc.
+        Used by handlers to specialize behavior.
+    depth:
+        Stack depth when this frame was pushed (for debugging).
+    """
+
+    return_cursor_id: UUID
+    call_site_label: str
+    call_type: str = "generic"
+    depth: int = 0
+
+    def __repr__(self) -> str:
+        return (
+            f"StackFrame(return_to={self.call_site_label}, "
+            f"type={self.call_type}, depth={self.depth})"
+        )
+
 class ChoiceEdge(Edge, Conditional):
     """
     A selectable or auto-triggering control edge between structural nodes.
@@ -31,8 +64,11 @@ class ChoiceEdge(Edge, Conditional):
 
     * Presents to the traversal orchestrator as a *choice* (no trigger) or jump automatically (with trigger).
     * Only links *structural* nodes; use domain handlers to mutate attached data.
+    * Set ``is_call=True`` to push a :class:`StackFrame` before moving to the destination.
     """
     trigger_phase: Optional[Literal[P.PREREQS, P.POSTREQS]] = None
+    is_call: bool = False
+    call_type: str | None = None
 
 
 @dataclass
@@ -81,8 +117,8 @@ class Frame:
     cursor_history: list[UUID] = field(default_factory=list)
     """Shared traversal history from the ledger (append-only)."""
 
-    call_stack: list["StackFrame"] = field(default_factory=list)
-    """Call stack placeholder shared with the ledger."""
+    call_stack: list[StackFrame] = field(default_factory=list)
+    """Reference to the ledger's call stack (shared list instance)."""
 
     local_behaviors: BehaviorRegistry = field(default_factory=lambda: BehaviorRegistry(label="frame.local.dispatch", handler_layer=HandlerLayer.LOCAL))
     # # SYSTEM, APPLICATION, AUTHOR layers
@@ -162,6 +198,49 @@ class Frame:
 
         return outcome
 
+    def _push_call(self, edge: Edge, caller_cursor: UUID) -> None:
+        """
+        Push a call frame onto the stack before jumping to a subroutine.
+
+        Parameters
+        ----------
+        edge:
+            Call edge being followed.
+        caller_cursor:
+            Cursor position the call originates from (return address).
+
+        Raises
+        ------
+        RuntimeError
+            When the stack exceeds the maximum supported depth.
+        """
+
+        max_depth = 50
+
+        if len(self.call_stack) + 1 >= max_depth:
+            raise RuntimeError(
+                f"Call stack overflow at depth {max_depth}. "
+                "Possible infinite recursion in graph structure?"
+            )
+
+        caller_node = self.graph.get(caller_cursor)
+
+        frame = StackFrame(
+            return_cursor_id=caller_cursor,
+            call_site_label=caller_node.label if caller_node else "unknown",
+            call_type=getattr(edge, "call_type", "generic"),
+            depth=len(self.call_stack),
+        )
+
+        self.call_stack.append(frame)
+
+        logger.debug(
+            "Pushed call frame: %s (type=%s, depth=%s)",
+            frame.call_site_label,
+            frame.call_type,
+            frame.depth,
+        )
+
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
 
@@ -173,6 +252,9 @@ class Frame:
 
             if isinstance(edge, HasEffects):
                 edge.apply_entry_effects(ctx=current_ctx)
+
+        if getattr(edge, "is_call", False):
+            self._push_call(edge, caller_cursor=self.cursor_id)
 
         self.step += 1
         self.cursor_id = edge.destination.uid
