@@ -163,11 +163,14 @@ class Frame:
         else:
             graph = self.graph
         logger.debug(f'Creating context with cursor id {self.cursor_id}')
-        return Context(graph=graph,
-                       cursor_id=self.cursor_id,
-                       step=self.step,
-                       active_layers=self.get_active_layers()
-                       )
+        ctx = Context(
+            graph=graph,
+            cursor_id=self.cursor_id,
+            step=self.step,
+            active_layers=self.get_active_layers(),
+        )
+        object.__setattr__(ctx, "_frame", self)
+        return ctx
 
     def _invalidate_context(self) -> None:
         if hasattr(self, "context"):
