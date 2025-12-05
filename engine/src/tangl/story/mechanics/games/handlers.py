@@ -34,6 +34,9 @@ def setup_game_on_first_visit(cursor: HasGame, *, ctx: Context, **kwargs: Any):
         This handler never redirects traversal.
     """
 
+    if not isinstance(cursor, HasGame):
+        return None
+
     frame = ctx._frame
 
     if not is_first_visit(cursor.uid, frame.cursor_history):
@@ -66,6 +69,9 @@ def provision_game_moves(cursor: HasGame, *, ctx: Context, **kwargs: Any):
     """
 
     from tangl.story.episode.action import Action
+
+    if not isinstance(cursor, HasGame):
+        return []
 
     if cursor.game.phase != GamePhase.READY:
         logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
@@ -108,6 +114,9 @@ def process_game_move(cursor: HasGame, *, ctx: Context, **kwargs: Any):
     None
         Updates occur in-place on ``cursor.game``; no redirect is produced.
     """
+
+    if not isinstance(cursor, HasGame):
+        return None
 
     frame = ctx._frame
     selected_edge = getattr(frame, "selected_edge", None)
@@ -166,6 +175,9 @@ def generate_game_journal(cursor: HasGame, *, ctx: Context, **kwargs: Any):
 
     from tangl.journal.content import ContentFragment
 
+    if not isinstance(cursor, HasGame):
+        return []
+
     last_round = cursor.locals.get("last_round")
     if not last_round:
         logger.debug("No last_round available for journal at %s", cursor.get_label())
@@ -213,6 +225,9 @@ def inject_game_context(cursor: HasGame, *, ctx: Context, **kwargs: Any) -> dict
     dict[str, Any]
         Namespace entries prefixed with ``game_`` for predicate access.
     """
+
+    if not isinstance(cursor, HasGame):
+        return {}
 
     return {
         "game_phase": cursor.game.phase.value,
