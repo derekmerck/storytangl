@@ -19,10 +19,9 @@ from collections import defaultdict
 
 import jinja2.exceptions
 
-from tangl.core import Renderable
 from tangl.story import Scene, Block
-from tangl.world.world import World
-from tangl.world.narrator.lang.ref_lex import find_misspelled, suggest_misspelled
+from tangl.story.fabula.world import World
+from tangl.lang.ref_lex import find_misspelled, suggest_misspelled
 from tidylib import tidy_fragment
 
 CHECK_SPELLING = True   # check all strings against world pwl

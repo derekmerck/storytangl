@@ -117,10 +117,10 @@ class HairStyle(EnumPlusMixin, Enum):
     OTHER = "other"                                 # use tags to inspect
 
 class PresentingGender(EnumPlusMixin, Enum):
-    # This should map to lang.gender
+    # todo: This should map by name to lang.gender
     XY = MASCULINE = "masculine"
     XX = FEMININE = "feminine"
-    XXY = ANDROGYNOUS = "androgynous"
+    XXY = ANDROGYNOUS = NB = "androgynous"
     OTHER = "other"                                  # use tags to inspect
 
 class Attitude(EnumPlusMixin, Enum):
