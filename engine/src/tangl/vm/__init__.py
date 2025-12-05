@@ -52,9 +52,19 @@ from .replay import Event, EventType, EventWatcher, Patch
 # Resolution step
 from .resolution_phase import ResolutionPhase
 from .context import Context
-from .frame import Frame, ChoiceEdge
+from .frame import Frame, ChoiceEdge, StackFrame
 from .ledger import Ledger
-from .traversal import TraversableSubgraph
+from .traversal import (
+    TraversableSubgraph,
+    get_visit_count,
+    is_first_visit,
+    steps_since_last_visit,
+    is_self_loop,
+    in_subroutine,
+    get_caller_frame,
+    get_call_depth,
+    get_root_caller,
+)
 
 # Dispatch
 from .dispatch import vm_dispatch
@@ -84,11 +94,44 @@ Offer = ProvisionOffer
 
 __all__ = [
     # events/replay
-    "Event", "EventType", "Patch",
+    "Event",
+    "EventType",
+    "Patch",
     # resolution
-    "Frame", "ChoiceEdge", "ResolutionPhase", "Ledger", "Context", "TraversableSubgraph",
+    "Frame",
+    "ChoiceEdge",
+    "StackFrame",
+    "ResolutionPhase",
+    "Ledger",
+    "Context",
+    "TraversableSubgraph",
+    "get_visit_count",
+    "is_first_visit",
+    "steps_since_last_visit",
+    "is_self_loop",
+    "in_subroutine",
+    "get_caller_frame",
+    "get_call_depth",
+    "get_root_caller",
     # dispatch
     "vm_dispatch",
     # planning
-    "Requirement", "Provisioner", "GraphProvisioner", "TemplateProvisioner", "UpdatingProvisioner", "CloningProvisioner", "CompanionProvisioner", "Dependency", "Affordance", "ProvisioningPolicy", "Offer", "ProvisionOffer", "DependencyOffer", "AffordanceOffer", "ProvisionCost", "BuildReceipt", "PlanningReceipt", "PlanningDebugger",
+    "Requirement",
+    "Provisioner",
+    "GraphProvisioner",
+    "TemplateProvisioner",
+    "UpdatingProvisioner",
+    "CloningProvisioner",
+    "CompanionProvisioner",
+    "Dependency",
+    "Affordance",
+    "ProvisioningPolicy",
+    "Offer",
+    "ProvisionOffer",
+    "DependencyOffer",
+    "AffordanceOffer",
+    "ProvisionCost",
+    "BuildReceipt",
+    "PlanningReceipt",
+    "PlanningDebugger",
 ]
