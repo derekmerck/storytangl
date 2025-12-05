@@ -1,7 +1,7 @@
 # Planning & Provisioning System Design (v3.7)
 
 **Status:** This document reflects the **actual current implementation** as of v3.7.  
-**Last Updated:** November 2025  
+**Last Updated:** December 2025  
 **Location:** `engine/src/tangl/vm/provision/` and `engine/src/tangl/vm/dispatch/planning.py`
 
 ---
@@ -134,6 +134,78 @@ Affordance(
 )
 # "Dragon can appear in scenes with 'wants_dragon' tag"
 ```
+### Protocol / Constraint-Satisfaction View
+
+The same planning mechanics can be viewed through a more standard
+**protocol / CSP** vocabulary. This is useful if you think in terms of
+queries, proposals, and commitments:
+
+- **Constraint**  
+  Each :class:`Requirement` attached to an open edge (Dependency or
+  Affordance) is the VM's constraint object: it combines a *selector*
+  (``identifier`` / ``criteria``) with a *provisioning contract*
+  (``policy``, ``template``, ``reference_id``, ``hard_requirement``).
+
+- **Selector**  
+  The selector surface is the subset of fields used by
+  ``Requirement.get_selection_criteria()`` and ``Requirement.satisfied_by()``.
+  Anything that can produce equivalent selection criteria and answer
+  "does this node satisfy me?" can conceptually play the same role.
+
+- **Proposals (Offers)**  
+  Provisioners respond to constraints by emitting
+  :class:`ProvisionOffer` instances (and their specializations
+  ``DependencyOffer`` / ``AffordanceOffer``). These are *lazy* proposals:
+  they describe how the constraint *could* be satisfied, but defer the
+  actual work to an accept callback.
+
+- **Negotiation (Planning pass)**  
+  The planning layer collects all offers for the frontier, deduplicates
+  candidate providers, applies a cost model
+  (:class:`ProvisionCost` + proximity), and selects exactly one accepted
+  offer per requirement. This is the negotiation step.
+
+- **Commitments**  
+  When the selected :class:`PlannedOffer` instances are executed, they
+  produce :class:`BuildReceipt` objects. A :class:`PlanningReceipt`
+  aggregates these to describe what was actually committed for a given
+  planning cycle.
+
+- **Failure modes**  
+  ``Requirement.hard_requirement`` plus ``Requirement.is_unresolvable``
+  capture the current binary failure semantics: hard unresolved
+  requirements are reported and can softlock a frontier; soft ones are
+  treated as waived.
+
+This mapping is intentionally descriptive: it names the roles that
+existing types already play without changing the implementation.
+
+#### Possible Future Extensions (Not Yet Implemented)
+
+These are design opportunities that fall naturally out of the protocol
+view but are *deliberately* deferred until real use cases appear:
+
+- **Selector protocol**  
+  Today, anything that wants to behave like a selector reuses the
+  ``selection_criteria`` shape and/or ``get_selection_criteria`` /
+  ``satisfied_by`` methods. In the future we may introduce a small
+  :pep:`544` ``Protocol`` (e.g. ``Selector``) that formalizes this
+  surface for better static typing and reuse, without forcing inheritance
+  from :class:`Requirement`.
+
+- **Richer failure modes**  
+  At present, the only distinction is hard vs soft
+  (block vs waive). If a story or μ-layer feature needs finer-grained
+  behavior (e.g. "fall back to a different requirement", "log and
+  degrade", "escalate to UI"), we can extend the failure semantics with
+  a small enum (e.g. ``FailureMode``) and optional fallback requirement
+  references. Until a concrete need arises, the simple hard/soft model
+  keeps the implementation smaller and easier to reason about.
+
+The core takeaway is that the **constraint → proposals → negotiation →
+commitment** pipeline is already encoded in the current types; this
+section just names that structure in protocol terms and sketches where
+we might extend it later.
 
 ---
 

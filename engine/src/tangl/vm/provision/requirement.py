@@ -54,8 +54,19 @@ class Requirement(GraphItem, Generic[NodeT]):
     ----
     Encodes *what must be linked* (by identifier/criteria) and *how to obtain it*
     (via :class:`ProvisioningPolicy`). Requirements are carried on open edges
-    (e.g., :class:`Dependency`, :class:`Affordance`) and
-    are satisfied by binding a provider node.
+    (e.g., :class:`Dependency`, :class:`Affordance`) and are satisfied by
+    binding a provider node.
+
+    In protocol / constraint-satisfaction terms, a Requirement is the VM's
+    **Constraint** object:
+
+    * Its **selector surface** is the combination of :attr:`identifier` and
+      :attr:`criteria`, exposed via :meth:`get_selection_criteria` and
+      :meth:`satisfied_by`. This describes *what* would be acceptable.
+    * Its **provisioning contract** is the combination of :attr:`policy`,
+      :attr:`template`, :attr:`reference_id`, and :attr:`hard_requirement`.
+      This describes *how* the engine may satisfy the selector once a match
+      is found.
 
     Key Features
     ------------
@@ -87,6 +98,21 @@ class Requirement(GraphItem, Generic[NodeT]):
     - ``EXISTING/UPDATE`` require :attr:`identifier` **or** :attr:`criteria`.
     - ``CLONE`` requires :attr:`reference_id` and :attr:`template`.
     - ``CREATE/UPDATE`` require :attr:`template`.
+
+    Protocol view:
+
+    - **Constraint:** each Requirement instance attached to an open edge.
+    - **Selector:** the subset of fields used by
+      :meth:`get_selection_criteria` / :meth:`satisfied_by`.
+    - **Contract:** the provisioning fields (:attr:`policy`,
+      :attr:`template`, :attr:`reference_id`, :attr:`hard_requirement`)
+      that guide how offers and plans are constructed.
+
+    A future refinement (not yet implemented) is to formalize this selector
+    surface as a small :pep:`544` ``Protocol`` (e.g. ``Selector`` with
+    ``get_selection_criteria`` / ``satisfied_by``), so other constraint-like
+    objects can participate in the same matching pipeline without inheriting
+    from :class:`Requirement`.
     """
     provider_id: Optional[UUID] = None
 

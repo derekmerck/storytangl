@@ -48,6 +48,7 @@ class MenuBlock(Block):
     :param with_tags: A set of tags that target nodes must match
     """
 
+    # Use 'selection_criteria" for this, selects for cls -> is_instance, tags -> has_tags
     with_cls: Typelike = Block
     with_tags: set[Tag] = Field(default_factory=set)
     # within_scene_only: bool = True  # limit search to children of the same root
