@@ -78,6 +78,12 @@ class Frame:
     cursor_id: UUID
     step: Step = 0
 
+    cursor_history: list[UUID] = field(default_factory=list)
+    """Shared traversal history from the ledger (append-only)."""
+
+    call_stack: list["StackFrame"] = field(default_factory=list)
+    """Call stack placeholder shared with the ledger."""
+
     local_behaviors: BehaviorRegistry = field(default_factory=lambda: BehaviorRegistry(label="frame.local.dispatch", handler_layer=HandlerLayer.LOCAL))
     # # SYSTEM, APPLICATION, AUTHOR layers
     # active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
@@ -156,8 +162,6 @@ class Frame:
 
         return outcome
 
-    cursor_history: list[UUID] = field(default_factory=list)
-
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
 
@@ -172,6 +176,8 @@ class Frame:
 
         self.step += 1
         self.cursor_id = edge.destination.uid
+
+        self.cursor_history.append(self.cursor_id)
 
         # Set a marker on the record stream
         self.records.set_marker(f"step-{self.step:04d}", "frame")
@@ -201,8 +207,6 @@ class Frame:
                 return nxt
             else:
                 raise RuntimeError(f"Proposed prereq jump is not a valid edge {type(nxt)}!")
-
-        self.cursor_history.append(self.cursor_id)
         self.run_phase(P.UPDATE)         # No-op for now
 
         # todo: If we are using event sourcing, we _may_ need to recreate a preview graph now if context isn't holding a mutable copy and change events were logged
