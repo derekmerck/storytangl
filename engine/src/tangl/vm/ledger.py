@@ -65,7 +65,7 @@ class Ledger(Entity):
     derived from record type ("snapshot", "patch", "fragment").
 
     Call Stack Persistence
-    ----------------------
+    -----------------------
     The call stack is persisted via two mechanisms:
 
     1. **Direct serialization** (fast path)
@@ -108,7 +108,7 @@ class Ledger(Entity):
         # Both graph and call_stack reconstructed to consistent state
 
     Why two paths
-    ------------
+    -------------
     Event-sourced systems and request/response flows have different persistence
     needs:
 
@@ -344,9 +344,9 @@ class Ledger(Entity):
         if not self.event_sourced:
             raise RuntimeError("undo_to_step requires event_sourced=True")
 
-        if target_step < 0 or target_step >= self.step:
+        if target_step <= 0 or target_step >= self.step:
             raise ValueError(
-                f"target_step {target_step} must be >= 0 and less than current step {self.step}"
+                f"target_step {target_step} must be > 0 and less than current step {self.step}"
             )
 
         snapshots = list(self.records.find_all(has_channel="stack"))
@@ -361,7 +361,8 @@ class Ledger(Entity):
         )
 
         if self.cursor_history and target_step - 1 < len(self.cursor_history):
-            self.cursor_id = self.cursor_history[target_step - 1]
+            self.cursor_history = self.cursor_history[:target_step]
+            self.cursor_id = self.cursor_history[-1]
 
         self.step = target_step
 
