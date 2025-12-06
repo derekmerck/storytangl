@@ -60,14 +60,39 @@ class StreamRegistry(Registry[HasSeq]):
 
     # ---- bookmarks ----
 
-    def set_marker(self, marker_name: str, marker_type: str = '_', marker_seq: int = None):
+    def set_marker(
+        self,
+        marker_name: str,
+        marker_type: str = '_',
+        marker_seq: int | None = None,
+        *,
+        overwrite: bool = False,
+    ) -> None:
+        """Bookmark ``marker_seq`` for ``marker_name`` under ``marker_type``.
+
+        Parameters
+        ----------
+        marker_name:
+            Logical name for the bookmark (e.g., ``"step-0001"``).
+        marker_type:
+            Namespace for the bookmark. Separates independent marker streams
+            such as ``"journal"`` or ``"update"``.
+        marker_seq:
+            Sequence index to record. Defaults to ``self.max_seq`` so callers
+            can mark the last appended record. Passing ``None`` also chooses
+            ``self.max_seq``.
+        overwrite:
+            When ``True``, replace an existing marker of the same name instead
+            of raising. Useful for sliding bookmarks like ``"latest"``.
+        """
+
         if marker_seq is None:
             marker_seq = self.max_seq + 1
             # be careful about 1-off errors!  Set the marker _before_ appending
         logger.debug(f"Adding marker: {marker_name}@{marker_type} to {marker_seq}")
         if marker_type not in self.markers:
             self.markers[marker_type] = {}
-        if marker_name in self.markers[marker_type]:
+        if not overwrite and marker_name in self.markers[marker_type]:
             raise KeyError(f"Marker {marker_name} already exists")
         self.markers[marker_type][marker_name] = marker_seq
 

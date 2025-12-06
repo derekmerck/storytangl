@@ -18,7 +18,7 @@ import logging
 from pydantic import Field
 
 from tangl.core import BaseFragment, Node, Graph, CallReceipt  # noqa
-from tangl.core.behavior import HandlerPriority as Prio
+from tangl.core.behavior import CallReceipt, HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
 from tangl.journal.media import MediaFragment
@@ -330,12 +330,10 @@ class Block(Node, HasEffects):
 
         # Step 5: gather choices (first-result semantics)
         with ctx._fresh_call_receipts():
-            for receipt in story_dispatch.dispatch(
-                self, task="gather_choices", ctx=ctx
-            ):
-                if receipt.result is not None:
-                    ctx.set_current_choices(receipt.result)
-                    break
+            receipts = tuple(
+                story_dispatch.dispatch(self, task="gather_choices", ctx=ctx)
+            )
+            ctx.set_current_choices(CallReceipt.first_result(*receipts))
 
         logger.info(f"After gather_choices: {ctx.current_choices}")
 
