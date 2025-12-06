@@ -17,7 +17,7 @@ import logging
 
 from pydantic import Field
 
-from tangl.core import BaseFragment, Node, Graph  # noqa
+from tangl.core import BaseFragment, Node, Graph, CallReceipt  # noqa
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
@@ -288,12 +288,13 @@ class Block(Node, HasEffects):
 
         # Step 1: gather content
         with ctx._fresh_call_receipts():
-            for receipt in story_dispatch.dispatch(
+            receipts = story_dispatch.dispatch(
                 self, task="gather_content", ctx=ctx
-            ):
-                if receipt.result is not None:
-                    ctx.set_current_content(receipt.result)
-                    break
+            )
+            result = CallReceipt.first_result(*receipts)
+            ctx.set_current_content(result)
+
+        logger.info(f"After gather_content: {ctx.current_content}")
 
         # Step 2: sequential post-processing
         if ctx.current_content is not None:
@@ -303,6 +304,8 @@ class Block(Node, HasEffects):
                 ):
                     if receipt.result is not None:
                         ctx.set_current_content(receipt.result)
+
+        logger.info(f"After post_process: {ctx.current_content}")
 
         fragments: list[BaseFragment] = []
 
@@ -319,6 +322,7 @@ class Block(Node, HasEffects):
                     )
                 )
 
+
         # Step 4: append media fragments
         media_fragments = emit_media_fragments(self, ctx=ctx)
         if media_fragments:
@@ -333,8 +337,13 @@ class Block(Node, HasEffects):
                     ctx.set_current_choices(receipt.result)
                     break
 
+        logger.info(f"After gather_choices: {ctx.current_choices}")
+
         if ctx.current_choices:
             fragments.extend(ctx.current_choices)
+
+        # In compose_block_journal
+        logger.info(f"Final fragments: {fragments}")
 
         return fragments
 

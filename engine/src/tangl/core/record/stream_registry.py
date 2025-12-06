@@ -62,7 +62,8 @@ class StreamRegistry(Registry[HasSeq]):
 
     def set_marker(self, marker_name: str, marker_type: str = '_', marker_seq: int = None):
         if marker_seq is None:
-            marker_seq = self.max_seq
+            marker_seq = self.max_seq + 1
+            # be careful about 1-off errors!  Set the marker _before_ appending
         logger.debug(f"Adding marker: {marker_name}@{marker_type} to {marker_seq}")
         if marker_type not in self.markers:
             self.markers[marker_type] = {}
@@ -103,14 +104,28 @@ class StreamRegistry(Registry[HasSeq]):
     #     return [self.get(uid) for uid in items]
 
     def get_section(self, marker_name: str, marker_type: str = '_', **criteria) -> Iterator[RecordT]:
-        md = self.markers.get(marker_type)
-        if not md or marker_name not in md:
+        """
+        Iterate over records between a named marker and the next marker of the same type.
+
+        Special case: if ``marker_name == "latest"``, the section starts at the most recently
+        set marker of the given ``marker_type`` (i.e., the marker with the highest seq).
+        """
+        md = self.markers.get(marker_type) or {}
+        if not md:
             raise KeyError(f"{marker_name}@{marker_type} not found")
-        start = md[marker_name]
+
+        # Allow a sentinel name to always refer to the most recently set marker of this type.
+        if marker_name == "latest":
+            # pick the marker with the greatest seq; seq is monotonic for this stream
+            marker_name, start = max(md.items(), key=lambda kv: kv[1])
+        else:
+            if marker_name not in md:
+                raise KeyError(f"{marker_name}@{marker_type} not found")
+            start = md[marker_name]
+
         end = self._next_marker_seq(start, marker_type)
         logger.debug(f"{marker_name}@{marker_type} start: {start} end: {end}")
         return self.get_slice(start_seq=start, end_seq=end, **criteria)
-
     # ---- add/push ----
 
     def add_record(self, item: Record | UnstructuredData):

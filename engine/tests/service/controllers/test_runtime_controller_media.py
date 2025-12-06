@@ -90,7 +90,7 @@ def test_get_story_update_returns_runtime_info_with_fragments() -> None:
         ),
     ]
 
-    ledger.records.push_records(*fragments, marker_type="journal", marker_name="step-0001")
+    ledger.records.push_records(*fragments, marker_type="entry", marker_name="step-0001")
 
     controller = RuntimeController()
     frame = Frame(graph=graph, cursor_id=start.uid)

@@ -365,18 +365,20 @@ class Frame:
 
     def jump_to_node(self, destination: Node | UUID, *, include_postreq: bool = False) -> None:
         """Teleport to ``destination`` by following an anonymous edge."""
-
         if isinstance(destination, UUID):
             node = self.graph.get(destination)
         else:
             node = destination
-
         if node is None:
             raise RuntimeError(f"Destination {destination!r} not found in graph")
-
         from tangl.core.graph.edge import AnonymousEdge
-
         bootstrap_edge = AnonymousEdge(destination=node)
+
+        # self.resolve_choice(bootstrap_edge)
+        # return
+        # todo: Why so complicated??  Under which conditions do we want to ignore post-reqs??  Apparently on init when it would suck us into a sink?
+
+        self.records.set_marker(f"jump-entry-{self.step:04d}", "entry")
         next_edge = self.follow_edge(bootstrap_edge)
 
         while isinstance(next_edge, ChoiceEdge):
@@ -415,6 +417,9 @@ class Frame:
         get_available_choices : List choices for user selection
         ChoiceEdge.trigger_phase : Mark edges for automatic following
         """
+
+        # Set a marker on the record stream
+        self.records.set_marker(f"entry-{self.step:04d}", "entry")
 
         cur = choice
         while cur:

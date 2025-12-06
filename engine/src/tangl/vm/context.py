@@ -35,6 +35,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+# todo: bunch of story-related stuff embedded in here.  add an 'enrichment'
+#       layer to the ns or something, but don't be referencing concepts and
+#       locations.
+
+# todo: enrichments should be computed like ns, once per existing object
+#       and cached, using the ns of whoever requested/injected the
+#       enrichment I think.
+
 # dataclass for simplified init and frozen, not serialized or tracked
 @dataclass(frozen=True)
 class Context:
@@ -211,6 +219,7 @@ class Context:
         """Store concept descriptions for template rendering."""
 
         object.__setattr__(self, "concept_descriptions", mapping)
+
 
     def set_current_content(self, content: str | list[BaseFragment] | None) -> None:
         """Store current content during journal pipeline."""

@@ -103,9 +103,13 @@ def test_complete_story_creation() -> None:
         records=StreamRegistry(),
         label="test_story",
     )
+    ledger.push_snapshot()
     ledger.init_cursor()
+
+    assert ledger.cursor_id == story.initial_cursor_id
+    # todo: I think that actually it _should_ be at sink (as it is), b/c this is a terminal choice and it autofollows to the sink?  idk?
     frame = ledger.get_frame()
-    assert frame.cursor.label == "start"
+    assert frame.cursor.label == "start", f"cursor should be 'start' ({frame.cursor.get_label()})"
 
     actions = [
         edge
