@@ -64,7 +64,7 @@ def test_block_journal_renders_inline_content() -> None:
     assert "Inline text" in inline[0].content
 
 
-def test_block_journal_renders_child_concepts() -> None:
+def test_block_journal_collects_concept_descriptions() -> None:
     g = StoryGraph(label="test")
     block = Block(graph=g, label="block")
     first = Concept(graph=g, label="first", content="First")
@@ -75,10 +75,11 @@ def test_block_journal_renders_child_concepts() -> None:
     frame = Frame(graph=g, cursor_id=block.uid)
     fragments = frame.run_phase(P.JOURNAL)
 
-    concept_frags = extract_fragments(fragments, "concept")
-    assert len(concept_frags) == 2
-    contents = {f.content for f in concept_frags}
-    assert {"First", "Second"} <= contents
+    assert extract_fragments(fragments, "concept") == []
+    assert frame.context.concept_descriptions == {
+        "first": "First",
+        "second": "Second",
+    }
 
 
 def test_block_journal_renders_choice_menu() -> None:

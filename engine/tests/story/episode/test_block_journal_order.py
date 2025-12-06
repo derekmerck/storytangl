@@ -37,12 +37,10 @@ def test_block_journal_orders_block_concept_choice() -> None:
 
     assert [fragment.fragment_type for fragment in non_text] == [
         "content",
-        "concept",
         "choice",
     ]
     assert [fragment.content for fragment in non_text] == [
         "Start text",
-        "Concept text",
         "Continue",
     ]
 
@@ -103,17 +101,11 @@ def test_block_journal_places_all_concepts_before_choices() -> None:
 
     assert [fragment.fragment_type for fragment in fragments] == [
         "content",
-        "concept",
-        "concept",
         "choice",
         "choice",
     ]
     assert fragments[0].content == "You enter the tavern."
-    assert {fragments[1].content, fragments[2].content} == {
-        "It smells of ale.",
-        "Music plays softly.",
-    }
-    assert [fragment.content for fragment in fragments[3:]] == [
+    assert [fragment.content for fragment in fragments[1:]] == [
         "Approach bar",
         "Find corner",
     ]

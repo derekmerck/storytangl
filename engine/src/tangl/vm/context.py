@@ -27,6 +27,8 @@ from .provision import (
 )
 
 if TYPE_CHECKING:
+    from tangl.core.record.base_fragment import BaseFragment
+
     from .traversal import TraversableSubgraph
     from .dispatch import Namespace as NS
 
@@ -79,6 +81,11 @@ class Context:
     step: int = -1
     call_receipts: list[CallReceipt] = field(default_factory=list)
     initial_state_hash: Hash = None
+
+    # Journal pipeline state
+    concept_descriptions: dict[str, str] | None = field(default=None)
+    current_content: str | list[BaseFragment] | None = field(default=None)
+    current_choices: list[BaseFragment] | None = field(default=None)
 
     # this is just a dataclass re-implementation of HasLocalBehaviors mixin
     # recall, anything with local behaviors is NOT serializable.
@@ -199,6 +206,21 @@ class Context:
                 # self.call_receipts.extend(call_receipts)
 
         return self._ns_cache[node.uid]
+
+    def set_concept_descriptions(self, mapping: dict[str, str]) -> None:
+        """Store concept descriptions for template rendering."""
+
+        object.__setattr__(self, "concept_descriptions", mapping)
+
+    def set_current_content(self, content: str | list[BaseFragment] | None) -> None:
+        """Store current content during journal pipeline."""
+
+        object.__setattr__(self, "current_content", content)
+
+    def set_current_choices(self, choices: list[BaseFragment] | None) -> None:
+        """Store current choices during journal pipeline."""
+
+        object.__setattr__(self, "current_choices", choices)
 
     provision_offers: dict[UUID | str, list[ProvisionOffer]] = field(default_factory=dict)
     provision_builds: list[BuildReceipt] = field(default_factory=list)

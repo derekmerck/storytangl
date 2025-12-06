@@ -461,3 +461,35 @@ def test_drop_story_without_active_story_raises(runtime_controller: RuntimeContr
 
     with pytest.raises(ValueError, match="no active story"):
         runtime_controller.drop_story(user=user)
+
+
+def test_get_story_update_uses_update_section_for_auto_follow(
+    runtime_controller: RuntimeController,
+) -> None:
+    graph = StoryGraph(label="update-test")
+    start = Block(graph=graph, label="start", content="start content")
+    mid = Block(graph=graph, label="mid", content="mid content")
+    end = Block(graph=graph, label="end", content="end content")
+
+    user_choice = Action(
+        graph=graph, source_id=start.uid, destination_id=mid.uid, label="go"
+    )
+    Action(
+        graph=graph,
+        source_id=mid.uid,
+        destination_id=end.uid,
+        label="auto",
+        trigger_phase=ResolutionPhase.PREREQS,
+    )
+
+    ledger = Ledger(graph=graph, cursor_id=start.uid, records=StreamRegistry())
+    frame = ledger.get_frame()
+
+    frame.resolve_choice(user_choice)
+
+    response = runtime_controller.get_story_update(ledger=ledger, frame=frame)
+    fragments = (response.details or {}).get("fragments", [])
+    contents = [frag.get("content", "") for frag in fragments if isinstance(frag, dict)]
+
+    assert any("step 0001" in text for text in contents)
+    assert any("step 0002" in text for text in contents)

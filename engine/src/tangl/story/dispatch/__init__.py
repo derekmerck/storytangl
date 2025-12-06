@@ -6,6 +6,9 @@ from .story_dispatch import (
     on_journal_content,
     on_describe,
     on_get_choices,
+    on_gather_content,
+    on_post_process_content,
+    on_gather_choices,
 
     # linking
     on_cast_actor,

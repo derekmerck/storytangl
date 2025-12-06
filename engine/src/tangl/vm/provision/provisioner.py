@@ -117,7 +117,7 @@ class GraphProvisioner(Provisioner):
             return
 
         seen: set[UUID] = set()
-        criteria = requirement.get_selection_criteria()
+        criteria = requirement.get_selection_criteria() or {}
         for node in self.node_registry.find_all(**criteria):
             if not requirement.satisfied_by(node):
                 continue

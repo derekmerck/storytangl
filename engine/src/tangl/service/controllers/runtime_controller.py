@@ -180,8 +180,15 @@ class RuntimeController(HasApiEndpoints):
         """Return the current story update, dereferencing media fragments to URLs."""
 
         world_id = self._world_id_for_ledger(ledger)
-        fragments = list(ledger.records.iter_channel("fragment"))
-        fragments = self._latest_step_slice(fragments)
+        try:
+            fragments = list(
+                ledger.records.get_section(
+                    "latest", marker_type="update", has_channel="fragment"
+                )
+            )
+        except KeyError:
+            fragments = list(ledger.records.iter_channel("fragment"))
+            fragments = self._latest_step_slice(fragments)
 
         output_fragments: list[dict] = []
         for fragment in fragments:
