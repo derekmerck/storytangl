@@ -139,8 +139,6 @@ class TestProvisioningHandler:
 class TestUpdateHandler:
     def test_move_processing_stores_results(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
-
         game_block.game_handler.setup(game_block.game)
 
         action = Action(
@@ -149,9 +147,8 @@ class TestUpdateHandler:
             destination_id=game_block.uid,
             payload={"move": "win"},
         )
-        frame.selected_edge = action
 
-        process_game_move(game_block, ctx=ctx)
+        frame.resolve_choice(action)
 
         assert game_block.game.round == 1
         assert game_block.locals["round_result"] is RoundResult.WIN
