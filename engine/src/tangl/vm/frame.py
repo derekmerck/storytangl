@@ -253,8 +253,27 @@ class Frame:
             frame.depth,
         )
 
-    def follow_edge(self, edge: Edge) -> Edge | None:
+    def follow_edge(self, edge: Edge, *, mark_section: bool = True) -> Edge | None:
+        """Advance along ``edge`` and run the phase pipeline once.
+
+        Parameters
+        ----------
+        edge:
+            Edge to traverse.
+        mark_section:
+            When ``True``, set a sliding ``update/latest`` bookmark on the
+            record stream so downstream consumers can slice the latest update
+            as a section. Automatic follow-on edges disable the bookmark to
+            keep the section contiguous.
+        """
+
         logger.debug(f'Following edge {edge!r}')
+
+        if mark_section:
+            start_seq = self.records.max_seq + 1
+            self.records.set_marker(
+                "latest", "update", marker_seq=start_seq, overwrite=True
+            )
 
         # Track the edge being traversed so downstream handlers can introspect
         # the selected payload during this resolution step.
@@ -383,11 +402,11 @@ class Frame:
             trigger_phase = getattr(next_edge, "trigger_phase", None)
 
             if trigger_phase == P.PREREQS:
-                next_edge = self.follow_edge(next_edge)
+                next_edge = self.follow_edge(next_edge, mark_section=False)
                 continue
 
             if trigger_phase == P.POSTREQS and include_postreq:
-                next_edge = self.follow_edge(next_edge)
+                next_edge = self.follow_edge(next_edge, mark_section=False)
                 continue
 
             break
@@ -417,5 +436,7 @@ class Frame:
         """
 
         cur = choice
+        first_step = True
         while cur:
-            cur = self.follow_edge(cur)
+            cur = self.follow_edge(cur, mark_section=first_step)
+            first_step = False
