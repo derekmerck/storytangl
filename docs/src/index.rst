@@ -15,5 +15,6 @@ Documentation is divided into sections:
    :caption: Contents:
 
    api/index
+   mechanics/index
    designer/index
    contrib/index

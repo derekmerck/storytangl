@@ -1,5 +1,15 @@
 # tangl/type_hints.py
-from typing import Protocol, Any, Type, Union, Callable, TypeAlias, MutableMapping, Optional, Self
+from typing import (
+    Protocol,
+    Any,
+    Type,
+    Union,
+    Callable,
+    TypeAlias,
+    MutableMapping,
+    Optional,
+    Self,
+)
 from uuid import UUID
 from enum import Enum
 from pathlib import Path
@@ -11,7 +21,7 @@ StringMap: TypeAlias = MutableMapping[str, Any]
 Primitive: TypeAlias = str | int | float | Enum | bool
 Pathlike: TypeAlias = Path | str
 Typelike: TypeAlias = Type | str
-Predicate: TypeAlias = Callable[[StringMap], bool]
+Predicate: TypeAlias = Callable[[StringMap], bool] | str
 # There is also a MatchPredicate type that takes entities in core
 Hash: TypeAlias = bytes         # Digests are bytes
 

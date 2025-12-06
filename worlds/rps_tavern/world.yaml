@@ -1,0 +1,31 @@
+name: RPS Tavern
+description: Challenge the bartender to Rock Paper Scissors.
+
+graph:
+  nodes:
+    - id: entrance
+      type: Block
+      label: Tavern Entrance
+      content: You enter a smoky tavern. The bartender eyes you suspiciously.
+
+    - id: challenge
+      type: RpsBlock
+      label: RPS Challenge
+      content: "The bartender cracks his knuckles. 'Best two out of three?'"
+
+    - id: victory
+      type: Block
+      label: Victory
+      content: The bartender grumbles and slides you a free ale.
+
+    - id: defeat
+      type: Block
+      label: Defeat
+      content: "You owe me 5 gold," the bartender smirks.
+
+  edges:
+    - source: entrance
+      destination: challenge
+      label: Challenge the bartender
+
+    # Exit edges for victory/defeat are created by the HasGame factory in script.py

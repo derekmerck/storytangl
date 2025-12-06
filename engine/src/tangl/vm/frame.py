@@ -124,6 +124,9 @@ class Frame:
     # # SYSTEM, APPLICATION, AUTHOR layers
     # active_layers: Iterable[BehaviorRegistry] = field(default_factory=list)
 
+    selected_edge: Edge | None = None
+    """Edge most recently chosen by the user or auto-follow logic."""
+
     def get_active_layers(self) -> Iterable[BehaviorRegistry]:
         # We know that we are part of the SYSTEM layer
         from tangl.core.dispatch import core_dispatch
@@ -246,6 +249,10 @@ class Frame:
 
     def follow_edge(self, edge: Edge) -> Edge | None:
         logger.debug(f'Following edge {edge!r}')
+
+        # Track the edge being traversed so downstream handlers can introspect
+        # the selected payload during this resolution step.
+        self.selected_edge = edge
 
         current_ctx = self.context
         if hasattr(edge, "apply_selected"):
