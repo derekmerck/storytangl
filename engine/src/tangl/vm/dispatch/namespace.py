@@ -6,6 +6,7 @@ from collections import ChainMap
 from tangl.core import Entity, Node
 from tangl.core.behavior import HandlerPriority as Prio, CallReceipt, ContextP
 from tangl.core.dispatch.scoped_dispatch import scoped_dispatch
+from tangl.vm import Context
 from .vm_dispatch import vm_dispatch
 
 Namespace: TypeAlias = ChainMap[str, Any]
@@ -22,6 +23,17 @@ logger.setLevel(logging.WARNING)
 def _contribute_locals_to_ns(caller: Entity, *_, **__):
     if hasattr(caller, "locals"):
         return caller.locals
+
+
+@on_get_ns(priority=Prio.EARLY)
+def inject_concept_descriptions(caller, *, ctx: Context, **_):
+    """Make concept descriptions available in namespaces."""
+
+    concept_descriptions = getattr(ctx, "concept_descriptions", None)
+    if not concept_descriptions:
+        return None
+    return concept_descriptions
+
 
 @on_get_ns()
 def _contribute_deps_to_ns(caller: Node, *_, **__):
