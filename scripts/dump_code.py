@@ -209,8 +209,7 @@ if __name__ == "__main__":
     # process_directory(legacy_root / "vm/vm-36",     "tangl36_vm_archive.py")
 
     process_directory(scratch_root / "mechanics/progression", "tangl3x_progression_archive.py", include_notes=True)
-    process_directory(scratch_root / "mechanics/look", "tangl3x_look_archive.py", include_notes=True)
-    process_directory(scratch_root / "compilers/md2yaml", "tangl3x_md2yaml_archive.py", include_notes=True)
+    process_directory(scratch_root / "mechanics/presence", "tangl3x_presence_archive.py", include_notes=True)
     process_directory(scratch_root / "old/docs", "tanglxx_docs_archive.py", include_notes=True)
 
     process_directory(cwx_root / "domain", "tangl2x_cwx_archive.py",
