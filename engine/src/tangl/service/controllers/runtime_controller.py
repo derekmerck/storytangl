@@ -222,6 +222,7 @@ class RuntimeController(HasApiEndpoints):
 
         ledger.cursor_id = frame.cursor_id
         ledger.step = frame.step
+        ledger.record_stack_snapshot()
 
         return RuntimeInfo.ok(
             cursor_id=ledger.cursor_id,
@@ -268,6 +269,7 @@ class RuntimeController(HasApiEndpoints):
 
         ledger.cursor_id = frame.cursor_id
         ledger.step = frame.step
+        ledger.record_stack_snapshot()
 
         return RuntimeInfo.ok(
             cursor_id=ledger.cursor_id,
