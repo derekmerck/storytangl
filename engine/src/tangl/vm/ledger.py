@@ -170,7 +170,23 @@ class Ledger(Entity):
         self.records.add_record(snapshot)
 
     @classmethod
-    def recover_graph_from_stream(cls, records: StreamRegistry) -> Graph:
+    def recover_graph_from_stream(
+        cls,
+        records: StreamRegistry,
+        *,
+        verify_patches: bool = True,
+    ) -> Graph:
+        """Restore a graph from snapshots and patches in ``records``.
+
+        Parameters
+        ----------
+        records:
+            Stream of snapshots and patches to replay.
+        verify_patches:
+            When ``False``, bypass registry state hash checks on patches. Undo
+            operations use this to tolerate partial streams while still applying
+            historical mutations in order.
+        """
 
         # Get the most recent snapshot
         snapshot = records.last(channel="snapshot")  # type: Snapshot[Graph]
@@ -183,10 +199,15 @@ class Ledger(Entity):
             # is_instance=Patch,
             predicate=lambda x: x.seq > seq,
             has_channel="patch",
-            sort_key=lambda x: x.seq)  # type: list[Patch]
+            sort_key=lambda x: x.seq,
+        )  # type: list[Patch]
         # fine if this is [], just returns graph from snapshot
-        for p in patches:
-            graph = p.apply(graph)
+        for patch in patches:
+            patch_to_apply = patch
+            if not verify_patches:
+                patch_to_apply = patch.model_copy(update={"registry_state_hash": None})
+
+            graph = patch_to_apply.apply(graph)
         return graph
 
     def get_journal(self, marker_name: str):
@@ -355,7 +376,9 @@ class Ledger(Entity):
 
         target_snapshot = snapshots[target_step - 1]
         truncated = self.records.slice_to_seq(target_snapshot.seq)
-        self.graph = self.recover_graph_from_stream(truncated)
+        self.graph = self.recover_graph_from_stream(
+            truncated, verify_patches=False
+        )
         self.call_stack = self.recover_stack_from_stream(
             truncated, self.graph, upto_seq=target_snapshot.seq
         )
