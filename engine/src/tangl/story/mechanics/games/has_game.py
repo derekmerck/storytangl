@@ -2,11 +2,10 @@ from __future__ import annotations
 
 """Facet mixin for blocks hosting game instances."""
 
-from collections.abc import Mapping
 from typing import Any, ClassVar, Optional, TYPE_CHECKING
 from uuid import UUID
 
-from tangl.mechanics.games import Game, GameHandler, GameResult
+from tangl.mechanics.games import Game, GameHandler
 
 if TYPE_CHECKING:
     from tangl.core import Graph, Node
@@ -132,7 +131,7 @@ class HasGame:
                 source_id=node.uid,
                 destination_id=victory_dest.uid,
                 trigger_phase=P.POSTREQS,
-                predicate=cls._game_result_predicate(GameResult.WIN),
+                predicate="game_won",
                 label="Victory!",
             )
             node.victory_edge_id = victory_edge.uid
@@ -143,7 +142,7 @@ class HasGame:
                 source_id=node.uid,
                 destination_id=defeat_dest.uid,
                 trigger_phase=P.POSTREQS,
-                predicate=cls._game_result_predicate(GameResult.LOSE),
+                predicate="game_lost",
                 label="Defeat",
             )
             node.defeat_edge_id = defeat_edge.uid
@@ -154,22 +153,9 @@ class HasGame:
                 source_id=node.uid,
                 destination_id=draw_dest.uid,
                 trigger_phase=P.POSTREQS,
-                predicate=cls._game_result_predicate(GameResult.DRAW),
+                predicate="game_draw",
                 label="Draw",
             )
             node.draw_edge_id = draw_edge.uid
 
         return node
-
-    @staticmethod
-    def _game_result_predicate(target: GameResult):
-        """Build a predicate that checks the cursor's game result."""
-
-        def _predicate(ns: Mapping[str, Any]) -> bool:
-            cursor = ns.get("cursor")
-            game = getattr(cursor, "_game", None) if cursor is not None else None
-            if game is None:
-                return False
-            return game.result is target
-
-        return _predicate

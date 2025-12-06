@@ -5,7 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from tangl.core import Graph
-from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult
+from tangl.mechanics.games import Game, GameHandler, GamePhase, RoundResult
 from tangl.story.episode import Block
 from tangl.story.mechanics.games import HasGame
 
@@ -109,9 +109,9 @@ class TestGameBlockFactory:
         assert block.victory_edge_id is not None
 
         edge = graph.get(block.victory_edge_id)
-        block.game.result = GameResult.WIN
-        assert callable(edge.predicate)
-        assert edge.predicate({"cursor": block}) is True
+        assert edge.predicate == "game_won"
+        assert edge.available({"game_won": True}) is True
+        assert edge.available({"game_won": False}) is False
         assert edge.source_id == block.uid
         assert edge.destination_id == victory.uid
         assert edge.trigger_phase is P.POSTREQS
@@ -127,8 +127,9 @@ class TestGameBlockFactory:
         assert block.defeat_edge_id is not None
 
         edge = graph.get(block.defeat_edge_id)
-        block.game.result = GameResult.LOSE
-        assert edge.predicate({"cursor": block}) is True
+        assert edge.predicate == "game_lost"
+        assert edge.available({"game_lost": True}) is True
+        assert edge.available({"game_lost": False}) is False
 
     def test_factory_creates_draw_edge(self) -> None:
         graph = Graph(label="test")
@@ -139,8 +140,9 @@ class TestGameBlockFactory:
         assert block.draw_edge_id is not None
 
         edge = graph.get(block.draw_edge_id)
-        block.game.result = GameResult.DRAW
-        assert edge.predicate({"cursor": block}) is True
+        assert edge.predicate == "game_draw"
+        assert edge.available({"game_draw": True}) is True
+        assert edge.available({"game_draw": False}) is False
 
     def test_factory_without_exits(self) -> None:
         graph = Graph(label="test")

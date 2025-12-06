@@ -153,6 +153,10 @@ def process_game_move(cursor: HasGame, *, ctx: Context, **kwargs: Any):
         cursor.game.round,
     )
 
+    # Context namespaces cache values per cursor; refresh so POSTREQ predicates
+    # read the updated game_* flags from :func:`inject_game_context`.
+    ctx._frame._invalidate_context()
+
     return None
 
 

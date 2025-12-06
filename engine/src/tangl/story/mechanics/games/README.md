@@ -45,6 +45,10 @@ block = RpsBlock.create_game_block(
 6. **POSTREQS** – exit edges created by the factory auto-trigger when predicates
    resolve true.
 
+Exit edges use string predicates (``"game_won"``, ``"game_lost"``, ``"game_draw"``)
+that map directly to the keys injected by the ``inject_game_context`` handler, so
+the VM reads the shared namespace instead of reaching into the facet internals.
+
 ## Creating New Games
 
 1. Subclass ``Game`` and implement scoring/round resolution.

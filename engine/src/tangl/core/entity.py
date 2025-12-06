@@ -375,26 +375,32 @@ class Selectable(BaseModel):
 
 class Conditional(BaseModel):
     """
-    Conditional(predicate: ~typing.Callable[[Entity, dict], bool])
+    Conditional(predicate: ~tangl.type_hints.Predicate)
 
     Lightweight predicate gate for availability checks.
 
     Why
     ----
-    Wraps a callable predicate so conditionals can be stored, serialized, and
+    Wraps simple predicates so conditionals can be stored, serialized, and
     evaluated consistently across domains/handlers.
 
     Key Features
     ------------
-    * **Callable** – `predicate(ns)` returns truthy/falsey.
-    * **Portable** – designed for simple lambdas; richer expressions can be layered later.
+    * **Callable or string** – call ``predicate(ns)`` or read ``ns[predicate]``
+      when ``predicate`` is a key string.
+    * **Portable** – designed for small lambdas or namespace flags; richer
+      expressions can be layered later.
 
     API
     ---
-    - :attr:`predicate` – `(ns: dict) -> bool`.
+    - :attr:`predicate` – ``(ns: dict) -> bool`` or namespace key string.
     - :meth:`available` – evaluate predicate against a namespace.
     """
+
     predicate: Predicate = Field(default=lambda x: True)
 
     def available(self, ns: StringMap) -> bool:
+        if isinstance(self.predicate, str):
+            return bool(ns.get(self.predicate))
+
         return self.predicate(ns) is True
