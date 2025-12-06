@@ -177,6 +177,20 @@ class StreamRegistry(Registry[HasSeq]):
             criteria.setdefault('has_channel', channel)
         return max(self.find_all(**criteria, sort_key=lambda x: x.seq), default=None)
 
+    def slice_to_seq(self, max_seq: int) -> StreamRegistry:
+        """Copy records up to and including ``max_seq`` into a new stream."""
+
+        truncated = StreamRegistry()
+        truncated.markers = {
+            marker_type: {name: seq for name, seq in markers.items() if seq <= max_seq}
+            for marker_type, markers in self.markers.items()
+        }
+
+        for record in self.find_all(predicate=lambda item: item.seq <= max_seq):
+            truncated.add_record(record)
+
+        return truncated
+
     # todo: we will also want something like last_marked(marker_type), which gets
     #       everything from the last marker of that type up to the end, like the last
     #       frame entry.

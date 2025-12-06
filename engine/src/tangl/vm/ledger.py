@@ -5,18 +5,24 @@ State holder for the live graph, cursor, and record stream (snapshots, patches, 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Iterable
+import logging
 from pydantic import Field
 from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BehaviorRegistry
 from .frame import Frame, StackFrame
+from .stack_snapshot import StackSnapshot
 
 if TYPE_CHECKING:
     from tangl.service.user.user import User
     from .replay import Patch
 else:
     User = Entity
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+
 
 class Ledger(Entity):
     """
@@ -58,6 +64,61 @@ class Ledger(Entity):
     Records are not stored on the graph; they live in :attr:`records`. Channels are
     derived from record type ("snapshot", "patch", "fragment").
 
+    Call Stack Persistence
+    -----------------------
+    The call stack is persisted via two mechanisms:
+
+    1. **Direct serialization** (fast path)
+
+       * :attr:`call_stack` serializes with ledger JSON.
+       * Used for REST resume, save/load at the current state.
+       * No stream replay needed.
+       * Source of truth when :attr:`event_sourced` is ``False``.
+
+    2. **Event-sourced snapshots** (time-travel path)
+
+       * :class:`~tangl.vm.stack_snapshot.StackSnapshot` records emitted to the
+         stream after each step.
+       * Used for undo or replay to arbitrary historical states.
+       * Source of truth when :attr:`event_sourced` is ``True``.
+       * Enables validation via checksum comparison.
+       * Produced by :meth:`record_stack_snapshot`; consumed by
+         :meth:`recover_stack_from_stream` and
+         :meth:`~tangl.core.record.StreamRegistry.iter_channel` with
+         ``channel="stack"``.
+
+    Usage Patterns
+    --------------
+    REST interface (fast resume)::
+
+        ledger = Ledger.structure(json_data)  # trusts call_stack in JSON
+        assert ledger.event_sourced is False
+        # call_stack restored directly, no stream replay
+
+    Event-sourced rebuild (time-travel)::
+
+        ledger = Ledger.structure(json_data)
+        ledger.event_sourced = True
+        # Rebuilds call_stack from StackSnapshot records
+        stack = Ledger.recover_stack_from_stream(ledger.records, ledger.graph)
+
+    Undo to step ``N``::
+
+        ledger.undo_to_step(42)
+        # Both graph and call_stack reconstructed to consistent state
+
+    Why two paths
+    -------------
+    Event-sourced systems and request/response flows have different persistence
+    needs:
+
+    * **REST**: Execution spans HTTP requests; fast resume should not require
+      replay.
+    * **Undo**: Time-travel requires consistent historical graph and stack
+      state.
+    * **Validation**: Stream history serves as an audit trail and checksum for
+      serialized state.
+
     **Domains:** Only singleton domains belong at the ledger level. They
     serialize via the usual :meth:`structure`/:meth:`unstructure` hooks for
     singletons; other domain styles are not supported here and should live on
@@ -71,8 +132,13 @@ class Ledger(Entity):
     event_sourced: bool = False
     user: Optional[User] = Field(None, exclude=True)
     cursor_history: list[UUID] = Field(default_factory=list)
-    call_stack: list[StackFrame] = Field(default_factory=list, exclude=True)
-    """Runtime call stack for subroutine jumps (not persisted in snapshots)."""
+    call_stack: list[StackFrame] = Field(default_factory=list)
+    """
+    Runtime call stack for subroutine jumps.
+
+    Included in the serialized ledger payload for save/resume flows; time-travel
+    still reconstructs call stacks from stream snapshots when needed.
+    """
 
     def push_snapshot(self):
         # No particular need to unstructure/serialize this separately from
@@ -87,8 +153,40 @@ class Ledger(Entity):
         if (self.step % snapshot_cadence == 0) or force:
             self.push_snapshot()
 
+    def record_stack_snapshot(self) -> None:
+        """Persist the current call stack as a :class:`StackSnapshot`."""
+
+        from .stack_snapshot import StackFrameSnapshot
+
+        snapshot = StackSnapshot(
+            frames=[
+                StackFrameSnapshot(
+                    return_cursor_id=frame.return_cursor_id,
+                    call_type=frame.call_type,
+                )
+                for frame in self.call_stack
+            ]
+        )
+        self.records.add_record(snapshot)
+
     @classmethod
-    def recover_graph_from_stream(cls, records: StreamRegistry) -> Graph:
+    def recover_graph_from_stream(
+        cls,
+        records: StreamRegistry,
+        *,
+        verify_patches: bool = True,
+    ) -> Graph:
+        """Restore a graph from snapshots and patches in ``records``.
+
+        Parameters
+        ----------
+        records:
+            Stream of snapshots and patches to replay.
+        verify_patches:
+            When ``False``, bypass registry state hash checks on patches. Undo
+            operations use this to tolerate partial streams while still applying
+            historical mutations in order.
+        """
 
         # Get the most recent snapshot
         snapshot = records.last(channel="snapshot")  # type: Snapshot[Graph]
@@ -101,10 +199,15 @@ class Ledger(Entity):
             # is_instance=Patch,
             predicate=lambda x: x.seq > seq,
             has_channel="patch",
-            sort_key=lambda x: x.seq)  # type: list[Patch]
+            sort_key=lambda x: x.seq,
+        )  # type: list[Patch]
         # fine if this is [], just returns graph from snapshot
-        for p in patches:
-            graph = p.apply(graph)
+        for patch in patches:
+            patch_to_apply = patch
+            if not verify_patches:
+                patch_to_apply = patch.model_copy(update={"registry_state_hash": None})
+
+            graph = patch_to_apply.apply(graph)
         return graph
 
     def get_journal(self, marker_name: str):
@@ -167,6 +270,7 @@ class Ledger(Entity):
         graph_data = payload.pop("graph", None)
         # domain_data = payload.pop("domains", None)
         record_data = payload.pop("records", None)
+        call_stack_data = payload.pop("call_stack", None)
         if "graph" not in payload:
             payload["graph"] = Graph()
         ledger = super().structure(payload, **kwargs)
@@ -194,7 +298,96 @@ class Ledger(Entity):
         if ledger.event_sourced and (graph_data is None or not getattr(ledger.graph, "data", {})):
             ledger.graph = cls.recover_graph_from_stream(ledger.records)
 
+        if ledger.event_sourced:
+            ledger.call_stack = cls.recover_stack_from_stream(
+                ledger.records,
+                ledger.graph,
+            )
+            if call_stack_data and ledger.call_stack:
+                serialized_depth = len(call_stack_data)
+                reconstructed_depth = len(ledger.call_stack)
+                if serialized_depth != reconstructed_depth:
+                    logger.warning(
+                        "Serialized call stack depth %s does not match reconstructed depth %s",
+                        serialized_depth,
+                        reconstructed_depth,
+                    )
+        elif call_stack_data:
+            ledger.call_stack = [
+                StackFrame.model_validate(frame_data) for frame_data in call_stack_data
+            ]
+
         return ledger
+
+    @classmethod
+    def recover_stack_from_stream(
+        cls,
+        records: StreamRegistry,
+        graph: Graph,
+        upto_seq: int | None = None,
+    ) -> list[StackFrame]:
+        """Rebuild a call stack from :class:`StackSnapshot` records."""
+
+        predicate = None
+        if upto_seq is not None:
+            predicate = lambda record: record.seq <= upto_seq
+
+        snapshots = list(
+            records.find_all(
+                has_channel="stack",
+                predicate=predicate,
+                sort_key=lambda record: record.seq,
+            )
+        )
+
+        if not snapshots:
+            return []
+
+        snapshot = snapshots[-1]
+        stack: list[StackFrame] = []
+
+        for depth, frame_snapshot in enumerate(snapshot.frames):
+            caller_node = graph.get(frame_snapshot.return_cursor_id)
+            call_site_label = caller_node.label if caller_node is not None else "unknown"
+            frame = StackFrame(
+                return_cursor_id=frame_snapshot.return_cursor_id,
+                call_site_label=call_site_label,
+                call_type=frame_snapshot.call_type,
+                depth=depth,
+            )
+            stack.append(frame)
+
+        return stack
+
+    def undo_to_step(self, target_step: int) -> None:
+        """Rewind ledger state to ``target_step`` using event-sourced history."""
+
+        if not self.event_sourced:
+            raise RuntimeError("undo_to_step requires event_sourced=True")
+
+        if target_step <= 0 or target_step >= self.step:
+            raise ValueError(
+                f"target_step {target_step} must be > 0 and less than current step {self.step}"
+            )
+
+        snapshots = list(self.records.find_all(has_channel="stack"))
+        if len(snapshots) < target_step:
+            raise KeyError(f"No stack snapshot recorded for step {target_step}")
+
+        target_snapshot = snapshots[target_step - 1]
+        truncated = self.records.slice_to_seq(target_snapshot.seq)
+        self.graph = self.recover_graph_from_stream(
+            truncated, verify_patches=False
+        )
+        self.call_stack = self.recover_stack_from_stream(
+            truncated, self.graph, upto_seq=target_snapshot.seq
+        )
+
+        if self.cursor_history and target_step - 1 < len(self.cursor_history):
+            self.cursor_history = self.cursor_history[:target_step]
+            self.cursor_id = self.cursor_history[-1]
+
+        self.step = target_step
 
     def unstructure(self) -> UnstructuredData:
         data = super().unstructure()

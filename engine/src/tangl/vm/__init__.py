@@ -53,6 +53,7 @@ from .replay import Event, EventType, EventWatcher, Patch
 from .resolution_phase import ResolutionPhase
 from .context import Context
 from .frame import Frame, ChoiceEdge, StackFrame
+from .stack_snapshot import StackSnapshot
 from .ledger import Ledger
 from .traversal import (
     TraversableSubgraph,
@@ -101,6 +102,7 @@ __all__ = [
     "Frame",
     "ChoiceEdge",
     "StackFrame",
+    "StackSnapshot",
     "ResolutionPhase",
     "Ledger",
     "Context",

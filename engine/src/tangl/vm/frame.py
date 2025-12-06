@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from copy import deepcopy, copy
 import logging
 
+from pydantic import field_validator
+from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.type_hints import Step
 from tangl.core import StreamRegistry, Graph, Edge, Node, CallReceipt, BaseFragment, BehaviorRegistry
 from tangl.core.behavior import HandlerLayer
@@ -24,8 +26,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 
-@dataclass
-class StackFrame:
+class StackFrame(BaseModelPlus):
     """
     One subroutine call on the call stack.
 
@@ -49,6 +50,11 @@ class StackFrame:
     call_site_label: str
     call_type: str = "generic"
     depth: int = 0
+
+    @field_validator("call_type", mode="before")
+    @classmethod
+    def _set_default_call_type(cls, value: str | None) -> str:
+        return value or "generic"
 
     def __repr__(self) -> str:
         return (

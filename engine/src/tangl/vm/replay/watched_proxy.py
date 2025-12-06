@@ -208,6 +208,9 @@ class WatchedRegistry(WatchedEntityProxy):
         self._emit(event_type=EventType.DELETE, value=key)
         self.__wrapped__.remove(key)
 
+    def __contains__(self, key: object) -> bool:
+        return key in self.__wrapped__
+
     def get(self, key) -> Optional[WatchedEntityProxy]:
         # This covers property accessors and collections of graph items automatically.
         # Singletons and handlers are not covered, but they are not part of the graph state.
