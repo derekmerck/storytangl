@@ -8,7 +8,7 @@ This module has minimal dependencies - just Pydantic for validation
 and the local enums/strategies.
 """
 from __future__ import annotations
-from typing import Any, ClassVar, TypeVar, Generic
+from typing import Any, Callable, ClassVar, Generic, TypeVar
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
@@ -193,6 +193,30 @@ class Game(BaseModel, Generic[Move]):
         raise NotImplementedError(
             "Subclass must implement get_available_moves() or use GameHandler"
         )
+
+    def matches(self, *, predicate: Callable[[Any], bool] | None = None, **criteria: Any) -> bool:
+        """Behavior selection helper for VM dispatch registries."""
+
+        if predicate is not None and not predicate(self):
+            return False
+
+        for key, expected in criteria.items():
+            if key == "is_instance":
+                if not isinstance(self, expected):
+                    return False
+                continue
+
+            if not hasattr(self, key):
+                return False
+
+            current = getattr(self, key)
+            if (key.startswith("has_") or key.startswith("is_")) and callable(current):
+                if not current(expected):
+                    return False
+            elif current != expected:
+                return False
+
+        return True
     
     # ─────────────────────────────────────────────────────────────────────
     # Context export (for namespace injection)

@@ -223,7 +223,7 @@ class Requirement(GraphItem, Generic[NodeT]):
         return self.graph.get(self.reference_id)
 
     def get_selection_criteria(self) -> StringMap:
-        criteria = deepcopy(self.criteria)
+        criteria = deepcopy(self.criteria) or {}
         if self.identifier:
             criteria.setdefault("has_identifier", self.identifier)
         return criteria

@@ -8,10 +8,13 @@ The classic state-independent game demonstrating:
 """
 from __future__ import annotations
 from enum import Enum
-from typing import ClassVar, Type
+from typing import ClassVar, Mapping, Type, TypeVar
 import random
 
 from pydantic import Field
+
+from tangl.journal.content import ContentFragment
+from tangl.vm.dispatch import vm_dispatch
 
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord
@@ -234,3 +237,110 @@ class RpslsGameHandler(SimpleGameHandler[RpslsGame]):
 def _rpsls_random(game: RpslsGame, **ctx) -> RpslsMove:
     """Random RPSLS move."""
     return random.choice(list(RpslsMove))
+
+
+MoveT = TypeVar("MoveT", bound=Enum)
+
+RPS_VERB_TEMPLATES: dict[tuple[RpsMove, RpsMove], str] = {
+    (RpsMove.ROCK, RpsMove.SCISSORS): "{player} crushes {opponent}",
+    (RpsMove.SCISSORS, RpsMove.PAPER): "{player} cuts {opponent}",
+    (RpsMove.PAPER, RpsMove.ROCK): "{player} covers {opponent}",
+}
+
+
+RPSLS_VERB_TEMPLATES: dict[tuple[RpslsMove, RpslsMove], str] = {
+    (RpslsMove.ROCK, RpslsMove.SCISSORS): "{player} crushes {opponent}",
+    (RpslsMove.ROCK, RpslsMove.LIZARD): "{player} crushes {opponent}",
+    (RpslsMove.PAPER, RpslsMove.ROCK): "{player} covers {opponent}",
+    (RpslsMove.PAPER, RpslsMove.SPOCK): "{player} disproves {opponent}",
+    (RpslsMove.SCISSORS, RpslsMove.PAPER): "{player} cuts {opponent}",
+    (RpslsMove.SCISSORS, RpslsMove.LIZARD): "{player} decapitates {opponent}",
+    (RpslsMove.LIZARD, RpslsMove.PAPER): "{player} eats {opponent}",
+    (RpslsMove.LIZARD, RpslsMove.SPOCK): "{player} poisons {opponent}",
+    (RpslsMove.SPOCK, RpslsMove.ROCK): "{player} vaporizes {opponent}",
+    (RpslsMove.SPOCK, RpslsMove.SCISSORS): "{player} smashes {opponent}",
+}
+
+
+def _round_journal_fragments(
+    game: Game[MoveT], *, verb_templates: Mapping[tuple[MoveT, MoveT], str]
+) -> list[ContentFragment] | None:
+    """Render the latest round as content fragments with narrative verbs."""
+
+    if not getattr(game, "history", None):
+        return None
+
+    last_round = game.history[-1]
+    fragments: list[ContentFragment] = [
+        ContentFragment(content=f"**Round {last_round.round_number} of {game.scoring_n}**")
+    ]
+
+    player_move: MoveT = last_round.player_move
+    opponent_move: MoveT | None = last_round.opponent_move
+
+    if opponent_move is None:
+        narrative = "Opponent forfeited."
+    elif last_round.result == RoundResult.DRAW:
+        narrative = f"Both play {player_move.value}. Draw!"
+    else:
+        winner_move: MoveT
+        loser_move: MoveT
+        suffix: str
+
+        if last_round.result == RoundResult.WIN:
+            winner_move = player_move
+            loser_move = opponent_move
+            suffix = " You won this round!"
+        else:
+            winner_move = opponent_move
+            loser_move = player_move
+            suffix = " You lost this round."
+
+        template = verb_templates.get((winner_move, loser_move))
+        verb_line = (
+            template.format(
+                player=winner_move.value.capitalize(),
+                opponent=loser_move.value,
+            )
+            if template
+            else f"{winner_move.value.capitalize()} beats {loser_move.value}"
+        )
+        narrative = f"{verb_line}{suffix}"
+
+    fragments.append(ContentFragment(content=narrative))
+
+    score = game.score or {"player": 0, "opponent": 0}
+    fragments.append(
+        ContentFragment(
+            content=f"*Score: {score.get('player', 0)}-{score.get('opponent', 0)} (first to {game.scoring_n})*"
+        )
+    )
+
+    if getattr(game, "opponent_next_move", None):
+        fragments.append(
+            ContentFragment(
+                content=f"*Your opponent is preparing {game.opponent_next_move.value}...*"
+            )
+        )
+
+    return fragments
+
+
+@vm_dispatch.register(task="generate_journal", caller=RpsGame)
+def rps_generate_journal(game: RpsGame, *, ctx, **kwargs) -> list[ContentFragment] | None:
+    """Generate Rock–Paper–Scissors journal fragments."""
+
+    if not isinstance(game, RpsGame):
+        return None
+
+    return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
+
+
+@vm_dispatch.register(task="generate_journal", caller=RpslsGame)
+def rpsls_generate_journal(game: RpslsGame, *, ctx, **kwargs) -> list[ContentFragment] | None:
+    """Generate Rock–Paper–Scissors–Lizard–Spock journal fragments."""
+
+    if not isinstance(game, RpslsGame):
+        return None
+
+    return _round_journal_fragments(game, verb_templates=RPSLS_VERB_TEMPLATES)
