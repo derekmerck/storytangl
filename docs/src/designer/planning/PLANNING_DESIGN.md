@@ -19,19 +19,6 @@ StoryTangl's planning system enables **dynamic narrative resolution** by:
 
 ---
 
-## Table of Contents
-
-1. [Core Concepts](#core-concepts)
-2. [Architecture Overview](#architecture-overview)
-3. [The Planning Cycle](#the-planning-cycle)
-4. [Provisioning Mechanics](#provisioning-mechanics)
-5. [What's Implemented](#whats-implemented)
-6. [What's Missing](#whats-missing)
-7. [Integration Points](#integration-points)
-8. [Usage Examples](#usage-examples)
-
----
-
 ## Core Concepts
 
 ### The Frontier

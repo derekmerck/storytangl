@@ -19,19 +19,6 @@ StoryTangl's service layer provides a **clean orchestration boundary** between a
 
 ---
 
-## Table of Contents
-
-1. [Core Concepts](#core-concepts)
-2. [Architecture Overview](#architecture-overview)
-3. [The Orchestration Cycle](#the-orchestration-cycle)
-4. [Dependency Injection](#dependency-injection)
-5. [What's Implemented](#whats-implemented)
-6. [What's Missing](#whats-missing)
-7. [Integration Points](#integration-points)
-8. [Usage Examples](#usage-examples)
-
----
-
 ## Core Concepts
 
 ### Service Boundary

@@ -1,6 +1,5 @@
-# Concept Provisioning Design
-
----
+Concept Provisioning Design
+===========================
 
 ## Core Philosophy
 

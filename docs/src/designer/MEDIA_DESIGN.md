@@ -19,21 +19,6 @@ StoryTangl's media subsystem enables **rich multimedia narratives** by:
 
 ---
 
-## Table of Contents
-
-1. [Core Concepts](#core-concepts)
-2. [Architecture Overview](#architecture-overview)
-3. [The Media Lifecycle](#the-media-lifecycle)
-4. [Provisioning Integration](#provisioning-integration)
-5. [Fragment Rendering & Dereferencing](#fragment-rendering--dereferencing)
-6. [Creator Pipeline](#creator-pipeline)
-7. [What's Implemented](#whats-implemented)
-8. [What's Missing](#whats-missing)
-9. [Integration Points](#integration-points)
-10. [Usage Examples](#usage-examples)
-
----
-
 ## Core Concepts
 
 ### MediaResourceInventoryTag (MediaRIT)

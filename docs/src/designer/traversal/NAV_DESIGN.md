@@ -1,14 +1,14 @@
-## Navigation vs Automatic Redirects
+# Navigation vs Automatic Redirects
 
 StoryTangl distinguishes between two types of edge traversal:
 
-### User Choices (Manual Navigation)
+## User Choices (Manual Navigation)
 - Edges with `trigger_phase=None` (the default)
 - Always require explicit user selection via `Frame.resolve_choice()`
 - **Never auto-followed**, even if there's only one available choice
 - Use case: Player decisions, "Continue" prompts, branching paths
 
-### Automatic Redirects (Triggered Jumps)  
+## Automatic Redirects (Triggered Jumps)  
 - Edges with `trigger_phase=P.PREREQS` or `trigger_phase=P.POSTREQS`
 - Auto-followed during phase execution when conditions are met
 - No user interaction - transparent navigation
@@ -31,7 +31,7 @@ ChoiceEdge(
 )
 ```
 
-### Navigation Assistant Pattern
+## Navigation Assistant Pattern
 
 Authors wanting "auto-continue on single choice" can implement this 
 as an optional behavior at the application layer:

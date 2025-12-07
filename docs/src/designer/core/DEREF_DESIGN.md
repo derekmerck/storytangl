@@ -1,5 +1,5 @@
 Dereferencing GraphItems
-------------------------
+========================
 
 **GraphItems** use _properties_ with implicit registry access::
 
