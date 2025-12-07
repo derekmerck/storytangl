@@ -13,7 +13,7 @@
 Version is roughly semantic.
 
 - **Major** is codebase organization
-- **Minor** is incremented across all components on api changes
+- **Minor** is incremented for all components on api changes
 - **Patch** number indicates component-specific rev
 
 3.n.m = v3 codebase, nth revision, mth iteration

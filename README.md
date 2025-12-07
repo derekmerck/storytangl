@@ -531,11 +531,11 @@ A: Existing tools are great for their use cases. StoryTangl actually emerged fro
 A: Optimized for _clarity_ and _correctness_, not speed. It is intended as a reference implementation and platform for theoretical exploration, so I intentionally avoid optimizations that might interfere with simple reasoning about the underlying entities and behaviors. Production systems can borrow the architecture and optimize as needed.
 
 **Q: Can I use this for my game?**  
-A: If you understand the architecture and think that it's stable enough, sure. But, be aware that it is designed as a reference, not a turn-key solution.  And although the library API has been fairly stable for a couple of years now, it may evolve as new versions require new endpoints. 
+A: If you understand the architecture and think that it's stable enough, sure. But, be aware that it is designed as a reference, not a turn-key solution.  And although the library API has been fairly stable for a couple of years now, it may evolve as new features require new endpoints. 
 
 **Q: How do I learn more?**  
 A: Read `AGENTS.md` first as it tracks the current conventions fairly closely.  Then explore `docs/source` and study the tests. The codebase itself is heavily documented and meant to be understood by interacting with it.
 
 ---
 
-**This is a reference implementation.** It prioritizes correctness, clarity, and architectural integrity over performance or feature count. The goal is to demonstrate a novel approach to interactive narrative that others can learn from and build upon.
+**This is a reference implementation.** It prioritizes correctness, clarity, and architectural integrity over performance or feature count. The goal is to demonstrate a novel approach to interactive narrative spaces that others can learn from and build upon.

@@ -131,7 +131,7 @@ class WearableType(AssetType):
 
     @classmethod
     def load_defaults(cls, *args, **kwargs):
-        super().load_instances_from_yaml("tangl.mechanics.presence.wearable", "wearables.yaml")
+        super().load_instances_from_yaml("tangl.mechanics.presence.wearable.examples", "wearables.yaml")
 
 WearableType.load_defaults()
 Wearable = SingletonNode._create_wrapper_cls(WearableType, "Wearable")
