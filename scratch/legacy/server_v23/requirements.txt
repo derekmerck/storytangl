@@ -1,0 +1,4 @@
+connexion
+flask_cors
+redis
+python-redis-lock  # no conda

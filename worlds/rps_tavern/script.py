@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from tangl.core import Graph
-from tangl.mechanics.games import RpsGame, RpsGameHandler
-from tangl.story.mechanics.games import HasGame
-from tangl.story.structure import Block
+from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler
+from tangl.mechanics.games import HasGame
+from tangl.story.episode import Block
 
 
 class RpsBlock(HasGame, Block):

@@ -1,0 +1,420 @@
+# There are /public, /client, and /dev zones
+
+openapi: 3.0.0
+
+servers:
+  - url: "{{ TANGL_API_BASE_PATH }}"
+#  - url: https://api.storytan.gl{{ ST_API_BASE_PATH }}
+
+info:
+  description: "TANGL backend api"
+  version: '{{ TANGL_VERSION }}'
+  title: "{{ TANGL_NAME }}"
+  contact:
+    email: "{{ TANGL_AUTHOR_EMAIL }}"
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+
+paths:
+
+  # Public/Stateless
+  # -----------------------------------
+  /public/api_key:
+    get:
+      summary: Retrieve the api key for a secret or get a new api key and secret
+      x-openapi-router-controller: public
+      operationId: do_get_api_key
+      security: []
+      parameters:
+        - name: secret
+          schema:
+            type: string
+          in: query
+          required: False
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # Public/World-specific
+  # ------------------------------------
+  /public/info/{wo_}:
+    get:
+      summary: Get public world info
+      operationId: do_get_world_info
+      x-openapi-router-controller: public
+      security: []
+      parameters:
+        - in: path
+          name: wo_
+          description: requested world uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Renderable'
+
+  /public/image/{wo_}/{grp_}/{im_}:
+    get:
+      summary: Get a scene image
+      operationId: do_get_world_image
+      x-openapi-router-controller: public
+      security: []
+      parameters:
+        - in: path
+          name: wo_
+          description: requested world uid
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: grp_
+          description: requested image group uid
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: im_
+          description: requested image uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            image/svg+xml: {}
+            # If you want to return a png, must return a response with
+            # proper header from controller
+
+  # CTX-req
+  # -----------------------------------
+
+  #No state update
+  /client/world:
+    get:
+      summary: Get the most recently played world for client
+      operationId: do_get_current_story
+      x-openapi-router-controller: account
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /client/current:
+    get:
+      summary: Get scene content at client bookmark
+      operationId: do_get_current_block
+      x-openapi-router-controller: story
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: wo_
+          description: requested world uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: content blocks response
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/RenderableList'
+
+  /client/do/{uid}:
+    post:
+      summary: Invoke an available action
+      x-openapi-router-controller: story
+      operationId: do_do_action
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: uid
+          description: requested action uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: content blocks response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderableList'
+        '400':
+          description: invalid action request
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              x-nullable: true
+              type: object
+        description: optional callback parameters to action
+
+  # No state update
+  /client/status:
+    get:
+      summary: get game status
+      x-openapi-router-controller: story
+      operationId: do_get_status
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: wo_
+          description: requested world uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: game status for world
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderableList'
+        '400':
+          description: invalid status request
+
+  /client/clear/{wo_}:
+    delete:
+      summary: Reset world state
+      x-openapi-router-controller: account
+      operationId: do_clear_world
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: wo_
+          description: requested world uid
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: hard
+          description: hard reset meta for world
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+
+  # No state update
+  /client/image/{uid}:
+    get:
+      summary: Get image associated with a particular game resource, like an avatar
+      operationId: do_get_story_image
+      x-openapi-router-controller: story
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: uid
+          description: requested resource uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            image/svg+xml: {}
+
+  # ---------------------
+  # Restricted/Dev
+  # ---------------------
+
+  # Dev Stateless
+  /dev/ls/scenes/{wo_}:
+    get:
+      summary: List game scenes
+      x-openapi-router-controller: restricted
+      operationId: do_get_scene_directory
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: wo_
+          description: requested world uid
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: resource_type
+          schema:
+            type: string
+            enum: [scene, actor, facility]
+      responses:
+        '200':
+          description: list by types
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ---------------------
+  # Dev Stateful
+  # ---------------------
+
+  /dev/go/{sc_}/{bl_}:
+    put:
+      summary: Set bookmark to content at block uid
+      operationId: do_set_current_block
+      x-openapi-router-controller: restricted
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      parameters:
+        - in: path
+          name: sc_
+          description: requested scene
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: bl_
+          description: requested block
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: content blocks response
+          content:
+            application/json:
+              schema:
+               $ref: '#/components/schemas/RenderableList'
+        '400':
+          description: invalid block request
+
+  /dev/eval:
+    post:
+      summary: Evaluate a conditional expression on game state
+      x-openapi-router-controller: restricted
+      operationId: do_eval
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      responses:
+        '200':
+          description: result
+          content:
+            application/json:
+              schema:
+                type: object
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        description: expression
+
+  /dev/exec:
+    post:
+      summary: Exec an expression on game state
+      x-openapi-router-controller: restricted
+      operationId: do_exec
+      security:
+        - header_auth: []
+        - cookie_auth: []
+      responses:
+        '200':
+          description: OK
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        description: expression
+
+  /dev/inspect/{uid}:
+    get:
+      summary: inspect a game object
+      x-openapi-router-controller: restricted
+      operationId: do_inspect
+      description: |
+        Inspect a particular game object
+      parameters:
+        - in: path
+          name: uid
+          description: requested game object uid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: object summary
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+
+  securitySchemes:
+    header_auth:
+      type: apiKey
+      name: X-Auth
+      in: header
+      x-apikeyInfoFunc: controllers.check_api_key
+    cookie_auth:
+      type: apiKey
+      name: X-Auth
+      in: cookie
+      x-apikeyInfoFunc: controllers.check_api_key
+
+  schemas:
+
+    Renderable:
+      type: object
+      required:
+        - uid
+      properties:
+        uid:
+          type: string
+          example: 'park'
+        label:
+          type: string
+          example: 'A Day at the Park'
+        desc:
+          type: string
+          example: 'So there I was...'
+        icon:
+          type: string
+          example: forest
+        actions:
+          type: array
+          # sphinxcontrib.openapi does not like this recursion
+#          items:
+#            $ref: '#/components/schemas/RenderableList'
+
+    RenderableList:
+      type: array
+      items:
+        $ref: '#/components/schemas/Renderable'

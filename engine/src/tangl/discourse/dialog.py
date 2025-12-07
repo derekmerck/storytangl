@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Dialog parsing and rendering helpers.
 
@@ -11,6 +9,7 @@ Dialog blocks follow a lightweight Obsidian-style admonition syntax::
 Leading ``>`` markers denote dialog paragraphs; non-dialog paragraphs are
 emitted as narration micro-blocks.
 """
+from __future__ import annotations
 import re
 from dataclasses import dataclass
 from uuid import UUID

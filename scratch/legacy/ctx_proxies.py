@@ -101,7 +101,7 @@ class EntityRegistry(dict[UUID, Entity]):
 class Context:
     entity_registry: EntityRegistry = EntityRegistry()
     maps: list[dict | EntityRegistry] = field(default_factory=list)
-    audit_log:
+    audit_log = None
 
 # There are 2 directions that we need to take this, through scope distance (chain map) and through nesting maps/entities
 
