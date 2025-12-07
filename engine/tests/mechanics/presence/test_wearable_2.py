@@ -1,6 +1,6 @@
 import pytest
 
-from tangl.mechanics.presence.wearable import WearableType, Wearable, WearableState, WearableLayer
+from tangl.mechanics.presence.wearable import WearableType, Wearable, WearableState, WearableLayer, WearableHandler
 from tangl.lang.nominal import DeterminativeType as DT
 from tangl.lang.body_parts import BodyRegion
 
@@ -111,7 +111,7 @@ def test_wearable_covers_multiple_regions(wearables):
     assert BodyRegion.UPPER in dress.covers
     assert BodyRegion.LOWER in dress.covers
 
-@pytest.mark.skip(reason="WearableHandler and transitions not implemented yet")
+# @pytest.mark.skip(reason="WearableHandler and transitions not implemented yet")
 def test_state_transition(wearables):
     coat, _, _, _, _, _, _ = wearables
 

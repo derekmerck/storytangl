@@ -1,7 +1,7 @@
 from __future__ import annotations
 import functools
 from enum import Enum
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, Self
 import logging
 
 from pydantic import Field, field_validator, ValidationInfo, field_serializer
@@ -15,16 +15,6 @@ from .enums import WearableLayer, WearableState
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
-
-# class BodyRegion(EnumPlusMixin, Enum):
-#     # this is in body-region now
-#     HEAD = "head"
-#     UPPER = TOP = "upper"
-#     LOWER = BOTTOM = "lower"
-#     HANDS = "hands"
-#     FEET = "feet"
-#
-
 
 class WearableHandler:
     """
@@ -71,7 +61,7 @@ class WearableType(AssetType):
     # todo: Mix-in the 'Nominal' class, so they render as a noun phrase.
     #       that would include `is_plural` as well
 
-    _instances: ClassVar[dict[str, WearableType]]
+    # _instances: ClassVar[dict[str, WearableType]]
 
     noun: str = Field(None, validate_default=True)
 
@@ -110,23 +100,17 @@ class WearableType(AssetType):
     #                                      json_schema_extra={'instance_var': True})
     # int or int-like, e.g., Quality
 
-    # Any instance methods for wrappers need to be disguised as class methods, so they
-    # can be rebound to the instance in the accessor
-    @classmethod
-    def is_exclusive(cls, self: Wearable):
+    def is_exclusive(self: Self):
         # Unfortunately, this can't be a property b/c it is a singleton method
         return self.has_tags('exclusive') or self.locals.get('exclusive', False)
 
-    @classmethod
-    def can_transition(cls, self: Wearable, to_state: WearableState):
+    def can_transition(self: Self, to_state: WearableState):
         return WearableHandler.can_transition(self, to_state)
 
-    @classmethod
-    def transition(cls, self: Wearable, to_state: WearableState):
+    def transition(self: Self, to_state: WearableState):
         return WearableHandler.transition(self, to_state)
 
-    @classmethod
-    def render_desc(cls, self: Wearable):
+    def render_desc(self: Self):
         return WearableHandler.render_desc(self)
 
     @classmethod
