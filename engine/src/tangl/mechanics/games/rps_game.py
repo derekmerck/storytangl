@@ -327,7 +327,7 @@ def _round_journal_fragments(
 
 
 @vm_dispatch.register(task="generate_journal", caller=RpsGame)
-def rps_generate_journal(game: RpsGame, *, ctx, **kwargs) -> list[ContentFragment]:
+def rps_generate_journal(game: RpsGame, *, ctx, **kwargs) -> list[ContentFragment] | None:
     """Generate Rock–Paper–Scissors journal fragments."""
 
     if not isinstance(game, RpsGame):
@@ -337,7 +337,7 @@ def rps_generate_journal(game: RpsGame, *, ctx, **kwargs) -> list[ContentFragmen
 
 
 @vm_dispatch.register(task="generate_journal", caller=RpslsGame)
-def rpsls_generate_journal(game: RpslsGame, *, ctx, **kwargs) -> list[ContentFragment]:
+def rpsls_generate_journal(game: RpslsGame, *, ctx, **kwargs) -> list[ContentFragment] | None:
     """Generate Rock–Paper–Scissors–Lizard–Spock journal fragments."""
 
     if not isinstance(game, RpslsGame):
