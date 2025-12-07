@@ -485,7 +485,13 @@ def test_get_story_update_uses_update_section_for_auto_follow(
     )
 
     ledger = Ledger(graph=graph, cursor_id=start.uid, records=StreamRegistry())
+    ledger.init_cursor()
     frame = ledger.get_frame()
+
+    response = runtime_controller.get_story_update(ledger=ledger, frame=frame)
+    fragments = (response.details or {}).get("fragments", [])
+    contents = [frag.get("content", "") for frag in fragments if isinstance(frag, dict)]
+    assert any("start content" in text for text in contents), f"expected 'start content' in initial {contents}"
 
     frame.resolve_choice(user_choice)
 
@@ -493,5 +499,4 @@ def test_get_story_update_uses_update_section_for_auto_follow(
     fragments = (response.details or {}).get("fragments", [])
     contents = [frag.get("content", "") for frag in fragments if isinstance(frag, dict)]
 
-    assert any("step 0001" in text for text in contents)
-    assert any("step 0002" in text for text in contents)
+    assert any("end content" in text for text in contents), f"expected 'end content' in final {contents}"
