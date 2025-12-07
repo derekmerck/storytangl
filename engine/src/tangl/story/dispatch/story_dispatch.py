@@ -27,6 +27,28 @@ on_journal_content = partial(story_dispatch.register, task="journal_content")
 on_relationship_change = partial(story_dispatch.register, task="relationship_change")
 on_get_choices = partial(story_dispatch.register, task="get_choices")
 
+# Journal subtasks
+on_gather_content = partial(story_dispatch.register, task="gather_content")
+on_post_process_content = partial(story_dispatch.register, task="post_process_content")
+on_gather_choices = partial(story_dispatch.register, task="gather_choices")
+
+# Journal Subtask Contracts:
+#
+# gather_content:
+#   Signature: (entity, *, ctx, **kwargs) -> str | list[BaseFragment] | None
+#   Semantics: First non-None result wins (first_result)
+#   Purpose: Generate raw content (string for post-processing OR pre-built fragments)
+#
+# post_process_content:
+#   Signature: (entity, *, ctx, **kwargs) -> list[BaseFragment] | None
+#   Semantics: Sequential pipeline - reads/writes ctx.current_content
+#   Purpose: Transform string → fragments (dialog, cards, etc.)
+#
+# gather_choices:
+#   Signature: (entity, *, ctx, **kwargs) -> list[BaseFragment] | None
+#   Semantics: First non-None result wins (first_result)
+#   Purpose: Collect choice fragments from outgoing edges
+
 # story application-level dispatch
 def do_describe(concept: Concept, *,
                 ctx: ContextP,

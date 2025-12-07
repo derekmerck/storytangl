@@ -3,9 +3,9 @@
 Block: cursor node that orchestrates JOURNAL fragments.
 
 JOURNAL handlers (same task, different priorities):
-1) block_fragment (EARLY): render inline block content → content fragments
-2) describe_concepts (NORMAL): render child concepts → "concept" fragments
-3) collect_choices (LATE): gather outgoing actions → "choice" fragments
+1) enrich_namespace (FIRST): describe child concepts into namespace resources
+2) emit_media_fragments (NORMAL): attach media payloads
+3) compose_block_journal (LAST): orchestrate subtasks into a flat fragment list
 
 Only blocks register JOURNAL handlers; other nodes contribute fragments on request.
 """
@@ -17,13 +17,19 @@ import logging
 
 from pydantic import Field
 
-from tangl.core import BaseFragment, Node, CallReceipt, Graph  # noqa
-from tangl.core.behavior import HandlerPriority as Prio
+from tangl.core import BaseFragment, Node, Graph, CallReceipt  # noqa
+from tangl.core.behavior import CallReceipt, HandlerPriority as Prio
 from tangl.vm import ResolutionPhase as P, ChoiceEdge, Context
 from tangl.journal.content import ContentFragment
 from tangl.journal.media import MediaFragment
 from tangl.discourse import DialogHandler
-from tangl.story.dispatch import on_get_choices, on_journal_content, story_dispatch
+from tangl.story.dispatch import (
+    on_gather_choices,
+    on_gather_content,
+    on_get_choices,
+    on_post_process_content,
+    story_dispatch,
+)
 from tangl.story.runtime import ContentRenderer
 from tangl.story.concepts import Concept
 from tangl.media.media_data_type import MediaDataType
@@ -150,68 +156,101 @@ class Block(Node, HasEffects):
             choices.append(edge)
         return choices
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.EARLY)
-    def block_fragment(
-        self: Block, *, ctx: Context, **locals_: Any
-    ) -> list[BaseFragment] | None:
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.FIRST)
+    def enrich_namespace(self: Block, *, ctx: Context, **_: Any) -> None:
         """
-        JOURNAL (EARLY): render inline content via ``journal_content`` handlers.
+        JOURNAL (FIRST): describe concepts into the namespace.
+
+        Concepts act as contextual resources. Their rendered descriptions live in
+        ``ctx.concept_descriptions`` for template expansion but do not emit
+        fragments.
+        """
+
+        descriptions: dict[str, str] = {}
+
+        for concept in self.get_concepts():
+            if not concept.content:
+                continue
+            description = ContentRenderer.render_with_ctx(
+                concept.content,
+                concept,
+                ctx=ctx,
+            )
+            if description:
+                descriptions[concept.label] = description
+
+        if descriptions:
+            ctx.set_concept_descriptions(descriptions)
+
+        return None
+
+    @on_gather_choices(priority=Prio.NORMAL)
+    def block_gather_choices(self: Block, *, ctx: Context, **_: Any):
+        """
+        gather_choices (NORMAL): collect "choice" fragments for outgoing actions.
 
         Returns
         -------
-        list[BaseFragment] | None
+        list[ChoiceFragment] | None
         """
 
-        with ctx._fresh_call_receipts():
-            content_receipts = story_dispatch.dispatch(
-                self, ctx=ctx, task="journal_content"
-            )
-            content_fragments = CallReceipt.merge_results(*content_receipts)
+        fragments: list[BaseFragment] = []
 
-        return content_fragments or None
+        for choice in self.edges_out(is_instance=Action, trigger_phase=None):
+            fragment = choice.choice_fragment(ctx=ctx)
+            if fragment:
+                fragments.append(fragment)
 
-    @on_journal_content(priority=Prio.NORMAL)
-    def render_inline_content(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment]:
+        return fragments or None
+
+    @on_gather_content(priority=Prio.LATE)
+    def block_gather_content(self: Block, *, ctx: Context, **_: Any):
         """
-        journal_content (NORMAL): render the inline ``content`` field.
+        gather_content (LATE): render block templates to raw strings.
 
-        Checks for dialog syntax and emits attributed fragments when detected.
+        Renders the block ``content`` field with the enriched namespace. Returns a
+        string for post-processing; an empty value yields ``None`` so higher
+        priority handlers can win.
         """
 
         if not self.content:
-            return []
+            return None
 
-        rendered = ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
+        return ContentRenderer.render_with_ctx(self.content, self, ctx=ctx)
 
-        if DialogHandler.has_mu_blocks(rendered):
-            mu_blocks = DialogHandler.parse(rendered, source_id=self.uid)
+    @on_post_process_content(priority=Prio.EARLY)
+    def parse_dialog_in_content(self: Block, *, ctx: Context, **_: Any):
+        """
+        post_process_content (EARLY): parse dialog microblocks from strings.
+
+        Reads ``ctx.current_content`` and converts strings into dialog fragments
+        when microblock syntax is present. Fragment lists are passed through
+        unchanged, and ``None`` values are ignored.
+        """
+
+        content = ctx.current_content
+
+        if isinstance(content, list):
+            return content
+
+        if not content:
+            return None
+
+        if not isinstance(content, str):
+            return None
+
+        if DialogHandler.has_mu_blocks(content):
+            mu_blocks = DialogHandler.parse(content, source_id=self.uid)
             return DialogHandler.render(mu_blocks)
 
         return [
             ContentFragment(
-                content=rendered,
+                content=content,
                 source_id=self.uid,
                 tags={f"source_label:{self.label}"} if self.label else None,
-            )
+            ),
         ]
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
-    def describe_concepts(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
-        """
-        JOURNAL (NORMAL): collect "concept" fragments from child concepts.
-
-        Returns
-        -------
-        list[BaseFragment] | None
-        """
-        fragments: list[BaseFragment] = []
-        for concept in self.get_concepts():
-            fragment = concept.concept_fragment(ctx=ctx)
-            if fragment:
-                fragments.append(fragment)
-        return fragments or None
-
-    # @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
     @on_get_choices(priority=Prio.EARLY)
     def provide_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
         """
@@ -221,6 +260,7 @@ class Block(Node, HasEffects):
         -------
         list[ChoiceFragment] | None
         """
+
         fragments: list[BaseFragment] = []
         for choice in self.edges_out(is_instance=Action, trigger_phase=None):
             f = choice.choice_fragment(ctx=ctx)
@@ -228,17 +268,82 @@ class Block(Node, HasEffects):
                 fragments.append(f)
         return fragments or None
 
-    @story_dispatch.register(task=P.JOURNAL, priority=Prio.LATE)
-    def collect_choices(self: Block, *, ctx: Context, **_: Any) -> list[BaseFragment] | None:
+    @story_dispatch.register(task=P.JOURNAL, priority=Prio.LAST)
+    def compose_block_journal(
+        self: Block, *, ctx: Context, **kwargs: Any
+    ) -> list[BaseFragment]:
         """
-        JOURNAL (LATE): merge choice fragments provided by ``get_choices`` handlers.
+        JOURNAL (LAST): orchestrate journal subtasks into flat fragments.
+
+        Pipeline
+        --------
+        1. ``gather_content`` (first-result) → ``ctx.current_content``
+        2. ``post_process_content`` (sequential) → ``ctx.current_content``
+        3. ``gather_choices`` (first-result) → ``ctx.current_choices``
+        4. Assemble content, media, then choice fragments into a list
         """
 
+        ctx.set_current_content(None)
+        ctx.set_current_choices(None)
+
+        # Step 1: gather content
         with ctx._fresh_call_receipts():
-            choice_receipts = story_dispatch.dispatch(self, ctx=ctx, task="get_choices")
-            choices = CallReceipt.merge_results(*choice_receipts)
+            receipts = story_dispatch.dispatch(
+                self, task="gather_content", ctx=ctx
+            )
+            result = CallReceipt.first_result(*receipts)
+            ctx.set_current_content(result)
 
-        return choices or None
+        logger.info(f"After gather_content: {ctx.current_content}")
+
+        # Step 2: sequential post-processing
+        if ctx.current_content is not None:
+            with ctx._fresh_call_receipts():
+                for receipt in story_dispatch.dispatch(
+                    self, task="post_process_content", ctx=ctx
+                ):
+                    if receipt.result is not None:
+                        ctx.set_current_content(receipt.result)
+
+        logger.info(f"After post_process: {ctx.current_content}")
+
+        fragments: list[BaseFragment] = []
+
+        # Step 3: add content fragments
+        if ctx.current_content:
+            if isinstance(ctx.current_content, list):
+                fragments.extend(ctx.current_content)
+            elif isinstance(ctx.current_content, str):
+                fragments.append(
+                    ContentFragment(
+                        content=ctx.current_content,
+                        source_id=self.uid,
+                        tags={f"source_label:{self.label}"} if self.label else None,
+                    )
+                )
+
+
+        # Step 4: append media fragments
+        media_fragments = emit_media_fragments(self, ctx=ctx)
+        if media_fragments:
+            fragments.extend(media_fragments)
+
+        # Step 5: gather choices (first-result semantics)
+        with ctx._fresh_call_receipts():
+            receipts = tuple(
+                story_dispatch.dispatch(self, task="gather_choices", ctx=ctx)
+            )
+            ctx.set_current_choices(CallReceipt.first_result(*receipts))
+
+        logger.info(f"After gather_choices: {ctx.current_choices}")
+
+        if ctx.current_choices:
+            fragments.extend(ctx.current_choices)
+
+        # In compose_block_journal
+        logger.info(f"Final fragments: {fragments}")
+
+        return fragments
 
 
 @story_dispatch.register(task=P.JOURNAL, priority=Prio.NORMAL)
@@ -274,16 +379,12 @@ def emit_media_fragments(block: Block, *, ctx: Context, **_: Any) -> list[BaseFr
 # @story_dispatch.register(task=P.INIT, priority=Prio.NORMAL)
 # def init_block_media(block: Block, *, ctx: Context, **_: Any) -> None:
 #     """INIT: attach static media dependencies declared on the block script."""
-#
 #     world = getattr(ctx.graph, "world", None)
 #     if world is None:
 #         return
-#
 #     block_script = None
 #     if hasattr(world, "get_block_script"):
 #         block_script = world.get_block_script(block.uid)
-#
 #     if block_script is None:
 #         return
-#
 #     attach_media_deps_for_block(graph=ctx.graph, block=block, script=block_script)

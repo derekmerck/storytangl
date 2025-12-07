@@ -253,8 +253,27 @@ class Frame:
             frame.depth,
         )
 
-    def follow_edge(self, edge: Edge) -> Edge | None:
+    def follow_edge(self, edge: Edge, *, mark_section: bool = True) -> Edge | None:
+        """Advance along ``edge`` and run the phase pipeline once.
+
+        Parameters
+        ----------
+        edge:
+            Edge to traverse.
+        mark_section:
+            When ``True``, set a sliding ``update/latest`` bookmark on the
+            record stream so downstream consumers can slice the latest update
+            as a section. Automatic follow-on edges disable the bookmark to
+            keep the section contiguous.
+        """
+
         logger.debug(f'Following edge {edge!r}')
+
+        if mark_section:
+            start_seq = self.records.max_seq + 1
+            self.records.set_marker(
+                "latest", "update", marker_seq=start_seq, overwrite=True
+            )
 
         # Track the edge being traversed so downstream handlers can introspect
         # the selected payload during this resolution step.
@@ -365,29 +384,31 @@ class Frame:
 
     def jump_to_node(self, destination: Node | UUID, *, include_postreq: bool = False) -> None:
         """Teleport to ``destination`` by following an anonymous edge."""
-
         if isinstance(destination, UUID):
             node = self.graph.get(destination)
         else:
             node = destination
-
         if node is None:
             raise RuntimeError(f"Destination {destination!r} not found in graph")
-
         from tangl.core.graph.edge import AnonymousEdge
-
         bootstrap_edge = AnonymousEdge(destination=node)
+
+        # self.resolve_choice(bootstrap_edge)
+        # return
+        # todo: Why so complicated??  Under which conditions do we want to ignore post-reqs??  Apparently on init when it would suck us into a sink?
+
+        self.records.set_marker(f"jump-entry-{self.step:04d}", "entry")
         next_edge = self.follow_edge(bootstrap_edge)
 
         while isinstance(next_edge, ChoiceEdge):
             trigger_phase = getattr(next_edge, "trigger_phase", None)
 
             if trigger_phase == P.PREREQS:
-                next_edge = self.follow_edge(next_edge)
+                next_edge = self.follow_edge(next_edge, mark_section=False)
                 continue
 
             if trigger_phase == P.POSTREQS and include_postreq:
-                next_edge = self.follow_edge(next_edge)
+                next_edge = self.follow_edge(next_edge, mark_section=False)
                 continue
 
             break
@@ -416,6 +437,11 @@ class Frame:
         ChoiceEdge.trigger_phase : Mark edges for automatic following
         """
 
+        # Set a marker on the record stream
+        self.records.set_marker(f"entry-{self.step:04d}", "entry")
+
         cur = choice
+        first_step = True
         while cur:
-            cur = self.follow_edge(cur)
+            cur = self.follow_edge(cur, mark_section=first_step)
+            first_step = False
