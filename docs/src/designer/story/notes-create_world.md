@@ -1,4 +1,5 @@
-How create world _should_ work.
+How create world _should_ work
+==============================
 
 ```yaml
 ScriptMeta:

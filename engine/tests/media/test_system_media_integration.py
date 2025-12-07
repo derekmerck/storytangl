@@ -10,7 +10,7 @@ from tangl.vm import ResolutionPhase as P
 from tangl.vm.context import Context
 from tangl.vm.frame import Frame
 
-from .helpers import MediaWorld, build_world_with_logo_media_block
+from media.helpers import MediaWorld, build_world_with_logo_media_block
 
 
 def test_system_media_fallback(tmp_path, monkeypatch):

@@ -1,15 +1,15 @@
-## MenuBlock: Dynamic Choice Hubs
+# MenuBlock: Dynamic Choice Hubs
 
 MenuBlock extends Block to automatically provision choices from compatible blocks.
 
-### Use Cases
+## Use Cases
 
 - **Location menus**: "You're at the mall. Where to?"
 - **Scene selection**: "Which chapter would you like to visit?"
 - **Quest boards**: "Available quests" (with conditional availability)
 - **Context menus**: Actions based on current world state
 
-### Patterns
+## Patterns
 
 **Pull Pattern (Dependencies)**
 Menu declares what it wants via `selection_criteria`:
@@ -40,7 +40,7 @@ parking.offer_as_affordance(
 **Bidirectional (Both)**
 Pull and push work together - menu gets both shops it asked for AND parking that volunteered.
 
-### Scope Control
+## Scope Control
 
 ```python
 # Only find blocks in same scene
@@ -56,7 +56,7 @@ menu = MenuBlock(
 )
 ```
 
-### Action Labels
+## Action Labels
 
 MenuBlock checks block metadata in order:
 1. `locals['action_text']` - Explicit menu text
@@ -70,11 +70,11 @@ shop = Block(
 )
 ```
 
-### Scene Navigation
+## Scene Navigation
 
 When MenuBlock links to a Scene, it automatically creates Actions to `scene.source` (the canonical entry point), not to the Scene node itself.
 
-### Implementation Notes
+## Implementation Notes
 
 - Creates dependencies during PLANNING phase
 - Materializes Actions during UPDATE phase

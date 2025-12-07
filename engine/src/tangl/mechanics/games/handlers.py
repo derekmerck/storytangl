@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# todo: should probably register these on story dispatch instead of vm
+
 
 @vm_dispatch.register(task=P.PREREQS, caller=HasGame)
 def setup_game_on_first_visit(cursor: HasGame, *, ctx: Context, **kwargs: Any):

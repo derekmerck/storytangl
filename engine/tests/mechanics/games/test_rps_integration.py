@@ -3,11 +3,10 @@ from __future__ import annotations
 """Integration tests covering RPS gameplay through the VM pipeline."""
 
 from tangl.core import Graph, StreamRegistry
-from tangl.mechanics.games import GamePhase, GameResult
+from tangl.mechanics.games import GamePhase, GameResult, HasGame
 from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler, RpsMove
 from tangl.story import Block
-from tangl.story.mechanics.games import HasGame
-from tangl.story.mechanics.games.handlers import provision_game_moves
+from tangl.mechanics.games.handlers import provision_game_moves
 from tangl.vm import ChoiceEdge, Ledger, get_visit_count
 
 

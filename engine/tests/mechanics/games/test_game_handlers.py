@@ -5,10 +5,9 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import Graph
-from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult
+from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
 from tangl.story.episode import Action, Block
-from tangl.story.mechanics.games import HasGame
-from tangl.story.mechanics.games.handlers import (
+from tangl.mechanics.games.handlers import (
     generate_game_journal,
     inject_game_context,
     process_game_move,

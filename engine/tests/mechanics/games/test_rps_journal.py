@@ -11,7 +11,7 @@ from tangl.mechanics.games.rps_game import (
     RpslsMove,
 )
 from tangl.story.episode import Block
-from tangl.story.mechanics.games import HasGame
+from tangl.mechanics.games import HasGame
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import Frame, ResolutionPhase as P
 

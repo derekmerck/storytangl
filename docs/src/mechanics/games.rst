@@ -11,8 +11,8 @@ Quick start
 .. code-block:: python
 
    from tangl.mechanics.games import RpsGame, RpsGameHandler
-   from tangl.story.mechanics.games import HasGame
-   from tangl.story.structure import Block
+   from tangl.mechanics.games import HasGame
+   from tangl.story.episode import Block
 
    class RpsBlock(HasGame, Block):
        """Rock–Paper–Scissors block with a game facet."""
@@ -49,17 +49,10 @@ Creating new games
    history tracking.
 2. Implement a :class:`tangl.mechanics.games.GameHandler` that returns available
    moves and resolves rounds by mutating the game instance.
-3. Subclass :class:`tangl.story.mechanics.games.HasGame` on your story block and
+3. Subclass :class:`tangl.mechanics.games.HasGame` on your story block and
    configure ``_game_class`` and ``_game_handler_class`` (or override via
    ``create_game_block``).
 4. Wire exit destinations through the factory to route victory/defeat/draw states.
 5. Add integration tests under ``engine/tests/story/mechanics/games`` to validate
    move flows and predicate-driven exits.
 
-API reference
--------------
-
-.. automodule:: tangl.story.mechanics.games
-   :members:
-   :undoc-members:
-   :show-inheritance:

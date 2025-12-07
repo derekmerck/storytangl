@@ -5,9 +5,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from tangl.core import Graph
-from tangl.mechanics.games import Game, GameHandler, GamePhase, RoundResult
+from tangl.mechanics.games import Game, GameHandler, GamePhase, RoundResult, HasGame
 from tangl.story.episode import Block
-from tangl.story.mechanics.games import HasGame
 
 
 class SampleGame(Game):

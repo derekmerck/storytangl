@@ -4,9 +4,8 @@ from tangl.vm import Frame, ResolutionPhase as P
 from tangl.vm.dispatch import vm_dispatch
 from tangl.story.dispatch import story_dispatch
 from tangl.story.episode import Block
-from tangl.story.mechanics.games import HasGame
 from tangl.story.story_graph import StoryGraph
-from tangl.mechanics.games import Game
+from tangl.mechanics.games import Game, HasGame
 from tangl.journal.content import ContentFragment
 
 
