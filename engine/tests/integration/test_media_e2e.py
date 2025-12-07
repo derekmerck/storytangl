@@ -13,11 +13,12 @@ from tangl.vm.context import Context
 from tangl.vm.frame import Frame
 
 
-WORLD_ROOT = Path("engine/tests/resources/worlds")
 
 
-def test_media_full_flow_world_scope() -> None:
+def test_media_full_flow_world_scope(resources_dir) -> None:
     """E2E: YAML world -> MediaDeps -> bound RITs -> media fragments with URLs."""
+
+    WORLD_ROOT = resources_dir / "worlds"
 
     registry = WorldRegistry(world_dirs=[WORLD_ROOT])
     world = registry.get_world("media_e2e")

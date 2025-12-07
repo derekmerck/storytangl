@@ -28,5 +28,5 @@ def SceneL():
 
 
 @pytest.fixture
-def media_mvp_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "resources" / "worlds" / "media_mvp"
+def media_mvp_path(resources_dir) -> Path:
+    return resources_dir / "worlds" / "media_mvp"

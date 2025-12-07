@@ -9,7 +9,7 @@ import logging
 import pydantic
 from pydantic import Field, field_validator
 
-from tangl.type_hints import UniqueLabel
+from tangl.type_hints import UniqueLabel, Tag
 from tangl.core import Singleton
 from .graph import Graph  # for pydantic model schema
 from .node import Node
@@ -61,6 +61,11 @@ class SingletonNode(Node, Generic[WrappedType]):
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
     label: UniqueLabel = Field(...)  # required now
+    # tags: set[Tag] = Field(default_factory=set, json_schema_extra={"instance_var": True})
+
+    def has_tags(self, *tags: Tag) -> bool:
+        # all_tags = self.tags.union(self.reference_singleton.tags)
+        return self.reference_singleton.has_tags(*tags)
 
     # noinspection PyNestedDecorators
     @field_validator("label")

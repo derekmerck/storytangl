@@ -10,6 +10,7 @@ def setup_wearable():
     WearableType.load_defaults()
     yield
     WearableType.clear_instances()
+    WearableType.load_defaults()
 
 def test_wearable():
     instance_labels = Wearable.wrapped_cls.all_instance_labels()
