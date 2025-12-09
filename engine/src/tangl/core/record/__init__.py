@@ -33,7 +33,7 @@ A :class:`Record` is the smallest unit of runtime history.
 It is a frozen, graph-independent entity with:
 
 * ``id: UUID`` – unique identity.
-* ``seq: int`` – a monotone sequence number **within a single stream**.
+* ``seq: int`` – a monotone sequence number **over all records**.
 * ``origin_id: UUID | None`` – the entity primarily responsible for this
   record being created (behavior, node, service, etc.).
 * ``tags: set[str]`` – arbitrary labels for downstream indexing, filtering,
@@ -163,7 +163,7 @@ To handle this multiplexing cleanly, we use **tags** rather than a dedicated
 * Helpers such as ``has_channel("journal")`` are provided to check for
   ``"channel:journal"`` in the tag set.
 
-Typical queries combine type and channel, for example:
+Find queries can combine type and channel, for example:
 
 * ``stream.find_all(is_instance=BaseFragment, has_channel="journal")``
 * ``stream.find_all(is_instance=CallReceipt, has_channel="planning")``
@@ -195,8 +195,7 @@ Key properties:
   ``seq`` within that stream.
 * **Heterogeneous** – any :class:`Record` subclass can be stored in the same
   stream.
-* **Queryable** – records can be filtered by seq range, tags, channels, and
-  arbitrary criteria (including ``is_instance``).
+* **Queryable** – records can be filtered with common helpers for type, seq range, tags, and channel, as well as with arbitrary criteria by using a predicate function.
 
 Typical operations include:
 

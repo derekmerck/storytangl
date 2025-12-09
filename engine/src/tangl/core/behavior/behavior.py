@@ -154,6 +154,7 @@ CT = TypeVar("CT", bound=Entity)
 
 @total_ordering
 class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
+    # language=rst
     """
     Behavior(func: ~typing.Callable[[Entity, ...], typing.Any], priority: int = NORMAL)
 
@@ -210,7 +211,8 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
     def get_label(self) -> str:
         return self.label or self.func.__name__
 
-    # classification is inferred in _populate_from_funcinfo unless explicitly provided
+    # type, caller, owner classifications are inferred in `cls._populate_from_func_info`
+    # unless explicitly provided
     handler_type: HandlerType
     caller_cls: Type[CT] = None   # for selection and dist; can infer on bind/call
     owner: OT | weakref.ReferenceType[OT] | None = None
@@ -225,7 +227,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         Also normalizes a bound caller method (self, no 'caller') to unbound
         to avoid double-binding at call time.
         """
-        # todo: can't we merge _all_ of this into func info's preprocessor
+        # todo: can't we merge _all_ of this into func_info's preprocessor
         #       as hints?
         func = values.get("func")
         if func is None:
@@ -341,6 +343,7 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
         return self._criteria_specificity(**self.get_selection_criteria())
 
     def sort_key(self, caller: CT = None):
+        # language=rst
         """
         Return the stable ordering tuple used by Behavior registries.
 
@@ -453,7 +456,8 @@ class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
             ctx.call_receipts.append(receipt)
         return receipt
 
-    def unstructure(self) -> StringMap:
+    def model_dump(self):
+        # language=rst
         """
         Behaviors intentionally do not serialize because they capture callables
         and weak references. Persist references to registries/owners instead.

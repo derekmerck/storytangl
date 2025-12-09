@@ -16,6 +16,7 @@ from tangl.utils.sanitize_str import sanitize_str
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+# match is so noisy that we put it into its own channel
 match_logger = logging.getLogger(__name__ + '.match')
 match_logger.setLevel(logging.WARNING)
 
@@ -25,6 +26,7 @@ def is_identifier(func: Callable) -> Callable:
     return func
 
 class Entity(BaseModelPlus):
+    # language=rst
     """
     Entity(label: str, tags: set[str])
 
@@ -64,13 +66,16 @@ class Entity(BaseModelPlus):
     label: Optional[str] = Field(None, json_schema_extra={'is_identifier': True})
     tags: set[Tag] = Field(default_factory=set)
     # tag syntax can be used by the _parser_ as sugar for various attributes
-    # - indicate domain memberships       domain
+    # - indicate membership               domain:<foo> or channel:<foo>
     # - automatically set default values  .str=100
     # - indicate relationships            @other_node.friendship=+10
+    # However, such logic is NOT built into the base functionality
 
     @field_validator('label', mode="after")
     @classmethod
     def _sanitize_label(cls, value):
+        # Any entity may be coerced into a namespace using its label in
+        # the identifier.  It's easiest to just sanitize it when set.
         if isinstance(value, str):
             value = sanitize_str(value)
         return value
@@ -149,10 +154,12 @@ class Entity(BaseModelPlus):
             match_logger.warning("Matching `is_instance(self, object)`: this is harmless but it always returns True and is almost certainly not what you intended to do.")
         return isinstance(self, obj_cls)
 
+    # todo: push this into a pure utility
     def get_tag_kv(self,
                    prefix: str | None = None,
                    enum_type: type | None = None) -> set[Tag]:
-        # actually of -> set[enum_type] if given
+        # actually type hint: -> set[enum_type] if given
+        # language=rst
         """
         Extract tag values for a given key prefix and/or enum_type.
 
@@ -264,7 +271,9 @@ class Entity(BaseModelPlus):
         # For persistent id's, use either the uid or a field annotated as UniqueLabel
         return hashing_func(self.__class__, self.uid)
 
-    # Entities are not frozen, should not be hashed or used in sets, use the uid directly if necessary
+    # Entities are mutable, so they generally should not be hashed or used in sets.
+    # Use entity.uid if a hashable identifier is required.
+
     # def __hash__(self) -> int:
     #     return hash((self.uid, self.__class__))
 
@@ -299,7 +308,7 @@ class Entity(BaseModelPlus):
         """
         Unstructure an object into a string-keyed dict of unflattened data.
         """
-        # Also excludes any fields attrib 'exclude' (Pydantic only, not dataclass)
+        # Automatically excludes any fields attrib 'exclude' (Pydantic only, not dataclass)
         exclude = set(self._fields(serialize=False))
         # logger.debug(f"exclude={exclude}")
         data = super().model_dump(
@@ -308,7 +317,7 @@ class Entity(BaseModelPlus):
             exclude_defaults=True,
             exclude=exclude,
         )
-        data['uid'] = self.uid  # uid is considered Unset initially
+        data['uid'] = self.uid  # uid is factoried, so it is considered Unset initially
         data["obj_cls"] = self.__class__
         # The 'obj_cls' key _may_ be flattened by some serializers.  If flattened as qual name,
         # it can be unflattened with `Entity.dereference_cls_name`
@@ -375,6 +384,9 @@ class Selectable(BaseModel):
         # return filter(filt_, values)
 
 
+# todo: is this a redundancy on Selectable with only the predicate function?
+#       it also duplicates some functionality from `tangl.vm.runtime.has_conditions`,
+#       making it unclear when to use each variant.
 class Conditional(BaseModel):
     """
     Conditional(predicate: ~tangl.type_hints.Predicate)

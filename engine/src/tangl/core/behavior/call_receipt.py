@@ -1,4 +1,5 @@
 # /tangle/core/behavior/call_receipt.py
+# language=rst
 """
 Job receipts
 ------------
@@ -40,6 +41,7 @@ class AggregatorType(Enum):
     ALL = "all"
 
 class CallReceipt(Record):
+    # language=rst
     """
     CallReceipt(origin: Behavior, result: Any)
 

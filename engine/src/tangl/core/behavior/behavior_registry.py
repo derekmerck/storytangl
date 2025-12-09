@@ -1,4 +1,5 @@
 # tangl/core/behavior/behavior_registry.py
+# language=rst
 """
 Behavior Registry – dispatch (v3.7.2)
 
@@ -39,6 +40,11 @@ API
 - :meth:`BehaviorRegistry.add_behavior` / :meth:`BehaviorRegistry.register` — add behaviors.
 - :class:`~tangl.core.dispatch.behavior.Behavior` — behavior wrapper and sort key.
 - :class:`~tangl.core.dispatch.call_receipt.CallReceipt` — audit record for each call.
+
+.. admonition:: No serialization!
+    Behaviors do _not_ structure and unstructure, so non-singletons that need to serialize
+    should _never_ carry a BehaviorRegistry.  Singletons _can_ carry BehaviorRegistries
+    because they serialize by uid, not by state.
 """
 from __future__ import annotations
 from typing import Type, Callable, Iterator, Iterable
@@ -58,6 +64,7 @@ logger.setLevel(logging.WARNING)
 # Registry/Dispatch
 
 class BehaviorRegistry(Selectable, Registry[Behavior]):
+    # language=rst
     """
     BehaviorRegistry(data: dict[~uuid.UUID, Behavior])
 
@@ -110,6 +117,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                      owner_cls: Type[Entity] | None = None,
                      caller_cls: Type[Entity] | None = None,
                      **attrs):
+        # language=rst
         """
         Register a :class:`Behavior` or a plain callable into this registry.
 
@@ -247,6 +255,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                  extra_handlers: list[HandlerFunc|Behavior] = None,  # loose handlers
                  dry_run=False                # just print handlers
                  ) -> Iterator[CallReceipt]:
+        # language=rst
         """
         Select, sort, and execute matching behaviors.
 
@@ -345,6 +354,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                        extra_handlers: list[HandlerFunc | Behavior] = None,  # loose handlers
                        dry_run=False          # just print handlers
                        ) -> Iterator[CallReceipt]:
+        # language=rst
         """
         Select, sort, and invoke matching behaviors across multiple registries.
 
@@ -364,6 +374,7 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
                                   dry_run=dry_run)
 
     def all_tasks(self) -> list[str]:
+        # language=rst
         """
         Return the list of non‑``None`` behavior tasks present in this registry.
         """

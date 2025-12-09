@@ -16,11 +16,12 @@ from tangl.core.registry import Registry
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-# note: currently HasSeq uses a different instance counter _per_ class and shares
+# note: currently HasSeq uses a global instance counter on Record and shares
 #       that counter across all sessions/frames regardless of differences in graph
 #       or owner. Practically this means that JournalFragment seq's, for example,
 #       will be monotonic in creation order, but NOT continuous if any other records
-#       are also being generated.
+#       are also being generated.  There doesn't seem to be any compelling reason to
+#       manage multiple iterators for specific domains.
 
 # •	A StreamRegistry is append-only; seq is unique and monotonic.
 # •	Sections are half-open: get_section(X) yields seq ∈ [marker(X), next_marker); never overlaps.

@@ -14,6 +14,7 @@ logger.setLevel(logging.WARNING)
 EntityT = TypeVar('EntityT', bound=Entity)
 
 class Snapshot(Record, ContentAddressable, Generic[EntityT]):
+    # language=rst
     """
     Snapshot[EntityT]()
 

@@ -14,9 +14,9 @@ logger.setLevel(logging.WARNING)
 
 RecordT = TypeVar('RecordT', bound=Record)
 
-# todo: type should be Entity with HasSeq?
 
 class StreamRegistry(Registry[HasSeq]):
+    # language=rst
     """
     StreamRegistry(data: dict[~uuid.UUID, Record])
 
@@ -45,6 +45,7 @@ class StreamRegistry(Registry[HasSeq]):
     max_seq: int = -1
 
     def find_all(self, sort_key: Callable[[RecordT], object] | None = None, **criteria) -> Iterator[RecordT]:
+        # language=rst
         """Iterate over records matching ``criteria`` sorted by ``seq`` by default."""
 
         effective_sort_key = sort_key or (lambda record: record.seq)
@@ -67,6 +68,7 @@ class StreamRegistry(Registry[HasSeq]):
         *,
         overwrite: bool = False,
     ) -> None:
+        # language=rst
         """Bookmark ``marker_seq`` for ``marker_name`` under ``marker_type``.
 
         Parameters
@@ -106,9 +108,6 @@ class StreamRegistry(Registry[HasSeq]):
 
     # ---- slicing ----
 
-    # todo: anytime you find_all on a record stream, you want to sort it _at_least_ by seq
-    #       should just overload find all to do that by default unless flagged not to.
-
     def get_slice(self, start_seq: int, end_seq: int, *, predicate=None, **criteria) -> Iterator[RecordT]:
         def _predicate(record: RecordT) -> bool:
             if not start_seq <= record.seq < end_seq:
@@ -128,6 +127,7 @@ class StreamRegistry(Registry[HasSeq]):
     #     return [self.get(uid) for uid in items]
 
     def get_section(self, marker_name: str, marker_type: str = '_', **criteria) -> Iterator[RecordT]:
+        # language=rst
         """
         Iterate over records between a named marker and the next marker of the same type.
 
@@ -196,20 +196,6 @@ class StreamRegistry(Registry[HasSeq]):
         self.set_marker(name, marker_type, start_seq)
 
         return start_seq, self.max_seq
-
-    # ---- channel/criteria convenience ----
-    #
-    # def iter_channel(self, channel: str, **criteria) -> Iterator[Record]:
-    #     """
-    #     Filter by channel tag.
-    #
-    #     Same as:
-    #     - find_all( has_channel=x )
-    #     - find_all( has_tags={'channel:x'} )
-    #     """
-    #     if channel is not None:
-    #         criteria.setdefault('has_channel', channel)
-    #     yield from self.find_all(**criteria, sort_key=lambda x: x.seq)
 
     def last(self, channel: str = None, **criteria) -> Optional[Record]:
         """Last by seq that matches criteria."""
