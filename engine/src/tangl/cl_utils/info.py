@@ -1,7 +1,6 @@
 # tangl/cl_utils/info.py
 from __future__ import annotations
 
-import json
 import sys
 
 from tangl.service.controllers.system_controller import SystemController

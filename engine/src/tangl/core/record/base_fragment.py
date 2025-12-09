@@ -6,12 +6,15 @@ from pydantic import Field, ConfigDict
 
 from .record import Record
 
-# red, output, linked within by red, without by yellow
+# note:
+# BaseFragment stays in core as the minimal narrative/UI record envelope.
+# Derived fragment types (text/media/group/control, etc.) should live with the
+# journal/story layer (e.g. `tangl.journal`), not in core.
 
-class BaseFragment(Record, extra='allow'):
+class BaseFragment(Record):
     # language=rst
     """
-    BaseFragment(fragment_type: str)
+    BaseFragment(fragment_type: str | Enum | None = None)
 
     Minimal envelope for narrative/UI fragments emitted during resolution.
 
@@ -19,24 +22,36 @@ class BaseFragment(Record, extra='allow'):
     ----
     Journal output is a linear stream of immutable fragments. This base class
     supplies the common schema so domains can emit text/media/control updates in a
-    uniform way.
+    uniform way, while the client layer decides how to render them.
 
     Key Features
     ------------
-    * **Record-derived** – immutable, sequenced, channel-filterable.
-    * **Typed** – :attr:`fragment_type` (e.g., `text`, `media`, `kv`, `group`, `control`).
-    * **Extensible** – higher-level fragment types (:class:`Content<ContentFragment>`/:class:`Control<ControlFragment>`/:class:`Group<GroupFragment>`/:class:`KV<KvFragment>`) add
-      their own content schema but share the same envelope.
+    * **Record-derived** – immutable, globally sequenced, tag/channel-filterable
+      via :class:`Record` and :class:`StreamRegistry`.
+    * **Client-facing type** – :attr:`fragment_type` (e.g., ``"text"``,
+      ``"media"``, ``"kv"``, ``"group"``, ``"control"``) tells the
+      *presentation layer* how to interpret the payload once serialized to JSON.
+    * **Extensible payload** – higher-level fragment types
+      (:class:`ContentFragment`, :class:`ControlFragment`,
+      :class:`GroupFragment`, :class:`KvFragment`, media fragments, etc.)
+      add their own fields but share this envelope.
 
     API
     ---
-    - :attr:`fragment_type` – enum/str indicating display/processing semantics.
+    - :attr:`fragment_type` – enum/str indicating display/processing semantics
+      at the client boundary.
 
     Notes
     -----
-    Fragments form the **Journal** (non-replayable UX) as distinct from **Events**
-    (replayable ops). Use origin links to trace a fragment back to originating
-    graph entities or handlers.
+    Fragments form the **Journal** (non-replayable UX) as distinct from
+    **Events** or **Patches** (replayable state changes). Use :attr:`origin_id`
+    and :meth:`Record.origin` to trace a fragment back to originating graph
+    entities or handlers.
+
+    The engine routes fragments by concrete Python type and tags (e.g.,
+    ``is_instance=BaseFragment`` with ``has_channel="journal"``). The
+    :attr:`fragment_type` field exists primarily for clients that only see the
+    JSON representation and need a cheap discriminator for rendering logic.
     """
     model_config = ConfigDict(extra='allow')
 
