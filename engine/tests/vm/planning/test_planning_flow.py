@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pytest
 
-from tangl.core import Graph, Node
+from tangl.core import Graph, Node, BaseFragment
 from tangl.core.graph.edge import AnonymousEdge
 from tangl.vm import (
     Frame,
@@ -10,6 +10,7 @@ from tangl.vm import (
     Dependency,
     Affordance,
     ProvisioningPolicy,
+    Patch
 )
 from tangl.vm.dispatch import planning
 from tangl.vm.provision import PlanningReceipt, BuildReceipt
@@ -148,13 +149,13 @@ def test_event_sourced_frame_records_planning_receipt_and_patch():
     assert projected is not None
 
     section = list(frame.records.get_section("step-0001", marker_type="frame"))
-    assert section[0].record_type == "planning_receipt"
-    assert section[-1].record_type == "patch"
-    assert any(record.record_type == "fragment" for record in section)
+    assert isinstance( section[0], PlanningReceipt)
+    assert isinstance( section[-1], Patch )
+    assert any(isinstance(rec, BaseFragment) for rec in section)
 
     frame.run_phase(P.UPDATE)
     patch = frame.phase_outcome[P.FINALIZE]
-    assert patch is not None and patch.record_type == "patch"
+    assert patch is not None and isinstance(patch, Patch)
     assert patch.registry_state_hash == baseline_hash
     # maybe doesn't get cleared on finalize anymore?
     # assert frame.event_watcher.events == []

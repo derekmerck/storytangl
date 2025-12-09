@@ -45,7 +45,7 @@ A tiny **phase bus** dispatches **handlers** by `(phase, priority)`: `validate`,
 - **One patch per tick**; canonical op ordering.  
 - **Seeded RNG** per tick `(story_id, epoch, choice, payload_hash)`.  
 - **External IO** (LLMs/media) goes through a deterministic IO port and is recorded in the Patch.  
-- **Provenance** (blame edges) on nodes, edges, patches, and journal entries.
+- **Provenance** (origin edges) on nodes, edges, patches, and journal entries.
 
 ## Why This Matters
 - **Validate** story spaces as solvable/coherent; detect unreachable beats and unsatisfied roles.  
@@ -124,7 +124,7 @@ _Status_: VALIDATE/PLANNING/UPDATE/JOURNAL/FINALIZE dispatch through handlers; r
 
 ## Design Tenets
 - **Deterministic**: stable handler ordering; (planned) one patch per tick; seeded RNG per tick.
-- **Observable**: event log now; (planned) blame/provenance edges; patch metadata `{plugin, version, code_sha}`.
+- **Observable**: event log now; (planned) origin/provenance edges; patch metadata `{plugin, version, code_sha}`.
 - **Extensible**: minimal contracts (entities/graph, handlers, providers, domains).
 - **Portable**: keep the IR/rules spec‑first; Python impl stays pragmatic and thin.
 

@@ -88,7 +88,7 @@ class ProvisionOffer(Entity):
     selection_criteria: StringMap = Field(default_factory=dict)
 
     @property
-    def blame_id(self) -> UUID | None:  # pragma: no cover - compatibility hook
+    def origin_id(self) -> UUID | None:  # pragma: no cover - compatibility hook
         """Expose the originating provisioner identifier."""
 
         return self.source_provisioner_id
@@ -172,10 +172,9 @@ class AffordanceOffer(ProvisionOffer):
 class BuildReceipt(CallReceipt):
     """Summary of what happened when accepting a single offer."""
 
-    record_type: str = Field("build_receipt", alias="type")
     result_type: type[UUID] = UUID
 
-    blame_id: UUID = Field(alias="provisioner_id")
+    origin_id: UUID = Field(alias="provisioner_id")
     caller_id: UUID = Field(alias="requirement_id")
     result: UUID | None = Field(None, alias="provider_id")
 
@@ -195,7 +194,6 @@ class BuildReceipt(CallReceipt):
 class PlanningReceipt(Record):
     """Aggregated report for a planning phase."""
 
-    record_type: str = Field("planning_receipt", alias="type")
     cursor_id: UUID = Field(default=UUID(int=0))
     frontier_node_ids: list[UUID] = Field(default_factory=list)
     builds: list[BuildReceipt] = Field(default_factory=list)

@@ -1,15 +1,5 @@
 # tangl/type_hints.py
-from typing import (
-    Protocol,
-    Any,
-    Type,
-    Union,
-    Callable,
-    TypeAlias,
-    MutableMapping,
-    Optional,
-    Self,
-)
+from typing import Protocol, Any, Type, Union, Callable, TypeAlias, MutableMapping, Self
 from uuid import UUID
 from enum import Enum
 from pathlib import Path

@@ -33,7 +33,7 @@ from typing import TypeVar, Generic, Optional, Iterator, overload, Self
 from uuid import UUID
 from collections import Counter
 import itertools
-import warnings
+import logging
 from contextvars import ContextVar
 from contextlib import contextmanager
 
@@ -41,6 +41,8 @@ from pydantic import Field
 
 from tangl.type_hints import StringMap, Tag
 from .entity import Entity, Selectable
+
+logger = logging.getLogger(__name__)
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
@@ -164,7 +166,7 @@ class Registry(Entity, Generic[VT]):
     @classmethod
     def chain_find_one(cls, *registries: Self, sort_key = None, **criteria) -> Optional[VT]:
         if sort_key is None:
-            warnings.warn("chain_find_one with no sort key is legal, but it may not be what you want, it is just reg[0].find_one()")
+            logger.warning("chain_find_one with no sort key is legal, but it may not be what you want, it is just reg[0].find_one()")
         return next(cls.chain_find_all(*registries, sort_key=sort_key, **criteria), None)
 
     # -------- FIND SATISFIERS -----------

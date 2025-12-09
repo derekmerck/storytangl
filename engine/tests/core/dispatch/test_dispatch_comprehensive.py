@@ -344,7 +344,7 @@ class TestBehaviorExecution:
 
         assert isinstance(receipt, CallReceipt)
         assert receipt.result == "static_result"
-        assert receipt.blame_id is b.uid
+        assert receipt.origin_id is b.uid
 
 
 # ============================================================================
@@ -830,7 +830,7 @@ class TestCompleteWorkflow:
         runs = []
         for _ in range(5):
             receipts = list(registry.dispatch(caller=char, ctx=None))
-            order = [registry.get(r.blame_id) for r in receipts]
+            order = [registry.get(r.origin_id) for r in receipts]
             runs.append(order)
 
         # All runs should have same order

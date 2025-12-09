@@ -13,7 +13,7 @@ ignore_imports = True
 
 project_root = Path(__file__).parent.parent
 pkg_root = project_root / "engine/src/tangl"
-docs_root = project_root / "docs/src"
+docs_root = project_root / "docs"
 apps_root = project_root / "apps"
 tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
@@ -68,7 +68,14 @@ def process_directory(root: Path,
                         name = f
             content = fp.read()
             if f.suffix in [".md", ".csv", ".txt", ".json", ".rst", ".yaml"]:
-                content = '"""\n' + content + '"""\n'
+                content = "'''\n" + content + "'''\n"
+                match f.suffix:
+                    case ".md":
+                        content = '# language=markdown\n' + content
+                    case ".rst":
+                        content = '# language=rst\n' + content
+                    case ".yaml":
+                        content = '# language=yaml\n' + content
             if content:
                 data[name] = content
 
@@ -188,7 +195,8 @@ if __name__ == "__main__":
     process_directory(pkg_root / 'mechanics', "tangl3x_mechanics_snippits.py", include_notes=True)
     process_directory(pkg_root / 'media', "tangl3x_media_snippits.py", include_notes=True)
 
-    process_directory(docs_root, "tangl37_docs_archive.py", include_notes=True)
+    process_directory(docs_root / "src", "tangl37_docs_archive.py", include_notes=True)
+    process_directory(docs_root / "build/markdown", "tangl37_md_docs_archive.py", include_notes=True)
 
     # testing
     process_directory(tests_root, "tangl37_tests_archive.py")

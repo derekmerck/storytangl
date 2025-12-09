@@ -9,6 +9,7 @@ from .record import Record
 # red, output, linked within by red, without by yellow
 
 class BaseFragment(Record, extra='allow'):
+    # language=rst
     """
     BaseFragment(fragment_type: str)
 
@@ -29,17 +30,15 @@ class BaseFragment(Record, extra='allow'):
 
     API
     ---
-    - :attr:`record_type` – fixed `'fragment'` for channel filtering.
     - :attr:`fragment_type` – enum/str indicating display/processing semantics.
 
     Notes
     -----
     Fragments form the **Journal** (non-replayable UX) as distinct from **Events**
-    (replayable ops). Use blame links to trace a fragment back to originating
+    (replayable ops). Use origin links to trace a fragment back to originating
     graph entities or handlers.
     """
     model_config = ConfigDict(extra='allow')
 
-    record_type: Literal['fragment'] = Field('fragment', alias='type')
     fragment_type: Optional[ str | Enum ] = None
     # intent for fragment, e.g., 'content', 'update', 'group', 'media', etc.  `See tangl.journal`

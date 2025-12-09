@@ -145,6 +145,8 @@ class Entity(BaseModelPlus):
 
     def is_instance(self, obj_cls: Type[Self]) -> bool:
         # helper func for matches
+        if obj_cls is object:
+            match_logger.warning("Matching `is_instance(self, object)`: this is harmless but it always returns True and is almost certainly not what you intended to do.")
         return isinstance(self, obj_cls)
 
     def get_tag_kv(self,

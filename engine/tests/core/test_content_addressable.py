@@ -12,16 +12,12 @@ from tangl.utils.hashing import hashing_func
 
 class SimpleContentRecord(Record, ContentAddressable):
     """Minimal test record using default hashing."""
-
-    record_type: str = Field(default="simple", alias="type")
     name: str
     value: int
 
 
 class CustomContentRecord(Record, ContentAddressable):
     """Test record with custom hash computation."""
-
-    record_type: str = Field(default="custom", alias="type")
     name: str
     metadata: str
 
@@ -32,8 +28,6 @@ class CustomContentRecord(Record, ContentAddressable):
 
 class NoHashRecord(Record, ContentAddressable):
     """Test record that explicitly skips hashing."""
-
-    record_type: str = Field(default="nohash", alias="type")
     name: str
 
     @classmethod
@@ -140,7 +134,6 @@ def test_content_hash_is_identifier_flag():
 
 def test_construction_succeeds_even_if_hashing_fails():
     class FailingHashRecord(Record, ContentAddressable):
-        record_type: str = Field(default="fail", alias="type")
         name: str
 
         @classmethod

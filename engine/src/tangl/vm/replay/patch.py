@@ -56,7 +56,6 @@ class Patch(Record):
     incremental recovery.  Use :meth:`Event.canonicalize_events` to build canonical
     patches suitable for deduplication and audit.
     """
-    record_type: Literal['patch'] = 'patch'
     registry_id: Optional[UUID] = None
     registry_state_hash: Hash = None
     events: list[Event]

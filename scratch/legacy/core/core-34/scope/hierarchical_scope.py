@@ -24,7 +24,7 @@ class HierarchicalScope(HasContext, Node):
 
     The underlying shared graph object is only used for dereferencing memberships,
     is-parent and is-within are _not_ explicit edges in the sense of structural
-    edges, dependencies, blame, etc.
+    edges, dependencies, origin, etc.
 
     For nodes, this is equivalent to an anchored subgraph.  For a registry of
     generic entities, this would be a partition and require a reference

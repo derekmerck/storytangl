@@ -76,11 +76,11 @@ node = Node(label="test")  # No graph
 
 ```python
 # ❌ Bug: record has no graph
-record = stream.find_one(record_type="event")
-entity = record.blame  # AttributeError: no 'blame' property
+record = stream.find_one(is_instance=Event)
+entity = record.origin  # AttributeError: no 'origin' property
 
 # ✅ Correct: pass registry explicitly
-entity = record.blame(entity_registry)
+entity = record.origin(entity_registry)
 ```
 
 **Why**: Records are frozen and graph-independent by design (see [Section 15](coding_style.md#15-dereferencing--resolution-patterns)).

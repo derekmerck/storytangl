@@ -54,7 +54,7 @@ _Status_: VALIDATE/PLANNING/UPDATE/JOURNAL/FINALIZE dispatch through handlers; r
 
 ## Design Tenets
 - **Deterministic**: stable handler ordering; (planned) one patch per tick; seeded RNG per tick.
-- **Observable**: event log now; (planned) blame/provenance edges; patch metadata `{plugin, version, code_sha}`.
+- **Observable**: event log now; (planned) origin/provenance edges; patch metadata `{plugin, version, code_sha}`.
 - **Extensible**: minimal contracts (entities/graph, handlers, providers, domains).
 - **Portable**: keep the IR/rules spec‑first; Python impl stays pragmatic and thin.
 

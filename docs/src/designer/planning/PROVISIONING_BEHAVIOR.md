@@ -33,7 +33,7 @@ outcomes, especially when multiple templates could satisfy the same role.
 from tangl.vm.debug import PlanningDebugger
 
 # After running a frame
-receipt = next(r for r in frame.records if r.record_type == 'planning_receipt')
+receipt = next(r for r in frame.records if isinstance(r, PlanningReceipt)
 PlanningDebugger.print_receipt(receipt)
 ```
 

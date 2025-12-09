@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class ContentAddressable:
-    """ContentAddressable()
+    # language=rst
+    """
+    ContentAddressable()
 
     Mixin for Records that need content-addressed identifiers.
 
@@ -127,7 +129,8 @@ class ContentAddressable:
                 return {k: v for k, v in data.items() if k not in exclude}
         """
         # Default: Hash everything except known metadata fields
-        exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "type", "record_type"}
+        # todo: could use fields here with a filter
+        exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "type", "obj_cls"}
         return {k: v for k, v in data.items() if k not in exclude}
 
     @is_identifier

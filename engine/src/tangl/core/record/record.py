@@ -24,14 +24,15 @@ logger.setLevel(logging.WARNING)
 
 # •	A StreamRegistry is append-only; seq is unique and monotonic.
 # •	Sections are half-open: get_section(X) yields seq ∈ [marker(X), next_marker); never overlaps.
-# •	Channels are derived—not a separate index: record_type == x or f"channel:{x}" in tags.
+# •	Channels are derived—not a separate index: f"channel:{x}" in tags.
 # •	Push returns half-open bounds so callers can pass directly to get_slice.
 # •	A Record is frozen; mutate by creating a new one.
 
 @functools.total_ordering
 class Record(HasSeq, Entity):
+    # language=rst
     """
-    Record(record_type: str, blame: Entity)
+    Record(origin: Entity)
 
     Immutable runtime artifact.
 
@@ -49,33 +50,24 @@ class Record(HasSeq, Entity):
 
     API
     ---
-    - :meth:`blame` – dereference to the originating entity
+    - :meth:`origin` – dereference to the originating entity
     - :meth:`has_channel` – check membership in a channel
 
     Notes
     -----
-    Records are graph-independent. Use ``.blame(registry)`` to dereference,
+    Records are graph-independent. Use ``.origin(registry)`` to dereference,
     unlike :class:`GraphItem` properties which use implicit ``.graph`` access.
     This asymmetry preserves record immutability and topology independence.
     """
     # records are immutable once created
     model_config = ConfigDict(frozen=True, extra="allow")
 
-    record_type: str | Enum = Field(..., alias='type')
-    blame_id: Optional[UUID] = None
+    origin_id: Optional[UUID] = None
 
-    def blame(self, registry: Registry[Self]) -> Self:
+    def origin(self, registry: Registry[Self]) -> Self:
         # records are not graph-aware (GraphItem), so dereferencing a node id
         # requires a registry
-        return registry.get(self.blame_id)
-
-    @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
-        # todo: actually want to use discriminated union to assemble the
-        #       correct type by record_type
-        #       Or is obj_cls sufficient?  We don't do much with multiple rec_type
-        #       pointing to the same object cls
-        return super().structure(data)
+        return registry.get(self.origin_id)
 
     def has_channel(self, name: str) -> bool:
-        return self.record_type == name or f"channel:{name}" in self.tags
+        return f"channel:{name}" in self.tags

@@ -60,10 +60,7 @@ class StackSnapshot(Record):
     API
     ---
     - :attr:`frames` – ordered list of :class:`StackFrameSnapshot` entries.
-    - :attr:`record_type` – channel marker (``"stack"``).
     """
-
-    record_type: str = Field("stack", alias="type")
     frames: list[StackFrameSnapshot] = Field(default_factory=list)
 
 

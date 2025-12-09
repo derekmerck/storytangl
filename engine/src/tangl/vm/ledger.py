@@ -4,19 +4,19 @@ State holder for the live graph, cursor, and record stream (snapshots, patches, 
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Iterable
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Iterable, Iterator
 import logging
 from pydantic import Field
 from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
-from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BehaviorRegistry
+from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BaseFragment
 from .frame import Frame, StackFrame
 from .stack_snapshot import StackSnapshot
+from .replay import Patch
 
 if TYPE_CHECKING:
     from tangl.service.user.user import User
-    from .replay import Patch
 else:
     User = Entity
 
@@ -83,9 +83,7 @@ class Ledger(Entity):
        * Source of truth when :attr:`event_sourced` is ``True``.
        * Enables validation via checksum comparison.
        * Produced by :meth:`record_stack_snapshot`; consumed by
-         :meth:`recover_stack_from_stream` and
-         :meth:`~tangl.core.record.StreamRegistry.iter_channel` with
-         ``channel="stack"``.
+         :meth:`recover_stack_from_stream`
 
     Usage Patterns
     --------------
@@ -189,18 +187,17 @@ class Ledger(Entity):
         """
 
         # Get the most recent snapshot
-        snapshot = records.last(channel="snapshot")  # type: Snapshot[Graph]
+        snapshot = records.last(is_instance=Snapshot)  # type: Snapshot[Graph]
         if snapshot is None:
             raise RuntimeError(f"No snapshot found in record stream")
         graph = snapshot.restore_item()  # don't access item directly
         seq = snapshot.seq
         # Get all patches since the most recent snapshot and apply them
         patches = records.find_all(
-            # is_instance=Patch,
             predicate=lambda x: x.seq > seq,
-            has_channel="patch",
-            sort_key=lambda x: x.seq,
-        )  # type: list[Patch]
+            is_instance=Patch,
+            # sort_key=lambda x: x.seq,
+        )  # type: Iterator[Patch]
         # fine if this is [], just returns graph from snapshot
         for patch in patches:
             patch_to_apply = patch
@@ -212,7 +209,7 @@ class Ledger(Entity):
 
     def get_journal(self, marker_name: str):
         # todo: should default to most recent -1 or something
-        return self.records.get_section(marker_name, marker_type="journal", has_channel="fragment")
+        return self.records.get_section(marker_name, marker_type="journal", is_instance=BaseFragment)
 
     def get_frame(self) -> Frame:
         from .dispatch import vm_dispatch
@@ -334,9 +331,8 @@ class Ledger(Entity):
 
         snapshots = list(
             records.find_all(
-                has_channel="stack",
+                is_instance=StackSnapshot,
                 predicate=predicate,
-                sort_key=lambda record: record.seq,
             )
         )
 
@@ -370,7 +366,7 @@ class Ledger(Entity):
                 f"target_step {target_step} must be > 0 and less than current step {self.step}"
             )
 
-        snapshots = list(self.records.find_all(has_channel="stack"))
+        snapshots = list(self.records.find_all(is_instance=StackSnapshot))
         if len(snapshots) < target_step:
             raise KeyError(f"No stack snapshot recorded for step {target_step}")
 

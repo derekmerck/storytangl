@@ -22,7 +22,7 @@ class ControlFragment(BaseFragment, extra='allow'):
 
     @model_validator(mode="after")
     def _validate_payload(self):
-        if self.record_type == 'update_fragment':
+        if self.fragment_type == 'update_fragment':
             if self.payload is None:
                 raise ValueError('payload cannot be None for an update fragment')
         return self

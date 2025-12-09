@@ -51,7 +51,6 @@ class Snapshot(Record, ContentAddressable, Generic[EntityT]):
     on higher-level persistence managers to handle storage. Type parameters exist
     for documentation only.
     """
-    record_type: Literal['snapshot'] = 'snapshot'
     item: EntityT  #: :meta-private:
 
     @classmethod

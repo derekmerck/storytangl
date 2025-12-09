@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Integration tests covering RPS gameplay through the VM pipeline."""
 
-from tangl.core import Graph, StreamRegistry
+from tangl.core import Graph, StreamRegistry, BaseFragment
 from tangl.mechanics.games import GamePhase, GameResult, HasGame
 from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler, RpsMove
 from tangl.story import Block
@@ -79,7 +79,7 @@ def test_complete_rps_game_to_victory():
     assert game_block.game.result is GameResult.WIN
     assert ledger.cursor_id == victory.uid
 
-    fragments = list(ledger.records.iter_channel("fragment"))
+    fragments = list(ledger.records.find_all(is_instance=BaseFragment))
     assert fragments
     assert any("You played" in fragment.content for fragment in fragments)
 

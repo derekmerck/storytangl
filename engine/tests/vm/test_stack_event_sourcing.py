@@ -37,7 +37,7 @@ def test_stack_snapshot_emission() -> None:
 
     ledger.record_stack_snapshot()
 
-    snapshots = list(ledger.records.find_all(has_channel="stack"))
+    snapshots = list(ledger.records.find_all(is_instance=StackSnapshot))
     assert len(snapshots) == 1
     assert isinstance(snapshots[0], StackSnapshot)
     assert snapshots[0].frames[0].return_cursor_id == caller.uid

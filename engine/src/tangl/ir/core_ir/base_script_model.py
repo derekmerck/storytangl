@@ -9,7 +9,6 @@ from tangl.type_hints import ClassName, Expr, Label, StringMap
 
 class BaseScriptItem(Record, ContentAddressable):
     """Template IR record that also provides a deterministic content hash."""
-    record_type: str = Field("script", alias="type")
 
     obj_cls: Optional[ClassName] = None      # For structuring/unstructuring
     template_names: Optional[Label] = None

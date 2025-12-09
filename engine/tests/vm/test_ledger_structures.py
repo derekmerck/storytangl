@@ -89,6 +89,7 @@ def test_ledger_structure_round_trip():
     # Records round-trip: same count and last snapshot exists
     rebuilt_record_count = sum(1 for _ in rebuilt.records.find_all())
     assert rebuilt_record_count == original_record_count
-    assert rebuilt.records.last(channel="snapshot") is not None
+    from tangl.core import Snapshot
+    assert rebuilt.records.last(is_instance=Snapshot) is not None
 
     # assert len(rebuilt.domains) == 1 and rebuilt.domains[0] == my_test_domain

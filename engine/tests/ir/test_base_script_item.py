@@ -15,7 +15,6 @@ def test_base_script_item_defaults_and_extras() -> None:
 
     item = BaseScriptItem(obj_cls="Node", templates="demo", extra_field=3)
 
-    assert item.record_type == "script"
     assert item.uid is not None
     assert item.template_names == "demo"
     assert item.extra_field == 3

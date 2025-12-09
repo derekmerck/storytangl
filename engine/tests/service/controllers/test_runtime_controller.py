@@ -391,7 +391,8 @@ def test_create_story_materializes_ledger(
     assert isinstance(ledger_obj, Ledger)
     assert ledger_obj.uid == ledger_id
     assert ledger_obj.step >= 1
-    assert list(ledger_obj.records.iter_channel("fragment"))
+    from tangl.core import BaseFragment
+    assert list(ledger_obj.records.find_all(is_instance=BaseFragment))
 
 
 def test_create_story_handles_prereq_redirects(

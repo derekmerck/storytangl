@@ -32,13 +32,12 @@ class StreamRegistry(Registry[HasSeq]):
     * **Monotonic seq** – strict temporal order.
     * **Bookmarks** – mark sections with :meth:`set_marker`.
     * **Slices** – extract intervals with :meth:`get_slice`.
-    * **Channels** – filter logical streams with :meth:`iter_channel`.
+    * **Channels** – filter logical streams with :meth:`has_channel=x` and 'channel:x' tags
 
     API
     ---
     - :meth:`add_record` / :meth:`push_records`
     - :meth:`get_section(**criteria)<get_section>` – retrieve bookmarked section
-    - :meth:`iter_channel` – iterate filtered records
     - :meth:`last(**criteria)<last>` – last matching record
     """
 
@@ -120,7 +119,7 @@ class StreamRegistry(Registry[HasSeq]):
         # HasSeq has a built-in `__lt__` so a bare `sorted(values)` works, but passing a
         # sort_key kwarg explicitly into find_all will also internally sort and yield
         # from the sorted list
-        return self.find_all(predicate=_predicate, **criteria, sort_key=lambda x: x.seq)
+        return self.find_all(predicate=_predicate, **criteria)
 
     # Prior ref - early stop types entry << section << chapter << book, etc.
     # def get_entry(self, which=-1) -> list[Record]:
@@ -199,23 +198,24 @@ class StreamRegistry(Registry[HasSeq]):
         return start_seq, self.max_seq
 
     # ---- channel/criteria convenience ----
-
-    def iter_channel(self, channel: str, **criteria) -> Iterator[Record]:
-        """
-        Filter by the effective channel.  Matches record_type or has
-        'channel:x' tag by default.
-
-        Same as find_all(has_channel=x, **criteria)
-        """
-        if channel is not None:
-            criteria.setdefault('has_channel', channel)
-        yield from self.find_all(**criteria, sort_key=lambda x: x.seq)
+    #
+    # def iter_channel(self, channel: str, **criteria) -> Iterator[Record]:
+    #     """
+    #     Filter by channel tag.
+    #
+    #     Same as:
+    #     - find_all( has_channel=x )
+    #     - find_all( has_tags={'channel:x'} )
+    #     """
+    #     if channel is not None:
+    #         criteria.setdefault('has_channel', channel)
+    #     yield from self.find_all(**criteria, sort_key=lambda x: x.seq)
 
     def last(self, channel: str = None, **criteria) -> Optional[Record]:
         """Last by seq that matches criteria."""
         if channel is not None:
             criteria.setdefault('has_channel', channel)
-        return max(self.find_all(**criteria, sort_key=lambda x: x.seq), default=None)
+        return max(self.find_all(**criteria), default=None)
 
     def slice_to_seq(self, max_seq: int) -> StreamRegistry:
         """Copy records up to and including ``max_seq`` into a new stream."""

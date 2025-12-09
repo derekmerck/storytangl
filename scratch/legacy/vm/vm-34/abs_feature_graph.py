@@ -37,7 +37,7 @@ class ChoiceEdge(Satisfiable, Edge[StructureNode, StructureNode]):
 
 class BlameEdge(Edge[Node, Node]):
     # audit links, yellow
-    blame_type: str  # what we are assigning blame for
+    blame_type: str  # what we are assigning origin for
 
 class AssociationEdge(Edge[Node, Node]):
     # unspecified link, black, possibly bi-directional

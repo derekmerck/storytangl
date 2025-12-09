@@ -161,7 +161,7 @@ class Edge(GraphItem):
 class Record:
     blame_id: Optional[UUID] = None
     
-    def blame(self, registry: Registry[Entity]) -> Optional[Entity]:
+    def origin(self, registry: Registry[Entity]) -> Optional[Entity]:
         """Dereference blame_id via provided registry."""
         return registry.get(self.blame_id) if self.blame_id else None
 ```

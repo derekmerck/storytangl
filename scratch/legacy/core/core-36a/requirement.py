@@ -54,5 +54,5 @@ class Requirement(Edge):
         """Check whether the given provider satisfies this requirement."""
         return provider.match(**self.provider_criteria)
 
-    # todo: when a provider is assigned, we can add a blame edge to the provisioner that
+    # todo: when a provider is assigned, we can add a origin edge to the provisioner that
     #       provided it as well

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core import Graph, StreamRegistry
+from tangl.core import Graph, StreamRegistry, Snapshot
 from tangl.vm import ChoiceEdge, ResolutionPhase, Ledger
 from tangl.vm.replay import Event, EventType, Patch
 
@@ -17,12 +17,13 @@ def test_init_cursor_generates_journal_entry() -> None:
     ledger.push_snapshot()
 
     assert ledger.step == 0
-    assert list(ledger.records.iter_channel("fragment")) == []
+    from tangl.core.record import BaseFragment
+    assert list(ledger.records.find_all(is_instance=BaseFragment)) == []
 
     ledger.init_cursor()
 
     assert ledger.step >= 1
-    fragments = list(ledger.records.iter_channel("fragment"))
+    fragments = list(ledger.records.find_all(is_instance=BaseFragment))
     assert fragments
 
 
@@ -68,20 +69,20 @@ def test_maybe_push_snapshot_respects_cadence() -> None:
     # No snapshot until step divisible by cadence unless forced.
     ledger.step = 1
     ledger.maybe_push_snapshot()
-    assert list(ledger.records.iter_channel("snapshot")) == []
+    assert list(ledger.records.find_all(is_instance=Snapshot)) == []
 
     ledger.step = 2
     ledger.maybe_push_snapshot()
-    assert list(ledger.records.iter_channel("snapshot")) == []
+    assert list(ledger.records.find_all(is_instance=Snapshot)) == []
 
     ledger.step = 3
     ledger.maybe_push_snapshot()
-    snapshots = list(ledger.records.iter_channel("snapshot"))
+    snapshots = list(ledger.records.find_all(is_instance=Snapshot))
     assert len(snapshots) == 1
 
     ledger.step = 4
     ledger.maybe_push_snapshot(force=True)
-    snapshots = list(ledger.records.iter_channel("snapshot"))
+    snapshots = list(ledger.records.find_all(is_instance=Snapshot))
     assert len(snapshots) == 2
 
 

@@ -95,10 +95,6 @@ See also
 
 Keep them compact: short summary + Why + 1–3 **Key Features** bullets + **API** if there are helper methods (e.g., ":meth:`apply_order`"). Do not list every member in prose; rely on autodoc member list.
 
-### Record-like classes (immutable artifacts)
-
-Follow the same template, but include a bullet under **Key Features** noting the fixed `record_type` (e.g., "`record_type='event'` for stream filtering").
-
 ---
 
 ## B. Subpackage `__init__.py` docstring: “Conceptual layers + Design intent”
@@ -240,7 +236,7 @@ graph. Every access goes through ``self.graph.get()`` for watchability.
 ```rst
 Notes
 -----
-Records are graph-independent. Use ``.blame(registry)`` to dereference,
+Records are graph-independent. Use ``.origin(registry)`` to dereference,
 unlike :class:`GraphItem` properties which use implicit ``.graph`` access.
 This asymmetry preserves record immutability and topology independence.
 ```

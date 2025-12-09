@@ -89,7 +89,7 @@ class RuntimeController(HasApiEndpoints):
                 ledger.records.get_slice(
                     start_seq=start_seq,
                     end_seq=end_seq,
-                    has_channel="fragment",
+                    is_instance=BaseFragment,
                 )
             )
 
@@ -102,7 +102,7 @@ class RuntimeController(HasApiEndpoints):
                     ledger.records.get_section(
                         marker,
                         marker_type=marker_type,
-                        has_channel="fragment",
+                        is_instance=BaseFragment,
                     )
                 )
             except KeyError:
@@ -126,17 +126,17 @@ class RuntimeController(HasApiEndpoints):
                     ledger.records.get_section(
                         "latest",
                         marker_type=marker_type,
-                        has_channel="fragment",
+                        is_instance=BaseFragment,
                     )
                 )
             except KeyError:
                 # Fallback to legacy behavior that scans for "[step ...]" markers.
-                fragments = list(ledger.records.iter_channel("fragment"))
+                fragments = list(ledger.records.find_all(is_instance=BaseFragment))
                 fragments = self._latest_step_slice(fragments)
 
         # --- full journal (optionally limited) ---
         else:
-            fragments = list(ledger.records.iter_channel("fragment"))
+            fragments = list(ledger.records.find_all(is_instance=BaseFragment))
 
         if limit > 0 and not (marker or start_marker or end_marker or current_only):
             fragments = fragments[-limit:]
@@ -276,7 +276,7 @@ class RuntimeController(HasApiEndpoints):
             title=ledger.graph.label,
             step=ledger.step,
             cursor_id=ledger.cursor_id,
-            journal_size=sum(1 for _ in ledger.records.iter_channel("fragment")),
+            journal_size=sum(1 for _ in ledger.records.find_all(is_instance=BaseFragment)),
             cursor_label=cursor_node.label if cursor_node else None,
         )
 

@@ -89,7 +89,6 @@ class Event(Record):
 
     ``READ`` is non-mutating and ignored during apply.
     """
-    record_type: Literal['event'] = 'event'
     event_type: EventType = Field(...)
 
     source_id: UUID = Field(...)

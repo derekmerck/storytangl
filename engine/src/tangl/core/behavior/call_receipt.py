@@ -41,7 +41,7 @@ class AggregatorType(Enum):
 
 class CallReceipt(Record):
     """
-    CallReceipt(blame: Behavior, result: Any)
+    CallReceipt(origin: Behavior, result: Any)
 
     Immutable result record from a handler invocation.
 
@@ -65,8 +65,7 @@ class CallReceipt(Record):
     - :meth:`any_truthy` – boolean OR across payloads.
     - :meth:`all_truthy` – boolean AND across payloads.
     """
-    record_type: Literal['call_receipt'] = Field("call_receipt", alias='type')
-    blame_id: UUID = Field(..., alias="behavior_id")
+    origin_id: UUID = Field(..., alias="behavior_id")
 
     # -----------------------
     # Result data
@@ -150,17 +149,17 @@ class CallReceipt(Record):
     # todo: should we allow these to be passed through by behavior.__call__()?
 
     @classmethod
-    def ok(cls, blame, result, **kw):
-        return cls(blame_id=blame.uid, result=result, result_code=ResultCode.OK, **kw)
+    def ok(cls, origin, result, **kw):
+        return cls(origin_id=origin.uid, result=result, result_code=ResultCode.OK, **kw)
 
     @classmethod
-    def skip(cls, blame, msg=None, **kw):
-        return cls(blame_id=blame.uid, result=None, result_code=ResultCode.SKIP, message=msg, **kw)
+    def skip(cls, origin, msg=None, **kw):
+        return cls(origin_id=origin.uid, result=None, result_code=ResultCode.SKIP, message=msg, **kw)
 
     @classmethod
-    def invalid(cls, blame, msg=None, **kw):
-        return cls(blame_id=blame.uid, result=None, result_code=ResultCode.INVALID, message=msg, **kw)
+    def invalid(cls, origin, msg=None, **kw):
+        return cls(origin_id=origin.uid, result=None, result_code=ResultCode.INVALID, message=msg, **kw)
 
     @classmethod
-    def error(cls, blame, msg, **kw):
-        return cls(blame_id=blame.uid, result=None, result_code=ResultCode.ERROR, message=msg, **kw)
+    def error(cls, origin, msg, **kw):
+        return cls(origin_id=origin.uid, result=None, result_code=ResultCode.ERROR, message=msg, **kw)

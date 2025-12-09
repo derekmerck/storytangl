@@ -31,6 +31,9 @@ Topology
 
 Artifacts
 ---------
+
+.. automodule:: tangl.core.record
+
 .. autoclass:: tangl.core.Record
 .. autoclass:: tangl.core.StreamRegistry
 .. autoclass:: tangl.core.Snapshot

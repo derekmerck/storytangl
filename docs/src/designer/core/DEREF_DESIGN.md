@@ -8,7 +8,7 @@ Dereferencing GraphItems
 
 **Records** don't have `self.graph`, so they use _methods_ with explicit registry parameter::
 
-    record.blame(registry)  # returns Entity via passed registry
+    record.origin(registry)  # returns Entity via passed registry
 
 **Collections & Queries** return fresh iterators::
 
