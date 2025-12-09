@@ -21,7 +21,7 @@ match_logger = logging.getLogger(__name__ + '.match')
 match_logger.setLevel(logging.WARNING)
 
 def is_identifier(func: Callable) -> Callable:
-    """Label Entity and subclass methods as providing an identifier."""
+    """Label Entity and subclass methods as providing an identifier for match."""
     setattr(func, '_is_identifier', True)
     return func
 

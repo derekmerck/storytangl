@@ -1,6 +1,6 @@
 from pprint import pprint
 
-from scratch.compilers.md2yaml import tree2doc, doc2tree
+from scratch.md2yaml import tree2doc, doc2tree
 
 import pytest
 
