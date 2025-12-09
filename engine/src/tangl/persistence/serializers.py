@@ -73,6 +73,11 @@ class JsonSerializationHandler:
                 return o.isoformat()
             elif isinstance(o, UUID):
                 return o.hex
+            elif isinstance(o, (bytes, bytearray, memoryview)):
+                # Represent binary as a hex string, e.g. for content_hash
+                # content_hash knows how to read hex, so this works without a decoder
+                # for general binary data, would probably want to use base64
+                return o.hex()
             try:
                 return super().default(o)  # Attempt to serialize using super class
             except TypeError:

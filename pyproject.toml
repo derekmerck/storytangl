@@ -126,6 +126,7 @@ testpaths = [
 ]
 pythonpath = [
     "engine/src/",
+    "engine/tests/",
     "apps/cli/src/",
     "apps/server/src",
     "apps/server/tests"

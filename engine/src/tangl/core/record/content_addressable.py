@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, ClassVar
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, BaseModel, field_validator, ConfigDict
 
 from tangl.type_hints import Hash
 from tangl.utils.hashing import hashing_func
@@ -14,10 +14,10 @@ from tangl.core.entity import is_identifier
 logger = logging.getLogger(__name__)
 
 
-class ContentAddressable:
+class ContentAddressable(BaseModel):
     # language=rst
     """
-    ContentAddressable()
+    ContentAddressable(content_hash: bytes)
 
     Mixin for Records that need content-addressed identifiers.
 
@@ -30,9 +30,9 @@ class ContentAddressable:
     Key Features
     ------------
     * **Automatic hashing** – ``content_hash`` is computed during model
-      validation.
+      construction unless explicitly provided (e.g. by :class:`Snapshot`).
     * **Customizable scope** – override :meth:`_get_hashable_content` to control
-      which attributes influence the hash.
+      which attributes influence the hash (media bytes, template structure, etc.).
     * **Registry alias** – the hash is marked as an identifier for
       :class:`~tangl.core.registry.Registry` lookups.
 
@@ -49,22 +49,29 @@ class ContentAddressable:
     See also
     --------
     :class:`~tangl.core.record.Record`
+    :class:`~tangl.core.snapshot.Snapshot`
     """
+
+    model_config = ConfigDict(frozen=True)
+    # Must override to True to run any 'after' model validators
     
     content_hash: Optional[Hash] = Field(
         None,
         json_schema_extra={'is_identifier': True},
         description="Content-addressed identifier computed from record data"
     )
+
+    req_hash: ClassVar[bool] = False
     
     @model_validator(mode='before')
     @classmethod
     def _compute_content_hash(cls, data: Any) -> dict:
+        # language=rst
         """Compute content_hash if not explicitly provided.
         
         Called during model construction before field validation.
         If content_hash already present, respects it (for deserialization).
-        Otherwise computes it from _get_hashable_content().
+        Otherwise, computes it from _get_hashable_content().
         
         Args:
             data: Raw data dict before Pydantic processing
@@ -77,7 +84,7 @@ class ContentAddressable:
             return data
         
         # If hash already provided, don't override (deserialization case)
-        if "content_hash" in data and data["content_hash"] is not None:
+        if "content_hash" in data and data["content_hash"]:  # Reject any falsy
             return data
 
         try:
@@ -94,12 +101,15 @@ class ContentAddressable:
                 )
         except Exception as exc:
             logger.warning("%s: failed to compute content_hash: %s", cls.__name__, exc, exc_info=True)
+            if cls.req_hash:
+                raise
             # Allow construction to proceed without hash
         
         return data
     
     @classmethod
     def _get_hashable_content(cls, data: dict) -> Any:
+        # language=rst
         """Extract hashable content from raw data dict.
         
         Override in subclasses to customize what gets hashed.
@@ -130,7 +140,7 @@ class ContentAddressable:
         """
         # Default: Hash everything except known metadata fields
         # todo: could use fields here with a filter
-        exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "type", "obj_cls"}
+        exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "obj_cls"}
         return {k: v for k, v in data.items() if k not in exclude}
 
     @is_identifier
@@ -145,3 +155,23 @@ class ContentAddressable:
         if self.content_hash:
             return self.content_hash.hex()[:16]
         return "no-hash"
+
+    # @field_serializer("content_hash")
+    # def serialize_hash(self, value: bytes | None) -> str | None:
+    #     return value.hex() if value is not None else None
+
+    @field_validator("content_hash", mode="before")
+    @classmethod
+    def parse_hash(cls, value: Any) -> bytes | None:
+        if not value:
+            return None
+        elif isinstance(value, bytes):
+            return value
+        elif isinstance(value, str):
+            value = value.strip()
+            try:
+                return bytes.fromhex(value)
+            except ValueError as exc:
+                msg = f"Invalid hex content_hash: {value!r}"
+                raise ValueError(msg) from exc
+        return value

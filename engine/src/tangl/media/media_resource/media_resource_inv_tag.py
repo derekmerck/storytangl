@@ -1,66 +1,46 @@
 from __future__ import annotations
-from typing import Self
+from typing import Self, ClassVar
 import hashlib
 from typing import Optional, Any
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import Field, field_serializer, field_validator, model_validator
+from pydantic import Field, model_validator, ConfigDict
 
 from tangl.utils.shelved2 import shelved, clear_shelf
 from tangl.utils.hashing import compute_data_hash
-from tangl.core.entity import Entity
+from tangl.core import Entity
+from tangl.core.record.content_addressable import ContentAddressable
 from tangl.media.media_data_type import MediaDataType
-
-# todo: these are Records now
 
 # RITs are _technically_ resource-type Nodes when used in a graph,
 # but they can also be used without a graph, so it makes more sense
 # as an Entity rather than a GraphItem.
-class MediaResourceInventoryTag(Entity):
+class MediaResourceInventoryTag(Entity, ContentAddressable):
     """
     MediaResourceInventoryTags track data resources, in-mem or on disk.
 
     MRT's for media data can be dereferenced by the response handler at the
     service layer to generate a client-relative media path.
     """
-    # todo: handle data stored in other dbs?  Annotate data with cms info?
+    model_config = ConfigDict(frozen=False)
+    # frozen false, so it can run 'after' model validators
+
+    # todo: handle data stored in other dbs like path is indirect reference to file data?
+    #       Annotate data with cms info?
     path: Optional[Path] = None
     data: Optional[Any] = None
     # Must have one or the other if no pre-computed content hash
-    content_hash: bytes | None = Field(None, json_schema_extra={'is_identifier': True})
 
-    @field_serializer("content_hash")
-    def serialize_hash(self, value: bytes | None) -> str | None:
-        return value.hex() if value is not None else None
+    req_hash: ClassVar[bool] = True
 
-    @field_validator("content_hash", mode="before")
     @classmethod
-    def parse_hash(cls, value: Any) -> bytes | None:
-        if isinstance(value, str):
-            value = value.strip()
-            if not value:
-                return None
-            try:
-                return bytes.fromhex(value)
-            except ValueError as exc:
-                msg = f"Invalid hex content_hash: {value!r}"
-                raise ValueError(msg) from exc
-        return value
-
-    @model_validator(mode="before")
-    @classmethod
-    def _set_content_hash(cls, data: Any) -> bytes:
-        if 'content_hash' not in data:
-            if 'data' in data:
-                content_hash = compute_data_hash(data['data'])
-            elif 'path' in data:
-                path = Path(data['path'])
-                content_hash = compute_data_hash(path)
-            else:
-                raise ValueError("Must include a content hash, data, or a path in constructor.")
-            data['content_hash'] = content_hash
-        return data
+    def _get_hashable_content(cls, data: dict) -> Any:
+        if 'data' in data:
+            return data['data']
+        elif 'path' in data:
+            return compute_data_hash(Path(data['path']))
+        raise ValueError("Must specify either a content hash, the data, or path")
 
     data_type: MediaDataType = None
 

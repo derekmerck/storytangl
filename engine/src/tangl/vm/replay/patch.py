@@ -1,4 +1,5 @@
 # tangl/vm/replay/patch.py
+# language=rst
 """
 Replay artifacts: Patch and Snapshot.
 
@@ -23,6 +24,7 @@ from .event import Event
 #       - dict-diff (update delta)
 
 class Patch(Record):
+    # language=rst
     """
     Patch(registry_id: UUID | None, registry_state_hash: bytes | None, events: list[Event])
 

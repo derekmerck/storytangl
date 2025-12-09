@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Generic, Literal, Optional, TypeVar
+from typing import Generic, Literal, Optional, TypeVar, ClassVar
 import logging
 from copy import deepcopy
 
@@ -29,7 +29,8 @@ class Snapshot(Record, ContentAddressable, Generic[EntityT]):
     Key Features
     ------------
     * **Immutable baseline** – deep copy of an entity at a point in time.
-    * **State hash** – :attr:`item_state_hash` verifies integrity during recovery.
+    * **State hash** – :attr:`content_hash` mirrors the entity's own
+      ``_state_hash()`` for integrity checks during recovery.
     * **Generic type parameter** – documents the entity type being snapshotted.
     * **Integration** – works with :class:`~tangl.vm.ledger.Ledger` and
       :class:`~tangl.vm.replay.patch.Patch` for replay and restoration.
@@ -37,22 +38,28 @@ class Snapshot(Record, ContentAddressable, Generic[EntityT]):
     API
     ---
     - :meth:`from_item(item)` – create a snapshot with a deep copy and computed hash.
-    - :meth:`restore_item()` – return a deep copy of the stored entity.
-    - :attr:`item_state_hash` – hash of the entity’s state for verification.
+    - :meth:`restore_item(verify=False)` – return a deep copy of the stored entity,
+      optionally verifying the state hash first.
+    - :attr:`content_hash` – hash of the entity’s state for verification and
+      deduplication.
 
     Example
     -------
     >>> snap = Snapshot.from_item(graph)
     >>> stream.add_record(snap)
-    >>> restored = stream.last(channel="snapshot").restore_item()
+    >>> restored = stream.last(is_instance=Snapshot).restore_item(verify=True)
 
     Notes
     -----
-    Snapshots are immutable records; they do not serialize data internally but rely
-    on higher-level persistence managers to handle storage. Type parameters exist
-    for documentation only.
+    Snapshots are immutable records describing *state at a moment in time*.
+    They hold a deep copy of the entity in :attr:`item`, but do not manage
+    storage themselves; higher-level persistence managers decide when and
+    where to store or reload snapshots. Type parameters exist for
+    documentation and static analysis only.
     """
     item: EntityT  #: :meta-private:
+
+    req_hash: ClassVar[bool] = True
 
     @classmethod
     def from_item(cls, item: EntityT) -> Snapshot[EntityT]:

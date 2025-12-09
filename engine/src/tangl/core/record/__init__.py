@@ -1,3 +1,4 @@
+# tangl/core/record/__init__.py
 # language=rst
 """
 Records & Streams
@@ -9,7 +10,10 @@ Overview
 The records/streams layer captures **runtime history** in a way that is:
 
 * **Frozen** – records are immutable snapshots once created.
-* **Sequenced** – each record has a monotone sequence number within a stream.
+* **Sequenced** – each record has a monotone ``seq`` number assigned at
+  creation time (global across all records). A :class:`StreamRegistry`
+  preserves this ordering for the subset of records it contains; gaps in
+  ``seq`` are expected when multiple streams interleave.
 * **Graph-independent** – records do not require graph membership; they can be
   persisted, replayed, or shipped across process boundaries.
 * **Identifiable** – every record has a stable UUID and a lightweight origin
@@ -33,7 +37,8 @@ A :class:`Record` is the smallest unit of runtime history.
 It is a frozen, graph-independent entity with:
 
 * ``id: UUID`` – unique identity.
-* ``seq: int`` – a monotone sequence number **over all records**.
+* ``seq: int`` – a monotone sequence number **over all records**, assigned by
+  :class:`HasSeq`. Individual streams may see gaps, but ordering is preserved.
 * ``origin_id: UUID | None`` – the entity primarily responsible for this
   record being created (behavior, node, service, etc.).
 * ``tags: set[str]`` – arbitrary labels for downstream indexing, filtering,
@@ -46,7 +51,7 @@ Records do **not** model game/world state directly.  Instead, they describe:
 * What the world looked like (:class:`Snapshot`).
 * What was shown to the player or client (:class:`BaseFragment` subclasses).
 
-Records are immutable.  Any “update” is represented by appending a **new**
+Records are immutable. Any “update” is represented by appending a **new**
 record with a higher sequence number.
 
 Record roles
@@ -111,8 +116,8 @@ The registries expose this via criteria such as:
 * ``stream.find_all(is_instance=Snapshot, ...)``
 * ``stream.find_all(is_instance=BaseFragment, ...)``
 
-Under the hood, the ``is_instance`` criterion is implemented in using
-``isinstance(record, <class>)``, and is combined with any other match
+Under the hood, the ``is_instance`` criterion is implemented using
+``isinstance(record, <class>)`` and is combined with any other match
 criteria (tags, channels, seq ranges, etc.).
 
 This is the canonical way to answer questions like:
@@ -156,7 +161,7 @@ For example, a single stream might interleave:
 * Journal fragments for the player.
 
 To handle this multiplexing cleanly, we use **tags** rather than a dedicated
-``channel`` field.  The conventions are:
+``channel`` field. The conventions are:
 
 * Tags are free-form strings.
 * A *channel* is a tag of the form ``"channel:<name>"``.
@@ -191,15 +196,19 @@ A :class:`StreamRegistry` is an append-only, sequenced collection of records.
 Key properties:
 
 * **Append-only** – records are only added; they are not mutated in-place.
-* **Sequenced** – each appended record is assigned a strictly increasing
-  ``seq`` within that stream.
+* **Sequenced** – records are ordered by their global ``seq`` value. Appends
+  preserve this monotone ordering, but the values in a single stream may not
+  be contiguous.
 * **Heterogeneous** – any :class:`Record` subclass can be stored in the same
   stream.
-* **Queryable** – records can be filtered with common helpers for type, seq range, tags, and channel, as well as with arbitrary criteria by using a predicate function.
+* **Queryable** – records can be filtered with common helpers for type, seq
+  range, tags, and channel, as well as with arbitrary criteria by using a
+  predicate function.
 
 Typical operations include:
 
-* ``append(record)`` – assign the next ``seq`` and store the record.
+* ``append(record)`` – store the record; append preserves the ordering given
+  by ``record.seq``.
 * ``last()`` – retrieve the latest record (by seq).
 * ``get_slice(start_seq, end_seq)`` – retrieve a range of records.
 * Marker/section helpers (e.g. “get all records between two logical
@@ -210,11 +219,11 @@ Invariants
 
 For each :class:`StreamRegistry` instance:
 
-* ``seq`` is monotone increasing; no two records share a seq.
-* Once appended, a record is immutable.  Any “change” is modeled as a new
+* Records are ordered by increasing ``seq``; no two records share a seq.
+* Once appended, a record is immutable. Any “change” is modeled as a new
   record with a higher sequence number.
 * The registry does not itself interpret the payload; it only enforces
-  sequencing and basic filtering.  Higher-level conventions (for example,
+  sequencing and basic filtering. Higher-level conventions (for example,
   “what is a journal entry?”) live in the VM/service/story layers.
 
 Motivation & design intent

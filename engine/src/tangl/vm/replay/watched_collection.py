@@ -166,6 +166,7 @@ class WatchedList(MutableSequence, _Owned):
 
 
 class WatchedSet(MutableSet, _Owned):
+    # language=rst
     """
     Wraps a set stored on an entity attribute.
     Emits an UPDATE(owner, attr, deepcopy(set)) after each mutating op.

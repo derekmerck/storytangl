@@ -1,3 +1,5 @@
+# tangl/vm/replay/event.py
+# language=rst
 """
 Event model and replay utilities
 -------------------------------
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 class EventType(Enum):
+    # language=rst
     """
     CRUD event kinds with a stable application precedence.
 

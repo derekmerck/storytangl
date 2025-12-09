@@ -26,18 +26,29 @@ class StreamRegistry(Registry[HasSeq]):
     ----
     Provides temporal ordering and bookmark semantics for records, enabling
     logs, journals, and patches to be stored and queried without ambiguity.
+    A single stream can be hierarchically segmented into chapters, sections,
+    entries, and other logical units by using typed markers.
 
     Key Features
     ------------
-    * **Monotonic seq** – strict temporal order.
-    * **Bookmarks** – mark sections with :meth:`set_marker`.
-    * **Slices** – extract intervals with :meth:`get_slice`.
-    * **Channels** – filter logical streams with :meth:`has_channel=x` and 'channel:x' tags
+    * **Monotonic seq** – strict temporal order within the stream; sequence
+      numbers come from :class:`HasSeq` and are monotonically increasing.
+    * **Bookmarks** – mark boundaries with :meth:`set_marker`, using
+      ``marker_type`` as a namespace (e.g., ``"chapter"``, ``"section"``,
+      ``"entry"``) so the same logical name (``"start"``, ``"latest"``)
+      can be reused at multiple levels.
+    * **Slices** – extract intervals with :meth:`get_slice` and
+      :meth:`get_section`, combining sequence ranges with normal match
+      criteria.
+    * **Channels via tags** – logical substreams can be filtered with
+      normal registry criteria, e.g. ``is_instance=BaseFragment`` and
+      ``has_channel="journal"`` (sugar for a ``"channel:journal"`` tag).
 
     API
     ---
     - :meth:`add_record` / :meth:`push_records`
-    - :meth:`get_section(**criteria)<get_section>` – retrieve bookmarked section
+    - :meth:`get_section(**criteria)<get_section>` – retrieve a section
+      between typed markers
     - :meth:`last(**criteria)<last>` – last matching record
     """
 
@@ -50,6 +61,12 @@ class StreamRegistry(Registry[HasSeq]):
 
         effective_sort_key = sort_key or (lambda record: record.seq)
         yield from super().find_all(sort_key=effective_sort_key, **criteria)
+
+    # Only useful b/c contents are always sorted
+    def last(self, **criteria) -> Optional[Record]:
+        # language=rst
+        """Last by seq that matches criteria."""
+        return max(self.find_all(**criteria), default=None)
 
     def _ensure_seq(self, item: RecordT) -> RecordT:
         # If seq is missing or negative, assign next.
@@ -69,24 +86,36 @@ class StreamRegistry(Registry[HasSeq]):
         overwrite: bool = False,
     ) -> None:
         # language=rst
-        """Bookmark ``marker_seq`` for ``marker_name`` under ``marker_type``.
+        """Bookmark a sequence position for ``marker_name`` under ``marker_type``.
+
+        Markers are stored as ``markers[marker_type][marker_name] = seq`` and
+        provide named boundaries for later slicing.
 
         Parameters
         ----------
         marker_name:
-            Logical name for the bookmark (e.g., ``"step-0001"``).
+            Logical name for the bookmark (e.g., ``"start"``, ``"choice-17"``).
+            Names are local to a ``marker_type``; you can reuse the same name
+            under different types (e.g., ``"start"`` for both ``"chapter"``
+            and ``"section"`` markers).
         marker_type:
             Namespace for the bookmark. Separates independent marker streams
-            such as ``"journal"`` or ``"update"``.
+            such as ``"chapter"``, ``"section"``, or ``"entry"``. This allows
+            hierarchical segmentation of the same underlying stream; for
+            example, a single fragment log can be cut into chapters, within
+            which sections, within which individual entries.
         marker_seq:
-            Sequence index to record. Defaults to ``self.max_seq`` so callers
-            can mark the last appended record. Passing ``None`` also chooses
-            ``self.max_seq``.
+            Sequence index to record. If ``None``, the marker is placed at
+            ``self.max_seq + 1``, i.e., *just after* the last appended record.
+            This is useful when you want to mark the start of the *next*
+            region before appending more records. To mark the start of an
+            existing batch, pass its first record's ``seq`` explicitly (as
+            :meth:`push_records` does).
         overwrite:
-            When ``True``, replace an existing marker of the same name instead
-            of raising. Useful for sliding bookmarks like ``"latest"``.
+            When ``True``, replace an existing marker of the same name within
+            the same type instead of raising. Useful for sliding bookmarks
+            like ``"latest"`` or ``"cursor"``.
         """
-
         if marker_seq is None:
             marker_seq = self.max_seq + 1
             # be careful about 1-off errors!  Set the marker _before_ appending
@@ -129,10 +158,28 @@ class StreamRegistry(Registry[HasSeq]):
     def get_section(self, marker_name: str, marker_type: str = '_', **criteria) -> Iterator[RecordT]:
         # language=rst
         """
-        Iterate over records between a named marker and the next marker of the same type.
+        Iterate over records between a named marker and the next marker
+        of the same type.
 
-        Special case: if ``marker_name == "latest"``, the section starts at the most recently
-        set marker of the given ``marker_type`` (i.e., the marker with the highest seq).
+        Sections are half-open intervals in sequence space:
+
+        * Start at the sequence stored in ``markers[marker_type][marker_name]``.
+        * End at the next higher marker of the same ``marker_type``, or at
+          ``max_seq + 1`` if there is no later marker of that type.
+
+        Special case
+        ------------
+        If ``marker_name == "latest"``, the section starts at the most
+        recently set marker of the given ``marker_type`` (i.e., the marker
+        whose recorded seq is maximal for that type).
+
+        This is typically combined with normal registry criteria, e.g.::
+
+            stream.get_section("latest", "entry",
+                               is_instance=BaseFragment,
+                               has_channel="journal")
+
+        to retrieve "the most recent entry section of journal fragments".
         """
         md = self.markers.get(marker_type) or {}
         if not md:
@@ -197,12 +244,6 @@ class StreamRegistry(Registry[HasSeq]):
 
         return start_seq, self.max_seq
 
-    def last(self, channel: str = None, **criteria) -> Optional[Record]:
-        """Last by seq that matches criteria."""
-        if channel is not None:
-            criteria.setdefault('has_channel', channel)
-        return max(self.find_all(**criteria), default=None)
-
     def slice_to_seq(self, max_seq: int) -> StreamRegistry:
         """Copy records up to and including ``max_seq`` into a new stream."""
 
@@ -217,10 +258,5 @@ class StreamRegistry(Registry[HasSeq]):
 
         return truncated
 
-    # todo: we will also want something like last_marked(marker_type), which gets
-    #       everything from the last marker of that type up to the end, like the last
-    #       frame entry.
-
     def remove(*args, **kwargs):
         raise NotImplementedError("Cannot remove records from a StreamRegistry.")
-

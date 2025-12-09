@@ -3,12 +3,10 @@ from __future__ import annotations
 import functools
 from typing import Optional, Self
 import logging
-from enum import Enum
 from uuid import UUID
 
-from pydantic import Field, ConfigDict
+from pydantic import ConfigDict
 
-from tangl.type_hints import UnstructuredData, Hash
 from tangl.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity
 from tangl.core.registry import Registry
@@ -33,7 +31,7 @@ logger.setLevel(logging.WARNING)
 class Record(HasSeq, Entity):
     # language=rst
     """
-    Record(origin: Entity)
+    Record(origin_id: UUID)
 
     Immutable runtime artifact.
 
@@ -46,19 +44,27 @@ class Record(HasSeq, Entity):
     Key Features
     ------------
     * **Frozen** – once created, cannot be changed.
-    * **Sequenced** – each record has a monotonic :attr:`seq` number.
-    * **Channels** – lightweight filtering by :meth:`has_channel`.
+    * **Sequenced (global)** – each record has a monotonic :attr:`seq` number,
+      assigned by :class:`HasSeq` across all records, regardless of which
+      stream they end up in.
+    * **Tags & channels** – free-form tags, with channels encoded as
+      ``"channel:<name>"`` and accessed via :meth:`has_channel`.
 
     API
     ---
-    - :meth:`origin` – dereference to the originating entity
-    - :meth:`has_channel` – check membership in a channel
+    - :meth:`origin` – dereference the originating entity via a registry.
+    - :meth:`has_channel` – check membership in a logical channel.
 
     Notes
     -----
-    Records are graph-independent. Use ``.origin(registry)`` to dereference,
-    unlike :class:`GraphItem` properties which use implicit ``.graph`` access.
-    This asymmetry preserves record immutability and topology independence.
+    Records are graph-independent. Use ``.origin(registry)`` to dereference
+    :attr:`origin_id`, unlike :class:`GraphItem` properties which use implicit
+    ``.graph`` access. This asymmetry preserves record immutability and
+    topology independence.
+
+    Sequence numbers (:attr:`seq`) are process-global and monotonic; individual
+    :class:`StreamRegistry` instances preserve that ordering for the records
+    they contain but may see gaps when other records are created elsewhere.
     """
     # records are immutable once created
     model_config = ConfigDict(frozen=True, extra="allow")

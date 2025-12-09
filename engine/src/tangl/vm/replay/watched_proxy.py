@@ -1,4 +1,5 @@
 # tangl/vm/watched_proxy
+# language=rst
 """
 Proxies that watch entity/registry mutations and emit replayable events.
 """
@@ -16,10 +17,12 @@ from .watched_collection import WatchedSet, WatchedDict, WatchedList
 
 
 class EventWatcher(Protocol):
+    # language=rst
     """Protocol for event sinks that accept :class:`~tangl.vm.replay.event.Event`."""
     def submit(self, event: Event) -> None: ...
 
 class PrintWatcher:
+    # language=rst
     """
     Trivial watcher that prints each event (for debugging).
     """
