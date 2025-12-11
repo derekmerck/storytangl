@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from helpers.fragment_helpers import extract_all_choices, extract_blocks_with_choices
+from .fragment_helpers import extract_all_choices, extract_blocks_with_choices
 
 
 def test_extract_all_choices_and_blocks_with_choices() -> None:

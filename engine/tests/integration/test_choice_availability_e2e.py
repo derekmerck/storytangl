@@ -5,7 +5,7 @@ from tangl.story.story_graph import StoryGraph
 from tangl.vm import Frame, ResolutionPhase as P
 from tangl.vm.provision import Dependency, ProvisioningPolicy, Requirement
 
-from helpers.fragment_helpers import (
+from fragment_helpers import (
     count_fragments_by_type,
     extract_all_choices,
     extract_fragments,

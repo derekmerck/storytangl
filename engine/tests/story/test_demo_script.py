@@ -13,7 +13,6 @@ from tangl.story.fabula.world import World
 from tangl.vm.ledger import Ledger
 from tangl.core import StreamRegistry
 
-from helpers.fragment_helpers import extract_fragments, extract_all_choices
 
 @pytest.fixture(autouse=True)
 def _clear_worlds():
@@ -85,7 +84,7 @@ def test_load_demo_script(resources_dir) -> None:
     assert guide.name == "The Guide"
     assert guide.has_tags({"npc", "helpful"})
 
-def test_load_linear_script(resources_dir) -> None:
+def test_load_linear_script(resources_dir, extract_fragments, extract_all_choices) -> None:
     script_path = resources_dir / "linear_script.yaml"
     data = yaml.safe_load(script_path.read_text())
 

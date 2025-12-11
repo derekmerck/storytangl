@@ -124,6 +124,7 @@ def test_orchestrator_cleanup_mapping_result_deletes_string_key() -> None:
 
 
 class _Frag(BaseFragment):
+    fragment_type: str = "test"  # Must assign when inheriting from base frag
     text: str
 
 

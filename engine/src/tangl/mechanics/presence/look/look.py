@@ -1,7 +1,7 @@
 # tangl/mechanics/look/look.py
 
 from typing import Self
-from pydantic import field_validator
+from pydantic import field_validator, Field
 
 from tangl.lang.age_range import AgeRange
 from tangl.core import Entity
@@ -10,10 +10,8 @@ from tangl.story.concepts import Concept
 from tangl.lang.gens import Gens
 
 from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
-from .ornaments import Ornamentation
-# from .outfit import Outfit
-
-Outfit = object
+from ..ornaments import Ornamentation
+from ...assembly.examples.outfit import OutfitManager as Outfit
 
 
 class Look(Concept):
@@ -22,16 +20,18 @@ class Look(Concept):
 
     hair_color: HairColor = None
     eye_color: EyeColor = None
-    body_phenotype: BodyPhenotype = None
+    body_phenotype: BodyPhenotype = Field(None, alias="phenotype")
     skin_tone: SkinTone = None
     hair_style: HairStyle = None
     apparent_age: AgeRange = None
 
-    @field_validator("skin_tone", "hair_color", mode="before")
+    @field_validator("skin_tone", "hair_color", "hair_style", mode="before")
     @classmethod
     def _replace_spaces(cls, value):
-        if isinstance(value, str) and " " in value:
-            value = value.replace(" ", "_")
+        if isinstance(value, str):
+            value = value.replace(" skin", "")
+            value = value.replace(" hair", "")
+            # value = value.replace(" ", "_")
         return value
 
     # @on_render.register()
@@ -70,6 +70,7 @@ class Look(Concept):
     # def get_media_spec(self, spec_type: Type[MediaSpec] = MediaSpec) -> MediaSpec:
     #     ...
 
+# todo: HasOutfit?
 class HasLook(Entity):
 
     look: Look
@@ -83,41 +84,3 @@ class HasLook(Entity):
     # @on_create_media.register()
     def _provide_media_spec(self):
         return self.look.adapt_media_spec()
-
-class FantasticLook(Look):
-    # For creatures with unusual features
-    # Quite probably need a BodyPart map for this
-
-    body_type: str = None  # human, snakelike, taur, robot
-
-    eye_count: int = 2
-    eye_type: str = None   # human, cat, spider (6)
-
-    mandible_type: str = None # human (1, vertical), insectoid (2, lateral), snout
-    mandible_count: int = 1
-
-    arm_count: int = 2
-    arm_type: str = None   # human, insect, tentacle, robot
-
-    leg_count: int = 2     # indicate digitigrade
-    leg_type: str = None   # horse, goat, dog, insect, tentacle, robot
-
-    fur_color: str = None
-
-    horn_count: int = 0
-    horn_type: str = None  # goat (2), oni (1), unicorn (1)
-    horn_color: str = None # bone
-
-    wing_count: int = 0
-    wing_type: str = None  # bug, dragonfly, butterfly, bird/feathered, bat/leather, robotic
-    wing_palette: str = None
-
-    tail_count: int = 0
-    tail_type: str = None  # catlike, spaded, forked, prehensile
-    tail_color: str = None
-
-    ovipositor_type: str = None
-    ovipositor_color: str = None
-    stinger_type: str = None   # scorpion, wasp
-    stinger_color: str = None
-

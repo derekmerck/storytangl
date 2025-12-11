@@ -32,7 +32,7 @@ def test_fragment_serialization():
     assert data["fragment_type"] == "test"
     assert data["label"] == "test_label"
     assert data["content"] == "Test content"
-    assert data["content_format"] == "plain"
+    assert data["format"] == "plain"
     assert "uid" in data
 
 def test_update_fragment():

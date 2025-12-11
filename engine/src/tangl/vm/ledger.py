@@ -414,3 +414,7 @@ class Ledger(Entity):
             }
 
         return data
+
+    # def model_dump(self, **kwargs) -> UnstructuredData:
+    #     kwargs['exclude_unset'] = False
+    #     return super().model_dump(**kwargs)

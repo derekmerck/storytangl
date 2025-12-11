@@ -50,7 +50,7 @@ def _make_crossroads_script() -> dict:
             "crossroads": {
                 "blocks": {
                     "start": {
-                        "block_cls": "NarrativeBlock",
+                        "obj_cls": "NarrativeBlock",
                         "content": "You stand at a crossroads.",
                         "actions": [
                             {
@@ -70,7 +70,7 @@ def _make_crossroads_script() -> dict:
             "garden": {
                 "blocks": {
                     "entrance": {
-                        "block_cls": "NarrativeBlock",
+                        "obj_cls": "NarrativeBlock",
                         "content": "A peaceful garden.",
                     }
                 }
@@ -78,7 +78,7 @@ def _make_crossroads_script() -> dict:
             "cave": {
                 "blocks": {
                     "entrance": {
-                        "block_cls": "NarrativeBlock",
+                        "obj_cls": "NarrativeBlock",
                         "content": "A dark cave.",
                     }
                 }
@@ -93,6 +93,7 @@ def test_complete_story_creation() -> None:
 
     assert story.initial_cursor_id is not None
     start_node = story.get(story.initial_cursor_id)
+    print(start_node.unstructure())
     assert isinstance(start_node, NarrativeBlock)
     assert start_node.label == "start"
     assert start_node.content == "You stand at a crossroads."

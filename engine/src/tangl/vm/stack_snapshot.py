@@ -36,7 +36,6 @@ class StackFrameSnapshot(BaseModelPlus):
     - :attr:`call_type` – semantic category of the call (defaults to
       ``"generic"``).
     """
-
     return_cursor_id: UUID
     call_type: str = "generic"
 

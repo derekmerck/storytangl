@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import Optional, Iterator, TYPE_CHECKING
+from typing import Optional, Iterator, TYPE_CHECKING, Self
 from uuid import UUID
 from enum import Enum
 
 from pydantic import Field, model_validator
 
+from tangl.type_hints import StringMap, UnstructuredData
 from .graph import GraphItem, Graph
 
 if TYPE_CHECKING:
@@ -75,3 +76,7 @@ class Subgraph(GraphItem):
 
     def find_one(self, **criteria) -> Optional[GraphItem]:
         return next(self.find_all(**criteria), None)
+
+    # def model_dump(self, **kwargs) -> UnstructuredData:
+    #     kwargs['exclude_unset'] = False
+    #     return super().model_dump(**kwargs)

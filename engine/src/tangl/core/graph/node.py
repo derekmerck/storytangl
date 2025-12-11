@@ -21,7 +21,6 @@ class Node(GraphItem):
 
     Key Features
     ------------
-    * **Typed** – optional :attr:`node_type` for coarse classification.
     * **Edge navigation** – :meth:`edges_in`, :meth:`edges_out`, :meth:`edges`.
     * **Wiring helpers** – :meth:`add_edge_to`, :meth:`add_edge_from`, and removers.
 
@@ -32,7 +31,6 @@ class Node(GraphItem):
     - :meth:`add_edge_to` / :meth:`add_edge_from` – create edges within this node's graph.
     - :meth:`remove_edge_to` / :meth:`remove_edge_from` – detach first matching edge if present.
     """
-    node_type: Optional[str | Enum] = None  # No need to enumerate this yet
 
     def edges_in(self, **criteria) -> Iterator[Edge]:
         return self.graph.find_edges(destination=self, **criteria)

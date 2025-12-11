@@ -24,7 +24,6 @@ class Edge(GraphItem):
 
     Key Features
     ------------
-    * **Typed** – optional :attr:`edge_type`.
     * **Endpoint conversion** – pre-init validator accepts ``source``/``destination``
       as :class:`GraphItem` and converts them to ids.
     * **Live accessors** – :attr:`source` / :attr:`destination` resolve via graph.
@@ -49,8 +48,6 @@ class Edge(GraphItem):
     --------
     :class:`~tangl.core.graph.AnonymousEdge`
     """
-
-    edge_type: Optional[Enum|str] = None       # No need to enumerate this yet
     source_id:  Optional[UUID] = None          # usually parent
     destination_id: Optional[UUID] = None      # attach to a structure (choice) or dependency (role, loc, etc.)
 

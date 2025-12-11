@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from helpers.fragment_helpers import extract_fragments
 from tangl.story.episode import Block
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import Frame, ResolutionPhase as P
 
 
-def test_block_renders_dialog_fragments() -> None:
+def test_block_renders_dialog_fragments(extract_fragments) -> None:
     graph = StoryGraph(label="dialog_story")
     block = Block(graph=graph, label="dialog", content="> [!POV] MC\n> I'm speaking.")
 

@@ -40,7 +40,7 @@ class SkinTone(EnumPlusMixin, Enum):
     DARK = "dark"
     ASIAN = "asian"
     EURASIAN = "eurasian"
-    LATIN = CAFE = "latin"
+    LATIN = LATINA = CAFE = "latin"
     SEMITIC = "semitic"
     AMERIND = "amerind"
 
@@ -85,16 +85,16 @@ class EyeColor(EnumPlusMixin, Enum):
     OTHER = "other"                                 # use tags to inspect
 
 class HairStyle(EnumPlusMixin, Enum):
-    VERY_LONG = VERY_LONG_HAIR = "v_long"
-    LONG = LONG_HAIR = "long"
-    SHORT = SHORT_HAIR = NEAT = "short"
-    VERY_SHORT = VERY_SHORT_HAIR = "v_short"
+    VERY_LONG = "v_long"
+    LONG = "long"
+    SHORT = NEAT = "short"
+    VERY_SHORT = "v_short"
     SHAVED = "shaved"
     BALD = NO_HAIR = "bald"
 
-    MESSY = MESSY_HAIR = "messy"
-    WILD = WILD_HAIR = "wild"
-    CURLY = CURLY_HAIR = "curly"
+    MESSY = "messy"
+    WILD = "wild"
+    CURLY = "curly"
     BOB = "bob"
     SHAVED_SIDES = "shaved_sides"  # "sidecut" in booru
     FLIP = "flip"

@@ -77,3 +77,13 @@ from pathlib import Path
 def resources_dir():
     return Path(__file__).resolve().parent / "resources"
 
+sys.path.append(str(Path(__file__).resolve().parent / "pytest_helpers"))
+from pytest_helpers.fragment_helpers import extract_fragments as extract_fragments_, extract_all_choices as extract_all_choices_
+
+@pytest.fixture(scope="session")
+def extract_all_choices():
+    return extract_all_choices_
+
+@pytest.fixture(scope="session")
+def extract_fragments():
+    return extract_fragments_

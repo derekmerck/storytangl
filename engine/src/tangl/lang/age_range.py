@@ -10,7 +10,7 @@ class AgeRange(EnumPlusMixin, IntEnum):
     OLD = 4                 # 80
     VERY_OLD = 5            # 100
 
-    OTHER = -1                                      # use tags to inspect
+    OTHER = -1              # use tags to inspect
 
     @classmethod
     def from_tags(cls, item) -> Self:

@@ -16,7 +16,7 @@ from tangl.vm.context import Context
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class Concept(Node, HasBehaviors):
+class Concept(Node):
     """Concept(label: str, content: str = "")
 
     Minimal narrative node that stores textual content and renders it into the

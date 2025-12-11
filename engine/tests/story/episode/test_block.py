@@ -8,12 +8,9 @@ from tangl.story.concepts import Concept
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import ChoiceEdge, Frame, ResolutionPhase as P
 
-from helpers.fragment_helpers import extract_all_choices, extract_fragments
-
 
 # def _by_fragment_type(fragments: list[BaseFragment], fragment_type: str) -> list[BaseFragment]:
 #     return [f for f in fragments if isinstance(f, BaseFragment) and f.fragment_type == fragment_type]
-
 
 def test_block_stores_inline_content() -> None:
     block = Block(label="block", content="Inline text")
@@ -52,7 +49,7 @@ def test_get_choices_filters_by_availability() -> None:
     assert start.get_choices(ns={"has_key": True}) == [locked, open_edge]
 
 
-def test_block_journal_renders_inline_content() -> None:
+def test_block_journal_renders_inline_content(extract_fragments) -> None:
     g = StoryGraph(label="test")
     block = Block(graph=g, label="block", content="Inline text")
 
@@ -64,7 +61,7 @@ def test_block_journal_renders_inline_content() -> None:
     assert "Inline text" in inline[0].content
 
 
-def test_block_journal_collects_concept_descriptions() -> None:
+def test_block_journal_collects_concept_descriptions(extract_fragments) -> None:
     g = StoryGraph(label="test")
     block = Block(graph=g, label="block")
     first = Concept(graph=g, label="first", content="First")
@@ -82,7 +79,7 @@ def test_block_journal_collects_concept_descriptions() -> None:
     }
 
 
-def test_block_journal_renders_choice_menu() -> None:
+def test_block_journal_renders_choice_menu(extract_all_choices) -> None:
     g = StoryGraph(label="test")
     start = Block(graph=g, label="start")
     left = Block(graph=g, label="left")
@@ -99,7 +96,7 @@ def test_block_journal_renders_choice_menu() -> None:
     assert menus[1].content == "Right"
 
 
-def test_block_journal_includes_locked_choices() -> None:
+def test_block_journal_includes_locked_choices(extract_all_choices) -> None:
     g = StoryGraph(label="test")
     start = Block(graph=g, label="start")
     open_block = Block(graph=g, label="open")

@@ -4,7 +4,7 @@ from typing import Any, Self, Type, Iterator, ClassVar
 import logging
 from uuid import uuid4
 
-from pydantic import BaseModel, field_validator, field_serializer, FieldValidationInfo, model_validator, Field
+from pydantic import BaseModel, field_validator, field_serializer, model_serializer, FieldValidationInfo, model_validator, Field
 
 
 logger = logging.getLogger(__name__)
@@ -19,17 +19,26 @@ class BaseModelPlus(BaseModel):
     def _cast_to_set(cls, v, info: FieldValidationInfo):
         # Only process if this is a set-typed field
         if cls._pydantic_field_type_is(info.field_name, set):
-            if isinstance(v, str):
-                return {x.strip() for x in v.split(',')}
             if v is None:
                 return set()
+            if isinstance(v, str):
+                return {x.strip() for x in v.split(',')}
         return v
 
-    @field_serializer('*')
-    def _convert_set_to_list(self, values: set):
-        if isinstance(values, set):
-            return list(values)
-        return values
+    @model_serializer(mode='wrap')
+    def _convert_sets_to_list(self, nxt_ser):
+        dumped = nxt_ser(self)
+        for k in dumped.keys():
+            if isinstance(dumped[k], set):
+                dumped[k] = list(dumped[k])
+        return dumped
+
+    # @field_serializer('*', mode='wrap')
+    # def _convert_set_to_list(self, values: set, nxt_ser):
+    #     if isinstance(values, set) and values:
+    #         return list(values)
+    #     return nxt_ser(values)
+    #     # return values
 
     # INTROSPECTION
 

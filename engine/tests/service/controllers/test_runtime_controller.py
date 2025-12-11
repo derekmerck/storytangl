@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import sys
 from types import SimpleNamespace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -20,7 +22,6 @@ from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm import ChoiceEdge, Frame, Ledger, ResolutionPhase
 
-from helpers.fragment_helpers import extract_all_choices
 
 
 @pytest.fixture()
@@ -332,7 +333,8 @@ def test_get_available_choices_returns_choice_info_models(
 
 
 def test_choices_come_from_journal_stream(
-    runtime_controller: RuntimeController, ledger: Ledger
+    runtime_controller: RuntimeController, ledger: Ledger,
+        extract_all_choices
 ) -> None:
     graph = ledger.graph
     start = graph.get(ledger.cursor_id)
@@ -344,6 +346,7 @@ def test_choices_come_from_journal_stream(
     ledger.records.push_records(*fragments, marker_type="foo")
 
     fragments = runtime_controller.get_journal_entries(ledger, marker_type="foo", limit=10)
+
     choice_fragments = extract_all_choices(fragments)
 
     assert len(choice_fragments) == 1

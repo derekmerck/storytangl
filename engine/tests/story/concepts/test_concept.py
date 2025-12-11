@@ -26,6 +26,14 @@ class TestSimpleConcept:
         assert concept.content == "Hello world"
         assert concept.label == "test"
 
+    def test_minimal_model_dump(self):
+
+        concept = Concept(label="test", content="Hello world")
+        dumped = concept.unstructure()
+        from pprint import pprint
+        pprint(dumped)
+
+
     def test_render_with_namespace(self):
         concept = Concept(label="greeting", content="Hello, {{name}}!")
         rendered = concept.describe(ns={"name": "Alice"})

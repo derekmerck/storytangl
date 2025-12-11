@@ -22,6 +22,10 @@ def test_entity_creation_and_label():
 def test_entity_structure_unstructure():
     e = TestEntity(foo=7)
     data = e.unstructure()
+
+    from pprint import pprint
+    pprint(data)
+
     restored = TestEntity.structure(data)
     assert restored.foo == 7
     assert restored.uid == e.uid

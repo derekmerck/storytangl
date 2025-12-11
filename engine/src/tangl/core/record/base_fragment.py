@@ -1,9 +1,11 @@
 # tangl/core/record/base_fragment.py
 from typing import Optional, Literal
+import typing
 from enum import Enum
 
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, model_serializer
 
+from tangl.type_hints import UnstructuredData
 from .record import Record
 
 # note:
@@ -55,5 +57,20 @@ class BaseFragment(Record):
     """
     model_config = ConfigDict(extra='allow')
 
-    fragment_type: Optional[ str | Enum ] = None
-    # intent for fragment, e.g., 'content', 'update', 'group', 'media', etc.  `See tangl.journal`
+    fragment_type: str
+    # intent for fragment, e.g., 'content', 'update', 'group', 'media', etc.
+    # `See tangl.journal`, required if creating a bare BaseFragment
+
+    def model_dump(self, **kwargs) -> UnstructuredData:
+        # Fragment-type will often be default b/c it's basically a class var.
+        data = super().model_dump(**kwargs)
+        data['fragment_type'] = self.fragment_type
+        return data
+
+    # @model_serializer(mode='wrap')
+    # def include_literals(self, next_serializer):
+    #     dumped = next_serializer(self)
+    #     for name, field_info in self.model_fields.items():
+    #         if typing.get_origin(field_info.annotation) == typing.Literal:
+    #             dumped[name] = getattr(self, name)
+    #     return dumped

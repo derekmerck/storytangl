@@ -54,7 +54,9 @@ class InheritingSingleton(Singleton):
                     f"while creating <{cls.__name__}:{data.get('label', '<unknown>')}>"
                 )
             defaults = BaseModel.model_dump(ref_instance,
-                exclude_unset=True, exclude_defaults=True, exclude_none=True,
+                exclude_unset=True,
+                exclude_defaults=True,
+                exclude_none=True,
                 exclude={"uid", "label", "from_ref"})
             for k, v in defaults.items():
                 if k in data:

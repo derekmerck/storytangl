@@ -308,16 +308,22 @@ class Entity(BaseModelPlus):
         """
         Unstructure an object into a string-keyed dict of unflattened data.
         """
+        kwargs.setdefault("exclude_unset", False)  # too many mutable fields get lost to track
+        kwargs.setdefault("exclude_none", True)
+        kwargs.setdefault("exclude_defaults", True)
+        kwargs.setdefault("by_alias", True)
+
         # Automatically excludes any fields attrib 'exclude' (Pydantic only, not dataclass)
         exclude = set(self._fields(serialize=False))
-        # logger.debug(f"exclude={exclude}")
-        data = super().model_dump(
-            # exclude_unset=True,  # too many things are mutated after being initially unset
-            exclude_none=True,
-            exclude_defaults=True,
-            exclude=exclude,
-        )
-        data['uid'] = self.uid  # uid is factoried, so it is considered Unset initially
+        if exclude:
+            # logger.debug(f"exclude={exclude}")
+            kwargs.setdefault("exclude", set())
+            kwargs['exclude'].update(exclude)
+
+        data = super().model_dump(**kwargs)
+        # guard for excluding unset; since uid is factoried, so it is considered
+        # Unset initially
+        data['uid'] = self.uid
         data["obj_cls"] = self.__class__
         # The 'obj_cls' key _may_ be flattened by some serializers.  If flattened as qual name,
         # it can be unflattened with `Entity.dereference_cls_name`
@@ -359,6 +365,7 @@ class Selectable(BaseModel):
     selection_criteria: StringMap = Field(default_factory=dict)
     # include a selection MatchPredicate that will run on the _tester_ with the key
     # {'predicate': lambda x: True}
+    # If you include a predicate, this becomes a behavior and WILL NOT be serializable
 
     def get_selection_criteria(self) -> StringMap:
         # override this to create dynamic selections
