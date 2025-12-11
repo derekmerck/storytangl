@@ -33,6 +33,13 @@ class TestSimpleConcept:
         from pprint import pprint
         pprint(dumped)
 
+        from pprint import pprint
+        pprint(dumped)
+        assert 'tags' not in dumped
+        assert 'locals' not in dumped
+        assert 'is_dirty' not in dumped
+        assert 'content' in dumped
+        assert 'uid' in dumped
 
     def test_render_with_namespace(self):
         concept = Concept(label="greeting", content="Hello, {{name}}!")

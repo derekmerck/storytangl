@@ -25,6 +25,10 @@ def test_entity_structure_unstructure():
 
     from pprint import pprint
     pprint(data)
+    assert 'tags' not in data
+    assert 'is_dirty' not in data
+    assert 'foo' in data
+    assert 'uid' in data
 
     restored = TestEntity.structure(data)
     assert restored.foo == 7
