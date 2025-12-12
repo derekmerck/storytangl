@@ -1,7 +1,7 @@
 `tangl.mechanics`
 =================
 
-`tangl.mechanics` is a _namespace_ package for story-related concepts that _extend_ or _combine_ concept and episode nodes along with media and discourse controllers. In the current codebase only the **demographics** helpers ship as live modules; the remaining bullet points are legacy planning notes that still need implementation.
+`tangl.mechanics` is a _namespace_ package for story-related concepts that _extend_ or _combine_ concept and episode nodes along with media and discourse controllers.
 
 - **Demographics**: a parametric regional/ethnic name generator used by `Player` and other concept nodes.
 - **Progression** *(in progress)*: a tiny-RPG stat progression system and a Block wrapper for stat challenges.
@@ -18,3 +18,17 @@
 
 - Timelines with longer-term cause/effect relationships
 - Alternate universe overlays with ability to observe/influence playthroughs already completed
+
+## Current Status Summary
+
+### Implemented ✅
+- **Demographics**: Name generation (fully functional)
+
+### Stubs (API exists, implementation incomplete) ⚠️
+- **Progression**: Stat system scaffolding
+- **Game**: Interactive component wrapper
+
+### Planned (design only) 📋
+- Sandbox, Credentials, Look, Wearables, Ornaments, Crafting
+- (See research_agenda.md for prioritization)
+

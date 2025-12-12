@@ -27,8 +27,7 @@ def _find_planning_receipt(records: list[object]) -> PlanningReceipt:
             return record
     raise AssertionError("planning receipt not found in records")
 
-# @pytest.mark.xfail(reason="planning needs reimplemented")
-# todo: This requires the ability to trace from cursor to sink or sink back to cursor, implemented in traversable domain
+
 def test_planning_cycle_with_mixed_requirements():
     """Full planning pass reuses affordances, waives soft requirements, and creates new nodes."""
 
@@ -169,7 +168,6 @@ def test_planning_cycle_with_mixed_requirements():
     assert frame.cursor == end
     assert frame.step == 3
 
-# @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_softlock_detection_and_prevention():
     """Unresolvable hard requirements are surfaced in planning receipts and block progress."""
 

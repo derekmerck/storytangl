@@ -1,6 +1,10 @@
 Concept Provisioning Design
 ===========================
 
+**Document Version:** 2.1
+**Last Updated:** December 2025
+**Status:** ✅ IMPLEMENTATION COMPLETE
+
 ## Core Philosophy
 
 StoryTangl distinguishes between **named individuals** (unique entities with identity) and **generic templates** (fungible role-fillers). This distinction drives the entire provisioning architecture:
@@ -1518,9 +1522,15 @@ templates:
 
 ## Implementation Status
 
-### Phase 1-2: Template Registry & TemplateProvisioner ✅ COMPLETE
+### All Core Features: ✅ COMPLETE
 
-### Phase 3: World Creation Modes ✅ LAZY MODE (DEFAULT)
+Verified implementations:
+- Template registry with scope filtering
+- TemplateProvisioner creates from templates
+- GraphProvisioner binds existing affordances
+- Role/Setting edges wire to Dependencies
+- World._wire_roles() and ._wire_settings() functional
+- Test coverage in test_world_materialization.py
 
 Current runtime behavior wires role and setting edges with attached requirements, leaving
 all provisioning to the planning phase:
@@ -1532,9 +1542,3 @@ World creation does not pre-link destinations. The compiler remains lean and the
 machine owns provisioning. A future optimization could add a `pre_plan=True` flag on the
 VM to pre-run planning for faster traversal; this would remain outside the World
 builder.
-
----
-
-**Document Version:** 2.1
-**Date:** 2024-11-14
-**Status:** Design Target (Implementation in Progress)

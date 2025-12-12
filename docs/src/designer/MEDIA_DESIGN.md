@@ -1,7 +1,8 @@
-# Media Subsystem Design (v3.7)
+Media Subsystem Design
+======================
 
-**Status:** This document reflects the **target architecture** for media integration with v3.7.  
 **Last Updated:** November 2025  
+**Status:** ⚠️ IN PROGRESS **target architecture** for media integration with v3.7
 **Location:** `engine/src/tangl/media/` and `engine/src/tangl/journal/media/`
 
 ---
@@ -157,7 +158,7 @@ Roles inform:
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                    VM Provision Layer                       │
-│  (tangl.vm.provision, tangl.vm.dispatch.planning)          │
+│  (tangl.vm.provision, tangl.vm.dispatch.planning)           │
 │                                                             │
 │  MediaProvisioner:                                          │
 │    • Discovers existing RIT via MediaResourceRegistry       │
@@ -169,7 +170,7 @@ Roles inform:
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                   Media Resource Layer                      │
-│  (tangl.media.media_resource)                              │
+│  (tangl.media.media_resource)                               │
 │                                                             │
 │  • MediaResourceInventoryTag (Entity)                       │
 │  • MediaResourceRegistry (Registry)                         │
@@ -179,7 +180,7 @@ Roles inform:
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                  Media Creator Layer                        │
-│  (tangl.media.media_creators)                              │
+│  (tangl.media.media_creators)                               │
 │                                                             │
 │  MediaForge dispatch:                                       │
 │    • on_adapt_media_spec: Context-aware spec refinement     │
@@ -194,7 +195,7 @@ Roles inform:
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                    Journal Layer                            │
-│  (tangl.journal.media)                                     │
+│  (tangl.journal.media)                                      │
 │                                                             │
 │  • MediaFragment (ContentFragment subclass)                 │
 │  • Emitted during JOURNAL phase by story nodes              │
@@ -204,7 +205,7 @@ Roles inform:
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                 Service/Controller Layer                    │
-│  (tangl.service.controllers)                               │
+│  (tangl.service.controllers)                                │
 │                                                             │
 │  Dereference pipeline:                                      │
 │    1. Collect MediaFragments from journal                   │
@@ -962,96 +963,6 @@ media:
 
 ---
 
-## What's Implemented
-
-### ✅ Core Infrastructure (Stable)
-
-**MediaRIT Entity:**
-- [x] `MediaResourceInventoryTag` with uid, content_hash, metadata
-- [x] Path-based, data-based, spec-based construction
-- [x] Entity integration (persistent, serializable)
-
-**Registry:**
-- [x] `MediaResourceRegistry` with add/find operations
-- [x] Content-addressed deduplication via hash lookup
-- [x] Registry integration (indexing, scoped search)
-
-**Fragment:**
-- [x] `MediaFragment` with MediaRIT content
-- [x] Staging hints (orientation, placement, z-index)
-- [x] Media role field for client interpretation
-- [x] Base64 serialization for binary content
-
-### ⚠️ Partial Implementation (Needs Modernization)
-
-**Provisioning:**
-- [x] `MediaDependency` edge structure
-- [x] `MediaProvisioner` basic skeleton
-- [ ] **TODO:** Align with v3.7 Provisioner base class
-- [ ] **TODO:** Implement offer generation (EXISTING/CREATE)
-- [ ] **TODO:** Wire into planning.py handlers
-
-**Scripts:**
-- [x] `MediaScriptItem` schema (basic)
-- [ ] **TODO:** Full YAML integration with ScriptManager
-- [ ] **TODO:** Media role and staging hint validation
-
-**Spec System:**
-- [x] `MediaSpec` base class and dispatch registries
-- [x] `StableForge` proof-of-concept (bespoke API)
-- [ ] **TODO:** Standardize creator handler signatures
-- [ ] **TODO:** Document adapter vs creator patterns
-
----
-
-## What's Missing
-
-### 🔴 Critical Gaps
-
-1. **MediaRequirement Implementation**
-   - Need: `MediaRequirement(Requirement[MediaRIT])` subclass
-   - Purpose: Type-safe requirement for media provisioning
-   - Integration: Used by MediaProvisioner, validated by planning phase
-
-2. **Provisioner Integration**
-   - Need: Wire MediaProvisioner into planning.py handlers
-   - Current: Provisioner exists but not invoked during PLANNING
-   - Impact: Media dependencies never resolved, fragments empty
-
-3. **Service Layer Dereferencing**
-   - Need: RuntimeController media resolution logic
-   - Current: MediaFragment emitted with RIT, never dereferenced
-   - Impact: Clients receive opaque RIT objects instead of URLs/data
-
-4. **MediaDep → Fragment Wiring**
-   - Need: Block/Concept JOURNAL handlers emit MediaFragment
-   - Current: Concepts have `concept_fragment()` but no media logic
-   - Impact: Provisioned media never appears in output
-
-### 🟡 Important Enhancements
-
-5. **Creator Pipeline Documentation**
-   - Need: Clear adapter/creator handler patterns
-   - Current: `on_adapt_media_spec` and `on_create_media` exist but unused
-   - Impact: Hard to add new forge types
-
-6. **Spec Validation**
-   - Need: Pydantic validators for spec parameters
-   - Current: Loose dict-based specs
-   - Impact: Runtime errors instead of compile-time
-
-7. **Media Registry Indexing**
-   - Need: `on_index` dispatch for MediaRIT
-   - Current: Basic add/find operations only
-   - Impact: No audit trail for media creation
-
-8. **Comprehensive Testing**
-   - Need: Tests for provisioning, fragment emission, dereferencing
-   - Current: Only basic fragment serialization tests
-   - Impact: Unclear if integration works end-to-end
-
----
-
 ## Integration Points
 
 ### With VM Provisioning
@@ -1470,22 +1381,21 @@ def test_block_emits_media_fragment():
 
 ---
 
-## Revision History
+## Implementation Status (Dec 2025)
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 3.7.0 | Nov 2025 | Initial comprehensive design document for v3.7 framework integration |
+### ✅ Core Infrastructure Complete
+- MediaRIT abstraction (path, data, spec variants)
+- MediaFragment journal emission
+- Content/spec hashing
+- Basic registry operations
 
----
+### ⚠️ In Progress
+- MediaProvisioner v3.7 integration (uses legacy base class)
+- Service layer dereferencing (RuntimeController)
+- PLANNING phase media resolution
 
-**Document Status:** 🟡 **TARGET ARCHITECTURE**
+### 📋 Not Started
+- Comprehensive test coverage
+- Actual forge implementations (SD, TTS, SVG)
+- Media-specific provisioning tests
 
-This document describes the **intended design** for media subsystem integration with v3.7. Core infrastructure exists but critical gaps remain (provisioning wiring, service layer dereferencing). Implementation is in progress.
-
-**Next Steps:**
-1. Implement `MediaRequirement` subclass
-2. Modernize `MediaProvisioner` to use v3.7 base class
-3. Wire provisioner into `planning.py` handlers
-4. Add Block/Concept media emission logic
-5. Implement RuntimeController dereferencing
-6. Comprehensive testing across full lifecycle

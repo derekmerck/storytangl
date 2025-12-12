@@ -1,13 +1,17 @@
 from __future__ import annotations
 from typing import Iterable, Type, Any, Callable, ByteString
 from uuid import UUID
+import logging
 
 from pydantic import model_validator
 
 from tangl.core.registry import Registry
 from tangl.core.dispatch import HookedRegistry
-from tangl.core.behavior import BehaviorRegistry, Behavior
+from tangl.core.behavior import BehaviorRegistry, Behavior, CallReceipt
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 class MediaResourceRegistry(HookedRegistry[MediaRIT]):
     """
@@ -21,7 +25,7 @@ class MediaResourceRegistry(HookedRegistry[MediaRIT]):
     def _default_on_index(self):
         if not self.on_index:
             self.on_index = BehaviorRegistry(
-                label=f"{self.label}_indexer"
+                label=f"{self.label}_indexer",
                 # aggregation_strategy="gather"
         )
         return self
@@ -47,9 +51,11 @@ class MediaResourceRegistry(HookedRegistry[MediaRIT]):
                 continue
 
             # Run through indexing pipeline
-            self.on_index.dispatch(record, ctx=None, extra_handlers=extra_handlers)
+            receipts = self.on_index.dispatch(record, ctx=None, extra_handlers=extra_handlers)
+            CallReceipt.gather_results(*receipts)
 
             # Add to registry
+            logger.debug(f"indexed {record!r}")
             self.add(record)
             results.append(record)
 
