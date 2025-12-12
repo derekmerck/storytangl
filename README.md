@@ -1,103 +1,122 @@
-# StoryTangl v3.7
+# StoryTangl
 
-**TanglDev, Fall 2025**  
+**A Reference Implementation for Graph-based Computational Narratology**
 
 [![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml) [![docs](https://app.readthedocs.org/projects/storytangl/badge/?version=latest)](https://storytangl.readthedocs.io/en/latest/)
-
-
-**A graph-based narrative engine for interactive storytelling**
 
 ---
 
 ## What This Is
 
-StoryTangl is a **reference implementation** of a sophisticated graph-based narrative system. It demonstrates a novel architecture where stories exist as abstract graphs that "collapse" into linear narratives through player choices—think quantum superposition for interactive fiction.
+StoryTangl is a **research platform** that demonstrates how narrative theory can be implemented and explored using abstract narrative graph and computable systems.
 
-### Project Status
+**Core Thesis:** Interactive narratives are best understood as graph structures where player choices collapse possibility spaces into specific story paths—similar to quantum observation collapsing wave functions into measured states.
 
-StoryTangl is an actively developed reference implementation. The core architecture is stable and exercised across the test suite, but individual subsystems are at varying levels of completeness and are expected to evolve.
+### What Makes This Different
 
-**Core capabilities:**
-- Layered architecture across core, IR, journal, VM, story, service, and apps
-- Event-sourced execution with ledger persistence
-- Multi-phase VM pipeline with deterministic resolution
-- Planning & provisioning system for dynamic narrative construction
-- YAML-based story scripting with validation
-- Linear and branching narrative playback via CLI and REST API
-- Multiple persistence backends (in-memory, file, Redis, MongoDB, SQLite)
-- Vue 3 web client with a functional MVP UI
-- Test suite with pytest and coverage reporting
-- Detailed API documentation with Sphinx
+Most interactive fiction tools (Twine, Ink, Ren'Py) are **authoring environments** optimized for content creation. StoryTangl is a **theoretical validation platform** that:
 
-**Active areas of work:**
-- Refining story dispatch integration into the VM pipeline
-- Role and setting provisioning driven from story scripts
-- Media provisioning and client-facing media contracts
-- Tunable narrative voices, vocabularies, languages
-- Comprehensive reference stories and user/author guide
+- **Implements narratological separation of concerns as code** - fabula/episodic process/syuzhet formalism reflected in architectural layering and capabilities
+- **Enables formal verification** - Dependency graphs prove narrative coherence (no softlocks, all paths completable)
+- **Supports systematic exploration** - Graph topology + semantic embeddings enable directed or exhaustive narrative space navigation
+- **Separates structure from presentation** - Same story mechanics can render through different thematic vocabularies
 
-**Future directions:**
-- Dynamic and generative media integration
-- Turnkey RPG and sandbox mechanics (progression, maps, schedules, mobile actors, etc.)
-- Multi-reader stories
-- Transpilers and adapters to/from other narrative engines
-- Continuous narrative interpolation rather than sampled points
-- Specialized in-story asset types (inventory, wearables, etc.)
-- Constraint satisfaction with SAT solver
+**Use this when:** You want to explore graph-based story generation, or experiment with interactive narrative concepts.
+
+**Use something else when:** You want to ship a game quickly, need mature tooling and community support, or prioritize authoring convenience over architectural purity.
 
 ---
 
-## Architecture Highlights
+## Architecture Overview
 
-StoryTangl's distinguishing features come from its architectural choices:
+### Layered Design
 
-### Clean Layering
 ```
-core     → Generic graph entities, registries, records
-ir       → Script / DSL models (core/story/media/vm IR)
-journal  → Narrative fragments and discourse structures
-vm       → Narrative virtual machine with phase-based execution
-story    → Domain model (episodes, scenes, actors, locations)
-service  → Orchestrator pattern with controller endpoints
-apps     → CLI, REST API, web client
+core/        → Graph entities, registries, records (domain-agnostic)
+ir/          → Intermediate representations (YAML scripts, templates)
+journal/     → Narrative fragments and discourse structures  
+vm/          → Virtual machine with phase-based execution pipeline
+story/       → Domain model (episodes, scenes, actors, locations)
+service/     → Orchestrator pattern with controller endpoints
+apps/        → CLI, REST API, Vue web client
 ```
 
-**Dependency flow is strictly one-way.** Lower layers never import from higher ones.
+**Dependency flow is strictly unidirectional.** Core never imports from VM; VM never imports from Story; etc. This enables the "compiler metaphor" where higher layers are syntactic sugar over lower-level semantics.
 
-### Phase Bus Execution
+### The Phase Bus (VM Pipeline)
 
-The VM uses an eight-phase execution cycle for deterministic, auditable narrative resolution:
+Narrative execution proceeds through eight deterministic phases:
 
-The VM uses a multi-phase execution cycle for deterministic, auditable narrative resolution. Phases are ordered, but not every step needs to perform work in every phase:
+```python
+class ResolutionPhase(Enum):
+    VALIDATE = 10    # Check preconditions
+    PLANNING = 20    # Resolve frontier dependencies
+    PREREQS = 30     # Pre-action hooks
+    UPDATE = 40      # Apply state changes
+    JOURNAL = 50     # Emit narrative fragments
+    FINALIZE = 60    # Commit transactions
+    POSTREQS = 70    # Post-action hooks
+    # (advance cursor)
+```
 
-1. **INIT** – Initial placeholder before any work has run.
-2. **VALIDATE** – Check preconditions for the current cursor and candidate transitions.
-3. **PLANNING** – Resolve frontier dependencies and provision needed resources.
-4. **PREREQS** – Run pre-transition hooks or prerequisite transitions.
-5. **UPDATE** – Apply state changes to the graph and runtime entities.
-6. **JOURNAL** – Generate narrative output fragments.
-7. **FINALIZE** – Commit the frame as an event-sourced patch to the ledger.
-8. **POSTREQS** – Run post-transition hooks and redirects (epilogues, follow-ups).
+Each phase dispatches registered handlers in priority order, enabling orthogonal concerns (media provisioning, stat checks, logging) to compose without coupling.
 
-This separates concerns clearly: planning happens *before* choices are presented, preventing softlocks.
+**Why this matters:** Narrative manipulations (order, duration, focalization) become **operational** as phase-level transformations.
+
+### Planning & Provisioning
+
+The system implements **proactive dependency resolution**:
+
+1. **Frontier Identification** - VM identifies all reachable-next nodes from cursor
+2. **Requirement Discovery** - Each frontier node declares what it needs (actors, items, conditions)
+3. **Offer Generation** - Provisioners propose solutions (existing nodes, templates, clones)
+4. **Cost-Based Selection** - System picks best offers (prefer existing > modify > create)
+5. **Plan Execution** - Selected offers materialize; requirements bind to providers
+6. **Viability Assessment** - Unresolved hard requirements mark choices unavailable
 
 ### Event Sourcing
 
-Every narrative session is a **Ledger** consisting of snapshots + patches. This enables:
-- Deterministic replay
-- Efficient persistence
-- Clear audit trail
-- Time-travel debugging
+Every narrative action records to an append-only ledger:
 
-### Dynamic Provisioning
+```python
+Ledger = Stream[Record]
+Record = (timestamp, phase, handler, payload, outcome)
+```
 
-The planning system can:
-- Search for existing resources (actors, items, locations)
-- Create new ones from templates
-- Update existing resources
-- Clone and modify resources
+**Benefits:**
+- **Deterministic replay** - Rerun any playthrough from seed
+- **Formal audit** - Verify planning decisions, trace state evolution
+- **Save/load** - Serialize ledger, not graph state
+- **Structural analysis** - Mine corpora for dependency patterns
 
-Requirements distinguish between hard dependencies (gates choice availability) and soft ones (nice-to-have).
+---
+
+## Current Implementation Status
+
+### ✅ Core Systems (Stable)
+
+- **Graph entity model** - Nodes, edges, registries with UUID-based addressing
+- **Phase bus execution** - Eight-phase pipeline with handler dispatch
+- **Planning & provisioning** - Frontier resolution, offer selection, dependency satisfaction
+- **Role/Setting wiring** - YAML scripts create actual dependency edges
+- **Event-sourced ledger** - Record stream with multiple persistence backends
+- **Service layer** - Orchestrator with controller endpoints, user isolation
+- **CLI & REST API** - Functional interfaces for story playback
+- **Vue 3 web client** - Working MVP with component testing
+
+### ⚠️ Active Development
+
+- **Media provisioning** - Infrastructure exists; integration with planning incomplete
+- **Template scoping** - Registry operational; advanced scope selectors planned
+- **Dialog parsing** - Basic speaker attribution; conversational state machines future
+- **Reference worlds** - One complete example; expanding demonstration library
+
+### 📋 Research Explorations (Not MVP)
+
+- **Semantic distance metrics** - Quantify narrative similarity, enable interpolation
+- **Structural inference** - Extract dependency graphs from play traces (Twine import, etc.)
+- **Multi-lane storytelling** - Multiple simultaneous cursors with coordination protocols
+- **Continuous interpolation** - Treat narratives as parametric curves, not discrete samples
 
 ---
 
@@ -106,394 +125,362 @@ Requirements distinguish between hard dependencies (gates choice availability) a
 ### Installation
 
 ```bash
-# Clone the repository
-$ git clone https://github.com/derekmerck/storytangl.git
-$ cd storytangl
+# Clone repository
+git clone https://github.com/derekmerck/storytangl.git
+cd storytangl
 
 # Install with Poetry
-$ poetry install
+poetry install
 
-# Or install specific extras
-$ poetry install -E server  # Includes FastAPI, Redis, MongoDB
-$ poetry install -E cli     # Just the command-line interface
+# Or with pip
+pip install -e ".[cli,server]"
 ```
 
-### Run a Story (CLI)
+### Play a Story (CLI)
 
 ```bash
-# Start the interactive CLI
-$ poetry run tangl-cli
+# List available worlds
+poetry run tangl_info
 
-# Or use the console script
-$ tangl-cli
+# Play interactively
+poetry run tangl_cli
 
-# In the CLI:
-> load_script path/to/your_story.yaml
-> create_story my_story
-> story        # View current state
-> do 1         # Make first choice
+# Non-interactive playthrough
+poetry run tangl_nav reference --auto-select
 ```
 
-### Run a Story (API + Web)
+### Start REST API Server
 
 ```bash
-# Start the REST API server
-$ poetry run tangl-serve
-# Or: uvicorn tangl.rest.main:app --reload
+# Development server
+poetry run uvicorn tangl.rest.api_server:app --reload
 
-# In another terminal, start the web client
-$ cd apps/web
-$ yarn install
-$ yarn dev
+# Visit http://localhost:8000/docs for interactive API documentation
 ```
 
-The web client will open at `http://localhost:5173` and connect to the API at `http://localhost:8000`.
-
-### Docker Deployment
+### Run Web Client
 
 ```bash
-# Build the image
-$ docker build -t storytangl:3.7 .
+cd apps/web
+yarn install
+yarn dev
 
-# Run the server (includes API + docs)
-$ docker run -p 8000:8000 storytangl:3.7
-# optionally mount an external 'worlds' directory with story content
-
-# For the CLI instead, just override the entrypoint
-$ docker run -it storytangl:3.7 tangl-cli
+# Visit http://localhost:5173
 ```
-
----
-
-## Writing Stories
-
-Stories are defined in YAML with a simple, expressive syntax:
-
-```yaml
-label: my_story
-metadata:
-  title: "My First Story"
-  author: "Your Name"
-
-scenes:
-  intro:
-    blocks:
-      start:
-        content: "Your adventure begins at a crossroads."
-        actions:
-          - text: "Take the left path"
-            successor: left_path
-          - text: "Take the right path"
-            successor: right_path
-      
-      left_path:
-        content: "You venture into the dark forest..."
-        # More blocks here
-      
-      right_path:
-        content: "You follow the sunny trail..."
-        # More blocks here
-```
-
-### Script Features
-
-**Currently Supported:**
-- Hierarchical scene/block structure
-- Multiple choice actions
-- Inline content with Jinja2 templating
-- Actor and location definitions
-- Reusable templates
-- Asset manifests (for media)
-
-**In Development:**
-- Role/setting requirements on scenes
-- Conditional availability (guards)
-- Dynamic provisioning from templates
-- State-based content variations
-- Markdown-like writerly format
-
-See `engine/tests/resources/` for working examples.
-
----
-
-## Development
-
-### Architecture Philosophy
-
-StoryTangl follows strict principles:
-
-1. **Type purity**: Store data in native Python types (bytes for hashes, UUID objects, not strings). Serialize only at boundaries.
-
-2. **Explicit mechanisms**: Small, clear functions over clever magic. Deterministic behavior.
-
-3. **Test-driven**: Post-design test coverage. Use xfail markers for intended-but-unimplemented features.
-
-4. **Layer discipline**: No upward imports. Core stays generic. Domain logic lives in higher layers.
-
-5. **Reference implementation**: Prioritize correctness and clarity over performance. This is meant to be read and understood.
-
-### Running Tests
-
-```bash
-# All tests
-$ poetry run pytest
-
-# Specific layers
-$ poetry run pytest engine/tests/core
-$ poetry run pytest engine/tests/vm
-$ poetry run pytest engine/tests/story
-
-# With coverage
-$ poetry run pytest --cov=tangl --cov-report=html
-
-# Watch mode
-$ poetry run pytest --watch
-```
-
-### Documentation
-
-```bash
-# Build Sphinx docs
-$ cd docs
-$ poetry run make html
-
-# View at docs/build/html/index.html
-```
-
-**Read these first:**
-- `AGENTS.md` - Contributor guide with coding conventions
-- `docs/source/contrib/` - Architecture and design patterns
-- Design docs near relevant code (e.g., `engine/src/tangl/vm/provision/PLANNING_DESIGN.md`)
-
-### Project Structure
-
-```
-storytangl/
-├── engine/
-│   ├── src/tangl/
-│   │   ├── core/          # Graph entities, registries, records
-│   │   ├── vm/            # Virtual machine, planning, ledger
-│   │   ├── story/         # Domain model (episodes, actors, etc.)
-│   │   ├── service/       # Orchestrator, controllers
-│   │   ├── ir/            # Scripting/template models
-│   │   ├── journal/       # Output stream models
-│   │   └── persistence/   # Storage backends
-│   └── tests/             # Comprehensive test suite
-├── apps/
-│   ├── cli/               # Command-line interface
-│   ├── server/            # FastAPI REST API
-│   └── web/               # Vue web client
-├── docs/                  # Sphinx documentation
-└── worlds/                # Reference story content
-```
-
----
-
-## Design Concepts
-
-### Narrative as Quantum Collapse
-
-StoryTangl treats narrative as a field of potentials. Story elements exist in *superposition*—they are possible but not yet real. Player choices cause *collapse*: specific scenes, characters, and events materialize while others remain forever unrealized.
-
-This isn't just metaphor. The architecture literally implements:
-- **Superposition**: Template nodes that can become multiple concrete instances
-- **Observation**: The planning phase that resolves ambiguity
-- **Collapse**: Deterministic materialization through the phase bus
-- **Entanglement**: Dependency edges that link narrative elements
-
-### Separation of Concerns
-
-The system distinguishes four conceptual layers:
-
-1. **Story World** (Domain of Possibility)
-   - Templates, constraints, logic rules
-   - The "shape model" of what *can* exist
-
-2. **Story Graph** (Semantic Instance)
-   - Specific narrative concepts: scenes, characters, relationships
-   - State tracking and branching logic
-   - The "noumenal narrative" before presentation
-
-3. **Story Navigator** (Collapser)
-   - Traverses graph to produce event sequences
-   - Manages choices, planning, state updates
-   - The execution engine
-
-4. **Story Representer** (Phenomenon)
-   - Converts abstract narrative into concrete output
-   - Handles text rendering, media, formatting
-   - What the player actually experiences
-
-By keeping these separate, one semantic core can project into many forms—like weaving different patterns from the same thread.
-
-### Compiler Metaphor
-
-If you're a developer, think of StoryTangl as a narrative compiler:
-
-- **YAML scripts** are the source language (author-friendly)
-- **Graph representation** is the intermediate form (runtime-efficient)
-- **VM phases** are the instruction set architecture
-- **Journal fragments** are the execution trace
-- **Planning system** is the optimizer (resolves dependencies ahead of time)
-
-This framing makes the architecture immediately comprehensible to programmers.
-
----
-
-## API Overview
-
-### REST Endpoints
-
-The FastAPI server provides a clean HTTP interface:
-
-**World Management:**
-- `GET /worlds` - List available story worlds
-- `GET /worlds/{world_id}` - Get world metadata
-- `POST /worlds/load` - Load world from script
-
-**Story Operations:**
-- `POST /story/create` - Start new story session
-- `GET /story/update` - Get latest narrative state
-- `POST /story/do` - Execute choice
-- `GET /story/status` - Check session status
-- `DELETE /story` - End session
-
-**System:**
-- `GET /info` - System info and health check
-- `GET /openapi` - OpenAPI spec
-
-See `/docs` endpoint when running the server for interactive API documentation.
-
-The server app also bundles a simple static file server for exposing world and system media objects to a story client at `/media`.
 
 ### Python API
 
-For direct integration:
-
 ```python
-import uuid
-
 from tangl.service.orchestrator import Orchestrator
-from tangl.service.controllers.runtime_controller import RuntimeController
-from tangl.service.controllers.world_controller import WorldController
+from tangl.service.controllers import WorldController, RuntimeController
 
-# Initialize orchestrator and register controllers
+# Initialize
 orchestrator = Orchestrator()
 orchestrator.register_controller(WorldController())
 orchestrator.register_controller(RuntimeController())
 
 user_id = uuid.uuid4()
 
-# Load a world
+# Load world
 world_info = orchestrator.execute(
     "WorldController.load_world",
     user_id=user_id,
-    source="path/to/story.yaml",
+    source="worlds/reference/script.yaml"
 )
-
-world_id = world_info.world_id
 
 # Create story session
 runtime = orchestrator.execute(
     "WorldController.create_story",
     user_id=user_id,
-    world_id=world_id,
-    story_label="session_001",
+    world_id=world_info.world_id,
+    story_label="session_001"
 )
 
-ledger_id = runtime.ledger_id
-
-# Get current state
+# Get narrative update
 update = orchestrator.execute(
     "RuntimeController.get_story_update",
     user_id=user_id,
-    ledger_id=ledger_id,
+    ledger_id=runtime.ledger_id
 )
 
-# Make choice
+# Execute choice
 result = orchestrator.execute(
     "RuntimeController.do_action",
     user_id=user_id,
-    ledger_id=ledger_id,
-    action_id=update["choices"][0]["uid"],
+    ledger_id=runtime.ledger_id,
+    action_id=update["choices"][0]["uid"]
 )
 ```
 
-The orchestrator handles all resource hydration and persistence automatically.
+---
+
+## Documentation
+
+### For Contributors
+
+Start here to understand the codebase:
+
+1. **`AGENTS.md`** - Coding conventions, architectural principles, testing patterns
+2. **`docs/source/contrib/`** - Architecture guides, design patterns, docstring style
+
+### Build Docs Locally
+
+```bash
+cd docs
+poetry run make html
+# Open docs/build/html/index.html
+```
 
 ---
 
-## Performance & Scale
+## Testing
 
-**Current State:**
-- Optimized for **correctness** over speed (reference implementation)
-- Single-threaded execution within a user session
-- Concurrent users/stories isolated via per-user locking
-- Memory footprint scales with graph size + journal length
+```bash
+# Full test suite
+poetry run pytest
+
+# Specific layers
+poetry run pytest engine/tests/core
+poetry run pytest engine/tests/vm
+poetry run pytest engine/tests/story
+
+# With coverage
+poetry run pytest --cov=tangl --cov-report=html
+# Open htmlcov/index.html
+
+# Watch mode (requires pytest-watch)
+poetry run ptw
+```
+
+**Test philosophy:** Architecture-first, test-after. Use `xfail(strict=True)` for intended-but-unimplemented features. When implementations accidentally pass xfail tests, the test suite errors—forcing you to verify the implementation and remove the marker.
+
+---
+
+## Project Structure
+
+```
+storytangl/
+├── engine/
+│   ├── src/tangl/
+│   │   ├── core/          # Graph, entities, registries, records
+│   │   ├── ir/            # Intermediate representations (scripts, templates)
+│   │   ├── journal/       # Output fragments, discourse structures
+│   │   ├── vm/            # Virtual machine, planning, ledger
+│   │   ├── story/         # Domain model (episodes, actors, locations)
+│   │   ├── service/       # Orchestrator, controllers, user management
+│   │   ├── persistence/   # Storage backends (file, Redis, MongoDB, SQLite)
+│   │   └── utils/         # Hashing, validation, base models
+│   └── tests/             # Comprehensive test suite
+├── apps/
+│   ├── cli/               # Command-line interface
+│   ├── server/            # FastAPI REST API
+│   └── web/               # Vue 3 web client
+├── docs/                  # Sphinx documentation
+├── worlds/                # Reference story bundles
+└── scripts/               # Utility scripts
+```
+
+---
+
+## Design Philosophy
+
+### 1. Reference Implementation
+
+StoryTangl prioritizes **correctness** and **clarity** over performance. The goal is demonstrating concepts that others can learn from, validate, and build upon. Production systems should borrow the architecture and optimize as needed.
+
+### 2. Theory-First
+
+Architectural decisions map to narratological theory or formal methods:
+- Phase bus → narrative operations
+- Dependency graphs → Constraint satisfaction  
+- Planning → STRIPS-style planning (preconditions + effects)
+- Concept and Episode Templates → Proppian morphological functions
+
+### 3. Explicit Over Clever
+
+Prefer small, clear functions over metaprogramming magic. Deterministic behavior beats "flexible" code. Type hints everywhere. No hidden state.
+
+### 4. Compiler Metaphor
+
+Think of StoryTangl as a narrative compiler:
+- **YAML scripts** = source language (author-friendly)
+- **Graph representation** = intermediate form (runtime-efficient)
+- **VM phases** = instruction set architecture
+- **Journal fragments** = execution trace
+- **Planning system** = linker and optimizer (resolves dependencies ahead of time)
+
+This framing makes the architecture intuitive to software developers.
+
+### 5. Separation of Concerns
+
+Four conceptual layers maintained rigorously:
+
+1. **Story World** (Templates, constraints) - Latent Fabula, what *can* exist
+2. **Story Graph** (Scenes, actors, edges) - Realized Fabula, What *does* exist (semantic 'shape')
+3. **Story Navigator** (VM, planning) - Episodic process, how we *move through* it
+4. **Story Renderer** (Journal, media) - Syuzhet, how we *present* it (syntactic 'appearance')
+
+By keeping these separate, one semantic core can project into many forms—rendered text, audio drama, comic panels, VR experience.
 
 ---
 
 ## Philosophical Foundations
 
-### Why This Architecture?
+### Narrative as Quantum Collapse
 
-This is a bit of navel-gazing, but this architecture has been 30 years in the making, drawing on _many_ intellectual traditions that I have learned about and engaged with over the decades.
+StoryTangl treats narrative as a **field of potentials**. Story elements exist in superposition—they are possible but not yet real. Player choices cause collapse: specific scenes and events materialize while others remain unrealized.
 
-**Kantian Framework:** The story graph is the "noumenal" reality (things-in-themselves), while rendered output is "phenomenal" (things-as-perceived). The VM mediates between these realms.
+This isn't just a metaphor. The architecture literally implements:
+- **Superposition** → Template nodes can become multiple instances
+- **Observation** → Planning phase resolves ambiguity
+- **Collapse** → Deterministic materialization through phase bus
+- **Entanglement** → Dependency edges link narrative elements
 
-**Platonic Forms:** Templates are ideal forms; instances are shadows in the cave. The planning system is the mechanism for projecting forms into concrete existence.
+### Kantian Noumena/Phenomena
 
-**Compiler Theory:** YAML→Graph→Journal is a compilation pipeline with intermediate representations at each stage. The phase bus is an instruction set architecture for narrative execution.
+The story graph is the **noumenal** reality (things-in-themselves); rendered output is **phenomenal** (things-as-perceived). The VM mediates between these realms.
 
-**AI Planning (STRIPS):** Requirements specify preconditions; provisioners apply operators; the planning cycle searches the state space of possible narratives.
+Authors work in the noumenal space (graph structure, dependencies, constraints). Players experience the phenomenal space (text, images, choices). The system ensures **multiple phenomenal presentations** can arise from **single noumenal structure**.
 
-**Morphological Models:** The story world is a shape model defining the space of valid narratives. Story instances are specific shapes sampled from this space and projected into a representation space as they are unrolled.
+### Platonic Forms
 
-These aren't just esoteric analogies —- they are the actual design principles that shaped concrete technical choices and are used in reasoning about the  logic.
+Templates are ideal forms; instances are shadows in the cave. Planning is the mechanism for projecting forms into concrete existence. Vocabulary banks enable the same form to cast different shadows (genre transformations).
 
-### Evolution Through Iteration
+---
 
-This is version 3.7, representing the ~37th architectural iteration (4 rewrites with 8-12 iterations each over 5+ years).  Each rewrite has been inspired by evolution of key strategies.
+## Use Cases & Applications
 
-1. **System and domain encapsulation** emerged after multiple  attempts at monolithic systems
-2. **Phase bus** replaced brittle event handlers and task chains
-3. **Event sourcing** solved replay and debugging problems
-4. **Type purity** eliminated subtle serialization bugs
-5. **Planning-first** prevents softlocks better than backtracking
-6. **Template-driven** scales better than hardcoded content
-7. **Interactions as re-entrant nodes** provide a powerful adjunct for embedding complex, procedurally driven subtrees
+### Academic Research
 
-Each major version abandoned working code to get the architecture closer to correct. The current design is stable (for now) because it's been tested through repeated rebuilds.
+- **Computational narratology** - Test theories by implementing them
+- **Interactive narrative design** - Explore narrative possibility spaces systematically  
+- **AI & games** - Narrative planning, procedural generation
+- **Digital humanities** - Structural analysis of IF corpora
+
+### Practical Applications
+
+- **IF authoring tool** - Graph-native alternative to Twine with semantic linting (advanced users)
+- **Narrative backend** - Drop-in story engine for games
+- **Educational platform** - Teaching interactive narrative concepts
+- **Experimental narratives** - Multi-lane stories, continuous interpolation, etc.
+
+### What This Is *Not* For
+
+- **Rapid prototyping** - Use Twine, Ink, or Ren'Py for fast iteration
+- **Production games** - StoryTangl is reference-grade, not turn-key
+- **Non-technical authors** - Leveraging non-trivial features require programming/systems thinking
+- **Traditional storytelling** - If you want linear narratives, use a word processor
+
+---
+
+## Performance Considerations
+
+**Current State:**
+- Single-threaded per-user session execution
+- Memory footprint scales with graph size + journal length
+- Planning phase is O(frontier_size × provisioner_count × offers_per_provisioner)
+- No caching or memoization yet (deferred for clarity)
+
+**Optimizations Available:**
+- Pre-plan stories at compile time (eager mode)
+- Cache provisioning results
+- Incremental graph serialization
+- Graph database backends (Neo4j, etc.)
+
+**Design Trade-off:** We deliberately avoid optimizations that would obscure the conceptual model. Reference implementations should be **easy to understand**, not fast. Production systems can profile and optimize hotspots.
 
 ---
 
 ## Contributing
 
-If you want to contribute:
+### Before Starting
 
-1. **Read `AGENTS.md` first** - Contains all coding conventions
-2. **Study the layer boundaries** - Respect the architecture
-3. **Write tests** - Use xfail for intended features
-4. **Document thoroughly** - This is a reference implementation
-5. **Ask questions** - Better to clarify than assume
+1. Read `AGENTS.md` for conventions
+2. Explore `docs/source/contrib/` for patterns
+3. Study tests—they document intended behavior
+4. Run the test suite successfully
 
-### Key Conventions
+### Development Workflow
 
-- Python 3.13+ with type hints
-- Pydantic for all data models
-- pytest with comprehensive coverage
-- Black-like formatting (4-space indent)
-- Sphinx for documentation (reStructuredText in docstrings, Markdown/Myst for design guides)
-- Keep lines under 100 characters
+```bash
+# Create feature branch
+git checkout -b feature/my-exploration
 
-See `docs/source/contrib/coding_style.md` for detailed guidelines.
+# Make changes, write tests
+poetry run pytest
+
+# Type checking
+poetry run mypy engine/src/tangl
+
+# Lint (if configured)
+poetry run flake8 engine/src
+
+# Commit and push
+git commit -am "Add exploration of X"
+git push origin feature/my-exploration
+```
+
+### What We Value
+
+- **Theoretical grounding** - Patterns based on formal systems
+- **Architectural integrity** - Respect layer boundaries
+- **Test coverage** - Write tests that validate concepts
+- **Documentation** - Explain *why*, not just *what*
+- **Clarity** - Simple code beats clever code
+
+---
+
+## Roadmap
+
+### Short-term (Current Focus)
+
+- Complete media provisioning integration
+- Expand reference world library
+- Write theory validation papers (no new code required)
+- Clean up stale design documentation
+
+### Medium-term (Next 6-12 Months)
+
+- Semantic distance metrics (shape space exploration)
+- Proppian pattern library (re-entrant subgraphs)
+- Vocabulary substitution framework (parametric thematics)
+
+### Long-term (Research Directions)
+
+- Structural inference from play traces
+- Multi-lane storytelling with coordination
+- Continuous narrative interpolation
+- Learning-based provisioning
+
+---
+
+## FAQ
+
+**Q: Is this production-ready?**  
+A: The core architecture is solid and battle-tested through comprehensive test suite. Individual subsystems vary in completeness. Use at your own risk; this is a reference implementation, not a turn-key solution.
+
+**Q: Why 37 iterations before v3.7?**  
+A: Your missing keys are always in the last place you look.
+
+**Q: Why not use [existing IF tool]?**  
+A: Twine, Ink, Inform, and Ren'Py are excellent for their purposes. StoryTangl comes from a fundamentally different design space: **graph-native, theory-first, formally verifiable**. Use those tools to ship games; use StoryTangl to explore what's computationally possible in narrative.
+
+**Q: What's the performance like?**  
+A: Optimized for **correctness** and **clarity**, not speed. Fast enough for academic research and prototyping; could be optimized for use with production applications. The architecture supports scaling, but this implementation prioritizes understanding over throughput.
+
+**Q: Can I use this for my game/app/research?**  
+A: If you understand the architecture and accept that it's research-grade, sure. Be aware that APIs may evolve as new insights require new abstractions. This is not a stable 1.0 product—it's an ongoing research platform.
+
+**Q: How do I learn more?**  
+A: Read `AGENTS.md` → Study tests → Explore `docs/source` → Build a world and extend it with interesting mechanics. The codebase is meant to be understood through interaction, not passive reading.
 
 ---
 
 ## License
 
-MIT except BSD on the Demographics module name-banks, which includes content
-directly lifted from a BSD-licensed project, see that subpackage for details.
+MIT License - See `LICENSE` file for details.
+
+Exception: Demographics module name-banks use BSD-licensed content from external sources. See `engine/src/tangl/mechanics/demographics/` for attribution.
 
 ---
 
@@ -504,38 +491,14 @@ directly lifted from a BSD-licensed project, see that subpackage for details.
 **Version:** 3.7.2  
 **Date:** Winter 2025
 
-Built with: Python 3.13, Pydantic, FastAPI, Vue 3, Vuetify 3, Poetry
+**Built with:** Python 3.13, Pydantic, FastAPI, Vue 3, Vuetify 3, Poetry
 
-Inspired by: Compiler theory, quantum mechanics, Kantian philosophy, STRIPS planning, morphological models, and years of exploring other interactive fiction tools.
+**Inspired by:** Compiler theory, quantum mechanics, Kantian philosophy, STRIPS planning, morphological analysis, and decades of interactive fiction tools (Inform, Twine, Ink, Ren'Py, RPG Maker).
 
----
-
-## FAQ
-
-**Q: Is this production-ready?**  
-A: No idea.  It's pretty straightforward to create a reference implementation online, feel free to stress test it and report back.  Core architecture is solid; polish and completeness are in progress.
-
-**Q: Why 37 iterations?**  
-A: Your missing keys are always in the last place you look.
-
-**Q: Why not use [existing IF tool]?**  
-A: Existing tools are great for their use cases. StoryTangl actually emerged from exploring [Inform][], [Twine][]/Sugarcube, [Ink][], [Ren'Py][], kirikiri, [RPGmaker][], and other interactive fiction platforms.  I have adopted or hope to adopt many of the strengths of those systems here.  But StoryTangl comes from a fundamentally different design space: graph-native, planning-first, reproducible, with best-effort separation between the semantic story space representation and the syntactic presentation layer.
-
-[Inform]: https://ganelson.github.io/inform-website/
-[Ink]: https://www.inklestudios.com/ink/
-[Twine]: https://twinery.org/
-[Ren'Py]: https://www.renpy.org/
-[RPGMaker]: https://www.rpgmakerweb.com/
-
-**Q: What's the performance like?**  
-A: Optimized for _clarity_ and _correctness_, not speed. It is intended as a reference implementation and platform for theoretical exploration, so I intentionally avoid optimizations that might interfere with simple reasoning about the underlying entities and behaviors. Production systems can borrow the architecture and optimize as needed.
-
-**Q: Can I use this for my game?**  
-A: If you understand the architecture and think that it's stable enough, sure. But, be aware that it is designed as a reference, not a turn-key solution.  And although the library API has been fairly stable for a couple of years now, it may evolve as new features require new endpoints. 
-
-**Q: How do I learn more?**  
-A: Read `AGENTS.md` first as it tracks the current conventions fairly closely.  Then explore `docs/source` and study the tests. The codebase itself is heavily documented and meant to be understood by interacting with it.
+**Special thanks to:** The narratology community for 50+ years of theory that can now be tested computationally.
 
 ---
 
-**This is a reference implementation.** It prioritizes correctness, clarity, and architectural integrity over performance or feature count. The goal is to demonstrate a novel approach to interactive narrative spaces that others can learn from and build upon.
+**This is a reference implementation.** It prioritizes correctness, clarity, and theoretical integrity over features or performance. The goal is demonstrating novel approaches to interactive narrative that others can learn from, validate, and build upon.
+
+**Read. Understand. Extend. Publish.**
