@@ -316,7 +316,7 @@ This framing makes the architecture intuitive to software developers.
 Four conceptual layers maintained rigorously:
 
 1. **Story World** (Templates, constraints) - Latent Fabula, what *can* exist
-2. **Story Graph** (Scenes, actors, edges) - Realized Fabula, What *does* exist (semantic 'shape')
+2. **Story Graph** (Scenes, actors, edges) - Realized Fabula, what *does* exist (semantic 'shape')
 3. **Story Navigator** (VM, planning) - Episodic process, how we *move through* it
 4. **Story Renderer** (Journal, media) - Syuzhet, how we *present* it (syntactic 'appearance')
 

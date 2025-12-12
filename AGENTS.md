@@ -149,5 +149,7 @@ invalid or untracked binary files into the repository.
   Pydantic instead of manual dict munging when possible.
 - When adding enums or user-facing strings, sanitize labels via `sanitize_str` and
   respect identifier/tag casing conventions.
+- If updating an implementation that is detailed in an existing design or planning 
+  doc, be sure to update the 'status' section so the document doesn't go stale.
 
 Thanks for contributing to StoryTangl!
