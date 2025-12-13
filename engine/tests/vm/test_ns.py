@@ -100,7 +100,7 @@ def test_get_ns(NodeL, SubgraphL, GraphL):
         return {'ctx_layer': 'present'}
 
     assert len(ctx.local_behaviors) == 1
-    logger.debug( list(ctx.local_behaviors.select_all_for(n, task="get_ns")) )
+    logger.debug( list(ctx.local_behaviors.find_all(selector=n, task="get_ns")) )
 
     ctx.get_ns(nocache=True)
     ns = ctx.get_ns()

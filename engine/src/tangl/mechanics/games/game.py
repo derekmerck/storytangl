@@ -6,6 +6,8 @@ GameHandler classes operate on Game instances to implement rules.
 
 This module has minimal dependencies - just Pydantic for validation
 and the local enums/strategies.
+
+Must derive from entity to use with dispatch tho.
 """
 from __future__ import annotations
 from typing import Any, Callable, ClassVar, Generic, TypeVar
@@ -14,6 +16,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from tangl.core import Entity
 from .enums import GamePhase, GameResult, RoundResult
 
 # Generic type for moves (each game defines its own move enum/type)
@@ -36,7 +39,7 @@ class RoundRecord(Generic[Move]):
     notes: dict[str, Any] | None = None
 
 
-class Game(BaseModel, Generic[Move]):
+class Game(Entity, Generic[Move]):
     """
     Base class for game state.
     

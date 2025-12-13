@@ -153,7 +153,7 @@ OT = TypeVar("OT", bound=Entity)
 CT = TypeVar("CT", bound=Entity)
 
 @total_ordering
-class Behavior(Entity, Selectable, HasSeq, Generic[OT, CT]):
+class Behavior(Selectable, Entity, HasSeq, Generic[OT, CT]):
     # language=rst
     """
     Behavior(func: ~typing.Callable[[Entity, ...], typing.Any], priority: int = NORMAL)

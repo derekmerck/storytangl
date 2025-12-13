@@ -510,7 +510,7 @@ class TestBehaviorRegistrySelection:
         registry.add_behavior(static_handler, task="validate")
 
         char = Character(label="hero")
-        behaviors = list(registry.select_all_for(selector=char))
+        behaviors = list(registry.find_all(selector=char))
 
         assert len(behaviors) == 1
         assert behaviors[0].func is static_handler
@@ -522,7 +522,7 @@ class TestBehaviorRegistrySelection:
         registry.add_behavior(Character.self_heal, task="heal")
 
         char = Character(label="hero")
-        behaviors = list(registry.select_all_for(
+        behaviors = list(registry.find_all(
             selector=char,
             has_task="validate"
         ))
@@ -544,7 +544,7 @@ class TestBehaviorRegistrySelection:
         registry.add_behavior(gm_handler)
 
         char = Character(label="hero")
-        behaviors = list(registry.select_all_for(selector=char))
+        behaviors = list(registry.find_all(selector=char))
 
         # Should only get char_handler
         assert len(behaviors) == 1
@@ -573,7 +573,7 @@ class TestBehaviorRegistrySelection:
 
         char = Character(label="hero")
         # Need to invoke the built-in __lt__ for sorting
-        behaviors = list(registry.select_all_for(selector=char, sort_key=lambda x: x))
+        behaviors = list(registry.find_all(selector=char, sort_key=lambda x: x))
 
         # Should be sorted FIRST -> NORMAL -> LAST
         assert len(behaviors) == 3

@@ -371,24 +371,16 @@ class Selectable(BaseModel):
         # override this to create dynamic selections
         return copy(self.selection_criteria)
 
+    def matches(self, *, selector: Entity = None, **inline_criteria) -> bool:
+        if selector is not None:
+            if not isinstance(selector, Entity):
+                raise TypeError("Selector must be an instance of Entity")
+            if not selector.matches(**self.get_selection_criteria()):
+                return False
+        return super().matches(**inline_criteria)
+
     def satisfies(self, selector: Entity, **inline_criteria) -> bool:
-        if not self.matches(**inline_criteria):
-            return False
-        return selector.matches(**self.get_selection_criteria())
-
-    @classmethod
-    def filter_for_selector(cls, values: Iterable[Self], *, selector: Entity, **inline_criteria) -> Iterator[Self]:
-
-        return filter(lambda x: hasattr(x, 'get_selection_criteria') and
-                      x.matches(**inline_criteria) and
-                      selector.matches(**x.get_selection_criteria()), values)
-
-        # or could use the symmetric helper `lambda x: helper x.satisfies(selector)`
-        # def filt_(self: Self) -> Self:
-        #     if not hasattr(self, 'get_selection_criteria'): return False
-        #     if not self.matches(**inline_criteria: return False
-        #     return self.satisfies(selector)
-        # return filter(filt_, values)
+        return self.matches(selector=selector, **inline_criteria)
 
 
 # todo: is this a redundancy on Selectable with only the predicate function?

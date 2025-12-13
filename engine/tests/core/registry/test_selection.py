@@ -5,7 +5,7 @@ from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable
 
 
-class Provider(Entity, Selectable):
+class Provider(Selectable, Entity):
     # providers declare criteria the selector must match
     selection_criteria: dict = {}
 
@@ -30,7 +30,7 @@ def test_selectable_satisfies_and_filter_for_selector():
     assert p2.satisfies(c) is True
     assert p1.satisfies(c) is False
 
-    values = list(Provider.filter_for_selector([p1, p2], selector=c))
+    values = list(Provider.filter_by_criteria([p1, p2], selector=c))
     assert values == [p2]
 
 
@@ -47,16 +47,16 @@ def test_registry_select_for_and_chain_find():
     seeker = Consumer(label="wizard", kind="wand", tier=2)
 
     # select_for searches a single registry
-    got1 = list(reg1.select_all_for(seeker))
+    got1 = list(reg1.find_all(selector=seeker))
     assert got1 == [], 'only c satisfies seeker, c not in r1'
 
-    got2 = list(reg2.select_all_for(seeker))
+    got2 = list(reg2.find_all(selector=seeker))
     assert got2 == [c], 'only c satisfies seeker, c in r2'
 
     # chain across registries
-    got = list(Registry.chain_select_all_for(reg1, reg2, selector=seeker))
+    got = list(Registry.chain_find_all(reg1, reg2, selector=seeker))
     assert got == [c]
 
     # chain_find_one yields the first in the chained ordering
-    one = Registry.chain_select_one_for(reg1, reg2, selector=seeker)
+    one = Registry.chain_find_one(reg1, reg2, selector=seeker)
     assert one is c

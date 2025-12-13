@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 VT = TypeVar("VT", bound=Entity)  # registry value type
 FT = TypeVar("FT", bound=Entity)  # find type within registry
-ST = TypeVar("ST", bound=Selectable)
+# ST = TypeVar("ST", bound=Selectable)
 
 
 class Registry(Entity, Generic[VT]):
@@ -169,33 +169,6 @@ class Registry(Entity, Generic[VT]):
             logger.warning("chain_find_one with no sort key is legal, but it may not be what you want, it is just reg[0].find_one()")
         return next(cls.chain_find_all(*registries, sort_key=sort_key, **criteria), None)
 
-    # -------- FIND SATISFIERS -----------
-
-    def select_all_for(self, selector: Entity, sort_key = None, **inline_criteria) -> Iterator[ST]:
-        # filter will gracefully fail if VT is not a Selectable
-        iter_values = Selectable.filter_for_selector(self.values(), selector=selector, **inline_criteria)
-        if sort_key is None:
-            yield from iter_values
-        else:
-            yield from sorted(iter_values, key=sort_key)
-
-    def select_one_for(self, selector: Entity, **inline_criteria) -> Optional[ST]:
-        return next(self.select_for(selector, **inline_criteria), None)
-
-    @classmethod
-    def chain_select_all_for(cls, *registries: Self, selector: Entity, sort_key = None, **inline_criteria) -> Iterator[ST]:
-        with _chained_registries(*registries):  # make registries available to inner calls
-            iter_values = itertools.chain.from_iterable(
-                r.select_all_for(selector, **inline_criteria) for r in registries)
-            if sort_key is None:
-                yield from iter_values
-            else:
-                yield from sorted(iter_values, key=sort_key)
-
-    @classmethod
-    def chain_select_one_for(cls, *registries: Self, selector: Entity, **inline_criteria) -> Optional[ST]:
-        return next(cls.chain_select_all_for(*registries, selector=selector, **inline_criteria), None)
-
     # -------- DELEGATE MAPPING METHODS -----------
 
     def keys(self) -> Iterator[UUID]:
@@ -271,8 +244,10 @@ class Registry(Entity, Generic[VT]):
             data['_data'].append(v.unstructure())
         return data
 
+# todo: this is currently unused and extraneous
 # For chain-find/select, provide the entire list of participating registries
-# in the call stack.  Enables chain-order sort keys for items that know what registry they came from.
+# in the call stack.  Enables chain-order sort keys for items that know what
+# registry they came from.
 
 _CHAINED_REGISTRIES: ContextVar[list[Registry] | None] = ContextVar(
     "_CHAINED_REGISTRIES", default=None

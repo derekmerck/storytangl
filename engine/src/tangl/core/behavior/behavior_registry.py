@@ -225,7 +225,9 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
         inline_criteria = cls._normalize_inline_criteria(task, inline_criteria)
         logger.debug(f"Inline criteria: {inline_criteria!r}")
 
-        iter_behaviors = Selectable.filter_for_selector(behaviors, selector=caller, **inline_criteria)
+        iter_behaviors = Entity.filter_by_criteria(behaviors, selector=caller, **inline_criteria)
+
+        # iter_behaviors = Selectable.filter_for_selector(behaviors, selector=caller, **inline_criteria)
 
         # extra handlers have no selection criteria and are assumed to be opted in, so we just include them all
         if extra_handlers:
