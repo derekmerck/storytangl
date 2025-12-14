@@ -247,14 +247,18 @@ class TemplateProvisioner(Provisioner):
             return getattr(module, class_name, None)
         return None
 
-    def _resolve_template(self, requirement: Requirement, *, ctx: "Context") -> dict | None:
+    def _resolve_template(self, requirement: Requirement, *, ctx: "Context") -> tuple[dict | None, dict[str, Any]]:
+        provenance: dict[str, Any] = {}
         if requirement.template is not None:
             normalized = self._normalize_template_payload(requirement.template)
-            return normalized or None
+            provenance["template_ref"] = getattr(requirement.template, "label", None)
+            provenance["template_hash"] = getattr(requirement.template, "content_hash", None)
+            provenance["template_content_id"] = self._get_content_identifier(requirement.template)
+            return normalized or None, provenance
 
         registry = self._get_registry(ctx)
         if registry is None:
-            return None
+            return None, provenance
 
         cursor = getattr(ctx, "cursor", None)
         if cursor is None:
@@ -285,8 +289,25 @@ class TemplateProvisioner(Provisioner):
         if template is None and requirement.criteria:
             template = _find_template(selector=cursor, **requirement.criteria)
 
+        if template is not None:
+            provenance["template_ref"] = getattr(template, "label", None)
+            provenance["template_hash"] = getattr(template, "content_hash", None)
+            provenance["template_content_id"] = self._get_content_identifier(template)
+
         normalized = self._normalize_template_payload(template)
-        return normalized or None
+        return normalized or None, provenance
+
+    @staticmethod
+    def _get_content_identifier(template: Any) -> str | None:
+        identifier = getattr(template, "content_identifier", None)
+        if identifier is None:
+            return None
+        if callable(identifier):
+            try:
+                return identifier()
+            except TypeError:  # pragma: no cover - defensive guard
+                return None
+        return str(identifier)
 
     def get_dependency_offers(
         self,
@@ -296,7 +317,7 @@ class TemplateProvisioner(Provisioner):
     ) -> Iterator[DependencyOffer]:
         if not (requirement.policy & ProvisioningPolicy.CREATE):
             return
-        template = self._resolve_template(requirement, ctx=ctx)
+        template, provenance = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             return
 
@@ -320,6 +341,9 @@ class TemplateProvisioner(Provisioner):
             accept_func=create_node,
             source_provisioner_id=self.uid,
             source_layer=self.layer,
+            template_ref=provenance.get("template_ref"),
+            template_hash=provenance.get("template_hash"),
+            template_content_id=provenance.get("template_content_id"),
         )
 
 
@@ -340,7 +364,7 @@ class UpdatingProvisioner(TemplateProvisioner):
             return
         if not (requirement.policy & ProvisioningPolicy.UPDATE):
             return
-        template = self._resolve_template(requirement, ctx=ctx)
+        template, _ = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             return
 
@@ -396,7 +420,7 @@ class CloningProvisioner(TemplateProvisioner):
             return
         if requirement.reference_id is None:
             raise ValueError("CLONE policy requires reference_id to specify source node")
-        template = self._resolve_template(requirement, ctx=ctx)
+        template, _ = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             raise ValueError("CLONE policy requires template to evolve clone")
         if self.node_registry is None:

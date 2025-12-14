@@ -129,6 +129,9 @@ class DependencyOffer(ProvisionOffer):
     provider_id: UUID | None = None
     """Identifier of the node that will be provided when known (EXISTING offers)."""
     requirement: Requirement | None = Field(default=None, exclude=True)
+    template_ref: str | None = None
+    template_hash: bytes | None = None
+    template_content_id: str | None = None
 
     def accept(self, *, ctx: "Context") -> Node:
         provider = self.accept_func(ctx)
@@ -182,6 +185,9 @@ class BuildReceipt(CallReceipt):
     accepted: bool = True
     hard_req: bool | None = None
     reason: str | None = None
+    template_ref: str | None = None
+    template_hash: bytes | None = None
+    template_content_id: str | None = None
 
     @property
     def provider_id(self) -> UUID | None:

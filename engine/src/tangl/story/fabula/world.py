@@ -127,8 +127,13 @@ class World(Singleton):
 
     def create_story(self, story_label: str, mode: str = "full") -> StoryGraph:
         """Create a new story instance from the world script."""
+
         if mode == "full":
             return self._create_story_full(story_label)
+        if mode == "lazy":
+            return self._create_story_lazy(story_label)
+        if mode == "hybrid":
+            return self._create_story_hybrid(story_label)
         raise NotImplementedError(f"Mode {mode} not yet implemented")
 
     @property
@@ -158,6 +163,79 @@ class World(Singleton):
         """Return the :class:`BlockScript` backing ``block_uid`` if cached."""
 
         return self._block_scripts.get(block_uid)
+
+    def _create_story_lazy(self, story_label: str) -> StoryGraph:
+        """Create a minimal story graph with only the starting cursor node."""
+
+        from tangl.story.story_graph import StoryGraph
+
+        graph = StoryGraph(label=story_label, world=self)
+
+        globals_ns = self.script_manager.get_story_globals() or {}
+        if globals_ns:
+            graph.locals.update(globals_ns)
+
+        start_scene_label, start_block_label = self._get_starting_cursor()
+
+        block_script = self._get_block_script(start_scene_label, start_block_label)
+        block_cls = self.domain_manager.resolve_class(
+            block_script.obj_cls or "tangl.story.episode.block.Block",
+        )
+
+        payload = self._prepare_payload(
+            block_cls,
+            block_script.model_dump(),
+            graph,
+            drop_keys=("actions", "continues", "redirects", "media"),
+        )
+        payload.setdefault("label", block_script.label)
+
+        start_block = block_cls.structure(payload)
+        graph.add(start_block)
+
+        self._block_scripts[start_block.uid] = block_script
+        attach_media_deps_for_block(
+            graph=graph,
+            block=start_block,
+            script=block_script,
+        )
+
+        graph.initial_cursor_id = start_block.uid
+        return graph
+
+    def _create_story_hybrid(self, story_label: str) -> StoryGraph:
+        """Create a graph with materialized nodes but open dependencies."""
+
+        from tangl.story.story_graph import StoryGraph
+
+        graph = StoryGraph(label=story_label, world=self)
+        globals_ns = self.script_manager.get_story_globals() or {}
+        if globals_ns:
+            graph.locals.update(globals_ns)
+
+        actor_map = self._build_actors(graph)
+        location_map = self._build_locations(graph)
+        item_map = self._build_items(graph)
+        flag_map = self._build_flags(graph)
+
+        block_map, action_scripts = self._build_blocks(graph)
+        scene_map = self._build_scenes(
+            graph,
+            block_map,
+            actor_map=actor_map,
+            location_map=location_map,
+            wire_dependencies=False,
+        )
+
+        self._build_action_edges(graph, block_map, action_scripts)
+
+        start_scene, start_block = self._get_starting_cursor()
+        start_uid = block_map.get(f"{start_scene}.{start_block}")
+        if start_uid is None:
+            raise ValueError(f"Start block '{start_scene}.{start_block}' not found in story graph")
+
+        graph.initial_cursor_id = start_uid
+        return graph
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
@@ -315,6 +393,7 @@ class World(Singleton):
         *,
         actor_map: dict[str, UUID],
         location_map: dict[str, UUID],
+        wire_dependencies: bool = True,
     ) -> dict[str, UUID]:
         """Instantiate scenes and associate their member blocks."""
 
@@ -344,18 +423,19 @@ class World(Singleton):
             scene = cls.structure(payload)
             scene_map[scene_label] = scene.uid
 
-            self._wire_roles(
-                graph=graph,
-                source_node=scene,
-                roles_data=scene_data.get("roles"),
-                actor_map=actor_map,
-            )
-            self._wire_settings(
-                graph=graph,
-                source_node=scene,
-                settings_data=scene_data.get("settings"),
-                location_map=location_map,
-            )
+            if wire_dependencies:
+                self._wire_roles(
+                    graph=graph,
+                    source_node=scene,
+                    roles_data=scene_data.get("roles"),
+                    actor_map=actor_map,
+                )
+                self._wire_settings(
+                    graph=graph,
+                    source_node=scene,
+                    settings_data=scene_data.get("settings"),
+                    location_map=location_map,
+                )
 
             for block_label, block_data in members.items():
                 qualified_label = f"{scene_label}.{block_label}"
@@ -565,6 +645,21 @@ class World(Singleton):
             raise ValueError(f"Scene '{scene_label}' does not contain any blocks")
         block_label = next(iter(blocks))
         return scene_label, block_label
+
+    def _get_block_script(self, scene_label: str, block_label: str) -> BlockScript:
+        """Return the :class:`BlockScript` for ``scene_label`` and ``block_label``."""
+
+        scenes = self._get_scenes_dict()
+        scene_data = scenes.get(scene_label)
+        if scene_data is None:
+            raise ValueError(f"Scene '{scene_label}' not found in story script")
+
+        blocks = self._normalize_section(scene_data.get("blocks"))
+        block_data = blocks.get(block_label)
+        if block_data is None:
+            raise ValueError(f"Block '{scene_label}.{block_label}' not found in story script")
+
+        return BlockScript.model_validate(block_data)
 
     def _get_scenes_dict(self) -> dict[str, dict[str, Any]]:
         scenes_iter = self.script_manager.get_unstructured("scenes") or ()
