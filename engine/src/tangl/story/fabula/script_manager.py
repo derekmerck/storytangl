@@ -227,13 +227,9 @@ class ScriptManager:
         return registry
 
     def get_story_globals(self) -> StringMap:
-        if self.master_script.locals:
+    def get_story_globals(self) -> StringMap:
+        if self.master_script.locals is not None:
             return deepcopy(self.master_script.locals)
-
-        dumped = self.master_script.model_dump(exclude_none=True)
-        if dumped.get("locals"):
-            return deepcopy(dumped["locals"])
-
         return {}
 
     def get_unstructured(self, key: str) -> Iterator[UnstructuredData]:
