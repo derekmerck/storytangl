@@ -335,7 +335,7 @@ MatchPredicate: TypeAlias = Callable[[Entity], bool]
 
 # Extension mixins
 
-class Selectable(BaseModel):
+class Selectable(Entity):
     """
     Selectable(selection_criteria: dict[str, ~typing.Any])
 

@@ -58,19 +58,6 @@ class ScopeSelector(BaseModel):
         )
 
 
-_types_namespace = {"ScopeSelector": ScopeSelector, "Hash": Hash}
-
-ActorScript.model_rebuild(_types_namespace=_types_namespace)
-LocationScript.model_rebuild(_types_namespace=_types_namespace)
-RoleScript.model_rebuild(_types_namespace={"ActorScript": ActorScript, "Hash": Hash})
-SettingScript.model_rebuild(
-    _types_namespace={"LocationScript": LocationScript, "Hash": Hash}
-)
-BlockScript.model_rebuild()
-MenuBlockScript.model_rebuild()
-SceneScript.model_rebuild()
-
-
 class StoryScript(MasterScript):
 
     label: UniqueLabel = Field(..., description="A unique name for this script.") # req for indexing
@@ -93,3 +80,30 @@ class StoryScript(MasterScript):
             for k, v in value.items():
                 v.setdefault("label", k)
         return value
+
+
+_types_namespace = {
+    "ScopeSelector": ScopeSelector,
+    "Hash": Hash,
+    "ActorScript": ActorScript,
+    "LocationScript": LocationScript,
+    "RoleScript": RoleScript,
+    "SettingScript": SettingScript,
+    "BlockScript": BlockScript,
+    "MenuBlockScript": MenuBlockScript,
+    "SceneScript": SceneScript,
+    "StoryScript": StoryScript,
+    "MasterScript": MasterScript,
+}
+
+BaseScriptItem.model_rebuild(_types_namespace=_types_namespace)
+
+ActorScript.model_rebuild(_types_namespace=_types_namespace)
+LocationScript.model_rebuild(_types_namespace=_types_namespace)
+RoleScript.model_rebuild(_types_namespace=_types_namespace)
+SettingScript.model_rebuild(_types_namespace=_types_namespace)
+BlockScript.model_rebuild(_types_namespace=_types_namespace)
+MenuBlockScript.model_rebuild(_types_namespace=_types_namespace)
+SceneScript.model_rebuild(_types_namespace=_types_namespace)
+StoryScript.model_rebuild(_types_namespace=_types_namespace)
+MasterScript.model_rebuild(_types_namespace=_types_namespace)

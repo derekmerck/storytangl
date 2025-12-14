@@ -7,6 +7,7 @@ from .graph import GraphItem, Graph  # Import graph for pydantic
 
 if TYPE_CHECKING:
     from .edge import Edge
+    from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 class Node(GraphItem):
     """
@@ -58,3 +59,43 @@ class Node(GraphItem):
         edge = self.graph.find_edge(source=node, destination=self)
         if edge is not None:
             self.graph.remove(edge.uid)
+
+    def has_scope(self, scope: "ScopeSelector | None") -> bool:
+        """Return ``True`` when this node satisfies the given scope selector."""
+
+        if scope is None or scope.is_global():
+            return True
+
+        if scope.source_label is not None and self.label != scope.source_label:
+            return False
+
+        if scope.parent_label is not None and not self.has_parent_label(scope.parent_label):
+            return False
+
+        if scope.ancestor_labels is not None and not self.has_ancestor_labels(scope.ancestor_labels):
+            return False
+
+        if scope.ancestor_tags is not None and not self.has_ancestor_tags(scope.ancestor_tags):
+            return False
+
+        return True
+
+    def has_parent_label(self, parent_label: str) -> bool:
+        parent = self.parent
+        return parent is not None and parent.label == parent_label
+
+    def has_ancestor_labels(self, labels: set[str]) -> bool:
+        if not labels:
+            return True
+
+        ancestor_labels = {ancestor.label for ancestor in self.ancestors() if ancestor.label}
+        return labels.issubset(ancestor_labels)
+
+    def has_ancestor_tags(self, tags: set[str]) -> bool:
+        if not tags:
+            return True
+
+        ancestor_tags = {
+            tag for ancestor in self.ancestors() if ancestor.tags for tag in ancestor.tags
+        }
+        return tags.issubset(ancestor_tags)

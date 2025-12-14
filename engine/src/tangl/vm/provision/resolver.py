@@ -103,6 +103,9 @@ class PlannedOffer:
                 operation=operation,
                 accepted=True,
                 hard_req=hard_req,
+                template_ref=getattr(self.offer, "template_ref", None),
+                template_hash=getattr(self.offer, "template_hash", None),
+                template_content_id=getattr(self.offer, "template_content_id", None),
             )
         except Exception as exc:  # pragma: no cover - defensive path
             if isinstance(self.offer, AffordanceOffer):
@@ -117,6 +120,9 @@ class PlannedOffer:
                 accepted=False,
                 hard_req=hard_req,
                 reason=str(exc),
+                template_ref=getattr(self.offer, "template_ref", None),
+                template_hash=getattr(self.offer, "template_hash", None),
+                template_content_id=getattr(self.offer, "template_content_id", None),
             )
 
 

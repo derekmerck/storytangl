@@ -95,7 +95,11 @@ class ScriptManager:
 
         def _extract_label(default: str | None, item: Any) -> str | None:
             if isinstance(item, BaseScriptItem):
-                return item.label or item.get_label()
+                if item.label:
+                    return item.label
+                if default:
+                    return default
+                return item.get_label()
             if isinstance(item, Mapping):
                 label_value = item.get("label")
                 if isinstance(label_value, str):
@@ -223,7 +227,7 @@ class ScriptManager:
         return registry
 
     def get_story_globals(self) -> StringMap:
-        if self.master_script.locals:
+        if self.master_script.locals is not None:
             return deepcopy(self.master_script.locals)
         return {}
 
