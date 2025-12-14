@@ -93,6 +93,7 @@ _types_namespace = {
     "MenuBlockScript": MenuBlockScript,
     "SceneScript": SceneScript,
     "StoryScript": StoryScript,
+    "MasterScript": MasterScript,
 }
 
 BaseScriptItem.model_rebuild(_types_namespace=_types_namespace)
@@ -105,3 +106,4 @@ BlockScript.model_rebuild(_types_namespace=_types_namespace)
 MenuBlockScript.model_rebuild(_types_namespace=_types_namespace)
 SceneScript.model_rebuild(_types_namespace=_types_namespace)
 StoryScript.model_rebuild(_types_namespace=_types_namespace)
+MasterScript.model_rebuild(_types_namespace=_types_namespace)
