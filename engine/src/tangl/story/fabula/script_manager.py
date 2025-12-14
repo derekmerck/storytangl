@@ -227,7 +227,6 @@ class ScriptManager:
         return registry
 
     def get_story_globals(self) -> StringMap:
-    def get_story_globals(self) -> StringMap:
         if self.master_script.locals is not None:
             return deepcopy(self.master_script.locals)
         return {}

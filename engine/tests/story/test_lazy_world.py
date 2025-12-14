@@ -26,7 +26,7 @@ def test_lazy_story_materializes_start_block_only() -> None:
     script = {
         "label": "lazy_world",
         "metadata": {"title": "Lazy World", "author": "Tester", "start_at": "intro.start"},
-        "locals": {"gold": 3},
+        "globals": {"gold": 3},
         "scenes": {
             "intro": {
                 "blocks": {
@@ -48,6 +48,11 @@ def test_lazy_story_materializes_start_block_only() -> None:
     start_block = blocks[0]
     assert story.initial_cursor_id == start_block.uid
     assert start_block.content == "Welcome!"
+
+    print(world.script_manager.master_script.locals)
+    print(world.script_manager.get_story_globals())
+    print(story.locals)
+
     assert story.locals.get("gold") == 3
 
     assert story.edges == []
