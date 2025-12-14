@@ -41,10 +41,27 @@ class BaseScriptItem(Selectable, Record, ContentAddressable):
     icon: Optional[str] = None
 
     def get_selection_criteria(self) -> dict[str, Any]:
-        if not self.scope or self.scope.is_global():
-            return {}
+        """Translate template scope into node-matchable predicates."""
 
-        return {"has_scope": self.scope}
+        criteria: dict[str, Any] = {}
+
+        scope = getattr(self, "scope", None)
+        if scope is None or scope.is_global():
+            return criteria
+
+        if scope.parent_label:
+            criteria["has_parent_label"] = scope.parent_label
+
+        if scope.ancestor_labels:
+            criteria["has_ancestor_labels"] = scope.ancestor_labels
+
+        if scope.ancestor_tags:
+            criteria["has_ancestor_tags"] = scope.ancestor_tags
+
+        if scope.source_label:
+            criteria["label"] = scope.source_label
+
+        return criteria
 
     @classmethod
     def _get_hashable_content(cls, data: dict[str, Any]) -> dict[str, Any]:
