@@ -60,11 +60,23 @@ class ScopeSelector(BaseModel):
 
 _types_namespace = {"ScopeSelector": ScopeSelector, "Hash": Hash}
 
+BaseScriptItem.model_rebuild(_types_namespace={"ScopeSelector": ScopeSelector})
+
 ActorScript.model_rebuild(_types_namespace=_types_namespace)
 LocationScript.model_rebuild(_types_namespace=_types_namespace)
-RoleScript.model_rebuild(_types_namespace={"ActorScript": ActorScript, "Hash": Hash})
+RoleScript.model_rebuild(
+    _types_namespace={
+        "ActorScript": ActorScript,
+        "Hash": Hash,
+        "ScopeSelector": ScopeSelector,
+    },
+)
 SettingScript.model_rebuild(
-    _types_namespace={"LocationScript": LocationScript, "Hash": Hash}
+    _types_namespace={
+        "LocationScript": LocationScript,
+        "Hash": Hash,
+        "ScopeSelector": ScopeSelector,
+    }
 )
 BlockScript.model_rebuild()
 MenuBlockScript.model_rebuild()

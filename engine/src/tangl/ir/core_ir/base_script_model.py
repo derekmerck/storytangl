@@ -1,13 +1,19 @@
-from typing import Any, Optional
-import functools
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import Field, model_validator
 
 from tangl.core import ContentAddressable, Record
+from tangl.core.entity import Selectable
 from tangl.type_hints import ClassName, Expr, Label, StringMap
 
 
-class BaseScriptItem(Record, ContentAddressable):
+if TYPE_CHECKING:
+    from tangl.ir.story_ir.story_script_models import ScopeSelector
+
+
+class BaseScriptItem(Selectable, Record, ContentAddressable):
     """Template IR record that also provides a deterministic content hash."""
 
     obj_cls: Optional[ClassName] = None      # For structuring/unstructuring
@@ -16,6 +22,11 @@ class BaseScriptItem(Record, ContentAddressable):
     locked: bool = False                     # Requires manual unlocking
 
     locals: Optional[StringMap] = None       # Namespace
+
+    scope: ScopeSelector | None = Field(
+        None,
+        description="Where this template is valid (``None`` makes it global).",
+    )
 
     conditions: Optional[list[Expr]] = Field(
         None,
@@ -28,6 +39,12 @@ class BaseScriptItem(Record, ContentAddressable):
 
     content: Optional[str] = None           # Rendered content fields
     icon: Optional[str] = None
+
+    def get_selection_criteria(self) -> dict[str, Any]:
+        if not self.scope or self.scope.is_global():
+            return {}
+
+        return {"has_scope": self.scope}
 
     @classmethod
     def _get_hashable_content(cls, data: dict[str, Any]) -> dict[str, Any]:
