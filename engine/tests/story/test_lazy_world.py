@@ -42,7 +42,7 @@ def test_lazy_story_materializes_start_block_only() -> None:
     world = _build_world(script)
     story = world.create_story("lazy_story", mode="lazy")
 
-    blocks = story.find_all(is_instance=Block)
+    blocks = list(story.find_all(is_instance=Block))
     assert len(blocks) == 1
 
     start_block = blocks[0]

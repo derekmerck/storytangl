@@ -95,7 +95,11 @@ class ScriptManager:
 
         def _extract_label(default: str | None, item: Any) -> str | None:
             if isinstance(item, BaseScriptItem):
-                return item.label or item.get_label()
+                if item.label:
+                    return item.label
+                if default:
+                    return default
+                return item.get_label()
             if isinstance(item, Mapping):
                 label_value = item.get("label")
                 if isinstance(label_value, str):
@@ -225,6 +229,11 @@ class ScriptManager:
     def get_story_globals(self) -> StringMap:
         if self.master_script.locals:
             return deepcopy(self.master_script.locals)
+
+        dumped = self.master_script.model_dump(exclude_none=True)
+        if dumped.get("locals"):
+            return deepcopy(dumped["locals"])
+
         return {}
 
     def get_unstructured(self, key: str) -> Iterator[UnstructuredData]:
