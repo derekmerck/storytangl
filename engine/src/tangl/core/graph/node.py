@@ -69,24 +69,14 @@ class Node(GraphItem):
         if scope.source_label is not None and self.label != scope.source_label:
             return False
 
-        if (
-            scope.parent_label is None
-            and scope.ancestor_labels is None
-            and scope.ancestor_tags is None
-        ):
-            return True
+        if scope.parent_label is not None and not self.has_parent_label(scope.parent_label):
+            return False
 
-        if scope.parent_label is not None:
-            if not self.has_parent_label(scope.parent_label):
-                return False
+        if scope.ancestor_labels is not None and not self.has_ancestor_labels(scope.ancestor_labels):
+            return False
 
-        if scope.ancestor_labels is not None:
-            if not self.has_ancestor_labels(scope.ancestor_labels):
-                return False
-
-        if scope.ancestor_tags is not None:
-            if not self.has_ancestor_tags(scope.ancestor_tags):
-                return False
+        if scope.ancestor_tags is not None and not self.has_ancestor_tags(scope.ancestor_tags):
+            return False
 
         return True
 
