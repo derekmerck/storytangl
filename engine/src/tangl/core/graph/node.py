@@ -63,33 +63,36 @@ class Node(GraphItem):
     def has_scope(self, scope: "ScopeSelector | None") -> bool:
         """Return ``True`` when this node satisfies the given scope selector."""
 
-        if scope is None:
+        if scope is None or scope.is_global():
             return True
 
-        if scope.is_global():
+        if scope.source_label is not None and self.label != scope.source_label:
+            return False
+
+        if (
+            scope.parent_label is None
+            and scope.ancestor_labels is None
+            and scope.ancestor_tags is None
+        ):
             return True
 
         ancestors = list(self.ancestors())
-        parent = ancestors[0] if ancestors else None
-        ancestor_labels = {ancestor.label for ancestor in ancestors if ancestor.label}
-        ancestor_tags: set[str] = set().union(
-            *(ancestor.tags or set() for ancestor in ancestors),
-        )
 
         if scope.parent_label is not None:
+            parent = ancestors[0] if ancestors else None
             if parent is None or parent.label != scope.parent_label:
                 return False
 
         if scope.ancestor_labels is not None:
+            ancestor_labels = {ancestor.label for ancestor in ancestors if ancestor.label}
             if not scope.ancestor_labels.issubset(ancestor_labels):
                 return False
 
         if scope.ancestor_tags is not None:
+            ancestor_tags = {
+                tag for ancestor in ancestors if ancestor.tags for tag in ancestor.tags
+            }
             if not scope.ancestor_tags.issubset(ancestor_tags):
-                return False
-
-        if scope.source_label is not None:
-            if self.label != scope.source_label:
                 return False
 
         return True
