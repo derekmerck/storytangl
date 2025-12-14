@@ -192,7 +192,23 @@ class TemplateProvisioner(Provisioner):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        object.__setattr__(self, "template_registry", template_registry or {})
+        object.__setattr__(self, "template_registry", template_registry)
+
+    def _get_registry(self, ctx: "Context") -> Mapping[str, dict] | Registry | None:
+        """Resolve the template registry from local or world context."""
+
+        if self.template_registry is not None:
+            return self.template_registry
+
+        graph = getattr(ctx, "graph", None)
+        if graph is None:
+            return None
+
+        world = getattr(graph, "world", None)
+        if world is None:
+            return None
+
+        return getattr(world, "template_registry", None)
 
     def _normalize_template_payload(self, template: Any) -> dict | None:
         if template is None:
@@ -231,37 +247,46 @@ class TemplateProvisioner(Provisioner):
             return getattr(module, class_name, None)
         return None
 
-    def _lookup_template_ref(self, template_ref: str | None) -> dict | None:
-        if not template_ref:
-            return None
-
-        registry = self.template_registry
-        if not registry:
-            return None
-
-        template: Any | None
-        if isinstance(registry, Mapping):
-            template = registry.get(template_ref)
-        else:
-            template = registry.find_one(label=template_ref)
-
-        return self._normalize_template_payload(template)
-
-    def _resolve_template(self, requirement: Requirement) -> dict | None:
+    def _resolve_template(self, requirement: Requirement, *, ctx: "Context") -> dict | None:
         if requirement.template is not None:
-            template = deepcopy(requirement.template)
-            if not template:
-                return None
-            return template
+            normalized = self._normalize_template_payload(requirement.template)
+            return normalized or None
+
+        registry = self._get_registry(ctx)
+        if registry is None:
+            return None
+
+        cursor = getattr(ctx, "cursor", None)
+        if cursor is None:
+            graph = getattr(ctx, "graph", None)
+            cursor_id = getattr(ctx, "cursor_id", None)
+            if graph is not None and cursor_id is not None:
+                cursor = graph.get(cursor_id)
+
+        def _find_template(**criteria: Any) -> Any:
+            if isinstance(registry, Mapping):
+                label = criteria.get("label")
+                return registry.get(label) if label is not None else None
+
+            find_one = getattr(registry, "find_one", None)
+            if callable(find_one):
+                return find_one(**criteria)
+
+            return None
+
+        template: Any | None = None
+
         if requirement.template_ref:
-            template = self._lookup_template_ref(str(requirement.template_ref))
-            if template:
-                return template
-        if self.template_registry and requirement.identifier:
-            template = self._lookup_template_ref(str(requirement.identifier))
-            if template:
-                return template
-        return None
+            template = _find_template(label=requirement.template_ref, selector=cursor)
+
+        if template is None and requirement.identifier:
+            template = _find_template(label=requirement.identifier, selector=cursor)
+
+        if template is None and requirement.criteria:
+            template = _find_template(selector=cursor, **requirement.criteria)
+
+        normalized = self._normalize_template_payload(template)
+        return normalized or None
 
     def get_dependency_offers(
         self,
@@ -271,7 +296,7 @@ class TemplateProvisioner(Provisioner):
     ) -> Iterator[DependencyOffer]:
         if not (requirement.policy & ProvisioningPolicy.CREATE):
             return
-        template = self._resolve_template(requirement)
+        template = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             return
 
@@ -315,7 +340,7 @@ class UpdatingProvisioner(TemplateProvisioner):
             return
         if not (requirement.policy & ProvisioningPolicy.UPDATE):
             return
-        template = self._resolve_template(requirement)
+        template = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             return
 
@@ -371,7 +396,7 @@ class CloningProvisioner(TemplateProvisioner):
             return
         if requirement.reference_id is None:
             raise ValueError("CLONE policy requires reference_id to specify source node")
-        template = self._resolve_template(requirement)
+        template = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             raise ValueError("CLONE policy requires template to evolve clone")
         if self.node_registry is None:
