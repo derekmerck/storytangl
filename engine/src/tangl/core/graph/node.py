@@ -7,6 +7,7 @@ from .graph import GraphItem, Graph  # Import graph for pydantic
 
 if TYPE_CHECKING:
     from .edge import Edge
+    from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 class Node(GraphItem):
     """
@@ -58,3 +59,37 @@ class Node(GraphItem):
         edge = self.graph.find_edge(source=node, destination=self)
         if edge is not None:
             self.graph.remove(edge.uid)
+
+    def has_scope(self, scope: "ScopeSelector | None") -> bool:
+        """Return ``True`` when this node satisfies the given scope selector."""
+
+        if scope is None:
+            return True
+
+        if scope.is_global():
+            return True
+
+        ancestors = list(self.ancestors())
+        parent = ancestors[0] if ancestors else None
+        ancestor_labels = {ancestor.label for ancestor in ancestors if ancestor.label}
+        ancestor_tags: set[str] = set().union(
+            *(ancestor.tags or set() for ancestor in ancestors),
+        )
+
+        if scope.parent_label is not None:
+            if parent is None or parent.label != scope.parent_label:
+                return False
+
+        if scope.ancestor_labels is not None:
+            if not scope.ancestor_labels.issubset(ancestor_labels):
+                return False
+
+        if scope.ancestor_tags is not None:
+            if not scope.ancestor_tags.issubset(ancestor_tags):
+                return False
+
+        if scope.source_label is not None:
+            if self.label != scope.source_label:
+                return False
+
+        return True
