@@ -92,8 +92,8 @@ def test_scene_level_templates_have_parent_scope() -> None:
     assert scene_template.scope.model_dump() == ScopeSelector(parent_label="village").model_dump()
 
 
-def test_block_level_templates_have_source_scope() -> None:
-    """Block templates should inherit a ``source_label`` constraint."""
+def test_block_level_templates_have_parent_scope() -> None:
+    """Block templates should inherit a ``parent_label`` constraint."""
 
     story_data = {
         "label": "example",
@@ -119,7 +119,7 @@ def test_block_level_templates_have_source_scope() -> None:
     block_template = templates["block_market"]
     assert isinstance(block_template, LocationScript)
     assert block_template.scope is not None
-    assert block_template.scope.model_dump() == ScopeSelector(source_label="village_market").model_dump()
+    assert block_template.scope.model_dump() == ScopeSelector(parent_label="village").model_dump()
 
 
 def test_explicit_scope_overrides_inferred() -> None:
@@ -247,32 +247,78 @@ def test_templates_are_records_with_uids() -> None:
     assert guard.get_label() == "global_guard"
 
 
-def test_duplicate_template_labels_raise_warning(caplog: pytest.LogCaptureFixture) -> None:
-    """Duplicate labels should be ignored with a descriptive warning."""
+def test_duplicate_labels_allowed_with_different_scopes() -> None:
+    """Templates with same label but different scopes should both register."""
 
     story_data = {
         "label": "example",
         "metadata": {"title": "Example", "author": "Tests"},
         "templates": {
-            "duplicate": {"obj_cls": ACTOR_CLASS},
+            "guard": {"obj_cls": ACTOR_CLASS, "tags": {"global"}},
         },
         "scenes": {
             "village": {
                 "label": "village",
                 "blocks": {},
                 "templates": {
-                    "duplicate": {"obj_cls": ACTOR_CLASS},
+                    "guard": {"obj_cls": ACTOR_CLASS, "tags": {"village"}},
                 },
             }
         },
     }
 
-    with caplog.at_level("WARNING"):
-        world = build_world(story_data)
+    world = build_world(story_data)
+    all_guards = list(world.template_registry.find_all(label="guard"))
 
-    templates = _collect_templates(world)
-    assert list(templates) == ["duplicate"]
-    assert any("Duplicate template label duplicate skipped" in message for message in caplog.messages)
+    assert len(all_guards) == 2
+
+    global_guard = next(t for t in all_guards if "global" in t.tags)
+    village_guard = next(t for t in all_guards if "village" in t.tags)
+
+    assert global_guard.scope is None
+    assert village_guard.scope.parent_label == "village"
+
+    assert world.template_registry.find_one(identifier="guard") is not None
+    assert world.template_registry.find_one(identifier="village.guard") == village_guard
+
+
+def test_registry_finds_template_by_qual_label() -> None:
+    """Registry should resolve templates by qualified label identifier."""
+
+    story_data = {
+        "label": "example",
+        "metadata": {"title": "Example", "author": "Tests"},
+        "scenes": {
+            "scene1": {
+                "label": "scene1",
+                "blocks": {},
+                "templates": {
+                    "start": {"obj_cls": ACTOR_CLASS},
+                },
+            },
+            "scene2": {
+                "label": "scene2",
+                "blocks": {},
+                "templates": {
+                    "start": {"obj_cls": ACTOR_CLASS},
+                },
+            }
+        },
+    }
+
+    world = build_world(story_data)
+
+    all_templates = list(world.template_registry.find_all())
+    assert len(all_templates) == 2
+
+    scene1_start = world.template_registry.find_one(identifier="scene1.start")
+    scene2_start = world.template_registry.find_one(identifier="scene2.start")
+
+    assert scene1_start is not None
+    assert scene2_start is not None
+    assert scene1_start.uid != scene2_start.uid
+    assert scene1_start.scope.parent_label == "scene1"
+    assert scene2_start.scope.parent_label == "scene2"
 
 
 def test_inline_location_template_preserves_concrete_type() -> None:

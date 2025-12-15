@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from pydantic import Field, model_validator
 
 from tangl.core import ContentAddressable, Record
-from tangl.core.entity import Selectable
+from tangl.core.entity import Selectable, is_identifier
 from tangl.type_hints import ClassName, Expr, Label, StringMap
 
 
@@ -62,6 +62,16 @@ class BaseScriptItem(Selectable, Record, ContentAddressable):
             criteria["label"] = scope.source_label
 
         return criteria
+
+    @property
+    @is_identifier
+    def qual_label(self) -> str:
+        """Qualified label: parent.label for scoped templates, plain label for global."""
+
+        scope = getattr(self, "scope", None)
+        if scope and scope.parent_label:
+            return f"{scope.parent_label}.{self.label}"
+        return self.label
 
     @classmethod
     def _get_hashable_content(cls, data: dict[str, Any]) -> dict[str, Any]:

@@ -169,10 +169,6 @@ class ScriptManager:
                 template = _parse_template(label_value, template_data, scope)
                 if template is None or template.label is None:
                     continue
-                existing = registry.find_one(label=template.label)
-                if existing is not None:
-                    logger.warning("Duplicate template label %s skipped", template.label)
-                    continue
                 try:
                     registry.add(template)
                 except ValueError as exc:  # pragma: no cover - Registry guards
@@ -218,7 +214,7 @@ class ScriptManager:
                     continue
                 block_templates = getattr(block_obj, "templates", None)
                 if isinstance(block_templates, Mapping):
-                    _add_templates(block_templates, scope=ScopeSelector(source_label=block_label))
+                    _add_templates(block_templates, scope=ScopeSelector(parent_label=scene_label))
                 elif block_templates:
                     logger.warning(
                         "Block %s templates should be a mapping; received %r", block_label, type(block_templates)
