@@ -270,10 +270,37 @@ class TemplateProvisioner(Provisioner):
             if graph is not None and cursor_id is not None:
                 cursor = graph.get(cursor_id)
 
+        def _scope_from_identifier(identifier: str | None):
+            if not identifier or "." not in identifier:
+                return None
+
+            try:
+                parent_label, _ = identifier.rsplit(".", 1)
+            except ValueError:  # pragma: no cover - defensive
+                return None
+
+            from tangl.ir.story_ir.story_script_models import ScopeSelector
+
+            return ScopeSelector(parent_label=parent_label)
+
         def _find_template(**criteria: Any) -> Any:
             if isinstance(registry, Mapping):
+                identifier = criteria.get("has_identifier")
                 label = criteria.get("label")
-                return registry.get(label) if label is not None else None
+
+                if identifier is not None and isinstance(identifier, str):
+                    if identifier in registry:
+                        return registry.get(identifier)
+
+                    if "." in identifier:
+                        _, tail = identifier.rsplit(".", 1)
+                        if tail in registry:
+                            return registry.get(tail)
+
+                if label is not None:
+                    return registry.get(label)
+
+                return None
 
             find_one = getattr(registry, "find_one", None)
             if callable(find_one):
@@ -281,13 +308,29 @@ class TemplateProvisioner(Provisioner):
 
             return None
 
+        def _build_search(identifier: str | None) -> dict[str, Any]:
+            scope_hint = _scope_from_identifier(identifier) or _scope_from_identifier(
+                requirement.identifier
+            )
+
+            search: dict[str, Any] = {"selector": cursor}
+            if identifier is None:
+                return search
+
+            search["has_identifier"] = identifier
+
+            if "." not in identifier and scope_hint is not None:
+                search.setdefault("has_scope", scope_hint)
+
+            return search
+
         template: Any | None = None
 
         if requirement.template_ref:
-            template = _find_template(label=requirement.template_ref, selector=cursor)
+            template = _find_template(**_build_search(requirement.template_ref))
 
         if template is None and requirement.identifier:
-            template = _find_template(label=requirement.identifier, selector=cursor)
+            template = _find_template(**_build_search(requirement.identifier))
 
         if template is None and requirement.criteria:
             template = _find_template(selector=cursor, **requirement.criteria)
@@ -371,7 +414,11 @@ class TemplateProvisioner(Provisioner):
                     if callable(get_subgraph):
                         parent_container = get_subgraph(label=template_model.scope.parent_label)
                     else:
-                        parent_container = ctx.graph.get(template_model.scope.parent_label)
+                        find_subgraph = getattr(ctx.graph, "find_subgraph", None)
+                        if callable(find_subgraph):
+                            parent_container = find_subgraph(label=template_model.scope.parent_label)
+                        else:
+                            parent_container = ctx.graph.get(template_model.scope.parent_label)
                     if not parent_container:
                         raise ValueError(
                             f"Template '{template_model.label}' requires parent scene "

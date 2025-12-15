@@ -110,10 +110,6 @@ def test_lazy_block_provisioning_from_template_registry():
     assert req.policy == ProvisioningPolicy.CREATE
     assert not req.satisfied, "Requirement should not be satisfied yet"
 
-    # TemplateProvisioner currently expects template_ref to match template labels
-    # rather than qualified identifiers.
-    req.template_ref = "next"
-
     from tangl.vm.provision import TemplateProvisioner
     from types import SimpleNamespace
 
@@ -297,9 +293,6 @@ def test_lazy_provisioning_across_scene_boundary():
     assert dependency is not None
     req = dependency.requirement
     assert req.identifier == "cave.mouth"
-
-    # Provisioner currently matches by label, so use unqualified template ref.
-    req.template_ref = "mouth"
 
     from tangl.vm.provision import TemplateProvisioner
     from types import SimpleNamespace

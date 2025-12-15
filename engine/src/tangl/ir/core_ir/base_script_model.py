@@ -63,6 +63,34 @@ class BaseScriptItem(Selectable, Record, ContentAddressable):
 
         return criteria
 
+    def has_scope(self, scope: Optional["ScopeSelector"]) -> bool:
+        """Return ``True`` when this template is valid for the given scope selector."""
+
+        if scope is None or scope.is_global():
+            return True
+
+        candidate = getattr(self, "scope", None)
+        if candidate is None:
+            return False
+
+        if scope.source_label is not None and candidate.source_label != scope.source_label:
+            return False
+
+        if scope.parent_label is not None and candidate.parent_label != scope.parent_label:
+            return False
+
+        if scope.ancestor_labels is not None:
+            candidate_labels = candidate.ancestor_labels or set()
+            if not scope.ancestor_labels.issubset(candidate_labels):
+                return False
+
+        if scope.ancestor_tags is not None:
+            candidate_tags = candidate.ancestor_tags or set()
+            if not scope.ancestor_tags.issubset(candidate_tags):
+                return False
+
+        return True
+
     @property
     @is_identifier
     def qual_label(self) -> str:
