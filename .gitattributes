@@ -13,3 +13,5 @@
 *.md
 *.yaml
 *.svg
+
+*.lock export-ignore
