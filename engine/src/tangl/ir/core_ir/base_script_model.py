@@ -70,8 +70,8 @@ class BaseScriptItem(Selectable, Record, ContentAddressable):
 
         scope = getattr(self, "scope", None)
         if scope and scope.parent_label:
-            return f"{scope.parent_label}.{self.label}"
-        return self.label
+            return f"{scope.parent_label}.{self.get_label()}"
+        return self.get_label()
 
     @classmethod
     def _get_hashable_content(cls, data: dict[str, Any]) -> dict[str, Any]:

@@ -220,6 +220,16 @@ class ScriptManager:
                         "Block %s templates should be a mapping; received %r", block_label, type(block_templates)
                     )
 
+                try:
+                    block_script = BlockScript.model_validate(block_obj)
+                    if block_script.scope is None:
+                        block_script = block_script.model_copy(
+                            update={"scope": ScopeSelector(parent_label=scene_label)}
+                        )
+                    registry.add(block_script)
+                except ValidationError as exc:
+                    logger.warning("Skipping block %s due to validation error: %s", block_label, exc)
+
         return registry
 
     def get_story_globals(self) -> StringMap:

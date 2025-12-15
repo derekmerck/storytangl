@@ -1,7 +1,7 @@
 """Tests for template compilation and helpers on :class:`World`."""
 
 from tangl.ir.core_ir import MasterScript, ScriptMetadata
-from tangl.ir.story_ir import ActorScript, LocationScript, StoryScript
+from tangl.ir.story_ir import ActorScript, BlockScript, LocationScript, StoryScript
 from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
@@ -82,7 +82,7 @@ def test_world_compiles_templates_with_scope_inference() -> None:
 
         templates = {template.label: template for template in world.template_registry.find_all()}
 
-        assert set(templates) == {"global_guard", "scene_guard", "block_market"}
+        assert set(templates) == {"global_guard", "scene_guard", "block_market", "town_intro"}
 
         global_template = templates["global_guard"]
         assert isinstance(global_template, ActorScript)
@@ -97,6 +97,11 @@ def test_world_compiles_templates_with_scope_inference() -> None:
         assert isinstance(block_template, LocationScript)
         assert block_template.scope is not None
         assert block_template.scope.model_dump() == ScopeSelector(parent_label="town").model_dump()
+
+        block_script = templates["town_intro"]
+        assert isinstance(block_script, BlockScript)
+        assert block_script.scope is not None
+        assert block_script.scope.model_dump() == ScopeSelector(parent_label="town").model_dump()
 
         actor_labels = sorted(template.label for template in world.actor_templates)
         assert actor_labels == ["global_guard", "scene_guard"]
