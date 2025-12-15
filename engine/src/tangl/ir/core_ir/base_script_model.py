@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from pydantic import Field, model_validator
 
 from tangl.core import ContentAddressable, Record
-from tangl.core.entity import Selectable
+from tangl.core.entity import Selectable, is_identifier
 from tangl.type_hints import ClassName, Expr, Label, StringMap
 
 
@@ -62,6 +62,44 @@ class BaseScriptItem(Selectable, Record, ContentAddressable):
             criteria["label"] = scope.source_label
 
         return criteria
+
+    def has_scope(self, scope: Optional["ScopeSelector"]) -> bool:
+        """Return ``True`` when this template is valid for the given scope selector."""
+
+        if scope is None or scope.is_global():
+            return True
+
+        candidate = getattr(self, "scope", None)
+        if candidate is None:
+            return False
+
+        if scope.source_label is not None and candidate.source_label != scope.source_label:
+            return False
+
+        if scope.parent_label is not None and candidate.parent_label != scope.parent_label:
+            return False
+
+        if scope.ancestor_labels is not None:
+            candidate_labels = candidate.ancestor_labels or set()
+            if not scope.ancestor_labels.issubset(candidate_labels):
+                return False
+
+        if scope.ancestor_tags is not None:
+            candidate_tags = candidate.ancestor_tags or set()
+            if not scope.ancestor_tags.issubset(candidate_tags):
+                return False
+
+        return True
+
+    @property
+    @is_identifier
+    def qual_label(self) -> str:
+        """Qualified label: parent.label for scoped templates, plain label for global."""
+
+        scope = getattr(self, "scope", None)
+        if scope and scope.parent_label:
+            return f"{scope.parent_label}.{self.get_label()}"
+        return self.get_label()
 
     @classmethod
     def _get_hashable_content(cls, data: dict[str, Any]) -> dict[str, Any]:
