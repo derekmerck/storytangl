@@ -231,6 +231,9 @@ class World(Singleton):
             template.obj_cls or "tangl.core.graph.Node"
         ) or Node
 
+        if cls is Node and isinstance(template, BlockScript):
+            cls = self.domain_manager.resolve_class("tangl.story.episode.block.Block")
+
         wirable_fields = ("actions", "continues", "redirects", "media", "roles", "settings")
         drop_keys = tuple(
             field for field in wirable_fields
@@ -246,6 +249,7 @@ class World(Singleton):
         if getattr(template, "model_extra", None):
             payload.update(template.model_extra)
         payload.setdefault("label", template.label)
+        payload.pop("obj_cls", None)
 
         node = cls.structure(payload)
 

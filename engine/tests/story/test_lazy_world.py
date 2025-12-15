@@ -107,9 +107,7 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
         policy=ProvisioningPolicy.CREATE,
     )
     offers = list(provisioner.get_dependency_offers(in_scope_req, ctx=ctx))
-    # Scoped templates now inherit the parent scene; lazy stories do not materialize scene
-    # nodes, so parent-scoped templates are unavailable until the scene exists.
-    assert offers == []
+    assert len(offers) == 1
 
     out_of_scope_req = Requirement(
         graph=story,
@@ -118,6 +116,4 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
     )
     out_of_scope_offers = list(provisioner.get_dependency_offers(out_of_scope_req, ctx=ctx))
     assert out_of_scope_offers == []
-
-    assert offers == []
 

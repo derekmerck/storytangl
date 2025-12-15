@@ -221,11 +221,23 @@ class ScriptManager:
                     )
 
                 try:
-                    block_script = BlockScript.model_validate(block_obj)
+                    parsed_block = block_obj
+                    if isinstance(block_obj, Mapping):
+                        parsed_block = dict(block_obj)
+                        if "block_cls" not in parsed_block and "obj_cls" in parsed_block:
+                            parsed_block["block_cls"] = parsed_block.get("obj_cls")
+                            parsed_block.pop("obj_cls", None)
+
+                    block_script = BlockScript.model_validate(parsed_block)
+                    updates: dict[str, Any] = {}
+                    if not block_script.label and block_label:
+                        updates["label"] = block_label
+                    if block_script.obj_cls is None:
+                        updates["obj_cls"] = "tangl.story.episode.block.Block"
                     if block_script.scope is None:
-                        block_script = block_script.model_copy(
-                            update={"scope": ScopeSelector(parent_label=scene_label)}
-                        )
+                        updates["scope"] = ScopeSelector(parent_label=scene_label)
+                    if updates:
+                        block_script = block_script.model_copy(update=updates)
                     registry.add(block_script)
                 except ValidationError as exc:
                     logger.warning("Skipping block %s due to validation error: %s", block_label, exc)

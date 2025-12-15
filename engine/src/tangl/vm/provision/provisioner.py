@@ -344,31 +344,34 @@ class TemplateProvisioner(Provisioner):
                 )
 
             world = getattr(ctx.graph, "world", None)
+            world_materialize = getattr(world, "_materialize_from_template", None) if world else None
 
-            if world is None:
-                logger.warning(
-                    "Creating node without World - custom obj_cls may not resolve correctly"
-                )
+            if world is None or not callable(world_materialize):
                 payload = template_model.model_dump()
                 obj_cls_value = payload.get("obj_cls")
-                if isinstance(obj_cls_value, str):
-                    resolved_cls = Entity.dereference_cls_name(obj_cls_value)
-                    payload["obj_cls"] = resolved_cls or Node
-                elif obj_cls_value is None:
-                    payload["obj_cls"] = Node
+                resolved_cls = self._resolve_obj_cls(obj_cls_value)
+
+                resolved_cls = resolved_cls or Node
+                payload["obj_cls"] = resolved_cls
                 payload.setdefault("graph", ctx.graph)
-                payload.setdefault("obj_cls", "tangl.core.graph.Node")
-                node = Node.structure(payload)
-                if node not in ctx.graph:
+
+                try:
+                    node = resolved_cls.structure(payload)  # type: ignore[arg-type]
+                except AttributeError:  # pragma: no cover - extremely defensive
+                    node = Entity.structure(payload)
+
+                if hasattr(ctx.graph, "add") and node not in ctx.graph:
                     ctx.graph.add(node)
                 return node
 
             parent_container = None
             if hasattr(template_model, "scope") and template_model.scope:
                 if template_model.scope.parent_label:
-                    parent_container = ctx.graph.get(
-                        template_model.scope.parent_label
-                    )
+                    get_subgraph = getattr(ctx.graph, "get_subgraph", None)
+                    if callable(get_subgraph):
+                        parent_container = get_subgraph(label=template_model.scope.parent_label)
+                    else:
+                        parent_container = ctx.graph.get(template_model.scope.parent_label)
                     if not parent_container:
                         raise ValueError(
                             f"Template '{template_model.label}' requires parent scene "
@@ -376,7 +379,7 @@ class TemplateProvisioner(Provisioner):
                             f"Scenes should be pre-provisioned in lazy mode."
                         )
 
-            return world._materialize_from_template(
+            return world_materialize(
                 template=template_model,
                 graph=ctx.graph,
                 parent_container=parent_container,
