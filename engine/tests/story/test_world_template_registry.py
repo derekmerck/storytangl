@@ -96,7 +96,7 @@ def test_world_compiles_templates_with_scope_inference() -> None:
         block_template = templates["block_market"]
         assert isinstance(block_template, LocationScript)
         assert block_template.scope is not None
-        assert block_template.scope.model_dump() == ScopeSelector(source_label="town_intro").model_dump()
+        assert block_template.scope.model_dump() == ScopeSelector(parent_label="town").model_dump()
 
         actor_labels = sorted(template.label for template in world.actor_templates)
         assert actor_labels == ["global_guard", "scene_guard"]
