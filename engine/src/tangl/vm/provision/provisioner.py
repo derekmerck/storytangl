@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from importlib import import_module
 from copy import deepcopy
 from typing import Iterator, TYPE_CHECKING, Callable, Mapping, Any
@@ -10,6 +11,8 @@ from uuid import UUID
 from pydantic import ConfigDict
 
 from tangl.core import Edge, Entity, Node, Registry
+
+logger = logging.getLogger(__name__)
 
 from .offer import (
     AffordanceOffer,
@@ -322,13 +325,62 @@ class TemplateProvisioner(Provisioner):
             return
 
         def create_node(ctx: Context) -> Node:
-            template_data = deepcopy(template)
-            template_data.pop("graph", None)
-            template_data.setdefault("obj_cls", Node)
-            node = Node.structure(template_data)
-            if node not in ctx.graph:
-                ctx.graph.add(node)
-            return node
+            if isinstance(template, dict):
+                from tangl.ir.core_ir import BaseScriptItem
+
+                normalized = dict(template)
+                obj_cls_value = normalized.get("obj_cls")
+                if isinstance(obj_cls_value, type):
+                    module = getattr(obj_cls_value, "__module__", "")
+                    qualname = getattr(obj_cls_value, "__qualname__", obj_cls_value.__name__)
+                    normalized["obj_cls"] = f"{module}.{qualname}" if module else qualname
+
+                template_model = BaseScriptItem.model_validate(normalized)
+            elif hasattr(template, "model_dump"):
+                template_model = template
+            else:
+                raise TypeError(
+                    f"Template must be dict or Pydantic model, got {type(template)}"
+                )
+
+            world = getattr(ctx.graph, "world", None)
+
+            if world is None:
+                logger.warning(
+                    "Creating node without World - custom obj_cls may not resolve correctly"
+                )
+                payload = template_model.model_dump()
+                obj_cls_value = payload.get("obj_cls")
+                if isinstance(obj_cls_value, str):
+                    resolved_cls = Entity.dereference_cls_name(obj_cls_value)
+                    payload["obj_cls"] = resolved_cls or Node
+                elif obj_cls_value is None:
+                    payload["obj_cls"] = Node
+                payload.setdefault("graph", ctx.graph)
+                payload.setdefault("obj_cls", "tangl.core.graph.Node")
+                node = Node.structure(payload)
+                if node not in ctx.graph:
+                    ctx.graph.add(node)
+                return node
+
+            parent_container = None
+            if hasattr(template_model, "scope") and template_model.scope:
+                if template_model.scope.parent_label:
+                    parent_container = ctx.graph.get(
+                        template_model.scope.parent_label
+                    )
+                    if not parent_container:
+                        raise ValueError(
+                            f"Template '{template_model.label}' requires parent scene "
+                            f"'{template_model.scope.parent_label}' which doesn't exist. "
+                            f"Scenes should be pre-provisioned in lazy mode."
+                        )
+
+            return world._materialize_from_template(
+                template=template_model,
+                graph=ctx.graph,
+                parent_container=parent_container,
+            )
 
         yield DependencyOffer(
             requirement_id=requirement.uid,

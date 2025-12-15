@@ -36,6 +36,8 @@ from tangl.type_hints import UniqueLabel
 from tangl.utils.sanitize_str import sanitize_path
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
+from tangl.core.graph.node import Node
+from tangl.core.graph.subgraph import Subgraph
 from tangl.core.singleton import Singleton
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.provision.open_edge import Dependency
@@ -165,43 +167,199 @@ class World(Singleton):
         return self._block_scripts.get(block_uid)
 
     def _create_story_lazy(self, story_label: str) -> StoryGraph:
-        """Create a minimal story graph with only the starting cursor node."""
+        """Create story with scenes pre-provisioned, blocks lazy."""
 
         from tangl.story.story_graph import StoryGraph
 
         graph = StoryGraph(label=story_label, world=self)
 
+        # Set global variables
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
 
+        # Pre-provision all scenes as empty subgraphs
+        # FIXED: Use graph.add() explicitly, not just constructor
+        scenes = self._get_scenes_dict()
+        for scene_label, scene_data in scenes.items():
+            scene_cls = self.domain_manager.resolve_class(
+                scene_data.get("obj_cls") or "tangl.core.graph.Subgraph"
+            )
+            scene = scene_cls(label=scene_label, graph=graph)
+            if scene not in graph:
+                graph.add(scene)
+
+        # Determine starting position
         start_scene_label, start_block_label = self._get_starting_cursor()
+        start_scene = graph.get(start_scene_label)
 
-        block_script = self._get_block_script(start_scene_label, start_block_label)
-        block_cls = self.domain_manager.resolve_class(
-            block_script.obj_cls or "tangl.story.episode.block.Block",
-        )
+        if start_scene is None:
+            raise ValueError(
+                f"Start scene '{start_scene_label}' not found in graph after pre-provisioning. "
+                f"Check that scene was created and added to graph."
+            )
 
-        payload = self._prepare_payload(
-            block_cls,
-            block_script.model_dump(),
-            graph,
-            drop_keys=("actions", "continues", "redirects", "media"),
-        )
-        payload.setdefault("label", block_script.label)
+        # Get block template from registry
+        start_block_identifier = f"{start_scene_label}.{start_block_label}"
+        block_template = self.template_registry.find_one(identifier=start_block_identifier)
 
-        start_block = block_cls.structure(payload)
-        graph.add(start_block)
+        if block_template is None:
+            raise ValueError(
+                f"Start block template '{start_block_identifier}' not found in registry. "
+                f"Ensure BlockScript templates are registered during compilation (Phase D)."
+            )
 
-        self._block_scripts[start_block.uid] = block_script
-        attach_media_deps_for_block(
+        # Materialize seed block into scene
+        start_block = self._materialize_from_template(
+            template=block_template,
             graph=graph,
-            block=start_block,
-            script=block_script,
+            parent_container=start_scene,
         )
 
         graph.initial_cursor_id = start_block.uid
         return graph
+
+    def _materialize_from_template(
+        self,
+        template: BaseScriptItem,
+        graph: StoryGraph,
+        parent_container: Subgraph | None = None,
+    ) -> Node:
+        """Materialize any template into a concrete node."""
+
+        cls = self.domain_manager.resolve_class(
+            template.obj_cls or "tangl.core.graph.Node"
+        ) or Node
+
+        wirable_fields = ("actions", "continues", "redirects", "media", "roles", "settings")
+        drop_keys = tuple(
+            field for field in wirable_fields
+            if hasattr(template, field) and getattr(template, field)
+        )
+
+        payload = self._prepare_payload(
+            cls,
+            template.model_dump(exclude={"scope"}),
+            graph,
+            drop_keys=drop_keys,
+        )
+        if getattr(template, "model_extra", None):
+            payload.update(template.model_extra)
+        payload.setdefault("label", template.label)
+
+        node = cls.structure(payload)
+
+        if parent_container:
+            parent_container.add_member(node)
+        else:
+            graph.add(node)
+
+        if isinstance(template, BlockScript):
+            self._block_scripts[node.uid] = template
+
+        if hasattr(template, "media") and template.media:
+            attach_media_deps_for_block(graph, node, template)
+
+        for edge_type in ("actions", "continues", "redirects"):
+            edge_scripts = getattr(template, edge_type, None)
+            if edge_scripts:
+                self._attach_action_requirements(graph, node, edge_scripts, template.scope)
+
+        if hasattr(template, "roles") and template.roles:
+            self._wire_roles(
+                graph=graph,
+                source_node=node,
+                roles_data=template.roles,
+                actor_map={},
+            )
+
+        if hasattr(template, "settings") and template.settings:
+            self._wire_settings(
+                graph=graph,
+                source_node=node,
+                settings_data=template.settings,
+                location_map={},
+            )
+
+        return node
+
+    def _attach_action_requirements(
+        self,
+        graph: StoryGraph,
+        source_node: Node,
+        action_scripts: list[dict[str, Any]],
+        scope: ScopeSelector | None,
+    ) -> None:
+        """Create action edges with requirements for successor blocks."""
+
+        scene_label = scope.parent_label if scope else None
+
+        for action_data in action_scripts:
+            if hasattr(action_data, "model_dump"):
+                payload_get = lambda key: getattr(action_data, key, None)  # noqa: E731
+            elif isinstance(action_data, Mapping):
+                payload_get = action_data.get
+            else:
+                continue
+
+            successor_ref = payload_get("successor")
+            if not successor_ref:
+                continue
+
+            successor_identifier = self._qualify_successor_ref(successor_ref, scene_label)
+
+            action_cls = self.domain_manager.resolve_class(
+                payload_get("obj_cls") or "tangl.story.episode.action.Action"
+            ) or Node
+
+            trigger_phase = self._map_activation_to_phase(
+                payload_get("activation") or payload_get("trigger")
+            )
+
+            action = action_cls(
+                graph=graph,
+                source=source_node,
+                destination=None,
+                content=payload_get("text"),
+                conditions=payload_get("conditions") or [],
+                entry_effects=payload_get("entry_effects") or [],
+                final_effects=payload_get("final_effects") or [],
+                trigger_phase=trigger_phase,
+            )
+
+            graph.add(action)
+
+            from tangl.vm.provision import Requirement, ProvisioningPolicy
+            from tangl.vm.provision.open_edge import Dependency
+
+            req = Requirement(
+                graph=graph,
+                identifier=successor_identifier,
+                template_ref=successor_identifier,
+                policy=ProvisioningPolicy.CREATE,
+                hard_requirement=True,
+            )
+
+            dependency = Dependency(
+                graph=graph,
+                source=action,
+                requirement=req,
+                label="destination",
+            )
+            graph.add(dependency)
+
+    def _qualify_successor_ref(self, successor_ref: str, scene_label: str | None) -> str:
+        """Convert successor reference to qualified identifier."""
+
+        successor_ref = sanitize_path(successor_ref)
+
+        if "." in successor_ref:
+            return successor_ref
+
+        if scene_label:
+            return f"{scene_label}.{successor_ref}"
+
+        return successor_ref
 
     def _create_story_hybrid(self, story_label: str) -> StoryGraph:
         """Create a graph with materialized nodes but open dependencies."""
