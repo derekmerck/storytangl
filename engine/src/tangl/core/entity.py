@@ -124,13 +124,21 @@ class Entity(BaseModelPlus):
                     result.add(value)
         for cls in self.__class__.__mro__:
             for ff in cls.__dict__.values():
-                if callable(ff) and getattr(ff, '_is_identifier', False):
-                    value = ff(self)
-                    if value is not None:
-                        if isinstance(value, set):
-                            result.update(value)
-                        else:
-                            result.add(value)
+                func = None
+                if isinstance(ff, property):
+                    func = ff.fget
+                elif callable(ff):
+                    func = ff
+
+                if func is None or not getattr(func, '_is_identifier', False):
+                    continue
+
+                value = func(self)
+                if value is not None:
+                    if isinstance(value, set):
+                        result.update(value)
+                    else:
+                        result.add(value)
         return result
 
     def has_identifier(self, alias: Identifier) -> bool:

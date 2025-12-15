@@ -169,10 +169,6 @@ class ScriptManager:
                 template = _parse_template(label_value, template_data, scope)
                 if template is None or template.label is None:
                     continue
-                existing = registry.find_one(label=template.label)
-                if existing is not None:
-                    logger.warning("Duplicate template label %s skipped", template.label)
-                    continue
                 try:
                     registry.add(template)
                 except ValueError as exc:  # pragma: no cover - Registry guards
@@ -218,11 +214,33 @@ class ScriptManager:
                     continue
                 block_templates = getattr(block_obj, "templates", None)
                 if isinstance(block_templates, Mapping):
-                    _add_templates(block_templates, scope=ScopeSelector(source_label=block_label))
+                    _add_templates(block_templates, scope=ScopeSelector(parent_label=scene_label))
                 elif block_templates:
                     logger.warning(
                         "Block %s templates should be a mapping; received %r", block_label, type(block_templates)
                     )
+
+                try:
+                    parsed_block = block_obj
+                    if isinstance(block_obj, Mapping):
+                        parsed_block = dict(block_obj)
+                        if "block_cls" not in parsed_block and "obj_cls" in parsed_block:
+                            parsed_block["block_cls"] = parsed_block.get("obj_cls")
+                            parsed_block.pop("obj_cls", None)
+
+                    block_script = BlockScript.model_validate(parsed_block)
+                    updates: dict[str, Any] = {}
+                    if not block_script.label and block_label:
+                        updates["label"] = block_label
+                    if block_script.obj_cls is None:
+                        updates["obj_cls"] = "tangl.story.episode.block.Block"
+                    if block_script.scope is None:
+                        updates["scope"] = ScopeSelector(parent_label=scene_label)
+                    if updates:
+                        block_script = block_script.model_copy(update=updates)
+                    registry.add(block_script)
+                except ValidationError as exc:
+                    logger.warning("Skipping block %s due to validation error: %s", block_label, exc)
 
         return registry
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from importlib import import_module
 from copy import deepcopy
 from typing import Iterator, TYPE_CHECKING, Callable, Mapping, Any
@@ -10,6 +11,8 @@ from uuid import UUID
 from pydantic import ConfigDict
 
 from tangl.core import Edge, Entity, Node, Registry
+
+logger = logging.getLogger(__name__)
 
 from .offer import (
     AffordanceOffer,
@@ -267,10 +270,37 @@ class TemplateProvisioner(Provisioner):
             if graph is not None and cursor_id is not None:
                 cursor = graph.get(cursor_id)
 
+        def _scope_from_identifier(identifier: str | None):
+            if not identifier or "." not in identifier:
+                return None
+
+            try:
+                parent_label, _ = identifier.rsplit(".", 1)
+            except ValueError:  # pragma: no cover - defensive
+                return None
+
+            from tangl.ir.story_ir.story_script_models import ScopeSelector
+
+            return ScopeSelector(parent_label=parent_label)
+
         def _find_template(**criteria: Any) -> Any:
             if isinstance(registry, Mapping):
+                identifier = criteria.get("has_identifier")
                 label = criteria.get("label")
-                return registry.get(label) if label is not None else None
+
+                if identifier is not None and isinstance(identifier, str):
+                    if identifier in registry:
+                        return registry.get(identifier)
+
+                    if "." in identifier:
+                        _, tail = identifier.rsplit(".", 1)
+                        if tail in registry:
+                            return registry.get(tail)
+
+                if label is not None:
+                    return registry.get(label)
+
+                return None
 
             find_one = getattr(registry, "find_one", None)
             if callable(find_one):
@@ -278,13 +308,29 @@ class TemplateProvisioner(Provisioner):
 
             return None
 
+        def _build_search(identifier: str | None) -> dict[str, Any]:
+            scope_hint = _scope_from_identifier(identifier) or _scope_from_identifier(
+                requirement.identifier
+            )
+
+            search: dict[str, Any] = {"selector": cursor}
+            if identifier is None:
+                return search
+
+            search["has_identifier"] = identifier
+
+            if "." not in identifier and scope_hint is not None:
+                search.setdefault("has_scope", scope_hint)
+
+            return search
+
         template: Any | None = None
 
         if requirement.template_ref:
-            template = _find_template(label=requirement.template_ref, selector=cursor)
+            template = _find_template(**_build_search(requirement.template_ref))
 
         if template is None and requirement.identifier:
-            template = _find_template(label=requirement.identifier, selector=cursor)
+            template = _find_template(**_build_search(requirement.identifier))
 
         if template is None and requirement.criteria:
             template = _find_template(selector=cursor, **requirement.criteria)
@@ -322,13 +368,69 @@ class TemplateProvisioner(Provisioner):
             return
 
         def create_node(ctx: Context) -> Node:
-            template_data = deepcopy(template)
-            template_data.pop("graph", None)
-            template_data.setdefault("obj_cls", Node)
-            node = Node.structure(template_data)
-            if node not in ctx.graph:
-                ctx.graph.add(node)
-            return node
+            if isinstance(template, dict):
+                from tangl.ir.core_ir import BaseScriptItem
+
+                normalized = dict(template)
+                obj_cls_value = normalized.get("obj_cls")
+                if isinstance(obj_cls_value, type):
+                    module = getattr(obj_cls_value, "__module__", "")
+                    qualname = getattr(obj_cls_value, "__qualname__", obj_cls_value.__name__)
+                    normalized["obj_cls"] = f"{module}.{qualname}" if module else qualname
+
+                template_model = BaseScriptItem.model_validate(normalized)
+            elif hasattr(template, "model_dump"):
+                template_model = template
+            else:
+                raise TypeError(
+                    f"Template must be dict or Pydantic model, got {type(template)}"
+                )
+
+            world = getattr(ctx.graph, "world", None)
+            world_materialize = getattr(world, "_materialize_from_template", None) if world else None
+
+            if world is None or not callable(world_materialize):
+                payload = template_model.model_dump()
+                obj_cls_value = payload.get("obj_cls")
+                resolved_cls = self._resolve_obj_cls(obj_cls_value)
+
+                resolved_cls = resolved_cls or Node
+                payload["obj_cls"] = resolved_cls
+                payload.setdefault("graph", ctx.graph)
+
+                try:
+                    node = resolved_cls.structure(payload)  # type: ignore[arg-type]
+                except AttributeError:  # pragma: no cover - extremely defensive
+                    node = Entity.structure(payload)
+
+                if hasattr(ctx.graph, "add") and node not in ctx.graph:
+                    ctx.graph.add(node)
+                return node
+
+            parent_container = None
+            if hasattr(template_model, "scope") and template_model.scope:
+                if template_model.scope.parent_label:
+                    get_subgraph = getattr(ctx.graph, "get_subgraph", None)
+                    if callable(get_subgraph):
+                        parent_container = get_subgraph(label=template_model.scope.parent_label)
+                    else:
+                        find_subgraph = getattr(ctx.graph, "find_subgraph", None)
+                        if callable(find_subgraph):
+                            parent_container = find_subgraph(label=template_model.scope.parent_label)
+                        else:
+                            parent_container = ctx.graph.get(template_model.scope.parent_label)
+                    if not parent_container:
+                        raise ValueError(
+                            f"Template '{template_model.label}' requires parent scene "
+                            f"'{template_model.scope.parent_label}' which doesn't exist. "
+                            f"Scenes should be pre-provisioned in lazy mode."
+                        )
+
+            return world_materialize(
+                template=template_model,
+                graph=ctx.graph,
+                parent_container=parent_container,
+            )
 
         yield DependencyOffer(
             requirement_id=requirement.uid,

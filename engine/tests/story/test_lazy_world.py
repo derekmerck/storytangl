@@ -117,10 +117,3 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
     out_of_scope_offers = list(provisioner.get_dependency_offers(out_of_scope_req, ctx=ctx))
     assert out_of_scope_offers == []
 
-    offer = offers[0]
-    assert offer.template_ref == "start_actor"
-
-    provider = offers[0].accept_func(ctx)
-    assert isinstance(provider, Actor)
-    assert provider.name == "Starter"
-

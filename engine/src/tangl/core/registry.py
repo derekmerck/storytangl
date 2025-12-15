@@ -140,6 +140,10 @@ class Registry(Entity, Generic[VT]):
         ...
 
     def find_all(self, sort_key = None, **criteria):
+        identifier = criteria.pop("identifier", None)
+        if identifier is not None:
+            criteria.setdefault("has_identifier", identifier)
+
         iter_values = Entity.filter_by_criteria(self.values(), **criteria)
         if sort_key is None:
             yield from iter_values

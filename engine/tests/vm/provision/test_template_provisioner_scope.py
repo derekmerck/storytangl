@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 from tangl.core.graph import Graph, Node
 from tangl.core.registry import Registry
@@ -24,9 +25,15 @@ def _ctx(graph: Graph, cursor: Node | None = None):
 def test_template_provisioner_reads_world_registry() -> None:
     graph = Graph(label="story")
     registry: Registry[BaseScriptItem] = Registry(label="templates")
+    graph.add_subgraph(label="town")
+    graph.add_subgraph(label="castle")
     registry.add(BaseScriptItem(label="villager"))
 
-    object.__setattr__(graph, "world", SimpleNamespace(template_registry=registry))
+    provider = Node(label="villager", graph=graph)
+    world = Mock()
+    world.template_registry = registry
+    world._materialize_from_template.return_value = provider
+    object.__setattr__(graph, "world", world)
 
     requirement = Requirement(
         graph=graph,
@@ -120,3 +127,74 @@ def test_template_provisioner_falls_back_to_local_registry() -> None:
 
     assert len(offers) == 1
     assert offers[0].accept(ctx=ctx).label == "hermit"
+
+
+def test_template_ref_accepts_qualified_identifier() -> None:
+    graph = Graph(label="story")
+    registry: Registry[BaseScriptItem] = Registry(label="templates")
+    registry.add(
+        BaseScriptItem(label="start", scope=ScopeSelector(parent_label="scene1"))
+    )
+
+    object.__setattr__(graph, "world", SimpleNamespace(template_registry=registry))
+
+    requirement = Requirement(
+        graph=graph,
+        template_ref="scene1.start",
+        policy=ProvisioningPolicy.CREATE,
+    )
+
+    provisioner = TemplateProvisioner(layer="author")
+    ctx = _ctx(graph)
+
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+
+    assert len(offers) == 1
+    provider = offers[0].accept(ctx=ctx)
+    assert provider.label == "start"
+
+
+def test_bare_template_ref_uses_scope_hint() -> None:
+    graph = Graph(label="story")
+    graph.add_subgraph(label="town")
+    graph.add_subgraph(label="castle")
+    registry: Registry[BaseScriptItem] = Registry(label="templates")
+    town_guard = BaseScriptItem(
+        label="guard",
+        scope=ScopeSelector(parent_label="town"),
+    )
+    castle_guard = BaseScriptItem(
+        label="guard",
+        scope=ScopeSelector(parent_label="castle"),
+    )
+    registry.add(town_guard)
+    registry.add(castle_guard)
+
+    world = Mock()
+    world.template_registry = registry
+    world._materialize_from_template.side_effect = lambda template, graph, parent_container=None: Node(
+        label=template.label, graph=graph
+    )
+
+    object.__setattr__(graph, "world", world)
+
+    requirement = Requirement(
+        graph=graph,
+        identifier="town.guard",
+        template_ref="guard",
+        policy=ProvisioningPolicy.CREATE,
+    )
+
+    provisioner = TemplateProvisioner(layer="author")
+    ctx = _ctx(graph)
+
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+
+    assert len(offers) == 1
+    provider = offers[0].accept(ctx=ctx)
+    assert provider.label == "guard"
+
+    # Ensure scoped template was chosen
+    world._materialize_from_template.assert_called_once()
+    chosen_template = world._materialize_from_template.call_args.kwargs["template"]
+    assert chosen_template.scope.parent_label == "town"
