@@ -15,3 +15,4 @@
 *.svg
 
 *.lock export-ignore
+scratch export-ignore
