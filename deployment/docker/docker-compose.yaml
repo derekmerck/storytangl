@@ -21,7 +21,7 @@ version: "3.9"
 services:
 
   api:
-    image: story-tangl:${TANGL_VERSION}
+    image: storytangl:${TANGL_VERSION}
     build:
       context: .
     restart: unless-stopped

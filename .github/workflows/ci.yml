@@ -95,11 +95,7 @@ jobs:
         run: |
           which tangl-cli
           which tangl-serve
-#          cli --help
-#          serve --help
 
-      # todo: maybe rerun all tests under a full install?
-      #       check that lfs files were properly included
       - name: Run distribution tests
         run: |
           pip install pytest
