@@ -71,7 +71,7 @@ def test_manifest_metadata_inheritance(tmp_path: Path) -> None:
         """
         label: my_world
         metadata:
-          author: Derek
+          author: TanglDev
         """,
         encoding="utf-8",
     )
@@ -88,7 +88,7 @@ def test_manifest_metadata_inheritance(tmp_path: Path) -> None:
 
     world = registry.get_world("my_world")
 
-    assert world.metadata.get("author") == "Derek"
+    assert world.metadata.get("author") == "TanglDev"
 
 
 def test_bundle_label_must_match_directory_name(tmp_path: Path) -> None:

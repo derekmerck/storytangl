@@ -1088,8 +1088,6 @@ if player.inventory.count() < player.inventory.max_items:
 - `AssetLoadout` instead of `ComponentManager`?
 - `SlottedCollection` instead of `ComponentManager`?
 
-**Decision:** Defer to Derek's preference
-
 ### 2. Single vs Multiple Managers
 
 **Option A:** One node can have multiple collection types

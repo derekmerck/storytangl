@@ -12,11 +12,11 @@ def test_manifest_parses_yaml() -> None:
     scripts: story.yaml
     media_dir: media
     metadata:
-      author: Derek
+      author: TanglDev
     """
     manifest = WorldManifest.model_validate(yaml.safe_load(yaml_text))
     assert manifest.scripts == ["story.yaml"]
-    assert manifest.metadata["author"] == "Derek"
+    assert manifest.metadata["author"] == "TanglDev"
 
 
 def test_manifest_normalizes_scripts() -> None:
