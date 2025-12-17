@@ -3,6 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
+
 from tangl.core import Graph, Node
 from tangl.core.registry import Registry
 from tangl.ir.story_ir import StoryScript
@@ -193,6 +195,37 @@ def test_template_ref_accepts_qualified_identifier() -> None:
     assert len(offers) == 1
     provider = offers[0].accept(ctx=ctx)
     assert provider.label == "start"
+
+
+def test_template_provisioner_requires_container_when_world_missing() -> None:
+    graph = Graph(label="story")
+    registry: Registry[BaseScriptItem] = Registry(label="templates")
+    registry.add(
+        BaseScriptItem(
+            label="start",
+            scope=ScopeSelector(parent_label="scene1"),
+        )
+    )
+
+    graph.add_node(label="scene1")  # Not a container; should be ignored
+
+    requirement = Requirement(
+        graph=graph,
+        template_ref="start",
+        policy=ProvisioningPolicy.CREATE,
+    )
+
+    provisioner = TemplateProvisioner(template_registry=registry, layer="author")
+    ctx = _ctx(graph)
+
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+    assert len(offers) == 1
+
+    with pytest.raises(
+        ValueError,
+        match="requires parent scene 'scene1'.*pre-provisioned",
+    ):
+        offers[0].accept(ctx=ctx)
 
 
 def test_bare_template_ref_uses_scope_hint() -> None:

@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import ConfigDict
 
 from tangl.core import Edge, Entity, Node, Registry
+from tangl.core.graph.subgraph import Subgraph
 
 logger = logging.getLogger(__name__)
 
@@ -439,15 +440,14 @@ class TemplateProvisioner(Provisioner):
                 if world is not None and hasattr(world, "ensure_scope"):
                     parent_container = world.ensure_scope(scope_selector, ctx.graph)
                 elif scope_selector.parent_label:
-                    find_subgraph = getattr(ctx.graph, "find_subgraph", None)
-                    if callable(find_subgraph):
-                        parent_container = find_subgraph(label=scope_selector.parent_label)
-                    else:
-                        parent_container = ctx.graph.get(scope_selector.parent_label)
+                    parent_container = ctx.graph.find_one(
+                        is_instance=Subgraph, label=scope_selector.parent_label
+                    )
                     if parent_container is None:
                         raise ValueError(
                             f"Template '{template_model.label}' requires parent scene "
-                            f"'{scope_selector.parent_label}' which doesn't exist."
+                            f"'{scope_selector.parent_label}' which doesn't exist or is not a container. "
+                            f"When not using a World with lazy-loading, scenes must be pre-provisioned."
                         )
 
             if world is None or not callable(world_materialize):
