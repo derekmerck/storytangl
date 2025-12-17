@@ -9,6 +9,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ValidationError
 
+from tangl.core.graph import Node
 from tangl.core.registry import Registry
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from tangl.ir.story_ir import StoryScript
@@ -73,6 +74,99 @@ class ScriptManager:
             ),
         }
         self.template_registry = self._compile_templates()
+
+    def find_template(
+        self,
+        *,
+        identifier: str | None = None,
+        selector: Node | None = None,
+        scope: ScopeSelector | None = None,
+        **criteria: Any,
+    ) -> BaseScriptItem | None:
+        """Return the first template matching identifier/criteria within scope."""
+
+        scoped_criteria: dict[str, Any] = dict(criteria)
+
+        if identifier and self._is_qualified(identifier):
+            return self.template_registry.find_one(has_identifier=identifier, **scoped_criteria)
+
+        if identifier and selector is not None:
+            return self._anchored_lookup(identifier, selector, scoped_criteria)
+
+        query = self._build_query(identifier, scope, scoped_criteria)
+        return self.template_registry.find_one(**query)
+
+    def find_templates(
+        self,
+        *,
+        identifier: str | None = None,
+        selector: Node | None = None,
+        scope: ScopeSelector | None = None,
+        **criteria: Any,
+    ) -> list[BaseScriptItem]:
+        """Return all templates matching identifier/criteria within scope."""
+
+        scoped_criteria: dict[str, Any] = dict(criteria)
+        query = self._build_query(identifier, scope, scoped_criteria)
+        if selector is not None and identifier and not self._is_qualified(identifier):
+            anchored = self._anchored_lookup(identifier, selector, scoped_criteria)
+            return [anchored] if anchored is not None else []
+        return list(self.template_registry.find_all(**query))
+
+    @staticmethod
+    def _is_qualified(identifier: str) -> bool:
+        """Return ``True`` when identifier includes a scope separator."""
+
+        return "." in identifier
+
+    def _anchored_lookup(
+        self,
+        identifier: str,
+        selector: Node,
+        criteria: Mapping[str, Any],
+    ) -> BaseScriptItem | None:
+        """Search the selector's scope chain for an unqualified identifier."""
+
+        scope_chain = self._get_scope_chain(selector)
+        for scope_prefix in scope_chain:
+            qualified = f"{scope_prefix}.{identifier}" if scope_prefix else identifier
+            template = self.template_registry.find_one(has_identifier=qualified, **criteria)
+            if template is not None:
+                return template
+        return None
+
+    def _get_scope_chain(self, selector: Node) -> list[str]:
+        """Return the selector's scope chain from most specific to global."""
+
+        labels: list[str] = []
+        current: Any | None = selector
+
+        while current is not None:
+            label = getattr(current, "label", None)
+            if isinstance(label, str) and label:
+                labels.append(label)
+            current = getattr(current, "parent", None)
+
+        labels.reverse()
+        paths = [".".join(labels[: index + 1]) for index in range(len(labels))]
+        paths.reverse()
+        paths.append("")
+        return paths
+
+    @staticmethod
+    def _build_query(
+        identifier: str | None,
+        scope: ScopeSelector | None,
+        criteria: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Compose a registry query from identifier/scope/criteria."""
+
+        query = dict(criteria)
+        if identifier:
+            query["has_identifier"] = identifier
+        if scope:
+            query["has_scope"] = scope
+        return query
 
     @classmethod
     def from_data(cls, data: UnstructuredData) -> Self:

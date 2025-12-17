@@ -203,6 +203,10 @@ class TemplateProvisioner(Provisioner):
         if self.template_registry is not None:
             return self.template_registry
 
+        manager = self._get_script_manager(ctx)
+        if manager is not None:
+            return getattr(manager, "template_registry", None)
+
         graph = getattr(ctx, "graph", None)
         if graph is None:
             return None
@@ -212,6 +216,18 @@ class TemplateProvisioner(Provisioner):
             return None
 
         return getattr(world, "template_registry", None)
+
+    @staticmethod
+    def _get_script_manager(ctx: "Context"):
+        graph = getattr(ctx, "graph", None)
+        if graph is None:
+            return None
+        world = getattr(graph, "world", None)
+        if world is None:
+            return None
+        if hasattr(world, "__dict__") and "script_manager" in world.__dict__:
+            return world.__dict__.get("script_manager")
+        return None
 
     def _normalize_template_payload(self, template: Any) -> dict | None:
         if template is None:
@@ -259,8 +275,9 @@ class TemplateProvisioner(Provisioner):
             provenance["template_content_id"] = self._get_content_identifier(requirement.template)
             return normalized or None, provenance
 
-        registry = self._get_registry(ctx)
-        if registry is None:
+        manager = self._get_script_manager(ctx)
+        registry = None if manager is not None else self._get_registry(ctx)
+        if manager is None and registry is None:
             return None, provenance
 
         cursor = getattr(ctx, "cursor", None)
@@ -324,16 +341,34 @@ class TemplateProvisioner(Provisioner):
 
             return search
 
+        criteria = requirement.criteria or {}
         template: Any | None = None
 
-        if requirement.template_ref:
-            template = _find_template(**_build_search(requirement.template_ref))
+        if manager is not None:
+            if requirement.template_ref:
+                template = manager.find_template(
+                    identifier=requirement.template_ref,
+                    selector=cursor,
+                    **criteria,
+                )
+            if template is None and requirement.identifier:
+                template = manager.find_template(
+                    identifier=requirement.identifier,
+                    selector=cursor,
+                    **criteria,
+                )
+            if template is None and criteria:
+                template = manager.find_template(selector=cursor, **criteria)
 
-        if template is None and requirement.identifier:
-            template = _find_template(**_build_search(requirement.identifier))
+        if manager is None:
+            if requirement.template_ref:
+                template = _find_template(**_build_search(requirement.template_ref))
 
-        if template is None and requirement.criteria:
-            template = _find_template(selector=cursor, **requirement.criteria)
+            if template is None and requirement.identifier:
+                template = _find_template(**_build_search(requirement.identifier))
+
+            if template is None and criteria:
+                template = _find_template(selector=cursor, **criteria)
 
         if template is not None:
             provenance["template_ref"] = getattr(template, "label", None)
