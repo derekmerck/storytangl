@@ -34,12 +34,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from tangl.type_hints import UniqueLabel
 from tangl.utils.sanitize_str import sanitize_path
+from tangl.core import Entity
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.graph.node import Node
 from tangl.core.graph.subgraph import Subgraph
 from tangl.core.singleton import Singleton
 from tangl.vm import ProvisioningPolicy
+from tangl.vm.context import MaterializationContext
+from tangl.vm.dispatch import vm_dispatch
+from tangl.vm.dispatch.materialize_task import MaterializePhase, MaterializeTask
 from tangl.vm.provision.open_edge import Dependency
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
@@ -307,67 +311,38 @@ class World(Singleton):
         graph: StoryGraph,
         parent_container: Subgraph | None = None,
     ) -> Node:
-        """Materialize any template into a concrete node."""
+        """Dispatch-driven materialization of a single template."""
 
-        cls = self.domain_manager.resolve_class(
-            template.obj_cls or "tangl.core.graph.Node"
-        ) or Node
-
-        if cls is Node and isinstance(template, BlockScript):
-            cls = self.domain_manager.resolve_class("tangl.story.episode.block.Block")
-
-        wirable_fields = ("actions", "continues", "redirects", "media", "roles", "settings")
-        drop_keys = tuple(
-            field for field in wirable_fields
-            if hasattr(template, field) and getattr(template, field)
-        )
-
-        payload = self._prepare_payload(
-            cls,
-            template.model_dump(exclude={"scope"}),
-            graph,
-            drop_keys=drop_keys,
-        )
+        payload = template.model_dump(exclude={"scope"})
         if getattr(template, "model_extra", None):
             payload.update(template.model_extra)
         payload.setdefault("label", template.label)
         payload.pop("obj_cls", None)
 
-        node = cls.structure(payload)
+        ctx = MaterializationContext(
+            template=template,
+            graph=graph,
+            payload=payload,
+            parent_container=parent_container,
+            node=None,
+        )
 
-        if parent_container:
-            parent_container.add_member(node)
-        else:
-            graph.add(node)
+        caller = parent_container or graph
+        receipts = vm_dispatch.dispatch(
+            caller=caller,
+            ctx=ctx,
+            task=MaterializeTask.MATERIALIZE,
+        )
+        list(receipts)
 
-        if isinstance(template, BlockScript):
-            self._block_scripts[node.uid] = template
-
-        if hasattr(template, "media") and template.media:
-            attach_media_deps_for_block(graph, node, template)
-
-        for edge_type in ("actions", "continues", "redirects"):
-            edge_scripts = getattr(template, edge_type, None)
-            if edge_scripts:
-                self._attach_action_requirements(graph, node, edge_scripts, template.scope)
-
-        if hasattr(template, "roles") and template.roles:
-            self._wire_roles(
-                graph=graph,
-                source_node=node,
-                roles_data=template.roles,
-                actor_map={},
+        if ctx.node is None:
+            raise RuntimeError(
+                "Materialization dispatch failed: no handler set ctx.node for "
+                f"template '{template.label}'. A NORMAL phase handler must create "
+                "the node and assign it to ctx.node."
             )
 
-        if hasattr(template, "settings") and template.settings:
-            self._wire_settings(
-                graph=graph,
-                source_node=node,
-                settings_data=template.settings,
-                location_map={},
-            )
-
-        return node
+        return ctx.node
 
     def _attach_action_requirements(
         self,
@@ -1049,3 +1024,115 @@ class World(Singleton):
         if data is None:
             return {}
         return dict(data)
+
+
+@vm_dispatch.register(
+    task=MaterializeTask.MATERIALIZE,
+    priority=MaterializePhase.NORMAL,
+)
+def _materialize_default_normal(
+    caller: Entity,
+    *,
+    ctx: MaterializationContext,
+    **_: Any,
+) -> Node | None:
+    template = ctx.template
+    graph = ctx.graph
+    world = getattr(graph, "world", None)
+    domain_manager = getattr(world, "domain_manager", None)
+
+    cls: type[Any]
+    if domain_manager is not None:
+        cls = domain_manager.resolve_class(
+            template.obj_cls or "tangl.core.graph.Node"
+        ) or Node
+        if cls is Node and isinstance(template, BlockScript):
+            cls = domain_manager.resolve_class("tangl.story.episode.block.Block") or Node
+    else:
+        obj_cls = getattr(template, "obj_cls", None)
+        cls = obj_cls if isinstance(obj_cls, type) else Node
+
+    wirable_fields = ("actions", "continues", "redirects", "media", "roles", "settings")
+    drop_keys = tuple(
+        field for field in wirable_fields if getattr(template, field, None)
+    )
+
+    payload = ctx.payload or {}
+    if world is not None:
+        prepared = world._prepare_payload(
+            cls,
+            payload,
+            graph,
+            drop_keys=drop_keys,
+        )
+    else:
+        prepared = {key: value for key, value in payload.items() if key not in drop_keys}
+        if World._is_graph_item(cls):
+            prepared["graph"] = graph
+        else:
+            prepared.pop("graph", None)
+
+    prepared.setdefault("label", template.label)
+
+    node = cls.structure(prepared)
+    if ctx.parent_container is not None:
+        ctx.parent_container.add_member(node)
+    else:
+        graph.add(node)
+
+    ctx.payload = prepared
+    ctx.node = node
+    return node
+
+
+@vm_dispatch.register(
+    task=MaterializeTask.MATERIALIZE,
+    priority=MaterializePhase.LATE,
+)
+def _materialize_default_wiring(
+    caller: Entity,
+    *,
+    ctx: MaterializationContext,
+    **_: Any,
+) -> None:
+    node = ctx.node
+    if node is None:
+        return
+
+    world = getattr(ctx.graph, "world", None)
+    if world is None:
+        return
+
+    template = ctx.template
+
+    if isinstance(template, BlockScript):
+        world._block_scripts[node.uid] = template
+
+    if getattr(template, "media", None):
+        attach_media_deps_for_block(ctx.graph, node, template)
+
+    for edge_type in ("actions", "continues", "redirects"):
+        edge_scripts = getattr(template, edge_type, None)
+        if edge_scripts:
+            world._attach_action_requirements(
+                ctx.graph,
+                node,
+                edge_scripts,
+                template.scope,
+            )
+
+    if getattr(template, "roles", None):
+        world._wire_roles(
+            graph=ctx.graph,
+            source_node=node,
+            roles_data=template.roles,
+            actor_map={},
+        )
+
+    if getattr(template, "settings", None):
+        world._wire_settings(
+            graph=ctx.graph,
+            source_node=node,
+            settings_data=template.settings,
+            location_map={},
+        )
