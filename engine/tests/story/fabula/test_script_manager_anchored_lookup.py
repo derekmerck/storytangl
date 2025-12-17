@@ -104,8 +104,6 @@ def test_get_scope_chain_from_nested_node():
     assert manager._get_scope_chain(counter) == [
         "village.store.counter",
         "village.store",
-        "counter",
-        "store",
         "village",
         "",
     ]
@@ -144,7 +142,7 @@ def test_unqualified_identifier_falls_back_to_parent_scope(hierarchical_world):
     )
 
     assert result is not None
-    assert result.has_identifier("village.guard")
+    assert getattr(result.scope, "parent_label", None) == "village"
     assert result.name == "Village Guard"
 
 
@@ -196,7 +194,7 @@ def test_qualified_identifier_bypasses_scope_filtering(hierarchical_world):
     )
 
     assert result is not None
-    assert result.has_identifier("countryside.guard")
+    assert getattr(result.scope, "parent_label", None) == "countryside"
     assert result.name == "Countryside Guard"
 
 
@@ -237,7 +235,7 @@ def test_find_template_with_additional_criteria(hierarchical_world):
     )
 
     assert result is not None
-    assert result.has_identifier("village.guard")
+    assert getattr(result.scope, "parent_label", None) == "village"
 
 
 def test_find_templates_plural_returns_all_in_scope():

@@ -110,7 +110,24 @@ class ScriptManager:
         scoped_criteria: dict[str, Any] = dict(criteria)
 
         if identifier and self._is_qualified(identifier):
-            return self._template_registry.find_one(has_identifier=identifier, **scoped_criteria)
+            direct = self._template_registry.find_one(
+                has_identifier=identifier, **scoped_criteria
+            )
+            if direct is not None:
+                return direct
+
+            try:
+                parent_label, tail = identifier.rsplit(".", 1)
+            except ValueError:
+                parent_label, tail = None, identifier
+
+            if parent_label:
+                scoped = dict(scoped_criteria)
+                scoped["has_identifier"] = tail
+                scoped["has_scope"] = ScopeSelector(parent_label=parent_label)
+                return self._template_registry.find_one(**scoped)
+
+            return None
 
         if identifier and selector is not None:
             return self._anchored_lookup(identifier, selector, scoped_criteria)
@@ -126,13 +143,18 @@ class ScriptManager:
         scope: ScopeSelector | None = None,
         **criteria: Any,
     ) -> list[BaseScriptItem]:
-        """Return all templates matching identifier/criteria within scope."""
+        """Return all templates matching identifier/criteria.
+
+        Notes
+        -----
+        This plural query intentionally **does not** perform anchored lookup for
+        unqualified identifiers. Use :meth:`find_template` (singular) when you
+        need scope-chain resolution. ``find_templates`` performs a general
+        registry search using the supplied identifier and criteria.
+        """
 
         scoped_criteria: dict[str, Any] = dict(criteria)
         query = self._build_query(identifier, scope, scoped_criteria)
-        if selector is not None and identifier and not self._is_qualified(identifier):
-            anchored = self._anchored_lookup(identifier, selector, scoped_criteria)
-            return [anchored] if anchored is not None else []
         return list(self._template_registry.find_all(**query))
 
     @staticmethod
@@ -155,6 +177,17 @@ class ScriptManager:
             template = self._template_registry.find_one(has_identifier=qualified, **criteria)
             if template is not None:
                 return template
+
+            if not scope_prefix:
+                continue
+
+            parent_label = scope_prefix.split(".")[-1]
+            scoped_search = dict(criteria)
+            scoped_search["has_identifier"] = identifier
+            scoped_search["has_scope"] = ScopeSelector(parent_label=parent_label)
+            template = self._template_registry.find_one(**scoped_search)
+            if template is not None:
+                return template
         return None
 
     def _get_scope_chain(self, selector: Node) -> list[str]:
@@ -170,13 +203,13 @@ class ScriptManager:
             current = getattr(current, "parent", None)
 
         labels.reverse()
-        cumulative = [".".join(labels[: index + 1]) for index in range(len(labels))]
-        cumulative.reverse()
 
         paths: list[str] = []
-        for candidate in cumulative[:-1] + list(reversed(labels)) + [""]:
-            if candidate not in paths:
-                paths.append(candidate)
+        for index in range(len(labels), 0, -1):
+            path = ".".join(labels[:index])
+            paths.append(path)
+
+        paths.append("")
 
         return paths
 

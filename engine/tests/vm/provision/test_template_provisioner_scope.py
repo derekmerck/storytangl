@@ -74,6 +74,7 @@ def test_template_provisioner_reads_world_registry() -> None:
     provider = Node(label="villager", graph=graph)
     world = Mock()
     world.template_registry = registry
+    world.script_manager = None
     world._materialize_from_template.return_value = provider
     object.__setattr__(graph, "world", world)
 
@@ -246,6 +247,7 @@ def test_bare_template_ref_uses_scope_hint() -> None:
 
     world = Mock()
     world.template_registry = registry
+    world.script_manager = None
     world._materialize_from_template.side_effect = lambda template, graph, parent_container=None: Node(
         label=template.label, graph=graph
     )
@@ -290,6 +292,7 @@ def test_provisioner_calls_world_ensure_scope_before_materializing() -> None:
 
     world = Mock()
     world.template_registry = registry
+    world.script_manager = None
     parent_scene = graph.add_subgraph(label="village")
     world.ensure_scope.return_value = parent_scene
 

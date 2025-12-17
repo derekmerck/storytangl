@@ -219,8 +219,8 @@ class TemplateProvisioner(Provisioner):
         if world is None:
             return None
 
-        if hasattr(world, "__dict__") and "script_manager" in world.__dict__:
-            manager = world.__dict__["script_manager"]
+        manager = getattr(world, "script_manager", None)
+        if manager is not None:
             direct = getattr(manager, "_template_registry", None)
             if direct is not None:
                 return direct
@@ -235,9 +235,7 @@ class TemplateProvisioner(Provisioner):
         world = getattr(graph, "world", None)
         if world is None:
             return None
-        if hasattr(world, "__dict__") and "script_manager" in world.__dict__:
-            return world.__dict__.get("script_manager")
-        return None
+        return getattr(world, "script_manager", None)
 
     def _normalize_template_payload(self, template: Any) -> dict | None:
         if template is None:
