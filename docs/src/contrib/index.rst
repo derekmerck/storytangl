@@ -7,3 +7,4 @@ Contribution Guide
    coding_style
    docstring_style
    exception_policy
+   script_manager_facade_migration

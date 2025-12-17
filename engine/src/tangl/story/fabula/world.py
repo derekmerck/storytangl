@@ -148,18 +148,18 @@ class World(Singleton):
     def actor_templates(self) -> list[ActorScript]:
         """Return all actor templates declared in this world."""
 
-        return list(self.template_registry.find_all(is_instance=ActorScript))
+        return list(self.script_manager.find_templates(is_instance=ActorScript))
 
     @property
     def location_templates(self) -> list[LocationScript]:
         """Return all location templates declared in this world."""
 
-        return list(self.template_registry.find_all(is_instance=LocationScript))
+        return list(self.script_manager.find_templates(is_instance=LocationScript))
 
     def find_template(self, label: str) -> BaseScriptItem | None:
         """Return a template by ``label`` if it has been registered."""
 
-        return self.template_registry.find_one(label=label)
+        return self.script_manager.find_template(identifier=label)
 
     def get_block_script(self, block_uid: UUID) -> BlockScript | None:
         """Return the :class:`BlockScript` backing ``block_uid`` if cached."""
@@ -181,7 +181,7 @@ class World(Singleton):
 
         # Get block template from registry
         start_block_identifier = f"{start_scene_label}.{start_block_label}"
-        block_template = self.template_registry.find_one(identifier=start_block_identifier)
+        block_template = self.script_manager.find_template(identifier=start_block_identifier)
 
         if block_template is None:
             raise ValueError(
@@ -248,9 +248,7 @@ class World(Singleton):
         if existing is not None:
             return existing
 
-        template = self.template_registry.find_one(has_identifier=scope.parent_label)
-        if template is None:
-            template = self.template_registry.find_one(label=scope.parent_label)
+        template = self.script_manager.find_template(identifier=scope.parent_label)
 
         parent_container: Subgraph | None = None
         if template is not None:

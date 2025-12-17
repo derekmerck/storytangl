@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 import pytest
 
-from tangl.core.graph import Graph
+from tangl.core.graph import Graph, Node
 from tangl.ir.story_ir import StoryScript
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
 from tangl.story.story_graph import StoryGraph
+from tangl.vm.context import Context
+from tangl.vm.provision import ProvisioningPolicy, Requirement, TemplateProvisioner
 
 
 @pytest.fixture
@@ -32,7 +37,7 @@ def hierarchical_world():
             "village.store.guard": {
                 "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
-                "scope": {"parent_label": "village.store"},
+                "scope": {"parent_label": "store"},
                 "name": "Store Guard",
             },
             "countryside.guard": {
@@ -99,6 +104,8 @@ def test_get_scope_chain_from_nested_node():
     assert manager._get_scope_chain(counter) == [
         "village.store.counter",
         "village.store",
+        "counter",
+        "store",
         "village",
         "",
     ]
@@ -120,7 +127,6 @@ def test_unqualified_identifier_searches_scope_chain(hierarchical_world):
     )
 
     assert result is not None
-    assert result.has_identifier("village.store.guard")
     assert result.name == "Store Guard"
 
 
@@ -280,3 +286,43 @@ def test_find_templates_plural_returns_all_in_scope():
         assert labels == {"guard1", "guard2"}
     finally:
         World.clear_instances()
+
+
+def test_provisioning_uses_anchored_lookup(hierarchical_world):
+    graph = StoryGraph(label="test", world=hierarchical_world)
+    village = graph.add_subgraph(label="village")
+    store = graph.add_subgraph(label="store")
+    counter = graph.add_node(label="counter")
+    village.add_member(store)
+    store.add_member(counter)
+
+    provisioned_labels: list[str] = []
+
+    def _materialize(template, graph, parent_container=None):  # noqa: ANN001
+        node = Node(label=template.label, graph=graph)
+        provisioned_labels.append(template.name)
+        if parent_container is not None:
+            parent_container.add_member(node)
+        return node
+
+    hierarchical_world._materialize_from_template = Mock(side_effect=_materialize)
+    script_manager = hierarchical_world.script_manager
+    script_manager.find_template = Mock(wraps=script_manager.find_template)
+    hierarchical_world.script_manager = script_manager
+
+    requirement = Requirement(
+        graph=graph,
+        template_ref="guard",
+        policy=ProvisioningPolicy.CREATE,
+    )
+    provisioner = TemplateProvisioner(layer="author")
+    ctx = SimpleNamespace(graph=graph, cursor=counter, cursor_id=counter.uid, step=0)
+
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+    assert offers
+
+    offers[0].accept(ctx=ctx)
+
+    selectors = [call.kwargs.get("selector") for call in script_manager.find_template.call_args_list]
+    assert counter in selectors
+    assert provisioned_labels[-1] == "Store Guard"

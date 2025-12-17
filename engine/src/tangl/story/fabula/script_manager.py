@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -73,7 +74,28 @@ class ScriptManager:
                 },
             ),
         }
-        self.template_registry = self._compile_templates()
+        self._template_registry = self._compile_templates()
+
+    @property
+    def template_registry(self) -> Registry:
+        """Access to the compiled template registry (deprecated).
+
+        Direct registry access is deprecated. Prefer :meth:`find_template` or
+        :meth:`find_templates` to benefit from anchored lookup semantics and to
+        decouple callers from registry internals. This property will be removed
+        in v4.0.
+        """
+
+        warnings.warn(
+            (
+                "Direct access to ScriptManager.template_registry is "
+                "deprecated; use find_template/find_templates instead. "
+                "This alias will be removed in v4.0."
+            ),
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._template_registry
 
     def find_template(
         self,
@@ -88,13 +110,13 @@ class ScriptManager:
         scoped_criteria: dict[str, Any] = dict(criteria)
 
         if identifier and self._is_qualified(identifier):
-            return self.template_registry.find_one(has_identifier=identifier, **scoped_criteria)
+            return self._template_registry.find_one(has_identifier=identifier, **scoped_criteria)
 
         if identifier and selector is not None:
             return self._anchored_lookup(identifier, selector, scoped_criteria)
 
         query = self._build_query(identifier, scope, scoped_criteria)
-        return self.template_registry.find_one(**query)
+        return self._template_registry.find_one(**query)
 
     def find_templates(
         self,
@@ -111,7 +133,7 @@ class ScriptManager:
         if selector is not None and identifier and not self._is_qualified(identifier):
             anchored = self._anchored_lookup(identifier, selector, scoped_criteria)
             return [anchored] if anchored is not None else []
-        return list(self.template_registry.find_all(**query))
+        return list(self._template_registry.find_all(**query))
 
     @staticmethod
     def _is_qualified(identifier: str) -> bool:
@@ -130,7 +152,7 @@ class ScriptManager:
         scope_chain = self._get_scope_chain(selector)
         for scope_prefix in scope_chain:
             qualified = f"{scope_prefix}.{identifier}" if scope_prefix else identifier
-            template = self.template_registry.find_one(has_identifier=qualified, **criteria)
+            template = self._template_registry.find_one(has_identifier=qualified, **criteria)
             if template is not None:
                 return template
         return None
@@ -148,9 +170,14 @@ class ScriptManager:
             current = getattr(current, "parent", None)
 
         labels.reverse()
-        paths = [".".join(labels[: index + 1]) for index in range(len(labels))]
-        paths.reverse()
-        paths.append("")
+        cumulative = [".".join(labels[: index + 1]) for index in range(len(labels))]
+        cumulative.reverse()
+
+        paths: list[str] = []
+        for candidate in cumulative[:-1] + list(reversed(labels)) + [""]:
+            if candidate not in paths:
+                paths.append(candidate)
+
         return paths
 
     @staticmethod

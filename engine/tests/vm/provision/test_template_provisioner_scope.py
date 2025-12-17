@@ -25,6 +25,43 @@ def _ctx(graph: Graph, cursor: Node | None = None):
     return Context(graph=graph, cursor_id=cursor.uid, step=0)
 
 
+def test_template_provisioner_prefers_script_manager_over_registry() -> None:
+    graph = Graph(label="story")
+    template = BaseScriptItem(label="villager")
+
+    world = Mock()
+    def _materialize(template, graph, parent_container=None, **_: object) -> Node:  # noqa: ANN001
+        return Node(label=template.label, graph=graph)
+
+    world._materialize_from_template.side_effect = _materialize
+
+    script_manager = Mock()
+    script_manager.find_template.return_value = template
+    world.script_manager = script_manager
+
+    registry = Mock()
+    registry.find_one.return_value = None
+    world.template_registry = registry
+
+    object.__setattr__(graph, "world", world)
+
+    requirement = Requirement(
+        graph=graph,
+        template_ref="villager",
+        policy=ProvisioningPolicy.CREATE,
+    )
+
+    provisioner = TemplateProvisioner(layer="author")
+    ctx = _ctx(graph)
+
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+    assert len(offers) == 1
+
+    offers[0].accept(ctx=ctx)
+
+    script_manager.find_template.assert_called_once()
+    registry.find_one.assert_not_called()
+
 def test_template_provisioner_reads_world_registry() -> None:
     graph = Graph(label="story")
     registry: Registry[BaseScriptItem] = Registry(label="templates")
@@ -289,7 +326,7 @@ def test_provisioner_creates_missing_scene_via_world_ensure_scope() -> None:
 
     try:
         graph = StoryGraph(label="story", world=world)
-        template = world.template_registry.find_one(identifier="village.start")
+        template = world.script_manager.find_template(identifier="village.start")
 
         requirement = Requirement(
             graph=graph,

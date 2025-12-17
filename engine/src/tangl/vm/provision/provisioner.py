@@ -205,6 +205,9 @@ class TemplateProvisioner(Provisioner):
 
         manager = self._get_script_manager(ctx)
         if manager is not None:
+            direct = getattr(manager, "_template_registry", None)
+            if direct is not None:
+                return direct
             return getattr(manager, "template_registry", None)
 
         graph = getattr(ctx, "graph", None)
@@ -214,6 +217,12 @@ class TemplateProvisioner(Provisioner):
         world = getattr(graph, "world", None)
         if world is None:
             return None
+
+        if hasattr(world, "__dict__") and "script_manager" in world.__dict__:
+            manager = world.__dict__["script_manager"]
+            direct = getattr(manager, "_template_registry", None)
+            if direct is not None:
+                return direct
 
         return getattr(world, "template_registry", None)
 

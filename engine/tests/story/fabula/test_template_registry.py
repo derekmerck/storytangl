@@ -44,7 +44,10 @@ def build_world(story_data: dict[str, Any]) -> World:
 
 
 def _collect_templates(world: World) -> dict[str, ActorScript | LocationScript]:
-    return {template.label: template for template in world.template_registry.find_all()}
+    return {
+        template.label: template
+        for template in world.script_manager.find_templates()
+    }
 
 
 def test_world_level_templates_have_global_scope() -> None:
@@ -215,10 +218,10 @@ def test_template_registry_queries() -> None:
     actor_templates = list(world.actor_templates)
     assert sorted(template.label for template in actor_templates) == ["global_guard", "global_merchant"]
 
-    npc_templates = list(world.template_registry.find_all(has_tags={"npc"}))
+    npc_templates = list(world.script_manager.find_templates(has_tags={"npc"}))
     assert {template.label for template in npc_templates} == {"global_guard", "global_merchant"}
 
-    guard_archetypes = list(world.template_registry.find_all(archetype="guard"))
+    guard_archetypes = list(world.script_manager.find_templates(archetype="guard"))
     assert [template.label for template in guard_archetypes] == ["global_guard"]
 
 
@@ -268,7 +271,7 @@ def test_duplicate_labels_allowed_with_different_scopes() -> None:
     }
 
     world = build_world(story_data)
-    all_guards = list(world.template_registry.find_all(label="guard"))
+    all_guards = list(world.script_manager.find_templates(identifier="guard"))
 
     assert len(all_guards) == 2
 
@@ -278,8 +281,8 @@ def test_duplicate_labels_allowed_with_different_scopes() -> None:
     assert global_guard.scope is None
     assert village_guard.scope.parent_label == "village"
 
-    assert world.template_registry.find_one(identifier="guard") is not None
-    assert world.template_registry.find_one(identifier="village.guard") == village_guard
+    assert world.script_manager.find_template(identifier="guard") is not None
+    assert world.script_manager.find_template(identifier="village.guard") == village_guard
 
 
 def test_registry_finds_template_by_qual_label() -> None:
@@ -308,11 +311,11 @@ def test_registry_finds_template_by_qual_label() -> None:
 
     world = build_world(story_data)
 
-    all_templates = list(world.template_registry.find_all())
+    all_templates = list(world.script_manager.find_templates())
     assert len(all_templates) == 2
 
-    scene1_start = world.template_registry.find_one(identifier="scene1.start")
-    scene2_start = world.template_registry.find_one(identifier="scene2.start")
+    scene1_start = world.script_manager.find_template(identifier="scene1.start")
+    scene2_start = world.script_manager.find_template(identifier="scene2.start")
 
     assert scene1_start is not None
     assert scene2_start is not None
@@ -346,8 +349,8 @@ def test_block_scripts_registered_as_templates() -> None:
 
     world = build_world(story_data)
 
-    start_template = world.template_registry.find_one(identifier="scene1.start")
-    next_template = world.template_registry.find_one(identifier="scene1.next")
+    start_template = world.script_manager.find_template(identifier="scene1.start")
+    next_template = world.script_manager.find_template(identifier="scene1.next")
 
     assert start_template is not None
     assert isinstance(start_template, BlockScript)
@@ -384,14 +387,14 @@ def test_block_templates_coexist_with_concept_templates() -> None:
     }
 
     world = build_world(story_data)
-    all_templates = list(world.template_registry.find_all())
+    all_templates = list(world.script_manager.find_templates())
 
     assert len(all_templates) == 3
 
     labels = {template.label for template in all_templates}
     assert labels == {"guard", "elder", "start"}
 
-    start_block = world.template_registry.find_one(identifier="village.start")
+    start_block = world.script_manager.find_template(identifier="village.start")
     assert isinstance(start_block, BlockScript)
 
 
