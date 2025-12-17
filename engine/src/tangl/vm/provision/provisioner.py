@@ -389,6 +389,23 @@ class TemplateProvisioner(Provisioner):
             world = getattr(ctx.graph, "world", None)
             world_materialize = getattr(world, "_materialize_from_template", None) if world else None
 
+            parent_container = None
+            scope_selector = getattr(template_model, "scope", None)
+            if scope_selector:
+                if world is not None and hasattr(world, "ensure_scope"):
+                    parent_container = world.ensure_scope(scope_selector, ctx.graph)
+                elif scope_selector.parent_label:
+                    find_subgraph = getattr(ctx.graph, "find_subgraph", None)
+                    if callable(find_subgraph):
+                        parent_container = find_subgraph(label=scope_selector.parent_label)
+                    else:
+                        parent_container = ctx.graph.get(scope_selector.parent_label)
+                    if parent_container is None:
+                        raise ValueError(
+                            f"Template '{template_model.label}' requires parent scene "
+                            f"'{scope_selector.parent_label}' which doesn't exist."
+                        )
+
             if world is None or not callable(world_materialize):
                 payload = template_model.model_dump()
                 obj_cls_value = payload.get("obj_cls")
@@ -405,26 +422,9 @@ class TemplateProvisioner(Provisioner):
 
                 if hasattr(ctx.graph, "add") and node not in ctx.graph:
                     ctx.graph.add(node)
+                if parent_container is not None and hasattr(parent_container, "add_member"):
+                    parent_container.add_member(node)
                 return node
-
-            parent_container = None
-            if hasattr(template_model, "scope") and template_model.scope:
-                if template_model.scope.parent_label:
-                    get_subgraph = getattr(ctx.graph, "get_subgraph", None)
-                    if callable(get_subgraph):
-                        parent_container = get_subgraph(label=template_model.scope.parent_label)
-                    else:
-                        find_subgraph = getattr(ctx.graph, "find_subgraph", None)
-                        if callable(find_subgraph):
-                            parent_container = find_subgraph(label=template_model.scope.parent_label)
-                        else:
-                            parent_container = ctx.graph.get(template_model.scope.parent_label)
-                    if not parent_container:
-                        raise ValueError(
-                            f"Template '{template_model.label}' requires parent scene "
-                            f"'{template_model.scope.parent_label}' which doesn't exist. "
-                            f"Scenes should be pre-provisioned in lazy mode."
-                        )
 
             return world_materialize(
                 template=template_model,

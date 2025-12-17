@@ -167,37 +167,17 @@ class World(Singleton):
         return self._block_scripts.get(block_uid)
 
     def _create_story_lazy(self, story_label: str) -> StoryGraph:
-        """Create story with scenes pre-provisioned, blocks lazy."""
+        """Create story with only the seed block materialized."""
 
         from tangl.story.story_graph import StoryGraph
 
         graph = StoryGraph(label=story_label, world=self)
 
-        # Set global variables
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
 
-        # Pre-provision all scenes as empty subgraphs
-        # FIXED: Use graph.add() explicitly, not just constructor
-        scenes = self._get_scenes_dict()
-        for scene_label, scene_data in scenes.items():
-            scene_cls = self.domain_manager.resolve_class(
-                scene_data.get("obj_cls") or "tangl.core.graph.Subgraph"
-            )
-            scene = scene_cls(label=scene_label, graph=graph)
-            if scene not in graph:
-                graph.add(scene)
-
-        # Determine starting position
         start_scene_label, start_block_label = self._get_starting_cursor()
-        start_scene = graph.get(start_scene_label)
-
-        if start_scene is None:
-            raise ValueError(
-                f"Start scene '{start_scene_label}' not found in graph after pre-provisioning. "
-                f"Check that scene was created and added to graph."
-            )
 
         # Get block template from registry
         start_block_identifier = f"{start_scene_label}.{start_block_label}"
@@ -209,15 +189,119 @@ class World(Singleton):
                 f"Ensure BlockScript templates are registered during compilation (Phase D)."
             )
 
-        # Materialize seed block into scene
+        parent_container = self.ensure_scope(block_template.scope, graph)
+
         start_block = self._materialize_from_template(
             template=block_template,
             graph=graph,
-            parent_container=start_scene,
+            parent_container=parent_container,
         )
 
         graph.initial_cursor_id = start_block.uid
         return graph
+
+    def ensure_scope(self, scope: ScopeSelector | None, graph: StoryGraph) -> Subgraph | None:
+        """Ensure that a container described by ``scope`` exists in ``graph``.
+
+        The method is idempotent and will return an existing subgraph when one
+        matches ``scope.parent_label``. When absent, it attempts to materialize
+        the container from the world's template registry or, as a fallback, from
+        scene definitions in the story script.
+
+        Parameters
+        ----------
+        scope:
+            Scope selector indicating the parent container requirement.
+        graph:
+            Story graph that should own the ensured container.
+
+        Returns
+        -------
+        Subgraph | None
+            ``None`` when no container is required, otherwise the existing or
+            newly created subgraph.
+
+        Raises
+        ------
+        ValueError
+            When a parent label is requested but no template or scene definition
+            is available to create it.
+        NotImplementedError
+            When ancestor-based selectors are provided (unsupported today).
+        """
+
+        if scope is None:
+            return None
+
+        if scope.is_global():
+            return None
+
+        if scope.ancestor_tags or scope.ancestor_labels:
+            raise NotImplementedError(
+                "ancestor_tags and ancestor_labels are not yet supported in ensure_scope"
+            )
+
+        if not scope.parent_label:
+            return None
+
+        existing = graph.find_subgraph(label=scope.parent_label)
+        if existing is not None:
+            return existing
+
+        template = self.template_registry.find_one(has_identifier=scope.parent_label)
+        if template is None:
+            template = self.template_registry.find_one(label=scope.parent_label)
+
+        parent_container: Subgraph | None = None
+        if template is not None:
+            if getattr(template, "scope", None):
+                parent_container = self.ensure_scope(template.scope, graph)
+
+            return self._materialize_from_template(
+                template=template,
+                graph=graph,
+                parent_container=parent_container,
+            )
+
+        scenes = self._get_scenes_dict()
+        scene_data = scenes.get(scope.parent_label)
+
+        if scene_data is None:
+            raise ValueError(
+                f"Scope requires parent container '{scope.parent_label}' but no template found in"
+                f" template registry or scene definitions."
+            )
+
+        scene_scope_data = scene_data.get("scope")
+        scene_scope = None
+        if scene_scope_data:
+            scene_scope = ScopeSelector.model_validate(scene_scope_data)
+            parent_container = self.ensure_scope(scene_scope, graph)
+
+        scene_cls = self.domain_manager.resolve_class(
+            scene_data.get("obj_cls") or "tangl.core.graph.Subgraph"
+        )
+        try:
+            if not issubclass(scene_cls, Subgraph):
+                scene_cls = Subgraph
+        except TypeError:  # pragma: no cover - defensive
+            scene_cls = Subgraph
+
+        payload = self._prepare_payload(
+            scene_cls,
+            scene_data,
+            graph,
+            drop_keys=("blocks", "templates", "roles", "settings"),
+        )
+        payload.setdefault("label", scope.parent_label)
+
+        scene = scene_cls.structure(payload)
+        graph.add(scene)
+
+        if parent_container:
+            parent_container.add_member(scene)
+
+        return scene
 
     def _materialize_from_template(
         self,

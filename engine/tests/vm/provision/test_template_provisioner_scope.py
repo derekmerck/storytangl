@@ -3,10 +3,13 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from tangl.core.graph import Graph, Node
+from tangl.core import Graph, Node
 from tangl.core.registry import Registry
+from tangl.ir.story_ir import StoryScript
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
 from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
+from tangl.story.story_graph import StoryGraph
 from tangl.vm.context import Context
 from tangl.vm.provision import (
     ProvisioningContext,
@@ -131,6 +134,7 @@ def test_template_provisioner_falls_back_to_local_registry() -> None:
 
 def test_template_ref_accepts_qualified_identifier() -> None:
     graph = Graph(label="story")
+    graph.add_subgraph(label="scene1")
     registry: Registry[BaseScriptItem] = Registry(label="templates")
     registry.add(
         BaseScriptItem(label="start", scope=ScopeSelector(parent_label="scene1"))
@@ -198,3 +202,114 @@ def test_bare_template_ref_uses_scope_hint() -> None:
     world._materialize_from_template.assert_called_once()
     chosen_template = world._materialize_from_template.call_args.kwargs["template"]
     assert chosen_template.scope.parent_label == "town"
+
+
+def test_provisioner_calls_world_ensure_scope_before_materializing() -> None:
+    graph = Graph(label="story")
+    registry: Registry[BaseScriptItem] = Registry(label="templates")
+    container_template = BaseScriptItem(
+        label="village",
+        obj_cls="tangl.core.graph.Subgraph",
+    )
+    block_template = BaseScriptItem(
+        label="start",
+        scope=ScopeSelector(parent_label="village"),
+    )
+    registry.add(container_template)
+    registry.add(block_template)
+
+    world = Mock()
+    world.template_registry = registry
+    parent_scene = graph.add_subgraph(label="village")
+    world.ensure_scope.return_value = parent_scene
+
+    def _materialize(template, graph, parent_container=None):  # noqa: ANN001
+        node = Node(label=template.label, graph=graph)
+        if parent_container is not None:
+            parent_container.add_member(node)
+        return node
+
+    world._materialize_from_template.side_effect = _materialize
+    object.__setattr__(graph, "world", world)
+
+    requirement = Requirement(
+        graph=graph,
+        template_ref="start",
+        policy=ProvisioningPolicy.CREATE,
+    )
+
+    provisioner = TemplateProvisioner(layer="author")
+    ctx = _ctx(graph)
+
+    offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+    assert len(offers) == 1
+
+    node = offers[0].accept(ctx=ctx)
+
+    world.ensure_scope.assert_called_once_with(block_template.scope, graph)
+    assert node.parent is parent_scene
+
+
+def test_provisioner_creates_missing_scene_via_world_ensure_scope() -> None:
+    World.clear_instances()
+
+    script_data = {
+        "label": "test",
+        "metadata": {"title": "Test", "author": "Tests", "start_at": "village.start"},
+        "templates": {
+            "village": {
+                "obj_cls": "tangl.core.graph.Subgraph",
+                "label": "village",
+            }
+        },
+        "scenes": {
+            "village": {
+                "label": "village",
+                "blocks": {
+                    "start": {
+                        "label": "start",
+                        "obj_cls": "tangl.story.episode.block.Block",
+                        "content": "Start block",
+                    }
+                },
+            }
+        },
+    }
+
+    script = StoryScript.model_validate(script_data)
+    manager = ScriptManager(master_script=script)
+    world = World(
+        label="test",
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=script_data["metadata"],
+    )
+
+    try:
+        graph = StoryGraph(label="story", world=world)
+        template = world.template_registry.find_one(identifier="village.start")
+
+        requirement = Requirement(
+            graph=graph,
+            template_ref="village.start",
+            policy=ProvisioningPolicy.CREATE,
+        )
+
+        provisioner = TemplateProvisioner(layer="author")
+        ctx = ProvisioningContext(graph=graph, step=0)
+
+        assert graph.find_subgraph(label="village") is None
+
+        offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
+        assert len(offers) == 1
+
+        created = offers[0].accept(ctx=ctx)
+
+        village = graph.find_subgraph(label="village")
+        assert village is not None
+        assert created.parent is village
+        assert template is not None
+    finally:
+        World.clear_instances()

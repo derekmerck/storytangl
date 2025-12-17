@@ -6,6 +6,7 @@ from tangl.ir.story_ir import StoryScript
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
+from tangl.story.episode.block import Block
 from tangl.story.fabula.world import World
 from tangl.vm.provision import ProvisioningPolicy
 
@@ -81,12 +82,17 @@ def test_lazy_block_provisioning_from_template_registry():
     graph = world.create_story("test_run", mode="lazy")
 
     scene1 = graph.find_subgraph(label="scene1")
-    assert scene1 is not None, "Scene should be pre-provisioned"
+    assert scene1 is not None, "Seed scene should be created on demand"
 
     start_block = graph.find_node(label="start")
     assert start_block is not None, "Seed block not created"
     assert start_block.content == "You stand at the beginning."
     assert start_block.parent == scene1, "Block should be in scene"
+
+    assert len(list(graph.subgraphs)) == 1, "Only the seed scene should be present initially"
+
+    materialized_blocks = list(graph.find_nodes(is_instance=Block))
+    assert len(materialized_blocks) == 1, "Only the seed block should be present initially"
 
     next_block = graph.find_node(label="next")
     assert next_block is None, "Next block should not be materialized yet (lazy mode)"
@@ -270,7 +276,7 @@ def test_lazy_provisioning_across_scene_boundary():
     forest_scene = graph.find_subgraph(label="forest")
     cave_scene = graph.find_subgraph(label="cave")
     assert forest_scene is not None
-    assert cave_scene is not None
+    assert cave_scene is None
 
     entrance = graph.find_node(label="entrance")
     assert entrance is not None
@@ -303,7 +309,10 @@ def test_lazy_provisioning_across_scene_boundary():
     offers = list(provisioner.get_dependency_offers(req, ctx=ctx))
     cave_mouth = offers[0].accept(ctx=ctx)
 
+    cave_scene = graph.find_subgraph(label="cave")
+
     assert cave_mouth.label == "mouth"
+    assert cave_scene is not None
     assert cave_mouth.parent == cave_scene
     assert cave_mouth in cave_scene.members
 
