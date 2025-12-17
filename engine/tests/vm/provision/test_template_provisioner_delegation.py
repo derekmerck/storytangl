@@ -25,6 +25,9 @@ def test_provisioner_delegates_to_world_materialize():
     mock_world._materialize_from_template.return_value = Graph.add_node(
         graph, label="guard"
     )
+    script_manager = Mock()
+    script_manager.find_template = Mock(return_value=template)
+    mock_world.script_manager = script_manager
 
     object.__setattr__(graph, "world", mock_world)
 
@@ -64,13 +67,19 @@ def test_provisioner_finds_parent_container_for_scoped_template():
     )
 
     mock_world = Mock()
-    mock_world.template_registry = {
-        template.label: template,
-        f"village.{template.label}": template,
-    }
-    mock_world._materialize_from_template.return_value = Graph.add_node(
-        graph, label="start"
-    )
+    mock_world.ensure_scope = Mock(return_value=scene)
+
+    def _materialize(*, template: BlockScript, graph: Graph, parent_container=None, **_: object):  # noqa: ANN001
+        node = graph.add_node(label=template.label)
+        if parent_container is not None:
+            parent_container.add_member(node)
+        return node
+
+    mock_world._materialize_from_template = Mock(side_effect=_materialize)
+
+    script_manager = Mock()
+    script_manager.find_template = Mock(return_value=template)
+    mock_world.script_manager = script_manager
 
     object.__setattr__(graph, "world", mock_world)
 
@@ -87,8 +96,9 @@ def test_provisioner_finds_parent_container_for_scoped_template():
     assert len(offers) == 1
     node = offers[0].accept(ctx=ctx)
 
-    call_args = mock_world._materialize_from_template.call_args
-    assert call_args[1]["parent_container"] == scene
+    mock_world.ensure_scope.assert_called_once()
+    assert mock_world._materialize_from_template.call_args.kwargs["parent_container"] is scene
+    assert node.parent is scene
     assert node.label == "start"
 
 
@@ -104,7 +114,14 @@ def test_provisioner_errors_if_parent_scene_missing():
     )
 
     mock_world = Mock()
-    mock_world.template_registry.find_one.return_value = template
+    mock_world.ensure_scope = Mock(
+        side_effect=ValueError(
+            "Scope requires parent container 'missing_scene' but no template found in template registry."
+        )
+    )
+    script_manager = Mock()
+    script_manager.find_template = Mock(return_value=template)
+    mock_world.script_manager = script_manager
 
     object.__setattr__(graph, "world", mock_world)
 
@@ -119,7 +136,7 @@ def test_provisioner_errors_if_parent_scene_missing():
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
 
-    with pytest.raises(ValueError, match="requires parent scene.*doesn't exist"):
+    with pytest.raises(ValueError, match="no template found"):
         offers[0].accept(ctx=ctx)
 
 
@@ -135,6 +152,9 @@ def test_provisioner_normalizes_dict_templates():
     mock_world._materialize_from_template.return_value = Graph.add_node(
         graph, label="simple"
     )
+    script_manager = Mock()
+    script_manager.find_template = Mock(return_value=template_dict)
+    mock_world.script_manager = script_manager
 
     object.__setattr__(graph, "world", mock_world)
 

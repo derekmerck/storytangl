@@ -945,7 +945,13 @@ class World(Singleton):
             payload.pop("graph", None)
 
         model_fields = getattr(cls, "model_fields", {})
-        if model_fields:
+        model_config = getattr(cls, "model_config", {}) or {}
+        allow_extra = (
+            isinstance(model_config, dict)
+            and model_config.get("extra") == "allow"
+        )
+
+        if model_fields and not allow_extra:
             allowed = set(model_fields.keys())
             aliases = {
                 field.alias

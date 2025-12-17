@@ -133,8 +133,8 @@ def test_materialize_adds_to_parent_container(mock_world):
     assert actor.parent == scene
 
 
-def test_lazy_mode_pre_provisions_scenes(mock_world):
-    """Lazy mode should create scenes and add them via graph.add()."""
+def test_lazy_mode_does_not_pre_provision_scenes(mock_world):
+    """Lazy mode should only materialize the seed block and its scene."""
 
     story_data = {
         "label": "multi_scene",
@@ -171,13 +171,17 @@ def test_lazy_mode_pre_provisions_scenes(mock_world):
     scene1 = graph.get("scene1")
     scene2 = graph.get("scene2")
 
-    assert scene1 is not None, "Scene1 should be pre-provisioned"
-    assert scene2 is not None, "Scene2 should be pre-provisioned"
-    assert scene1 in graph
-    assert scene2 in graph
+    assert scene1 is not None, "Seed scene should materialize for the start block"
+    assert scene2 is None, "Scene2 should not be pre-provisioned in lazy mode"
 
+    # Only the seed block should exist initially
     start_block = graph.get("start")
     assert start_block is not None
+    assert len(list(graph.subgraphs)) == 1
+    from tangl.story.episode.block import Block
+
+    blocks = [node for node in graph.nodes if isinstance(node, Block)]
+    assert len(blocks) == 1
     assert start_block.parent == scene1
 
 
