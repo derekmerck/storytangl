@@ -84,6 +84,7 @@ class Requirement(GraphItem, Generic[NodeT]):
     - :attr:`criteria` – dict used with :meth:`~tangl.core.registry.Registry.find_all` to discover candidates.
     - :attr:`template` – unstructured data used to create/update/clone a provider.
     - :attr:`policy` – :class:`ProvisioningPolicy` that validates required fields.
+    - :attr:`asset_ref` – direct-addressed asset token to satisfy the requirement.
     - :attr:`provider` – get/set bound provider node (backed by :attr:`provider_id`).
     - :attr:`reference_id` – explicit source node for :attr:`ProvisioningPolicy.CLONE`.
     - :attr:`hard_requirement` – if ``True``, unresolved requirements are reported at planning end.
@@ -117,6 +118,8 @@ class Requirement(GraphItem, Generic[NodeT]):
     provider_id: Optional[UUID] = None
 
     identifier: Optional[Identifier] = None  # aka 'ref' or 'alias'
+    asset_ref: Optional[Identifier] = None
+    """Direct asset token reference (bypasses template lookup when provided)."""
     criteria: Optional[StringMap] = Field(default_factory=dict)
     template: Optional[UnstructuredData] = None
     template_ref: Optional[Identifier] = None
@@ -148,7 +151,11 @@ class Requirement(GraphItem, Generic[NodeT]):
         if self.policy is ProvisioningPolicy.NOOP:
             raise ValueError("Policy cannot be NOOP")
 
-        has_template_source = self.template is not None or self.template_ref is not None
+        has_template_source = (
+            self.template is not None
+            or self.template_ref is not None
+            or self.asset_ref is not None
+        )
 
         if self.policy in [ProvisioningPolicy.EXISTING, ProvisioningPolicy.UPDATE]:
             if self.identifier is None and self.criteria is None:
@@ -168,10 +175,11 @@ class Requirement(GraphItem, Generic[NodeT]):
             if (
                 self.identifier is None
                 and self.criteria is None
+                and self.asset_ref is None
                 and not has_template_source
             ):
                 raise ValueError(
-                    "ANY requires at least one of identifier, criteria, template, or template_ref"
+                    "ANY requires at least one of identifier, criteria, template, template_ref, or asset_ref"
                 )
 
         return self

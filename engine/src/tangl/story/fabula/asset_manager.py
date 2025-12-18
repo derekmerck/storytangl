@@ -2,14 +2,19 @@ from __future__ import annotations
 
 """Asset management helpers for StoryTangl worlds."""
 
+from copy import deepcopy
 from pathlib import Path
-from typing import Type
+from typing import TYPE_CHECKING, Any, Type
 
 import yaml
 
 from tangl.core import Graph
 
 from tangl.story.concepts.asset import AssetType, CountableAsset, DiscreteAsset
+
+if TYPE_CHECKING:
+    from tangl.story.fabula.domain_manager import DomainManager
+    from tangl.core.graph import Node
 
 
 class AssetManager:
@@ -29,6 +34,8 @@ class AssetManager:
     * **Registration** – :meth:`register_discrete_class` and
       :meth:`register_countable_class` bind category names to their implementation
       classes.
+    * **Direct asset templates** – :meth:`register` stores fiat asset templates
+      addressable via ``asset_ref`` for opt-in token creation.
     * **Loading** – :meth:`load_discrete_from_yaml`,
       :meth:`load_countable_from_yaml`, and their ``*_from_data`` variants populate
       singletons from structured input.
@@ -57,10 +64,41 @@ class AssetManager:
         self.asset_classes: dict[
             str, Type[AssetType] | Type[CountableAsset]
         ] = {}
+        self._asset_templates: dict[str, dict[str, Any]] = {}
 
     # ==================
     # Registration
     # ==================
+
+    def register(self, asset_ref: str, template: dict[str, Any]) -> None:
+        """Register a direct-addressable asset template.
+
+        Parameters
+        ----------
+        asset_ref:
+            Identifier used when requesting the asset token.
+        template:
+            Template dictionary containing ``obj_cls`` and any default
+            attributes for the token. The template is stored immutably.
+        """
+
+        if not asset_ref:
+            raise ValueError("asset_ref cannot be empty")
+
+        if not isinstance(template, dict):
+            raise ValueError("template must be a dict of asset fields")
+
+        self._asset_templates[asset_ref] = deepcopy(template)
+
+    def has_asset(self, asset_ref: str) -> bool:
+        """Return ``True`` when a template is registered for ``asset_ref``."""
+
+        return asset_ref in self._asset_templates
+
+    def list_assets(self) -> list[str]:
+        """List registered asset identifiers."""
+
+        return sorted(self._asset_templates.keys())
 
     def register_discrete_class(self, name: str, cls: Type[AssetType]) -> None:
         """Register a discrete asset class under ``name``."""
@@ -164,12 +202,40 @@ class AssetManager:
 
     def create_token(
         self,
-        asset_type: str,
-        label: str,
-        graph: Graph,
+        asset_type: str | None = None,
+        label: str | None = None,
+        graph: Graph | None = None,
+        *,
+        asset_ref: str | None = None,
+        domain_manager: "DomainManager | None" = None,
         **instance_vars: object,
-    ) -> DiscreteAsset:
-        """Create a discrete asset token for ``label`` within ``graph``."""
+    ) -> "DiscreteAsset | Node":
+        """Create an asset token.
+
+        Two call styles are supported for backward compatibility:
+
+        - ``create_token(asset_type="weapons", label="sword", graph=graph)``
+          continues to wrap registered discrete assets.
+        - ``create_token(asset_ref="standard_deck", graph=graph, owner="p1")``
+          instantiates a token from a direct asset template and overlays extra
+          fields (``owner`` in this example).
+        """
+
+        if asset_ref is not None:
+            if graph is None:
+                raise ValueError("graph is required when creating tokens from asset_ref")
+
+            return self._create_token_from_asset(
+                asset_ref=asset_ref,
+                graph=graph,
+                domain_manager=domain_manager,
+                **instance_vars,
+            )
+
+        if asset_type is None or label is None or graph is None:
+            raise ValueError(
+                "asset_type, label, and graph are required when asset_ref is not provided"
+            )
 
         cls = self._get_discrete_class(asset_type)
         if cls.get_instance(label) is None:
@@ -180,6 +246,55 @@ class AssetManager:
 
         wrapper_cls = DiscreteAsset[cls]
         return wrapper_cls(label=label, graph=graph, **instance_vars)
+
+    def _create_token_from_asset(
+        self,
+        *,
+        asset_ref: str,
+        graph: Graph,
+        domain_manager: "DomainManager | None" = None,
+        **overlay: Any,
+    ) -> "Node":
+        if not self.has_asset(asset_ref):
+            available = ", ".join(self.list_assets()) or "<none>"
+            raise ValueError(
+                f"Asset '{asset_ref}' not registered. Available assets: {available}"
+            )
+
+        template = deepcopy(self._asset_templates[asset_ref])
+        payload: dict[str, Any] = {**template, **overlay}
+
+        obj_cls_str = payload.pop("obj_cls", None)
+
+        if domain_manager is None:
+            world = getattr(graph, "world", None)
+            domain_manager = getattr(world, "domain_manager", None)
+
+        cls = None
+        if obj_cls_str:
+            if domain_manager is not None:
+                cls = domain_manager.resolve_class(obj_cls_str)
+            if cls is None:
+                try:
+                    module_name, class_name = obj_cls_str.rsplit(".", 1)
+                    import importlib
+
+                    module = importlib.import_module(module_name)
+                    cls = getattr(module, class_name)
+                except (ValueError, ImportError, AttributeError):
+                    cls = None
+
+        if cls is None:
+            from tangl.core.graph import Node
+
+            cls = Node
+
+        node = cls.structure(payload)
+        for key, value in payload.items():
+            if not hasattr(node, key):
+                object.__setattr__(node, key, value)
+        graph.add(node)
+        return node
 
     # ==================
     # Lookup
