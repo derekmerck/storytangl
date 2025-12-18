@@ -308,26 +308,30 @@ class TemplateProvisioner(Provisioner):
 
             return ScopeSelector(parent_label=parent_label)
 
-        def _scope_chain(node: Any | None) -> list[str]:
+        def _scope_chain(node: Any | None) -> tuple[list[str], list[set[str]]]:
             labels: list[str] = []
+            tags: list[set[str]] = []
             current: Any | None = node
 
             while current is not None:
                 label = getattr(current, "label", None)
                 if isinstance(label, str) and label:
                     labels.append(label)
+                tag_values = getattr(current, "tags", None)
+                tags.append(set(tag_values) if tag_values else set())
                 current = getattr(current, "parent", None)
 
             labels.reverse()
+            tags.reverse()
 
             paths: list[str] = []
             for index in range(len(labels), 0, -1):
                 paths.append(".".join(labels[:index]))
             paths.append("")
 
-            return paths
+            return paths, tags
 
-        def _scope_matches(template: Any | None, chain: list[str]) -> bool:
+        def _scope_matches(template: Any | None, chain: list[str], tag_chain: list[set[str]]) -> bool:
             if template is None:
                 return False
 
@@ -345,17 +349,23 @@ class TemplateProvisioner(Provisioner):
             if parent_label:
                 return any(segment.split(".")[-1] == parent_label for segment in chain if segment)
 
-            if getattr(scope, "ancestor_tags", None) or getattr(scope, "ancestor_labels", None):
-                return False
+            ancestor_labels = getattr(scope, "ancestor_labels", None)
+            if ancestor_labels is None and isinstance(scope, Mapping):
+                ancestor_labels = scope.get("ancestor_labels")
 
-            if isinstance(scope, Mapping) and (
-                scope.get("ancestor_tags") is not None or scope.get("ancestor_labels") is not None
-            ):
-                return False
+            if ancestor_labels:
+                return any(label in chain for label in ancestor_labels)
+
+            ancestor_tags = getattr(scope, "ancestor_tags", None)
+            if ancestor_tags is None and isinstance(scope, Mapping):
+                ancestor_tags = scope.get("ancestor_tags")
+
+            if ancestor_tags:
+                return any(set(ancestor_tags) & tags for tags in tag_chain)
 
             return True
 
-        scope_chain = _scope_chain(cursor) if cursor is not None else []
+        scope_chain, tag_chain = _scope_chain(cursor) if cursor is not None else ([], [])
 
         def _find_template(**criteria: Any) -> Any:
             if isinstance(registry, Mapping):
@@ -427,7 +437,7 @@ class TemplateProvisioner(Provisioner):
             if template is None and criteria:
                 template = _find_template(selector=cursor, **criteria)
 
-            if template is not None and scope_chain and not _scope_matches(template, scope_chain):
+            if template is not None and scope_chain and not _scope_matches(template, scope_chain, tag_chain):
                 template = None
 
         if template is not None:

@@ -355,11 +355,18 @@ class World(Singleton):
         source_node: Node,
         action_scripts: list[dict[str, Any]],
         scope: ScopeSelector | None,
-        block_map: dict[str, UUID],
+        block_map: Mapping[str, UUID] | None = None,
     ) -> None:
         """Create action edges with requirements for successor blocks."""
 
         scene_label = scope.parent_label if scope else None
+
+        if block_map is None:
+            block_map = {
+                getattr(node, "label", ""): node.uid
+                for node in graph.find_nodes()
+                if getattr(node, "label", None)
+            }
 
         for action_data in action_scripts:
             if hasattr(action_data, "model_dump"):
