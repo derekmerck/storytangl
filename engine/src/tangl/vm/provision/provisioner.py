@@ -508,6 +508,8 @@ class UpdatingProvisioner(TemplateProvisioner):
             return
         if not (requirement.policy & ProvisioningPolicy.UPDATE):
             return
+        if requirement.identifier is None and not requirement.criteria:
+            return
         template, _ = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             return

@@ -45,6 +45,7 @@ from tangl.vm.context import MaterializationContext
 from tangl.vm.dispatch import vm_dispatch
 from tangl.vm.dispatch.materialize_task import MaterializeTask
 from tangl.vm.provision.open_edge import Dependency
+from tangl.vm.provision.requirement import Requirement
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
@@ -443,7 +444,8 @@ class World(Singleton):
             block_map,
             actor_map=actor_map,
             location_map=location_map,
-            wire_dependencies=False,
+            wire_dependencies=True,
+            resolve_dependencies=False,
         )
 
         self._build_action_edges(graph, block_map, action_scripts)
@@ -488,6 +490,7 @@ class World(Singleton):
             block_map,
             actor_map=actor_map,
             location_map=location_map,
+            resolve_dependencies=True,
         )
         node_map.update(scene_map)
 
@@ -613,6 +616,7 @@ class World(Singleton):
         actor_map: dict[str, UUID],
         location_map: dict[str, UUID],
         wire_dependencies: bool = True,
+        resolve_dependencies: bool = False,
     ) -> dict[str, UUID]:
         """Instantiate scenes and associate their member blocks."""
 
@@ -648,12 +652,14 @@ class World(Singleton):
                     source_node=scene,
                     roles_data=scene_data.get("roles"),
                     actor_map=actor_map,
+                    resolve_dependencies=resolve_dependencies,
                 )
                 self._wire_settings(
                     graph=graph,
                     source_node=scene,
                     settings_data=scene_data.get("settings"),
                     location_map=location_map,
+                    resolve_dependencies=resolve_dependencies,
                 )
 
             for block_label, block_data in members.items():
@@ -671,12 +677,14 @@ class World(Singleton):
                     source_node=block,
                     roles_data=block_data.get("roles"),
                     actor_map=actor_map,
+                    resolve_dependencies=resolve_dependencies,
                 )
                 self._wire_settings(
                     graph=graph,
                     source_node=block,
                     settings_data=block_data.get("settings"),
                     location_map=location_map,
+                    resolve_dependencies=resolve_dependencies,
                 )
 
         return scene_map
@@ -715,14 +723,26 @@ class World(Singleton):
         source_node: GraphItem,
         roles_data: Any,
         actor_map: dict[str, UUID],
+        resolve_dependencies: bool,
     ) -> None:
         roles = self._normalize_section(roles_data)
         if not roles:
             return
 
         for role_label, role_spec in roles.items():
+            policy_value = (
+                self._get_spec_value(role_spec, "policy")
+                or self._get_spec_value(role_spec, "requirement_policy")
+                or ProvisioningPolicy.ANY
+            )
+            policy = (
+                ProvisioningPolicy[policy_value.upper()]
+                if isinstance(policy_value, str)
+                else policy_value
+            )
+
             role_cls = self._resolve_dependency_class(
-                role_spec.get("obj_cls"),
+                self._get_spec_value(role_spec, "obj_cls"),
                 fallback=Role,
             )
             payload = self._prepare_payload(
@@ -732,8 +752,19 @@ class World(Singleton):
             )
             payload.setdefault("label", role_label)
             payload.setdefault("source_id", source_node.uid)
-            payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
-            role_cls.structure(payload)
+            payload.setdefault("requirement_policy", policy)
+            payload.setdefault("hard_requirement", bool(self._get_spec_value(role_spec, "hard", True)))
+
+            role = role_cls.structure(payload)
+
+            if resolve_dependencies and getattr(role, "requirement", None) is not None:
+                provider = self._resolve_role_provider(
+                    requirement=role.requirement,
+                    actor_map=actor_map,
+                    graph=graph,
+                )
+                if provider is not None:
+                    role.requirement.provider = provider
 
     def _wire_settings(
         self,
@@ -742,14 +773,26 @@ class World(Singleton):
         source_node: GraphItem,
         settings_data: Any,
         location_map: dict[str, UUID],
+        resolve_dependencies: bool,
     ) -> None:
         settings = self._normalize_section(settings_data)
         if not settings:
             return
 
         for setting_label, setting_spec in settings.items():
+            policy_value = (
+                self._get_spec_value(setting_spec, "policy")
+                or self._get_spec_value(setting_spec, "requirement_policy")
+                or ProvisioningPolicy.ANY
+            )
+            policy = (
+                ProvisioningPolicy[policy_value.upper()]
+                if isinstance(policy_value, str)
+                else policy_value
+            )
+
             setting_cls = self._resolve_dependency_class(
-                setting_spec.get("obj_cls"),
+                self._get_spec_value(setting_spec, "obj_cls"),
                 fallback=Setting,
             )
             payload = self._prepare_payload(
@@ -759,8 +802,109 @@ class World(Singleton):
             )
             payload.setdefault("label", setting_label)
             payload.setdefault("source_id", source_node.uid)
-            payload.setdefault("requirement_policy", ProvisioningPolicy.ANY)
-            setting_cls.structure(payload)
+            payload.setdefault("requirement_policy", policy)
+            payload.setdefault(
+                "hard_requirement", bool(self._get_spec_value(setting_spec, "hard", True))
+            )
+
+            setting = setting_cls.structure(payload)
+
+            if resolve_dependencies and getattr(setting, "requirement", None) is not None:
+                provider = self._resolve_setting_provider(
+                    requirement=setting.requirement,
+                    location_map=location_map,
+                    graph=graph,
+                )
+                if provider is not None:
+                    setting.requirement.provider = provider
+
+    @staticmethod
+    def _get_spec_value(spec: Any, key: str, default: Any | None = None) -> Any:
+        if isinstance(spec, Mapping):
+            return spec.get(key, default)
+        return getattr(spec, key, default)
+
+    def _resolve_role_provider(
+        self,
+        *,
+        requirement: Requirement,
+        actor_map: dict[str, UUID],
+        graph: StoryGraph,
+    ) -> Node | None:
+        keys = [str(req_key) for req_key in (requirement.identifier,) if req_key]
+        if requirement.template_ref:
+            keys.append(str(requirement.template_ref))
+
+        if requirement.policy is not ProvisioningPolicy.CREATE:
+            for key in keys:
+                uid = actor_map.get(key)
+                if uid:
+                    existing = graph.get(uid)
+                    if existing is not None:
+                        return existing
+
+        if requirement.policy & ProvisioningPolicy.CREATE and requirement.template_ref:
+            template = self.script_manager.find_template(identifier=str(requirement.template_ref))
+            if template is None:
+                return None
+
+            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
+            provider = self._materialize_from_template(
+                template=template,
+                graph=graph,
+                parent_container=parent_container,
+            )
+
+            if provider is not None:
+                actor_map[provider.label] = provider.uid
+                if requirement.template_ref:
+                    actor_map[str(requirement.template_ref)] = provider.uid
+                if requirement.identifier:
+                    actor_map[str(requirement.identifier)] = provider.uid
+            return provider
+
+        return None
+
+    def _resolve_setting_provider(
+        self,
+        *,
+        requirement: Requirement,
+        location_map: dict[str, UUID],
+        graph: StoryGraph,
+    ) -> Node | None:
+        keys = [str(req_key) for req_key in (requirement.identifier,) if req_key]
+        if requirement.template_ref:
+            keys.append(str(requirement.template_ref))
+
+        if requirement.policy is not ProvisioningPolicy.CREATE:
+            for key in keys:
+                uid = location_map.get(key)
+                if uid:
+                    existing = graph.get(uid)
+                    if existing is not None:
+                        return existing
+
+        if requirement.policy & ProvisioningPolicy.CREATE and requirement.template_ref:
+            template = self.script_manager.find_template(identifier=str(requirement.template_ref))
+            if template is None:
+                return None
+
+            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
+            provider = self._materialize_from_template(
+                template=template,
+                graph=graph,
+                parent_container=parent_container,
+            )
+
+            if provider is not None:
+                location_map[provider.label] = provider.uid
+                if requirement.template_ref:
+                    location_map[str(requirement.template_ref)] = provider.uid
+                if requirement.identifier:
+                    location_map[str(requirement.identifier)] = provider.uid
+            return provider
+
+        return None
 
     def _build_action_edges(
         self,

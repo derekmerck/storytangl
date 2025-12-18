@@ -104,10 +104,9 @@ def _planning_orchestrate_frontier(cursor: Node, *, ctx: Context, **_):
     """Provision all frontier nodes using the pure resolver."""
 
     frontier = _iter_frontier(cursor)
-
-    # if not frontier:
-    #     logger.debug("No frontier from %s - provisioning cursor", cursor.label)
-    #     frontier = [cursor]
+    if not frontier:
+        logger.debug("No frontier from %s - provisioning cursor itself", cursor.label)
+        frontier = [cursor]
 
     provisioners = do_get_provisioners(cursor, ctx=ctx)
 
