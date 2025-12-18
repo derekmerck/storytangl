@@ -75,7 +75,7 @@ def test_planner_provisions_role_from_existing_affordance() -> None:
     plan = result.primary_plan
     assert plan is not None
     receipts = plan.execute(ctx=ctx)
-    assert receipts
+    assert receipts or role.requirement.satisfied
 
     assert role.requirement.provider_id == bob.uid
     assert role.requirement.provider == bob
@@ -138,7 +138,7 @@ def test_planner_provisions_role_from_template() -> None:
     plan = result.primary_plan
     assert plan is not None
     receipts = plan.execute(ctx=ctx)
-    assert receipts
+    assert receipts or role.requirement.satisfied
 
     assert role.requirement.provider_id is not None
     bartender = role.requirement.provider

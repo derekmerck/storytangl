@@ -308,6 +308,65 @@ class TemplateProvisioner(Provisioner):
 
             return ScopeSelector(parent_label=parent_label)
 
+        def _scope_chain(node: Any | None) -> tuple[list[str], list[set[str]]]:
+            labels: list[str] = []
+            tags: list[set[str]] = []
+            current: Any | None = node
+
+            while current is not None:
+                label = getattr(current, "label", None)
+                if isinstance(label, str) and label:
+                    labels.append(label)
+                tag_values = getattr(current, "tags", None)
+                tags.append(set(tag_values) if tag_values else set())
+                current = getattr(current, "parent", None)
+
+            labels.reverse()
+            tags.reverse()
+
+            paths: list[str] = []
+            for index in range(len(labels), 0, -1):
+                paths.append(".".join(labels[:index]))
+            paths.append("")
+
+            return paths, tags
+
+        def _scope_matches(template: Any | None, chain: list[str], tag_chain: list[set[str]]) -> bool:
+            if template is None:
+                return False
+
+            scope = getattr(template, "scope", None)
+            if scope is None and isinstance(template, Mapping):
+                scope = template.get("scope")
+
+            def _scope_value(key: str) -> Any | None:
+                value = getattr(scope, key, None)
+                if value is None and isinstance(scope, Mapping):
+                    value = scope.get(key)
+                return value
+
+            if scope is None:
+                return True
+
+            parent_label = _scope_value("parent_label")
+
+            if parent_label:
+                return any(segment.split(".")[-1] == parent_label for segment in chain if segment)
+
+            ancestor_labels = _scope_value("ancestor_labels")
+
+            if ancestor_labels:
+                return any(label in chain for label in ancestor_labels)
+
+            ancestor_tags = _scope_value("ancestor_tags")
+
+            if ancestor_tags:
+                return any(set(ancestor_tags) & tags for tags in tag_chain)
+
+            return True
+
+        scope_chain, tag_chain = _scope_chain(cursor) if cursor is not None else ([], [])
+
         def _find_template(**criteria: Any) -> Any:
             if isinstance(registry, Mapping):
                 identifier = criteria.get("has_identifier")
@@ -378,6 +437,9 @@ class TemplateProvisioner(Provisioner):
             if template is None and criteria:
                 template = _find_template(selector=cursor, **criteria)
 
+            if template is not None and scope_chain and not _scope_matches(template, scope_chain, tag_chain):
+                template = None
+
         if template is not None:
             provenance["template_ref"] = getattr(template, "label", None)
             provenance["template_hash"] = getattr(template, "content_hash", None)
@@ -413,6 +475,7 @@ class TemplateProvisioner(Provisioner):
         def create_node(ctx: Context) -> Node:
             if isinstance(template, dict):
                 from tangl.ir.core_ir import BaseScriptItem
+                from tangl.ir.story_ir.story_script_models import ScopeSelector
 
                 normalized = dict(template)
                 obj_cls_value = normalized.get("obj_cls")
@@ -421,6 +484,8 @@ class TemplateProvisioner(Provisioner):
                     qualname = getattr(obj_cls_value, "__qualname__", obj_cls_value.__name__)
                     normalized["obj_cls"] = f"{module}.{qualname}" if module else qualname
 
+                ScopeSelector.model_rebuild()
+                BaseScriptItem.model_rebuild()
                 template_model = BaseScriptItem.model_validate(normalized)
             elif hasattr(template, "model_dump"):
                 template_model = template

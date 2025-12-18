@@ -110,7 +110,12 @@ def standard_wiring_handler(
     for edge_type in ("actions", "continues", "redirects"):
         edge_scripts = getattr(template, edge_type, None)
         if edge_scripts:
-            world._attach_action_requirements(ctx.graph, node, edge_scripts, template.scope)
+            world._attach_action_requirements(
+                ctx.graph,
+                node,
+                edge_scripts,
+                template.scope,
+            )
 
     if getattr(template, "roles", None):
         _wire_roles(node=node, roles_data=template.roles, graph=ctx.graph)

@@ -122,6 +122,12 @@ def test_complete_story_creation() -> None:
         "Take_the_right_path",
     }
 
+    assert all(action.destination_id for action in actions)
+    assert {story.get(action.destination_id).label for action in actions} == {
+        "entrance",
+        "entrance",
+    }
+
     left_action = next(action for action in actions if action.label == "Take_the_left_path")
 
     frame.follow_edge(left_action)

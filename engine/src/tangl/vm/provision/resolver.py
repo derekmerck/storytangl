@@ -145,21 +145,7 @@ class ProvisioningPlan:
         if self._executed:
             return list(self._receipts)
 
-        receipts: list[BuildReceipt] = [
-            BuildReceipt(
-                provisioner_id=requirement.uid,
-                requirement_id=requirement.uid,
-                provider_id=requirement.provider_id,
-                operation=ProvisioningPolicy.NOOP,
-                accepted=True,
-                hard_req=requirement.hard_requirement,
-                reason="already satisfied",
-                template_ref=requirement.template_ref,
-                template_hash=None,
-                template_content_id=None,
-            )
-            for requirement in self.already_satisfied_requirements
-        ]
+        receipts: list[BuildReceipt] = []
         for planned in self.steps:
             requirement = planned.requirement
             if requirement is not None and requirement.provider is not None:
