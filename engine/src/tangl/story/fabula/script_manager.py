@@ -110,24 +110,9 @@ class ScriptManager:
         scoped_criteria: dict[str, Any] = dict(criteria)
 
         if identifier and self._is_qualified(identifier):
-            direct = self._template_registry.find_one(
+            return self._template_registry.find_one(
                 has_identifier=identifier, **scoped_criteria
             )
-            if direct is not None:
-                return direct
-
-            try:
-                parent_label, tail = identifier.rsplit(".", 1)
-            except ValueError:
-                parent_label, tail = None, identifier
-
-            if parent_label:
-                scoped = dict(scoped_criteria)
-                scoped["has_identifier"] = tail
-                scoped["has_scope"] = ScopeSelector(parent_label=parent_label)
-                return self._template_registry.find_one(**scoped)
-
-            return None
 
         if identifier and selector is not None:
             return self._anchored_lookup(identifier, selector, scoped_criteria)
@@ -171,11 +156,28 @@ class ScriptManager:
     ) -> BaseScriptItem | None:
         """Search the selector's scope chain for an unqualified identifier."""
 
+        def _scope_matches(template: BaseScriptItem | None, chain: list[str]) -> bool:
+            scope = getattr(template, "scope", None)
+            if scope is None:
+                return True
+            parent_label = getattr(scope, "parent_label", None)
+            if parent_label:
+                return any(
+                    segment.split(".")[-1] == parent_label
+                    for segment in chain
+                    if segment
+                )
+            if getattr(scope, "ancestor_tags", None) or getattr(
+                scope, "ancestor_labels", None
+            ):
+                return False
+            return True
+
         scope_chain = self._get_scope_chain(selector)
         for scope_prefix in scope_chain:
             qualified = f"{scope_prefix}.{identifier}" if scope_prefix else identifier
             template = self._template_registry.find_one(has_identifier=qualified, **criteria)
-            if template is not None:
+            if template is not None and _scope_matches(template, scope_chain):
                 return template
 
             if not scope_prefix:

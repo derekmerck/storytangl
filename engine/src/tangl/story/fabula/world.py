@@ -286,9 +286,13 @@ class World(Singleton):
         )
         try:
             if not issubclass(scene_cls, Subgraph):
-                scene_cls = Subgraph
+                raise TypeError(
+                    f"Scene class {scene_cls.__name__} for '{scope.parent_label}' must be a subclass of Subgraph."
+                )
         except TypeError:  # pragma: no cover - defensive
-            scene_cls = Subgraph
+            raise TypeError(
+                f"Invalid scene class configured for '{scope.parent_label}'. Expected a class, but got {scene_cls!r}."
+            )
 
         payload = self._prepare_payload(
             scene_cls,
@@ -924,31 +928,21 @@ class World(Singleton):
                     continue
 
                 scripts = action_scripts.get(qualified_label, {})
+                source_node = graph.get(source_uid)
+                if source_node is None:
+                    continue
+
+                scope_selector = ScopeSelector(parent_label=scene_label)
                 for key in ("actions", "continues", "redirects"):
-                    for action_data in scripts.get(key, []):
-                        successor = action_data.get("successor")
-                        if not successor:
-                            continue
-                        destination_id = self._resolve_successor(
-                            successor,
-                            scene_label,
-                            block_map,
-                        )
-
-                        cls = self.domain_manager.resolve_class(action_data.get("obj_cls"))
-                        cls = self._ensure_edge_class(cls)
-
-                        payload = self._prepare_payload(
-                            cls,
-                            action_data,
-                            graph,
-                            drop_keys=("successor",),
-                        )
-                        payload.setdefault("label", action_data.get("text"))
-                        payload["source_id"] = source_uid
-                        payload["destination_id"] = destination_id
-
-                        cls.structure(payload)
+                    edge_scripts = scripts.get(key, [])
+                    if not edge_scripts:
+                        continue
+                    self._attach_action_requirements(
+                        graph=graph,
+                        source_node=source_node,
+                        action_scripts=edge_scripts,
+                        scope=scope_selector,
+                    )
 
     def _resolve_successor(
         self,

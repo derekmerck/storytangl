@@ -134,6 +134,7 @@ class ProvisioningPlan:
     steps: list[PlannedOffer] = field(default_factory=list)
     satisfied_requirement_ids: set[UUID] = field(default_factory=set)
     already_satisfied_requirement_ids: set[UUID] = field(default_factory=set)
+    already_satisfied_requirements: list[Requirement] = field(default_factory=list)
 
     _executed: bool = field(default=False, init=False, repr=False)
     _receipts: list[BuildReceipt] = field(default_factory=list, init=False, repr=False)
@@ -144,7 +145,21 @@ class ProvisioningPlan:
         if self._executed:
             return list(self._receipts)
 
-        receipts: list[BuildReceipt] = []
+        receipts: list[BuildReceipt] = [
+            BuildReceipt(
+                provisioner_id=requirement.uid,
+                requirement_id=requirement.uid,
+                provider_id=requirement.provider_id,
+                operation=ProvisioningPolicy.NOOP,
+                accepted=True,
+                hard_req=requirement.hard_requirement,
+                reason="already satisfied",
+                template_ref=requirement.template_ref,
+                template_hash=None,
+                template_content_id=None,
+            )
+            for requirement in self.already_satisfied_requirements
+        ]
         for planned in self.steps:
             requirement = planned.requirement
             if requirement is not None and requirement.provider is not None:
@@ -415,11 +430,14 @@ def provision_node(
         requirement = dep.requirement
         if requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
+            plan.already_satisfied_requirements.append(requirement)
 
     for affordance in inbound_affordances:
         requirement = affordance.requirement
         if requirement is not None and requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
+            if requirement not in plan.already_satisfied_requirements:
+                plan.already_satisfied_requirements.append(requirement)
 
     used_affordance_labels: dict[UUID, set[str]] = defaultdict(set)
 
@@ -453,6 +471,8 @@ def provision_node(
             continue
         if requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
+            if requirement not in plan.already_satisfied_requirements:
+                plan.already_satisfied_requirements.append(requirement)
             continue
         best_offer, selection_meta = _select_best_offer(offers)
         selection_meta.setdefault("requirement_label", requirement.label)
