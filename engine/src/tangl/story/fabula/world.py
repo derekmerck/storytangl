@@ -355,6 +355,7 @@ class World(Singleton):
         source_node: Node,
         action_scripts: list[dict[str, Any]],
         scope: ScopeSelector | None,
+        block_map: dict[str, UUID],
     ) -> None:
         """Create action edges with requirements for successor blocks."""
 
@@ -382,14 +383,33 @@ class World(Singleton):
                 payload_get("activation") or payload_get("trigger")
             )
 
+            label = payload_get("label") or payload_get("text")
+
+            entry_effects = payload_get("entry_effects") or []
+            final_effects = (
+                payload_get("final_effects")
+                or payload_get("effects")
+                or []
+            )
+
+            destination_id = None
+            try:
+                destination_id = self._resolve_successor(
+                    successor_identifier, scene_label or "", block_map
+                )
+            except ValueError:
+                destination_id = None
+
             action = action_cls(
                 graph=graph,
                 source=source_node,
-                destination=None,
+                destination_id=destination_id,
+                destination=graph.get(destination_id) if destination_id else None,
+                label=label,
                 content=payload_get("text"),
                 conditions=payload_get("conditions") or [],
-                entry_effects=payload_get("entry_effects") or [],
-                final_effects=payload_get("final_effects") or [],
+                entry_effects=entry_effects,
+                final_effects=final_effects,
                 trigger_phase=trigger_phase,
             )
 
@@ -412,6 +432,13 @@ class World(Singleton):
                 requirement=req,
                 label="destination",
             )
+
+            if destination_id:
+                destination = graph.get(destination_id)
+                if destination is not None:
+                    dependency.destination = destination
+                    req.provider = destination
+
             graph.add(dependency)
 
     def _qualify_successor_ref(self, successor_ref: str, scene_label: str | None) -> str:
@@ -420,6 +447,9 @@ class World(Singleton):
         successor_ref = sanitize_path(successor_ref)
 
         if "." in successor_ref:
+            return successor_ref
+
+        if successor_ref in self._get_scenes_dict():
             return successor_ref
 
         if scene_label:
@@ -942,6 +972,7 @@ class World(Singleton):
                         source_node=source_node,
                         action_scripts=edge_scripts,
                         scope=scope_selector,
+                        block_map=block_map,
                     )
 
     def _resolve_successor(

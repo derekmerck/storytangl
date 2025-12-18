@@ -124,7 +124,7 @@ def test_branching_right_path_walkthrough(resources_dir: Path) -> None:
     assert cave_block and "dark cave" in cave_block[0].content.lower()
 
     step2_choice_texts = {content.lower() for content in _choice_contents(step2)}
-    assert {"enter_the_cave", "go_back"} <= step2_choice_texts
+    assert {"enter the cave", "go back"} <= step2_choice_texts
 
     enter_choice = next(fragment for fragment in _fragments_of_type(step2, "choice") if "enter" in fragment.content.lower())
     frame.follow_edge(ledger.graph.get(enter_choice.source_id))
