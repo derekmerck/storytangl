@@ -37,6 +37,7 @@ from .asset_manager import AssetManager
 from .domain_manager import DomainManager
 from .script_manager import ScriptManager
 from .world import World
+from . import materialize_handlers  # register materialization handlers
 
 __all__ = [
     "AssetManager",

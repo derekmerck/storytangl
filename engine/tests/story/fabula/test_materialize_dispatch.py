@@ -8,10 +8,7 @@ from tangl.core import Entity
 from tangl.core.graph import GraphItem, Node
 from tangl.ir.story_ir import BlockScript, StoryScript
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
-from tangl.story.fabula.world import (
-    _materialize_default_normal,
-    _materialize_default_wiring,
-)
+from tangl.story.fabula import materialize_handlers
 from tangl.story.story_graph import StoryGraph
 from tangl.vm.context import MaterializationContext
 from tangl.vm.dispatch import vm_dispatch
@@ -27,7 +24,10 @@ def clear_world_singleton():
 
 def _suspend_default_handlers() -> list:
     suspended: list = []
-    for handler in (_materialize_default_normal, _materialize_default_wiring):
+    for handler in (
+        materialize_handlers.instantiation_handler,
+        materialize_handlers.standard_wiring_handler,
+    ):
         behavior = getattr(handler, "_behavior", None)
         if behavior is not None:
             vm_dispatch.remove(behavior)
