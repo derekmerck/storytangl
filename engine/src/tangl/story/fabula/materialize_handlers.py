@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from tangl.core import Entity
 from tangl.core.graph import GraphItem, Node
+from tangl.vm.provision import Dependency, ProvisioningPolicy, Requirement
 from tangl.vm.dispatch import vm_dispatch
 from tangl.vm.dispatch.materialize_task import MaterializePhase, MaterializeTask
 
@@ -103,20 +104,110 @@ def standard_wiring_handler(
             world._attach_action_requirements(ctx.graph, node, edge_scripts, template.scope)
 
     if getattr(template, "roles", None):
-        world._wire_roles(
-            graph=ctx.graph,
-            source_node=node,
-            roles_data=template.roles,
-            actor_map={},
-        )
+        _wire_roles(node=node, roles_data=template.roles, graph=ctx.graph)
 
     if getattr(template, "settings", None):
-        world._wire_settings(
-            graph=ctx.graph,
-            source_node=node,
-            settings_data=template.settings,
-            location_map={},
+        _wire_settings(node=node, settings_data=template.settings, graph=ctx.graph)
+
+
+def _wire_roles(*, node: Node, roles_data: Any, graph: GraphItem) -> None:
+    """Create :class:`Dependency` edges for each role declaration."""
+
+    if not roles_data:
+        return
+
+    for role_label, role_spec in _iter_specs(roles_data, default_label="actor"):
+        identifier = _get_spec_value(role_spec, "actor_ref")
+        template_ref = _get_spec_value(role_spec, "actor_template_ref")
+        criteria = _get_spec_value(role_spec, "actor_criteria")
+
+        policy_value = (
+            _get_spec_value(role_spec, "policy")
+            or _get_spec_value(role_spec, "requirement_policy")
+            or ProvisioningPolicy.ANY
         )
+        if isinstance(policy_value, str):
+            policy = ProvisioningPolicy[policy_value.upper()]
+        else:
+            policy = policy_value
+
+        requirement = Requirement(
+            graph=graph,
+            identifier=identifier,
+            template_ref=template_ref,
+            criteria=criteria,
+            policy=policy,
+            hard_requirement=bool(_get_spec_value(role_spec, "hard", default=True)),
+        )
+
+        Dependency(
+            graph=graph,
+            source_id=node.uid,
+            requirement=requirement,
+            label=role_label,
+        )
+
+
+def _wire_settings(*, node: Node, settings_data: Any, graph: GraphItem) -> None:
+    """Create :class:`Dependency` edges for each setting declaration."""
+
+    if not settings_data:
+        return
+
+    for setting_label, setting_spec in _iter_specs(settings_data, default_label="location"):
+        identifier = _get_spec_value(setting_spec, "location_ref")
+        template_ref = _get_spec_value(setting_spec, "location_template_ref")
+        criteria = _get_spec_value(setting_spec, "location_criteria")
+
+        policy_value = (
+            _get_spec_value(setting_spec, "policy")
+            or _get_spec_value(setting_spec, "requirement_policy")
+            or ProvisioningPolicy.ANY
+        )
+        if isinstance(policy_value, str):
+            policy = ProvisioningPolicy[policy_value.upper()]
+        else:
+            policy = policy_value
+
+        requirement = Requirement(
+            graph=graph,
+            identifier=identifier,
+            template_ref=template_ref,
+            criteria=criteria,
+            policy=policy,
+            hard_requirement=bool(_get_spec_value(setting_spec, "hard", default=True)),
+        )
+
+        Dependency(
+            graph=graph,
+            source_id=node.uid,
+            requirement=requirement,
+            label=setting_label,
+        )
+
+
+def _iter_specs(data: Any, *, default_label: str) -> list[tuple[str, Any]]:
+    """Yield ``(label, spec)`` pairs from dict or list forms."""
+
+    if isinstance(data, dict):
+        return [((label or default_label), spec) for label, spec in data.items()]
+
+    results: list[tuple[str, Any]] = []
+    for entry in data:
+        if isinstance(entry, dict):
+            label = entry.get("label") or default_label
+        else:
+            label = getattr(entry, "label", None) or default_label
+        results.append((label, entry))
+    return results
+
+
+def _get_spec_value(spec: Any, key: str, *, default: Any | None = None) -> Any:
+    """Retrieve a value from a spec that may be a dict or model object."""
+
+    if isinstance(spec, dict):
+        return spec.get(key, default)
+    return getattr(spec, key, default)
 
 
 def _prepare_payload(
