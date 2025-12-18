@@ -1,6 +1,7 @@
 # tangl/vm/__init__.py
 """Provisioning primitives for the planning phase."""
 
+from .asset_provisioner import AssetProvisioner
 from .requirement import ProvisioningPolicy, Requirement
 from .provisioner import (
     Provisioner,
@@ -30,6 +31,7 @@ from .resolver import (
 __all__ = [
     "ProvisioningPolicy",
     "Requirement",
+    "AssetProvisioner",
     "Provisioner",
     "GraphProvisioner",
     "TemplateProvisioner",
