@@ -339,26 +339,26 @@ class TemplateProvisioner(Provisioner):
             if scope is None and isinstance(template, Mapping):
                 scope = template.get("scope")
 
+            def _scope_value(key: str) -> Any | None:
+                value = getattr(scope, key, None)
+                if value is None and isinstance(scope, Mapping):
+                    value = scope.get(key)
+                return value
+
             if scope is None:
                 return True
 
-            parent_label = getattr(scope, "parent_label", None)
-            if parent_label is None and isinstance(scope, Mapping):
-                parent_label = scope.get("parent_label")
+            parent_label = _scope_value("parent_label")
 
             if parent_label:
                 return any(segment.split(".")[-1] == parent_label for segment in chain if segment)
 
-            ancestor_labels = getattr(scope, "ancestor_labels", None)
-            if ancestor_labels is None and isinstance(scope, Mapping):
-                ancestor_labels = scope.get("ancestor_labels")
+            ancestor_labels = _scope_value("ancestor_labels")
 
             if ancestor_labels:
                 return any(label in chain for label in ancestor_labels)
 
-            ancestor_tags = getattr(scope, "ancestor_tags", None)
-            if ancestor_tags is None and isinstance(scope, Mapping):
-                ancestor_tags = scope.get("ancestor_tags")
+            ancestor_tags = _scope_value("ancestor_tags")
 
             if ancestor_tags:
                 return any(set(ancestor_tags) & tags for tags in tag_chain)
