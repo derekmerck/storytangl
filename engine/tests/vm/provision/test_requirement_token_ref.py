@@ -73,3 +73,10 @@ def test_requirement_create_token_requires_reference_or_type_label():
 
     with pytest.raises(ValueError, match="CREATE_TOKEN requires"):
         Requirement(graph=graph, policy=ProvisioningPolicy.CREATE_TOKEN)
+
+
+def test_requirement_any_rejects_partial_token_fields():
+    graph = Graph(label="test")
+
+    with pytest.raises(ValueError, match="ANY requires at least one"):
+        Requirement(graph=graph, token_type="Weapon")

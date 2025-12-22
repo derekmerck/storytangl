@@ -187,13 +187,12 @@ class Requirement(GraphItem, Generic[NodeT]):
                 )
 
         if self.policy in [ProvisioningPolicy.ANY]:
-            if (
-                self.identifier is None
-                and self.criteria is None
-                and self.token_ref is None
-                and self.token_type is None
-                and self.token_label is None
-                and not has_template_source
+            if not (
+                self.identifier is not None
+                or bool(self.criteria)
+                or has_template_source
+                or has_token_source
+                or self.provider_id is not None
             ):
                 raise ValueError(
                     "ANY requires at least one of identifier, criteria, template, template_ref, or token fields"
