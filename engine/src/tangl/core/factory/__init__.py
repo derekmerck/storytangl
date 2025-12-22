@@ -48,3 +48,4 @@ the top level import.
 from .template import Template
 from .hierarchical_template import HierarchicalTemplate, ScopeSelectable
 from .templ_factory import TemplateFactory
+from .token_factory import TokenFactory
