@@ -12,6 +12,7 @@ from .provisioner import (
     CloningProvisioner,
     CompanionProvisioner,
 )
+from .token_provisioner import TokenProvisioner
 from .open_edge import Dependency, Affordance
 from .offer import (
     ProvisionCost,
@@ -36,6 +37,7 @@ __all__ = [
     "Provisioner",
     "GraphProvisioner",
     "TemplateProvisioner",
+    "TokenProvisioner",
     "UpdatingProvisioner",
     "CloningProvisioner",
     "CompanionProvisioner",
