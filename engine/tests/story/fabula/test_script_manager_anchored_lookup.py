@@ -311,7 +311,7 @@ def test_provisioning_uses_anchored_lookup(hierarchical_world):
     requirement = Requirement(
         graph=graph,
         template_ref="guard",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     provisioner = TemplateProvisioner(layer="author")
     ctx = SimpleNamespace(graph=graph, cursor=counter, cursor_id=counter.uid, step=0)

@@ -60,7 +60,7 @@ def test_provision_creates_when_missing():
     requirement = Requirement(
         graph=graph,
         template=Template[Node](label="generated_key", obj_cls=Node),
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     dependency = Dependency(graph=graph, source=scene, requirement=requirement, label="needs_generated")
 
@@ -76,7 +76,7 @@ def test_provision_creates_when_missing():
     assert dependency.destination.label == "generated_key"
     assert dependency.destination in graph
     assert len(receipts) == 1
-    assert receipts[0].operation is ProvisioningPolicy.CREATE
+    assert receipts[0].operation is ProvisioningPolicy.CREATE_TEMPLATE
     assert result.is_viable
 
 
@@ -242,7 +242,7 @@ def test_provision_result_tracks_all_offers():
     offers = result.dependency_offers[requirement.uid]
     assert {offer.operation for offer in offers} == {
         ProvisioningPolicy.EXISTING,
-        ProvisioningPolicy.CREATE,
+        ProvisioningPolicy.CREATE_TEMPLATE,
     }
     plan = result.primary_plan
     assert plan is not None

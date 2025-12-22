@@ -21,7 +21,7 @@ def test_template_provisioner_offers_for_template_ref_in_mapping() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="guard_template",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     factory = TemplateFactory(label="templates")
@@ -46,7 +46,7 @@ def test_template_provisioner_uses_registry_lookup_for_template_ref() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref=actor_template.label,
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=factory, layer="author")
@@ -65,7 +65,7 @@ def test_template_provisioner_skips_unknown_template_ref() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="missing.template",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=TemplateFactory(label="empty"), layer="author")

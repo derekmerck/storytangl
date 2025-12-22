@@ -113,7 +113,7 @@ def test_lazy_block_provisioning_from_template_registry():
 
     req = dependencies[0].requirement
     assert req.identifier == "scene1.next", "Requirement should reference next block"
-    assert req.policy == ProvisioningPolicy.CREATE
+    assert req.policy == ProvisioningPolicy.CREATE_TEMPLATE
     assert not req.satisfied, "Requirement should not be satisfied yet"
 
     from tangl.vm.provision import TemplateProvisioner

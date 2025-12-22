@@ -123,7 +123,7 @@ def test_plan_collect_offers_emits_multiple_operations_when_available():
     }
 
     assert ProvisioningPolicy.EXISTING in ops_for_requirement
-    assert ProvisioningPolicy.CREATE in ops_for_requirement
+    assert ProvisioningPolicy.CREATE_TEMPLATE in ops_for_requirement
     assert len(ops_for_requirement) >= 2
 
 def test_edge_destination_none_branch_does_not_validate():
@@ -165,7 +165,7 @@ def test_planning_create_when_missing():
     a = g.add_node(label="A")
     req = Requirement[Node](graph=g,
                             template=Template[Node](label="B", obj_cls=Node, tags={"green"}),
-                            policy=ProvisioningPolicy.CREATE)
+                            policy=ProvisioningPolicy.CREATE_TEMPLATE)
     dep = Dependency(source_id=a.uid, requirement=req, graph=g)
 
     prov = TemplateProvisioner()
@@ -187,8 +187,8 @@ def _graph_and_anchor():
 @pytest.mark.parametrize("policy, present, expected_satisfied", [
     (ProvisioningPolicy.EXISTING, True,  True),
     (ProvisioningPolicy.EXISTING, False, False),
-    (ProvisioningPolicy.CREATE,   False, True),
-    (ProvisioningPolicy.CREATE,   True,  True),   # won't resolve to the existing one by policy
+    (ProvisioningPolicy.CREATE_TEMPLATE,   False, True),
+    (ProvisioningPolicy.CREATE_TEMPLATE,   True,  True),   # won't resolve to the existing one by policy
 ])
 def test_requirement_satisfaction_matrix(policy, present, expected_satisfied):
     g, anchor = _graph_and_anchor()
@@ -346,7 +346,7 @@ def test_provision_node_prioritizes_affordance_offers():
             offer = DependencyOffer(
                 requirement_id=requirement.uid,
                 requirement=requirement,
-                operation=ProvisioningPolicy.CREATE,
+                operation=ProvisioningPolicy.CREATE_TEMPLATE,
                 base_cost=ProvisionCost.CREATE,
                 cost=float(ProvisionCost.CREATE),
                 accept_func=lambda ctx: _create_created(),
@@ -390,7 +390,7 @@ def test_affordance_creates_or_finds_source():
     g = Graph(label="demo")
     dst = g.add_node(label="terminal")
 
-    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.CREATE,
+    req = Requirement[Node](graph=g, policy=ProvisioningPolicy.CREATE_TEMPLATE,
                             template=Template[Node](label="origin", obj_cls=Node))
     Affordance[Node](graph=g, destination_id=dst.uid, requirement=req, label="from_origin")
 

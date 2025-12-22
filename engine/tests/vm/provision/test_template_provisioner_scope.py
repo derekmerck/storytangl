@@ -78,7 +78,7 @@ def test_template_provisioner_matches_scoped_template() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="guard",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=factory, layer="author")
@@ -100,7 +100,7 @@ def test_template_provisioner_rejects_out_of_scope_template() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="guard",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=factory, layer="author")
@@ -118,7 +118,7 @@ def test_template_ref_accepts_qualified_identifier() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="world.town.guard",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=factory, layer="author")

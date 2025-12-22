@@ -14,7 +14,7 @@ def test_build_receipt_captures_template_provenance() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="npc",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     factory = TemplateFactory(label="templates")
     factory.add(template)

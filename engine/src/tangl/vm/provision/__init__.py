@@ -2,7 +2,8 @@
 """Provisioning primitives for the planning phase."""
 
 from .asset_provisioner import AssetProvisioner
-from .requirement import ProvisioningPolicy, Requirement
+from .provisioning_policy import ProvisioningPolicy
+from .requirement import Requirement
 from .provisioner import (
     Provisioner,
     GraphProvisioner,

@@ -7,7 +7,6 @@ at the frontier and *how* to obtain it (via :class:`ProvisioningPolicy`).
 Requirements are carried by :class:`~tangl.vm.planning.open_edge.Dependency`
 and :class:`~tangl.vm.planning.open_edge.Affordance` edges.
 """
-from enum import Flag, auto
 from typing import Any, Optional, Generic, TypeVar
 from uuid import UUID
 from copy import deepcopy
@@ -19,36 +18,9 @@ from tangl.core.graph import GraphItem, Node, Graph
 from tangl.core.factory import Template
 from tangl.core.singleton import Singleton
 
+from .provisioning_policy import ProvisioningPolicy
+
 NodeT = TypeVar('NodeT', bound=Node)
-
-class ProvisioningPolicy(Flag):
-    """
-    Provisioning strategies for satisfying a requirement.
-
-    - **EXISTING**: Find a pre-existing provider by identifier and/or match criteria.
-    - **UPDATE**: Find a provider and update it using a template (in-place edit).
-    - **CREATE**: Create a new provider from a template.
-    - **CREATE_TEMPLATE**: Create a new provider from a template.
-    - **CREATE_TOKEN**: Create a new token from a token factory reference.
-    - **CLONE**: Find a reference provider, make a copy, then evolve via template.
-    - **ANY**: Any of Existing, Update, Create
-    - **NOOP**: No-op operation (Unsatisfiable and not allowed on Requirement)
-
-    Notes
-    -----
-    Validation ensures the presence of ``identifier/criteria`` for EXISTING-family
-    policies and a ``template`` for CREATE/UPDATE/CLONE.
-    """
-    EXISTING = auto()    # find by identifier and/or criteria match
-    UPDATE = auto()      # find and update from template
-    CREATE = auto()      # create from template
-    CREATE_TEMPLATE = auto()  # create from template (explicit)
-    CREATE_TOKEN = auto()  # create from token factory reference
-    CLONE = auto()       # find and evolve from template
-
-    NOOP = auto()        # not possible
-
-    ANY = EXISTING | UPDATE | CREATE   # No reason to clone unless explicitly indicated
 
 class Requirement(GraphItem, Generic[NodeT]):
     """
@@ -78,7 +50,7 @@ class Requirement(GraphItem, Generic[NodeT]):
     ------------
     * **Multiple acquisition modes** – find, update, create, or clone via :class:`ProvisioningPolicy`.
     * **Flexible targeting** – match by :attr:`identifier` or :attr:`criteria` (or both).
-    * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE/CLONE.
+    * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE_TEMPLATE/CLONE.
     * **Explicit cloning** – :attr:`reference_id` binds CLONE operations to a specific source node.
     * **Binding** – :attr:`provider` resolves to a live :class:`~tangl.core.graph.Node`; auto-added to the graph if needed.
     * **Hard/soft semantics** – :attr:`hard_requirement` gates whether unresolved requirements block progress.
@@ -107,7 +79,7 @@ class Requirement(GraphItem, Generic[NodeT]):
 
     - ``EXISTING/UPDATE`` require :attr:`identifier` **or** :attr:`criteria`.
     - ``CLONE`` requires :attr:`reference_id` and :attr:`template`.
-    - ``CREATE/CREATE_TEMPLATE/UPDATE`` require :attr:`template`.
+    - ``CREATE_TEMPLATE/UPDATE`` require :attr:`template`.
     - ``CREATE_TOKEN`` requires :attr:`token_ref` or both :attr:`token_type` and
       :attr:`token_label`.
 
@@ -174,12 +146,12 @@ class Requirement(GraphItem, Generic[NodeT]):
         """
         identifier is for unique EXISTING
         criteria is filter for any EXISTING
-        template is fallback for CREATE or provides UPDATE/CLONE attribs
+        template is fallback for CREATE_TEMPLATE or provides UPDATE/CLONE attribs
 
         identifier only:     unique match, must be satisfied with EXISTING
         criteria only:       any matching, must be satisfied with EXISTING
         id/crit:             unique that also matches criteria, must be satisfied with EXISTING
-        template only:       must be satisfied with CREATE
+        template only:       must be satisfied with CREATE_TEMPLATE
         id/crit, template:   match and UPDATE/CLONE according to template
         """
         if self.policy is ProvisioningPolicy.NOOP:
@@ -192,10 +164,7 @@ class Requirement(GraphItem, Generic[NodeT]):
         has_token_source = self.token_ref is not None or (
             self.token_type is not None and self.token_label is not None
         )
-        create_template_policies = {
-            ProvisioningPolicy.CREATE,
-            ProvisioningPolicy.CREATE_TEMPLATE,
-        }
+        create_template_policies = {ProvisioningPolicy.CREATE_TEMPLATE}
 
         if self.policy in [ProvisioningPolicy.EXISTING, ProvisioningPolicy.UPDATE]:
             if self.identifier is None and self.criteria is None:

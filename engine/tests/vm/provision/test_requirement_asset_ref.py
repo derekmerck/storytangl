@@ -19,7 +19,7 @@ def test_requirement_with_token_ref():
 def test_requirement_token_ref_optional_defaults():
     graph = Graph(label="test")
 
-    req = Requirement(graph=graph, template_ref="guard_template", policy=ProvisioningPolicy.CREATE)
+    req = Requirement(graph=graph, template_ref="guard_template", policy=ProvisioningPolicy.CREATE_TEMPLATE)
 
     assert req.token_ref is None
     assert req.template_ref == "guard_template"
@@ -41,7 +41,7 @@ def test_requirement_with_token_ref_and_template_overlay():
         graph=graph,
         token_ref="standard_deck",
         template_ref="card_deck_template",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     assert req.token_ref == "standard_deck"

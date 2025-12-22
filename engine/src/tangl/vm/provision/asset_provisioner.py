@@ -6,7 +6,7 @@ from typing import Generator, TYPE_CHECKING
 
 from .offer import DependencyOffer, ProvisionCost
 from .provisioner import Provisioner
-from .requirement import ProvisioningPolicy
+from .provisioning_policy import ProvisioningPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - import guarded for typing only
     from tangl.vm.context import Context
@@ -50,8 +50,7 @@ class AssetProvisioner(Provisioner):
         if not (
             requirement.policy
             & (
-                ProvisioningPolicy.CREATE
-                | ProvisioningPolicy.CREATE_TEMPLATE
+                ProvisioningPolicy.CREATE_TEMPLATE
                 | ProvisioningPolicy.CREATE_TOKEN
                 | ProvisioningPolicy.CLONE
                 | ProvisioningPolicy.ANY

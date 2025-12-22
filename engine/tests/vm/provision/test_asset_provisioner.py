@@ -79,7 +79,7 @@ def test_asset_provisioner_requires_explicit_asset_ref(asset_manager: DummyAsset
         graph=graph,
         template_ref="guard_template",
         criteria={"archetype": "guard"},
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = AssetProvisioner(layer="asset")
@@ -172,7 +172,7 @@ def test_templates_preferred_for_story_roles(asset_manager: DummyAssetManager) -
     requirement = Requirement(
         graph=graph,
         template_ref="guard",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     asset_prov = AssetProvisioner(layer="asset")

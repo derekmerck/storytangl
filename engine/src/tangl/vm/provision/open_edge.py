@@ -15,7 +15,8 @@ from pydantic import Field, model_validator
 
 from tangl.type_hints import StringMap, Identifier
 from tangl.core.graph import Edge, Graph, Node
-from .requirement import Requirement, NodeT, ProvisioningPolicy
+from .requirement import Requirement, NodeT
+from .provisioning_policy import ProvisioningPolicy
 
 
 # Provides the carrier mechanism to map requirements into the graph-topology.
