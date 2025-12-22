@@ -1,6 +1,7 @@
+# tangl/core/factory/__init__.py
 """
 ```
-core/factory/template.py (THIS FILE)
+core/factory/template.py
 ├── Template[ET]              # Generic template for any Entity
 ├── ScopeSelectable           # Pattern-based scope matching
 ├── HierarchicalTemplate[GIT] # Tree of templates with auto-paths
