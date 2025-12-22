@@ -83,6 +83,9 @@ def test_token_is_instance_checks_wrapped_type():
     # Not a class, should raise instead of fail?
     assert not token.is_instance("dog")
 
+    assert token.is_instance((NPC,NPC2))
+    assert not token.is_instance((NPC2,))
+
 
 def test_graph_find_includes_tokens():
     """Graph search finds tokens by wrapped type."""

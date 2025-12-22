@@ -54,6 +54,9 @@ def test_smoke():
     assert node_templ.matches(is_instance=Node)
     assert not node_templ.matches(is_instance=Scene)
 
+    assert node_templ.matches(is_instance=(Node,Scene))
+    assert not node_templ.matches(is_instance=(Scene,))
+
     print("✅ All smoke tests pass!")
 
 """

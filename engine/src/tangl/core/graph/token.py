@@ -90,18 +90,23 @@ class Token(Node, Generic[WrappedType]):
             raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.label}`.")
         return self.wrapped_cls.get_instance(self.label)
 
-    def is_instance(self, cls: type) -> bool:
+    def is_instance(self, obj_cls: type | tuple[type]) -> bool:
         """
         Check against wrapped type, not just Token class.
 
         Enables: Token[NPC].is_instance(NPC) → True
         """
+        logger.debug(f"Checking {obj_cls} is tuple.")
         # Check wrapped singleton type
-        if self.wrapped_cls and isclass(cls) and issubclass(self.wrapped_cls, cls):
+        if isinstance(obj_cls, tuple):
+            logger.debug(f"Checking all-classes {all(isclass(c) for c in obj_cls)} is true.")
+            if all(isclass(c) for c in obj_cls) and issubclass(self.wrapped_cls, obj_cls):
+                return True
+        elif isclass(obj_cls) and issubclass(self.wrapped_cls, obj_cls):
             return True
 
         # Fall back to Node hierarchy
-        return super().is_instance(cls)
+        return super().is_instance(obj_cls)
 
     def __getattr__(self, name: str) -> Any:
         """Delegates attribute access to non-instance-variables back to the reference singleton entity."""

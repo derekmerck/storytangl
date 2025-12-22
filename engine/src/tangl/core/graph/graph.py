@@ -11,7 +11,7 @@ from tangl.utils.hashing import hashing_func
 from tangl.core.entity import Entity, match_logger
 from tangl.core.registry import Registry
 
-match_logger.setLevel(logging.DEBUG)
+match_logger.setLevel(logging.WARNING)
 
 if TYPE_CHECKING:
     from .subgraph import Subgraph
