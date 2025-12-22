@@ -44,6 +44,6 @@ definitions.  i.e., Template modules are _independent_ of their ET at
 the top level import.
 """
 
-from .template import Template, HierarchicalTemplate, Factory, ScopeSelectable
-# from .hierarchical_template import HierarchicalTemplate
-# from .factory import Factory
+from .template import Template
+from .hierarchical_template import HierarchicalTemplate, ScopeSelectable
+from .factory import Factory

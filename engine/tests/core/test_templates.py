@@ -2,7 +2,9 @@ from pydantic import Field
 import pytest
 
 from tangl.core import GraphItem
-from tangl.core.factory.template import Factory, Template, HierarchicalTemplate
+from tangl.core.factory.template import Template
+from tangl.core.factory.hierarchical_template import HierarchicalTemplate, ScopeSelectable
+from tangl.core.factory.factory import Factory
 
 def test_smoke():
     """Everything basically works."""
