@@ -78,6 +78,11 @@ class Singleton(Entity):
         return cls._instances.find_one(**criteria)
 
     @classmethod
+    def find_all_instances(cls, **criteria) -> Iterator[Self]:
+        # Just consistency in delegation to internal registry
+        return cls._instances.find_all(**criteria)
+
+    @classmethod
     def clear_instances(cls) -> None:
         cls._instances.clear()
 

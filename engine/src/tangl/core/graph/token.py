@@ -5,6 +5,7 @@ from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
 import sys
 import logging
+from inspect import isclass
 
 import pydantic
 from pydantic import Field, field_validator
@@ -88,6 +89,19 @@ class Token(Node, Generic[WrappedType]):
         if not res:
             raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.label}`.")
         return self.wrapped_cls.get_instance(self.label)
+
+    def is_instance(self, cls: type) -> bool:
+        """
+        Check against wrapped type, not just Token class.
+
+        Enables: Token[NPC].is_instance(NPC) → True
+        """
+        # Check wrapped singleton type
+        if self.wrapped_cls and isclass(cls) and issubclass(self.wrapped_cls, cls):
+            return True
+
+        # Fall back to Node hierarchy
+        return super().is_instance(cls)
 
     def __getattr__(self, name: str) -> Any:
         """Delegates attribute access to non-instance-variables back to the reference singleton entity."""

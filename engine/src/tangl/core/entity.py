@@ -5,6 +5,7 @@ import logging
 from copy import copy
 from enum import Enum
 import re
+from inspect import isclass
 
 from pydantic import BaseModel, Field, field_validator
 import shortuuid
@@ -160,7 +161,7 @@ class Entity(BaseModelPlus):
         # helper func for matches
         if obj_cls is object:
             match_logger.warning("Matching `is_instance(self, object)`: this is harmless but it always returns True and is almost certainly not what you intended to do.")
-        return isinstance(self, obj_cls)
+        return isclass(obj_cls) and isinstance(self, obj_cls)
 
     # todo: push this into a pure utility
     def get_tag_kv(self,
