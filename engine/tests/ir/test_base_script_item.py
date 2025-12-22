@@ -1,6 +1,6 @@
 """Tests for :mod:`tangl.ir.core_ir.base_script_model`."""
 
-from tangl.core import Record
+from tangl.core import Record, Node
 from tangl.ir.core_ir import BaseScriptItem
 
 
@@ -25,11 +25,12 @@ def test_base_script_item_defaults_and_extras() -> None:
 def test_model_dump_emits_string_class_without_entity_fields() -> None:
     """Serialized scripts should match legacy export semantics."""
 
-    item = BaseScriptItem(obj_cls="tangl.story.Node", label="demo")
+    item = BaseScriptItem(obj_cls="tangl.core.graph.node.Node", label="demo")
+    assert item.obj_cls is Node
 
     payload = item.model_dump()
 
-    assert payload["obj_cls"] == "tangl.story.Node"
+    assert payload["obj_cls"] is Node
     assert payload["label"] == "demo"
     assert "uid" not in payload
     assert "seq" not in payload

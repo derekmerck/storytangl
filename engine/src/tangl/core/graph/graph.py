@@ -5,9 +5,9 @@ import functools
 
 from pydantic import Field, model_validator
 
-from tangl.type_hints import Identifier
+from tangl.type_hints import Identifier, Tag
 from tangl.utils.hashing import hashing_func
-from tangl.core.entity import Entity
+from tangl.core.entity import Entity, match_logger
 from tangl.core.registry import Registry
 
 if TYPE_CHECKING:
@@ -78,8 +78,35 @@ class GraphItem(Entity):
             yield current
             current = current.parent
 
+    def has_path(self, pattern: str) -> bool:
+        from fnmatch import fnmatch
+        return fnmatch(self.path, pattern)
+
     def has_ancestor(self, ancestor: Subgraph) -> bool:
         return ancestor in self.ancestors()
+
+    def has_ancestor_tags(self, *tags: Tag) -> bool:
+        # Normalize args to set[Tag]
+        if len(tags) == 1 and isinstance(tags[0], set):
+            tags = tags[0]  # already a set of tags
+        else:
+            tags = set(tags)
+
+        ancestors = [self] + list(self.ancestors())
+        ancestor_tags = { t for a in ancestors for t in a.tags }
+        match_logger.debug(f"Comparing query tags {tags} against {ancestor_tags}")
+        return tags.issubset(ancestor_tags)
+
+    def has_parent_label(self, parent_label: str) -> bool:
+        # seems redundant
+        return self.parent is not None and self.parent.label == parent_label
+
+    # def has_ancestor_labels(self, labels: set[str]) -> bool:
+    #     if not labels:
+    #         return True
+    #
+    #     ancestor_labels = {ancestor.label for ancestor in self.ancestors() if ancestor.label}
+    #     return labels.issubset(ancestor_labels)
 
     @property
     def root(self) -> Optional[Subgraph]:
@@ -89,6 +116,7 @@ class GraphItem(Entity):
             last = anc
         return last
 
+    # I don't _think_ this is an identifier, there _could_ be a block `scene1.foo` and an actor `scene1.foo`, although it would probably be confusing and a mistake.
     @property
     def path(self):
         # Include self in path

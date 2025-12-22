@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING, Type
 
 from pydantic import Field, model_validator
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
+from tangl.core import Entity
 from tangl.ir.core_ir import BaseScriptItem
 from .actor_script_models import ActorScript
 from .asset_script_models import AssetsScript
@@ -15,8 +16,14 @@ if TYPE_CHECKING:
 
 class LocationScript(BaseScriptItem):
 
+    @classmethod
+    def get_templ_cls_hint(cls) -> Type[Entity]:
+        # Keep this import out of the main scope
+        from tangl.story.concepts.location import Location
+        return Location
+
     assets: list[AssetsScript] = None   # assets associated with the loc
-    extras: list[ActorScript] = None   # extras associated with the loc
+    extras: list[ActorScript] = None    # extras associated with the loc
 
     scope: ScopeSelector | None = Field(
         None,
@@ -25,7 +32,14 @@ class LocationScript(BaseScriptItem):
 
 
 class SettingScript(BaseScriptItem):
-    location_template: Optional[LocationScript] = None
+
+    @classmethod
+    def get_templ_cls_hint(cls) -> Type[Entity]:
+        # Keep this import out of the main scope
+        from tangl.story.concepts.location import Setting
+        return Setting
+
+    location_template: Optional[LocationScript] = Field(None, json_schema_extra={'child_script': True})
     location_ref: Optional[UniqueLabel] = None
     location_template_ref: Optional[UniqueLabel] = Field(
         None,

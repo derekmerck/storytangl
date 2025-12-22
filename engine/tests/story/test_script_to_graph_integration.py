@@ -50,7 +50,7 @@ def _make_crossroads_script() -> dict:
             "crossroads": {
                 "blocks": {
                     "start": {
-                        "obj_cls": "NarrativeBlock",
+                        "block_cls": "NarrativeBlock",
                         "content": "You stand at a crossroads.",
                         "actions": [
                             {
@@ -70,7 +70,7 @@ def _make_crossroads_script() -> dict:
             "garden": {
                 "blocks": {
                     "entrance": {
-                        "obj_cls": "NarrativeBlock",
+                        "block_cls": "NarrativeBlock",
                         "content": "A peaceful garden.",
                     }
                 }
@@ -78,7 +78,7 @@ def _make_crossroads_script() -> dict:
             "cave": {
                 "blocks": {
                     "entrance": {
-                        "obj_cls": "NarrativeBlock",
+                        "block_cls": "NarrativeBlock",
                         "content": "A dark cave.",
                     }
                 }

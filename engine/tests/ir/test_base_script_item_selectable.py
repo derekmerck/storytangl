@@ -4,13 +4,15 @@ from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 
 def test_template_gates_on_scope_via_selector():
-    template = BaseScriptItem(label="cop", scope=ScopeSelector(ancestor_tags={"town"}))
+    template = BaseScriptItem(label="cop", scope_tags={"town"})
 
     graph = Graph()
     world = graph.add_subgraph(label="world", tags={"town"})
     block = graph.add_node(label="block")
     other_block = graph.add_node(label="other")
 
+    assert template.get_selection_criteria()['has_ancestor_tags'] == {'town'}
+    assert not template.matches(selector=block)
     world.add_member(block)
     assert template.matches(selector=block)
 

@@ -251,6 +251,7 @@ add new record subclasses **without** needing to invent new infrastructure:
 
 """
 from .record import Record
+from .content_addressable import ContentAddressable
 from .snapshot import Snapshot
 from .base_fragment import BaseFragment
 from .stream_registry import StreamRegistry

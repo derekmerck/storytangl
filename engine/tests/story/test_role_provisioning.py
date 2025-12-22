@@ -33,7 +33,7 @@ def test_scene_roles_materialize_placeholders() -> None:
             "throne_room": {
                 "blocks": {
                     "start": {
-                        "obj_cls": "tangl.story.episode.block.Block",
+                        "block_cls": "tangl.story.episode.block.Block",
                     },
                 },
                 "roles": {
@@ -75,7 +75,7 @@ def test_scene_roles_link_referenced_actor() -> None:
             "throne_room": {
                 "blocks": {
                     "start": {
-                        "obj_cls": "tangl.story.episode.block.Block",
+                        "block_cls": "tangl.story.episode.block.Block",
                     },
                 },
                 "roles": {

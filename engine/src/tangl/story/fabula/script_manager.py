@@ -60,7 +60,7 @@ class ScriptManager:
                         alias="block_cls",
                         children={
                             key: _DefaultClassConfig(
-                                class_path="tangl.story.episode.Action",
+                                class_path="tangl.story.episode.action.Action",
                             )
                             for key in ("actions", "continues", "redirects")
                         },

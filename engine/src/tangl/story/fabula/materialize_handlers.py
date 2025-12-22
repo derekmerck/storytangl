@@ -36,7 +36,7 @@ def instantiation_handler(
     cls: type[Any] = Node
     try:
         from tangl.ir.story_ir.scene_script_models import BlockScript
-    except Exception:  # pragma: no cover - defensive import
+    except ImportError:  # pragma: no cover - defensive import
         BlockScript = None  # type: ignore[assignment]
     if domain_manager is not None:
         cls = domain_manager.resolve_class(template.obj_cls or "tangl.core.graph.Node") or Node

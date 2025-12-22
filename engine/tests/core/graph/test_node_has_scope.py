@@ -1,5 +1,38 @@
 from tangl.core.graph import Graph
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+from tangl.core.graph.scope_selectable import ScopeSelector
+
+def test_has_ancestor_tags_matches():
+    graph = Graph()
+    node = graph.add_node(label="block", tags={"foo"})
+    assert node.has_ancestor_tags("foo")
+
+    parent = graph.add_subgraph(label="parent", members=[node], tags={"bar"})
+    assert node.has_ancestor_tags("foo", "bar")
+
+    grandparent = graph.add_subgraph(label="grandparent", members=[parent], tags={"baz"})
+    assert node.has_ancestor_tags("foo", "bar", "baz")
+
+
+def test_has_path_matches():
+    graph = Graph()
+    node = graph.add_node(label="block")
+
+    assert node.has_path("block")
+    assert not node.has_path("nonexistent")
+
+    parent = graph.add_subgraph(label="parent", members=[node])
+    assert not node.has_path("block")
+    assert node.has_path("parent.block")
+    assert node.has_path("*.block")
+    assert node.has_path("parent.*")
+
+    grandparent = graph.add_subgraph(label="grandparent", members=[parent])
+    assert node.has_path("grandparent.parent.block")
+    assert node.has_path("grandparent.*.block")
+    assert not node.has_path("grandparent.*.nonexistent")
+
+    # assert node.has_scope(ScopeSelector()) is True
+
 
 
 def test_has_scope_global_selector_matches():
@@ -30,7 +63,7 @@ def test_has_scope_ancestor_labels_and_tags():
     world.add_member(scene)
     scene.add_member(block)
 
-    assert block.has_scope(ScopeSelector(ancestor_labels={"world"})) is True
+    assert block.has_scope(ScopeSelector(ancestor_labels={"world*"})) is True
     assert block.has_scope(ScopeSelector(ancestor_labels={"missing"})) is False
     assert block.has_scope(ScopeSelector(ancestor_tags={"world"})) is True
     assert block.has_scope(ScopeSelector(ancestor_tags={"scene", "world"})) is True
@@ -65,7 +98,7 @@ def test_has_scope_with_mixed_constraints():
 
     scope = ScopeSelector(
         parent_label="scene1",
-        ancestor_labels={"world"},
+        ancestor_labels={"world*"},
         ancestor_tags={"world", "scene"},
         source_label="block1",
     )

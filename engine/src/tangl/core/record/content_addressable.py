@@ -140,7 +140,7 @@ class ContentAddressable(BaseModel):
         """
         # Default: Hash everything except known metadata fields
         # todo: could use fields here with a filter
-        exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "obj_cls"}
+        exclude = {"uid", "is_dirty_", "content_hash", "created_at", "updated_at", "seq", "obj_cls"}
         return {k: v for k, v in data.items() if k not in exclude}
 
     @is_identifier

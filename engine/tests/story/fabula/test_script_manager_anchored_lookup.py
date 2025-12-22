@@ -29,19 +29,19 @@ def hierarchical_world():
                 "name": "Generic Guard",
             },
             "village.guard": {
-                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
+                # "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "scope": {"parent_label": "village"},
                 "name": "Village Guard",
             },
             "village.store.guard": {
-                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
+                # "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "scope": {"parent_label": "store"},
                 "name": "Store Guard",
             },
             "countryside.guard": {
-                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
+                # "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "scope": {"parent_label": "countryside"},
                 "name": "Countryside Guard",
@@ -248,17 +248,17 @@ def test_find_templates_plural_returns_all_in_scope():
         "metadata": {"title": "Multi", "author": "Tests"},
         "templates": {
             "guard1": {
-                "obj_cls": "tangl.core.graph.Node",
+                # "obj_cls": "tangl.core.graph.Node",
                 "label": "guard1",
                 "archetype": "guard",
             },
             "guard2": {
-                "obj_cls": "tangl.core.graph.Node",
+                # "obj_cls": "tangl.core.graph.Node",
                 "label": "guard2",
                 "archetype": "guard",
             },
             "merchant": {
-                "obj_cls": "tangl.core.graph.Node",
+                # "obj_cls": "tangl.core.graph.Node",
                 "label": "merchant",
                 "archetype": "trader",
             },
