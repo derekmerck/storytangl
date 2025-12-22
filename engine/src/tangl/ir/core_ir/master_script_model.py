@@ -22,7 +22,7 @@ class MasterScript(BaseScriptItem):
             """Recursively remove verbose Enum descriptions from tags fields."""
             if isinstance(obj, dict):
                 # If this is a tags field definition
-                if 'title' in obj and obj.get('title') == 'Tags':
+                if 'title' in obj and obj.get('title') == 'Tag':
                     if 'anyOf' in obj:
                         for variant in obj['anyOf']:
                             if variant.get('type') == 'array' and 'items' in variant:
@@ -64,7 +64,7 @@ class MasterScript(BaseScriptItem):
                  'x-intellij-language-injection': 'Markdown'}
 
         # # todo: move this into passages format and override function
-        # if 'PassageScript'in defs:
+        # if 'PassageScript' in defs:
         #     defs['PassageScript']['properties']['text']['x-intellij-language-injection'] = "Markdown"
 
         return schema

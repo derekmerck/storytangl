@@ -39,12 +39,10 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
          >>> node = Node.structure(entity_data)
      """
 
-    # todo: maybe use serialize=False for these fields, not exclude, which will remove it from comparison and hashing
-
     # Mark record metadata as excluded for serialization
-    uid: UUID = Field(default_factory=uuid4, exclude=True)
-    is_dirty_: bool = Field(default=False, exclude=True)
-    seq: int = Field(init=False, exclude=True)  # injected by Record/HasSeq
+    uid: UUID = Field(default_factory=uuid4, json_schema_extra={'serialize': False})
+    is_dirty_: bool = Field(default=False, json_schema_extra={'serialize': False})
+    seq: int = Field(init=False, json_schema_extra={'serialize': False})  # injected by Record/HasSeq
 
     # obj_cls is a field (not just init param like Entity)
     obj_cls_: Typelike = Field(None, alias="obj_cls")
@@ -70,17 +68,24 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
 
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
+        """
+        Can include the default directly by overriding this function with
+        a local import, so you don't have to import the template ET at
+        the top level.  E.g., `get_default_obj_cls(): from story import Actor; return Actor`
+        """
         return cls.get_generic_type_for(Template, default=Entity)
 
     @property
     def obj_cls(self) -> Type[Entity]:
-        """Get obj_cls with fallback to default."""
+        """Get obj_cls_ with fallback to default."""
         return self.obj_cls_ or self.get_default_obj_cls()
 
     def is_instance(self, obj_cls: Type[Entity]) -> bool:
-        # Check against the _latent_ type, not the Template class
-        # Templ[MyActor].is_instance(Actor) -> True
-        # This enables Template.match(is_instance=Actor)
+        """
+        Check against the _latent_ type, not the Template class
+        `Template[MyActor].is_instance(Actor)` -> True
+        This enables Template[MyActor].match(is_instance=Actor)
+        """
         return issubclass(self.obj_cls, obj_cls)
 
     # Inherits label, tags as is
@@ -211,7 +216,9 @@ class ScopeSelectable(Selectable):
 
 GIT = TypeVar('GIT', bound=GraphItem)
 
-class HierarchicalTemplate(ScopeSelectable, Template[GIT], Generic[GIT]):
+class HierarchicalTemplate(ScopeSelectable,
+                           Template[GIT],   # type: ignore[type-arg]
+                           Generic[GIT]):
     """
     Template DAG with parent/child relationships and auto-computed paths.
 
@@ -241,7 +248,7 @@ class HierarchicalTemplate(ScopeSelectable, Template[GIT], Generic[GIT]):
         >>> scene.blocks["start"].path
         'scene1.start'
         >>>
-        >>> list(t.label for t in scene.visit())
+        >>> list(t.get_label() for t in scene.visit())
         ['scene1', 'start', 'end']
     """
     parent: Optional[Self] = Field(None, exclude=True)
@@ -390,7 +397,7 @@ class HierarchicalTemplate(ScopeSelectable, Template[GIT], Generic[GIT]):
         higher-level orchestration/dispatch.
         """
         # call model dump for unstructured data suitable to pass to Entity.structure
-        visit_fields = self._fields(visit_field=(True, False))
+        visit_fields = set(self._fields(visit_field=(True, False)))
         # Don't need any child templates, materializer will deal with them
         data = super().model_dump(by_alias=True,
                                   exclude_unset=False,
@@ -445,7 +452,7 @@ class Factory(Registry[Template]):
 
         return factory
 
-    # todo: this is maybe redundant unless it holds materialize dispatch
+    # todo: this redundant until it holds materialize dispatch
     @classmethod
     def materialize_templ(cls, templ: Template[ET], **kwargs) -> ET:
         """
@@ -468,3 +475,5 @@ class Factory(Registry[Template]):
         # factory.dispatch.do_materialize(self, ctx=params)
         # - calls: do_get_cls, do_materialize, do_init
 
+    def all_paths(self) -> list[str]:
+        return list(x.path for x in self.data.values())

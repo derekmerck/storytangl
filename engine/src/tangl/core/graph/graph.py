@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from uuid import UUID
 from typing import Optional, Iterator, Iterable, TYPE_CHECKING
 import functools
@@ -9,6 +10,8 @@ from tangl.type_hints import Identifier, Tag
 from tangl.utils.hashing import hashing_func
 from tangl.core.entity import Entity, match_logger
 from tangl.core.registry import Registry
+
+match_logger.setLevel(logging.DEBUG)
 
 if TYPE_CHECKING:
     from .subgraph import Subgraph
@@ -80,6 +83,7 @@ class GraphItem(Entity):
 
     def has_path(self, pattern: str) -> bool:
         from fnmatch import fnmatch
+        match_logger.debug(f"fnmatch({self.path}, {pattern}) = {fnmatch(self.path, pattern)}")
         return fnmatch(self.path, pattern)
 
     def has_ancestor(self, ancestor: Subgraph) -> bool:
