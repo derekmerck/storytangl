@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from tangl.type_hints import UniqueLabel
 from tangl.core import Singleton, Entity
-from tangl.core.graph import SingletonNode
+from tangl.core.graph import Token
 
 StoryId = UUID
 WorldId = UniqueLabel

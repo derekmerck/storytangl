@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tangl.core import Graph
-from tangl.core.graph.singleton_node import SingletonNode
+from tangl.core.graph.token import Token
 from tangl.story.concepts.asset import AssetType, DiscreteAsset
 
 
@@ -18,7 +18,7 @@ class TestDiscreteAssetGenericTyping:
 
         SwordToken = DiscreteAsset[Weapon]
         assert issubclass(SwordToken, DiscreteAsset)
-        assert issubclass(SwordToken, SingletonNode)
+        assert issubclass(SwordToken, Token)
 
     def test_token_delegates_to_singleton(self) -> None:
         """Token attributes delegate to singleton definition."""

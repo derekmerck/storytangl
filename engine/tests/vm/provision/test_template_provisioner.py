@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tangl.core.factory import Factory, Template
+from tangl.core.factory import TemplateFactory, Template
 from tangl.core.graph import Graph, Node
 from tangl.vm.provision import (
     ProvisioningContext,
@@ -24,7 +24,7 @@ def test_template_provisioner_offers_for_template_ref_in_mapping() -> None:
         policy=ProvisioningPolicy.CREATE,
     )
 
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     factory.add(Template[Node](label="guard_template", obj_cls=Node, tags={"npc"}))
     provisioner = TemplateProvisioner(factory=factory, layer="author")
 
@@ -39,7 +39,7 @@ def test_template_provisioner_offers_for_template_ref_in_mapping() -> None:
 
 def test_template_provisioner_uses_registry_lookup_for_template_ref() -> None:
     graph = Graph(label="story")
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     actor_template = Template[Node](label="village.guard", obj_cls=Node, tags={"npc"})
     factory.add(actor_template)
 
@@ -68,7 +68,7 @@ def test_template_provisioner_skips_unknown_template_ref() -> None:
         policy=ProvisioningPolicy.CREATE,
     )
 
-    provisioner = TemplateProvisioner(factory=Factory(label="empty"), layer="author")
+    provisioner = TemplateProvisioner(factory=TemplateFactory(label="empty"), layer="author")
     ctx = _ctx(graph)
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))

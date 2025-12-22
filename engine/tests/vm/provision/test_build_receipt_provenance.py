@@ -1,4 +1,4 @@
-from tangl.core.factory import Factory, Template
+from tangl.core.factory import TemplateFactory, Template
 from tangl.core.graph import Graph, Node
 from tangl.vm.provision import (
     PlannedOffer,
@@ -16,7 +16,7 @@ def test_build_receipt_captures_template_provenance() -> None:
         template_ref="npc",
         policy=ProvisioningPolicy.CREATE,
     )
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     factory.add(template)
     provisioner = TemplateProvisioner(factory=factory, layer="local")
     ctx = type("Ctx", (), {"graph": graph, "cursor": None, "cursor_id": None})()

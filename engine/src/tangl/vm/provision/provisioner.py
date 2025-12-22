@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import ConfigDict
 
 from tangl.core import Edge, Entity, Node, Registry
-from tangl.core.factory import Factory, Template
+from tangl.core.factory import TemplateFactory, Template
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class Provisioner(Entity):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     node_registry: Registry[Node] | None = None
-    factory: Factory | None = None
+    factory: TemplateFactory | None = None
     layer: str = "global"
     scope_node_id: UUID | None = None
     """Identifier of the node or subgraph that owns this provisioner."""
@@ -191,13 +191,13 @@ class TemplateProvisioner(Provisioner):
 
     def __init__(
         self,
-        factory: Factory | None = None,
+        factory: TemplateFactory | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         object.__setattr__(self, "factory", factory)
 
-    def _get_factory(self, ctx: "Context") -> Factory | None:
+    def _get_factory(self, ctx: "Context") -> TemplateFactory | None:
         """Resolve the active template factory."""
 
         if self.factory is not None:
@@ -262,7 +262,7 @@ class TemplateProvisioner(Provisioner):
 
     @staticmethod
     def _find_template(
-        factory: Factory,
+        factory: TemplateFactory,
         identifier: Any,
         criteria: dict[str, Any],
     ) -> Template | None:
@@ -304,7 +304,7 @@ class TemplateProvisioner(Provisioner):
         template: Template,
         *,
         ctx: "Context",
-        factory: Factory | None,
+        factory: TemplateFactory | None,
     ) -> Node:
         obj_cls = template.obj_cls
         kwargs: dict[str, Any] = {}

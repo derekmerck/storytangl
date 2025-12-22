@@ -39,7 +39,7 @@ class Singleton(Entity):
     See also
     --------
     :class:`~tangl.core.singleton.InheritingSingleton`
-    :class:`~tangl.core.singleton.SingletonNode`
+    :class:`~tangl.core.singleton.Token`
     """
 
     model_config = ConfigDict(frozen=True)

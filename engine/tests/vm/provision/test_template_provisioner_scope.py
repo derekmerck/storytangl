@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from pydantic import Field
 
-from tangl.core.factory import Factory, HierarchicalTemplate
+from tangl.core.factory import TemplateFactory, HierarchicalTemplate
 from tangl.core.graph import Graph, Node
 from tangl.vm.provision import (
     ProvisioningPolicy,
@@ -25,7 +25,7 @@ class SceneTemplate(HierarchicalTemplate[Node]):
     )
 
 
-def _build_factory() -> Factory:
+def _build_factory() -> TemplateFactory:
     root = HierarchicalTemplate[Node](
         label="world",
         children={
@@ -51,7 +51,7 @@ def _build_factory() -> Factory:
             ),
         },
     )
-    return Factory.from_root_templ(root)
+    return TemplateFactory.from_root_templ(root)
 
 
 def _build_graph() -> tuple[Graph, Node, Node]:

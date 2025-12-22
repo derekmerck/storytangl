@@ -197,7 +197,7 @@ class AssetManager:
         raise KeyError(f"No asset class registered for '{asset_type}'")
 
     # ==================
-    # Token Factory
+    # Token TemplateFactory
     # ==================
 
     def create_token(

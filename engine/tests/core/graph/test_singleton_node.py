@@ -3,7 +3,7 @@ import pytest
 from pydantic import Field
 
 from tangl.core import Graph, Singleton
-from tangl.core.graph import SingletonNode
+from tangl.core.graph import Token
 
 
 class TestSingleton(Singleton):
@@ -19,17 +19,17 @@ def reset_test_singleton():
 
 @pytest.fixture
 def ws():
-    return SingletonNode[TestSingleton](label="unique_singleton", graph=Graph())
+    return Token[TestSingleton](label="unique_singleton", graph=Graph())
 
 def test_wrapped_singleton_creation(ws):
 
-    assert isinstance(ws, SingletonNode)
+    assert isinstance(ws, Token)
     assert ws.label == "unique_singleton"
     assert ws.reference_singleton.label == "unique_singleton"
 
 def test_wrapped_singleton_invalid_ref():
     with pytest.raises(ValueError):
-        SingletonNode[TestSingleton](label="invalid_singleton")
+        Token[TestSingleton](label="invalid_singleton")
 
 def test_reference_singleton_missing(ws):
     TestSingleton._instances.clear()  # Simulate instance deletion

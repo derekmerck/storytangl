@@ -20,8 +20,8 @@ flowchart RL
         subgraph .singleton
             Singleton -- is --> Entity
             Singleton -- has --> Registry
-            SingletonNode -- is --> Singleton
-            SingletonNode -- is --> Node
+            Token -- is --> Singleton
+            Token -- is --> Node
         end
         subgraph .fragment
             BaseFragment -- is --> Entity

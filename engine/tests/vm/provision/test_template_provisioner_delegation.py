@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core.factory import Factory, Template
+from tangl.core.factory import TemplateFactory, Template
 from tangl.core.graph import Graph, Node, Subgraph
 from tangl.vm.provision import ProvisioningPolicy, Requirement, TemplateProvisioner
 
@@ -15,7 +15,7 @@ def _ctx(graph: Graph) -> SimpleNamespace:
 
 def test_provisioner_materializes_template_from_factory() -> None:
     graph = Graph(label="test")
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     factory.add(Template[Node](label="guard", tags={"npc"}))
 
     requirement = Requirement(
@@ -61,7 +61,7 @@ def test_provisioner_materializes_template_from_requirement() -> None:
 
 def test_provisioner_supports_subgraph_templates() -> None:
     graph = Graph(label="test")
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     factory.add(Template[Subgraph](label="village", obj_cls=Subgraph))
 
     requirement = Requirement(

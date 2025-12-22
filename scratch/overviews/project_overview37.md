@@ -82,7 +82,7 @@ Build a **narrative virtual machine** that represents story‑space (fabula), di
 - **Graph IR** (core): `GraphItem` → `Node`, `Edge`, `Subgraph`; membership and ancestry helpers; `Graph.add_*()` validates linkability; label and path addressing.
 - **Dispatch/Handlers** (core): `Handler`, `HandlerPriority`, `HandlerRegistry`, `JobReceipt` (with `blame_id` + `seq`), deterministic ordering.
 - **Domains & Scope** (core): `Domain(vars, handlers)` + `global_domain`; `Scope` composes a layered namespace and merges handlers from active domains (anchor → ancestors → globals). `DomainRegistry.find_domains_for()` is a stub to be implemented.
-- **Singletons** (core): immutable `Singleton` registry plus `SingletonNode[T]` wrapper for graph‑attachable instance variables.
+- **Singletons** (core): immutable `Singleton` registry plus `Token[T]` wrapper for graph‑attachable instance variables.
 - **Event Sourcing (preview)** (vm): `Event{CREATE,READ,UPDATE,DELETE}`, `ReplayWatcher`, `WatchedEntityProxy`/`WatchedRegistry` that emit events and support `replay_all` to produce a disposable preview graph.
 - **Resolution Session** (vm): `ResolutionPhase` and `Session.follow_edge()` control loop; phases currently call handlers via a `Context` that builds the scope and per‑phase namespace. Redirect stacks and auto‑follow are TODO.
 - **Provisioning Skeleton** (vm): `Provider`, `ProvisionOffer`, `ProvisionRequirement`, `Provisioner.run()`; generic finder/builder placeholders exist, concrete providers TBD.

@@ -22,7 +22,7 @@ from tangl.vm.provision import (
     ProvisioningPolicy,
 )
 from tangl.core import Node, Graph
-from tangl.core.factory import Factory, Template
+from tangl.core.factory import TemplateFactory, Template
 
 
 # ============================================================================
@@ -116,7 +116,7 @@ def test_template_provisioner_creates_from_template():
     """TemplateProvisioner should offer CREATE with template."""
     # Setup
     registry = Graph()
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     factory.add(Template[LockableNode](label="door", obj_cls=LockableNode, locked=True))
     
     requirement = Requirement(
@@ -227,7 +227,7 @@ def test_cheapest_offer_wins():
     # Multiple provisioners
     graph_prov = GraphProvisioner(node_registry=registry, layer='local')
     template_prov = TemplateProvisioner(
-        factory=Factory(label="templates"),
+        factory=TemplateFactory(label="templates"),
         layer='author'
     )
     template_prov.factory.add(Template[Node](label="door", obj_cls=Node))
@@ -269,7 +269,7 @@ def test_multiple_strategies_for_same_requirement():
     graph_prov = GraphProvisioner(node_registry=registry)
     updating_prov = UpdatingProvisioner(node_registry=registry)
     cloning_prov = CloningProvisioner(node_registry=registry)
-    factory = Factory(label="templates")
+    factory = TemplateFactory(label="templates")
     factory.add(Template[Node](label="door", obj_cls=Node))
     template_prov = TemplateProvisioner(factory=factory)
     
@@ -430,7 +430,7 @@ def test_template_provisioner_without_template():
     requirement = Requirement(identifier="door")  # No template
     ctx = MockContext(graph=registry, cursor_id=UUID('00000000-0000-0000-0000-000000000003'))
     
-    provisioner = TemplateProvisioner(factory=Factory(label="templates"))
+    provisioner = TemplateProvisioner(factory=TemplateFactory(label="templates"))
     
     # Act
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))

@@ -4,7 +4,7 @@ import pytest
 from tangl.core import GraphItem
 from tangl.core.factory.template import Template
 from tangl.core.factory.hierarchical_template import HierarchicalTemplate, ScopeSelectable
-from tangl.core.factory.factory import Factory
+from tangl.core.factory.templ_factory import TemplateFactory
 
 def test_smoke():
     """Everything basically works."""
@@ -44,8 +44,8 @@ def test_smoke():
     assert node.label == "guard"
     assert "npc" in node.tags
 
-    # 4. Factory flatten
-    factory = Factory.from_root_templ(root)
+    # 4. TemplateFactory flatten
+    factory = TemplateFactory.from_root_templ(root)
     all_templs = list(factory.find_all())
 
     assert len(all_templs) == 2  # scene1 + start
@@ -369,7 +369,7 @@ def test_scope_selectable_combined():
 
 
 def test_factory_from_root_templ():
-    """Factory flattens hierarchy into flat registry."""
+    """TemplateFactory flattens hierarchy into flat registry."""
     from tangl.core.graph import Node
 
     class Root(HierarchicalTemplate[Node]):
@@ -390,7 +390,7 @@ def test_factory_from_root_templ():
         }
     )
 
-    factory = Factory.from_root_templ(root)
+    factory = TemplateFactory.from_root_templ(root)
 
     # Should have all templates
     all_templs = list(factory.find_all())
@@ -417,7 +417,7 @@ def test_factory_find_by_path():
     )
 
     assert root.is_instance(GraphItem)
-    factory = Factory.from_root_templ(root)
+    factory = TemplateFactory.from_root_templ(root)
 
     # Find by exact path
     assert "scene1.block1" in factory.all_paths()
@@ -438,7 +438,7 @@ def test_factory_materialize_templ():
         tags={"test"}
     )
 
-    node = Factory.materialize_templ(template)
+    node = TemplateFactory.materialize_templ(template)
 
     # Should be Node instance
     assert isinstance(node, Node)
@@ -462,7 +462,7 @@ def test_factory_materialize_hierarchical():
     )
 
     # Materialize just the scene
-    scene = Factory.materialize_templ(template)
+    scene = TemplateFactory.materialize_templ(template)
 
     # Should be Scene instance
     assert isinstance(scene, Scene)

@@ -11,7 +11,7 @@ from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BaseFragment
-from tangl.core.factory import Factory
+from tangl.core.factory import TemplateFactory
 from .frame import Frame, StackFrame
 from .stack_snapshot import StackSnapshot
 from .replay import Patch
@@ -130,7 +130,7 @@ class Ledger(Entity):
     snapshot_cadence: int = 1
     event_sourced: bool = False
     user: Optional[User] = Field(None, exclude=True)
-    factory: Optional[Factory] = Field(default=None, exclude=True)
+    factory: Optional[TemplateFactory] = Field(default=None, exclude=True)
     cursor_history: list[UUID] = Field(default_factory=list)
     call_stack: list[StackFrame] = Field(default_factory=list)
     """
