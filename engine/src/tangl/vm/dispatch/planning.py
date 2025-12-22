@@ -50,7 +50,7 @@ def _inject_default_provisioners(caller: Entity, *, ctx: Context, **_):
         GraphProvisioner(node_registry=registry, layer="local"),
         UpdatingProvisioner(node_registry=registry, layer="local"),
         CloningProvisioner(node_registry=registry, layer="local"),
-        TemplateProvisioner(template_registry=None, layer="local"),
+        TemplateProvisioner(factory=None, layer="local"),
     ]
 
 

@@ -6,11 +6,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Iterable, Iterator
 import logging
-from pydantic import Field
+from pydantic import Field, model_validator
 from uuid import UUID
 
 from tangl.type_hints import UnstructuredData
 from tangl.core import Entity, Graph, StreamRegistry, Snapshot, BaseFragment
+from tangl.core.factory import Factory
 from .frame import Frame, StackFrame
 from .stack_snapshot import StackSnapshot
 from .replay import Patch
@@ -129,6 +130,7 @@ class Ledger(Entity):
     snapshot_cadence: int = 1
     event_sourced: bool = False
     user: Optional[User] = Field(None, exclude=True)
+    factory: Optional[Factory] = Field(default=None, exclude=True)
     cursor_history: list[UUID] = Field(default_factory=list)
     call_stack: list[StackFrame] = Field(default_factory=list)
     """
@@ -144,6 +146,12 @@ class Ledger(Entity):
         # todo: if event sourced, we need to update the graph before snapshot
         snapshot = Snapshot.from_item(self.graph)
         self.records.add_record(snapshot)
+
+    @model_validator(mode="after")
+    def _attach_factory(self):
+        if self.factory is not None:
+            object.__setattr__(self.graph, "factory", self.factory)
+        return self
 
     def maybe_push_snapshot(self, snapshot_cadence=None, force=False):
         # Use force if you want to insist on a snapshot

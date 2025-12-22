@@ -12,10 +12,11 @@ from typing import Optional, Generic, TypeVar
 from uuid import UUID
 from copy import deepcopy
 
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, PrivateAttr, model_validator, field_validator
 
 from tangl.type_hints import StringMap, UnstructuredData, Identifier
 from tangl.core.graph import GraphItem, Node, Graph
+from tangl.core.factory import Template
 
 NodeT = TypeVar('NodeT', bound=Node)
 
@@ -121,7 +122,7 @@ class Requirement(GraphItem, Generic[NodeT]):
     asset_ref: Optional[Identifier] = None
     """Direct asset token reference (bypasses template lookup when provided)."""
     criteria: Optional[StringMap] = Field(default_factory=dict)
-    template: Optional[UnstructuredData] = None
+    template: Optional[UnstructuredData | Template] = None
     template_ref: Optional[Identifier] = None
     policy: ProvisioningPolicy = ProvisioningPolicy.ANY
     reference_id: Optional[UUID] = None
@@ -131,6 +132,13 @@ class Requirement(GraphItem, Generic[NodeT]):
     """Scope identifier where the requirement was satisfied."""
 
     _provider_obj: Optional[NodeT] = PrivateAttr(default=None)
+
+    @field_validator("template", mode="before")
+    @classmethod
+    def _coerce_template_instance(cls, value):
+        if isinstance(value, Template):
+            return value
+        return value
 
     @model_validator(mode="after")
     def _validate_policy(self):

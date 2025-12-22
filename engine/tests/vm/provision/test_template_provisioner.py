@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+from tangl.core.factory import Factory, Template
 from tangl.core.graph import Graph, Node
-from tangl.core.registry import Registry
-from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.vm.provision import (
     ProvisioningContext,
     ProvisioningPolicy,
@@ -25,32 +24,24 @@ def test_template_provisioner_offers_for_template_ref_in_mapping() -> None:
         policy=ProvisioningPolicy.CREATE,
     )
 
-    provisioner = TemplateProvisioner(
-        template_registry={
-            "guard_template": {"label": "guard", "obj_cls": Node}
-        },
-        layer="author",
-    )
+    factory = Factory(label="templates")
+    factory.add(Template[Node](label="guard_template", obj_cls=Node, tags={"npc"}))
+    provisioner = TemplateProvisioner(factory=factory, layer="author")
 
     ctx = _ctx(graph)
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
 
     assert len(offers) == 1
     provider = offers[0].accept(ctx=ctx)
-    assert provider.label == "guard"
+    assert provider.label == "guard_template"
     assert provider in graph
 
 
 def test_template_provisioner_uses_registry_lookup_for_template_ref() -> None:
     graph = Graph(label="story")
-    registry: Registry[ActorScript] = Registry(label="templates")
-    actor_template = ActorScript.model_validate(
-        {
-            "label": "village.guard",
-            "obj_cls": "tangl.story.concepts.actor.actor.Actor",
-        }
-    )
-    registry.add(actor_template)
+    factory = Factory(label="templates")
+    actor_template = Template[Node](label="village.guard", obj_cls=Node, tags={"npc"})
+    factory.add(actor_template)
 
     requirement = Requirement(
         graph=graph,
@@ -58,7 +49,7 @@ def test_template_provisioner_uses_registry_lookup_for_template_ref() -> None:
         policy=ProvisioningPolicy.CREATE,
     )
 
-    provisioner = TemplateProvisioner(template_registry=registry, layer="author")
+    provisioner = TemplateProvisioner(factory=factory, layer="author")
     ctx = _ctx(graph)
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
@@ -77,7 +68,7 @@ def test_template_provisioner_skips_unknown_template_ref() -> None:
         policy=ProvisioningPolicy.CREATE,
     )
 
-    provisioner = TemplateProvisioner(template_registry={}, layer="author")
+    provisioner = TemplateProvisioner(factory=Factory(label="empty"), layer="author")
     ctx = _ctx(graph)
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
