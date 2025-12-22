@@ -321,7 +321,7 @@ class TemplateProvisioner(Provisioner):
         *,
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
-        if not (requirement.policy & ProvisioningPolicy.CREATE):
+        if not (requirement.policy & (ProvisioningPolicy.CREATE | ProvisioningPolicy.CREATE_TEMPLATE)):
             return
         template, provenance = self._resolve_template(requirement, ctx=ctx)
         if template is None:
@@ -332,10 +332,15 @@ class TemplateProvisioner(Provisioner):
         def create_node(ctx: Context) -> Node:
             return self._materialize_template(template, ctx=ctx, factory=factory)
 
+        operation = (
+            ProvisioningPolicy.CREATE_TEMPLATE
+            if requirement.policy is ProvisioningPolicy.CREATE_TEMPLATE
+            else ProvisioningPolicy.CREATE
+        )
         yield DependencyOffer(
             requirement_id=requirement.uid,
             requirement=requirement,
-            operation=ProvisioningPolicy.CREATE,
+            operation=operation,
             base_cost=ProvisionCost.CREATE,
             cost=float(ProvisionCost.CREATE),
             proximity=999.0,

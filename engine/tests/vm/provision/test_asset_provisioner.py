@@ -95,8 +95,8 @@ def test_asset_provisioner_offers_when_asset_ref_present(asset_manager: DummyAss
 
     requirement = Requirement(
         graph=graph,
-        asset_ref="Excalibur",
-        policy=ProvisioningPolicy.CREATE,
+        token_ref="Excalibur",
+        policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
     provisioner = AssetProvisioner(layer="asset")
@@ -113,8 +113,8 @@ def test_asset_provisioner_skips_if_asset_not_registered(asset_manager: DummyAss
 
     requirement = Requirement(
         graph=graph,
-        asset_ref="NonexistentAsset",
-        policy=ProvisioningPolicy.CREATE,
+        token_ref="NonexistentAsset",
+        policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
     provisioner = AssetProvisioner(layer="asset")
@@ -130,8 +130,8 @@ def test_asset_offer_creates_token_on_accept(asset_manager: DummyAssetManager) -
 
     requirement = Requirement(
         graph=graph,
-        asset_ref="Excalibur",
-        policy=ProvisioningPolicy.CREATE,
+        token_ref="Excalibur",
+        policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
     provisioner = AssetProvisioner(layer="asset")
@@ -150,9 +150,9 @@ def test_asset_provisioner_supports_template_overlay(asset_manager: DummyAssetMa
 
     requirement = Requirement(
         graph=graph,
-        asset_ref="standard_deck",
-        template={"shuffle_state": [2, 5, 1, 3], "owner": "player"},
-        policy=ProvisioningPolicy.CREATE,
+        token_ref="standard_deck",
+        overlay={"shuffle_state": [2, 5, 1, 3], "owner": "player"},
+        policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
     provisioner = AssetProvisioner(layer="asset")

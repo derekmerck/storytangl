@@ -17,11 +17,11 @@ class AssetProvisioner(Provisioner):
     """Create tokens from :class:`~tangl.story.fabula.AssetManager` assets.
 
     Asset provisioning is *opt-in only*: this provisioner emits offers **only**
-    when ``requirement.asset_ref`` is set and the referenced asset is registered
+    when ``requirement.token_ref`` is set and the referenced asset is registered
     with the active world's :class:`~tangl.story.fabula.AssetManager`.
 
     It deliberately avoids satisfying normal story-driven requirements. If a
-    dependency does not specify :attr:`Requirement.asset_ref`, this provisioner
+    dependency does not specify :attr:`Requirement.token_ref`, this provisioner
     remains silent so that :class:`TemplateProvisioner` and other story-centric
     provisioners continue to own narrative provisioning.
     """
@@ -34,9 +34,9 @@ class AssetProvisioner(Provisioner):
         *,
         ctx: "Context",
     ) -> Generator[DependencyOffer, None, None]:
-        """Yield a provisioning offer when an explicit ``asset_ref`` is present."""
+        """Yield a provisioning offer when an explicit ``token_ref`` is present."""
 
-        asset_ref = requirement.asset_ref
+        asset_ref = requirement.token_ref
         if not asset_ref:
             return
 
@@ -47,12 +47,21 @@ class AssetProvisioner(Provisioner):
         if asset_manager is None or not asset_manager.has_asset(asset_ref):
             return
 
-        if not (requirement.policy & (ProvisioningPolicy.CREATE | ProvisioningPolicy.CLONE | ProvisioningPolicy.ANY)):
+        if not (
+            requirement.policy
+            & (
+                ProvisioningPolicy.CREATE
+                | ProvisioningPolicy.CREATE_TEMPLATE
+                | ProvisioningPolicy.CREATE_TOKEN
+                | ProvisioningPolicy.CLONE
+                | ProvisioningPolicy.ANY
+            )
+        ):
             return
 
         def _accept(ctx: "Context"):
             domain_manager = getattr(world, "domain_manager", None) if world is not None else None
-            overlay = requirement.template or {}
+            overlay = requirement.overlay or requirement.template or {}
 
             return asset_manager.create_token(
                 asset_ref=asset_ref,
