@@ -2,11 +2,11 @@
 
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 
 def test_scope_selector_is_global_when_no_constraints() -> None:
-    selector = ScopeSelector()
+    # selector = ScopeSelector()
 
     assert selector.is_global() is True
     assert selector.model_dump() == {
@@ -18,7 +18,7 @@ def test_scope_selector_is_global_when_no_constraints() -> None:
 
 
 def test_scope_selector_recognises_constraints() -> None:
-    selector = ScopeSelector(source_label="village.smithy")
+    # selector = ScopeSelector(source_label="village.smithy")
 
     assert selector.is_global() is False
     assert selector.source_label == "village.smithy"

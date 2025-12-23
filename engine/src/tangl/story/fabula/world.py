@@ -50,7 +50,6 @@ from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
 from tangl.ir.story_ir.scene_script_models import BlockScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
 
@@ -969,7 +968,7 @@ class World(Singleton):
                 if source_node is None:
                     continue
 
-                scope_selector = ScopeSelector(parent_label=scene_label)
+                # scope_selector = ScopeSelector(parent_label=scene_label)
                 for key in ("actions", "continues", "redirects"):
                     edge_scripts = scripts.get(key, [])
                     if not edge_scripts:
@@ -978,7 +977,7 @@ class World(Singleton):
                         graph=graph,
                         source_node=source_node,
                         action_scripts=edge_scripts,
-                        scope=scope_selector,
+                        # scope=scope_selector,
                         block_map=block_map,
                     )
 

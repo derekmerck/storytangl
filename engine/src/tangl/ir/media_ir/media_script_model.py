@@ -7,6 +7,7 @@ from pydantic import AnyUrl, BaseModel, model_validator
 from tangl.media.media_role import MediaRole
 from tangl.media.type_hints import Media
 from tangl.type_hints import UniqueLabel
+from tangl.ir.core_ir import BaseScriptItem
 
 # language:yaml
 """
@@ -27,7 +28,7 @@ node:
         more_kwargs: {}    #   vector-spec kwargs to realize with parent ref
 """
 
-class MediaItemScript(BaseModel, arbitrary_types_allowed=True):
+class MediaItemScript(BaseScriptItem, arbitrary_types_allowed=True):
     """
     MediaItemScript -> MediaNode -> JournalMediaItem (response)
     """

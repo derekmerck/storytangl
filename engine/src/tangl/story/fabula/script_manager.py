@@ -17,7 +17,6 @@ from tangl.ir.story_ir import StoryScript
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
 from tangl.ir.story_ir.scene_script_models import BlockScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.type_hints import StringMap, UnstructuredData
 
 logger = logging.getLogger(__name__)
@@ -99,35 +98,37 @@ class ScriptManager:
 
     def find_template(
         self,
-        *,
-        identifier: str | None = None,
-        selector: Node | None = None,
-        scope: ScopeSelector | None = None,
-        **criteria: Any,
+        # identifier: str | None = None,
+        # selector: Node | None = None,
+        # scope: ScopeSelector | None = None,
+        **criteria: Any
     ) -> BaseScriptItem | None:
         """Return the first template matching identifier/criteria within scope."""
 
-        scoped_criteria: dict[str, Any] = dict(criteria)
+        # todo: anchored lookup is just sort by ancestry and then return first
+        return self._template_registry.find_one(**criteria)
 
-        if identifier and self._is_qualified(identifier):
-            return self._template_registry.find_one(
-                has_identifier=identifier, **scoped_criteria
-            )
-
-        if identifier and selector is not None:
-            return self._anchored_lookup(identifier, selector, scoped_criteria)
-
-        query = self._build_query(identifier, scope, scoped_criteria)
-        return self._template_registry.find_one(**query)
+        # scoped_criteria: dict[str, Any] = dict(criteria)
+        #
+        # if identifier and self._is_qualified(identifier):
+        #     return self._template_registry.find_one(
+        #         has_identifier=identifier, **scoped_criteria
+        #     )
+        #
+        # if identifier and selector is not None:
+        #     return self._anchored_lookup(identifier, selector, scoped_criteria)
+        #
+        # query = self._build_query(identifier, scope, scoped_criteria)
+        # return self._template_registry.find_one(**query)
 
     def find_templates(
         self,
-        *,
-        identifier: str | None = None,
-        selector: Node | None = None,
-        scope: ScopeSelector | None = None,
+        # *,
+        # identifier: str | None = None,
+        # selector: Node | None = None,
+        # scope: ScopeSelector | None = None,
         **criteria: Any,
-    ) -> list[BaseScriptItem]:
+    ) -> Iterator[BaseScriptItem]:
         """Return all templates matching identifier/criteria.
 
         Notes
@@ -138,9 +139,11 @@ class ScriptManager:
         registry search using the supplied identifier and criteria.
         """
 
-        scoped_criteria: dict[str, Any] = dict(criteria)
-        query = self._build_query(identifier, scope, scoped_criteria)
-        return list(self._template_registry.find_all(**query))
+        return self._template_registry.find_all(**criteria)
+
+        # scoped_criteria: dict[str, Any] = dict(criteria)
+        # query = self._build_query(identifier, scope, scoped_criteria)
+        # return list(self._template_registry.find_all(**query))
 
     @staticmethod
     def _is_qualified(identifier: str) -> bool:
@@ -155,6 +158,8 @@ class ScriptManager:
         criteria: Mapping[str, Any],
     ) -> BaseScriptItem | None:
         """Search the selector's scope chain for an unqualified identifier."""
+
+        # todo: anchored lookup is just sort by ancestry and then return first
 
         def _scope_matches(template: BaseScriptItem | None, chain: list[str]) -> bool:
             scope = getattr(template, "scope", None)

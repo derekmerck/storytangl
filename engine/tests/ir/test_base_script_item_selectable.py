@@ -1,6 +1,6 @@
 from tangl.core.graph import Graph
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 
 def test_template_gates_on_scope_via_selector():

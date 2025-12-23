@@ -4,7 +4,7 @@ import pytest
 
 from tangl.core.graph.subgraph import Subgraph
 from tangl.ir.story_ir import StoryScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
 from tangl.story.story_graph import StoryGraph
 

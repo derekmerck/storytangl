@@ -1,6 +1,6 @@
 # tangl/utils/base_model_plus.py
 from functools import total_ordering
-from typing import Any, Self, Type, Iterator, ClassVar, TypeVar, get_args, get_origin
+from typing import Any, Self, Type, Iterator, ClassVar, TypeVar, get_args, get_origin, Union
 import logging
 from uuid import uuid4
 from inspect import isclass
@@ -174,7 +174,7 @@ class BaseModelPlus(BaseModel):
         return field_names
 
     @classmethod
-    def _fields(cls, **criteria) -> Iterator[str]:
+    def _fields(cls, as_field=False, **criteria) -> Iterator[Union[Field, str]]:
         """
         Returns fields with attribs or json_extra metadata keys = values.
 
@@ -207,7 +207,10 @@ class BaseModelPlus(BaseModel):
         for n, f in cls.model_fields.items():
             if matches(f, **criteria):
                 logger.debug(f"Including field: {n}")
-                yield n
+                if as_field:
+                    yield f
+                else:
+                    yield n
             else:
                 logger.debug(f"Skipping field: {n}")
 
@@ -256,12 +259,19 @@ class BaseModelPlus(BaseModel):
         kwargs['uid'] = uuid4()
         return self.model_copy(update=kwargs, deep=True)
 
-    def update_attrs(self, **kwargs):
-        """Update attributes of this model in place."""
+    def update_attrs(self, force=False, **kwargs):
+        """
+        Update attributes of this model in place.
+
+        Use `force=True` to update attributes on a frozen instance by
+        editing the underlying dict directly (be careful!)
+        """
         for k, v in kwargs.items():
             if hasattr(self, k):
-                # setattr(self, k, v)
-                self.__dict__[k] = v
+                if force:
+                    self.__dict__[k] = v
+                else:
+                    setattr(self, k, v)
 
     @classmethod
     def __fqn__(cls):

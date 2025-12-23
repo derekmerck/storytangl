@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from tangl.core.graph import Node
 from tangl.ir.story_ir import ActorScript, BlockScript, StoryScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
@@ -193,7 +193,7 @@ def test_materialize_block_creates_action_edges(mock_world):
 
     template = BlockScript(
         label="start",
-        scope=ScopeSelector(parent_label="scene1"),
+        # scope=ScopeSelector(parent_label="scene1"),
         obj_cls=Block,
         text="Beginning",
         actions=[{"text": "Continue", "successor": "next"}],

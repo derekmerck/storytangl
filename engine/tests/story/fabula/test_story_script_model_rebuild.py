@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tangl.ir.story_ir import StoryScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.ir.core_ir import MasterScript, ScriptMetadata
 
 

@@ -68,7 +68,7 @@ class Entity(BaseModelPlus):
     tags: set[Tag] = Field(default_factory=set)
     # tag syntax can be used by the _parser_ as sugar for various attributes
     # - indicate membership               domain:<foo> or channel:<foo>
-    # - automatically set default values  .str=100
+    # - automatically set default values  str=100
     # - indicate relationships            @other_node.friendship=+10
     # However, such logic is NOT built into the base functionality
 

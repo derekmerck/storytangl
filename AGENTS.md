@@ -90,6 +90,8 @@ one of the above base types.
 ## Testing and quality checks
 - Run `pytest engine/tests` (or `poetry run pytest engine/tests`) before submitting
   changes. Add targeted tests in the matching module-specific folder.
+- Use the poetry-managed venv to avoid missing dependency issues, add `engine/tests`
+  and other test paths to PYTHONPATH for pytest, if necessary.
 - Keep fixtures lightweight; prefer deterministic data seeded from `engine/tests` or
   sample YAML fixtures under `engine/tests/resources`.
 - If you add CLI or REST surface changes, also update the relevant app/world tests

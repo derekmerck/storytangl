@@ -6,52 +6,17 @@ import logging
 from pydantic import Field, FieldValidationInfo, model_validator
 
 from tangl.type_hints import UnstructuredData, StringMap, Tag
-from tangl.core.entity import Selectable
 from tangl.core.graph import GraphItem
+from tangl.core.graph.scope_selectable import ScopeSelectable
 from .template import Template
 
 logger = logging.getLogger(__name__)
 
 
-# todo: this gets moved into `core.graph`, can be tested independently of
-#       template with GraphItem selectors
-class ScopeSelectable(Selectable):
-    """
-    Entity with scope requirements for pattern-based matching.
-
-    Examples:
-        >>> template = ScopeSelectable(
-        ...     label="guard",
-        ...     req_scope_tags={"combat"},
-        ...     req_scope_pattern="dungeon.*"
-        ... )
-        >>>
-        >>> criteria = template.get_selection_criteria()
-        >>> # {'has_ancestor_tags': {'combat'}, 'has_path': 'dungeon.*'}
-    """
-    req_ancestor_tags: set[Tag] = Field(default_factory=set, alias="ancestor_tags")
-    req_path_pattern: str = Field(None, alias="path_pattern")
-
-    def get_selection_criteria(self) -> StringMap:
-        """Translate scope requirements to selection criteria.
-
-        Notes:
-            - `has_ancestor_tags` means the selector (e.g., a GraphItem) must have
-              these tags somewhere on itself or in its ancestor chain.
-            - `has_path` is an fnmatch pattern against the selector's canonical path, i.e. <Node:scene1.foo>.has_path('scene1.*') -> True
-        """
-        criteria: StringMap = super().get_selection_criteria()
-        if self.req_ancestor_tags:
-            criteria.update({"has_ancestor_tags": self.req_ancestor_tags})
-        if self.req_path_pattern:
-            criteria.update({"has_path": self.req_path_pattern})
-        return criteria
-
-
 GIT = TypeVar('GIT', bound=GraphItem)
 
-class HierarchicalTemplate(ScopeSelectable,
-                           Template[GIT],   # type: ignore[type-arg]
+class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
+                           ScopeSelectable, # needs to be AFTER template for unstructure
                            Generic[GIT]):
     """
     Template DAG with parent/child relationships and auto-computed paths.
@@ -151,18 +116,18 @@ class HierarchicalTemplate(ScopeSelectable,
             value = getattr(self, field)
             if isinstance(value, Template):
                 # single child
-                value.update_attrs(parent=self)
+                value.update_attrs(parent=self, force=True)
             elif isinstance(value, dict):
                 # dict of children by label
                 for k, v in value.items():
                     if v.label is None:
                         logger.debug(f"Updating label {k}")
-                        v.update_attrs(label=k)
-                    v.update_attrs(parent=self)
+                        v.update_attrs(label=k, force=True)
+                    v.update_attrs(parent=self, force=True)
             elif isinstance(value, list):
                 # list of children
                 for v in value:
-                    v.update_attrs(parent=self)
+                    v.update_attrs(parent=self, force=True)
             else:
                 raise ValueError(f"Unexpected type {type(value)}")
         return self

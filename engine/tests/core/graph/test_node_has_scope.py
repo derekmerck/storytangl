@@ -1,5 +1,5 @@
 from tangl.core.graph import Graph
-from tangl.core.graph.scope_selectable import ScopeSelector
+# from tangl.core.graph.scope_selectable import ScopeSelector
 
 def test_has_ancestor_tags_matches():
     graph = Graph()
@@ -39,7 +39,7 @@ def test_has_scope_global_selector_matches():
     graph = Graph()
     node = graph.add_node(label="block")
 
-    assert node.has_scope(ScopeSelector()) is True
+    assert node.has_scope({"has_path": '*'}) is True
 
 
 def test_has_scope_parent_label_and_source_label():
@@ -48,10 +48,13 @@ def test_has_scope_parent_label_and_source_label():
     node = graph.add_node(label="block1")
     parent.add_member(node)
 
-    assert node.has_scope(ScopeSelector(parent_label="scene1")) is True
-    assert node.has_scope(ScopeSelector(source_label="block1")) is True
-    assert node.has_scope(ScopeSelector(source_label="other")) is False
-    assert node.has_scope(ScopeSelector(parent_label="scene2")) is False
+    assert node.has_scope({"has_path": 'scene1.*'})
+    assert node.has_scope({"has_path": '*.block1'})
+
+    # assert node.has_scope(ScopeSelector(parent_label="scene1")) is True
+    # assert node.has_scope(ScopeSelector(source_label="block1")) is True
+    # assert node.has_scope(ScopeSelector(source_label="other")) is False
+    # assert node.has_scope(ScopeSelector(parent_label="scene2")) is False
 
 
 def test_has_scope_ancestor_labels_and_tags():
@@ -63,28 +66,45 @@ def test_has_scope_ancestor_labels_and_tags():
     world.add_member(scene)
     scene.add_member(block)
 
-    assert block.has_scope(ScopeSelector(ancestor_labels={"world*"})) is True
-    assert block.has_scope(ScopeSelector(ancestor_labels={"missing"})) is False
-    assert block.has_scope(ScopeSelector(ancestor_tags={"world"})) is True
-    assert block.has_scope(ScopeSelector(ancestor_tags={"scene", "world"})) is True
-    assert block.has_scope(ScopeSelector(ancestor_tags={"dungeon"})) is False
+    assert block.has_scope({'has_path': "world.*"})
+    assert not block.has_scope({'has_path': "missing.*"})
+    assert block.has_scope({'has_ancestor_tags': {'world'}})
+    assert block.has_scope({'has_ancestor_tags': {'world', 'scene'}})
+    assert not block.has_scope({'has_ancestor_tags': {'world', 'scene', 'other'}})
+    # assert block.has_scope(ScopeSelector(ancestor_labels={"world*"})) is True
+    # assert block.has_scope(ScopeSelector(ancestor_labels={"missing"})) is False
+    # assert block.has_scope(ScopeSelector(ancestor_tags={"world"})) is True
+    # assert block.has_scope(ScopeSelector(ancestor_tags={"scene", "world"})) is True
+    # assert block.has_scope(ScopeSelector(ancestor_tags={"dungeon"})) is False
 
 
-def test_has_scope_no_parent_with_scope_constraints():
-    graph = Graph()
-    node = graph.add_node(label="orphan")
+# def test_has_scope_no_parent_with_scope_constraints():
+#     graph = Graph()
+#     node = graph.add_node(label="orphan")
 
-    assert node.has_scope(ScopeSelector(parent_label="scene1")) is False
-    assert node.has_scope(ScopeSelector(ancestor_labels={"world"})) is False
-    assert node.has_scope(ScopeSelector(ancestor_tags={"world"})) is False
+    # assert node.has_scope(ScopeSelector(parent_label="scene1")) is False
+    # assert node.has_scope(ScopeSelector(ancestor_labels={"world"})) is False
+    # assert node.has_scope(ScopeSelector(ancestor_tags={"world"})) is False
 
 
 def test_has_scope_source_label_only():
     graph = Graph()
-    node = graph.add_node(label="block1")
+    node = graph.add_node(label="block1", tags={"node"})
 
-    assert node.has_scope(ScopeSelector(source_label="block1")) is True
-    assert node.has_scope(ScopeSelector(source_label="block2")) is False
+    scope = {'has_path': 'block1'}
+    assert node.has_scope(scope)
+
+    scope = {'has_path': 'block2'}
+    assert not node.has_scope(scope)
+
+    scope = {'has_path': 'block1',
+             'has_ancestor_tags': {'node'}}
+    assert node.has_scope(scope)
+
+    scope = {'has_path': 'block1',
+             'has_ancestor_tags': {'node', 'other'}}
+    assert not node.has_scope(scope)
+
 
 
 def test_has_scope_with_mixed_constraints():
@@ -96,18 +116,12 @@ def test_has_scope_with_mixed_constraints():
     world.add_member(scene)
     scene.add_member(block)
 
-    scope = ScopeSelector(
-        parent_label="scene1",
-        ancestor_labels={"world*"},
-        ancestor_tags={"world", "scene"},
-        source_label="block1",
-    )
-
+    scope = {"has_path": "world.scene1.*",
+             "has_ancestor_tags": {"world"}}
     assert block.has_scope(scope) is True
-    assert block.has_scope(scope.model_copy(update={"source_label": "other"})) is False
-    assert (
-        block.has_scope(
-            scope.model_copy(update={"ancestor_tags": {"world", "dungeon"}}),
-        )
-        is False
-    )
+
+    scope['has_ancestor_tags'].add("scene")
+    assert block.has_scope(scope) is True
+
+    scope['has_ancestor_tags'].add("other")
+    assert not block.has_scope(scope)

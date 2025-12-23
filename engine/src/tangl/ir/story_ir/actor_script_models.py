@@ -10,9 +10,6 @@ from tangl.lang.gens import Gens
 from tangl.ir.core_ir import BaseScriptItem
 from .asset_script_models import AssetsScript
 
-if TYPE_CHECKING:
-    from .story_script_models import ScopeSelector
-
 MediaItemScript = BaseScriptItem
 
 class ActorScript(BaseScriptItem):
@@ -40,10 +37,6 @@ class ActorScript(BaseScriptItem):
 
     media: list[MediaItemScript] = None
 
-    scope: ScopeSelector | None = Field(
-        None,
-        description="Where this template is valid (``None`` makes it global).",
-    )
 
 class RoleScript(BaseScriptItem):
 

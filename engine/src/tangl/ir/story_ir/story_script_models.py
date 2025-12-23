@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from tangl.type_hints import Hash, StringMap, UniqueLabel
 from tangl.core import Registry
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
-from tangl.core.graph.scope_selectable import ScopeSelectable, ScopeSelector
+from tangl.core.graph.scope_selectable import ScopeSelectable
 from .scene_script_models import SceneScript, BlockScript, MenuBlockScript
 from .actor_script_models import ActorScript, RoleScript
 from .location_script_models import LocationScript, SettingScript
@@ -41,10 +41,10 @@ class StoryScript(MasterScript, BaseScriptItem):
     # Template-map {templ_name: {attrib: default}}
     templates: Optional[ dict[UniqueLabel, dict[str, Any]] ] = None
 
-    @field_validator('scenes', 'actors', 'locations', mode="before")
-    @classmethod
-    def __set_label_from_key(cls, value: dict[UniqueLabel, StringMap]) -> dict[UniqueLabel, StringMap]:
-        return cls._set_label_from_key(value)
+    # @field_validator('scenes', 'actors', 'locations', mode="before")
+    # @classmethod
+    # def __set_label_from_key(cls, value: dict[UniqueLabel, StringMap]) -> dict[UniqueLabel, StringMap]:
+    #     return cls._set_label_from_key(value)
 
     def create_template_registry(self) -> Registry[BaseScriptItem]:
         # decomposes a script into script items and registers them
@@ -56,7 +56,6 @@ class StoryScript(MasterScript, BaseScriptItem):
 
 
 _types_namespace = {
-    "ScopeSelector": ScopeSelector,
     "Hash": Hash,
     "ActorScript": ActorScript,
     "LocationScript": LocationScript,

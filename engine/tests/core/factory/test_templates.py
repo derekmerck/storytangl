@@ -91,9 +91,10 @@ def test_template_hydrates_string_obj_cls():
     assert template.obj_cls is Node
 
 
-def test_template_excludes_record_metadata():
+@pytest.mark.parametrize('templ_cls', (Template, HierarchicalTemplate))
+def test_template_excludes_record_metadata(templ_cls):
     """uid, seq, is_dirty excluded from serialization."""
-    template = Template(label="test")
+    template = templ_cls(label="test")
 
     data = template.unstructure()
 

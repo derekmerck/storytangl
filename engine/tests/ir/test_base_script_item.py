@@ -3,6 +3,8 @@
 from tangl.core import Record, Node
 from tangl.ir.core_ir import BaseScriptItem
 
+# todo: merge w template tests, nothing script-ish
+
 
 def test_base_script_item_is_record() -> None:
     """``BaseScriptItem`` should inherit :class:`~tangl.core.Record`."""
@@ -28,7 +30,7 @@ def test_model_dump_emits_string_class_without_entity_fields() -> None:
     item = BaseScriptItem(obj_cls="tangl.core.graph.node.Node", label="demo")
     assert item.obj_cls is Node
 
-    payload = item.model_dump()
+    payload = item.unstructure_as_template()
 
     assert payload["obj_cls"] is Node
     assert payload["label"] == "demo"

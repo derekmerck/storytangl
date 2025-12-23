@@ -9,7 +9,7 @@ import pytest
 
 from tangl.ir.core_ir.script_metadata_model import ScriptMetadata
 from tangl.ir.story_ir import ActorScript, BlockScript, LocationScript, SceneScript, StoryScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
@@ -285,7 +285,7 @@ def test_duplicate_labels_allowed_with_different_scopes() -> None:
     assert world.script_manager.find_template(identifier="village.guard") == village_guard
 
 
-def test_registry_finds_template_by_qual_label() -> None:
+def test_registry_finds_template_by_path() -> None:
     """Registry should resolve templates by qualified label identifier."""
 
     story_data = {
@@ -417,7 +417,7 @@ def test_block_script_has_template_interface() -> None:
 
     assert hasattr(block, "content_hash")
 
-    assert block.qual_label == "scene1.test"
+    assert block.path == "scene1.test"
 
 
 def test_block_script_scope_is_immutable() -> None:

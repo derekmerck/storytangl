@@ -2,7 +2,7 @@
 
 from tangl.ir.core_ir import MasterScript, ScriptMetadata
 from tangl.ir.story_ir import ActorScript, BlockScript, LocationScript, StoryScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager

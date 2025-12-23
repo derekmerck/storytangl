@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import warnings
 from uuid import UUID
 from typing import Optional, Iterator, Iterable, TYPE_CHECKING
 import functools
@@ -105,12 +106,9 @@ class GraphItem(Entity):
         # seems redundant
         return self.parent is not None and self.parent.label == parent_label
 
-    # def has_ancestor_labels(self, labels: set[str]) -> bool:
-    #     if not labels:
-    #         return True
-    #
-    #     ancestor_labels = {ancestor.label for ancestor in self.ancestors() if ancestor.label}
-    #     return labels.issubset(ancestor_labels)
+    def has_scope(self, scope: dict) -> bool:
+        warnings.warn(DeprecationWarning("`has_scope` is deprecated; prefer `matches(has_path, has_ancestor_tags`)."))
+        return self.matches(**scope)
 
     @property
     def root(self) -> Optional[Subgraph]:

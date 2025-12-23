@@ -1,5 +1,5 @@
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 
 def test_global_template_selection_criteria_empty():
