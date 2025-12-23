@@ -49,7 +49,8 @@ from pydantic import Field
 
 from tangl.core import CallReceipt, Edge, Entity, Node, Record, Registry
 from tangl.type_hints import StringMap
-from .requirement import ProvisioningPolicy, Requirement
+from .provisioning_policy import ProvisioningPolicy
+from .requirement import Requirement
 
 if TYPE_CHECKING:
     from tangl.vm.context import Context
@@ -229,7 +230,8 @@ class PlanningReceipt(Record):
         return sum(
             1
             for build in self.builds
-            if build.accepted and build.operation == ProvisioningPolicy.CREATE
+            if build.accepted
+            and build.operation in {ProvisioningPolicy.CREATE_TEMPLATE, ProvisioningPolicy.CREATE_TOKEN}
         )
 
     @property
@@ -275,7 +277,7 @@ class PlanningReceipt(Record):
                     attached += 1
                 case ProvisioningPolicy.UPDATE:
                     updated += 1
-                case ProvisioningPolicy.CREATE:
+                case ProvisioningPolicy.CREATE_TEMPLATE | ProvisioningPolicy.CREATE_TOKEN:
                     created += 1
                 case ProvisioningPolicy.CLONE:
                     cloned += 1
@@ -299,4 +301,3 @@ class PlanningReceipt(Record):
         # during summarization for test expectations.
         _ = attached + updated + created + cloned  # noqa: F841
         return receipt
-

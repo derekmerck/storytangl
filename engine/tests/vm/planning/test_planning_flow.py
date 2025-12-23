@@ -26,7 +26,7 @@ def test_plan_collect_offers_prioritizes_affordances_and_tags_sources():
 
     dep_req = Requirement[Node](
         graph=g,
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "generated"},
         hard_requirement=True,
     )
@@ -79,7 +79,7 @@ def test_planning_receipt_counts_created_unresolved_and_waived():
 
     created_req = Requirement[Node](
         graph=g,
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "created"},
         hard_requirement=True,
     )
@@ -113,7 +113,7 @@ def test_planning_receipt_counts_created_unresolved_and_waived():
 
     builds = _collect_build_receipts(frame)
     assert len(builds) == 1
-    assert builds[0].operation is ProvisioningPolicy.CREATE
+    assert builds[0].operation is ProvisioningPolicy.CREATE_TEMPLATE
 
 # @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_event_sourced_frame_records_planning_receipt_and_patch():
@@ -123,7 +123,7 @@ def test_event_sourced_frame_records_planning_receipt_and_patch():
 
     created_req = Requirement[Node](
         graph=g,
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "projected"},
         hard_requirement=True,
     )
@@ -170,7 +170,7 @@ def test_planning_clears_frontier_cache_when_provisioners_missing(monkeypatch):
 
     created_req = Requirement[Node](
         graph=g,
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "created"},
         hard_requirement=True,
     )

@@ -429,7 +429,7 @@ class World(Singleton):
                 graph=graph,
                 identifier=successor_identifier,
                 template_ref=successor_identifier,
-                policy=ProvisioningPolicy.CREATE,
+                policy=ProvisioningPolicy.CREATE_TEMPLATE,
                 hard_requirement=True,
             )
 
@@ -616,7 +616,7 @@ class World(Singleton):
                 block_data = block_data or {}
                 qualified_label = f"{scene_label}.{block_label}"
                 cls = self.domain_manager.resolve_class(
-                    block_data.get("obj_cls") or block_data.get("block_cls")
+                    block_data.get("block_cls") or block_data.get("obj_cls")
                 )
 
                 scripts = {
@@ -876,7 +876,7 @@ class World(Singleton):
         if requirement.template_ref:
             keys.append(str(requirement.template_ref))
 
-        if requirement.policy is not ProvisioningPolicy.CREATE:
+        if requirement.policy is not ProvisioningPolicy.CREATE_TEMPLATE:
             for key in keys:
                 uid = actor_map.get(key)
                 if uid:
@@ -884,7 +884,7 @@ class World(Singleton):
                     if existing is not None:
                         return existing
 
-        if requirement.policy & ProvisioningPolicy.CREATE and requirement.template_ref:
+        if requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE and requirement.template_ref:
             template = self.script_manager.find_template(identifier=str(requirement.template_ref))
             if template is None:
                 return None
@@ -917,7 +917,7 @@ class World(Singleton):
         if requirement.template_ref:
             keys.append(str(requirement.template_ref))
 
-        if requirement.policy is not ProvisioningPolicy.CREATE:
+        if requirement.policy is not ProvisioningPolicy.CREATE_TEMPLATE:
             for key in keys:
                 uid = location_map.get(key)
                 if uid:
@@ -925,7 +925,7 @@ class World(Singleton):
                     if existing is not None:
                         return existing
 
-        if requirement.policy & ProvisioningPolicy.CREATE and requirement.template_ref:
+        if requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE and requirement.template_ref:
             template = self.script_manager.find_template(identifier=str(requirement.template_ref))
             if template is None:
                 return None

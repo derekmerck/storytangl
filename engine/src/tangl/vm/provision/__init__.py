@@ -2,7 +2,8 @@
 """Provisioning primitives for the planning phase."""
 
 from .asset_provisioner import AssetProvisioner
-from .requirement import ProvisioningPolicy, Requirement
+from .provisioning_policy import ProvisioningPolicy
+from .requirement import Requirement
 from .provisioner import (
     Provisioner,
     GraphProvisioner,
@@ -11,6 +12,7 @@ from .provisioner import (
     CloningProvisioner,
     CompanionProvisioner,
 )
+from .token_provisioner import TokenProvisioner
 from .open_edge import Dependency, Affordance
 from .offer import (
     ProvisionCost,
@@ -35,6 +37,7 @@ __all__ = [
     "Provisioner",
     "GraphProvisioner",
     "TemplateProvisioner",
+    "TokenProvisioner",
     "UpdatingProvisioner",
     "CloningProvisioner",
     "CompanionProvisioner",

@@ -1,90 +1,64 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import Field
 
-from tangl.core.graph import Node
-from tangl.story.fabula import AssetManager, DomainManager
-from tangl.story.story_graph import StoryGraph
+from tangl.core.graph import Graph, Token
+from tangl.story.concepts.asset import AssetType
+from tangl.story.fabula import AssetManager
 
 
-def test_asset_manager_register_and_has_asset():
+class Deck(AssetType):
+    card_count: int = 52
+    shuffle_state: list[int] = Field(default_factory=list, json_schema_extra={"instance_var": True})
+
+
+@pytest.fixture(autouse=True)
+def _clear_deck_instances() -> None:
+    yield
+    Deck.clear_instances()
+
+
+def test_create_token_from_registered_asset() -> None:
     manager = AssetManager()
+    manager.register_discrete_class("decks", Deck)
+    Deck(label="standard", card_count=52)
 
-    manager.register(
-        asset_ref="test_asset",
-        template={"obj_cls": "tangl.core.graph.Node", "label": "test_item"},
-    )
+    graph = Graph(label="test")
+    token = manager.create_token("decks", "standard", graph)
 
-    assert manager.has_asset("test_asset")
-    assert "test_asset" in manager.list_assets()
-
-
-def test_create_token_from_registered_asset():
-    manager = AssetManager()
-    graph = StoryGraph(label="test")
-
-    manager.register(
-        asset_ref="standard_deck",
-        template={
-            "obj_cls": "tangl.core.graph.Node",
-            "label": "standard_deck",
-            "name": "Standard Deck of Cards",
-            "card_count": 52,
-        },
-    )
-
-    token = manager.create_token(asset_ref="standard_deck", graph=graph)
-
-    assert isinstance(token, Node)
-    assert token.label == "standard_deck"
-    assert token.name == "Standard Deck of Cards"
+    assert isinstance(token, Token)
+    assert token.label == "standard"
+    assert token.card_count == 52
     assert token in graph
 
 
-def test_create_token_overlays_do_not_mutate_template():
+def test_create_token_allows_overlay() -> None:
     manager = AssetManager()
-    graph = StoryGraph(label="test")
+    manager.register_discrete_class("decks", Deck)
+    Deck(label="standard", card_count=52)
 
-    manager.register(
-        asset_ref="deck",
-        template={"obj_cls": "tangl.core.graph.Node", "label": "deck", "card_count": 52},
-    )
-
-    first = manager.create_token(asset_ref="deck", graph=graph, shuffle_state=[1, 2, 3])
-    second = manager.create_token(asset_ref="deck", graph=graph, shuffle_state=[3, 2, 1])
-
-    assert first is not second
-    assert first.shuffle_state == [1, 2, 3]
-    assert second.shuffle_state == [3, 2, 1]
-
-    stored_template = manager._asset_templates["deck"]
-    assert "shuffle_state" not in stored_template
-
-
-def test_create_token_uses_domain_manager_resolution():
-    manager = AssetManager()
-    graph = StoryGraph(label="test")
-    domain_manager = DomainManager()
-
-    manager.register(
-        asset_ref="custom_node",
-        template={"obj_cls": "tangl.core.graph.Node", "label": "custom_node"},
-    )
-
+    graph = Graph(label="test")
     token = manager.create_token(
-        asset_ref="custom_node",
-        graph=graph,
-        domain_manager=domain_manager,
+        "decks",
+        "standard",
+        graph,
+        overlay={"shuffle_state": [1, 2, 3]},
     )
 
-    assert isinstance(token, Node)
-    assert token.label == "custom_node"
+    assert token.shuffle_state == [1, 2, 3]
 
 
-def test_create_token_errors_when_asset_missing():
+def test_create_token_requires_registered_type() -> None:
     manager = AssetManager()
-    graph = StoryGraph(label="test")
 
-    with pytest.raises(ValueError, match="missing"):
-        manager.create_token(asset_ref="missing", graph=graph)
+    with pytest.raises(ValueError, match="not registered"):
+        manager.create_token("unknown", "missing")
 
+
+def test_create_token_errors_when_base_missing() -> None:
+    manager = AssetManager()
+    manager.register_discrete_class("decks", Deck)
+
+    with pytest.raises(ValueError, match="Available"):
+        manager.create_token("decks", "missing")

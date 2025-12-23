@@ -49,7 +49,7 @@ def test_alice_templ_prov(location_setting):
     offers = list(template_prov.get_dependency_offers(wants_city.requirement, ctx=ctx))
 
     assert len(offers) == 1
-    assert offers[0].operation is ProvisioningPolicy.CREATE
+    assert offers[0].operation is ProvisioningPolicy.CREATE_TEMPLATE
 
     res = offers[0].accept(ctx=ctx)
     print(f"accepted: {res}")
@@ -65,5 +65,5 @@ def test_alice_templ_prov(location_setting):
     offers.extend(template_prov.get_dependency_offers(wants_city2.requirement, ctx=ctx))
     kinds = {offer.operation for offer in offers}
     assert ProvisioningPolicy.EXISTING in kinds
-    assert ProvisioningPolicy.CREATE in kinds
+    assert ProvisioningPolicy.CREATE_TEMPLATE in kinds
 

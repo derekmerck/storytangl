@@ -18,7 +18,8 @@ from .offer import (
 )
 from .open_edge import Affordance, Dependency
 from .provisioner import Provisioner
-from .requirement import ProvisioningPolicy, Requirement
+from .requirement import Requirement
+from .provisioning_policy import ProvisioningPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - import guarded for typing only
     from tangl.vm.context import Context

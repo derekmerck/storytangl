@@ -131,9 +131,10 @@ class BaseScriptItem(ScopeSelectable, ContentAddressable, Record):
     @classmethod
     def _alias_obj_cls_to_templ_cls(cls, data: Any) -> Any:
         if "obj_cls" in data:
-            if 'templ_cls' in data:
-                raise ValueError("Can't define both obj_cls _and_ templ_cls")
-            data['templ_cls'] = data.pop("obj_cls")
+            if "templ_cls" in data and data["templ_cls"] is not None:
+                data.pop("obj_cls", None)
+                return data
+            data["templ_cls"] = data.pop("obj_cls")
         return data
 
     @field_validator('templ_cls', mode="after")
@@ -144,8 +145,13 @@ class BaseScriptItem(ScopeSelectable, ContentAddressable, Record):
             # None is fine, it just means use hint or override
             if isinstance(data, str):
                 # strs are not fine, we want a type in here in accordance with general rules
-                data = Entity.dereference_cls_name(data)
-            if not (isclass(data) and (data is Entity or issubclass(data, Entity))):
+                resolved = Entity.dereference_cls_name(data)
+                if resolved is not None:
+                    data = resolved
+            if not (
+                isinstance(data, str)
+                or (isclass(data) and (data is Entity or issubclass(data, Entity)))
+            ):
                 raise ValueError(f"Failed to hydrate {data} as Entity cls")
         return data
 

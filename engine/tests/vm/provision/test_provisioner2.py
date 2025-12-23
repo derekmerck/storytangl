@@ -122,7 +122,7 @@ def test_template_provisioner_creates_from_template():
     requirement = Requirement(
         identifier="door",
         template=Template[LockableNode](label="door", obj_cls=LockableNode, locked=True),
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     ctx = MockContext(graph=registry, cursor_id=UUID('00000000-0000-0000-0000-000000000003'))
     
@@ -133,7 +133,7 @@ def test_template_provisioner_creates_from_template():
     
     # Assert
     assert len(offers) == 1
-    assert offers[0].operation is ProvisioningPolicy.CREATE
+    assert offers[0].operation is ProvisioningPolicy.CREATE_TEMPLATE
     assert offers[0].base_cost is ProvisionCost.CREATE
     assert offers[0].cost == float(ProvisionCost.CREATE)
     
@@ -285,7 +285,7 @@ def test_multiple_strategies_for_same_requirement():
     assert ProvisioningPolicy.EXISTING in operations
     assert ProvisioningPolicy.UPDATE in operations
     assert ProvisioningPolicy.CLONE in operations
-    assert ProvisioningPolicy.CREATE in operations
+    assert ProvisioningPolicy.CREATE_TEMPLATE in operations
     
     # Cost ordering is correct
     costs = {
@@ -296,7 +296,7 @@ def test_multiple_strategies_for_same_requirement():
         costs[ProvisioningPolicy.EXISTING]
         < costs[ProvisioningPolicy.UPDATE]
         < costs.get(ProvisioningPolicy.CLONE, float(ProvisionCost.CREATE) + 1)
-        < costs[ProvisioningPolicy.CREATE]
+        < costs[ProvisioningPolicy.CREATE_TEMPLATE]
     )
 
 
@@ -409,7 +409,7 @@ def test_offer_with_failing_callback():
     
     offer = DependencyOffer(
         requirement_id=UUID('00000000-0000-0000-0000-000000000002'),
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         base_cost=ProvisionCost.CREATE,
         cost=float(ProvisionCost.CREATE),
         accept_func=failing_callback,

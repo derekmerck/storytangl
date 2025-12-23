@@ -4,7 +4,7 @@ from pydantic import ConfigDict, model_validator, Field
 
 from tangl.type_hints import Identifier
 from tangl.vm.provision import Dependency, Requirement
-from tangl.vm.provision.requirement import ProvisioningPolicy
+from tangl.vm.provision.provisioning_policy import ProvisioningPolicy
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT

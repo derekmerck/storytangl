@@ -25,6 +25,7 @@ from .requirement import Requirement, ProvisioningPolicy
 if TYPE_CHECKING:
     from tangl.vm.context import Context
     from .open_edge import Dependency
+    from tangl.ir.core_ir import BaseScriptItem
 
 
 def calculate_provisioner_proximity(
@@ -192,10 +193,12 @@ class TemplateProvisioner(Provisioner):
     def __init__(
         self,
         factory: TemplateFactory | None = None,
+        template_registry: Mapping[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         object.__setattr__(self, "factory", factory)
+        object.__setattr__(self, "template_registry", template_registry)
 
     def _get_factory(self, ctx: "Context") -> TemplateFactory | None:
         """Resolve the active template factory."""
@@ -213,16 +216,26 @@ class TemplateProvisioner(Provisioner):
 
         return getattr(graph, "factory", None)
 
-    def _coerce_template(self, template: Any) -> Template | None:
+    def _coerce_template(self, template: Any) -> Template | "BaseScriptItem" | None:
         if template is None:
             return None
         if isinstance(template, Template):
             return template
+        from tangl.ir.core_ir import BaseScriptItem
+        if isinstance(template, BaseScriptItem):
+            return template
         if isinstance(template, Mapping):
+            if "scope" in template:
+                return BaseScriptItem.model_validate(dict(template))
             return Template.model_validate(dict(template))
         return None
 
-    def _resolve_template(self, requirement: Requirement, *, ctx: "Context") -> tuple[Template | None, dict[str, Any]]:
+    def _resolve_template(
+        self,
+        requirement: Requirement,
+        *,
+        ctx: "Context",
+    ) -> tuple[Template | "BaseScriptItem" | None, dict[str, Any]]:
         provenance: dict[str, Any] = {}
         if requirement.template is not None:
             template = self._coerce_template(requirement.template)
@@ -230,6 +243,46 @@ class TemplateProvisioner(Provisioner):
                 return None, provenance
             provenance.update(self._template_provenance(template))
             return template, provenance
+
+        graph = getattr(ctx, "graph", None)
+        world = getattr(graph, "world", None) if graph is not None else None
+        script_manager = getattr(world, "script_manager", None)
+
+        if self.template_registry and (requirement.template_ref or requirement.identifier):
+            identifier = str(requirement.template_ref or requirement.identifier)
+            registry = self.template_registry
+            candidates: list[Any] = []
+            if hasattr(registry, "find_all"):
+                candidates = list(registry.find_all(has_identifier=identifier))
+            elif isinstance(registry, Mapping):
+                template_data = registry.get(identifier)
+                if template_data is not None:
+                    candidates = [template_data]
+
+            for template_data in candidates:
+                if not self._matches_scope(template_data, ctx=ctx):
+                    continue
+                template = self._coerce_template(template_data)
+                if template is not None:
+                    provenance.update(self._template_provenance(template))
+                    return template, provenance
+
+        if script_manager is not None and (requirement.template_ref or requirement.identifier):
+            identifier = requirement.template_ref or requirement.identifier
+            cursor = getattr(ctx, "cursor", None)
+            if cursor is None and graph is not None:
+                cursor_id = getattr(ctx, "cursor_id", None)
+                if cursor_id is not None:
+                    cursor = graph.get(cursor_id)
+            criteria = requirement.criteria or {}
+            template = script_manager.find_template(
+                identifier=str(identifier),
+                selector=cursor,
+                **criteria,
+            )
+            if template is not None:
+                provenance.update(self._template_provenance(template))
+                return template, provenance
 
         factory = self._get_factory(ctx)
         if factory is None:
@@ -261,6 +314,56 @@ class TemplateProvisioner(Provisioner):
         return template, provenance
 
     @staticmethod
+    def _matches_scope(template_data: Mapping[str, Any] | Any, *, ctx: "Context") -> bool:
+        scope_data = getattr(template_data, "scope", None)
+        if scope_data is None and isinstance(template_data, Mapping):
+            scope_data = template_data.get("scope")
+        if not scope_data:
+            return True
+
+        from tangl.core.graph.scope_selectable import ScopeSelector
+
+        scope = scope_data
+        if not isinstance(scope_data, ScopeSelector):
+            scope = ScopeSelector.model_validate(scope_data)
+
+        cursor = getattr(ctx, "cursor", None)
+        if cursor is None:
+            graph = getattr(ctx, "graph", None)
+            cursor_id = getattr(ctx, "cursor_id", None)
+            if graph is not None and cursor_id is not None:
+                cursor = graph.get(cursor_id)
+        if cursor is None:
+            return scope.is_global()
+
+        def iter_ancestors(node: Any):
+            current = node
+            while current is not None:
+                yield current
+                current = getattr(current, "parent", None)
+
+        if scope.source_label and getattr(cursor, "label", None) != scope.source_label:
+            return False
+        if scope.parent_label:
+            parent = getattr(cursor, "parent", None)
+            if parent is None or getattr(parent, "label", None) != scope.parent_label:
+                return False
+        if scope.ancestor_labels:
+            ancestor_labels = {
+                getattr(ancestor, "label", None) for ancestor in iter_ancestors(cursor)
+            }
+            if not scope.ancestor_labels.issubset(ancestor_labels):
+                return False
+        if scope.ancestor_tags:
+            ancestor_tags: set[str] = set()
+            for ancestor in iter_ancestors(cursor):
+                tags = getattr(ancestor, "tags", None) or set()
+                ancestor_tags.update(tags)
+            if not scope.ancestor_tags.issubset(ancestor_tags):
+                return False
+        return True
+
+    @staticmethod
     def _find_template(
         factory: TemplateFactory,
         identifier: Any,
@@ -279,9 +382,13 @@ class TemplateProvisioner(Provisioner):
         return factory.find_one(uid=identifier, **criteria)
 
     @staticmethod
-    def _template_payload(template: Template | Mapping[str, Any]) -> dict[str, Any]:
+    def _template_payload(
+        template: Template | "BaseScriptItem" | Mapping[str, Any],
+    ) -> dict[str, Any]:
         if isinstance(template, Template):
             payload = template.unstructure_for_materialize()
+        elif hasattr(template, "model_dump"):
+            payload = template.model_dump(exclude_none=True)
         else:
             payload = dict(template)
         for key in ("graph", "uid", "content_hash", "seq", "is_dirty_", "obj_cls"):
@@ -292,7 +399,16 @@ class TemplateProvisioner(Provisioner):
         return payload
 
     @staticmethod
-    def _template_provenance(template: Template) -> dict[str, Any]:
+    def _template_provenance(template: Template | "BaseScriptItem") -> dict[str, Any]:
+        if not isinstance(template, Template):
+            template_ref = getattr(template, "label", None)
+            content_hash = getattr(template, "content_hash", None)
+            content_id = getattr(template, "content_identifier", lambda: None)()
+            return {
+                "template_ref": template_ref,
+                "template_hash": content_hash,
+                "template_content_id": content_id,
+            }
         return {
             "template_ref": template.label,
             "template_hash": template.content_hash,
@@ -301,11 +417,26 @@ class TemplateProvisioner(Provisioner):
 
     @staticmethod
     def _materialize_template(
-        template: Template,
+        template: Template | "BaseScriptItem",
         *,
         ctx: "Context",
         factory: TemplateFactory | None,
     ) -> Node:
+        if not isinstance(template, Template):
+            graph = getattr(ctx, "graph", None)
+            world = getattr(graph, "world", None) if graph is not None else None
+            if world is not None and hasattr(world, "_materialize_from_template"):
+                parent_container = None
+                scope = getattr(template, "scope", None)
+                if scope is not None and hasattr(world, "ensure_scope"):
+                    parent_container = world.ensure_scope(scope, graph)
+                return world._materialize_from_template(
+                    template=template,
+                    graph=graph,
+                    parent_container=parent_container,
+                )
+            return template.materialize_item(obj_cls=getattr(template, "obj_cls", None))
+
         obj_cls = template.obj_cls
         kwargs: dict[str, Any] = {}
         if hasattr(obj_cls, "model_fields") and "graph" in obj_cls.model_fields:
@@ -321,7 +452,7 @@ class TemplateProvisioner(Provisioner):
         *,
         ctx: Context,
     ) -> Iterator[DependencyOffer]:
-        if not (requirement.policy & ProvisioningPolicy.CREATE):
+        if not (requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE):
             return
         template, provenance = self._resolve_template(requirement, ctx=ctx)
         if template is None:
@@ -332,10 +463,11 @@ class TemplateProvisioner(Provisioner):
         def create_node(ctx: Context) -> Node:
             return self._materialize_template(template, ctx=ctx, factory=factory)
 
+        operation = ProvisioningPolicy.CREATE_TEMPLATE
         yield DependencyOffer(
             requirement_id=requirement.uid,
             requirement=requirement,
-            operation=ProvisioningPolicy.CREATE,
+            operation=operation,
             base_cost=ProvisionCost.CREATE,
             cost=float(ProvisionCost.CREATE),
             proximity=999.0,

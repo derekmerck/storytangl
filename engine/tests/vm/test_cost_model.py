@@ -93,7 +93,7 @@ def test_template_provisioner_uses_fixed_create_cost() -> None:
     requirement = Requirement(
         graph=graph,
         template=Template[Node](label="fabricated", obj_cls=Node),
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     ctx = ProvisioningContext(graph=graph, step=3)
     provisioner = TemplateProvisioner(factory=None)

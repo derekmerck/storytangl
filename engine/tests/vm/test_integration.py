@@ -14,7 +14,7 @@ def test_tiny_integration():
     # a dependency hanging off `scene` that must be provisioned
     req = Requirement[Node](
         graph=g,
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "Companion"}
     )
     dep = Dependency[Node](graph=g, source_id=scene.uid, requirement=req, label="needs_companion")

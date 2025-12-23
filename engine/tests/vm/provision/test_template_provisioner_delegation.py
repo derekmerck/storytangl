@@ -21,7 +21,7 @@ def test_provisioner_materializes_template_from_factory() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="guard",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=factory, layer="author")
@@ -43,7 +43,7 @@ def test_provisioner_materializes_template_from_requirement() -> None:
     requirement = Requirement(
         graph=graph,
         template=Template[Node](label="simple", tags={"core"}),
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(layer="author")
@@ -67,7 +67,7 @@ def test_provisioner_supports_subgraph_templates() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="village",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(factory=factory, layer="author")
