@@ -616,7 +616,7 @@ class World(Singleton):
                 block_data = block_data or {}
                 qualified_label = f"{scene_label}.{block_label}"
                 cls = self.domain_manager.resolve_class(
-                    block_data.get("obj_cls") or block_data.get("block_cls")
+                    block_data.get("block_cls") or block_data.get("obj_cls")
                 )
 
                 scripts = {

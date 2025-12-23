@@ -23,10 +23,11 @@ class ProvisioningPolicy(Flag):
 
     EXISTING = auto()  # find by identifier and/or criteria match
     UPDATE = auto()  # find and update from template
-    CREATE_TEMPLATE = auto()  # create from template
+    CREATE = auto()  # create from template
+    CREATE_TEMPLATE = CREATE
     CREATE_TOKEN = auto()  # create from token factory reference
     CLONE = auto()  # find and evolve from template
 
     NOOP = auto()  # not possible
 
-    ANY = EXISTING | UPDATE | CREATE_TEMPLATE | CREATE_TOKEN
+    ANY = EXISTING | UPDATE | CREATE | CREATE_TOKEN

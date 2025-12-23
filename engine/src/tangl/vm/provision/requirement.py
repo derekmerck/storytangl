@@ -194,9 +194,7 @@ class Requirement(GraphItem, Generic[NodeT]):
                 or has_token_source
                 or self.provider_id is not None
             ):
-                raise ValueError(
-                    "ANY requires at least one of identifier, criteria, template, template_ref, or token fields"
-                )
+                return self
 
         return self
 
