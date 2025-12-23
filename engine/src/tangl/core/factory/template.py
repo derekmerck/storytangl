@@ -86,6 +86,7 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
                 return True
         elif isclass(obj_cls) and issubclass(self.obj_cls, obj_cls):
             return True
+        return False
 
     # Inherits label, tags as is
 
@@ -176,4 +177,3 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
         # will include the wrong templ.__class__
         data["obj_cls"] = self.obj_cls
         return data
-

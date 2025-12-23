@@ -147,7 +147,9 @@ def test_asset_provisioner_supports_template_overlay(asset_manager: AssetManager
     assert getattr(token, "owner", None) == "player"
 
 
-def test_templates_preferred_for_story_roles(asset_manager: AssetManager) -> None:
+def test_neither_provisioner_offers_without_configured_sources(
+    asset_manager: AssetManager,
+) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(
