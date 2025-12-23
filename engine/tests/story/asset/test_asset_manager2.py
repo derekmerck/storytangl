@@ -4,9 +4,11 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from pydantic import Field
 
 from tangl.core import Graph
-from tangl.story.concepts.asset import AssetType, CountableAsset, DiscreteAsset
+from tangl.core.graph import Token
+from tangl.story.concepts.asset import AssetType, CountableAsset
 from tangl.story.fabula.asset_manager import AssetManager
 
 
@@ -24,6 +26,7 @@ class TestAssetManagerRegistration:
 
         assert "weapons" in manager.discrete_classes
         assert manager.discrete_classes["weapons"] is Weapon
+        assert manager.token_factory.has_type(Weapon)
 
     def test_register_countable_class(self) -> None:
         """Can register countable asset class."""
@@ -157,6 +160,7 @@ class TestAssetManagerTokenFactory:
     def weapon_class(self) -> type[AssetType]:
         class Weapon(AssetType):
             damage: int = 10
+            owner_id: str | None = Field(default=None, json_schema_extra={"instance_var": True})
 
         return Weapon
 
@@ -174,7 +178,7 @@ class TestAssetManagerTokenFactory:
 
         token = manager.create_token("weapons", "sword", graph)
 
-        assert isinstance(token, DiscreteAsset)
+        assert isinstance(token, Token)
         assert token.label == "sword"
         assert token.graph is graph
         assert token.damage == 15
@@ -188,7 +192,10 @@ class TestAssetManagerTokenFactory:
         weapon_class(label="sword")
 
         token = manager.create_token(
-            "weapons", "sword", graph, owner_id="player_123"
+            "weapons",
+            "sword",
+            graph,
+            overlay={"owner_id": "player_123"},
         )
 
         assert token.owner_id == "player_123"
@@ -200,7 +207,7 @@ class TestAssetManagerTokenFactory:
 
         manager.register_discrete_class("weapons", weapon_class)
 
-        with pytest.raises(ValueError, match="No weapons asset named"):
+        with pytest.raises(ValueError, match="No Weapon base named"):
             manager.create_token("weapons", "missing", graph)
 
     def test_create_token_shows_available(
@@ -325,6 +332,7 @@ class TestAssetManagerIntegration:
         class Weapon(AssetType):
             damage: int = 10
             weight: float = 1.0
+            owner_id: str | None = Field(default=None, json_schema_extra={"instance_var": True})
 
         manager = AssetManager()
         manager.register_discrete_class("weapons", Weapon)

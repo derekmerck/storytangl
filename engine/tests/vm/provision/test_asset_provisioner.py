@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pydantic
 import pytest
+from pydantic import Field
 
-from tangl.core.graph import Graph, Node
+from tangl.core.graph import Graph
+from tangl.story.concepts.asset import AssetType
+from tangl.story.fabula.asset_manager import AssetManager
 from tangl.vm.provision import (
     AssetProvisioner,
     ProvisionCost,
@@ -16,63 +18,38 @@ from tangl.vm.provision import (
 )
 
 
-AssetNode = pydantic.create_model(
-    "AssetNode",
-    __base__=Node,
-    name=(str, ""),
-    owner=(str | None, None),
-    shuffle_state=(list[int], []),
-)
+class Weapon(AssetType):
+    name: str = ""
+    owner: str | None = Field(default=None, json_schema_extra={"instance_var": True})
+    shuffle_state: list[int] = Field(
+        default_factory=list,
+        json_schema_extra={"instance_var": True},
+    )
 
 
-class DummyAssetManager:
-    def __init__(self) -> None:
-        self._assets: dict[str, dict] = {}
-
-    def register(self, asset_ref: str, template: dict) -> None:
-        self._assets[asset_ref] = dict(template)
-
-    def has_asset(self, asset_ref: str) -> bool:
-        return asset_ref in self._assets
-
-    def create_token(self, asset_ref: str, graph: Graph, **overlay) -> Node:
-        payload = dict(self._assets[asset_ref])
-        payload.update(overlay)
-        payload.setdefault("obj_cls", AssetNode)
-        payload.setdefault("graph", graph)
-        return Node.structure(payload)
+@pytest.fixture(autouse=True)
+def _clear_weapon_instances() -> None:
+    yield
+    Weapon.clear_instances()
 
 
 @pytest.fixture
-def asset_manager() -> DummyAssetManager:
-    manager = DummyAssetManager()
-    manager.register(
-        asset_ref="Excalibur",
-        template={
-            "obj_cls": AssetNode,
-            "label": "Excalibur",
-            "name": "The Legendary Sword",
-        },
-    )
-    manager.register(
-        asset_ref="standard_deck",
-        template={
-            "obj_cls": AssetNode,
-            "label": "deck",
-            "name": "Deck of Cards",
-        },
-    )
+def asset_manager() -> AssetManager:
+    manager = AssetManager()
+    manager.register_discrete_class("weapons", Weapon)
+    Weapon(label="Excalibur", name="The Legendary Sword")
+    Weapon(label="standard_deck", name="Deck of Cards")
     return manager
 
 
-def _graph_with_assets(asset_manager: DummyAssetManager) -> Graph:
+def _graph_with_assets(asset_manager: AssetManager) -> Graph:
     graph = Graph(label="test")
     world = SimpleNamespace(asset_manager=asset_manager, domain_manager=None)
     object.__setattr__(graph, "world", world)
     return graph
 
 
-def test_asset_provisioner_requires_explicit_asset_ref(asset_manager: DummyAssetManager) -> None:
+def test_asset_provisioner_requires_explicit_token_ref(asset_manager: AssetManager) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(
@@ -90,12 +67,13 @@ def test_asset_provisioner_requires_explicit_asset_ref(asset_manager: DummyAsset
     assert offers == []
 
 
-def test_asset_provisioner_offers_when_asset_ref_present(asset_manager: DummyAssetManager) -> None:
+def test_asset_provisioner_offers_when_token_ref_present(asset_manager: AssetManager) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(
         graph=graph,
-        token_ref="Excalibur",
+        token_type=f"{Weapon.__module__}.{Weapon.__qualname__}",
+        token_label="Excalibur",
         policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
@@ -108,12 +86,13 @@ def test_asset_provisioner_offers_when_asset_ref_present(asset_manager: DummyAss
     assert offers[0].cost == ProvisionCost.HEAVY_INDIRECT
 
 
-def test_asset_provisioner_skips_if_asset_not_registered(asset_manager: DummyAssetManager) -> None:
+def test_asset_provisioner_skips_if_asset_not_registered(asset_manager: AssetManager) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(
         graph=graph,
-        token_ref="NonexistentAsset",
+        token_type=f"{Weapon.__module__}.{Weapon.__qualname__}",
+        token_label="NonexistentAsset",
         policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
@@ -125,12 +104,13 @@ def test_asset_provisioner_skips_if_asset_not_registered(asset_manager: DummyAss
     assert offers == []
 
 
-def test_asset_offer_creates_token_on_accept(asset_manager: DummyAssetManager) -> None:
+def test_asset_offer_creates_token_on_accept(asset_manager: AssetManager) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(
         graph=graph,
-        token_ref="Excalibur",
+        token_type=f"{Weapon.__module__}.{Weapon.__qualname__}",
+        token_label="Excalibur",
         policy=ProvisioningPolicy.CREATE_TOKEN,
     )
 
@@ -145,12 +125,13 @@ def test_asset_offer_creates_token_on_accept(asset_manager: DummyAssetManager) -
     assert token in graph
 
 
-def test_asset_provisioner_supports_template_overlay(asset_manager: DummyAssetManager) -> None:
+def test_asset_provisioner_supports_template_overlay(asset_manager: AssetManager) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(
         graph=graph,
-        token_ref="standard_deck",
+        token_type=f"{Weapon.__module__}.{Weapon.__qualname__}",
+        token_label="standard_deck",
         overlay={"shuffle_state": [2, 5, 1, 3], "owner": "player"},
         policy=ProvisioningPolicy.CREATE_TOKEN,
     )
@@ -166,7 +147,7 @@ def test_asset_provisioner_supports_template_overlay(asset_manager: DummyAssetMa
     assert getattr(token, "owner", None) == "player"
 
 
-def test_templates_preferred_for_story_roles(asset_manager: DummyAssetManager) -> None:
+def test_templates_preferred_for_story_roles(asset_manager: AssetManager) -> None:
     graph = _graph_with_assets(asset_manager)
 
     requirement = Requirement(

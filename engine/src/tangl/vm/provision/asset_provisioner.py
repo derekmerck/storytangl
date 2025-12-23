@@ -36,15 +36,18 @@ class AssetProvisioner(Provisioner):
     ) -> Generator[DependencyOffer, None, None]:
         """Yield a provisioning offer when an explicit ``token_ref`` is present."""
 
-        asset_ref = requirement.token_ref
-        if not asset_ref:
+        token_type = requirement.token_type or requirement.token_ref
+        token_label = requirement.token_label
+        if not token_type or not token_label:
             return
 
         graph = getattr(ctx, "graph", None)
         world = getattr(graph, "world", None) if graph is not None else None
         asset_manager = getattr(world, "asset_manager", None) if world is not None else None
 
-        if asset_manager is None or not asset_manager.has_asset(asset_ref):
+        if asset_manager is None:
+            return
+        if not asset_manager.has_token_base(token_type, token_label):
             return
 
         if not (
@@ -59,14 +62,13 @@ class AssetProvisioner(Provisioner):
             return
 
         def _accept(ctx: "Context"):
-            domain_manager = getattr(world, "domain_manager", None) if world is not None else None
             overlay = requirement.overlay or requirement.template or {}
 
             return asset_manager.create_token(
-                asset_ref=asset_ref,
+                token_type=token_type,
+                label=token_label,
                 graph=ctx.graph,
-                domain_manager=domain_manager,
-                **overlay,
+                overlay=dict(overlay),
             )
 
         yield DependencyOffer(
