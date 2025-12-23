@@ -63,12 +63,16 @@ class AssetProvisioner(Provisioner):
 
         def _accept(ctx: "Context"):
             overlay = requirement.overlay or requirement.template or {}
+            if hasattr(overlay, "model_dump"):
+                overlay = overlay.model_dump()
+            elif not isinstance(overlay, dict):
+                overlay = dict(overlay)
 
             return asset_manager.create_token(
                 token_type=token_type,
                 label=token_label,
                 graph=ctx.graph,
-                overlay=dict(overlay),
+                overlay=overlay,
             )
 
         yield DependencyOffer(

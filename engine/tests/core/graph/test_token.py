@@ -43,7 +43,7 @@ def test_token_getattr(ws):
     assert ws.b == 200
 
     with pytest.raises(ValueError):
-        # can't set an instance variable
+        # can't set a non-instance variable
         ws.a = 150
 
     # can set an instance variable
@@ -126,7 +126,3 @@ def test_token_delegation_works():
 
     # Delegates to base
     assert token.damage == 10
-
-    # Update base affects token
-    base = Weapon.get_instance("sword")
-    # Can't actually update frozen base, but concept works
