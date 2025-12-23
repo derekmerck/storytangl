@@ -45,7 +45,7 @@ def test_planning_cycle_with_mixed_requirements():
     req_x = Requirement[Node](
         graph=g,
         identifier="resource_x",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "resource_x"},
         hard_requirement=True,
     )
@@ -101,7 +101,7 @@ def test_planning_cycle_with_mixed_requirements():
     req_w = Requirement[Node](
         graph=g,
         identifier="tool_w",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "tool_w"},
         hard_requirement=True,
     )
@@ -216,7 +216,7 @@ def test_affordance_precedence_over_creation():
     create_requirement = Requirement[Node](
         graph=g_no_aff,
         identifier="companion",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "new_companion"},
         hard_requirement=True,
     )
@@ -342,7 +342,7 @@ def test_event_sourced_planning_replay():
     req = Requirement[Node](
         graph=g,
         identifier="created",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
         template={"obj_cls": Node, "label": "created"},
         hard_requirement=True,
     )

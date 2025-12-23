@@ -24,7 +24,7 @@ class WrappedSingleton(BaseModel):
 
     Create a wrapped class:
 
-    > SingletonNode = WrappedSingleton.create_wrapper_class("SingletonNode", Singleton)
+    > Token = WrappedSingleton.create_wrapper_class("Token", Singleton)
 
     Attributes:
         label (UniqueLabel): The unique identifier for the specific singleton entity instance.

@@ -68,7 +68,7 @@ class Node(Entity):
     Related Concepts
     ----------------
     * :class:`~tangl.core.graph.Edge` can be used to dynamically connect a node to another by reference.
-    * :class:`SingletonNode<~tangl.core.graph.SingletonNode>` wraps a singleton with unique local vars and parent/children relationships.
+    * :class:`Token<~tangl.core.graph.Token>` wraps a singleton with unique local vars and parent/children relationships.
     * :class:`~tangl.story.StoryNode` provides a common basis for all Story-related object.
     """
     graph: Graph = Field(None,

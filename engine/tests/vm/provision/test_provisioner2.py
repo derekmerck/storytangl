@@ -22,6 +22,7 @@ from tangl.vm.provision import (
     ProvisioningPolicy,
 )
 from tangl.core import Node, Graph
+from tangl.core.factory import TemplateFactory, Template
 
 
 # ============================================================================
@@ -115,23 +116,24 @@ def test_template_provisioner_creates_from_template():
     """TemplateProvisioner should offer CREATE with template."""
     # Setup
     registry = Graph()
-    template_registry = {'door': {'obj_cls': LockableNode, 'label': 'door', 'locked': True}}
+    factory = TemplateFactory(label="templates")
+    factory.add(Template[LockableNode](label="door", obj_cls=LockableNode, locked=True))
     
     requirement = Requirement(
         identifier="door",
-        template={'label': 'door', 'locked': True, 'obj_cls': LockableNode},
-        policy=ProvisioningPolicy.CREATE,
+        template=Template[LockableNode](label="door", obj_cls=LockableNode, locked=True),
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     ctx = MockContext(graph=registry, cursor_id=UUID('00000000-0000-0000-0000-000000000003'))
     
-    provisioner = TemplateProvisioner(template_registry=template_registry, layer='author')
+    provisioner = TemplateProvisioner(factory=factory, layer='author')
     
     # Act
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
     
     # Assert
     assert len(offers) == 1
-    assert offers[0].operation is ProvisioningPolicy.CREATE
+    assert offers[0].operation is ProvisioningPolicy.CREATE_TEMPLATE
     assert offers[0].base_cost is ProvisionCost.CREATE
     assert offers[0].cost == float(ProvisionCost.CREATE)
     
@@ -150,7 +152,7 @@ def test_updating_provisioner_modifies_existing():
     
     requirement = Requirement(
         identifier="door",
-        template={'locked': True}
+        template=Template[LockableNode](locked=True, obj_cls=LockableNode),
     )
     ctx = MockContext(graph=registry, cursor_id=door.uid)
     
@@ -180,7 +182,7 @@ def test_cloning_provisioner_creates_copy():
     
     requirement = Requirement(
         identifier="door",
-        template={'label': 'door_clone', 'locked': True},
+        template=Template[LockableNode](label="door_clone", locked=True, obj_cls=LockableNode),
         policy=ProvisioningPolicy.CLONE,
         reference_id=ref_door.uid,
     )
@@ -217,7 +219,7 @@ def test_cheapest_offer_wins():
     
     requirement = Requirement(
         identifier="door",
-        template={'label': 'door', 'locked': False},
+        template=Template[Node](label="door", obj_cls=Node),
         policy=ProvisioningPolicy.ANY,
     )
     ctx = MockContext(graph=registry, cursor_id=existing_door.uid)
@@ -225,9 +227,10 @@ def test_cheapest_offer_wins():
     # Multiple provisioners
     graph_prov = GraphProvisioner(node_registry=registry, layer='local')
     template_prov = TemplateProvisioner(
-        template_registry={'door': {'label': 'door'}},
+        factory=TemplateFactory(label="templates"),
         layer='author'
     )
+    template_prov.factory.add(Template[Node](label="door", obj_cls=Node))
     
     # Collect all offers
     all_offers = []
@@ -256,7 +259,7 @@ def test_multiple_strategies_for_same_requirement():
     
     requirement = Requirement(
         identifier="door",
-        template={'label': 'door_updated', 'locked': True},
+        template=Template[LockableNode](label="door_updated", locked=True, obj_cls=LockableNode),
         policy=ProvisioningPolicy.ANY | ProvisioningPolicy.CLONE,
         reference_id=existing_door.uid,
     )
@@ -266,7 +269,9 @@ def test_multiple_strategies_for_same_requirement():
     graph_prov = GraphProvisioner(node_registry=registry)
     updating_prov = UpdatingProvisioner(node_registry=registry)
     cloning_prov = CloningProvisioner(node_registry=registry)
-    template_prov = TemplateProvisioner(template_registry={'door': {'label': 'door'}})
+    factory = TemplateFactory(label="templates")
+    factory.add(Template[Node](label="door", obj_cls=Node))
+    template_prov = TemplateProvisioner(factory=factory)
     
     # Collect all offers
     all_offers = []
@@ -280,7 +285,7 @@ def test_multiple_strategies_for_same_requirement():
     assert ProvisioningPolicy.EXISTING in operations
     assert ProvisioningPolicy.UPDATE in operations
     assert ProvisioningPolicy.CLONE in operations
-    assert ProvisioningPolicy.CREATE in operations
+    assert ProvisioningPolicy.CREATE_TEMPLATE in operations
     
     # Cost ordering is correct
     costs = {
@@ -291,7 +296,7 @@ def test_multiple_strategies_for_same_requirement():
         costs[ProvisioningPolicy.EXISTING]
         < costs[ProvisioningPolicy.UPDATE]
         < costs.get(ProvisioningPolicy.CLONE, float(ProvisionCost.CREATE) + 1)
-        < costs[ProvisioningPolicy.CREATE]
+        < costs[ProvisioningPolicy.CREATE_TEMPLATE]
     )
 
 
@@ -404,7 +409,7 @@ def test_offer_with_failing_callback():
     
     offer = DependencyOffer(
         requirement_id=UUID('00000000-0000-0000-0000-000000000002'),
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         base_cost=ProvisionCost.CREATE,
         cost=float(ProvisionCost.CREATE),
         accept_func=failing_callback,
@@ -425,11 +430,10 @@ def test_template_provisioner_without_template():
     requirement = Requirement(identifier="door")  # No template
     ctx = MockContext(graph=registry, cursor_id=UUID('00000000-0000-0000-0000-000000000003'))
     
-    provisioner = TemplateProvisioner(template_registry={'door': {}})
+    provisioner = TemplateProvisioner(factory=TemplateFactory(label="templates"))
     
     # Act
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
     
     # Assert
     assert len(offers) == 0, f"Shouldn't be able to create without template {offers[0]!r}"  # Can't create without template
-

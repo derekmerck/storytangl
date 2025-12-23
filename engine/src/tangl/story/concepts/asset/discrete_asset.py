@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import ClassVar, Generic, Optional, Type, TypeVar
 
 from tangl.core.graph.node import Node
-from tangl.core.graph.singleton_node import SingletonNode
+from tangl.core.graph.token import Token
 
 from .asset_type import AssetType
 
@@ -14,7 +14,7 @@ Associating = object
 AssetT = TypeVar("AssetT", bound=AssetType)
 
 
-class DiscreteAsset(SingletonNode[AssetT], Generic[AssetT]):
+class DiscreteAsset(Token[AssetT], Generic[AssetT]):
     """
     Graph node wrapper for discrete asset singletons.
 

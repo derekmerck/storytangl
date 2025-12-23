@@ -1,16 +1,16 @@
-# tangl/core/factory/factory.py
+# tangl/core/factory/templ_factory.py
 from __future__ import annotations
 from tangl.core.registry import Registry
 from .template import Template, ET
 from .hierarchical_template import HierarchicalTemplate
 
-class Factory(Registry[Template]):
+class TemplateFactory(Registry[Template]):
     """
     Registry of templates with materialization support.
 
     Examples:
         >>> # Create factory from root template
-        >>> factory = Factory.from_root_templ(root_script)
+        >>> factory = TemplateFactory.from_root_templ(root_script)
         >>>
         >>> # Find templates
         >>> start_block = factory.find_one(
@@ -19,11 +19,11 @@ class Factory(Registry[Template]):
         ... )
         >>>
         >>> # Materialize entity
-        >>> node = Factory.materialize_templ(start_block)
+        >>> node = TemplateFactory.materialize_templ(start_block)
     """
 
     @classmethod
-    def from_root_templ(cls, root_templ: HierarchicalTemplate) -> Factory:
+    def from_root_templ(cls, root_templ: HierarchicalTemplate) -> TemplateFactory:
         """
         Create factory by flattening hierarchical template.
 
@@ -35,7 +35,7 @@ class Factory(Registry[Template]):
             root_templ: Root of template hierarchy
 
         Returns:
-            Factory with all templates registered
+            TemplateFactory with all templates registered
         """
         factory = cls(label=f"{root_templ.get_label()}_factory")
 

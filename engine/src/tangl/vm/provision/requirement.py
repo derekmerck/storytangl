@@ -7,42 +7,20 @@ at the frontier and *how* to obtain it (via :class:`ProvisioningPolicy`).
 Requirements are carried by :class:`~tangl.vm.planning.open_edge.Dependency`
 and :class:`~tangl.vm.planning.open_edge.Affordance` edges.
 """
-from enum import Flag, auto
-from typing import Optional, Generic, TypeVar
+from typing import Any, Optional, Generic, TypeVar
 from uuid import UUID
 from copy import deepcopy
 
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import AliasChoices, Field, PrivateAttr, model_validator, field_validator
 
 from tangl.type_hints import StringMap, UnstructuredData, Identifier
 from tangl.core.graph import GraphItem, Node, Graph
+from tangl.core.factory import Template
+from tangl.core.singleton import Singleton
+
+from .provisioning_policy import ProvisioningPolicy
 
 NodeT = TypeVar('NodeT', bound=Node)
-
-class ProvisioningPolicy(Flag):
-    """
-    Provisioning strategies for satisfying a requirement.
-
-    - **EXISTING**: Find a pre-existing provider by identifier and/or match criteria.
-    - **UPDATE**: Find a provider and update it using a template (in-place edit).
-    - **CREATE**: Create a new provider from a template.
-    - **CLONE**: Find a reference provider, make a copy, then evolve via template.
-    - **ANY**: Any of Existing, Update, Create
-    - **NOOP**: No-op operation (Unsatisfiable and not allowed on Requirement)
-
-    Notes
-    -----
-    Validation ensures the presence of ``identifier/criteria`` for EXISTING-family
-    policies and a ``template`` for CREATE/UPDATE/CLONE.
-    """
-    EXISTING = auto()    # find by identifier and/or criteria match
-    UPDATE = auto()      # find and update from template
-    CREATE = auto()      # create from template
-    CLONE = auto()       # find and evolve from template
-
-    NOOP = auto()        # not possible
-
-    ANY = EXISTING | UPDATE | CREATE   # No reason to clone unless explicitly indicated
 
 class Requirement(GraphItem, Generic[NodeT]):
     """
@@ -72,7 +50,7 @@ class Requirement(GraphItem, Generic[NodeT]):
     ------------
     * **Multiple acquisition modes** – find, update, create, or clone via :class:`ProvisioningPolicy`.
     * **Flexible targeting** – match by :attr:`identifier` or :attr:`criteria` (or both).
-    * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE/CLONE.
+    * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE_TEMPLATE/CLONE.
     * **Explicit cloning** – :attr:`reference_id` binds CLONE operations to a specific source node.
     * **Binding** – :attr:`provider` resolves to a live :class:`~tangl.core.graph.Node`; auto-added to the graph if needed.
     * **Hard/soft semantics** – :attr:`hard_requirement` gates whether unresolved requirements block progress.
@@ -84,7 +62,10 @@ class Requirement(GraphItem, Generic[NodeT]):
     - :attr:`criteria` – dict used with :meth:`~tangl.core.registry.Registry.find_all` to discover candidates.
     - :attr:`template` – unstructured data used to create/update/clone a provider.
     - :attr:`policy` – :class:`ProvisioningPolicy` that validates required fields.
-    - :attr:`asset_ref` – direct-addressed asset token to satisfy the requirement.
+    - :attr:`token_ref` – direct-addressed token reference to satisfy the requirement.
+    - :attr:`token_type` – token class name or Singleton type for token creation.
+    - :attr:`token_label` – label for token creation.
+    - :attr:`overlay` – token overlay fields applied during token creation.
     - :attr:`provider` – get/set bound provider node (backed by :attr:`provider_id`).
     - :attr:`reference_id` – explicit source node for :attr:`ProvisioningPolicy.CLONE`.
     - :attr:`hard_requirement` – if ``True``, unresolved requirements are reported at planning end.
@@ -98,7 +79,9 @@ class Requirement(GraphItem, Generic[NodeT]):
 
     - ``EXISTING/UPDATE`` require :attr:`identifier` **or** :attr:`criteria`.
     - ``CLONE`` requires :attr:`reference_id` and :attr:`template`.
-    - ``CREATE/UPDATE`` require :attr:`template`.
+    - ``CREATE_TEMPLATE/UPDATE`` require :attr:`template`.
+    - ``CREATE_TOKEN`` requires :attr:`token_ref` or both :attr:`token_type` and
+      :attr:`token_label`.
 
     Protocol view:
 
@@ -118,10 +101,16 @@ class Requirement(GraphItem, Generic[NodeT]):
     provider_id: Optional[UUID] = None
 
     identifier: Optional[Identifier] = None  # aka 'ref' or 'alias'
-    asset_ref: Optional[Identifier] = None
-    """Direct asset token reference (bypasses template lookup when provided)."""
+    token_ref: Optional[Identifier | type[Singleton]] = Field(
+        default=None,
+        validation_alias=AliasChoices("token_ref", "asset_ref"),
+    )
+    """Direct token reference (bypasses template lookup when provided)."""
+    token_type: Optional[str | type[Singleton]] = None
+    token_label: Optional[str] = None
+    overlay: dict[str, Any] = Field(default_factory=dict)
     criteria: Optional[StringMap] = Field(default_factory=dict)
-    template: Optional[UnstructuredData] = None
+    template: Optional[UnstructuredData | Template] = None
     template_ref: Optional[Identifier] = None
     policy: ProvisioningPolicy = ProvisioningPolicy.ANY
     reference_id: Optional[UUID] = None
@@ -132,6 +121,23 @@ class Requirement(GraphItem, Generic[NodeT]):
 
     _provider_obj: Optional[NodeT] = PrivateAttr(default=None)
 
+    @field_validator("template", mode="before")
+    @classmethod
+    def _coerce_template_instance(cls, value):
+        if isinstance(value, Template):
+            return value
+        return value
+
+    @model_validator(mode="after")
+    def _parse_token_ref(self):
+        if self.token_ref and self.token_type is None and self.token_label is None:
+            if isinstance(self.token_ref, str) and "." in self.token_ref:
+                token_type, token_label = self.token_ref.rsplit(".", 1)
+                if token_type and token_label:
+                    self.token_type = token_type
+                    self.token_label = token_label
+        return self
+
     @model_validator(mode="after")
     def _validate_policy(self):
         # todo: this validates that the req is _independently_ complete.
@@ -140,12 +146,12 @@ class Requirement(GraphItem, Generic[NodeT]):
         """
         identifier is for unique EXISTING
         criteria is filter for any EXISTING
-        template is fallback for CREATE or provides UPDATE/CLONE attribs
+        template is fallback for CREATE_TEMPLATE or provides UPDATE/CLONE attribs
 
         identifier only:     unique match, must be satisfied with EXISTING
         criteria only:       any matching, must be satisfied with EXISTING
         id/crit:             unique that also matches criteria, must be satisfied with EXISTING
-        template only:       must be satisfied with CREATE
+        template only:       must be satisfied with CREATE_TEMPLATE
         id/crit, template:   match and UPDATE/CLONE according to template
         """
         if self.policy is ProvisioningPolicy.NOOP:
@@ -154,8 +160,11 @@ class Requirement(GraphItem, Generic[NodeT]):
         has_template_source = (
             self.template is not None
             or self.template_ref is not None
-            or self.asset_ref is not None
         )
+        has_token_source = self.token_ref is not None or (
+            self.token_type is not None and self.token_label is not None
+        )
+        create_template_policies = {ProvisioningPolicy.CREATE_TEMPLATE}
 
         if self.policy in [ProvisioningPolicy.EXISTING, ProvisioningPolicy.UPDATE]:
             if self.identifier is None and self.criteria is None:
@@ -167,20 +176,25 @@ class Requirement(GraphItem, Generic[NodeT]):
             if not has_template_source:
                 raise ValueError("CLONE requires template data to evolve clone")
 
-        if self.policy in [ProvisioningPolicy.CREATE, ProvisioningPolicy.UPDATE]:
+        if self.policy in create_template_policies | {ProvisioningPolicy.UPDATE}:
             if not has_template_source:
                 raise ValueError(f"{self.policy.name} requires a template")
 
-        if self.policy in [ProvisioningPolicy.ANY]:
-            if (
-                self.identifier is None
-                and self.criteria is None
-                and self.asset_ref is None
-                and not has_template_source
-            ):
+        if self.policy is ProvisioningPolicy.CREATE_TOKEN:
+            if not has_token_source:
                 raise ValueError(
-                    "ANY requires at least one of identifier, criteria, template, template_ref, or asset_ref"
+                    "CREATE_TOKEN requires token_ref or both token_type and token_label"
                 )
+
+        if self.policy in [ProvisioningPolicy.ANY]:
+            if not (
+                self.identifier is not None
+                or bool(self.criteria)
+                or has_template_source
+                or has_token_source
+                or self.provider_id is not None
+            ):
+                return self
 
         return self
 
@@ -217,6 +231,15 @@ class Requirement(GraphItem, Generic[NodeT]):
         self.graph._validate_linkable(value)  # redundant check that it's in the graph
         self.provider_id = value.uid
         self._provider_obj = value
+
+    @property
+    def asset_ref(self) -> Optional[Identifier | type[Singleton]]:
+        """Backward-compatible alias for :attr:`token_ref`."""
+        return self.token_ref
+
+    @asset_ref.setter
+    def asset_ref(self, value: Optional[Identifier | type[Singleton]]) -> None:
+        self.token_ref = value
 
     @property
     def satisfied(self):

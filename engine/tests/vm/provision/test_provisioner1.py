@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from tangl.core import Graph, Node
+from tangl.core.factory import Template
 from tangl.vm.provision import (
     CompanionProvisioner,
     CloningProvisioner,
@@ -71,7 +72,7 @@ def test_cheapest_offer_wins_existing_over_create():
     requirement = Requirement(
         graph=graph,
         identifier="door",
-        template={"obj_cls": Node, "label": "door"},
+        template=Template[Node](label="door", obj_cls=Node),
         policy=ProvisioningPolicy.ANY,
     )
 
@@ -115,7 +116,7 @@ def test_cloning_provisioner_missing_reference_returns_no_offers():
         graph=graph,
         policy=ProvisioningPolicy.CLONE,
         reference_id=uuid4(),
-        template={"label": "clone"},
+        template=Template[Node](label="clone"),
     )
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=_ctx(graph)))
@@ -130,7 +131,7 @@ def test_cloning_provisioner_clones_reference_node():
         graph=graph,
         policy=ProvisioningPolicy.CLONE,
         reference_id=source.uid,
-        template={"label": "prototype_clone", "tags": {"alpha", "beta"}},
+        template=Template[Node](label="prototype_clone", tags={"alpha", "beta"}),
     )
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=_ctx(graph)))
@@ -151,7 +152,7 @@ def test_requirement_clone_requires_reference_id_validation():
         Requirement(
             graph=graph,
             policy=ProvisioningPolicy.CLONE,
-            template={"label": "clone"},
+            template=Template[Node](label="clone"),
         )
 
 

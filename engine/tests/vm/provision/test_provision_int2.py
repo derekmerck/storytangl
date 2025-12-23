@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core import Graph
+from tangl.core import Graph, Node
+from tangl.core.factory import Template
 from tangl.vm.provision import (
     CloningProvisioner,
     GraphProvisioner,
@@ -80,7 +81,7 @@ def test_clone_offer_uses_reference_node():
         graph=graph,
         policy=ProvisioningPolicy.CLONE,
         reference_id=template_source.uid,
-        template={"label": "alice_clone"},
+        template=Template[Node](label="alice_clone"),
     )
 
     provisioner = CloningProvisioner(node_registry=graph)

@@ -21,7 +21,7 @@ def test_template_provisioner_skips_out_of_scope_registry_templates() -> None:
     requirement = Requirement(
         graph=graph,
         template_ref="late_actor",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(template_registry=template_registry, layer="local")
@@ -47,7 +47,7 @@ def test_template_provisioner_matches_registry_scope_by_ancestor_tags_mapping() 
     requirement = Requirement(
         graph=graph,
         template_ref="branch_actor",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
 
     provisioner = TemplateProvisioner(template_registry=template_registry, layer="local")

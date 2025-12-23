@@ -104,7 +104,7 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
     in_scope_req = Requirement(
         graph=story,
         template_ref="start_actor",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     offers = list(provisioner.get_dependency_offers(in_scope_req, ctx=ctx))
     assert len(offers) == 1
@@ -112,7 +112,7 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
     out_of_scope_req = Requirement(
         graph=story,
         template_ref="late_actor",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     out_of_scope_offers = list(provisioner.get_dependency_offers(out_of_scope_req, ctx=ctx))
     assert out_of_scope_offers == []

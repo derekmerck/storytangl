@@ -75,13 +75,18 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
         """Get obj_cls_ with fallback to default."""
         return self.obj_cls_ or self.get_default_obj_cls()
 
-    def is_instance(self, obj_cls: Type[Entity]) -> bool:
+    def is_instance(self, obj_cls: type | tuple[type]) -> bool:
         """
         Check against the _latent_ type, not the Template class
         `Template[MyActor].is_instance(Actor)` -> True
         This enables Template[MyActor].match(is_instance=Actor)
         """
-        return issubclass(self.obj_cls, obj_cls)
+        if isinstance(obj_cls, tuple):
+            if all(isclass(c) for c in obj_cls) and issubclass(self.obj_cls, obj_cls):
+                return True
+        elif isclass(obj_cls) and issubclass(self.obj_cls, obj_cls):
+            return True
+        return False
 
     # Inherits label, tags as is
 
@@ -172,4 +177,3 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
         # will include the wrong templ.__class__
         data["obj_cls"] = self.obj_cls
         return data
-

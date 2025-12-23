@@ -5,6 +5,7 @@ import logging
 from copy import copy
 from enum import Enum
 import re
+from inspect import isclass
 
 from pydantic import BaseModel, Field, field_validator
 import shortuuid
@@ -156,11 +157,13 @@ class Entity(BaseModelPlus):
         # return self._attrib_is_superset_of("tags", *tags)
         return tags.issubset(self.tags)
 
-    def is_instance(self, obj_cls: Type[Self]) -> bool:
-        # helper func for matches
+    def is_instance(self, obj_cls: type | tuple[type,...]) -> bool:
+        """Return True if self is an instance of the given class (or any class in a tuple)."""
         if obj_cls is object:
             match_logger.warning("Matching `is_instance(self, object)`: this is harmless but it always returns True and is almost certainly not what you intended to do.")
-        return isinstance(self, obj_cls)
+        if isinstance(obj_cls, tuple):
+            return all(isclass(c) for c in obj_cls) and isinstance(self, obj_cls)
+        return isclass(obj_cls) and isinstance(self, obj_cls)
 
     # todo: push this into a pure utility
     def get_tag_kv(self,

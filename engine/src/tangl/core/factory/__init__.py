@@ -5,7 +5,7 @@ core/factory/template.py
 ├── Template[ET]              # Generic template for any Entity
 ├── ScopeSelectable           # Pattern-based scope matching
 ├── HierarchicalTemplate[GIT] # Tree of templates with auto-paths
-└── Factory                   # Registry + materialization
+└── TemplateFactory             # Registry + materialization
 
 story/templates/
 ├── StoryScript(HierarchicalTemplate)         # Root of story hierarchy, contains Scenes, Actors, Locations
@@ -14,7 +14,7 @@ story/templates/
 └── ActorScript(Template[Actor])              # Leaf template
 
 vm/provision/
-└── Uses Factory to find and materialize templates
+└── Uses TemplateFactory to find and materialize templates
 ```
 
 **Key Principle:** `Template` knows NOTHING about stories, blocks, actors, etc.
@@ -47,4 +47,5 @@ the top level import.
 
 from .template import Template
 from .hierarchical_template import HierarchicalTemplate, ScopeSelectable
-from .factory import Factory
+from .templ_factory import TemplateFactory
+from .token_factory import TokenFactory

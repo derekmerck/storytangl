@@ -17,7 +17,7 @@ WrappedType = TypeVar("WrappedType", bound=Singleton)
 
 class SingletonNode(Node, Generic[WrappedType]):
     """
-    SingletonNode is a :class:`~tangl.core.graph.Node` extension that wraps a
+    Token is a :class:`~tangl.core.graph.Node` extension that wraps a
     :class:`~tangl.core.entity.Singleton` with instance-specific
     state, enabling it to be attached to a graph while maintaining singleton
     behavior.
@@ -28,19 +28,19 @@ class SingletonNode(Node, Generic[WrappedType]):
     * **Instance Variables**: Supports instance-specific variables.  Instance variables must be marked with :code:`json_schema_extra={"instance_var": True}` in the Singleton.
     * **Method Rebinding**: Class methods are rebound to the wrapped instance.
     * **Dynamic Class Creation**: Provides a method :meth:`create_wrapper_cls` to create wrapper classes for specific Singleton types.
-    * **Supports Generics**: SingletonNode[Singleton] automatically creates an appropriate class wrapper.
+    * **Supports Generics**: Token[Singleton] automatically creates an appropriate class wrapper.
 
     Usage
     -----
     .. code-block:: python
-        from tangl.core.graph import SingletonNode, Graph
+        from tangl.core.graph import Token, Graph
         from tangl.core import Singleton
 
         class MyConstant(Singleton):
             value: int
             state: str = Field(default="initial", json_schema_extra={"instance_var": True})
 
-        MyConstantNode = SingletonNode.create_wrapper_cls("MyConstantNode", MyConstant)
+        MyConstantNode = Token.create_wrapper_cls("MyConstantNode", MyConstant)
 
         graph = Graph()
         const_node1 = MyConstantNode(label="CONSTANT_1", value=42, graph=graph)

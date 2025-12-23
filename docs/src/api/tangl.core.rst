@@ -25,7 +25,7 @@ Topology
 .. autoclass:: tangl.core.Edge
 .. autoclass:: tangl.core.graph.AnonymousEdge
 .. autoclass:: tangl.core.Subgraph
-.. autoclass:: tangl.core.graph.singleton_node.SingletonNode
+.. autoclass:: tangl.core.graph.token.Token
 
 .. _core-artifacts:
 

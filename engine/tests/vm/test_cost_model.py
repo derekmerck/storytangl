@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from tangl.core.graph import Graph, Subgraph, Node
+from tangl.core.factory import Template
 from tangl.vm.provision import (
     GraphProvisioner,
     TemplateProvisioner,
@@ -91,11 +92,11 @@ def test_template_provisioner_uses_fixed_create_cost() -> None:
     graph = Graph()
     requirement = Requirement(
         graph=graph,
-        template={"label": "fabricated", "obj_cls": Node},
-        policy=ProvisioningPolicy.CREATE,
+        template=Template[Node](label="fabricated", obj_cls=Node),
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     ctx = ProvisioningContext(graph=graph, step=3)
-    provisioner = TemplateProvisioner(template_registry=None)
+    provisioner = TemplateProvisioner(factory=None)
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
     assert len(offers) == 1

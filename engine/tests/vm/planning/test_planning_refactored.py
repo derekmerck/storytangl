@@ -81,7 +81,7 @@ def test_deduplicate_offers_preserves_non_existing():
     
     create_offer = DependencyOffer(
         requirement_id=req_id,
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         provider_id=None,  # CREATE offers don't have provider_id
         cost=ProvisionCost.CREATE,
         accept_func=lambda ctx: None,
@@ -122,7 +122,7 @@ def test_deduplicate_offers_sorts_by_cost_proximity_order():
     
     offer3 = DependencyOffer(
         requirement_id=req_id,
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         provider_id=None,
         cost=ProvisionCost.CREATE,  # More expensive
         proximity=0,
@@ -174,7 +174,7 @@ def test_select_best_offer_chooses_cheapest():
     
     expensive = DependencyOffer(
         requirement_id=req_id,
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         cost=ProvisionCost.CREATE,
         accept_func=lambda ctx: None,
     )
