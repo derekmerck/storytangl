@@ -1,13 +1,11 @@
 from __future__ import annotations
 import logging
-import warnings
 from collections.abc import Iterator, Mapping
 from copy import deepcopy
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self, Optional
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ConfigDict, ValidationError
 
 from tangl.core.factory import TemplateFactory
 from tangl.core.graph import Node
@@ -20,6 +18,7 @@ from tangl.ir.story_ir.location_script_models import LocationScript
 from tangl.ir.story_ir.scene_script_models import BlockScript, SceneScript
 from tangl.type_hints import StringMap, UnstructuredData
 
+from tangl.core import Entity
 from tangl.story.concepts.actor import Actor
 from tangl.story.concepts.location import Location
 from tangl.story.episode import Scene
@@ -27,15 +26,6 @@ from tangl.story.episode import Scene
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-# @dataclass(frozen=True, slots=True)
-# class _DefaultClassConfig:
-#     """Configuration describing default ``obj_cls`` wiring for script exports."""
-#
-#     class_path: str | None = None
-#     alias: str | None = None
-#     children: dict[str, "_DefaultClassConfig"] = field(default_factory=dict)
-
-from tangl.core import Entity
 
 class ScriptManager(Entity):
     """ScriptManager mediates between input files and the world/story creation."""
@@ -499,11 +489,12 @@ class ScriptManager(Entity):
         if not section:
             return
 
-        config = getattr(self, "_default_tree", {}).get(key)
+        # Supposed to carry typing defaults, unnecessary
+        # config = None
 
         if isinstance(section, dict):
             for label, item in section.items():
-                payload = self._export_item(item, config)
+                payload = self._export_item(item)
                 payload.setdefault("label", label)
                 self._apply_defaults(key, payload)
                 logger.debug(payload)
@@ -511,7 +502,7 @@ class ScriptManager(Entity):
             return
 
         for item in section:
-            payload = self._export_item(item, config)
+            payload = self._export_item(item)
             self._apply_defaults(key, payload)
             logger.debug(payload)
             yield payload
@@ -521,12 +512,13 @@ class ScriptManager(Entity):
     def _export_item(
         cls,
         item: Any,
-        config: _DefaultClassConfig | None,
+        # config: _DefaultClassConfig | None,
     ) -> dict[str, Any]:
         payload = cls._dump_item(item)
-        if config is None:
-            return payload
-        return cls._apply_default_classes(payload, config)
+        return payload
+        # if config is None:
+        #     return payload
+        # return cls._apply_default_classes(payload, config)
 
     @staticmethod
     def _dump_item(item: Any) -> dict[str, Any]:

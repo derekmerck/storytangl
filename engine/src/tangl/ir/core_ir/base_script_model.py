@@ -10,7 +10,7 @@ from tangl.type_hints import Expr, Label, StringMap
 class BaseScriptItem(HierarchicalTemplate):
     """core.factory.HierarchicalTemplate with some added conveniences."""
 
-    # todo: I think this is out of spec now
+    # todo: I think this is out of spec now -- templates are just actor scripts, location scripts, block scripts, etc.
     template_names: Optional[Label] = None
 
     # todo: we haven't implemented this on story-node yet have we?

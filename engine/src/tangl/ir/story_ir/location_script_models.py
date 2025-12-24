@@ -32,7 +32,7 @@ class SettingScript(BaseScriptItem):
         from tangl.story.concepts.location import Setting
         return Setting
 
-    location_template: Optional[LocationScript] = Field(None, json_schema_extra={'child_script': True})
+    location_template: Optional[LocationScript] = Field(None, json_schema_extra={'visit_field': True})
     location_ref: Optional[UniqueLabel] = None
     location_template_ref: Optional[UniqueLabel] = Field(
         None,

@@ -194,19 +194,10 @@ class TemplateProvisioner(Provisioner):
     def __init__(
         self,
         factory: TemplateFactory | None = None,
-        template_registry: Mapping[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         object.__setattr__(self, "factory", factory)
-        if template_registry is not None:
-            warnings.warn(
-                "template_registry is deprecated; attach a TemplateFactory to the graph "
-                "or provide a factory explicitly.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        object.__setattr__(self, "template_registry", template_registry)
 
     def _get_factory(self, ctx: "Context") -> TemplateFactory | None:
         """Resolve the active template factory."""

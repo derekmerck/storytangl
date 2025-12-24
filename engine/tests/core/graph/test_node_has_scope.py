@@ -9,7 +9,7 @@ def test_has_ancestor_tags_matches():
     parent = graph.add_subgraph(label="parent", members=[node], tags={"bar"})
     assert node.has_ancestor_tags("foo", "bar")
 
-    grandparent = graph.add_subgraph(label="grandparent", members=[parent], tags={"baz"})
+    graph.add_subgraph(label="grandparent", members=[parent], tags={"baz"})
     assert node.has_ancestor_tags("foo", "bar", "baz")
 
 
@@ -26,13 +26,12 @@ def test_has_path_matches():
     assert node.has_path("*.block")
     assert node.has_path("parent.*")
 
-    grandparent = graph.add_subgraph(label="grandparent", members=[parent])
+    graph.add_subgraph(label="grandparent", members=[parent])
     assert node.has_path("grandparent.parent.block")
     assert node.has_path("grandparent.*.block")
     assert not node.has_path("grandparent.*.nonexistent")
 
     # assert node.has_scope(ScopeSelector()) is True
-
 
 
 def test_has_scope_global_selector_matches():
@@ -71,21 +70,6 @@ def test_has_scope_ancestor_labels_and_tags():
     assert block.has_scope({'has_ancestor_tags': {'world'}})
     assert block.has_scope({'has_ancestor_tags': {'world', 'scene'}})
     assert not block.has_scope({'has_ancestor_tags': {'world', 'scene', 'other'}})
-    # assert block.has_scope(ScopeSelector(ancestor_labels={"world*"})) is True
-    # assert block.has_scope(ScopeSelector(ancestor_labels={"missing"})) is False
-    # assert block.has_scope(ScopeSelector(ancestor_tags={"world"})) is True
-    # assert block.has_scope(ScopeSelector(ancestor_tags={"scene", "world"})) is True
-    # assert block.has_scope(ScopeSelector(ancestor_tags={"dungeon"})) is False
-
-
-# def test_has_scope_no_parent_with_scope_constraints():
-#     graph = Graph()
-#     node = graph.add_node(label="orphan")
-
-    # assert node.has_scope({"has_parent_label": "scene1"}) is False
-    # assert node.has_scope(ScopeSelector(ancestor_labels={"world"})) is False
-    # assert node.has_scope(ScopeSelector(ancestor_tags={"world"})) is False
-
 
 def test_has_scope_source_label_only():
     graph = Graph()
@@ -104,8 +88,6 @@ def test_has_scope_source_label_only():
     scope = {'has_path': 'block1',
              'has_ancestor_tags': {'node', 'other'}}
     assert not node.has_scope(scope)
-
-
 
 def test_has_scope_with_mixed_constraints():
     graph = Graph()

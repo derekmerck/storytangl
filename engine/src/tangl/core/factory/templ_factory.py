@@ -62,11 +62,10 @@ class TemplateFactory(Registry[Template]):
             This creates only the single entity - does NOT materialize
             children for graph items.
         """
-        return templ.materialize(**kwargs)
-
         # Future -- use factory dispatch and provide hooks
         # factory.dispatch.do_materialize(self, ctx=params)
         # - calls: do_get_cls, do_materialize, do_init
+        return templ.materialize(**kwargs)
 
     def all_paths(self) -> list[str]:
         return list(x.path for x in self.data.values())

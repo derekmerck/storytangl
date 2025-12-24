@@ -27,6 +27,7 @@ logger.setLevel(logging.WARNING)
 
 class StoryScript(MasterScript):
 
+    @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         from tangl.story.story_graph import StoryGraph
         return StoryGraph

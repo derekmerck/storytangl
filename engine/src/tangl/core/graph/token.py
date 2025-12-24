@@ -1,4 +1,4 @@
-# tangl/core/singleton/token.py
+# tangl/core/graph/token.py
 from __future__ import annotations
 import re
 from types import MethodType

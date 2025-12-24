@@ -302,10 +302,10 @@ class World(Singleton):
                 raise TypeError(
                     f"Scene class {scene_cls.__name__} for '{scope.parent_label}' must be a subclass of Subgraph."
                 )
-        except TypeError:  # pragma: no cover - defensive
+        except TypeError as err:  # pragma: no cover - defensive
             raise TypeError(
                 f"Invalid scene class configured for '{scope.parent_label}'. Expected a class, but got {scene_cls!r}."
-            )
+            ) from err
 
         payload = self._prepare_payload(
             scene_cls,

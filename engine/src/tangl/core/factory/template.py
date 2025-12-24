@@ -4,7 +4,7 @@ from typing import TypeVar, Generic, Self, Type
 from uuid import UUID, uuid4
 from inspect import isclass
 
-from pydantic import Field, field_validator, FieldValidationInfo
+from pydantic import Field, field_validator
 
 from tangl.type_hints import Typelike, UnstructuredData, StringMap
 from tangl.core.entity import Entity, Selectable

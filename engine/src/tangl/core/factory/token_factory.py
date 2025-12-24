@@ -259,6 +259,6 @@ class TokenFactory(Entity):
 
         # All types
         result = []
-        for token_type in self.registered_types():
-            result.extend(token_type.all_instances())
+        for token_type_ in self.registered_types():
+            result.extend(token_type_.all_instances())
         return result

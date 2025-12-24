@@ -1,7 +1,4 @@
 """Integration tests for resolving role dependencies during planning."""
-
-from __future__ import annotations
-
 from __future__ import annotations
 
 import pytest

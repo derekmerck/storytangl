@@ -12,6 +12,7 @@ from tangl.utils.hashing import hashing_func
 from tangl.core.entity import is_identifier
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class ContentAddressable(BaseModel):
@@ -90,7 +91,7 @@ class ContentAddressable(BaseModel):
         try:
             # Get hashable content (subclass customization point)
             hashable = cls._get_hashable_content(data)
-            logger.info(f"Content hash items: {hashable}")
+            logger.debug(f"Content hash items: {hashable}")
 
             # Compute hash using standard hashing function
             if hashable is not None:

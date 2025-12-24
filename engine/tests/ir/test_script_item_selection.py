@@ -14,12 +14,6 @@ def test_scene_template_selection_criteria_parent_label():
     assert template.get_selection_criteria() == {"has_path": "scene1.*"}
 
 
-# def test_block_template_selection_criteria_source_label():
-#     template = BaseScriptItem(label="block-template", scope=ScopeSelector(source_label="block1"))
-#
-#     assert template.get_selection_criteria() == {"label": "block1"}
-
-
 def test_complex_template_selection_criteria():
 
     template = BaseScriptItem(label="complex", path_pattern="world.scene1.block1", ancestor_tags={'tag1', 'tag2'})

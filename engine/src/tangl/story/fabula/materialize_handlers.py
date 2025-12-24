@@ -39,15 +39,7 @@ def instantiation_handler(
     except ImportError:  # pragma: no cover - defensive import
         BlockScript = None  # type: ignore[assignment]
     if domain_manager is not None:
-        cls = domain_manager.resolve_class(template.obj_cls or "tangl.core.graph.Node") or Node
-        if BlockScript is not None and isinstance(template, BlockScript):
-            block_cls = getattr(template, "block_cls", None)
-            if block_cls:
-                cls = domain_manager.resolve_class(block_cls) or cls
-        if cls is Node and getattr(template, "obj_cls", None) is None and hasattr(template, "block_cls"):
-            cls = domain_manager.resolve_class(template.block_cls) or Node
-        if cls is Node and BlockScript is not None and isinstance(template, BlockScript):
-            cls = domain_manager.resolve_class("tangl.story.episode.block.Block") or Node
+        cls = domain_manager.resolve_class(template.obj_cls or "tangl.core.graph.node.Node") or Node
     else:
         obj_cls = getattr(template, "obj_cls", None)
         if isinstance(obj_cls, type):

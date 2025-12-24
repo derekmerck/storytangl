@@ -67,10 +67,6 @@ def test_master_script_(script_manager):
     logger.debug(f"find_actors: {find_actors}")
     assert len(find_actors) > 3
 
-    find_actors = list(script_manager.find_actors())
-    logger.debug(f"find_actors: {find_actors}")
-    assert len(find_actors) > 3
-
     logger.debug(f"find_actors: {[(a.name, a.get_path_pattern(), a.scope_specificity()) for a in find_actors]}")
 
     assert find_actors[0].name == "Store Guard"

@@ -5,7 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from tangl.type_hints import StringMap, Tag
 from tangl.core.entity import Selectable, is_identifier
 
-
+# todo: I find it irritating that this bad idea keeps creeping back in.
+#       just use has_path or has_ancestor_tags or provide the requirement node
+#       as the selector.
 class ScopeSelector(BaseModel):
     """Scope selector metadata for template lookups."""
 
@@ -32,13 +34,16 @@ class ScopeSelectable(Selectable):
     Examples:
         >>> template = ScopeSelectable(
         ...     label="guard",
-        ...     req_scope_tags={"combat"},
-        ...     req_scope_pattern="dungeon.*"
+        ...     ancestor_tags={"combat"},
+        ...     path_pattern="dungeon.*"
         ... )
         >>>
         >>> criteria = template.get_selection_criteria()
         >>> # {'has_ancestor_tags': {'combat'}, 'has_path': 'dungeon.*'}
     """
+    # todo: we don't want this.  We want templates to infer their valid scope
+    #       and nodes be able to state their location/path.  Nodes don't need
+    #       scope, they have locality.
     scope: ScopeSelector | None = Field(default_factory=ScopeSelector)
     req_ancestor_tags: set[Tag] = Field(default_factory=set, alias="ancestor_tags")
     req_path_pattern: str | None = Field(None, alias="path_pattern")

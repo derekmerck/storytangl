@@ -324,7 +324,6 @@ def test_unstructure_for_materialize_excludes_children():
 2. ✅ Supports tag-based scoping (has_ancestor_tags)
 3. ✅ Supports pattern-based scoping (has_path with fnmatch)
 """
-from tangl.core.factory import ScopeSelectable
 
 def test_scope_selectable_tags():
     """req_scope_tags translates to has_ancestor_tags criteria."""
