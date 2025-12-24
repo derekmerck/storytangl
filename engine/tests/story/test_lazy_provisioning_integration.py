@@ -114,7 +114,7 @@ def test_lazy_block_provisioning_from_template_factory():
     assert len(dependencies) == 1, "Action should have destination requirement"
 
     req = dependencies[0].requirement
-    assert req.identifier == "next", "Requirement should reference next block"
+    assert req.identifier == "scene1.next", "Requirement should reference next block"
     assert req.policy == ProvisioningPolicy.CREATE_TEMPLATE
     assert not req.satisfied, "Requirement should not be satisfied yet"
 
@@ -222,7 +222,7 @@ def test_lazy_provisioning_with_multiple_successors():
         list(graph.find_edges(source=action, is_instance=Dependency))[0].requirement.identifier
         for action in actions
     }
-    assert identifiers == {"north", "south", "east"}
+    assert identifiers == {"hub.north", "hub.south", "hub.east"}
 
     assert graph.find_node(label="north") is None
     assert graph.find_node(label="south") is None

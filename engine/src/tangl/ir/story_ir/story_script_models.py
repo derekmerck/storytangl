@@ -44,6 +44,10 @@ class StoryScript(MasterScript):
     # Template-map {templ_name: {attrib: default}}
     templates: Optional[ dict[UniqueLabel, dict[str, Any]] ] = None
 
+    @classmethod
+    def from_data(cls, data: dict[str, Any]) -> StoryScript:
+        return cls.model_validate(data)
+
 
 
 _types_namespace = {

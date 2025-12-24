@@ -55,6 +55,8 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
             resolved = Entity.dereference_cls_name(data)
             if resolved:
                 data = resolved
+            else:
+                return data
 
         # Validate that it is a class and Entity subclass (or None)
         if not (data is Entity or (isclass(data) and issubclass(data, Entity))):

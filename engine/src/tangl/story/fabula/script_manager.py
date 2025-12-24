@@ -7,10 +7,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self, Optional
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from tangl.core.factory import TemplateFactory
 from tangl.core.graph import Node
+from tangl.core.graph.scope_selectable import ScopeSelector
 from tangl.core.registry import Registry
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from tangl.ir.story_ir import StoryScript
@@ -40,7 +41,9 @@ class ScriptManager(Entity):
     """ScriptManager mediates between input files and the world/story creation."""
 
     master_script: Optional[MasterScript] = None  # for reference
-    template_factory: TemplateFactory
+    template_factory: TemplateFactory = TemplateFactory(label="templates")
+
+    model_config = ConfigDict(extra="allow")
 
     # === CONSTRUCTORS ===
 
@@ -54,6 +57,10 @@ class ScriptManager(Entity):
         )
         manager._register_scoped_templates()
         return manager
+
+    @classmethod
+    def from_script(cls, master_script: MasterScript) -> Self:
+        return cls.from_master_script(master_script=master_script)
 
     @classmethod
     def from_data(cls, data: UnstructuredData) -> Self:
@@ -119,9 +126,9 @@ class ScriptManager(Entity):
         identifier: str | None = None,
         selector: Node | None = None,
         **criteria: Any,
-    ) -> Iterator[BaseScriptItem]:
-        """Return all templates matching identifier/criteria.
-        """
+    ) -> list[BaseScriptItem]:
+        """Return all templates matching identifier/criteria."""
+        results: list[BaseScriptItem] = []
         if selector is not None:
             criteria.setdefault("selector", selector)
 
@@ -141,23 +148,27 @@ class ScriptManager(Entity):
                     if template.uid in seen:
                         continue
                     seen.add(template.uid)
-                    yield template
-            return
+                    results.append(template)
+            return results
 
         if identifier is not None:
             criteria.setdefault("has_identifier", identifier)
-        yield from self.template_factory.find_all(
-            sort_key=lambda x: x.scope_specificity(),
-            **criteria,
+        return list(
+            self.template_factory.find_all(
+                sort_key=lambda x: x.scope_specificity(),
+                **criteria,
+            )
         )
 
     # This is similar api to how core.Graph wraps convenience accessors for
     # various sub-types of GraphItem
     def find_scenes(self, **criteria: Any) -> Iterator[SceneScript]:
         criteria.setdefault("is_instance", Scene)
-        return self.template_factory.find_all(
-            sort_key=lambda x: x.scope_specificity(),
-            **criteria,
+        return iter(
+            self.template_factory.find_all(
+                sort_key=lambda x: x.scope_specificity(),
+                **criteria,
+            )
         )
 
     def find_actors(self, **criteria: Any) -> Iterator[ActorScript]:
@@ -452,15 +463,6 @@ class ScriptManager(Entity):
         return registry
 
     def get_unstructured(self, key: str) -> Iterator[UnstructuredData]:
-
-        find_meth = f"find_{key}"
-        if hasattr(self, find_meth):
-            yield from getattr(self, find_meth)()
-        else:
-            raise ValueError(f"Accessor `ScriptManager.find_{key}` not found")
-
-        return
-
         if not hasattr(self.master_script, key):
             return
 
@@ -469,18 +471,20 @@ class ScriptManager(Entity):
         if not section:
             return
 
-        config = self._default_tree.get(key)
+        config = getattr(self, "_default_tree", {}).get(key)
 
         if isinstance(section, dict):
             for label, item in section.items():
                 payload = self._export_item(item, config)
                 payload.setdefault("label", label)
+                self._apply_defaults(key, payload)
                 logger.debug(payload)
                 yield payload
             return
 
         for item in section:
             payload = self._export_item(item, config)
+            self._apply_defaults(key, payload)
             logger.debug(payload)
             yield payload
 
@@ -513,6 +517,35 @@ class ScriptManager(Entity):
             return {key: value for key, value in payload.items() if value is not None}
 
         return dict(item)
+
+    @staticmethod
+    def _apply_defaults(key: str, payload: dict[str, Any]) -> None:
+        if key == "actors":
+            payload.setdefault("obj_cls", "tangl.story.concepts.actor.actor.Actor")
+            return
+        if key == "locations":
+            payload.setdefault("obj_cls", "tangl.story.concepts.location.location.Location")
+            return
+        if key == "scenes":
+            payload.setdefault("obj_cls", "tangl.story.episode.scene.Scene")
+            blocks = payload.get("blocks")
+            if isinstance(blocks, dict):
+                for block_label, block in blocks.items():
+                    if not isinstance(block, dict):
+                        continue
+                    block.setdefault("label", block_label)
+                    block.setdefault("obj_cls", "tangl.story.episode.block.Block")
+                    block.setdefault("block_cls", "tangl.story.episode.block.Block")
+                    for edge_key in ("actions", "continues", "redirects"):
+                        entries = block.get(edge_key)
+                        if not isinstance(entries, list):
+                            continue
+                        for entry in entries:
+                            if isinstance(entry, dict):
+                                entry.setdefault(
+                                    "obj_cls",
+                                    "tangl.story.episode.action.Action",
+                                )
     #
     # @classmethod
     # def _apply_default_classes(

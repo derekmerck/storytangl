@@ -105,16 +105,24 @@ def standard_wiring_handler(
     if getattr(template, "media", None):
         from tangl.story.fabula.media import attach_media_deps_for_block
 
-        attach_media_deps_for_block(ctx.graph, node, template)
+        attach_media_deps_for_block(graph=ctx.graph, block=node, script=template)
 
     for edge_type in ("actions", "continues", "redirects"):
         edge_scripts = getattr(template, edge_type, None)
         if edge_scripts:
+            scope = getattr(template, "scope", None)
+            if scope is None:
+                parent = getattr(template, "parent", None)
+                parent_label = getattr(parent, "label", None) if parent is not None else None
+                if parent_label:
+                    from tangl.core.graph.scope_selectable import ScopeSelector
+
+                    scope = ScopeSelector(parent_label=parent_label)
             world._attach_action_requirements(
                 ctx.graph,
                 node,
                 edge_scripts,
-                getattr(template, "scope", None),
+                scope,
             )
 
     if getattr(template, "roles", None):

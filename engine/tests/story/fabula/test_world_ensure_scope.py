@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.core.graph.subgraph import Subgraph
+from tangl.core.graph.scope_selectable import ScopeSelector
 from tangl.ir.story_ir import StoryScript
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World

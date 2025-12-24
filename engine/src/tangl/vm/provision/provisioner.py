@@ -116,6 +116,8 @@ class GraphProvisioner(Provisioner):
     ) -> Iterator[DependencyOffer]:
         if not (requirement.policy & ProvisioningPolicy.EXISTING):
             return
+        if requirement.template_ref is not None and not isinstance(requirement.identifier, str):
+            return
         if self.node_registry is None:
             return
 

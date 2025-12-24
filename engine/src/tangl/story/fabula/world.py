@@ -39,6 +39,7 @@ from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.graph.node import Node
 from tangl.core.graph.subgraph import Subgraph
+from tangl.core.graph.scope_selectable import ScopeSelector
 from tangl.core.singleton import Singleton
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.context import MaterializationContext
@@ -235,6 +236,13 @@ class World(Singleton):
 
         if scope is None:
             return None
+
+        if isinstance(scope, dict):
+            scope_value = scope.get("has_path")
+            if isinstance(scope_value, str) and scope_value.endswith(".*"):
+                scope = ScopeSelector(parent_label=scope_value.rsplit(".", 1)[0])
+            else:
+                scope = ScopeSelector.model_validate(scope)
 
         if scope.is_global():
             return None
@@ -532,47 +540,19 @@ class World(Singleton):
                 parent_container=parent_container,
             )
 
-        # todo: need to run linker
-        return graph
-
-        from tangl.story.concepts.item import Item, Flag
-
-        graph.locals.setdefault("Item", Item)
-        graph.locals.setdefault("Flag", Flag)
-
-        node_map: dict[str, UUID] = {}
-
-        actor_map = self._build_actors(graph)
-        location_map = self._build_locations(graph)
-        # item_map = self._build_items(graph)
-        # flag_map = self._build_flags(graph)
-
-        node_map.update(actor_map)
-        node_map.update(location_map)
-        # node_map.update(item_map)
-        # node_map.update(flag_map)
-
-        block_map, action_scripts = self._build_blocks(graph)
-        node_map.update(block_map)
-
-        scene_map = self._build_scenes(
-            graph,
-            block_map,
-            actor_map=actor_map,
-            location_map=location_map,
-            resolve_dependencies=True,
-        )
-        node_map.update(scene_map)
-
-        self._build_action_edges(graph, block_map, action_scripts)
-
         start_scene, start_block = self._get_starting_cursor()
-        start_label = f"{start_scene}.{start_block}"
-        start_uid = block_map.get(start_label)
-        if start_uid is None:
-            raise ValueError(f"Start block '{start_label}' not found in story graph")
+        start_node = None
+        for candidate in graph.find_nodes(label=start_block):
+            parent = getattr(candidate, "parent", None)
+            if parent is not None and getattr(parent, "label", None) == start_scene:
+                start_node = candidate
+                break
+        if start_node is None:
+            raise RuntimeError(
+                f"Start block '{start_scene}.{start_block}' not found in story graph"
+            )
 
-        graph.initial_cursor_id = start_uid
+        graph.initial_cursor_id = start_node.uid
         return graph
 
     def _build_actors(self, graph: StoryGraph) -> dict[str, UUID]:
@@ -1021,7 +1001,7 @@ class World(Singleton):
                 if source_node is None:
                     continue
 
-                # scope_selector = ScopeSelector(parent_label=scene_label)
+                scope_selector = ScopeSelector(parent_label=scene_label)
                 for key in ("actions", "continues", "redirects"):
                     edge_scripts = scripts.get(key, [])
                     if not edge_scripts:
@@ -1030,7 +1010,7 @@ class World(Singleton):
                         graph=graph,
                         source_node=source_node,
                         action_scripts=edge_scripts,
-                        # scope=scope_selector,
+                        scope=scope_selector,
                         block_map=block_map,
                     )
 
