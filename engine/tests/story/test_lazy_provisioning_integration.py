@@ -19,7 +19,7 @@ def clear_world_singleton():
     World.clear_instances()
 
 
-def test_lazy_block_provisioning_from_template_registry():
+def test_lazy_block_provisioning_from_template_factory():
     """
     Lazy story creates seed block with action edges (open Requirements).
     Planning resolves Requirements, provisions successor blocks on-demand.
@@ -71,8 +71,9 @@ def test_lazy_block_provisioning_from_template_registry():
         metadata=story_data["metadata"],
     )
 
-    start_template = world.template_registry.find_one(identifier="scene1.start")
-    next_template = world.template_registry.find_one(identifier="scene1.next")
+    factory = world.script_manager.template_factory
+    start_template = factory.find_one(path="test_story.scene1.start")
+    next_template = factory.find_one(path="test_story.scene1.next")
 
     assert start_template is not None, "Start block template not registered"
     assert next_template is not None, "Next block template not registered"
@@ -80,6 +81,7 @@ def test_lazy_block_provisioning_from_template_registry():
     assert next_template.content == "You have advanced to the next location."
 
     graph = world.create_story("test_run", mode="lazy")
+    assert graph.factory is factory
 
     scene1 = graph.find_subgraph(label="scene1")
     assert scene1 is not None, "Seed scene should be created on demand"
@@ -115,6 +117,7 @@ def test_lazy_block_provisioning_from_template_registry():
     assert req.identifier == "scene1.next", "Requirement should reference next block"
     assert req.policy == ProvisioningPolicy.CREATE_TEMPLATE
     assert not req.satisfied, "Requirement should not be satisfied yet"
+
 
     from tangl.vm.provision import TemplateProvisioner
     from types import SimpleNamespace
@@ -215,7 +218,10 @@ def test_lazy_provisioning_with_multiple_successors():
         assert len(reqs) == 1
         assert not reqs[0].requirement.satisfied
 
-    identifiers = {list(graph.find_edges(source=action, is_instance=Dependency))[0].requirement.identifier for action in actions}
+    identifiers = {
+        list(graph.find_edges(source=action, is_instance=Dependency))[0].requirement.identifier
+        for action in actions
+    }
     assert identifiers == {"hub.north", "hub.south", "hub.east"}
 
     assert graph.find_node(label="north") is None

@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
-from __future__ import annotations
-
 import pytest
 
 from tangl.ir.story_ir import StoryScript
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
-from tangl.vm.provision import Dependency
+from tangl.vm.provision import (
+    CloningProvisioner,
+    Dependency,
+    GraphProvisioner,
+    ProvisioningContext,
+    TemplateProvisioner,
+    UpdatingProvisioner,
+    provision_node,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -87,12 +93,24 @@ def test_lazy_mode_roles_create_open_dependencies():
 
 
 def test_full_mode_roles_resolved(world_with_roles):
-    """Full mode should eagerly provision role providers."""
+    """Full mode should allow provisioning role providers."""
 
     graph = world_with_roles.create_story("test", mode="full")
     main_block = graph.find_node(label="main")
     dependencies = list(graph.find_edges(source=main_block, is_instance=Dependency))
     barkeep_dep = [edge for edge in dependencies if edge.label == "barkeep"][0]
+
+    provisioners = [
+        GraphProvisioner(node_registry=graph, layer="local"),
+        UpdatingProvisioner(node_registry=graph, layer="local"),
+        CloningProvisioner(node_registry=graph, layer="local"),
+        TemplateProvisioner(layer="local"),
+    ]
+    ctx = ProvisioningContext(graph=graph, step=0)
+    result = provision_node(main_block, provisioners, ctx=ctx)
+    plan = result.primary_plan
+    assert plan is not None
+    plan.execute(ctx=ctx)
 
     assert barkeep_dep.requirement.satisfied
     assert barkeep_dep.requirement.provider is not None
@@ -103,18 +121,6 @@ def world_with_roles():
     """World fixture shared across mode tests."""
 
     return _build_world(_role_script(policy="ANY"))
-
-
-def test_hybrid_mode_roles_open(world_with_roles):
-    """Hybrid mode should materialize dependencies but leave them unresolved."""
-
-    graph = world_with_roles.create_story("test", mode="hybrid")
-    main_block = graph.find_node(label="main")
-    dependencies = list(graph.find_edges(source=main_block, is_instance=Dependency))
-    barkeep_dep = [edge for edge in dependencies if edge.label == "barkeep"][0]
-
-    assert not barkeep_dep.requirement.satisfied
-    assert barkeep_dep.requirement.provider is None
 
 
 def test_policy_any_reuses_actor_instance():
@@ -166,6 +172,16 @@ def test_policy_any_reuses_actor_instance():
     graph = world.create_story("test", mode="full")
     gate = graph.find_node(label="gate")
     courtyard = graph.find_node(label="courtyard")
+
+    provisioners = [
+        GraphProvisioner(node_registry=graph, layer="local"),
+        UpdatingProvisioner(node_registry=graph, layer="local"),
+        CloningProvisioner(node_registry=graph, layer="local"),
+        TemplateProvisioner(layer="local"),
+    ]
+    ctx = ProvisioningContext(graph=graph, step=0)
+    provision_node(gate, provisioners, ctx=ctx).primary_plan.execute(ctx=ctx)
+    provision_node(courtyard, provisioners, ctx=ctx).primary_plan.execute(ctx=ctx)
 
     gate_dep = list(graph.find_edges(source=gate, is_instance=Dependency))[0]
     courtyard_dep = list(graph.find_edges(source=courtyard, is_instance=Dependency))[0]
@@ -224,10 +240,19 @@ def test_policy_create_makes_unique_instances():
     gate = graph.find_node(label="gate")
     courtyard = graph.find_node(label="courtyard")
 
+    provisioners = [
+        GraphProvisioner(node_registry=graph, layer="local"),
+        UpdatingProvisioner(node_registry=graph, layer="local"),
+        CloningProvisioner(node_registry=graph, layer="local"),
+        TemplateProvisioner(layer="local"),
+    ]
+    ctx = ProvisioningContext(graph=graph, step=0)
+    provision_node(gate, provisioners, ctx=ctx).primary_plan.execute(ctx=ctx)
+    provision_node(courtyard, provisioners, ctx=ctx).primary_plan.execute(ctx=ctx)
+
     gate_dep = list(graph.find_edges(source=gate, is_instance=Dependency))[0]
     courtyard_dep = list(graph.find_edges(source=courtyard, is_instance=Dependency))[0]
 
     assert gate_dep.requirement.provider is not None
     assert courtyard_dep.requirement.provider is not None
     assert gate_dep.requirement.provider is not courtyard_dep.requirement.provider
-

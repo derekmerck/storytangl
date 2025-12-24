@@ -9,7 +9,7 @@ from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 
 
-def test_world_initializes_template_registry_without_templates() -> None:
+def test_world_initializes_template_factory_without_templates() -> None:
     World.clear_instances()
 
     metadata = ScriptMetadata(title="Example", author="Tests")
@@ -26,8 +26,14 @@ def test_world_initializes_template_registry_without_templates() -> None:
             metadata=manager.get_story_metadata(),
         )
 
-        assert world.template_registry.label == "example_templates"
-        assert list(world.template_registry.find_all()) == []
+        factory = world.script_manager.template_factory
+        assert factory.label == "example_factory"
+        templates = [
+            template
+            for template in factory.find_all()
+            if isinstance(template, (ActorScript, LocationScript, BlockScript))
+        ]
+        assert templates == []
     finally:
         World.clear_instances()
 
@@ -80,33 +86,39 @@ def test_world_compiles_templates_with_scope_inference() -> None:
             metadata=manager.get_story_metadata(),
         )
 
-        templates = {template.label: template for template in world.template_registry.find_all()}
+        factory = world.script_manager.template_factory
+        templates = {
+            template.label: template
+            for template in factory.find_all()
+            if isinstance(template, (ActorScript, LocationScript, BlockScript))
+        }
 
         assert set(templates) == {"global_guard", "scene_guard", "block_market", "town_intro"}
 
         global_template = templates["global_guard"]
         assert isinstance(global_template, ActorScript)
-        assert global_template.scope is None
+        assert global_template.get_selection_criteria().get("has_path") is None
 
         scene_template = templates["scene_guard"]
         assert isinstance(scene_template, ActorScript)
-        assert scene_template.scope is not None
-        # assert scene_template.scope.model_dump() == ScopeSelector(parent_label="town").model_dump()
+        assert scene_template.get_selection_criteria().get("has_path") == "town.*"
 
         block_template = templates["block_market"]
         assert isinstance(block_template, LocationScript)
-        assert block_template.scope is not None
-        # assert block_template.scope.model_dump() == ScopeSelector(parent_label="town").model_dump()
+        assert block_template.get_selection_criteria().get("has_path") == "town.*"
 
         block_script = templates["town_intro"]
         assert isinstance(block_script, BlockScript)
-        assert block_script.scope is not None
-        # assert block_script.scope.model_dump() == ScopeSelector(parent_label="town").model_dump()
+        assert block_script.get_selection_criteria().get("has_path") == "example.town.*"
 
-        actor_labels = sorted(template.label for template in world.actor_templates)
+        actor_labels = sorted(
+            template.label for template in world.script_manager.find_actors()
+        )
         assert actor_labels == ["global_guard", "scene_guard"]
 
-        location_labels = [template.label for template in world.location_templates]
+        location_labels = [
+            template.label for template in world.script_manager.find_locations()
+        ]
         assert location_labels == ["block_market"]
 
         assert world.find_template("scene_guard") is scene_template

@@ -1,4 +1,4 @@
-"""End-to-end tests for ``World.template_registry`` population and queries."""
+"""End-to-end tests for template factory population and queries."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
+from tangl.story.story_graph import StoryGraph
 
 ACTOR_CLASS = "tangl.story.concepts.actor.actor.Actor"
 LOCATION_CLASS = "tangl.story.concepts.location.location.Location"
@@ -43,10 +44,13 @@ def build_world(story_data: dict[str, Any]) -> World:
     )
 
 
-def _collect_templates(world: World) -> dict[str, ActorScript | LocationScript]:
+def _collect_templates(
+    world: World,
+) -> dict[str, ActorScript | LocationScript | BlockScript]:
     return {
         template.label: template
         for template in world.script_manager.find_templates()
+        if isinstance(template, (ActorScript, LocationScript, BlockScript))
     }
 
 
@@ -66,7 +70,7 @@ def test_world_level_templates_have_global_scope() -> None:
     templates = _collect_templates(world)
 
     assert set(templates) == {"global_guard"}
-    assert templates["global_guard"].scope is None
+    assert templates["global_guard"].get_selection_criteria().get("has_path") is None
 
 
 def test_scene_level_templates_have_parent_scope() -> None:
@@ -91,8 +95,15 @@ def test_scene_level_templates_have_parent_scope() -> None:
 
     scene_template = templates["scene_guard"]
     assert isinstance(scene_template, ActorScript)
-    assert scene_template.scope is not None
-    assert scene_template.scope.model_dump() == {"has_path": "village.*"}.model_dump()
+    assert scene_template.get_selection_criteria().get("has_path") == "village.*"
+
+    graph = StoryGraph(label="scene_scope", world=world)
+    village = graph.add_subgraph(label="village")
+    cursor = graph.add_node(label="start")
+    village.add_member(cursor)
+    factory = world.script_manager.template_factory
+    scoped = factory.find_one(identifier="scene_guard", selector=cursor)
+    assert scoped == scene_template
 
 
 def test_block_level_templates_have_parent_scope() -> None:
@@ -121,8 +132,43 @@ def test_block_level_templates_have_parent_scope() -> None:
 
     block_template = templates["block_market"]
     assert isinstance(block_template, LocationScript)
-    assert block_template.scope is not None
-    assert block_template.scope.model_dump() == {"has_path": "village.*"}.model_dump()
+    assert block_template.get_selection_criteria().get("has_path") == "village.*"
+
+    graph = StoryGraph(label="block_scope", world=world)
+    village = graph.add_subgraph(label="village")
+    cursor = graph.add_node(label="market")
+    village.add_member(cursor)
+    factory = world.script_manager.template_factory
+    scoped = factory.find_one(identifier="block_market", selector=cursor)
+    assert scoped == block_template
+
+
+def test_block_scripts_default_to_scene_scope() -> None:
+    """Block scripts registered in the factory should inherit scene scope."""
+
+    story_data = {
+        "label": "example",
+        "metadata": {"title": "Example", "author": "Tests"},
+        "scenes": {
+            "village": {
+                "label": "village",
+                "blocks": {
+                    "market": {
+                        "label": "market",
+                        "block_cls": "tangl.story.episode.block.Block",
+                    }
+                },
+            }
+        },
+    }
+
+    world = build_world(story_data)
+    factory = world.script_manager.template_factory
+
+    block_script = factory.find_one(label="market", is_instance=BlockScript)
+    assert block_script is not None
+    criteria = block_script.get_selection_criteria()
+    assert criteria.get("has_path") == "example.village.*"
 
 
 def test_explicit_scope_overrides_inferred() -> None:
@@ -136,7 +182,7 @@ def test_explicit_scope_overrides_inferred() -> None:
                 "label": "village",
                 "blocks": {},
                 "templates": {
-                    "scene.guard": {"obj_cls": ACTOR_CLASS, "scope": None},
+                    "scene.guard": {"obj_cls": ACTOR_CLASS, "path_pattern": None},
                 },
             }
         },
@@ -146,13 +192,13 @@ def test_explicit_scope_overrides_inferred() -> None:
     templates = _collect_templates(world)
 
     explicit_template = templates["scene_guard"]
-    assert explicit_template.scope is None
+    assert explicit_template.get_selection_criteria().get("has_path") is None
 
 
 def test_inline_templates_respect_explicit_none_scope() -> None:
     """Inline script instances should preserve ``scope=None`` even in nested contexts."""
 
-    inline_template = ActorScript(label="scene.guard", scope=None)
+    inline_template = ActorScript(label="scene.guard", path_pattern=None)
     block = BlockScript.model_construct(label="village.market")
     scene_script = SceneScript.model_construct(
         label="village",
@@ -177,11 +223,11 @@ def test_inline_templates_respect_explicit_none_scope() -> None:
     templates = _collect_templates(world)
 
     inline_scene_template = templates["scene_guard"]
-    assert inline_scene_template.scope is None
+    assert inline_scene_template.get_selection_criteria().get("has_path") is None
 
 
-def test_template_registry_queries() -> None:
-    """Registry helpers should expose type, tag, and attribute filtering."""
+def test_template_factory_queries() -> None:
+    """Factory helpers should expose type, tag, and attribute filtering."""
 
     story_data = {
         "label": "example",
@@ -215,7 +261,7 @@ def test_template_registry_queries() -> None:
     assert guard is not None
     assert guard.archetype == "guard"
 
-    actor_templates = list(world.actor_templates)
+    actor_templates = list(world.script_manager.find_actors())
     assert sorted(template.label for template in actor_templates) == ["global_guard", "global_merchant"]
 
     npc_templates = list(world.script_manager.find_templates(has_tags={"npc"}))
@@ -278,11 +324,18 @@ def test_duplicate_labels_allowed_with_different_scopes() -> None:
     global_guard = next(t for t in all_guards if "global" in t.tags)
     village_guard = next(t for t in all_guards if "village" in t.tags)
 
-    assert global_guard.scope is None
-    assert village_guard.scope.parent_label == "village"
+    assert global_guard.get_selection_criteria().get("has_path") is None
+    assert village_guard.get_selection_criteria().get("has_path") == "village.*"
 
-    assert world.script_manager.find_template(identifier="guard") is not None
-    assert world.script_manager.find_template(identifier="village.guard") == village_guard
+    factory = world.script_manager.template_factory
+    graph = StoryGraph(label="village_scope", world=world)
+    village = graph.add_subgraph(label="village")
+    cursor = graph.add_node(label="marker")
+    village.add_member(cursor)
+
+    assert factory.find_one(identifier="guard") is not None
+    scoped = world.script_manager.find_template(identifier="guard", selector=cursor)
+    assert scoped == village_guard
 
 
 def test_registry_finds_template_by_path() -> None:
@@ -311,17 +364,31 @@ def test_registry_finds_template_by_path() -> None:
 
     world = build_world(story_data)
 
-    all_templates = list(world.script_manager.find_templates())
+    all_templates = list(world.script_manager.find_templates(identifier="start"))
     assert len(all_templates) == 2
 
-    scene1_start = world.script_manager.find_template(identifier="scene1.start")
-    scene2_start = world.script_manager.find_template(identifier="scene2.start")
+    graph = StoryGraph(label="registry_path", world=world)
+    scene1 = graph.add_subgraph(label="scene1")
+    scene2 = graph.add_subgraph(label="scene2")
+    scene1_cursor = graph.add_node(label="start_one")
+    scene2_cursor = graph.add_node(label="start_two")
+    scene1.add_member(scene1_cursor)
+    scene2.add_member(scene2_cursor)
+
+    scene1_start = world.script_manager.find_template(
+        identifier="start",
+        selector=scene1_cursor,
+    )
+    scene2_start = world.script_manager.find_template(
+        identifier="start",
+        selector=scene2_cursor,
+    )
 
     assert scene1_start is not None
     assert scene2_start is not None
     assert scene1_start.uid != scene2_start.uid
-    assert scene1_start.scope.parent_label == "scene1"
-    assert scene2_start.scope.parent_label == "scene2"
+    assert scene1_start.get_selection_criteria().get("has_path") == "scene1.*"
+    assert scene2_start.get_selection_criteria().get("has_path") == "scene2.*"
 
 
 def test_block_scripts_registered_as_templates() -> None:
@@ -349,8 +416,9 @@ def test_block_scripts_registered_as_templates() -> None:
 
     world = build_world(story_data)
 
-    start_template = world.script_manager.find_template(identifier="scene1.start")
-    next_template = world.script_manager.find_template(identifier="scene1.next")
+    factory = world.script_manager.template_factory
+    start_template = factory.find_one(path="example.scene1.start")
+    next_template = factory.find_one(path="example.scene1.next")
 
     assert start_template is not None
     assert isinstance(start_template, BlockScript)
@@ -360,8 +428,8 @@ def test_block_scripts_registered_as_templates() -> None:
     assert isinstance(next_template, BlockScript)
     assert next_template.text == "Second block"
 
-    assert start_template.scope.parent_label == "scene1"
-    assert next_template.scope.parent_label == "scene1"
+    assert start_template.get_selection_criteria().get("has_path") == "example.scene1.*"
+    assert next_template.get_selection_criteria().get("has_path") == "example.scene1.*"
 
 
 def test_block_templates_coexist_with_concept_templates() -> None:
@@ -387,11 +455,11 @@ def test_block_templates_coexist_with_concept_templates() -> None:
     }
 
     world = build_world(story_data)
-    all_templates = list(world.script_manager.find_templates())
+    all_templates = _collect_templates(world)
 
     assert len(all_templates) == 3
 
-    labels = {template.label for template in all_templates}
+    labels = set(all_templates)
     assert labels == {"guard", "elder", "start"}
 
     start_block = world.script_manager.find_template(identifier="village.start")
@@ -403,13 +471,12 @@ def test_block_script_has_template_interface() -> None:
 
     block = BlockScript(
         label="test",
-        scope={"has_path": "scene1.*"},
+        path_pattern="scene1.*",
         text="Test block",
     )
 
     assert hasattr(block, "uid")
     assert hasattr(block, "label")
-    assert block.has_identifier("scene1.test")
     assert block.has_identifier("test")
 
     assert hasattr(block, "matches")
@@ -417,23 +484,22 @@ def test_block_script_has_template_interface() -> None:
 
     assert hasattr(block, "content_hash")
 
-    assert block.path == "scene1.test"
+    assert block.path == "test"
+    assert block.get_selection_criteria().get("has_path") == "scene1.*"
 
 
 def test_block_script_scope_is_immutable() -> None:
     """Modifying BlockScript should not mutate original object."""
 
     original = BlockScript(label="test", text="Original")
-    assert original.scope is None
+    assert original.get_selection_criteria().get("has_path") is None
 
     modified = original.model_copy(
-        update={"scope": {"has_path": "scene1.*"}}
+        update={"req_path_pattern": "scene1.*"}
     )
 
-    assert original.scope is None
-
-    assert modified.scope is not None
-    assert modified.scope.parent_label == "scene1"
+    assert original.get_selection_criteria().get("has_path") is None
+    assert modified.get_selection_criteria().get("has_path") == "scene1.*"
 
     assert original is not modified
 
@@ -463,12 +529,14 @@ def test_inline_location_template_preserves_concrete_type() -> None:
     template = world.find_template("hideout")
     assert isinstance(template, LocationScript)
 
-    location_labels = {location.label for location in world.location_templates}
+    location_labels = {
+        location.label for location in world.script_manager.find_locations()
+    }
     assert location_labels == {"hideout"}
 
 
-def test_templates_with_same_structure_have_same_content_hash() -> None:
-    """Templates that only differ by metadata should hash identically."""
+def test_templates_with_different_scopes_have_different_content_hashes() -> None:
+    """Scope changes should alter the content hash."""
 
     story_data = {
         "label": "example",
@@ -502,11 +570,11 @@ def test_templates_with_same_structure_have_same_content_hash() -> None:
     guard_scene = templates["scene_guard"]
 
     assert guard_global.label != guard_scene.label
-    assert guard_global.scope is None
-    assert guard_scene.scope is not None
+    assert guard_global.get_selection_criteria().get("has_path") is None
+    assert guard_scene.get_selection_criteria().get("has_path") == "village.*"
     assert guard_global.content_hash is not None
     assert guard_scene.content_hash is not None
-    assert guard_global.content_hash == guard_scene.content_hash
+    assert guard_global.content_hash != guard_scene.content_hash
 
 
 def test_templates_with_different_structure_have_different_hashes() -> None:
@@ -550,22 +618,22 @@ def test_template_content_hash_is_deterministic() -> None:
         "hp": 50,
     }
 
-    template_one = ActorScript.model_validate({**template_payload, "label": "guard.one"})
-    template_two = ActorScript.model_validate({**template_payload, "label": "guard.two"})
+    template_one = ActorScript.model_validate({**template_payload, "label": "guard"})
+    template_two = ActorScript.model_validate({**template_payload, "label": "guard"})
 
     assert template_one.uid != template_two.uid
     assert template_one.content_hash == template_two.content_hash
 
 
-def test_template_scope_excluded_from_content_hash() -> None:
-    """Changing scope metadata alone should not alter the hash."""
+def test_template_scope_included_in_content_hash() -> None:
+    """Changing scope metadata should alter the hash."""
 
     template_global = ActorScript.model_validate(
         {
             "label": "guard.global",
             "obj_cls": ACTOR_CLASS,
             "archetype": "guard",
-            "scope": None,
+            "path_pattern": None,
         }
     )
 
@@ -574,12 +642,13 @@ def test_template_scope_excluded_from_content_hash() -> None:
             "label": "guard.scoped",
             "obj_cls": ACTOR_CLASS,
             "archetype": "guard",
-            "scope": {"has_path": "village.*"},
+            "path_pattern": "village.*",
         }
     )
 
-    assert template_global.scope != template_scoped.scope
-    assert template_global.content_hash == template_scoped.content_hash
+    assert template_global.get_selection_criteria().get("has_path") is None
+    assert template_scoped.get_selection_criteria().get("has_path") == "village.*"
+    assert template_global.content_hash != template_scoped.content_hash
 
 
 def test_template_exposes_content_identifier_helper() -> None:

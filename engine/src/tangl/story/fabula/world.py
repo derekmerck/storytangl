@@ -39,6 +39,7 @@ from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.graph.node import Node
 from tangl.core.graph.subgraph import Subgraph
+from tangl.core.graph.scope_selectable import ScopeSelector
 from tangl.core.singleton import Singleton
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.context import MaterializationContext
@@ -154,16 +155,35 @@ class World(Singleton):
 
         from tangl.story.story_graph import StoryGraph
         graph = StoryGraph(label=story_label, world=self)
+        graph.factory = self.script_manager.template_factory
+        factory = self.script_manager.template_factory
 
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
+        from tangl.story.concepts.item import Flag, Item
+
+        graph.locals.setdefault("Item", Item)
+        graph.locals.setdefault("Flag", Flag)
 
         start_scene_label, start_block_label = self._get_starting_cursor()
 
-        # Get block template from registry
+        # Get block template from factory
+        script_label = getattr(self.script_manager.master_script, "label", None)
         start_block_identifier = f"{start_scene_label}.{start_block_label}"
-        block_template = self.script_manager.find_template(path=start_block_identifier)
+        path_candidates = [
+            f"{script_label}.{start_block_identifier}" if script_label else start_block_identifier,
+            start_block_identifier,
+        ]
+        block_template = None
+        for path_value in path_candidates:
+            if not path_value:
+                continue
+            block_template = factory.find_one(path=path_value)
+            if block_template is not None:
+                break
+        if block_template is None:
+            block_template = factory.find_one(label=start_block_label)
 
         if block_template is None:
             raise ValueError(
@@ -171,13 +191,19 @@ class World(Singleton):
                 f"Ensure BlockScript templates are registered during compilation (Phase D)."
             )
 
-        parent_container = self.ensure_scope(block_template.scope, graph)
+        parent_container = self.ensure_scope(getattr(block_template, "scope", None), graph)
 
         start_block = self._materialize_from_template(
             template=block_template,
             graph=graph,
             parent_container=parent_container,
         )
+
+        scene_container = graph.find_subgraph(label=start_scene_label)
+        if scene_container is None:
+            scene_container = graph.add_subgraph(label=start_scene_label)
+        if start_block.uid not in scene_container.member_ids:
+            scene_container.add_member(start_block)
 
         graph.initial_cursor_id = start_block.uid
         return graph
@@ -215,6 +241,13 @@ class World(Singleton):
         if scope is None:
             return None
 
+        if isinstance(scope, dict):
+            scope_value = scope.get("has_path")
+            if isinstance(scope_value, str) and scope_value.endswith(".*"):
+                scope = ScopeSelector(parent_label=scope_value.rsplit(".", 1)[0])
+            else:
+                scope = ScopeSelector.model_validate(scope)
+
         if scope.is_global():
             return None
 
@@ -230,7 +263,10 @@ class World(Singleton):
         if existing is not None:
             return existing
 
-        template = self.script_manager.find_template(identifier=scope.parent_label)
+        template = self.script_manager.template_factory.find_one(
+            sort_key=lambda item: item.scope_specificity(),
+            has_identifier=scope.parent_label,
+        )
 
         parent_container: Subgraph | None = None
         if template is not None:
@@ -447,9 +483,14 @@ class World(Singleton):
         from tangl.story.story_graph import StoryGraph
 
         graph = StoryGraph(label=story_label, world=self)
+        graph.factory = self.script_manager.template_factory
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
+        from tangl.story.concepts.item import Flag, Item
+
+        graph.locals.setdefault("Item", Item)
+        graph.locals.setdefault("Flag", Flag)
 
         actor_map = self._build_actors(graph)
         location_map = self._build_locations(graph)
@@ -482,49 +523,50 @@ class World(Singleton):
         from tangl.story.story_graph import StoryGraph
         globals_ns = self.script_manager.get_story_globals() or {}
         graph = StoryGraph(label=story_label, world=self, locals=globals_ns)
-
-        for templ in self.find_templates():
-            templ.materialize(graph=graph)
-
-        # todo: need to run linker
-        return graph
-
-        from tangl.story.concepts.item import Item, Flag
+        graph.factory = self.script_manager.template_factory
+        from tangl.story.concepts.item import Flag, Item
 
         graph.locals.setdefault("Item", Item)
         graph.locals.setdefault("Flag", Flag)
 
-        node_map: dict[str, UUID] = {}
-
         actor_map = self._build_actors(graph)
         location_map = self._build_locations(graph)
-        # item_map = self._build_items(graph)
-        # flag_map = self._build_flags(graph)
+        self._build_items(graph)
+        self._build_flags(graph)
+        from tangl.story.concepts.actor import Actor
+        from tangl.story.concepts.location import Location
 
-        node_map.update(actor_map)
-        node_map.update(location_map)
-        # node_map.update(item_map)
-        # node_map.update(flag_map)
+        for template in self.script_manager.find_templates():
+            resolved_cls = self.domain_manager.resolve_class(template.obj_cls)
+            if not issubclass(resolved_cls, (Actor, Location)):
+                continue
+            if template.label and graph.find_node(label=template.label) is not None:
+                continue
+            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
+            self._materialize_from_template(
+                template=template,
+                graph=graph,
+                parent_container=parent_container,
+            )
 
         block_map, action_scripts = self._build_blocks(graph)
-        node_map.update(block_map)
-
-        scene_map = self._build_scenes(
+        self._build_scenes(
             graph,
             block_map,
             actor_map=actor_map,
             location_map=location_map,
+            wire_dependencies=True,
             resolve_dependencies=True,
         )
-        node_map.update(scene_map)
 
         self._build_action_edges(graph, block_map, action_scripts)
 
         start_scene, start_block = self._get_starting_cursor()
-        start_label = f"{start_scene}.{start_block}"
-        start_uid = block_map.get(start_label)
+        start_uid = block_map.get(f"{start_scene}.{start_block}")
         if start_uid is None:
-            raise ValueError(f"Start block '{start_label}' not found in story graph")
+            raise ValueError(
+                f"Start block '{start_scene}.{start_block}' not found in story graph"
+            )
 
         graph.initial_cursor_id = start_uid
         return graph
@@ -533,11 +575,16 @@ class World(Singleton):
         """Instantiate actors described in the script into ``graph``."""
         actor_map: dict[str, UUID] = {}
         for actor_data in self.script_manager.get_unstructured("actors") or ():
-            payload = dict(actor_data)
+            payload = self._to_dict(actor_data)
             label = payload.get("label")
             if not label:
                 continue
-            cls = self.domain_manager.resolve_class(payload.get("obj_cls"))
+            obj_cls = (
+                actor_data.obj_cls
+                if hasattr(actor_data, "obj_cls")
+                else payload.get("obj_cls")
+            )
+            cls = self.domain_manager.resolve_class(obj_cls)
             actor = cls.structure(self._prepare_payload(cls, payload, graph))
             actor_map[label] = actor.uid
         return actor_map
@@ -546,11 +593,16 @@ class World(Singleton):
         """Instantiate locations described in the script into ``graph``."""
         location_map: dict[str, UUID] = {}
         for location_data in self.script_manager.get_unstructured("locations") or ():
-            payload = dict(location_data)
+            payload = self._to_dict(location_data)
             label = payload.get("label")
             if not label:
                 continue
-            cls = self.domain_manager.resolve_class(payload.get("obj_cls"))
+            obj_cls = (
+                location_data.obj_cls
+                if hasattr(location_data, "obj_cls")
+                else payload.get("obj_cls")
+            )
+            cls = self.domain_manager.resolve_class(obj_cls)
             location = cls.structure(self._prepare_payload(cls, payload, graph))
             location_map[label] = location.uid
         return location_map
@@ -594,28 +646,35 @@ class World(Singleton):
         scenes = self._get_scenes_dict()
 
         for scene_label, scene_data in scenes.items():
-            blocks = self._normalize_section(scene_data.blocks)
+            scene_payload = self._to_dict(scene_data)
+            blocks = self._normalize_section(scene_payload.get("blocks"))
             for block_label, block_data in blocks.items():
                 block_data = block_data or {}
+                block_payload = self._to_dict(block_data)
                 qualified_label = f"{scene_label}.{block_label}"
-                cls = self.domain_manager.resolve_class(
+                obj_cls = (
                     block_data.obj_cls
+                    if hasattr(block_data, "obj_cls")
+                    else block_payload.get("obj_cls")
                 )
+                if obj_cls is None:
+                    obj_cls = block_payload.get("block_cls")
+                cls = self.domain_manager.resolve_class(obj_cls)
 
                 scripts = {
                     key: [
                         self._normalize_action_entry(self._to_dict(entry))
-                        for entry in (block_data.get(key) or [])
+                        for entry in (block_payload.get(key) or [])
                     ]
                     for key in ("actions", "continues", "redirects")
                 }
                 action_scripts[qualified_label] = scripts
 
-                block_script = BlockScript.model_validate(block_data)
+                block_script = BlockScript.model_validate(block_payload)
 
                 payload = self._prepare_payload(
                     cls,
-                    block_data,
+                    block_payload,
                     graph,
                     drop_keys=("actions", "continues", "redirects", "media"),
                 )
@@ -648,8 +707,14 @@ class World(Singleton):
         scenes = self._get_scenes_dict()
 
         for scene_label, scene_data in scenes.items():
-            cls = self.domain_manager.resolve_class(scene_data.get("obj_cls"))
-            members = self._normalize_section(scene_data.get("blocks"))
+            scene_payload = self._to_dict(scene_data)
+            obj_cls = (
+                scene_data.obj_cls
+                if hasattr(scene_data, "obj_cls")
+                else scene_payload.get("obj_cls")
+            )
+            cls = self.domain_manager.resolve_class(obj_cls)
+            members = self._normalize_section(scene_payload.get("blocks"))
             member_ids = [
                 block_map[f"{scene_label}.{block_label}"]
                 for block_label in members
@@ -658,7 +723,7 @@ class World(Singleton):
 
             payload = self._prepare_payload(
                 cls,
-                scene_data,
+                scene_payload,
                 graph,
                 drop_keys=("blocks", "roles", "settings", "assets"),
             )
@@ -667,21 +732,21 @@ class World(Singleton):
             if member_ids and "member_ids" in getattr(cls, "model_fields", {}):
                 payload["member_ids"] = member_ids
 
-            scene = cls.materialize(payload)
+            scene = cls.structure(payload)
             scene_map[scene_label] = scene.uid
 
             if wire_dependencies:
                 self._wire_roles(
                     graph=graph,
                     source_node=scene,
-                    roles_data=scene_data.get("roles"),
+                    roles_data=scene_payload.get("roles"),
                     actor_map=actor_map,
                     resolve_dependencies=resolve_dependencies,
                 )
                 self._wire_settings(
                     graph=graph,
                     source_node=scene,
-                    settings_data=scene_data.get("settings"),
+                    settings_data=scene_payload.get("settings"),
                     location_map=location_map,
                     resolve_dependencies=resolve_dependencies,
                 )
@@ -696,17 +761,18 @@ class World(Singleton):
                 if block is None:
                     continue
 
+                block_payload = self._to_dict(block_data)
                 self._wire_roles(
                     graph=graph,
                     source_node=block,
-                    roles_data=block_data.get("roles"),
+                    roles_data=block_payload.get("roles"),
                     actor_map=actor_map,
                     resolve_dependencies=resolve_dependencies,
                 )
                 self._wire_settings(
                     graph=graph,
                     source_node=block,
-                    settings_data=block_data.get("settings"),
+                    settings_data=block_payload.get("settings"),
                     location_map=location_map,
                     resolve_dependencies=resolve_dependencies,
                 )
@@ -940,7 +1006,8 @@ class World(Singleton):
 
         scenes = self._get_scenes_dict()
         for scene_label, scene_data in scenes.items():
-            blocks = self._normalize_section(scene_data.get("blocks"))
+            scene_payload = self._to_dict(scene_data)
+            blocks = self._normalize_section(scene_payload.get("blocks"))
             for block_label in blocks:
                 qualified_label = f"{scene_label}.{block_label}"
                 source_uid = block_map.get(qualified_label)
@@ -952,7 +1019,7 @@ class World(Singleton):
                 if source_node is None:
                     continue
 
-                # scope_selector = ScopeSelector(parent_label=scene_label)
+                scope_selector = ScopeSelector(parent_label=scene_label)
                 for key in ("actions", "continues", "redirects"):
                     edge_scripts = scripts.get(key, [])
                     if not edge_scripts:
@@ -961,7 +1028,7 @@ class World(Singleton):
                         graph=graph,
                         source_node=source_node,
                         action_scripts=edge_scripts,
-                        # scope=scope_selector,
+                        scope=scope_selector,
                         block_map=block_map,
                     )
 
@@ -987,7 +1054,8 @@ class World(Singleton):
 
         scenes = self._get_scenes_dict()
         if successor in scenes:
-            blocks = self._normalize_section(scenes[successor].get("blocks"))
+            successor_payload = self._to_dict(scenes[successor])
+            blocks = self._normalize_section(successor_payload.get("blocks"))
             for block_label in blocks:
                 candidate = f"{successor}.{block_label}"
                 if candidate in block_map:
@@ -995,15 +1063,8 @@ class World(Singleton):
 
         raise ValueError(f"Could not resolve successor reference: {successor}")
 
-    def _get_starting_cursor(self) -> tuple[SceneScript, BlockScript]:
-        """Determine the starting scene and block templates for traversal."""
-
-        starting_scene = self.find_templates(is_start=True, is_instance=Scene)
-        starting_block = self.find_templates(is_start=True, is_instance=Block, parent=starting_scene)
-
-        return starting_scene, starting_block
-
-
+    def _get_starting_cursor(self) -> tuple[str, str]:
+        """Determine the starting scene and block labels for traversal."""
 
         metadata = self.script_manager.get_story_metadata() or {}
         scenes = self._get_scenes_dict()
@@ -1050,10 +1111,15 @@ class World(Singleton):
         scenes_iter = self.script_manager.get_unstructured("scenes") or ()
         scenes: dict[str, dict[str, Any]] = {}
         for scene in scenes_iter:
-            label = scene.get_label()
+            scene_dict = self._to_dict(scene)
+            label = scene_dict.get("label") or getattr(scene, "label", None)
+            if not label:
+                label = scene.get_label()
             if not label:
                 continue
-            scenes[label] = scene
+            scene_payload = dict(scene_dict)
+            scene_payload.setdefault("label", label)
+            scenes[label] = scene_payload
         if scenes:
             return scenes
 

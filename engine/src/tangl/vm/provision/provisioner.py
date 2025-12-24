@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from copy import deepcopy
 from typing import Iterator, TYPE_CHECKING, Callable, Mapping, Any
 from uuid import UUID
@@ -115,7 +116,7 @@ class GraphProvisioner(Provisioner):
     ) -> Iterator[DependencyOffer]:
         if not (requirement.policy & ProvisioningPolicy.EXISTING):
             return
-        if requirement.template_ref is not None:
+        if requirement.template_ref is not None and not isinstance(requirement.identifier, str):
             return
         if self.node_registry is None:
             return
@@ -198,6 +199,13 @@ class TemplateProvisioner(Provisioner):
     ):
         super().__init__(**kwargs)
         object.__setattr__(self, "factory", factory)
+        if template_registry is not None:
+            warnings.warn(
+                "template_registry is deprecated; attach a TemplateFactory to the graph "
+                "or provide a factory explicitly.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         object.__setattr__(self, "template_registry", template_registry)
 
     def _get_factory(self, ctx: "Context") -> TemplateFactory | None:
@@ -247,25 +255,6 @@ class TemplateProvisioner(Provisioner):
         graph = getattr(ctx, "graph", None)
         world = getattr(graph, "world", None) if graph is not None else None
         script_manager = getattr(world, "script_manager", None)
-
-        if self.template_registry and (requirement.template_ref or requirement.identifier):
-            identifier = str(requirement.template_ref or requirement.identifier)
-            registry = self.template_registry
-            candidates: list[Any] = []
-            if hasattr(registry, "find_all"):
-                candidates = list(registry.find_all(has_identifier=identifier))
-            elif isinstance(registry, Mapping):
-                template_data = registry.get(identifier)
-                if template_data is not None:
-                    candidates = [template_data]
-
-            for template_data in candidates:
-                if not self._matches_scope(template_data, ctx=ctx):
-                    continue
-                template = self._coerce_template(template_data)
-                if template is not None:
-                    provenance.update(self._template_provenance(template))
-                    return template, provenance
 
         if script_manager is not None and (requirement.template_ref or requirement.identifier):
             identifier = requirement.template_ref or requirement.identifier
@@ -422,14 +411,46 @@ class TemplateProvisioner(Provisioner):
         ctx: "Context",
         factory: TemplateFactory | None,
     ) -> Node:
-        if not isinstance(template, Template):
+        from tangl.ir.core_ir import BaseScriptItem
+
+        if isinstance(template, BaseScriptItem):
             graph = getattr(ctx, "graph", None)
             world = getattr(graph, "world", None) if graph is not None else None
             if world is not None and hasattr(world, "_materialize_from_template"):
                 parent_container = None
                 scope = getattr(template, "scope", None)
+                if (
+                    scope is not None
+                    and hasattr(scope, "is_global")
+                    and scope.is_global()
+                ):
+                    scope = None
                 if scope is not None and hasattr(world, "ensure_scope"):
                     parent_container = world.ensure_scope(scope, graph)
+                else:
+                    parent = getattr(template, "parent", None)
+                    if parent is not None and graph is not None:
+                        parent_label = getattr(parent, "label", None)
+                        if parent_label:
+                            parent_container = graph.find_subgraph(label=parent_label)
+                            if parent_container is None and hasattr(world, "_materialize_from_template"):
+                                from tangl.ir.story_ir.scene_script_models import SceneScript
+
+                                if isinstance(parent, SceneScript):
+                                    parent_container = world._materialize_from_template(
+                                        template=parent,
+                                        graph=graph,
+                                        parent_container=None,
+                                    )
+                    if parent_container is None and graph is not None:
+                        criteria = template.get_selection_criteria() or {}
+                        has_path = criteria.get("has_path")
+                        if isinstance(has_path, str) and "." in has_path:
+                            parent_path = has_path.rsplit(".", 1)[0]
+                            parent_label = parent_path.split(".")[-1]
+                            parent_container = graph.find_subgraph(label=parent_label)
+                            if parent_container is None:
+                                parent_container = graph.add_subgraph(label=parent_label)
                 return world._materialize_from_template(
                     template=template,
                     graph=graph,
