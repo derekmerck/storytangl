@@ -34,10 +34,11 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
          >>> node = Node.structure(entity_data)
      """
 
-    # Mark record metadata as excluded for serialization
-    uid: UUID = Field(default_factory=uuid4, json_schema_extra={'serialize': False})
-    is_dirty_: bool = Field(default=False, json_schema_extra={'serialize': False})
-    seq: int = Field(init=False, json_schema_extra={'serialize': False})  # injected by Record/HasSeq
+    # Mark record metadata as excluded for serialization and comparison
+    uid: UUID = Field(default_factory=uuid4, exclude=True, json_schema_extra={'serialize': False})
+    is_dirty_: bool = Field(default=False, exclude=True, json_schema_extra={'serialize': False})
+    seq: int = Field(init=False, exclude=True, json_schema_extra={'serialize': False})  # injected by Record/HasSeq
+    content_hash: bytes = Field(default=None, json_schema_extra={'serialize': False})
 
     # obj_cls is a field (not just init param like Entity)
     obj_cls_: Typelike = Field(None, alias="obj_cls")
@@ -86,7 +87,9 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
                 return True
         elif isclass(obj_cls) and issubclass(self.obj_cls, obj_cls):
             return True
-        return False
+
+        # Fall back to Node hierarchy
+        return super().is_instance(obj_cls)
 
     # Inherits label, tags as is
 
@@ -161,10 +164,15 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
         Returns:
           Script data suitable for round-trip serialization
         """
-        return super().model_dump(by_alias=True,
+        data = super().model_dump(by_alias=True,
                                   exclude_unset=True,
                                   exclude_defaults=True,
                                   exclude_none=True)
+        # Ensure unset obj_cls is discarded for round-trip; if it's
+        # None, super().model_dump will include the wrong templ.__class__
+        if "obj_cls_" not in self.model_fields_set:
+            data.pop("obj_cls", None)
+        return data
 
     def unstructure_for_materialize(self) -> UnstructuredData:
         # call model dump for unstructured data suitable to pass to Entity.structure

@@ -1,6 +1,15 @@
 """Tests for template declarations on scene and block scripts."""
 
+from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir.scene_script_models import BlockScript, SceneScript
+
+def test_base_script_valid():
+    data = { 'label': 'foo', 'text': 'bar' }
+    assert BaseScriptItem.model_validate(data)
+
+def test_block_script_valid():
+    data = { 'label': 'foo', 'text': 'bar' }
+    assert BlockScript.model_validate(data)
 
 
 def test_scene_script_templates_default_to_none() -> None:

@@ -4,7 +4,7 @@ from tangl.ir.core_ir.base_script_model import BaseScriptItem
 
 
 def test_template_gates_on_scope_via_selector():
-    template = BaseScriptItem(label="cop", scope_tags={"town"})
+    template = BaseScriptItem(label="cop", ancestor_tags={"town"})
 
     graph = Graph()
     world = graph.add_subgraph(label="world", tags={"town"})
@@ -29,7 +29,7 @@ def test_template_matches_still_allows_inline_criteria():
 
 
 def test_selectable_mro_uses_entity_matches():
-    template = BaseScriptItem(label="gate", scope=ScopeSelector(parent_label="parent"))
+    template = BaseScriptItem(label="gate", scope={"has_parent_label": "parent"})
     graph = Graph()
     parent = graph.add_subgraph(label="parent")
     selector = graph.add_node(label="child", tags=set())

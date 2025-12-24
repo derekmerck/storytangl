@@ -1,201 +1,138 @@
 from __future__ import annotations
-
 import logging
 import warnings
 from collections.abc import Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Self, Optional
 
 from pydantic import BaseModel, ValidationError
 
+from tangl.core.factory import TemplateFactory
 from tangl.core.graph import Node
 from tangl.core.registry import Registry
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from tangl.ir.story_ir import StoryScript
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
-from tangl.ir.story_ir.scene_script_models import BlockScript
+from tangl.ir.story_ir.scene_script_models import BlockScript, SceneScript
 from tangl.type_hints import StringMap, UnstructuredData
+
+from tangl.story.concepts.actor import Actor
+from tangl.story.concepts.location import Location
+from tangl.story.episode import Scene
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-@dataclass(frozen=True, slots=True)
-class _DefaultClassConfig:
-    """Configuration describing default ``obj_cls`` wiring for script exports."""
+# @dataclass(frozen=True, slots=True)
+# class _DefaultClassConfig:
+#     """Configuration describing default ``obj_cls`` wiring for script exports."""
+#
+#     class_path: str | None = None
+#     alias: str | None = None
+#     children: dict[str, "_DefaultClassConfig"] = field(default_factory=dict)
 
-    class_path: str | None = None
-    alias: str | None = None
-    children: dict[str, "_DefaultClassConfig"] = field(default_factory=dict)
+from tangl.core import Entity
 
-
-class ScriptManager:
+class ScriptManager(Entity):
     """ScriptManager mediates between input files and the world/story creation."""
 
-    master_script: MasterScript
+    master_script: Optional[MasterScript] = None  # for reference
+    template_factory: TemplateFactory
 
-    def __init__(self, master_script: MasterScript) -> None:
-        self.master_script = master_script
-        self._default_tree: dict[str, _DefaultClassConfig] = {
-            "actors": _DefaultClassConfig(
-                class_path="tangl.story.concepts.actor.actor.Actor",
-            ),
-            "locations": _DefaultClassConfig(
-                class_path="tangl.story.concepts.location.location.Location",
-            ),
-            "items": _DefaultClassConfig(
-                class_path="tangl.story.concepts.item.Item",
-            ),
-            "flags": _DefaultClassConfig(
-                class_path="tangl.story.concepts.item.Flag",
-            ),
-            "scenes": _DefaultClassConfig(
-                class_path="tangl.story.episode.scene.Scene",
-                children={
-                    "blocks": _DefaultClassConfig(
-                        class_path="tangl.story.episode.block.Block",
-                        alias="block_cls",
-                        children={
-                            key: _DefaultClassConfig(
-                                class_path="tangl.story.episode.action.Action",
-                            )
-                            for key in ("actions", "continues", "redirects")
-                        },
-                    ),
-                    "roles": _DefaultClassConfig(
-                        class_path="tangl.story.concepts.actor.role.Role",
-                    ),
-                    "settings": _DefaultClassConfig(
-                        class_path="tangl.story.concepts.location.setting.Setting",
-                    ),
-                },
-            ),
-        }
-        self._template_registry = self._compile_templates()
+    # === CONSTRUCTORS ===
 
-    @property
-    def template_registry(self) -> Registry:
-        """Access to the compiled template registry (deprecated).
+    @classmethod
+    def from_master_script(cls, master_script: MasterScript) -> Self:
+        factory = TemplateFactory.from_root_templ(master_script)
 
-        Direct registry access is deprecated. Prefer :meth:`find_template` or
-        :meth:`find_templates` to benefit from anchored lookup semantics and to
-        decouple callers from registry internals. This property will be removed
-        in v4.0.
-        """
-
-        warnings.warn(
-            (
-                "Direct access to ScriptManager.template_registry is "
-                "deprecated; use find_template/find_templates instead. "
-                "This alias will be removed in v4.0."
-            ),
-            DeprecationWarning,
-            stacklevel=2,
+        return cls(
+            master_script=master_script,
+            template_factory=factory  # Store factory instead of registry
         )
-        return self._template_registry
 
+    @classmethod
+    def from_data(cls, data: UnstructuredData) -> Self:
+        try:
+            ms: MasterScript = StoryScript(**data)
+        except ValidationError:
+            ms = MasterScript(**data)
+        # todo: Want to call "on new script" here too.
+        return cls.from_master_script(master_script=ms)
+
+    @classmethod
+    def from_files(cls, fp: Path) -> Self:
+        # todo: implement a file reader
+        data = {}
+        return cls.from_data(data)
+
+    # === METADATA ===
+
+    def get_story_metadata(self) -> UnstructuredData:
+        return self.master_script.metadata.model_dump()
+
+    def get_story_globals(self) -> StringMap:
+        if self.master_script.locals is not None:
+            return deepcopy(self.master_script.locals)
+        return {}
+
+    # === FACTORY SEARCH ===
+
+    # this is just a slightly different api for find-all with sort
     def find_template(
         self,
-        # identifier: str | None = None,
-        # selector: Node | None = None,
-        # scope: ScopeSelector | None = None,
+        identifier: str | None = None,
+        selector: Node | None = None,
         **criteria: Any
     ) -> BaseScriptItem | None:
         """Return the first template matching identifier/criteria within scope."""
-
-        # todo: anchored lookup is just sort by ancestry and then return first
-        return self._template_registry.find_one(**criteria)
-
-        # scoped_criteria: dict[str, Any] = dict(criteria)
-        #
-        # if identifier and self._is_qualified(identifier):
-        #     return self._template_registry.find_one(
-        #         has_identifier=identifier, **scoped_criteria
-        #     )
-        #
-        # if identifier and selector is not None:
-        #     return self._anchored_lookup(identifier, selector, scoped_criteria)
-        #
-        # query = self._build_query(identifier, scope, scoped_criteria)
-        # return self._template_registry.find_one(**query)
+        if identifier is not None:
+            criteria.setdefault("has_identifier", identifier)
+        if selector is not None:
+            criteria.setdefault("selector", selector)
+        # anchored lookup is just sort by ancestry and then return first
+        return self.template_factory.find_one(sort_key=lambda x: x.scope_specificity(), **criteria)
 
     def find_templates(
         self,
-        # *,
-        # identifier: str | None = None,
-        # selector: Node | None = None,
-        # scope: ScopeSelector | None = None,
+        *,
+        identifier: str | None = None,
+        selector: Node | None = None,
         **criteria: Any,
     ) -> Iterator[BaseScriptItem]:
         """Return all templates matching identifier/criteria.
-
-        Notes
-        -----
-        This plural query intentionally **does not** perform anchored lookup for
-        unqualified identifiers. Use :meth:`find_template` (singular) when you
-        need scope-chain resolution. ``find_templates`` performs a general
-        registry search using the supplied identifier and criteria.
         """
+        # anchored lookup is just sort by ancestry and then return first
+        if identifier is not None:
+            criteria.setdefault("has_identifier", identifier)
+        if selector is not None:
+            criteria.setdefault("selector", selector)
+        # anchored lookup is just sort by ancestry and then return first
+        return self.template_factory.find_all(sort_key=lambda x: x.scope_specificity(), **criteria)
 
-        return self._template_registry.find_all(**criteria)
+    # This is similar api to how core.Graph wraps convenience accessors for
+    # various sub-types of GraphItem
+    def find_scenes(self, **criteria: Any) -> Iterator[SceneScript]:
+        criteria.setdefault("is_instance", Scene)
+        return self.find_templates(**criteria)
 
-        # scoped_criteria: dict[str, Any] = dict(criteria)
-        # query = self._build_query(identifier, scope, scoped_criteria)
-        # return list(self._template_registry.find_all(**query))
+    def find_actors(self, **criteria: Any) -> Iterator[ActorScript]:
+        criteria.setdefault("is_instance", Actor)
+        return self.find_templates(**criteria)
+
+    def find_locations(self, **criteria: Any) -> Iterator[LocationScript]:
+        criteria.setdefault("is_instance", Location)
+        return self.find_templates(**criteria)
+
+    # todo: find blocks, actions, roles, settings similarly if useful
 
     @staticmethod
     def _is_qualified(identifier: str) -> bool:
         """Return ``True`` when identifier includes a scope separator."""
 
         return "." in identifier
-
-    def _anchored_lookup(
-        self,
-        identifier: str,
-        selector: Node,
-        criteria: Mapping[str, Any],
-    ) -> BaseScriptItem | None:
-        """Search the selector's scope chain for an unqualified identifier."""
-
-        # todo: anchored lookup is just sort by ancestry and then return first
-
-        def _scope_matches(template: BaseScriptItem | None, chain: list[str]) -> bool:
-            scope = getattr(template, "scope", None)
-            if scope is None:
-                return True
-            parent_label = getattr(scope, "parent_label", None)
-            if parent_label:
-                return any(
-                    segment.split(".")[-1] == parent_label
-                    for segment in chain
-                    if segment
-                )
-            if getattr(scope, "ancestor_tags", None) or getattr(
-                scope, "ancestor_labels", None
-            ):
-                return False
-            return True
-
-        scope_chain = self._get_scope_chain(selector)
-        for scope_prefix in scope_chain:
-            qualified = f"{scope_prefix}.{identifier}" if scope_prefix else identifier
-            template = self._template_registry.find_one(has_identifier=qualified, **criteria)
-            if template is not None and _scope_matches(template, scope_chain):
-                return template
-
-            if not scope_prefix:
-                continue
-
-            parent_label = scope_prefix.split(".")[-1]
-            scoped_search = dict(criteria)
-            scoped_search["has_identifier"] = identifier
-            scoped_search["has_scope"] = ScopeSelector(parent_label=parent_label)
-            template = self._template_registry.find_one(**scoped_search)
-            if template is not None:
-                return template
-        return None
 
     def _get_scope_chain(self, selector: Node) -> list[str]:
         """Return the selector's scope chain from most specific to global."""
@@ -219,36 +156,6 @@ class ScriptManager:
         paths.append("")
 
         return paths
-
-    @staticmethod
-    def _build_query(
-        identifier: str | None,
-        scope: ScopeSelector | None,
-        criteria: Mapping[str, Any],
-    ) -> dict[str, Any]:
-        """Compose a registry query from identifier/scope/criteria."""
-
-        query = dict(criteria)
-        if identifier:
-            query["has_identifier"] = identifier
-        if scope:
-            query["has_scope"] = scope
-        return query
-
-    @classmethod
-    def from_data(cls, data: UnstructuredData) -> Self:
-        try:
-            ms: MasterScript = StoryScript(**data)
-        except ValidationError:
-            ms = MasterScript(**data)
-        # todo: Want to call "on new script" here too.
-        return cls(master_script=ms)
-
-    @classmethod
-    def from_files(cls, fp: Path) -> Self:
-        # todo: implement a file reader
-        data = {}
-        return cls.from_data(data)
 
     def _compile_templates(self) -> Registry:
         script = self.master_script
@@ -405,12 +312,16 @@ class ScriptManager:
 
         return registry
 
-    def get_story_globals(self) -> StringMap:
-        if self.master_script.locals is not None:
-            return deepcopy(self.master_script.locals)
-        return {}
-
     def get_unstructured(self, key: str) -> Iterator[UnstructuredData]:
+
+        find_meth = f"find_{key}"
+        if hasattr(self, find_meth):
+            yield from getattr(self, find_meth)()
+        else:
+            raise ValueError(f"Accessor `ScriptManager.find_{key}` not found")
+
+        return
+
         if not hasattr(self.master_script, key):
             return
 
@@ -434,8 +345,6 @@ class ScriptManager:
             logger.debug(payload)
             yield payload
 
-    def get_story_metadata(self) -> UnstructuredData:
-        return self.master_script.metadata.model_dump()
 
     @classmethod
     def _export_item(
@@ -465,65 +374,65 @@ class ScriptManager:
             return {key: value for key, value in payload.items() if value is not None}
 
         return dict(item)
+    #
+    # @classmethod
+    # def _apply_default_classes(
+    #     cls,
+    #     data: dict[str, Any],
+    #     config: _DefaultClassConfig,
+    # ) -> dict[str, Any]:
+    #     payload = dict(data)
+    #
+    #     class_path = config.class_path
+    #     if class_path and not payload.get("obj_cls"):
+    #         payload["obj_cls"] = class_path
+    #     if config.alias and not payload.get(config.alias):
+    #         payload[config.alias] = class_path
+    #
+    #     if not config.children:
+    #         return payload
+    #
+    #     for field_name, child_config in config.children.items():
+    #         value = payload.get(field_name)
+    #         if not value:
+    #             continue
+    #
+    #         if isinstance(value, dict):
+    #             child_payload: dict[str, dict[str, Any]] = {}
+    #             for child_label, child_value in value.items():
+    #                 child_dict = cls._dump_item(child_value)
+    #                 enriched = cls._apply_default_classes(child_dict, child_config)
+    #                 enriched.setdefault("label", child_dict.get("label", child_label))
+    #                 child_payload[child_label] = enriched
+    #             payload[field_name] = child_payload
+    #             continue
+    #
+    #         if isinstance(value, list):
+    #             enriched_list = [
+    #                 cls._apply_default_classes(cls._dump_item(child), child_config)
+    #                 for child in value
+    #             ]
+    #             payload[field_name] = enriched_list
+    #
+    #     return payload
 
-    @classmethod
-    def _apply_default_classes(
-        cls,
-        data: dict[str, Any],
-        config: _DefaultClassConfig,
-    ) -> dict[str, Any]:
-        payload = dict(data)
-
-        class_path = config.class_path
-        if class_path and not payload.get("obj_cls"):
-            payload["obj_cls"] = class_path
-        if config.alias and not payload.get(config.alias):
-            payload[config.alias] = class_path
-
-        if not config.children:
-            return payload
-
-        for field_name, child_config in config.children.items():
-            value = payload.get(field_name)
-            if not value:
-                continue
-
-            if isinstance(value, dict):
-                child_payload: dict[str, dict[str, Any]] = {}
-                for child_label, child_value in value.items():
-                    child_dict = cls._dump_item(child_value)
-                    enriched = cls._apply_default_classes(child_dict, child_config)
-                    enriched.setdefault("label", child_dict.get("label", child_label))
-                    child_payload[child_label] = enriched
-                payload[field_name] = child_payload
-                continue
-
-            if isinstance(value, list):
-                enriched_list = [
-                    cls._apply_default_classes(cls._dump_item(child), child_config)
-                    for child in value
-                ]
-                payload[field_name] = enriched_list
-
-        return payload
-
-    def get_story_text(self) -> list[tuple[str, str]]:
-
-        result = []
-
-        def _get_text_fields(path: str, item: list | dict):
-            nonlocal result
-            if not item:
-                return
-            if isinstance(item, list) and isinstance( item[0], dict ):
-                [ _get_text_fields(path + f'.{i}', v) for i, v in enumerate(item) ]
-            elif isinstance(item, dict):
-                if 'text' in item:
-                    data = {"path": path,
-                            # "hash": key_for_secret(item['text'])[:6],
-                            "text": item['text']}
-                    result.append(data)
-                [ _get_text_fields( path + f'.{k}', v) for k, v in item.items() ]
-
-        _get_text_fields(self.master_script.label, self.master_script.model_dump())
-        return result
+    # def get_story_text(self) -> list[tuple[str, str]]:
+    #
+    #     result = []
+    #
+    #     def _get_text_fields(path: str, item: list | dict):
+    #         nonlocal result
+    #         if not item:
+    #             return
+    #         if isinstance(item, list) and isinstance( item[0], dict ):
+    #             [ _get_text_fields(path + f'.{i}', v) for i, v in enumerate(item) ]
+    #         elif isinstance(item, dict):
+    #             if 'text' in item:
+    #                 data = {"path": path,
+    #                         # "hash": key_for_secret(item['text'])[:6],
+    #                         "text": item['text']}
+    #                 result.append(data)
+    #             [ _get_text_fields( path + f'.{k}', v) for k, v in item.items() ]
+    #
+    #     _get_text_fields(self.master_script.label, self.master_script.model_dump())
+    #     return result

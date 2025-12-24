@@ -1,5 +1,6 @@
 # tangl/core/factory/hierarchical_template.py
 from __future__ import annotations
+from functools import total_ordering
 from typing import TypeVar, Generic, Self, Iterator, Optional
 import logging
 
@@ -74,37 +75,9 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
             root.a.b → "root.a.b"
         """
         # Build path from root to self
-        reversed_ancestors = reversed([self] + list(self.ancestors()))
+        ancestors = list(self.ancestors())
+        reversed_ancestors = reversed([self] + ancestors)
         return '.'.join([a.get_label() for a in reversed_ancestors])
-
-    # Not sure about this -- if we set label here, it won't be tracked as
-    # Unset and we need to note that manually somehow.  Maybe better to do
-    # it in an 'after' handler?
-    # @field_validator("*", mode="before")
-    # @classmethod
-    # def _set_label_from_key(cls, value: dict[UniqueLabel, StringMap], info: FieldValidationInfo) -> dict[UniqueLabel, StringMap]:
-    #     # Get field metadata
-    #     field_name = info.field_name
-    #     if not field_name:
-    #         return value
-    #
-    #     field_info = cls.model_fields.get(field_name)
-    #     if not field_info:
-    #         return value
-    #
-    #     extra = field_info.json_schema_extra or {}
-    #
-    #     # Only process visit fields
-    #     if not extra.get("visit_field"):
-    #         return value
-    #
-    #     # Set label from key for dict values
-    #     if isinstance(value, dict):
-    #         for k, v in value.items():
-    #             if isinstance(v, dict):
-    #                 v.setdefault("label", k)
-    #
-    #     return value
 
     @model_validator(mode="after")
     def _set_label_and_parent_on_children(self):
@@ -114,6 +87,8 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
         # Uses update_attrs b/c that bypasses frozen
         for field in self._fields(visit_field=(True, False)):
             value = getattr(self, field)
+            if value is None:
+                continue
             if isinstance(value, Template):
                 # single child
                 value.update_attrs(parent=self, force=True)
@@ -129,7 +104,7 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
                 for v in value:
                     v.update_attrs(parent=self, force=True)
             else:
-                raise ValueError(f"Unexpected type {type(value)}")
+                raise ValueError(f"Traversal found unexpected type {type(value)}")
         return self
 
     def visit(self) -> Iterator[Self]:
@@ -166,13 +141,22 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
              scene1.block1 → "scene1.*"
              root.a.b → "root.a.*"
          """
+        if self.req_path_pattern is not None:
+            if self.req_path_pattern.startswith("~"):
+                postfix = self.req_path_pattern[1:]
+            else:
+                return self.req_path_pattern
+        else:
+            postfix = "*"
+
         if self.parent is None:
             # Global template
-            return "*"
+            prefix = "*"
+        else:
+            # Pattern matches anything under the parent path
+            prefix = self.parent.path
 
-        # Pattern matches anything under the parent path
-        parent_path = self.parent.path
-        return f"{parent_path}.*"
+        return f"{prefix}.{postfix}"
 
     def get_selection_criteria(self) -> StringMap:
         """Selection metadata derived from hierarchy.
@@ -204,8 +188,14 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
                                   exclude_defaults=True,
                                   exclude_none=True,
                                   exclude=visit_fields)
-        # Ensure obj_cls is present
-        if "obj_cls" not in data:
-            data["obj_cls"] = self.obj_cls
+        # Ensure obj_cls is present and correct; if it's None, super().model_dump
+        # will include the wrong templ.__class__
+        data["obj_cls"] = self.obj_cls
         return data
 
+    # Use to sort on path specificity -- more specific sorts earlier
+    # Could make this default, but still need to give a sort_key to find
+    def scope_specificity(self) -> int:
+        if x := self.get_path_pattern():
+            return -len(x.split("."))
+        return 0

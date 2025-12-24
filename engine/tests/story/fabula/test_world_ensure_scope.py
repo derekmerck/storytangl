@@ -37,7 +37,7 @@ def minimal_world():
     }
 
     script = StoryScript.model_validate(script_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
 
     world = World(
         label="test_world",
@@ -76,7 +76,7 @@ def test_ensure_scope_reuses_existing_scene(minimal_world: World) -> None:
 
     existing_scene = graph.add_subgraph(label="village")
 
-    scope = ScopeSelector(parent_label="village")
+    scope = {"has_path": "village.*"}
     result = minimal_world.ensure_scope(scope=scope, graph=graph)
 
     assert result is existing_scene
@@ -85,7 +85,7 @@ def test_ensure_scope_reuses_existing_scene(minimal_world: World) -> None:
 
 def test_ensure_scope_creates_scene_from_template(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = ScopeSelector(parent_label="village")
+    scope = {"has_path": "village.*"}
 
     created = minimal_world.ensure_scope(scope=scope, graph=graph)
 
@@ -97,7 +97,7 @@ def test_ensure_scope_creates_scene_from_template(minimal_world: World) -> None:
 
 def test_ensure_scope_idempotent(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = ScopeSelector(parent_label="village")
+    scope = {"has_path": "village.*"}
 
     first = minimal_world.ensure_scope(scope=scope, graph=graph)
     second = minimal_world.ensure_scope(scope=scope, graph=graph)
@@ -108,7 +108,7 @@ def test_ensure_scope_idempotent(minimal_world: World) -> None:
 
 def test_ensure_scope_errors_when_template_missing(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = ScopeSelector(parent_label="missing")
+    scope = {"has_path": "missing.*"}
 
     with pytest.raises(ValueError, match="no template found"):
         minimal_world.ensure_scope(scope=scope, graph=graph)
@@ -135,7 +135,7 @@ def test_ensure_scope_recursively_creates_parent_hierarchy() -> None:
     }
 
     script = StoryScript.model_validate(script_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="hierarchical",
         script_manager=manager,
@@ -147,7 +147,7 @@ def test_ensure_scope_recursively_creates_parent_hierarchy() -> None:
 
     try:
         graph = StoryGraph(label="test", world=world)
-        scope = ScopeSelector(parent_label="village")
+        scope = {"has_path": "village.*"}
 
         created = world.ensure_scope(scope=scope, graph=graph)
 

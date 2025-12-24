@@ -32,7 +32,7 @@ def build_world(story_data: dict[str, Any]) -> World:
     """Helper that validates ``story_data`` and instantiates a ``World``."""
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     return World(
         label=story_data["label"],
         script_manager=manager,
@@ -92,7 +92,7 @@ def test_scene_level_templates_have_parent_scope() -> None:
     scene_template = templates["scene_guard"]
     assert isinstance(scene_template, ActorScript)
     assert scene_template.scope is not None
-    assert scene_template.scope.model_dump() == ScopeSelector(parent_label="village").model_dump()
+    assert scene_template.scope.model_dump() == {"has_path": "village.*"}.model_dump()
 
 
 def test_block_level_templates_have_parent_scope() -> None:
@@ -122,7 +122,7 @@ def test_block_level_templates_have_parent_scope() -> None:
     block_template = templates["block_market"]
     assert isinstance(block_template, LocationScript)
     assert block_template.scope is not None
-    assert block_template.scope.model_dump() == ScopeSelector(parent_label="village").model_dump()
+    assert block_template.scope.model_dump() == {"has_path": "village.*"}.model_dump()
 
 
 def test_explicit_scope_overrides_inferred() -> None:
@@ -165,7 +165,7 @@ def test_inline_templates_respect_explicit_none_scope() -> None:
         scenes={"village": scene_script},
     )
 
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="example",
         script_manager=manager,
@@ -403,7 +403,7 @@ def test_block_script_has_template_interface() -> None:
 
     block = BlockScript(
         label="test",
-        scope=ScopeSelector(parent_label="scene1"),
+        scope={"has_path": "scene1.*"},
         text="Test block",
     )
 
@@ -427,7 +427,7 @@ def test_block_script_scope_is_immutable() -> None:
     assert original.scope is None
 
     modified = original.model_copy(
-        update={"scope": ScopeSelector(parent_label="scene1")}
+        update={"scope": {"has_path": "scene1.*"}}
     )
 
     assert original.scope is None
@@ -450,7 +450,7 @@ def test_inline_location_template_preserves_concrete_type() -> None:
         templates={"hideout": inline_location},
         scenes={},
     )
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="example",
         script_manager=manager,
@@ -574,7 +574,7 @@ def test_template_scope_excluded_from_content_hash() -> None:
             "label": "guard.scoped",
             "obj_cls": ACTOR_CLASS,
             "archetype": "guard",
-            "scope": ScopeSelector(parent_label="village"),
+            "scope": {"has_path": "village.*"},
         }
     )
 

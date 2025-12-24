@@ -27,7 +27,7 @@ class LocationScript(BaseScriptItem):
 class SettingScript(BaseScriptItem):
 
     @classmethod
-    def get_templ_cls_hint(cls) -> Type[Entity]:
+    def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story.concepts.location import Setting
         return Setting

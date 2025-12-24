@@ -20,7 +20,7 @@ def clear_world() -> None:
 
 def _build_world(script_data: dict) -> World:
     script = StoryScript.model_validate(script_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     return World(
         label=script.label,
         script_manager=manager,

@@ -27,7 +27,7 @@ Tests can compile directly from bundles when bypassing discovery:
 from __future__ import annotations
 import logging
 from collections.abc import Iterable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -47,11 +47,10 @@ from tangl.vm.dispatch.materialize_task import MaterializeTask
 from tangl.vm.provision.open_edge import Dependency
 from tangl.vm.provision.requirement import Requirement
 from tangl.ir.core_ir import BaseScriptItem
-from tangl.ir.story_ir.actor_script_models import ActorScript
-from tangl.ir.story_ir.location_script_models import LocationScript
-from tangl.ir.story_ir.scene_script_models import BlockScript
+from tangl.ir.story_ir.scene_script_models import BlockScript, SceneScript
 from tangl.story.concepts.actor.role import Role
 from tangl.story.concepts.location.setting import Setting
+from tangl.story.episode import Scene, Block
 
 # Integrated Story Domains
 from .domain_manager import DomainManager  # behaviors and classes
@@ -142,39 +141,18 @@ class World(Singleton):
             return self._create_story_hybrid(story_label)
         raise NotImplementedError(f"Mode {mode} not yet implemented")
 
-    @property
-    def template_registry(self):
-        """Alias: :class:`ScriptManager` provides the template registry."""
-
-        return self.script_manager.template_registry
-
-    @property
-    def actor_templates(self) -> list[ActorScript]:
-        """Return all actor templates declared in this world."""
-
-        return list(self.script_manager.find_templates(is_instance=ActorScript))
-
-    @property
-    def location_templates(self) -> list[LocationScript]:
-        """Return all location templates declared in this world."""
-
-        return list(self.script_manager.find_templates(is_instance=LocationScript))
-
-    def find_template(self, label: str) -> BaseScriptItem | None:
+    def find_templates(self, *args, **criteria) -> Iterator[BaseScriptItem]:
         """Return a template by ``label`` if it has been registered."""
+        return self.script_manager.find_templates(*args, **criteria)
 
-        return self.script_manager.find_template(identifier=label)
-
-    def get_block_script(self, block_uid: UUID) -> BlockScript | None:
-        """Return the :class:`BlockScript` backing ``block_uid`` if cached."""
-
-        return self._block_scripts.get(block_uid)
+    def find_template(self, *args, **criteria) -> BaseScriptItem | None:
+        """Return a template by ``label`` if it has been registered."""
+        return self.script_manager.find_template(*args, **criteria)
 
     def _create_story_lazy(self, story_label: str) -> StoryGraph:
         """Create story with only the seed block materialized."""
 
         from tangl.story.story_graph import StoryGraph
-
         graph = StoryGraph(label=story_label, world=self)
 
         globals_ns = self.script_manager.get_story_globals() or {}
@@ -185,7 +163,7 @@ class World(Singleton):
 
         # Get block template from registry
         start_block_identifier = f"{start_scene_label}.{start_block_label}"
-        block_template = self.script_manager.find_template(identifier=start_block_identifier)
+        block_template = self.script_manager.find_template(path=start_block_identifier)
 
         if block_template is None:
             raise ValueError(
@@ -500,12 +478,18 @@ class World(Singleton):
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
-        from tangl.story.concepts.item import Item, Flag
+
         from tangl.story.story_graph import StoryGraph
-        graph = StoryGraph(label=story_label, world=self)
         globals_ns = self.script_manager.get_story_globals() or {}
-        if globals_ns:
-            graph.locals.update(globals_ns)
+        graph = StoryGraph(label=story_label, world=self, locals=globals_ns)
+
+        for templ in self.find_templates():
+            templ.materialize(graph=graph)
+
+        # todo: need to run linker
+        return graph
+
+        from tangl.story.concepts.item import Item, Flag
 
         graph.locals.setdefault("Item", Item)
         graph.locals.setdefault("Flag", Flag)
@@ -514,13 +498,13 @@ class World(Singleton):
 
         actor_map = self._build_actors(graph)
         location_map = self._build_locations(graph)
-        item_map = self._build_items(graph)
-        flag_map = self._build_flags(graph)
+        # item_map = self._build_items(graph)
+        # flag_map = self._build_flags(graph)
 
         node_map.update(actor_map)
         node_map.update(location_map)
-        node_map.update(item_map)
-        node_map.update(flag_map)
+        # node_map.update(item_map)
+        # node_map.update(flag_map)
 
         block_map, action_scripts = self._build_blocks(graph)
         node_map.update(block_map)
@@ -610,12 +594,12 @@ class World(Singleton):
         scenes = self._get_scenes_dict()
 
         for scene_label, scene_data in scenes.items():
-            blocks = self._normalize_section(scene_data.get("blocks"))
+            blocks = self._normalize_section(scene_data.blocks)
             for block_label, block_data in blocks.items():
                 block_data = block_data or {}
                 qualified_label = f"{scene_label}.{block_label}"
                 cls = self.domain_manager.resolve_class(
-                    block_data.get("block_cls") or block_data.get("obj_cls")
+                    block_data.obj_cls
                 )
 
                 scripts = {
@@ -683,7 +667,7 @@ class World(Singleton):
             if member_ids and "member_ids" in getattr(cls, "model_fields", {}):
                 payload["member_ids"] = member_ids
 
-            scene = cls.structure(payload)
+            scene = cls.materialize(payload)
             scene_map[scene_label] = scene.uid
 
             if wire_dependencies:
@@ -1011,8 +995,15 @@ class World(Singleton):
 
         raise ValueError(f"Could not resolve successor reference: {successor}")
 
-    def _get_starting_cursor(self) -> tuple[str, str]:
-        """Determine the starting scene and block labels for traversal."""
+    def _get_starting_cursor(self) -> tuple[SceneScript, BlockScript]:
+        """Determine the starting scene and block templates for traversal."""
+
+        starting_scene = self.find_templates(is_start=True, is_instance=Scene)
+        starting_block = self.find_templates(is_start=True, is_instance=Block, parent=starting_scene)
+
+        return starting_scene, starting_block
+
+
 
         metadata = self.script_manager.get_story_metadata() or {}
         scenes = self._get_scenes_dict()
@@ -1059,7 +1050,7 @@ class World(Singleton):
         scenes_iter = self.script_manager.get_unstructured("scenes") or ()
         scenes: dict[str, dict[str, Any]] = {}
         for scene in scenes_iter:
-            label = scene.get("label")
+            label = scene.get_label()
             if not label:
                 continue
             scenes[label] = scene

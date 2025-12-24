@@ -40,7 +40,7 @@ def mock_world():
 
     domain_manager = DomainManager()
     asset_manager = AssetManager()
-    script_manager = ScriptManager(master_script=_empty_story_script())
+    script_manager = ScriptManager.from_master_script(master_script=_empty_story_script())
 
     world = World(
         label="test_world",
@@ -94,7 +94,7 @@ def test_materialize_respects_custom_obj_cls():
 
     world = World(
         label="custom_world",
-        script_manager=ScriptManager(master_script=_empty_story_script()),
+        script_manager=ScriptManager.from_master_script(master_script=_empty_story_script()),
         domain_manager=domain_manager,
         asset_manager=AssetManager(),
         resource_manager=None,
@@ -122,7 +122,7 @@ def test_materialize_adds_to_parent_container(mock_world):
 
     template = ActorScript(
         label="guard",
-        obj_cls="tangl.core.graph.Node",
+        obj_cls="tangl.core.graph.node.Node",
     )
 
     actor = mock_world._materialize_from_template(
@@ -156,7 +156,7 @@ def test_lazy_mode_does_not_pre_provision_scenes(mock_world):
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="multi_scene",
         script_manager=manager,
@@ -193,7 +193,7 @@ def test_materialize_block_creates_action_edges(mock_world):
 
     template = BlockScript(
         label="start",
-        # scope=ScopeSelector(parent_label="scene1"),
+        # scope={"has_parent_label": "scene1"},
         obj_cls=Block,
         text="Beginning",
         actions=[{"text": "Continue", "successor": "next"}],

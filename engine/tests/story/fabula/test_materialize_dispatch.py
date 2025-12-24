@@ -44,7 +44,7 @@ def _make_world() -> World:
     script = StoryScript.model_validate(
         {"label": "test", "metadata": {"title": "Test", "author": "Tests"}, "scenes": {}}
     )
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     return World(
         label="test",
         script_manager=manager,

@@ -15,7 +15,7 @@ MediaItemScript = BaseScriptItem
 class ActorScript(BaseScriptItem):
 
     @classmethod
-    def get_templ_cls_hint(cls) -> Type[Entity]:
+    def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story.concepts.actor import Actor
         return Actor

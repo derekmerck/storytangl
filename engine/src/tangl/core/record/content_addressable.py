@@ -90,6 +90,7 @@ class ContentAddressable(BaseModel):
         try:
             # Get hashable content (subclass customization point)
             hashable = cls._get_hashable_content(data)
+            logger.info(f"Content hash items: {hashable}")
 
             # Compute hash using standard hashing function
             if hashable is not None:

@@ -61,22 +61,3 @@ class Node(GraphItem):
         if edge is not None:
             self.graph.remove(edge.uid)
 
-    # def has_scope(self, scope: "ScopeSelector | None") -> bool:
-    #     """Return ``True`` when this node satisfies the given scope selector."""
-    #
-    #     if scope is None or scope.is_global():
-    #         return True
-    #
-    #     if scope.source_label is not None and self.label != scope.source_label:
-    #         return False
-    #
-    #     if scope.parent_label is not None and not self.has_parent_label(scope.parent_label):
-    #         return False
-    #
-    #     if scope.ancestor_labels is not None and not self.has_path(".".join(scope.ancestor_labels)):
-    #         return False
-    #
-    #     if scope.ancestor_tags is not None and not self.has_ancestor_tags(scope.ancestor_tags):
-    #         return False
-    #
-    #     return True

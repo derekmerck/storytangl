@@ -133,7 +133,11 @@ class ActionScript(BaseScriptItem):
         conditions (list[str], optional): Conditions that must be met for this action to be available.
         effects (list[str], optional): Effects that occur as a result of taking this action.
     """
-    templ_cls_hint: ClassVar[str] = "Action"
+
+    @classmethod
+    def get_default_obj_cls(cls) -> Type[Entity]:
+        from tangl.story.episode import Action
+        return Action
 
     text: Optional[str] = Field(
         None,
@@ -177,13 +181,10 @@ class ActionScript(BaseScriptItem):
 class BlockScript(BaseScriptItem):
 
     @classmethod
-    def get_templ_cls_hint(cls) -> Type[Entity]:
+    def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story.episode import Block
         return Block
-
-    # templ_cls: ClassName = Field(None, exclude=True, alias='block_cls')
-    # todo: suggest known block class descendents in schema for 'block_cls' but allow any
 
     media: list[MediaItemScript] | None = None
 
@@ -242,7 +243,7 @@ class MenuBlockScript(BlockScript):
 class SceneScript(BaseScriptItem):
 
     @classmethod
-    def get_templ_cls_hint(cls) -> Type[Entity]:
+    def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story.episode import Scene
         return Scene

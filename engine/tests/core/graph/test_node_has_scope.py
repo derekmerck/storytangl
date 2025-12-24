@@ -51,10 +51,10 @@ def test_has_scope_parent_label_and_source_label():
     assert node.has_scope({"has_path": 'scene1.*'})
     assert node.has_scope({"has_path": '*.block1'})
 
-    # assert node.has_scope(ScopeSelector(parent_label="scene1")) is True
+    # assert node.has_scope({"has_parent_label": "scene1"}) is True
     # assert node.has_scope(ScopeSelector(source_label="block1")) is True
     # assert node.has_scope(ScopeSelector(source_label="other")) is False
-    # assert node.has_scope(ScopeSelector(parent_label="scene2")) is False
+    # assert node.has_scope({"has_parent_label": "scene2"}) is False
 
 
 def test_has_scope_ancestor_labels_and_tags():
@@ -82,7 +82,7 @@ def test_has_scope_ancestor_labels_and_tags():
 #     graph = Graph()
 #     node = graph.add_node(label="orphan")
 
-    # assert node.has_scope(ScopeSelector(parent_label="scene1")) is False
+    # assert node.has_scope({"has_parent_label": "scene1"}) is False
     # assert node.has_scope(ScopeSelector(ancestor_labels={"world"})) is False
     # assert node.has_scope(ScopeSelector(ancestor_tags={"world"})) is False
 

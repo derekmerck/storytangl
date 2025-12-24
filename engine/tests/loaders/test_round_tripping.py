@@ -9,7 +9,7 @@ def test_registry_has_blocks_for_export(media_mvp_path: Path):
     world = registry.get_world("media_mvp")
 
     # Must have blocks
-    blocks = list(world.template_registry.find_all(is_instance=BlockScript))
+    blocks = list(world.find_templates(is_instance=BlockScript))
     assert len(blocks) > 0
 
     # Must have serialization interface
@@ -19,7 +19,7 @@ def test_registry_has_blocks_for_export(media_mvp_path: Path):
         assert "text" in dumped or "content" in dumped
 
     # Can infer scenes from scopes
-    scene_labels = {b.scope.parent_label for b in blocks if b.scope}
+    scene_labels = {b.parent.label for b in blocks if b.parent}
     assert len(scene_labels) > 0  # At least one scene
 
     print(f"✓ Registry has {len(blocks)} blocks across {len(scene_labels)} scenes")

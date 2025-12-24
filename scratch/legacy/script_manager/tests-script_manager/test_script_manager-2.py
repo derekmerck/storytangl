@@ -45,12 +45,12 @@ def test_get_globals(my_script_manager):
     assert g['foo'] == "bar"
 
 
-def test_get_text(my_script_manager):
-
-    g = my_script_manager.get_story_text()
-    print( g )
-    assert isinstance(g, list)
-    assert g[0]['text'].startswith("This is the first")
+# def test_get_text(my_script_manager):
+#
+#     g = my_script_manager.get_story_text()
+#     print( g )
+#     assert isinstance(g, list)
+#     assert g[0]['text'].startswith("This is the first")
 
 
 def test_get_unstructured(my_script_manager):

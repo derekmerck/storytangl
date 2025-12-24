@@ -61,7 +61,7 @@ def test_lazy_block_provisioning_from_template_registry():
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="test_story",
         script_manager=manager,
@@ -189,7 +189,7 @@ def test_lazy_provisioning_with_multiple_successors():
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="branching",
         script_manager=manager,
@@ -261,7 +261,7 @@ def test_lazy_provisioning_across_scene_boundary():
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="multi_scene",
         script_manager=manager,
