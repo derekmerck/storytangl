@@ -143,6 +143,34 @@ def test_block_level_templates_have_parent_scope() -> None:
     assert scoped == block_template
 
 
+def test_block_scripts_default_to_scene_scope() -> None:
+    """Block scripts registered in the factory should inherit scene scope."""
+
+    story_data = {
+        "label": "example",
+        "metadata": {"title": "Example", "author": "Tests"},
+        "scenes": {
+            "village": {
+                "label": "village",
+                "blocks": {
+                    "market": {
+                        "label": "market",
+                        "block_cls": "tangl.story.episode.block.Block",
+                    }
+                },
+            }
+        },
+    }
+
+    world = build_world(story_data)
+    factory = world.script_manager.template_factory
+
+    block_script = factory.find_one(label="market", is_instance=BlockScript)
+    assert block_script is not None
+    criteria = block_script.get_selection_criteria()
+    assert criteria.get("has_path") == "example.village.*"
+
+
 def test_explicit_scope_overrides_inferred() -> None:
     """Explicit ``scope`` entries from content should not be overridden."""
 

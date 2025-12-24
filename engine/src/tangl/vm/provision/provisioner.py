@@ -419,6 +419,12 @@ class TemplateProvisioner(Provisioner):
             if world is not None and hasattr(world, "_materialize_from_template"):
                 parent_container = None
                 scope = getattr(template, "scope", None)
+                if (
+                    scope is not None
+                    and hasattr(scope, "is_global")
+                    and scope.is_global()
+                ):
+                    scope = None
                 if scope is not None and hasattr(world, "ensure_scope"):
                     parent_container = world.ensure_scope(scope, graph)
                 else:

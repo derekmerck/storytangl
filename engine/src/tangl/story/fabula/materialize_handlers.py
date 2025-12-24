@@ -111,6 +111,8 @@ def standard_wiring_handler(
         edge_scripts = getattr(template, edge_type, None)
         if edge_scripts:
             scope = getattr(template, "scope", None)
+            if scope is not None and hasattr(scope, "is_global") and scope.is_global():
+                scope = None
             if scope is None:
                 parent = getattr(template, "parent", None)
                 parent_label = getattr(parent, "label", None) if parent is not None else None

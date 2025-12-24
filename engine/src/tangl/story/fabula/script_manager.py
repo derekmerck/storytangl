@@ -452,7 +452,7 @@ class ScriptManager(Entity):
                         updates["label"] = block_label
                     if block_script.obj_cls is None:
                         updates["obj_cls"] = "tangl.story.episode.block.Block"
-                    if block_script.scope is None:
+                    if block_script.scope is None or block_script.scope.is_global():
                         updates["scope"] = ScopeSelector(parent_label=scene_label)
                     if updates:
                         block_script = block_script.model_copy(update=updates)
