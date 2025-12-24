@@ -161,6 +161,10 @@ class World(Singleton):
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
+        from tangl.story.concepts.item import Flag, Item
+
+        graph.locals.setdefault("Item", Item)
+        graph.locals.setdefault("Flag", Flag)
 
         start_scene_label, start_block_label = self._get_starting_cursor()
 
@@ -259,7 +263,10 @@ class World(Singleton):
         if existing is not None:
             return existing
 
-        template = self.script_manager.find_template(identifier=scope.parent_label)
+        template = self.script_manager.template_factory.find_one(
+            sort_key=lambda item: item.scope_specificity(),
+            has_identifier=scope.parent_label,
+        )
 
         parent_container: Subgraph | None = None
         if template is not None:
@@ -480,6 +487,10 @@ class World(Singleton):
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
             graph.locals.update(globals_ns)
+        from tangl.story.concepts.item import Flag, Item
+
+        graph.locals.setdefault("Item", Item)
+        graph.locals.setdefault("Flag", Flag)
 
         actor_map = self._build_actors(graph)
         location_map = self._build_locations(graph)
@@ -513,46 +524,51 @@ class World(Singleton):
         globals_ns = self.script_manager.get_story_globals() or {}
         graph = StoryGraph(label=story_label, world=self, locals=globals_ns)
         graph.factory = self.script_manager.template_factory
+        from tangl.story.concepts.item import Flag, Item
 
-        factory = self.script_manager.template_factory
-        templates = list(
-            factory.find_all(
-                sort_key=lambda item: (
-                    len(getattr(item, "path", "").split(".")) if getattr(item, "path", None) else 0,
-                    getattr(item, "path", ""),
-                ),
-            )
-        )
-        for template in templates:
-            obj_cls = template.obj_cls
-            if not self._is_graph_item(obj_cls):
+        graph.locals.setdefault("Item", Item)
+        graph.locals.setdefault("Flag", Flag)
+
+        actor_map = self._build_actors(graph)
+        location_map = self._build_locations(graph)
+        self._build_items(graph)
+        self._build_flags(graph)
+        from tangl.story.concepts.actor import Actor
+        from tangl.story.concepts.location import Location
+
+        for template in self.script_manager.find_templates():
+            resolved_cls = self.domain_manager.resolve_class(template.obj_cls)
+            if not issubclass(resolved_cls, (Actor, Location)):
                 continue
-            scope = getattr(template, "scope", None)
-            parent_container = self.ensure_scope(scope, graph)
-            if parent_container is None:
-                parent = getattr(template, "parent", None)
-                parent_label = getattr(parent, "label", None) if parent is not None else None
-                if parent_label:
-                    parent_container = graph.find_subgraph(label=parent_label)
+            if template.label and graph.find_node(label=template.label) is not None:
+                continue
+            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
             self._materialize_from_template(
                 template=template,
                 graph=graph,
                 parent_container=parent_container,
             )
 
+        block_map, action_scripts = self._build_blocks(graph)
+        self._build_scenes(
+            graph,
+            block_map,
+            actor_map=actor_map,
+            location_map=location_map,
+            wire_dependencies=True,
+            resolve_dependencies=True,
+        )
+
+        self._build_action_edges(graph, block_map, action_scripts)
+
         start_scene, start_block = self._get_starting_cursor()
-        start_node = None
-        for candidate in graph.find_nodes(label=start_block):
-            parent = getattr(candidate, "parent", None)
-            if parent is not None and getattr(parent, "label", None) == start_scene:
-                start_node = candidate
-                break
-        if start_node is None:
-            raise RuntimeError(
+        start_uid = block_map.get(f"{start_scene}.{start_block}")
+        if start_uid is None:
+            raise ValueError(
                 f"Start block '{start_scene}.{start_block}' not found in story graph"
             )
 
-        graph.initial_cursor_id = start_node.uid
+        graph.initial_cursor_id = start_uid
         return graph
 
     def _build_actors(self, graph: StoryGraph) -> dict[str, UUID]:
@@ -641,6 +657,8 @@ class World(Singleton):
                     if hasattr(block_data, "obj_cls")
                     else block_payload.get("obj_cls")
                 )
+                if obj_cls is None:
+                    obj_cls = block_payload.get("block_cls")
                 cls = self.domain_manager.resolve_class(obj_cls)
 
                 scripts = {

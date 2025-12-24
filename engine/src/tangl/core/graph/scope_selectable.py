@@ -85,7 +85,18 @@ class ScopeSelectable(Selectable):
             if self.scope.source_label:
                 criteria.setdefault("label", self.scope.source_label)
             if self.scope.parent_label:
-                criteria.setdefault("has_parent_label", self.scope.parent_label)
+                parent_label = self.scope.parent_label
+
+                def _matches_parent(selector: object) -> bool:
+                    label = getattr(selector, "label", None)
+                    if label == parent_label:
+                        return True
+                    has_parent_label = getattr(selector, "has_parent_label", None)
+                    if callable(has_parent_label):
+                        return has_parent_label(parent_label)
+                    return False
+
+                criteria.setdefault("predicate", _matches_parent)
             if self.scope.ancestor_tags:
                 criteria.setdefault("has_ancestor_tags", self.scope.ancestor_tags)
         if self.req_ancestor_tags:

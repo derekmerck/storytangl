@@ -198,6 +198,11 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
     # Use to sort on path specificity -- more specific sorts earlier
     # Could make this default, but still need to give a sort_key to find
     def scope_specificity(self) -> int:
-        if x := self.get_path_pattern():
-            return -len(x.split("."))
-        return 0
+        path_pattern = self.get_path_pattern()
+        if not path_pattern:
+            return 0
+        specificity = len(path_pattern.split("."))
+        scope = getattr(self, "scope", None)
+        if scope is not None and hasattr(scope, "is_global") and not scope.is_global():
+            specificity += 1
+        return -specificity
