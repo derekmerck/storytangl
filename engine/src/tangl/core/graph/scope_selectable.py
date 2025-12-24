@@ -20,7 +20,7 @@ class ScopeSelectable(Selectable):
         >>> # {'has_ancestor_tags': {'combat'}, 'has_path': 'dungeon.*'}
     """
     req_ancestor_tags: set[Tag] = Field(default_factory=set, alias="ancestor_tags")
-    req_path_pattern: str = Field(None, alias="path_pattern")
+    req_path_pattern: str | None = Field(None, alias="path_pattern")
 
     def get_selection_criteria(self) -> StringMap:
         """Translate scope requirements to selection criteria.
@@ -36,4 +36,3 @@ class ScopeSelectable(Selectable):
         if self.req_path_pattern:
             criteria.update({"has_path": self.req_path_pattern})
         return criteria
-

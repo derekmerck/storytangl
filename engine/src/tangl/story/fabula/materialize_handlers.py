@@ -114,7 +114,7 @@ def standard_wiring_handler(
                 ctx.graph,
                 node,
                 edge_scripts,
-                template.scope,
+                getattr(template, "scope", None),
             )
 
     if getattr(template, "roles", None):
@@ -171,6 +171,9 @@ def _wire_dependency(
         identifier = _get_spec_value(spec, ref_key)
         template_ref = _get_spec_value(spec, template_key)
         criteria = _get_spec_value(spec, criteria_key)
+
+        if identifier is None and template_ref is not None:
+            identifier = template_ref
 
         policy_value = (
             _get_spec_value(spec, "policy")
@@ -247,4 +250,3 @@ def _is_graph_item(cls: type[Any]) -> bool:
         return issubclass(cls, GraphItem)
     except TypeError:  # pragma: no cover - defensive fallback
         return False
-

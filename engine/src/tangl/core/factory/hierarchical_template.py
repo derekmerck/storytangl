@@ -151,6 +151,8 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
 
         if self.parent is None:
             # Global template
+            if postfix == "*":
+                return "*"
             prefix = "*"
         else:
             # Pattern matches anything under the parent path
