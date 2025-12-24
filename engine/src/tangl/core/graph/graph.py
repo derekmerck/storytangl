@@ -90,17 +90,26 @@ class GraphItem(Entity):
     def has_ancestor(self, ancestor: Subgraph) -> bool:
         return ancestor in self.ancestors()
 
+    @property
+    def ancestor_tags(self) -> set[Tag]:
+        ancestors = [self] + list(self.ancestors())
+        ancestor_tags = { t for a in ancestors for t in a.tags }
+        return ancestor_tags
+
     def has_ancestor_tags(self, *tags: Tag) -> bool:
         # Normalize args to set[Tag]
         if len(tags) == 1 and isinstance(tags[0], set):
             tags = tags[0]  # already a set of tags
         else:
             tags = set(tags)
+        match_logger.debug(f"Comparing query tags {tags} against {self.ancestor_tags}")
+        return tags.issubset(self.ancestor_tags)
 
-        ancestors = [self] + list(self.ancestors())
-        ancestor_tags = { t for a in ancestors for t in a.tags }
-        match_logger.debug(f"Comparing query tags {tags} against {ancestor_tags}")
-        return tags.issubset(ancestor_tags)
+    # todo: could dynamically generate __not accessors based on has_, is_ functions
+    #       either as a lambda in match, or during class creation as public methods
+    #       could similarly do __lt comparisons on int fields
+    def has_ancestor_tags__not(self, *tags: Tag) -> bool:
+        return not self.has_ancestor_tags(*tags)
 
     def has_parent_label(self, parent_label: str) -> bool:
         # seems redundant

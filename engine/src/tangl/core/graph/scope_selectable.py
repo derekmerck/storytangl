@@ -1,9 +1,11 @@
 from __future__ import annotations
+from fnmatch import fnmatch
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from tangl.type_hints import StringMap, Tag
 from tangl.core.entity import Selectable, is_identifier
+from .graph import GraphItem
 
 # todo: I find it irritating that this bad idea keeps creeping back in.
 #       just use has_path or has_ancestor_tags or provide the requirement node
@@ -46,7 +48,16 @@ class ScopeSelectable(Selectable):
     #       scope, they have locality.
     scope: ScopeSelector | None = Field(default_factory=ScopeSelector)
     req_ancestor_tags: set[Tag] = Field(default_factory=set, alias="ancestor_tags")
+    forbid_ancestor_tags: set[Tag] = Field(default_factory=set, alias="forbid_ancestor_tags")
     req_path_pattern: str | None = Field(None, alias="path_pattern")
+
+    def get_path_pattern(self) -> str:
+        if self.req_path_pattern is not None:
+            return self.req_path_pattern
+        # attachment point for subclasses to define default scope patterns
+        if hasattr(self, "_get_default_path_pattern"):
+            return self._get_default_path_pattern()
+        return "*"
 
     @model_validator(mode="before")
     @classmethod
@@ -104,8 +115,57 @@ class ScopeSelectable(Selectable):
                 criteria.setdefault("predicate", _matches_parent)
             if self.scope.ancestor_tags:
                 criteria.setdefault("has_ancestor_tags", self.scope.ancestor_tags)
-        if self.req_ancestor_tags:
-            criteria.update({"has_ancestor_tags": self.req_ancestor_tags})
         if self.req_path_pattern:
             criteria.update({"has_path": self.req_path_pattern})
+        if self.req_ancestor_tags:
+            criteria.update({"has_ancestor_tags": self.req_ancestor_tags})
+        if self.forbid_ancestor_tags:
+            criteria.update({"has_ancestor_tags__not": self.forbid_ancestor_tags})
         return criteria
+
+    # Use to sort on path specificity -- more specific sorts earlier
+    # Could make this default, but still need to give a sort_key to find
+    def scope_specificity(self) -> int:
+        path_pattern = self.get_path_pattern()
+        if not path_pattern:
+            return 0
+        specificity = len(path_pattern.split("."))
+        scope = getattr(self, "scope", None)
+        if scope is not None and hasattr(scope, "is_global") and not scope.is_global():
+            specificity += 1
+        return -specificity
+
+    @classmethod
+    def _pattern_specificity(cls, path_pattern, selector: GraphItem) -> int:
+        for i, p in enumerate(selector.ancestors()):
+            if not p.has_path(path_pattern):
+                return i
+        return 1 << 20  # matched all the way to global, return large
+
+    # todo: deprecate "scope specificity" as sort key and use this with selector
+    def scope_rank(self, selector: GraphItem = None) -> tuple:
+        # very similar to behavior.sort_key/relevance
+        pattern = self.get_path_pattern() or "*"
+
+        if selector is not None:
+            specificity = self._pattern_specificity(pattern, selector.path)
+        else:
+            specificity = 0
+        exact = 1 if ("*" not in pattern and selector.path == pattern) else 0
+        literal_segments = sum(1 for seg in pattern.split(".") if seg not in ("*", "**") and "*" not in seg)
+        star_count = pattern.count("*") - 2 * pattern.count("**")  # crude, but works
+        doublestar_count = pattern.count("**")
+
+        # can't use seq as final tie-breaker b/c no seq mixin, but could add if req
+        return (
+            exact,
+            -specificity,  # closer ancestor is better
+            literal_segments,
+            -doublestar_count,  # fewer ** is better
+            -star_count,  # fewer * is better
+            len(pattern.split("."))  # longer patterns as last-resort
+        )
+
+    # If you want a total ordering given a generic/root selector
+    # def __lt__(self, other):
+    #     return self.scope_rank() < other.scope_rank()
