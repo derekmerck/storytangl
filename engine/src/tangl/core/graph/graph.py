@@ -107,7 +107,7 @@ class GraphItem(Entity):
         return self.parent is not None and self.parent.label == parent_label
 
     def has_scope(self, scope: dict) -> bool:
-        warnings.warn(DeprecationWarning("`has_scope` is deprecated; prefer `matches(has_path, has_ancestor_tags`)."))
+        warnings.warn("`has_scope` is deprecated; prefer `matches(has_path, has_ancestor_tags)`.", DeprecationWarning, stacklevel=2)
         return self.matches(**scope)
 
     @property
