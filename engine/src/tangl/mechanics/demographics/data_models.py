@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -34,6 +35,7 @@ FALLBACK_WORLD_NAME_DATA = {
         'male_surnames': {},
     },
 }
+SUBTYPE_NAMEBANK_REQUIRED = {"usa", "zaf"}
 
 
 class Region(Singleton):
@@ -141,11 +143,22 @@ class NameBank(Singleton):
     # Optional dict indexed by common/female surname
 
 
-import re
-
 def resources_pkg() -> str:
     pkg = re.sub(r'\.\w*?$', '', __name__)  # get rid of fn
     return f"{pkg}.resources"
+
+
+def _build_fallback_namebank(country: Country) -> dict:
+    base = (country.demonym or country.name or country.label).strip()
+    base = re.sub(r"\s+", "", base)
+    if not base:
+        base = country.label
+    return {
+        "female": [f"{base}a", f"{base}e"],
+        "male": [f"{base}o", f"{base}i"],
+        "surname": [base, country.label.upper()],
+        "male_surnames": {},
+    }
 
 def _ensure_mapping(data, resource_name: str, fallback: dict | None = None) -> dict:
     """Return mapping data loaded from YAML, or an empty dict when unavailable.
@@ -201,6 +214,16 @@ def load_demographic_distributions():
         if NameBank.get_instance(label):
             continue
         NameBank(label=label, **data)
+
+    existing_labels = {bank.label for bank in NameBank.all_instances()}
+    for country in Country.all_instances():
+        if country.label in SUBTYPE_NAMEBANK_REQUIRED:
+            continue
+        if country.label in existing_labels:
+            continue
+        if any(label.startswith(f"{country.label}_") for label in existing_labels):
+            continue
+        NameBank(label=country.label, **_build_fallback_namebank(country))
 
     # for country in Country._instances.values():
     #     if country.label not in world_name_data:

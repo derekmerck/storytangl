@@ -170,7 +170,9 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
 
         if "has_path" not in criteria and self.parent is not None:
             # Default scope matching: global or anywhere under the parent path.
-            criteria["has_path"] = self.get_path_pattern()
+            path_pattern = self.get_path_pattern()
+            if path_pattern is not None:
+                criteria["has_path"] = path_pattern
 
         return criteria
 
@@ -194,4 +196,3 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
         # will include the wrong templ.__class__
         data["obj_cls"] = self.obj_cls
         return data
-

@@ -191,10 +191,6 @@ class BlockScript(BaseScriptItem):
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.", json_schema_extra={"visit_field": True})
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.", json_schema_extra={"visit_field": True})
     redirects: list[ActionScript] = Field(None, description="Automatic redirections to a different block.", json_schema_extra={"visit_field": True})
-    templates: Optional[dict[UniqueLabel, dict[str, Any]]] = Field(
-        None,
-        description="Templates available only within this block.",
-    )
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(
         None,
         description="Roles scoped to this block, provided as a list or mapping.", json_schema_extra={"visit_field": True}
@@ -255,10 +251,6 @@ class SceneScript(BaseScriptItem):
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     assets: list[AssetsScript] = Field(None, description="A list of asset types and items associated with the scene.")
-    templates: Optional[dict[UniqueLabel, dict[str, Any]]] = Field(
-        None,
-        description="Templates available to blocks in this scene.",
-    )
 
     # @field_validator('blocks', 'roles', 'settings', mode="before")
     # @classmethod
@@ -274,7 +266,5 @@ class SceneScript(BaseScriptItem):
     @classmethod
     def _expand_setting_shorthands(cls, value):
         return _expand_setting_shorthands(value)
-
-
 
 

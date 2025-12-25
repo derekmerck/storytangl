@@ -43,7 +43,7 @@ class StoryScript(MasterScript):
     # todo: include examples in json_schema_extras
 
     # Template-map {templ_name: {attrib: default}}
-    templates: Optional[ dict[UniqueLabel, dict[str, Any]] ] = None
+    # Templates are mapped to BaseScriptItem.children via aliasing.
 
     @classmethod
     def from_data(cls, data: dict[str, Any]) -> StoryScript:

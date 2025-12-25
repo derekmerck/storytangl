@@ -15,7 +15,7 @@ def test_base_script_item_is_record() -> None:
 def test_base_script_item_defaults_and_extras() -> None:
     """Instantiation should set defaults and allow Record features."""
 
-    item = BaseScriptItem(obj_cls="Node", templates="demo", extra_field=3)
+    item = BaseScriptItem(obj_cls="Node", template_names="demo", extra_field=3)
 
     assert item.uid is not None
     assert item.template_names == "demo"

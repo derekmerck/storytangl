@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Any, Optional
+from typing import Optional
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from tangl.core.factory import HierarchicalTemplate
 from tangl.type_hints import Expr, Label, StringMap
@@ -28,22 +28,46 @@ class BaseScriptItem(HierarchicalTemplate):
     content: Optional[str] = None   # Renderable content
     icon: Optional[str] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _lift_template_name_aliases(cls, data: Any) -> Any:
-        """Preserve legacy ``templates`` aliases for template name references."""
+    def get_path_pattern(self) -> str:
+        """Return the scope match pattern, treating root script templates as global."""
+        if "req_path_pattern" in self.model_fields_set and self.req_path_pattern is None:
+            return None
+        if self.req_path_pattern is None and self.parent is not None:
+            from .master_script_model import MasterScript
 
-        if not isinstance(data, dict):
-            return data
+            if isinstance(self.parent, MasterScript):
+                return "*"
+        pattern = super().get_path_pattern()
+        if self.req_path_pattern is None:
+            from .master_script_model import MasterScript
 
-        templates_value = data.get("templates")
-        if templates_value is None:
-            return data
+            story_label = None
+            for ancestor in self.ancestors():
+                if isinstance(ancestor, MasterScript):
+                    story_label = ancestor.label
+                    break
+            if story_label:
+                prefix = f"{story_label}."
+                if pattern.startswith(prefix):
+                    pattern = pattern[len(prefix):]
+            if (
+                self.parent is not None
+                and self.parent.__class__.__name__.endswith("BlockScript")
+                and pattern.endswith(".*")
+            ):
+                pattern = pattern[:-2]
+        return pattern
 
-        if isinstance(templates_value, dict):
-            return data
+    children: dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None = Field(
+        default_factory=dict,
+        alias="templates",
+        json_schema_extra={"visit_field": True},
+    )
 
-        updated = dict(data)
-        updated.setdefault("template_names", templates_value)
-        updated.pop("templates", None)
-        return updated
+    @property
+    def templates(self) -> dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None:
+        return self.children
+
+    @templates.setter
+    def templates(self, value: dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None) -> None:
+        self.children = value

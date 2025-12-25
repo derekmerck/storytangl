@@ -84,8 +84,11 @@ class GraphItem(Entity):
 
     def has_path(self, pattern: str) -> bool:
         from fnmatch import fnmatch
-        match_logger.debug(f"fnmatch({self.path}, {pattern}) = {fnmatch(self.path, pattern)}")
-        return fnmatch(self.path, pattern)
+        match = fnmatch(self.path, pattern)
+        if not match and pattern.endswith(".*"):
+            match = self.path == pattern[:-2]
+        match_logger.debug(f"fnmatch({self.path}, {pattern}) = {match}")
+        return match
 
     def has_ancestor(self, ancestor: Subgraph) -> bool:
         return ancestor in self.ancestors()

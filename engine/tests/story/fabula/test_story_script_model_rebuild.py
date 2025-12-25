@@ -16,7 +16,7 @@ def test_story_script_model_rebuild_runs_on_import() -> None:
         "templates": {
             "guard": {
                 "obj_cls": "tangl.story.concepts.actor.actor.Actor",
-                "scope": {"ancestor_tags": {"town"}},
+                "ancestor_tags": {"town"},
             }
         },
         "scenes": {},
@@ -28,9 +28,8 @@ def test_story_script_model_rebuild_runs_on_import() -> None:
     assert script.templates is not None
     guard = script.templates.get("guard")
     assert guard is not None
-    scope = guard.get("scope")
-    assert scope is not None
-    # assert scope.get("ancestor_tags") == ScopeSelector(ancestor_tags={"town"}).ancestor_tags
+    assert guard.req_ancestor_tags == {"town"}
+    assert guard.get_selection_criteria()["has_ancestor_tags"] == {"town"}
 
 
 def test_master_script_model_rebuild_runs_on_import() -> None:
@@ -44,4 +43,3 @@ def test_master_script_model_rebuild_runs_on_import() -> None:
 
     assert script.label == "example"
     assert script.scope is not None
-
