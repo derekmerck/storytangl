@@ -12,6 +12,7 @@ from tangl.utils.hashing import hashing_func
 from tangl.core.entity import is_identifier
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class ContentAddressable(BaseModel):
@@ -90,6 +91,7 @@ class ContentAddressable(BaseModel):
         try:
             # Get hashable content (subclass customization point)
             hashable = cls._get_hashable_content(data)
+            logger.debug(f"Content hash items: {hashable}")
 
             # Compute hash using standard hashing function
             if hashable is not None:
@@ -140,7 +142,7 @@ class ContentAddressable(BaseModel):
         """
         # Default: Hash everything except known metadata fields
         # todo: could use fields here with a filter
-        exclude = {"uid", "content_hash", "created_at", "updated_at", "seq", "obj_cls"}
+        exclude = {"uid", "is_dirty_", "content_hash", "created_at", "updated_at", "seq", "obj_cls"}
         return {k: v for k, v in data.items() if k not in exclude}
 
     @is_identifier

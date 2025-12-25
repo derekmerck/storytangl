@@ -41,6 +41,7 @@ def test_lazy_story_materializes_start_block_only() -> None:
 
     world = _build_world(script)
     story = world.create_story("lazy_story", mode="lazy")
+    assert story.factory is world.script_manager.template_factory
 
     blocks = list(story.find_all(is_instance=Block))
     assert len(blocks) == 1
@@ -98,13 +99,13 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
     start_block = story.find_one(is_instance=Block)
     assert start_block is not None
 
-    provisioner = TemplateProvisioner(template_registry=world.template_registry, layer="local")
+    provisioner = TemplateProvisioner(layer="local")
     ctx = type("Ctx", (), {"graph": story, "cursor": start_block, "cursor_id": start_block.uid})()
 
     in_scope_req = Requirement(
         graph=story,
         template_ref="start_actor",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     offers = list(provisioner.get_dependency_offers(in_scope_req, ctx=ctx))
     assert len(offers) == 1
@@ -112,8 +113,7 @@ def test_lazy_story_scoped_templates_respect_cursor_scope() -> None:
     out_of_scope_req = Requirement(
         graph=story,
         template_ref="late_actor",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
     out_of_scope_offers = list(provisioner.get_dependency_offers(out_of_scope_req, ctx=ctx))
     assert out_of_scope_offers == []
-

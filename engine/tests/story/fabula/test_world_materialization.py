@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from tangl.core.graph import Node
 from tangl.ir.story_ir import ActorScript, BlockScript, StoryScript
-from tangl.ir.story_ir.story_script_models import ScopeSelector
+# from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
@@ -40,7 +40,7 @@ def mock_world():
 
     domain_manager = DomainManager()
     asset_manager = AssetManager()
-    script_manager = ScriptManager(master_script=_empty_story_script())
+    script_manager = ScriptManager.from_master_script(master_script=_empty_story_script())
 
     world = World(
         label="test_world",
@@ -94,7 +94,7 @@ def test_materialize_respects_custom_obj_cls():
 
     world = World(
         label="custom_world",
-        script_manager=ScriptManager(master_script=_empty_story_script()),
+        script_manager=ScriptManager.from_master_script(master_script=_empty_story_script()),
         domain_manager=domain_manager,
         asset_manager=AssetManager(),
         resource_manager=None,
@@ -122,7 +122,7 @@ def test_materialize_adds_to_parent_container(mock_world):
 
     template = ActorScript(
         label="guard",
-        obj_cls="tangl.core.graph.Node",
+        obj_cls="tangl.core.graph.node.Node",
     )
 
     actor = mock_world._materialize_from_template(
@@ -133,8 +133,8 @@ def test_materialize_adds_to_parent_container(mock_world):
     assert actor.parent == scene
 
 
-def test_lazy_mode_pre_provisions_scenes(mock_world):
-    """Lazy mode should create scenes and add them via graph.add()."""
+def test_lazy_mode_does_not_pre_provision_scenes(mock_world):
+    """Lazy mode should only materialize the seed block and its scene."""
 
     story_data = {
         "label": "multi_scene",
@@ -156,7 +156,7 @@ def test_lazy_mode_pre_provisions_scenes(mock_world):
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="multi_scene",
         script_manager=manager,
@@ -171,13 +171,17 @@ def test_lazy_mode_pre_provisions_scenes(mock_world):
     scene1 = graph.get("scene1")
     scene2 = graph.get("scene2")
 
-    assert scene1 is not None, "Scene1 should be pre-provisioned"
-    assert scene2 is not None, "Scene2 should be pre-provisioned"
-    assert scene1 in graph
-    assert scene2 in graph
+    assert scene1 is not None, "Seed scene should materialize for the start block"
+    assert scene2 is None, "Scene2 should not be pre-provisioned in lazy mode"
 
+    # Only the seed block should exist initially
     start_block = graph.get("start")
     assert start_block is not None
+    assert len(list(graph.subgraphs)) == 1
+    from tangl.story.episode.block import Block
+
+    blocks = [node for node in graph.nodes if isinstance(node, Block)]
+    assert len(blocks) == 1
     assert start_block.parent == scene1
 
 
@@ -189,7 +193,7 @@ def test_materialize_block_creates_action_edges(mock_world):
 
     template = BlockScript(
         label="start",
-        scope=ScopeSelector(parent_label="scene1"),
+        # scope={"has_parent_label": "scene1"},
         obj_cls=Block,
         text="Beginning",
         actions=[{"text": "Continue", "successor": "next"}],

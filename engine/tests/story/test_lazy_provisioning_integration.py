@@ -6,6 +6,7 @@ from tangl.ir.story_ir import StoryScript
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
+from tangl.story.episode.block import Block
 from tangl.story.fabula.world import World
 from tangl.vm.provision import ProvisioningPolicy
 
@@ -18,7 +19,7 @@ def clear_world_singleton():
     World.clear_instances()
 
 
-def test_lazy_block_provisioning_from_template_registry():
+def test_lazy_block_provisioning_from_template_factory():
     """
     Lazy story creates seed block with action edges (open Requirements).
     Planning resolves Requirements, provisions successor blocks on-demand.
@@ -60,7 +61,7 @@ def test_lazy_block_provisioning_from_template_registry():
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="test_story",
         script_manager=manager,
@@ -70,8 +71,9 @@ def test_lazy_block_provisioning_from_template_registry():
         metadata=story_data["metadata"],
     )
 
-    start_template = world.template_registry.find_one(identifier="scene1.start")
-    next_template = world.template_registry.find_one(identifier="scene1.next")
+    factory = world.script_manager.template_factory
+    start_template = factory.find_one(path="test_story.scene1.start")
+    next_template = factory.find_one(path="test_story.scene1.next")
 
     assert start_template is not None, "Start block template not registered"
     assert next_template is not None, "Next block template not registered"
@@ -79,14 +81,20 @@ def test_lazy_block_provisioning_from_template_registry():
     assert next_template.content == "You have advanced to the next location."
 
     graph = world.create_story("test_run", mode="lazy")
+    assert graph.factory is factory
 
     scene1 = graph.find_subgraph(label="scene1")
-    assert scene1 is not None, "Scene should be pre-provisioned"
+    assert scene1 is not None, "Seed scene should be created on demand"
 
     start_block = graph.find_node(label="start")
     assert start_block is not None, "Seed block not created"
     assert start_block.content == "You stand at the beginning."
     assert start_block.parent == scene1, "Block should be in scene"
+
+    assert len(list(graph.subgraphs)) == 1, "Only the seed scene should be present initially"
+
+    materialized_blocks = list(graph.find_nodes(is_instance=Block))
+    assert len(materialized_blocks) == 1, "Only the seed block should be present initially"
 
     next_block = graph.find_node(label="next")
     assert next_block is None, "Next block should not be materialized yet (lazy mode)"
@@ -107,8 +115,9 @@ def test_lazy_block_provisioning_from_template_registry():
 
     req = dependencies[0].requirement
     assert req.identifier == "scene1.next", "Requirement should reference next block"
-    assert req.policy == ProvisioningPolicy.CREATE
+    assert req.policy == ProvisioningPolicy.CREATE_TEMPLATE
     assert not req.satisfied, "Requirement should not be satisfied yet"
+
 
     from tangl.vm.provision import TemplateProvisioner
     from types import SimpleNamespace
@@ -183,7 +192,7 @@ def test_lazy_provisioning_with_multiple_successors():
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="branching",
         script_manager=manager,
@@ -209,7 +218,10 @@ def test_lazy_provisioning_with_multiple_successors():
         assert len(reqs) == 1
         assert not reqs[0].requirement.satisfied
 
-    identifiers = {list(graph.find_edges(source=action, is_instance=Dependency))[0].requirement.identifier for action in actions}
+    identifiers = {
+        list(graph.find_edges(source=action, is_instance=Dependency))[0].requirement.identifier
+        for action in actions
+    }
     assert identifiers == {"hub.north", "hub.south", "hub.east"}
 
     assert graph.find_node(label="north") is None
@@ -255,7 +267,7 @@ def test_lazy_provisioning_across_scene_boundary():
     }
 
     script = StoryScript.model_validate(story_data)
-    manager = ScriptManager(master_script=script)
+    manager = ScriptManager.from_master_script(master_script=script)
     world = World(
         label="multi_scene",
         script_manager=manager,
@@ -270,7 +282,7 @@ def test_lazy_provisioning_across_scene_boundary():
     forest_scene = graph.find_subgraph(label="forest")
     cave_scene = graph.find_subgraph(label="cave")
     assert forest_scene is not None
-    assert cave_scene is not None
+    assert cave_scene is None
 
     entrance = graph.find_node(label="entrance")
     assert entrance is not None
@@ -303,7 +315,10 @@ def test_lazy_provisioning_across_scene_boundary():
     offers = list(provisioner.get_dependency_offers(req, ctx=ctx))
     cave_mouth = offers[0].accept(ctx=ctx)
 
+    cave_scene = graph.find_subgraph(label="cave")
+
     assert cave_mouth.label == "mouth"
+    assert cave_scene is not None
     assert cave_mouth.parent == cave_scene
     assert cave_mouth in cave_scene.members
 

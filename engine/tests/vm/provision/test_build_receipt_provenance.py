@@ -1,5 +1,5 @@
-from tangl.core.graph import Graph
-from tangl.ir.story_ir.actor_script_models import ActorScript
+from tangl.core.factory import TemplateFactory, Template
+from tangl.core.graph import Graph, Node
 from tangl.vm.provision import (
     PlannedOffer,
     ProvisioningPolicy,
@@ -9,18 +9,16 @@ from tangl.vm.provision import (
 
 
 def test_build_receipt_captures_template_provenance() -> None:
-    template = ActorScript(
-        label="npc",
-        obj_cls="tangl.story.concepts.actor.actor.Actor",
-        name="NPC",
-    )
+    template = Template[Node](label="npc", tags={"core"})
     graph = Graph()
     requirement = Requirement(
         graph=graph,
         template_ref="npc",
-        policy=ProvisioningPolicy.CREATE,
+        policy=ProvisioningPolicy.CREATE_TEMPLATE,
     )
-    provisioner = TemplateProvisioner(template_registry={"npc": template}, layer="local")
+    factory = TemplateFactory(label="templates")
+    factory.add(template)
+    provisioner = TemplateProvisioner(factory=factory, layer="local")
     ctx = type("Ctx", (), {"graph": graph, "cursor": None, "cursor_id": None})()
 
     offers = list(provisioner.get_dependency_offers(requirement, ctx=ctx))
@@ -34,4 +32,3 @@ def test_build_receipt_captures_template_provenance() -> None:
     assert receipt.template_hash == template.content_hash
     assert receipt.template_content_id == template.content_identifier()
     assert receipt.provider_id is not None
-

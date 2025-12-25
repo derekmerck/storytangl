@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Literal
+from typing import Any, Optional, Literal, ClassVar, Type
 from uuid import UUID
 
 import pydantic
-from pydantic import Field, model_validator, ConfigDict
+from pydantic import Field, model_validator, ConfigDict, field_validator
 
-from tangl.type_hints import UniqueLabel, Tag, ClassName
+from tangl.type_hints import UniqueLabel, Tag, ClassName, StringMap
+from tangl.core import Entity
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.media_ir.media_script_model import MediaItemScript
 from .actor_script_models import RoleScript
@@ -132,6 +133,12 @@ class ActionScript(BaseScriptItem):
         conditions (list[str], optional): Conditions that must be met for this action to be available.
         effects (list[str], optional): Effects that occur as a result of taking this action.
     """
+
+    @classmethod
+    def get_default_obj_cls(cls) -> Type[Entity]:
+        from tangl.story.episode import Action
+        return Action
+
     text: Optional[str] = Field(
         None,
         description="The narrative text associated with this choice or action."
@@ -173,25 +180,24 @@ class ActionScript(BaseScriptItem):
 
 class BlockScript(BaseScriptItem):
 
-    obj_cls: ClassName = Field(None, alias='block_cls')
-    # todo: suggest known block class descendents in schema but allow any
+    @classmethod
+    def get_default_obj_cls(cls) -> Type[Entity]:
+        # Keep this import out of the main scope
+        from tangl.story.episode import Block
+        return Block
 
     media: list[MediaItemScript] | None = None
 
-    actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.")
-    continues: list[ActionScript] = Field(None, description="Continuations to a next block.")
-    redirects: list[ActionScript] = Field(None, description="Automatic redirections to a different block.")
-    templates: Optional[dict[UniqueLabel, dict[str, Any]]] = Field(
-        None,
-        description="Templates available only within this block.",
-    )
+    actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.", json_schema_extra={"visit_field": True})
+    continues: list[ActionScript] = Field(None, description="Continuations to a next block.", json_schema_extra={"visit_field": True})
+    redirects: list[ActionScript] = Field(None, description="Automatic redirections to a different block.", json_schema_extra={"visit_field": True})
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(
         None,
-        description="Roles scoped to this block, provided as a list or mapping.",
+        description="Roles scoped to this block, provided as a list or mapping.", json_schema_extra={"visit_field": True}
     )
     settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(
         None,
-        description="Settings scoped to this block, provided as a list or mapping.",
+        description="Settings scoped to this block, provided as a list or mapping.", json_schema_extra={"visit_field": True}
     )
 
     @pydantic.field_validator('redirects', mode='before')
@@ -231,17 +237,25 @@ class MenuBlockScript(BlockScript):
 
 
 class SceneScript(BaseScriptItem):
+
+    @classmethod
+    def get_default_obj_cls(cls) -> Type[Entity]:
+        # Keep this import out of the main scope
+        from tangl.story.episode import Scene
+        return Scene
+
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
 
     # todo: How do we inject other block types like menus, challenges (games) and activities (task)??  using discriminator fields?
-    blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.")
-    roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.")
-    settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.")
+    blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.", json_schema_extra={"visit_field": True})
+    roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(None, description="Roles associated with this scene, provides scene-specific aliases for cast actors, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
+    settings: list[SettingScript] | dict[UniqueLabel, SettingScript] = Field(None, description="Settings associated with this scene, provides scene-specific aliases for locations, in label-keyed map or list form.", json_schema_extra={"visit_field": True})
     assets: list[AssetsScript] = Field(None, description="A list of asset types and items associated with the scene.")
-    templates: Optional[dict[UniqueLabel, dict[str, Any]]] = Field(
-        None,
-        description="Templates available to blocks in this scene.",
-    )
+
+    # @field_validator('blocks', 'roles', 'settings', mode="before")
+    # @classmethod
+    # def __set_label_from_key(cls, value: dict[UniqueLabel, StringMap]) -> dict[UniqueLabel, StringMap]:
+    #     return cls._set_label_from_key(value)
 
     @pydantic.field_validator('roles', mode='before')
     @classmethod
@@ -252,7 +266,5 @@ class SceneScript(BaseScriptItem):
     @classmethod
     def _expand_setting_shorthands(cls, value):
         return _expand_setting_shorthands(value)
-
-
 
 

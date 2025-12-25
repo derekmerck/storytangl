@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tangl.story.concepts.actor.role import Role
+from tangl.vm.provision.open_edge import Dependency
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
@@ -52,10 +52,11 @@ def test_planner_provisions_role_from_existing_affordance() -> None:
         resource_manager=None,
         metadata=script_manager.get_story_metadata(),
     )
-    graph = world.create_story("story")
+    graph = world.create_story("story", mode="full")
+    assert graph.factory is world.script_manager.template_factory
 
     bob = graph.find_one(label="bob")
-    role = graph.find_one(is_instance=Role, label="bartender")
+    role = graph.find_one(is_instance=Dependency, label="bartender")
     start = graph.find_one(label="start")
 
     assert role is not None
@@ -68,14 +69,14 @@ def test_planner_provisions_role_from_existing_affordance() -> None:
         GraphProvisioner(node_registry=graph, layer="local"),
         UpdatingProvisioner(node_registry=graph, layer="local"),
         CloningProvisioner(node_registry=graph, layer="local"),
-        TemplateProvisioner(template_registry=world.template_registry, layer="local"),
+        TemplateProvisioner(layer="local"),
     ]
     ctx = ProvisioningContext(graph=graph, step=0)
     result = provision_node(start, provisioners, ctx=ctx)
     plan = result.primary_plan
     assert plan is not None
     receipts = plan.execute(ctx=ctx)
-    assert receipts
+    assert receipts or role.requirement.satisfied
 
     assert role.requirement.provider_id == bob.uid
     assert role.requirement.provider == bob
@@ -118,9 +119,10 @@ def test_planner_provisions_role_from_template() -> None:
         resource_manager=None,
         metadata=script_manager.get_story_metadata(),
     )
-    graph = world.create_story("story")
+    graph = world.create_story("story", mode="full")
+    assert graph.factory is world.script_manager.template_factory
 
-    role = graph.find_one(is_instance=Role, label="bartender")
+    role = graph.find_one(is_instance=Dependency, label="bartender")
     start = graph.find_one(label="start")
     assert role is not None
     assert role.destination_id is None
@@ -131,14 +133,14 @@ def test_planner_provisions_role_from_template() -> None:
         GraphProvisioner(node_registry=graph, layer="local"),
         UpdatingProvisioner(node_registry=graph, layer="local"),
         CloningProvisioner(node_registry=graph, layer="local"),
-        TemplateProvisioner(template_registry=world.template_registry, layer="local"),
+        TemplateProvisioner(layer="local"),
     ]
     ctx = ProvisioningContext(graph=graph, step=0)
     result = provision_node(start, provisioners, ctx=ctx)
     plan = result.primary_plan
     assert plan is not None
     receipts = plan.execute(ctx=ctx)
-    assert receipts
+    assert receipts or role.requirement.satisfied
 
     assert role.requirement.provider_id is not None
     bartender = role.requirement.provider

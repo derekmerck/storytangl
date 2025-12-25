@@ -6,6 +6,7 @@ from pydantic import Field, field_serializer, field_validator
 
 from ..type_hints import StringMap
 from tangl.core import Graph, BehaviorRegistry
+from tangl.core.factory import TemplateFactory
 from .dispatch import story_dispatch
 from .fabula import World
 
@@ -16,6 +17,7 @@ class StoryGraph(Graph):
     world: World | None = None
     initial_cursor_id: UUID | None = None
     locals: dict[str, Any] = Field(default_factory=dict)
+    factory: TemplateFactory | None = Field(default=None, exclude=True)
 
     # Just override this in a subclass to create graph's that use
     # variant dispatches, for testing, for example.
@@ -45,4 +47,3 @@ class StoryGraph(Graph):
         elif value is None:
             return None
         raise ValueError(f"World {value} is not a valid data, World, or None")
-

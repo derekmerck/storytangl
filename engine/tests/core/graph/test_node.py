@@ -123,3 +123,9 @@ def test_node_remove_edge_helpers_are_idempotent():
 
     alpha.remove_edge_from(beta)
     assert list(alpha.edges_in()) == []
+
+def test_is_instance_accepts_tuple():
+    n = Node()
+    assert n.is_instance(Node)
+    assert n.is_instance((Node, Subgraph))
+    assert not n.is_instance((Subgraph,))

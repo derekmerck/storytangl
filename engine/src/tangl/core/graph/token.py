@@ -1,10 +1,11 @@
-# tangl/core/singleton/singleton_node.py
+# tangl/core/graph/token.py
 from __future__ import annotations
 import re
 from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
 import sys
 import logging
+from inspect import isclass
 
 import pydantic
 from pydantic import Field, field_validator
@@ -19,11 +20,11 @@ logger.setLevel(logging.WARNING)
 
 WrappedType = TypeVar("WrappedType", bound=Singleton)
 
-class SingletonNode(Node, Generic[WrappedType]):
+class Token(Node, Generic[WrappedType]):
     """
-    SingletonNode(from_ref: UniqueStr)
+    Token[Singleton](from_ref: UniqueStr)
 
-    Graph node wrapper that attaches a :class:`~tangl.core.Singleton` to a graph with node-local state.
+    Graph node wrapper that attaches a :class:`~tangl.core.Singleton` to a graph with node-local state.  Tokens are mid-way between templates and node-instances.  They delegate most features to a bound singleton reference object but provide a layer of instance-local state on top of that.
 
     Why
     ----
@@ -49,18 +50,25 @@ class SingletonNode(Node, Generic[WrappedType]):
     Notes
     -----
     Prefer modeling behavior in the singleton; keep node-local overrides minimal and explicit.
+
+    See Also
+    --------
+    `tangl.core.factory.TokenFactory`
     """
     # Allows embedding a Singleton into a mutable node so its properties can be
     # referenced indirectly via a graph
     # Note that singletons are frozen, so the referred attributes are immutable.
 
     #: Cached wrapper classes keyed by (wrapper base, singleton type).
-    _wrapper_cache: ClassVar[dict[tuple[type[SingletonNode], Type[Singleton]], type[SingletonNode]]] = {}
+    _wrapper_cache: ClassVar[dict[tuple[type[Token], Type[Singleton]], type[Token]]] = {}
 
     #: The singleton entity class that this wrapper is associated with.
     wrapped_cls: ClassVar[Type[Singleton]] = None
 
     label: UniqueLabel = Field(...)  # required now
+    # todo: why is this commented out, probably _do_ want to be able to update tags
+    #       maybe b/c discarding would be hard?  (i.e., keep {-foo} and use it to
+    #       hide {foo}?)
     # tags: set[Tag] = Field(default_factory=set, json_schema_extra={"instance_var": True})
 
     def has_tags(self, *tags: Tag) -> bool:
@@ -81,6 +89,24 @@ class SingletonNode(Node, Generic[WrappedType]):
         if not res:
             raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.label}`.")
         return self.wrapped_cls.get_instance(self.label)
+
+    def is_instance(self, obj_cls: type | tuple[type]) -> bool:
+        """
+        Check against wrapped type, not just Token class.
+
+        Enables: Token[NPC].is_instance(NPC) → True
+        """
+        logger.debug(f"Checking {obj_cls} is tuple.")
+        # Check wrapped singleton type
+        if isinstance(obj_cls, tuple):
+            logger.debug(f"Checking all-classes {all(isclass(c) for c in obj_cls)} is true.")
+            if all(isclass(c) for c in obj_cls) and issubclass(self.wrapped_cls, obj_cls):
+                return True
+        elif isclass(obj_cls) and issubclass(self.wrapped_cls, obj_cls):
+            return True
+
+        # Fall back to Node hierarchy
+        return super().is_instance(obj_cls)
 
     def __getattr__(self, name: str) -> Any:
         """Delegates attribute access to non-instance-variables back to the reference singleton entity."""

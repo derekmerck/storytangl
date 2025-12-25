@@ -55,6 +55,10 @@ class DomainManager:
         if not obj_cls_str:
             return Node
 
+        if (isinstance(obj_cls_str, type) and
+                (obj_cls_str is Entity or issubclass(obj_cls_str, Entity))):
+            return obj_cls_str
+
         if obj_cls_str in self.class_registry:
             return self.class_registry[obj_cls_str]
 

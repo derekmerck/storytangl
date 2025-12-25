@@ -5,11 +5,12 @@ import logging
 from copy import copy
 from enum import Enum
 import re
+from inspect import isclass
 
 from pydantic import BaseModel, Field, field_validator
 import shortuuid
 
-from tangl.type_hints import StringMap, Tag, Predicate, Identifier
+from tangl.type_hints import StringMap, Tag, Predicate, Identifier, UnstructuredData
 from tangl.utils.hashing import hashing_func
 from tangl.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitize_str
@@ -67,7 +68,7 @@ class Entity(BaseModelPlus):
     tags: set[Tag] = Field(default_factory=set)
     # tag syntax can be used by the _parser_ as sugar for various attributes
     # - indicate membership               domain:<foo> or channel:<foo>
-    # - automatically set default values  .str=100
+    # - automatically set default values  str=100
     # - indicate relationships            @other_node.friendship=+10
     # However, such logic is NOT built into the base functionality
 
@@ -156,11 +157,13 @@ class Entity(BaseModelPlus):
         # return self._attrib_is_superset_of("tags", *tags)
         return tags.issubset(self.tags)
 
-    def is_instance(self, obj_cls: Type[Self]) -> bool:
-        # helper func for matches
+    def is_instance(self, obj_cls: type | tuple[type,...]) -> bool:
+        """Return True if self is an instance of the given class (or any class in a tuple)."""
         if obj_cls is object:
             match_logger.warning("Matching `is_instance(self, object)`: this is harmless but it always returns True and is almost certainly not what you intended to do.")
-        return isinstance(self, obj_cls)
+        if isinstance(obj_cls, tuple):
+            return all(isclass(c) for c in obj_cls) and isinstance(self, obj_cls)
+        return isclass(obj_cls) and isinstance(self, obj_cls)
 
     # todo: push this into a pure utility
     def get_tag_kv(self,
@@ -293,15 +296,16 @@ class Entity(BaseModelPlus):
         return hashing_func(state_data)
 
     @classmethod
-    def structure(cls, data: StringMap) -> Self:
+    def structure(cls, data: UnstructuredData) -> Self:
         """
         Structure a string-keyed dict of unflattened data into an object of its
         declared class type.
         """
         _data = dict(data)  # local copy
         obj_cls = _data.pop("obj_cls", cls)
-        # This key _should_ be unflattened by the serializer when necessary, but if not,
-        # we can try to unflatten it as the qualified name against Entity
+        # This key _should_ be unflattened by the serializer when necessary,
+        # but if not, we can try to unflatten it as the qualified name against
+        # Entity
         if isinstance(obj_cls, str):
             obj_cls = cls.dereference_cls_name(obj_cls)
         if obj_cls is not cls:
@@ -309,10 +313,10 @@ class Entity(BaseModelPlus):
             return obj_cls.structure(_data)
         return cls(**_data)
 
-    def unstructure(self) -> StringMap:
+    def unstructure(self) -> UnstructuredData:
         return self.model_dump()
 
-    def model_dump(self, **kwargs) -> StringMap:
+    def model_dump(self, **kwargs) -> UnstructuredData:
         """
         Unstructure an object into a string-keyed dict of unflattened data.
         """
@@ -329,12 +333,15 @@ class Entity(BaseModelPlus):
             kwargs['exclude'].update(exclude)
 
         data = super().model_dump(**kwargs)
-        # guard for excluding unset; since uid is factoried, so it is considered
-        # Unset initially
-        data['uid'] = self.uid
-        data["obj_cls"] = self.__class__
-        # The 'obj_cls' key _may_ be flattened by some serializers.  If flattened as qual name,
-        # it can be unflattened with `Entity.dereference_cls_name`
+        # guard for accidentally excluding uid when excluding unset;
+        # since uid is initially factoried, it is initially considered unset
+        if 'uid' not in data and 'uid' not in kwargs.get('exclude', []):
+            data['uid'] = self.uid
+        if "obj_cls" not in data and 'obj_cls' not in kwargs.get('exclude', []):
+            data["obj_cls"] = self.__class__
+        # The 'obj_cls' key _may_ be flattened by some serializers.
+        # If flattened as qual name, it can be unflattened with
+        # `Entity.dereference_cls_name`
         return data
 
 EntityT = TypeVar('EntityT', bound=Entity)

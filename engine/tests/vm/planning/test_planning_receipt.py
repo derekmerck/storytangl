@@ -21,7 +21,7 @@ def test_planning_receipt_marks_no_offers_unresolved():
     requirement_id = uuid4()
     receipt = _build_receipt(
         caller_id=requirement_id,
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         accepted=False,
         hard_req=True,
         reason="no_offers",
@@ -43,7 +43,7 @@ def test_planning_receipt_counters_preserved_for_positive_receipts():
 
     successful = _build_receipt(
         caller_id=success_id,
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         accepted=True,
         provider_id=uuid4(),
     )
@@ -71,7 +71,7 @@ def test_planning_receipt_tracks_waived_soft_requirements():
 
     waived = _build_receipt(
         caller_id=waived_id,
-        operation=ProvisioningPolicy.CREATE,
+        operation=ProvisioningPolicy.CREATE_TEMPLATE,
         accepted=False,
         hard_req=False,
         reason="waived_soft",

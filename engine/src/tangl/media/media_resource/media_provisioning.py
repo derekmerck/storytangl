@@ -7,7 +7,8 @@ from pydantic import ConfigDict, Field
 
 from tangl.core import BehaviorRegistry
 from tangl.vm.provision import DependencyOffer, ProvisionCost, Provisioner
-from tangl.vm.provision.requirement import ProvisioningPolicy, Requirement
+from tangl.vm.provision.provisioning_policy import ProvisioningPolicy
+from tangl.vm.provision.requirement import Requirement
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_data_type import MediaDataType
@@ -102,7 +103,7 @@ class MediaProvisioner(Provisioner):
         yield DependencyOffer(
             requirement_id=requirement.uid,
             requirement=requirement,
-            operation=ProvisioningPolicy.CREATE,
+            operation=ProvisioningPolicy.CREATE_TEMPLATE,
             base_cost=ProvisionCost.CREATE,
             cost=float(ProvisionCost.CREATE),
             proximity=999.0,

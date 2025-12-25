@@ -7,7 +7,7 @@
 - Centrally defined, globally consistent
 - Changes propagate to all tokens
 
-**SingletonNode = Mutable Token (Individual Instance)**
+**Token = Mutable Token (Individual Instance)**
 - Wraps the singleton type
 - Adds instance-specific state
 - Delegates type queries to singleton
@@ -27,7 +27,7 @@ class WearableAsset(Singleton):
     )
 
 # TOKEN (Graph Node wrapping Singleton)
-Wearable = SingletonNode[WearableAsset]
+Wearable = Token[WearableAsset]
 
 # Usage
 iron_sword_type = WearableAsset.get_instance('iron_sword')
@@ -144,10 +144,10 @@ WearableAsset.get_instance('iron_sword').desc
 # → "A sturdy iron blade"
 ```
 
-### Layer 2: SingletonNode Wrapper (Token System)
+### Layer 2: Token Wrapper (Token System)
 
 ```python
-class SingletonNode(Node, Generic[T]):
+class Token(Node, Generic[T]):
     """
     Graph node that wraps a Singleton instance.
     
@@ -202,7 +202,7 @@ class SingletonNode(Node, Generic[T]):
             super().__setattr__(name, value)
 
 # Type alias for clarity
-Wearable = SingletonNode[WearableAsset]
+Wearable = Token[WearableAsset]
 ```
 
 ### Layer 3: Usage in Story
@@ -274,7 +274,7 @@ class AssetManager:
         asset_type: str,
         singleton_label: str,
         graph: Graph
-    ) -> SingletonNode:
+    ) -> Token:
         """
         Create a graph node token for an asset.
         
@@ -282,7 +282,7 @@ class AssetManager:
         token = asset_manager.create_token('wearables', 'iron_sword', graph)
         """
         cls = self.asset_classes[asset_type]
-        wrapper_cls = SingletonNode[cls]
+        wrapper_cls = Token[cls]
         return wrapper_cls(singleton_label, graph=graph)
     
     def get_asset_type(self, asset_type: str, label: str) -> Singleton:
@@ -571,8 +571,8 @@ def test_singleton_asset_pattern():
     
     # Create tokens
     graph = Graph(label='test')
-    token1 = SingletonNode[TestAsset]('sword', graph=graph)
-    token2 = SingletonNode[TestAsset]('sword', graph=graph)
+    token1 = Token[TestAsset]('sword', graph=graph)
+    token2 = Token[TestAsset]('sword', graph=graph)
     
     # Type properties are shared
     assert token1.desc == token2.desc == "A sword"
@@ -629,7 +629,7 @@ def test_asset_manager_integration():
 
 **Type/Token Pattern**:
 - **Singleton**: Immutable type definition, globally shared
-- **SingletonNode**: Mutable token, wraps singleton, independent state
+- **Token**: Mutable token, wraps singleton, independent state
 - **Benefits**: Consistency, memory efficiency, centralized updates
 
 This pattern explains your singleton obsession perfectly. It's not just for uniqueness - it's for **shared type identity with independent instance state**.

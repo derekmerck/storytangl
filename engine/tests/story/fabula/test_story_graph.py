@@ -5,7 +5,7 @@ from tangl.core.behavior import HandlerLayer
 from tangl.story.story_graph import StoryGraph
 from tangl.story.fabula import World
 
-from conftest import _make_world, _base_script
+from .conftest import _make_world, _base_script
 
 @pytest.fixture
 def world():

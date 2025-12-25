@@ -16,8 +16,9 @@ from contextlib import contextmanager
 
 from tangl.type_hints import Hash, StringMap
 from tangl.utils.hashing import hashing_func
-from tangl.core.graph import Graph, Node
+from tangl.core.graph import Graph, Node, Subgraph
 from tangl.core.behavior import Behavior, BehaviorRegistry, CallReceipt, HandlerLayer
+from tangl.ir.core_ir.base_script_model import BaseScriptItem
 from .provision import (
     BuildReceipt,
     ProvisionOffer,
@@ -237,3 +238,38 @@ class Context:
     planning_indexed_provisioners: list[tuple[int, Provisioner]] = field(default_factory=list)
     frontier_provision_results: dict[UUID, ProvisioningResult] = field(default_factory=dict)
     frontier_provision_plans: dict[UUID, ProvisioningPlan] = field(default_factory=dict)
+
+
+class MaterializationContext(Context):
+    """Context flowing through the materialization dispatch pipeline."""
+
+    template: BaseScriptItem
+    payload: dict
+    parent_container: Subgraph | None
+    node: Node | None
+
+    def __init__(
+        self,
+        *,
+        template: BaseScriptItem,
+        graph: Graph,
+        payload: dict,
+        parent_container: Subgraph | None = None,
+        node: Node | None = None,
+        cursor_id: UUID | None = None,
+        step: int = 0,
+    ) -> None:
+        super().__init__(graph=graph, cursor_id=cursor_id or graph.uid, step=step)
+        object.__setattr__(self, "template", template)
+        object.__setattr__(self, "payload", payload)
+        object.__setattr__(self, "parent_container", parent_container)
+        object.__setattr__(self, "node", node)
+
+    def __setattr__(self, name: str, value: Any) -> None:  # noqa: D401 - short override
+        """Allow mutation of materialization state within dispatch."""
+
+        if name in {"node", "payload", "parent_container", "template"}:
+            object.__setattr__(self, name, value)
+            return
+
+        super().__setattr__(name, value)

@@ -10,8 +10,8 @@ def base_scene_data() -> dict:
     return {
         "label": "village",
         "blocks": {
-            "village.intro": {
-                "label": "village.intro",
+            "intro": {
+                "content": "you arrive",
             }
         },
     }

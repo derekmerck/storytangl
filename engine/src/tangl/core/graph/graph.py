@@ -1,14 +1,18 @@
 from __future__ import annotations
+import logging
+import warnings
 from uuid import UUID
 from typing import Optional, Iterator, Iterable, TYPE_CHECKING
 import functools
 
 from pydantic import Field, model_validator
 
-from tangl.type_hints import Identifier
+from tangl.type_hints import Identifier, Tag
 from tangl.utils.hashing import hashing_func
-from tangl.core.entity import Entity
+from tangl.core.entity import Entity, match_logger
 from tangl.core.registry import Registry
+
+match_logger.setLevel(logging.WARNING)
 
 if TYPE_CHECKING:
     from .subgraph import Subgraph
@@ -78,8 +82,45 @@ class GraphItem(Entity):
             yield current
             current = current.parent
 
+    def has_path(self, pattern: str) -> bool:
+        from fnmatch import fnmatch
+        match = fnmatch(self.path, pattern)
+        if not match and pattern.endswith(".*"):
+            match = self.path == pattern[:-2]
+        match_logger.debug(f"fnmatch({self.path}, {pattern}) = {match}")
+        return match
+
     def has_ancestor(self, ancestor: Subgraph) -> bool:
         return ancestor in self.ancestors()
+
+    @property
+    def ancestor_tags(self) -> set[Tag]:
+        ancestors = [self] + list(self.ancestors())
+        ancestor_tags = { t for a in ancestors for t in a.tags }
+        return ancestor_tags
+
+    def has_ancestor_tags(self, *tags: Tag) -> bool:
+        # Normalize args to set[Tag]
+        if len(tags) == 1 and isinstance(tags[0], set):
+            tags = tags[0]  # already a set of tags
+        else:
+            tags = set(tags)
+        match_logger.debug(f"Comparing query tags {tags} against {self.ancestor_tags}")
+        return tags.issubset(self.ancestor_tags)
+
+    # todo: could dynamically generate __not accessors based on has_, is_ functions
+    #       either as a lambda in match, or during class creation as public methods
+    #       could similarly do __lt comparisons on int fields
+    def has_ancestor_tags__not(self, *tags: Tag) -> bool:
+        return not self.has_ancestor_tags(*tags)
+
+    def has_parent_label(self, parent_label: str) -> bool:
+        # seems redundant
+        return self.parent is not None and self.parent.label == parent_label
+
+    def has_scope(self, scope: dict) -> bool:
+        warnings.warn("`has_scope` is deprecated; prefer `matches(has_path, has_ancestor_tags)`.", DeprecationWarning, stacklevel=2)
+        return self.matches(**scope)
 
     @property
     def root(self) -> Optional[Subgraph]:
@@ -89,6 +130,7 @@ class GraphItem(Entity):
             last = anc
         return last
 
+    # I don't _think_ this is an identifier, there _could_ be a block `scene1.foo` and an actor `scene1.foo`, although it would probably be confusing and a mistake.
     @property
     def path(self):
         # Include self in path

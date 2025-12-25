@@ -29,7 +29,7 @@ core ideas you should understand before contributing.
   `logging.getLogger(__name__)` and prefer structured messages over f-string
   interpolation inside log calls.
 - Align with the architectural and naming guidance in
-  `docs/source/contrib/coding_style.md`. The quick summary: keep mechanisms
+  `docs/src/contrib/coding_style.md`. The quick summary: keep mechanisms
   explicit, respect the layer boundaries (`core` → `vm` → `service` → `app` →
   `presentation`), favor small nouns and deterministic behavior, and document the
   curated API surface. Review the doc for deeper rationale, anti-patterns, and
@@ -38,7 +38,7 @@ core ideas you should understand before contributing.
 ## Docstrings and comments
 - Write docstrings in **reStructuredText** so Sphinx can build narrative docs.
   - Follow the `Why / Key Features / API / (Notes / See also)` structure for
-    public classes as described in `docs/source/contrib/docstring_style.md`.
+    public classes as described in `docs/src/contrib/docstring_style.md`.
     Include the signature headline, single-sentence summary, and curated API
     bullets; defer exhaustive method prose to autodoc.
   - Keep module docstrings terse unless they introduce multiple peer concepts.
@@ -90,6 +90,8 @@ one of the above base types.
 ## Testing and quality checks
 - Run `pytest engine/tests` (or `poetry run pytest engine/tests`) before submitting
   changes. Add targeted tests in the matching module-specific folder.
+- Use the poetry-managed venv to avoid missing dependency issues, add `engine/tests`
+  and other test paths to PYTHONPATH for pytest, if necessary.
 - Keep fixtures lightweight; prefer deterministic data seeded from `engine/tests` or
   sample YAML fixtures under `engine/tests/resources`.
 - If you add CLI or REST surface changes, also update the relevant app/world tests

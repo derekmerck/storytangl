@@ -70,7 +70,7 @@ class Singleton(Entity):
     -----------------
     * :class:`~tangl.core.entity.SingletonEntity`: Combines Singleton with Entity for immutable reference concepts.
     * :class:`~tangl.core.entity.InheritingSingleton`: Singleton with inheritance from other instances.
-    * :class:`~tangl.core.graph.SingletonNode`: Wrapper for using Singletons in a graph structure.
+    * :class:`~tangl.core.graph.Token`: Wrapper for using Singletons in a graph structure.
     """
 
     model_config = ConfigDict(frozen=True)

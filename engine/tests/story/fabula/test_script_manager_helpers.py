@@ -100,4 +100,4 @@ def test_get_unstructured_injects_default_obj_classes() -> None:
 
     actions = start_block["actions"]
     assert actions
-    assert actions[0]["obj_cls"] == "tangl.story.episode.Action"
+    assert actions[0]["obj_cls"] == "tangl.story.episode.action.Action"

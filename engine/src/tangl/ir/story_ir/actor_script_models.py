@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING, ClassVar, Type
 
 from pydantic import Field, model_validator
 
 from tangl.type_hints import Expr, UniqueLabel, StringMap
+from tangl.core import Entity
 from tangl.lang.gens import Gens
 from tangl.ir.core_ir import BaseScriptItem
 from .asset_script_models import AssetsScript
 
-if TYPE_CHECKING:
-    from .story_script_models import ScopeSelector
-
 MediaItemScript = BaseScriptItem
 
-
 class ActorScript(BaseScriptItem):
+
+    @classmethod
+    def get_default_obj_cls(cls) -> Type[Entity]:
+        # Keep this import out of the main scope
+        from tangl.story.concepts.actor import Actor
+        return Actor
+
     name: Optional[str] = None
     full_name: Optional[str] = None
     first_name: Optional[str] = None
@@ -33,13 +37,16 @@ class ActorScript(BaseScriptItem):
 
     media: list[MediaItemScript] = None
 
-    scope: ScopeSelector | None = Field(
-        None,
-        description="Where this template is valid (``None`` makes it global).",
-    )
 
 class RoleScript(BaseScriptItem):
-    actor_template: Optional[ActorScript] = None
+
+    @classmethod
+    def get_default_obj_cls(cls) -> Type[Entity]:
+        # Keep this import out of the main scope
+        from tangl.story.concepts.actor import Role
+        return Role
+
+    actor_template: Optional[ActorScript] = Field(None, json_schema_extra={'visit_field': True})
     actor_ref: Optional[UniqueLabel] = None
     actor_template_ref: Optional[UniqueLabel] = Field(
         None,

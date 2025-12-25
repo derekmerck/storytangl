@@ -18,7 +18,8 @@ from .offer import (
 )
 from .open_edge import Affordance, Dependency
 from .provisioner import Provisioner
-from .requirement import ProvisioningPolicy, Requirement
+from .requirement import Requirement
+from .provisioning_policy import ProvisioningPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - import guarded for typing only
     from tangl.vm.context import Context
@@ -134,6 +135,7 @@ class ProvisioningPlan:
     steps: list[PlannedOffer] = field(default_factory=list)
     satisfied_requirement_ids: set[UUID] = field(default_factory=set)
     already_satisfied_requirement_ids: set[UUID] = field(default_factory=set)
+    already_satisfied_requirements: list[Requirement] = field(default_factory=list)
 
     _executed: bool = field(default=False, init=False, repr=False)
     _receipts: list[BuildReceipt] = field(default_factory=list, init=False, repr=False)
@@ -415,11 +417,14 @@ def provision_node(
         requirement = dep.requirement
         if requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
+            plan.already_satisfied_requirements.append(requirement)
 
     for affordance in inbound_affordances:
         requirement = affordance.requirement
         if requirement is not None and requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
+            if requirement not in plan.already_satisfied_requirements:
+                plan.already_satisfied_requirements.append(requirement)
 
     used_affordance_labels: dict[UUID, set[str]] = defaultdict(set)
 
@@ -453,6 +458,8 @@ def provision_node(
             continue
         if requirement.provider is not None:
             plan.already_satisfied_requirement_ids.add(requirement.uid)
+            if requirement not in plan.already_satisfied_requirements:
+                plan.already_satisfied_requirements.append(requirement)
             continue
         best_offer, selection_meta = _select_best_offer(offers)
         selection_meta.setdefault("requirement_label", requirement.label)

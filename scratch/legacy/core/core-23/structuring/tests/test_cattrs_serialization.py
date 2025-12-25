@@ -180,7 +180,7 @@ def test_ownable_node_serialization():
 
 
 from tangl.utils.singletons import Singletons
-SingletonNode = attr.make_class("SingletonNode", (), (Singletons, Node))
+SingletonNode = attr.make_class("Token", (), (Singletons, Node))
 
 def test_singleton_serialization():
     # this should just convert to the class and the label

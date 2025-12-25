@@ -39,7 +39,7 @@ class Singleton(Entity):
     See also
     --------
     :class:`~tangl.core.singleton.InheritingSingleton`
-    :class:`~tangl.core.singleton.SingletonNode`
+    :class:`~tangl.core.singleton.Token`
     """
 
     model_config = ConfigDict(frozen=True)
@@ -76,6 +76,11 @@ class Singleton(Entity):
     @classmethod
     def find_instance(cls, **criteria) -> Optional[Self]:
         return cls._instances.find_one(**criteria)
+
+    @classmethod
+    def find_all_instances(cls, **criteria) -> Iterator[Self]:
+        # Just consistency in delegation to internal registry
+        return cls._instances.find_all(**criteria)
 
     @classmethod
     def clear_instances(cls) -> None:

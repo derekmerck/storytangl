@@ -9,7 +9,7 @@ from pydantic import Field, field_validator, ValidationInfo, field_serializer
 from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.lang.helpers.pattern import is_plural
 from tangl.lang.body_parts import BodyRegion
-from tangl.core.graph import SingletonNode
+from tangl.core.graph import Token
 from tangl.story.concepts.asset import AssetType
 from .enums import WearableLayer, WearableState
 
@@ -118,4 +118,4 @@ class WearableType(AssetType):
         super().load_instances_from_yaml("tangl.mechanics.presence.wearable.examples", "wearables.yaml")
 
 WearableType.load_defaults()
-Wearable = SingletonNode._create_wrapper_cls(WearableType, "Wearable")
+Wearable = Token._create_wrapper_cls(WearableType, "Wearable")

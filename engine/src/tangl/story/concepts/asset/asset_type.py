@@ -5,7 +5,7 @@ Assets come in three flavors:
 - Simple
 
 Discrete and Countable are based on singleton reference classes.
-- Discrete assets are wrapped in a SingletonNode class and associated with other nodes in the story graph.
+- Discrete assets are wrapped in a Token class and associated with other nodes in the story graph.
 - Countable assets are inventoried in an AssetWallet counter that can be attached to a story node type.
 
 Simple assets are just a tag-like inventory of strings and enums with no higher-order handlers.

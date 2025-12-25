@@ -1,7 +1,9 @@
 """Tests for :mod:`tangl.ir.core_ir.base_script_model`."""
 
-from tangl.core import Record
+from tangl.core import Record, Node
 from tangl.ir.core_ir import BaseScriptItem
+
+# todo: merge w template tests, nothing script-ish
 
 
 def test_base_script_item_is_record() -> None:
@@ -13,7 +15,7 @@ def test_base_script_item_is_record() -> None:
 def test_base_script_item_defaults_and_extras() -> None:
     """Instantiation should set defaults and allow Record features."""
 
-    item = BaseScriptItem(obj_cls="Node", templates="demo", extra_field=3)
+    item = BaseScriptItem(obj_cls="Node", template_names="demo", extra_field=3)
 
     assert item.uid is not None
     assert item.template_names == "demo"
@@ -25,11 +27,12 @@ def test_base_script_item_defaults_and_extras() -> None:
 def test_model_dump_emits_string_class_without_entity_fields() -> None:
     """Serialized scripts should match legacy export semantics."""
 
-    item = BaseScriptItem(obj_cls="tangl.story.Node", label="demo")
+    item = BaseScriptItem(obj_cls="tangl.core.graph.node.Node", label="demo")
+    assert item.obj_cls is Node
 
-    payload = item.model_dump()
+    payload = item.unstructure_as_template()
 
-    assert payload["obj_cls"] == "tangl.story.Node"
+    assert payload["obj_cls"] is Node
     assert payload["label"] == "demo"
     assert "uid" not in payload
     assert "seq" not in payload
