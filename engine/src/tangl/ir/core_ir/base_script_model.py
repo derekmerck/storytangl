@@ -30,12 +30,33 @@ class BaseScriptItem(HierarchicalTemplate):
 
     def get_path_pattern(self) -> str:
         """Return the scope match pattern, treating root script templates as global."""
+        if "req_path_pattern" in self.model_fields_set and self.req_path_pattern is None:
+            return None
         if self.req_path_pattern is None and self.parent is not None:
             from .master_script_model import MasterScript
 
             if isinstance(self.parent, MasterScript):
                 return "*"
-        return super().get_path_pattern()
+        pattern = super().get_path_pattern()
+        if self.req_path_pattern is None:
+            from .master_script_model import MasterScript
+
+            story_label = None
+            for ancestor in self.ancestors():
+                if isinstance(ancestor, MasterScript):
+                    story_label = ancestor.label
+                    break
+            if story_label:
+                prefix = f"{story_label}."
+                if pattern.startswith(prefix):
+                    pattern = pattern[len(prefix):]
+            if (
+                self.parent is not None
+                and self.parent.__class__.__name__.endswith("BlockScript")
+                and pattern.endswith(".*")
+            ):
+                pattern = pattern[:-2]
+        return pattern
 
     children: dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None = Field(
         default_factory=dict,

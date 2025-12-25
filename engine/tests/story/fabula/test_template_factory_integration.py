@@ -55,11 +55,11 @@ def test_factory_registers_templates_via_visit():
 
     guard = factory.find_one(label="guard")
     assert guard.path == "test_world.village.guard"
-    assert guard.get_path_pattern() == "test_world.village.*"
+    assert guard.get_path_pattern() == "village.*"
 
     bartender = factory.find_one(label="bartender")
     assert bartender.path == "test_world.village.tavern.bartender"
-    assert bartender.get_path_pattern() == "test_world.village.tavern.*"
+    assert bartender.get_path_pattern() == "village.tavern"
 
 
 def test_templates_coexist_with_typed_fields():

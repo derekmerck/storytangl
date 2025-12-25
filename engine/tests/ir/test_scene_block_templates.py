@@ -24,7 +24,7 @@ def test_scene_script_templates_default_to_none() -> None:
         }
     )
 
-    assert scene.templates is None
+    assert scene.templates == {}
     assert "templates" not in scene.model_dump()
 
 
@@ -43,10 +43,12 @@ def test_scene_script_accepts_template_mapping() -> None:
         }
     )
 
-    assert scene.templates == {"villager.greeting": {"text": "Hello there"}}
+    assert scene.templates is not None
+    assert scene.templates["villager.greeting"].text == "Hello there"
     dumped = scene.model_dump()
 
-    assert dumped["templates"] == {"villager.greeting": {"text": "Hello there"}}
+    assert dumped["templates"]["villager.greeting"]["label"] == "villager.greeting"
+    assert dumped["templates"]["villager.greeting"]["text"] == "Hello there"
 
 
 def test_block_script_template_map_round_trips() -> None:
@@ -59,7 +61,9 @@ def test_block_script_template_map_round_trips() -> None:
         }
     )
 
-    assert block.templates == {"local_only": {"obj_cls": "example.Template"}}
+    assert block.templates is not None
+    assert block.templates["local_only"].obj_cls_ == "example.Template"
     dumped = block.model_dump()
 
-    assert dumped["templates"] == {"local_only": {"obj_cls": "example.Template"}}
+    assert dumped["templates"]["local_only"]["label"] == "local_only"
+    assert dumped["templates"]["local_only"]["obj_cls"] == "example.Template"

@@ -31,19 +31,19 @@ def hierarchical_world():
             "village.guard": {
                 # "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
-                "scope": {"parent_label": "village"},
+                "path_pattern": "village.*",
                 "name": "Village Guard",
             },
             "village.store.guard": {
                 # "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
-                "scope": {"parent_label": "store"},
+                "path_pattern": "village.store.*",
                 "name": "Store Guard",
             },
             "countryside.guard": {
                 # "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
-                "scope": {"parent_label": "countryside"},
+                "path_pattern": "countryside.*",
                 "name": "Countryside Guard",
             },
         },
@@ -142,7 +142,7 @@ def test_unqualified_identifier_falls_back_to_parent_scope(hierarchical_world):
     )
 
     assert result is not None
-    assert getattr(result.scope, "parent_label", None) == "village"
+    assert result.get_selection_criteria().get("has_path") == "village.*"
     assert result.name == "Village Guard"
 
 
@@ -194,7 +194,7 @@ def test_qualified_identifier_bypasses_scope_filtering(hierarchical_world):
     )
 
     assert result is not None
-    assert getattr(result.scope, "parent_label", None) == "countryside"
+    assert result.get_selection_criteria().get("has_path") == "countryside.*"
     assert result.name == "Countryside Guard"
 
 
@@ -235,7 +235,7 @@ def test_find_template_with_additional_criteria(hierarchical_world):
     )
 
     assert result is not None
-    assert getattr(result.scope, "parent_label", None) == "village"
+    assert result.get_selection_criteria().get("has_path") == "village.*"
 
 
 def test_find_templates_plural_returns_all_in_scope():

@@ -167,11 +167,11 @@ class ScopeSelectable(Selectable):
                         break
 
         if selector is not None:
-            specificity = -self._pattern_specificity(pattern, selector)
+            specificity = self._pattern_specificity(pattern, selector)
         else:
             segments = pattern.split(".")
-            specificity = sum(1 for seg in segments if "*" not in seg)
-        exact = 1 if ("*" not in pattern and selector and selector.path == pattern) else 0
+            specificity = -sum(1 for seg in segments if "*" not in seg)
+        exact = 0 if ("*" not in pattern and selector and selector.path == pattern) else 1
         literal_segments = sum(
             1
             for seg in pattern.split(".")
@@ -184,11 +184,11 @@ class ScopeSelectable(Selectable):
         return (
             exact,
             scope_distance,
-            -specificity,  # closer ancestor is better
-            literal_segments,
-            -doublestar_count,  # fewer ** is better
-            -star_count,  # fewer * is better
-            len(pattern.split(".")),  # longer patterns as last-resort
+            specificity,  # closer ancestor is better
+            -literal_segments,
+            doublestar_count,  # fewer ** is better
+            star_count,  # fewer * is better
+            -len(pattern.split(".")),  # longer patterns as last-resort
         )
 
     # If you want a total ordering given a generic/root selector

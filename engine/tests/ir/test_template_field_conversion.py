@@ -71,8 +71,8 @@ def test_template_path_computation():
 
     guard = script.scenes["village"].templates["guard"]
     assert guard.path == "world.village.guard"
-    assert guard.get_path_pattern() == "world.village.*"
+    assert guard.get_path_pattern() == "village.*"
 
     bartender = script.scenes["village"].blocks["tavern"].templates["bartender"]
     assert bartender.path == "world.village.tavern.bartender"
-    assert bartender.get_path_pattern() == "world.village.tavern.*"
+    assert bartender.get_path_pattern() == "village.tavern"
