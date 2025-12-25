@@ -131,10 +131,7 @@ class ScriptManager(Entity):
             :meth:`~tangl.core.graph.scope_selectable.ScopeSelectable.scope_rank`,
             which prefers templates closer to the selector in the hierarchy.
         """
-        if selector is not None:
-            sort_key = lambda template: template.scope_rank(selector)
-        else:
-            sort_key = lambda template: template.scope_rank()
+        sort_key = lambda template: template.scope_rank(selector)
         qualified = isinstance(identifier, str) and "." in identifier
 
         if qualified:
@@ -190,10 +187,7 @@ class ScriptManager(Entity):
         Notes:
             Results are sorted with most specific/closest templates first.
         """
-        if selector is not None:
-            sort_key = lambda template: template.scope_rank(selector)
-        else:
-            sort_key = lambda template: template.scope_rank()
+        sort_key = lambda template: template.scope_rank(selector)
         results: list[BaseScriptItem] = []
         qualified = isinstance(identifier, str) and "." in identifier
 
