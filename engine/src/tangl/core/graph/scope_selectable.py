@@ -144,26 +144,51 @@ class ScopeSelectable(Selectable):
 
     # todo: deprecate "scope specificity" as sort key and use this with selector
     def scope_rank(self, selector: GraphItem = None) -> tuple:
-        # very similar to behavior.sort_key/relevance
+        """Compute scope ranking tuple for sorting templates.
+
+        Returns tuple prioritizing:
+        1. Exact matches (no wildcards)
+        2. Closer ancestors (when selector provided)
+        3. More literal segments
+        4. Fewer wildcards
+        5. Longer patterns
+        """
         pattern = self.get_path_pattern() or "*"
+        scope_distance = 1 << 20
+
+        if selector is not None and self.scope is not None and self.scope.parent_label:
+            parent_label = self.scope.parent_label
+            if getattr(selector, "label", None) == parent_label:
+                scope_distance = 0
+            else:
+                for index, ancestor in enumerate(selector.ancestors(), start=1):
+                    if getattr(ancestor, "label", None) == parent_label:
+                        scope_distance = index
+                        break
 
         if selector is not None:
-            specificity = self._pattern_specificity(pattern, selector.path)
+            specificity = -self._pattern_specificity(pattern, selector)
         else:
-            specificity = 0
-        exact = 1 if ("*" not in pattern and selector.path == pattern) else 0
-        literal_segments = sum(1 for seg in pattern.split(".") if seg not in ("*", "**") and "*" not in seg)
+            segments = pattern.split(".")
+            specificity = sum(1 for seg in segments if "*" not in seg)
+        exact = 1 if ("*" not in pattern and selector and selector.path == pattern) else 0
+        literal_segments = sum(
+            1
+            for seg in pattern.split(".")
+            if seg not in ("*", "**") and "*" not in seg
+        )
         star_count = pattern.count("*") - 2 * pattern.count("**")  # crude, but works
         doublestar_count = pattern.count("**")
 
         # can't use seq as final tie-breaker b/c no seq mixin, but could add if req
         return (
             exact,
+            scope_distance,
             -specificity,  # closer ancestor is better
             literal_segments,
             -doublestar_count,  # fewer ** is better
             -star_count,  # fewer * is better
-            len(pattern.split("."))  # longer patterns as last-resort
+            len(pattern.split(".")),  # longer patterns as last-resort
         )
 
     # If you want a total ordering given a generic/root selector

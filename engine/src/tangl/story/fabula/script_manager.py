@@ -9,8 +9,6 @@ from pydantic import ConfigDict, ValidationError
 
 from tangl.core.factory import TemplateFactory
 from tangl.core.graph import Node
-from tangl.core.graph.scope_selectable import ScopeSelector
-from tangl.core.registry import Registry
 from tangl.ir.core_ir import BaseScriptItem, MasterScript
 from tangl.ir.story_ir import StoryScript
 from tangl.ir.story_ir.actor_script_models import ActorScript
@@ -28,7 +26,40 @@ logger.setLevel(logging.WARNING)
 
 
 class ScriptManager(Entity):
-    """ScriptManager mediates between input files and the world/story creation."""
+    """ScriptManager(master_script: MasterScript | None, template_factory: TemplateFactory)
+
+    Script-to-world coordinator for template lookup and materialization.
+
+    Why
+    ----
+    Centralizes access to compiled story scripts so world construction and
+    traversal helpers can query templates, metadata, and globals consistently.
+
+    Key Features
+    ------------
+    * **Template factory** – flattens hierarchical script templates for lookups.
+    * **Anchored lookup** – ranks templates by proximity to a selector node.
+    * **Metadata access** – exposes story metadata and global locals.
+    * **Scoped ordering** – prefers scope-aware matches via ``scope_rank``.
+
+    API
+    ---
+    - :meth:`from_master_script` / :meth:`from_data` – build from script inputs.
+    - :meth:`find_template` / :meth:`find_templates` – scoped template searches.
+    - :meth:`find_scenes` – scene template discovery.
+    - :meth:`get_story_metadata` / :meth:`get_story_globals` – script metadata access.
+
+    Notes
+    -----
+    Template selection prefers templates closer to the selector node::
+
+        block = graph.get("village.tavern.main")
+        guard = manager.find_template("guard", selector=block)
+
+    Without a selector, templates are ranked by pattern specificity::
+
+        guard = manager.find_template("guard")
+    """
 
     master_script: Optional[MasterScript] = None  # for reference
     template_factory: TemplateFactory = TemplateFactory(label="templates")
@@ -45,7 +76,6 @@ class ScriptManager(Entity):
             master_script=master_script,
             template_factory=factory  # Store factory instead of registry
         )
-        manager._register_scoped_templates()
         return manager
 
     @classmethod
@@ -86,7 +116,25 @@ class ScriptManager(Entity):
         selector: Node | None = None,
         **criteria: Any
     ) -> BaseScriptItem | None:
-        """Return the first template matching identifier/criteria within scope."""
+        """Return the first template matching identifier/criteria within scope.
+
+        Args:
+            identifier: Template identifier/label to search for.
+            selector: Node providing context for scope-aware ranking.
+            **criteria: Additional selection criteria.
+
+        Returns:
+            Best matching template, or None if no match found.
+
+        Notes:
+            When selector is provided, templates are ranked by
+            :meth:`~tangl.core.graph.scope_selectable.ScopeSelectable.scope_rank`,
+            which prefers templates closer to the selector in the hierarchy.
+        """
+        if selector is not None:
+            sort_key = lambda template: template.scope_rank(selector)
+        else:
+            sort_key = lambda template: template.scope_rank()
         qualified = isinstance(identifier, str) and "." in identifier
 
         if qualified:
@@ -97,7 +145,7 @@ class ScriptManager(Entity):
             path_candidates.append(identifier)
             for path_value in path_candidates:
                 template = self.template_factory.find_one(
-                    sort_key=lambda x: x.scope_specificity(),
+                    sort_key=sort_key,
                     path=path_value,
                     **criteria,
                 )
@@ -106,7 +154,7 @@ class ScriptManager(Entity):
             if identifier is not None:
                 criteria.setdefault("has_identifier", identifier)
             return self.template_factory.find_one(
-                sort_key=lambda x: x.scope_specificity(),
+                sort_key=sort_key,
                 **criteria,
             )
 
@@ -122,7 +170,7 @@ class ScriptManager(Entity):
             criteria.setdefault("has_identifier", identifier)
         # anchored lookup is just sort by ancestry and then return first
         return self.template_factory.find_one(
-            sort_key=lambda x: x.scope_specificity(),
+            sort_key=sort_key,
             **criteria,
         )
 
@@ -133,7 +181,23 @@ class ScriptManager(Entity):
         selector: Node | None = None,
         **criteria: Any,
     ) -> list[BaseScriptItem]:
-        """Return all templates matching identifier/criteria."""
+        """Return all templates matching identifier/criteria.
+
+        Args:
+            identifier: Template identifier/label to search for.
+            selector: Node providing context for scope-aware ranking.
+            **criteria: Additional selection criteria.
+
+        Returns:
+            List of matching templates, sorted by scope rank.
+
+        Notes:
+            Results are sorted with most specific/closest templates first.
+        """
+        if selector is not None:
+            sort_key = lambda template: template.scope_rank(selector)
+        else:
+            sort_key = lambda template: template.scope_rank()
         results: list[BaseScriptItem] = []
         qualified = isinstance(identifier, str) and "." in identifier
 
@@ -146,7 +210,7 @@ class ScriptManager(Entity):
             seen: set[Any] = set()
             for path_value in path_candidates:
                 for template in self.template_factory.find_all(
-                    sort_key=lambda x: x.scope_specificity(),
+                    sort_key=sort_key,
                     path=path_value,
                     **criteria,
                 ):
@@ -160,7 +224,7 @@ class ScriptManager(Entity):
                 criteria.setdefault("has_identifier", identifier)
             return list(
                 self.template_factory.find_all(
-                    sort_key=lambda x: x.scope_specificity(),
+                    sort_key=sort_key,
                     **criteria,
                 )
             )
@@ -171,18 +235,35 @@ class ScriptManager(Entity):
             criteria.setdefault("has_identifier", identifier)
         return list(
             self.template_factory.find_all(
-                sort_key=lambda x: x.scope_specificity(),
+                sort_key=sort_key,
                 **criteria,
             )
         )
 
     # This is similar api to how core.Graph wraps convenience accessors for
     # various sub-types of GraphItem
-    def find_scenes(self, **criteria: Any) -> Iterator[SceneScript]:
+    def find_scenes(
+        self,
+        selector: Node | None = None,
+        **criteria: Any,
+    ) -> Iterator[SceneScript]:
+        """Find scene templates.
+
+        Args:
+            selector: Optional node for context-aware ranking.
+            **criteria: Selection criteria.
+
+        Returns:
+            Iterator of matching scene templates.
+        """
         criteria.setdefault("is_instance", Scene)
+        if selector is not None:
+            sort_key = lambda template: template.scope_rank(selector)
+        else:
+            sort_key = lambda template: template.scope_rank()
         return iter(
             self.template_factory.find_all(
-                sort_key=lambda x: x.scope_specificity(),
+                sort_key=sort_key,
                 **criteria,
             )
         )
@@ -204,97 +285,6 @@ class ScriptManager(Entity):
         return iter(())
 
     # todo: find blocks, actions, roles, settings similarly if useful
-
-    def _register_scoped_templates(self) -> None:
-        script = self.master_script
-        if script is None:
-            return
-
-        def _determine_template_cls(payload: Mapping[str, Any]) -> type[BaseScriptItem]:
-            obj_cls = payload.get("obj_cls")
-            if isinstance(obj_cls, type) and issubclass(obj_cls, BaseScriptItem):
-                return obj_cls
-            if isinstance(obj_cls, str):
-                lowered = obj_cls.lower()
-                if "location" in lowered:
-                    return LocationScript
-                if "actor" in lowered:
-                    return ActorScript
-            if "name" in payload:
-                return ActorScript
-            return ActorScript
-
-        def _add_templates(templates: Mapping[str, Any] | None, path_pattern: str | None) -> None:
-            if not templates:
-                return
-            if not isinstance(templates, Mapping):
-                logger.warning("Expected mapping for templates but received %r", type(templates))
-                return
-            for template_label, template_data in templates.items():
-                label_value = template_label if isinstance(template_label, str) else str(template_label)
-                if isinstance(template_data, BaseScriptItem):
-                    updates = {}
-                    if label_value and not template_data.label:
-                        updates["label"] = label_value
-                    if path_pattern and not getattr(template_data, "req_path_pattern", None):
-                        updates["path_pattern"] = path_pattern
-                    template = template_data.model_copy(update=updates) if updates else template_data
-                elif isinstance(template_data, Mapping):
-                    payload = dict(template_data)
-                    payload.setdefault("label", label_value)
-                    if path_pattern and "path_pattern" not in payload:
-                        payload["path_pattern"] = path_pattern
-                    template_cls = _determine_template_cls(payload)
-                    try:
-                        template = template_cls.model_validate(payload)
-                    except ValidationError as exc:
-                        logger.warning(
-                            "Skipping template %s due to validation error: %s", label_value, exc
-                        )
-                        continue
-                else:
-                    logger.warning("Skipping template %s with unsupported payload %r", label_value, template_data)
-                    continue
-                try:
-                    self.template_factory.add(template)
-                except ValueError as exc:
-                    logger.warning("Duplicate template %s skipped: %s", template.label, exc)
-
-        world_templates = getattr(script, "templates", None)
-        if isinstance(world_templates, Mapping):
-            _add_templates(world_templates, path_pattern=None)
-        elif world_templates:
-            logger.warning("World templates should be a mapping; received %r", type(world_templates))
-
-        scenes = getattr(script, "scenes", None)
-        if isinstance(scenes, Mapping):
-            scene_items = scenes.items()
-        elif isinstance(scenes, list | tuple):
-            scene_items = ((getattr(scene, "label", None), scene) for scene in scenes)
-        else:
-            scene_items = ()
-
-        for scene_key, scene_obj in scene_items:
-            scene_label = scene_key if isinstance(scene_key, str) else getattr(scene_obj, "label", None)
-            if not scene_label:
-                continue
-            scene_templates = getattr(scene_obj, "templates", None)
-            _add_templates(scene_templates, path_pattern=f"{scene_label}.*")
-
-            blocks = getattr(scene_obj, "blocks", None)
-            if isinstance(blocks, Mapping):
-                block_items = blocks.items()
-            elif isinstance(blocks, list | tuple):
-                block_items = ((getattr(block, "label", None), block) for block in blocks)
-            else:
-                block_items = ()
-
-            for block_key, block_obj in block_items:
-                block_label = block_key if isinstance(block_key, str) else getattr(block_obj, "label", None)
-                if not block_label:
-                    continue
-                block_templates = getattr(block_obj, "templates", None)
-                _add_templates(block_templates, path_pattern=f"{scene_label}.*")
 
     @staticmethod
     def _is_qualified(identifier: str) -> bool:
@@ -325,160 +315,11 @@ class ScriptManager(Entity):
 
         return paths
 
-    def _compile_templates(self) -> Registry:
-        script = self.master_script
-        registry = Registry(label=f"{script.label}_templates")
-
-        def _extract_label(default: str | None, item: Any) -> str | None:
-            if isinstance(item, BaseScriptItem):
-                if item.label:
-                    return item.label
-                if default:
-                    return default
-                return item.get_label()
-            if isinstance(item, Mapping):
-                label_value = item.get("label")
-                if isinstance(label_value, str):
-                    return label_value
-            return default
-
-        def _determine_script_cls(payload: Mapping[str, Any]) -> type[BaseScriptItem]:
-            obj_cls = payload.get("obj_cls")
-            if isinstance(obj_cls, type) and issubclass(obj_cls, BaseScriptItem):
-                return obj_cls
-            if isinstance(obj_cls, str):
-                lowered = obj_cls.lower()
-                if "location" in lowered:
-                    return LocationScript
-                if "actor" in lowered:
-                    return ActorScript
-            return ActorScript
-
-        def _parse_template(label: str, raw_data: Any, scope: ScopeSelector | None) -> BaseScriptItem | None:
-            if isinstance(raw_data, BaseScriptItem):
-                template_cls: type[BaseScriptItem] = raw_data.__class__
-                fields_set = getattr(raw_data, "model_fields_set", set())
-                scope_specified = "scope" in fields_set
-                updates: dict[str, Any] = {}
-                if not raw_data.label and label:
-                    updates["label"] = label
-                if (
-                    scope is not None
-                    and not scope_specified
-                    and "scope" in template_cls.model_fields
-                ):
-                    updates["scope"] = scope
-                if updates:
-                    return raw_data.model_copy(update=updates)
-                return raw_data
-            if isinstance(raw_data, Mapping):
-                payload = dict(raw_data)
-                scope_specified = "scope" in raw_data
-            else:
-                logger.warning("Skipping template %s with unsupported payload %r", label, raw_data)
-                return None
-
-            payload.setdefault("label", label)
-            template_cls = _determine_script_cls(payload)
-            if (
-                scope is not None
-                and not scope_specified
-                and "scope" in template_cls.model_fields
-            ):
-                payload.setdefault("scope", scope.model_dump())
-
-            try:
-                template = template_cls.model_validate(payload)
-            except ValidationError as exc:
-                logger.warning("Skipping template %s due to validation error: %s", label, exc)
-                return None
-            return template
-
-        def _add_templates(templates: Mapping[str, Any] | None, scope: ScopeSelector | None) -> None:
-            if not templates:
-                return
-            if not isinstance(templates, Mapping):
-                logger.warning("Expected mapping for templates but received %r", type(templates))
-                return
-            for template_label, template_data in templates.items():
-                label_value = template_label if isinstance(template_label, str) else str(template_label)
-                template = _parse_template(label_value, template_data, scope)
-                if template is None or template.label is None:
-                    continue
-                try:
-                    registry.add(template)
-                except ValueError as exc:  # pragma: no cover - Registry guards
-                    logger.warning("Duplicate template %s skipped: %s", template.label, exc)
-
-        world_templates = getattr(script, "templates", None)
-        if isinstance(world_templates, Mapping):
-            _add_templates(world_templates, scope=None)
-        elif world_templates:
-            logger.warning("World templates should be a mapping; received %r", type(world_templates))
-
-        scenes = getattr(script, "scenes", None)
-        if isinstance(scenes, Mapping):
-            scene_items = scenes.items()
-        elif isinstance(scenes, list | tuple):
-            scene_items = ((getattr(scene, "label", None), scene) for scene in scenes)
-        else:
-            scene_items = ()
-
-        for scene_key, scene_obj in scene_items:
-            scene_label = _extract_label(scene_key if isinstance(scene_key, str) else None, scene_obj)
-            if scene_label is None:
-                continue
-            scene_templates = getattr(scene_obj, "templates", None)
-            if isinstance(scene_templates, Mapping):
-                _add_templates(scene_templates, scope=ScopeSelector(parent_label=scene_label))
-            elif scene_templates:
-                logger.warning(
-                    "Scene %s templates should be a mapping; received %r", scene_label, type(scene_templates)
-                )
-
-            blocks = getattr(scene_obj, "blocks", None)
-            if isinstance(blocks, Mapping):
-                block_items = blocks.items()
-            elif isinstance(blocks, list | tuple):
-                block_items = ((getattr(block, "label", None), block) for block in blocks)
-            else:
-                block_items = ()
-
-            for block_key, block_obj in block_items:
-                block_label = _extract_label(block_key if isinstance(block_key, str) else None, block_obj)
-                if block_label is None:
-                    continue
-                block_templates = getattr(block_obj, "templates", None)
-                if isinstance(block_templates, Mapping):
-                    _add_templates(block_templates, scope=ScopeSelector(parent_label=scene_label))
-                elif block_templates:
-                    logger.warning(
-                        "Block %s templates should be a mapping; received %r", block_label, type(block_templates)
-                    )
-
-                try:
-                    parsed_block = block_obj
-                    if isinstance(block_obj, Mapping):
-                        parsed_block = dict(block_obj)
-                        if "block_cls" not in parsed_block and "obj_cls" in parsed_block:
-                            parsed_block["block_cls"] = parsed_block.get("obj_cls")
-                            parsed_block.pop("obj_cls", None)
-
-                    block_script = BlockScript.model_validate(parsed_block)
-                    updates: dict[str, Any] = {}
-                    if not block_script.label and block_label:
-                        updates["label"] = block_label
-                    if block_script.obj_cls is None:
-                        updates["obj_cls"] = "tangl.story.episode.block.Block"
-                    if block_script.scope is None or block_script.scope.is_global():
-                        updates["scope"] = ScopeSelector(parent_label=scene_label)
-                    if updates:
-                        block_script = block_script.model_copy(update=updates)
-                    registry.add(block_script)
-                except ValidationError as exc:
-                    logger.warning("Skipping block %s due to validation error: %s", block_label, exc)
-
-        return registry
+    # NOTE: _compile_templates() and _register_scoped_templates() were removed.
+    # Template registration now happens automatically via:
+    # - TemplateFactory.from_root_templ() which calls root_templ.visit()
+    # - HierarchicalTemplate.visit() traverses all visit_field=True fields
+    # - templates are aliased to BaseScriptItem.children and marked visit_field
 
     def get_unstructured(self, key: str) -> Iterator[UnstructuredData]:
         if not hasattr(self.master_script, key):
