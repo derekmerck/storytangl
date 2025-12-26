@@ -394,12 +394,11 @@ class World(Singleton):
         graph: StoryGraph,
         node: Node,
         action_scripts: list[dict[str, Any]],
-        source_node: Node,
         block_map: Mapping[str, UUID] | None = None,
     ) -> None:
         """Create action edges with requirements for successor blocks."""
 
-        scene_label = source_node.parent.label if source_node.parent else None
+        scene_label = node.parent.label if node.parent else None
 
         if block_map is None:
             block_map = {
@@ -1057,7 +1056,6 @@ class World(Singleton):
                         graph=graph,
                         node=node,
                         action_scripts=edge_scripts,
-                        source_node=node,
                         block_map=block_map,
                     )
 

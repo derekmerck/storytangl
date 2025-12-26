@@ -238,7 +238,7 @@ def test_materialize_block_action_without_parent_keeps_successor_unqualified(moc
     )
 
     graph = StoryGraph(label="test", world=mock_world)
-    block = mock_world._materialize_from_template(template, graph)
+    mock_world._materialize_from_template(template, graph)
 
     actions = list(graph.find_edges(is_instance=Action))
     assert actions

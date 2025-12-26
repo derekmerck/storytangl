@@ -106,7 +106,6 @@ def standard_wiring_handler(
                 ctx.graph,
                 node,
                 edge_scripts,
-                source_node=node,
             )
 
     if getattr(template, "roles", None):
