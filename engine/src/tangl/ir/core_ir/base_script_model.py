@@ -58,7 +58,7 @@ class BaseScriptItem(HierarchicalTemplate):
                 pattern = pattern[:-2]
         return pattern
 
-    children: dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None = Field(
+    children: dict[str, BaseScriptItem] | list[BaseScriptItem] | None = Field(
         default_factory=dict,
         alias="templates",
         json_schema_extra={"visit_field": True},

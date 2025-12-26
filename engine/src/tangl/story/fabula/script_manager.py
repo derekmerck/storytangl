@@ -157,8 +157,6 @@ class ScriptManager(Entity):
 
         if selector is not None:
             criteria.setdefault("selector", selector)
-        elif identifier is not None:
-            criteria.setdefault("predicate", self._is_global_template)
         if identifier is not None:
             criteria.setdefault("has_identifier", identifier)
         # anchored lookup is just sort by ancestry and then return first
@@ -230,20 +228,6 @@ class ScriptManager(Entity):
             )
         )
 
-    @staticmethod
-    def _is_global_template(template: BaseScriptItem) -> bool:
-        scope = getattr(template, "scope", None)
-        if scope is not None and hasattr(scope, "is_global") and not scope.is_global():
-            return False
-
-        criteria = template.get_selection_criteria() or {}
-        has_path = criteria.get("has_path")
-        if has_path not in (None, "*"):
-            return False
-        if criteria.get("has_ancestor_tags") or criteria.get("has_ancestor_tags__not"):
-            return False
-        return True
-
     # This is similar api to how core.Graph wraps convenience accessors for
     # various sub-types of GraphItem
     def find_scenes(
@@ -261,10 +245,7 @@ class ScriptManager(Entity):
             Iterator of matching scene templates.
         """
         criteria.setdefault("is_instance", Scene)
-        if selector is not None:
-            sort_key = lambda template: template.scope_rank(selector)
-        else:
-            sort_key = lambda template: template.scope_rank()
+        sort_key = lambda template: template.scope_specificity(selector)
         return iter(
             self.template_factory.find_all(
                 sort_key=sort_key,

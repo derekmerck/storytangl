@@ -295,52 +295,49 @@ class TemplateProvisioner(Provisioner):
 
     @staticmethod
     def _matches_scope(template_data: Mapping[str, Any] | Any, *, ctx: "Context") -> bool:
-        scope_data = getattr(template_data, "scope", None)
-        if scope_data is None and isinstance(template_data, Mapping):
-            scope_data = template_data.get("scope")
-        if not scope_data:
-            return True
-
-        from tangl.core.graph.scope_selectable import ScopeSelector
-
-        scope = scope_data
-        if not isinstance(scope_data, ScopeSelector):
-            scope = ScopeSelector.model_validate(scope_data)
-
         cursor = getattr(ctx, "cursor", None)
         if cursor is None:
             graph = getattr(ctx, "graph", None)
             cursor_id = getattr(ctx, "cursor_id", None)
             if graph is not None and cursor_id is not None:
                 cursor = graph.get(cursor_id)
+        criteria: dict[str, Any]
+        if hasattr(template_data, "get_selection_criteria"):
+            criteria = template_data.get_selection_criteria() or {}
+        elif isinstance(template_data, Mapping):
+            criteria = {}
+            path_pattern = template_data.get("path_pattern")
+            if path_pattern:
+                criteria["has_path"] = path_pattern
+            ancestor_tags = template_data.get("ancestor_tags")
+            if ancestor_tags:
+                criteria["has_ancestor_tags"] = set(ancestor_tags)
+            forbid_ancestor_tags = template_data.get("forbid_ancestor_tags")
+            if forbid_ancestor_tags:
+                criteria["has_ancestor_tags__not"] = set(forbid_ancestor_tags)
+        else:
+            criteria = {}
+
+        if not criteria:
+            return True
+
         if cursor is None:
-            return scope.is_global()
+            has_path = criteria.get("has_path")
+            requires_path = has_path not in (None, "*")
+            requires_tags = bool(
+                criteria.get("has_ancestor_tags") or criteria.get("has_ancestor_tags__not")
+            )
+            return not (requires_path or requires_tags)
 
-        def iter_ancestors(node: Any):
-            current = node
-            while current is not None:
-                yield current
-                current = getattr(current, "parent", None)
-
-        if scope.source_label and getattr(cursor, "label", None) != scope.source_label:
+        has_path = criteria.get("has_path")
+        if has_path and not cursor.has_path(has_path):
             return False
-        if scope.parent_label:
-            parent = getattr(cursor, "parent", None)
-            if parent is None or getattr(parent, "label", None) != scope.parent_label:
-                return False
-        if scope.ancestor_labels:
-            ancestor_labels = {
-                getattr(ancestor, "label", None) for ancestor in iter_ancestors(cursor)
-            }
-            if not scope.ancestor_labels.issubset(ancestor_labels):
-                return False
-        if scope.ancestor_tags:
-            ancestor_tags: set[str] = set()
-            for ancestor in iter_ancestors(cursor):
-                tags = getattr(ancestor, "tags", None) or set()
-                ancestor_tags.update(tags)
-            if not scope.ancestor_tags.issubset(ancestor_tags):
-                return False
+        ancestor_tags = criteria.get("has_ancestor_tags")
+        if ancestor_tags and not cursor.has_ancestor_tags(ancestor_tags):
+            return False
+        forbid_ancestor_tags = criteria.get("has_ancestor_tags__not")
+        if forbid_ancestor_tags and not cursor.has_ancestor_tags__not(forbid_ancestor_tags):
+            return False
         return True
 
     @staticmethod
@@ -409,39 +406,31 @@ class TemplateProvisioner(Provisioner):
             world = getattr(graph, "world", None) if graph is not None else None
             if world is not None and hasattr(world, "_materialize_from_template"):
                 parent_container = None
-                scope = getattr(template, "scope", None)
-                if (
-                    scope is not None
-                    and hasattr(scope, "is_global")
-                    and scope.is_global()
-                ):
-                    scope = None
-                if scope is not None and hasattr(world, "ensure_scope"):
-                    parent_container = world.ensure_scope(scope, graph)
-                else:
-                    parent = getattr(template, "parent", None)
-                    if parent is not None and graph is not None:
-                        parent_label = getattr(parent, "label", None)
-                        if parent_label:
-                            parent_container = graph.find_subgraph(label=parent_label)
-                            if parent_container is None and hasattr(world, "_materialize_from_template"):
-                                from tangl.ir.story_ir.scene_script_models import SceneScript
+                parent = getattr(template, "parent", None)
+                if parent is not None and graph is not None:
+                    parent_label = world._template_parent_label(template)
+                    if parent_label and hasattr(world, "ensure_scope"):
+                        parent_container = world.ensure_scope(parent_label, graph)
+                    elif parent_label:
+                        parent_container = graph.find_subgraph(label=parent_label)
+                        if parent_container is None and hasattr(world, "_materialize_from_template"):
+                            from tangl.ir.story_ir.scene_script_models import SceneScript
 
-                                if isinstance(parent, SceneScript):
-                                    parent_container = world._materialize_from_template(
-                                        template=parent,
-                                        graph=graph,
-                                        parent_container=None,
-                                    )
-                    if parent_container is None and graph is not None:
-                        criteria = template.get_selection_criteria() or {}
-                        has_path = criteria.get("has_path")
-                        if isinstance(has_path, str) and "." in has_path:
-                            parent_path = has_path.rsplit(".", 1)[0]
-                            parent_label = parent_path.split(".")[-1]
-                            parent_container = graph.find_subgraph(label=parent_label)
-                            if parent_container is None:
-                                parent_container = graph.add_subgraph(label=parent_label)
+                            if isinstance(parent, SceneScript):
+                                parent_container = world._materialize_from_template(
+                                    template=parent,
+                                    graph=graph,
+                                    parent_container=None,
+                                )
+                if parent_container is None and graph is not None:
+                    criteria = template.get_selection_criteria() or {}
+                    has_path = criteria.get("has_path")
+                    if isinstance(has_path, str) and "." in has_path:
+                        parent_path = has_path.rsplit(".", 1)[0]
+                        parent_label = parent_path.split(".")[-1]
+                        parent_container = graph.find_subgraph(label=parent_label)
+                        if parent_container is None:
+                            parent_container = graph.add_subgraph(label=parent_label)
                 return world._materialize_from_template(
                     template=template,
                     graph=graph,

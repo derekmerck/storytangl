@@ -39,7 +39,6 @@ from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.graph.node import Node
 from tangl.core.graph.subgraph import Subgraph
-from tangl.core.graph.scope_selectable import ScopeSelector
 from tangl.core.singleton import Singleton
 from tangl.vm import ProvisioningPolicy
 from tangl.vm.context import MaterializationContext
@@ -191,7 +190,8 @@ class World(Singleton):
                 f"Ensure BlockScript templates are registered during compilation (Phase D)."
             )
 
-        parent_container = self.ensure_scope(getattr(block_template, "scope", None), graph)
+        parent_label = self._template_parent_label(block_template)
+        parent_container = self.ensure_scope(parent_label, graph)
 
         start_block = self._materialize_from_template(
             template=block_template,
@@ -208,18 +208,18 @@ class World(Singleton):
         graph.initial_cursor_id = start_block.uid
         return graph
 
-    def ensure_scope(self, scope: ScopeSelector | None, graph: StoryGraph) -> Subgraph | None:
-        """Ensure that a container described by ``scope`` exists in ``graph``.
+    def ensure_scope(self, parent_label: str | None, graph: StoryGraph) -> Subgraph | None:
+        """Ensure that a container described by ``parent_label`` exists in ``graph``.
 
         The method is idempotent and will return an existing subgraph when one
-        matches ``scope.parent_label``. When absent, it attempts to materialize
+        matches ``parent_label``. When absent, it attempts to materialize
         the container from the world's template registry or, as a fallback, from
         scene definitions in the story script.
 
         Parameters
         ----------
-        scope:
-            Scope selector indicating the parent container requirement.
+        parent_label:
+            Label identifying the parent container requirement.
         graph:
             Story graph that should own the ensured container.
 
@@ -238,40 +238,31 @@ class World(Singleton):
             When ancestor-based selectors are provided (unsupported today).
         """
 
-        if scope is None:
+        if parent_label is None:
             return None
 
-        if isinstance(scope, dict):
-            scope_value = scope.get("has_path")
-            if isinstance(scope_value, str) and scope_value.endswith(".*"):
-                scope = ScopeSelector(parent_label=scope_value.rsplit(".", 1)[0])
-            else:
-                scope = ScopeSelector.model_validate(scope)
-
-        if scope.is_global():
-            return None
-
-        if scope.ancestor_tags or scope.ancestor_labels:
-            raise NotImplementedError(
-                "ancestor_tags and ancestor_labels are not yet supported in ensure_scope"
-            )
-
-        if not scope.parent_label:
-            return None
-
-        existing = graph.find_subgraph(label=scope.parent_label)
+        existing = graph.find_subgraph(label=parent_label)
         if existing is not None:
             return existing
 
         template = self.script_manager.template_factory.find_one(
             sort_key=lambda item: item.scope_specificity(),
-            has_identifier=scope.parent_label,
+            has_identifier=parent_label,
         )
 
         parent_container: Subgraph | None = None
         if template is not None:
-            if getattr(template, "scope", None):
-                parent_container = self.ensure_scope(template.scope, graph)
+            template_parent = getattr(template, "parent", None)
+            if template_parent is not None:
+                from tangl.ir.core_ir.master_script_model import MasterScript
+
+                if isinstance(template_parent, MasterScript):
+                    template_parent_label = None
+                else:
+                    template_parent_label = getattr(template_parent, "label", None)
+            else:
+                template_parent_label = None
+            parent_container = self.ensure_scope(template_parent_label, graph)
 
             return self._materialize_from_template(
                 template=template,
@@ -280,19 +271,23 @@ class World(Singleton):
             )
 
         scenes = self._get_scenes_dict()
-        scene_data = scenes.get(scope.parent_label)
+        scene_data = scenes.get(parent_label)
 
         if scene_data is None:
             raise ValueError(
-                f"Scope requires parent container '{scope.parent_label}' but no template found in"
+                f"Scope requires parent container '{parent_label}' but no template found in"
                 f" template registry or scene definitions."
             )
 
         scene_scope_data = scene_data.get("scope")
-        scene_scope = None
         if scene_scope_data:
-            scene_scope = ScopeSelector.model_validate(scene_scope_data)
-            parent_container = self.ensure_scope(scene_scope, graph)
+            if hasattr(scene_scope_data, "parent_label"):
+                scene_parent_label = scene_scope_data.parent_label
+            elif isinstance(scene_scope_data, dict):
+                scene_parent_label = scene_scope_data.get("parent_label")
+            else:
+                scene_parent_label = None
+            parent_container = self.ensure_scope(scene_parent_label, graph)
 
         scene_cls = self.domain_manager.resolve_class(
             scene_data.get("obj_cls") or "tangl.core.graph.Subgraph"
@@ -300,11 +295,11 @@ class World(Singleton):
         try:
             if not issubclass(scene_cls, Subgraph):
                 raise TypeError(
-                    f"Scene class {scene_cls.__name__} for '{scope.parent_label}' must be a subclass of Subgraph."
+                    f"Scene class {scene_cls.__name__} for '{parent_label}' must be a subclass of Subgraph."
                 )
         except TypeError as err:  # pragma: no cover - defensive
             raise TypeError(
-                f"Invalid scene class configured for '{scope.parent_label}'. Expected a class, but got {scene_cls!r}."
+                f"Invalid scene class configured for '{parent_label}'. Expected a class, but got {scene_cls!r}."
             ) from err
 
         payload = self._prepare_payload(
@@ -313,7 +308,7 @@ class World(Singleton):
             graph,
             drop_keys=("blocks", "templates", "roles", "settings"),
         )
-        payload.setdefault("label", scope.parent_label)
+        payload.setdefault("label", parent_label)
 
         scene = scene_cls.structure(payload)
         graph.add(scene)
@@ -322,6 +317,38 @@ class World(Singleton):
             parent_container.add_member(scene)
 
         return scene
+
+    def _template_parent_label(self, template: BaseScriptItem) -> str | None:
+        parent = getattr(template, "parent", None)
+        if parent is None:
+            return None
+
+        from tangl.ir.core_ir.master_script_model import MasterScript
+
+        if isinstance(parent, MasterScript):
+            return None
+        parent_label = getattr(parent, "label", None)
+        if parent_label is None:
+            return None
+
+        obj_cls = getattr(parent, "obj_cls", None)
+        if obj_cls is None:
+            return parent_label
+
+        if isinstance(obj_cls, str):
+            resolved_cls = self.domain_manager.resolve_class(obj_cls)
+        else:
+            resolved_cls = obj_cls
+
+        from tangl.core.graph.subgraph import Subgraph
+
+        try:
+            if resolved_cls is None or not issubclass(resolved_cls, Subgraph):
+                return None
+        except TypeError:
+            return None
+
+        return parent_label
 
     def _materialize_from_template(
         self,
@@ -365,14 +392,13 @@ class World(Singleton):
     def _attach_action_requirements(
         self,
         graph: StoryGraph,
-        source_node: Node,
+        node: Node,
         action_scripts: list[dict[str, Any]],
-        scope: ScopeSelector | None,
         block_map: Mapping[str, UUID] | None = None,
     ) -> None:
         """Create action edges with requirements for successor blocks."""
 
-        scene_label = scope.parent_label if scope else None
+        scene_label = node.parent.label if node.parent else None
 
         if block_map is None:
             block_map = {
@@ -422,7 +448,7 @@ class World(Singleton):
 
             action = action_cls(
                 graph=graph,
-                source=source_node,
+                source=node,
                 destination_id=destination_id,
                 destination=graph.get(destination_id) if destination_id else None,
                 label=label,
@@ -542,7 +568,8 @@ class World(Singleton):
                 continue
             if template.label and graph.find_node(label=template.label) is not None:
                 continue
-            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
+            parent_label = self._template_parent_label(template)
+            parent_container = self.ensure_scope(parent_label, graph)
             self._materialize_from_template(
                 template=template,
                 graph=graph,
@@ -938,7 +965,8 @@ class World(Singleton):
             if template is None:
                 return None
 
-            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
+            parent_label = self._template_parent_label(template)
+            parent_container = self.ensure_scope(parent_label, graph)
             provider = self._materialize_from_template(
                 template=template,
                 graph=graph,
@@ -979,7 +1007,8 @@ class World(Singleton):
             if template is None:
                 return None
 
-            parent_container = self.ensure_scope(getattr(template, "scope", None), graph)
+            parent_label = self._template_parent_label(template)
+            parent_container = self.ensure_scope(parent_label, graph)
             provider = self._materialize_from_template(
                 template=template,
                 graph=graph,
@@ -1015,20 +1044,18 @@ class World(Singleton):
                     continue
 
                 scripts = action_scripts.get(qualified_label, {})
-                source_node = graph.get(source_uid)
-                if source_node is None:
+                node = graph.get(source_uid)
+                if node is None:
                     continue
 
-                scope_selector = ScopeSelector(parent_label=scene_label)
                 for key in ("actions", "continues", "redirects"):
                     edge_scripts = scripts.get(key, [])
                     if not edge_scripts:
                         continue
                     self._attach_action_requirements(
                         graph=graph,
-                        source_node=source_node,
+                        node=node,
                         action_scripts=edge_scripts,
-                        scope=scope_selector,
                         block_map=block_map,
                     )
 

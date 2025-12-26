@@ -212,14 +212,14 @@ def test_qualified_identifier_exact_match_only(hierarchical_world):
     assert result is None
 
 
-def test_unqualified_without_selector_uses_global_only(hierarchical_world):
-    """Without selector context, unqualified names fall back to global search."""
+def test_unqualified_without_selector_uses_specificity(hierarchical_world):
+    """Without selector context, unqualified names use scope specificity ordering."""
 
     result = hierarchical_world.script_manager.find_template(identifier="guard")
 
     assert result is not None
     assert result.label == "guard"
-    assert result.name == "Generic Guard"
+    assert result.name == "Store Guard"
 
 
 def test_find_template_with_additional_criteria(hierarchical_world):
