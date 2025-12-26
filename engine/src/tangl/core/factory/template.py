@@ -3,12 +3,15 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Self, Type
 from uuid import UUID, uuid4
 from inspect import isclass
+import logging
 
 from pydantic import Field, field_validator
 
 from tangl.type_hints import Typelike, UnstructuredData, StringMap
 from tangl.core.entity import Entity, Selectable
 from tangl.core.record import Record, ContentAddressable
+
+logger = logging.getLogger(__name__)
 
 
 ET = TypeVar('ET', bound=Entity)
@@ -38,7 +41,8 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
     uid: UUID = Field(default_factory=uuid4, exclude=True, json_schema_extra={'serialize': False})
     is_dirty_: bool = Field(default=False, exclude=True, json_schema_extra={'serialize': False})
     seq: int = Field(init=False, exclude=True, json_schema_extra={'serialize': False})  # injected by Record/HasSeq
-    content_hash: bytes = Field(default=None, json_schema_extra={'serialize': False})
+    content_hash: bytes = Field(default=None, json_schema_extra={'is_identifier': True, 'serialize': False}, exclude=True)
+    # todo: we _may_ want to include this in serialize->template, but it doesn't seem to respect serialize: False??
 
     # obj_cls is a field (not just init param like Entity)
     obj_cls_: Typelike = Field(None, alias="obj_cls")
