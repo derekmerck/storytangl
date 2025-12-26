@@ -38,3 +38,30 @@ def test_selectable_mro_uses_entity_matches():
 
     assert template.matches(selector=selector)
     assert template.matches(label="gate")
+
+
+def test_template_requires_path_and_ancestor_tags() -> None:
+    template = BaseScriptItem(
+        label="guard",
+        path_pattern="village.*",
+        ancestor_tags={"town"},
+    )
+
+    graph = Graph()
+    village = graph.add_subgraph(label="village", tags={"town"})
+    tavern = graph.add_node(label="tavern")
+    village.add_member(tavern)
+
+    assert template.matches(selector=tavern)
+
+    outsider = graph.add_subgraph(label="road", tags={"town"})
+    wagon = graph.add_node(label="wagon")
+    outsider.add_member(wagon)
+
+    assert not template.matches(selector=wagon)
+
+    village_no_tag = graph.add_subgraph(label="outskirts", tags=set())
+    shack = graph.add_node(label="shack")
+    village_no_tag.add_member(shack)
+
+    assert not template.matches(selector=shack)

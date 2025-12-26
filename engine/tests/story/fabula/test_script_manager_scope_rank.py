@@ -48,14 +48,25 @@ def test_find_template_prefers_closer_scope():
 
 
 def test_find_template_without_selector_still_works():
-    """Verify find_template works without selector (fallback behavior)."""
+    """Verify find_template ranks templates without selector context."""
     script_data = {
         "label": "test_world",
         "metadata": {"title": "Test World", "author": "Tests"},
         "templates": {
-            "guard": {
+            "global_guard": {
                 "obj_cls": "tangl.story.concepts.actor.Actor",
                 "label": "guard",
+                "path_pattern": "*",
+            },
+            "village_guard": {
+                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "label": "guard",
+                "path_pattern": "village.*",
+            },
+            "market_guard": {
+                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "label": "guard",
+                "path_pattern": "village.market.*",
             },
         },
         "scenes": {},
@@ -68,6 +79,7 @@ def test_find_template_without_selector_still_works():
 
     assert template is not None
     assert template.label == "guard"
+    assert template.get_path_pattern() == "village.market.*"
 
 
 def test_find_templates_orders_by_proximity():
@@ -119,6 +131,48 @@ def test_find_templates_orders_by_proximity():
     assert templates[0].get_path_pattern() == "village.market.*"
     assert templates[1].get_path_pattern() == "village.*"
     assert templates[2].get_path_pattern() == "*"
+
+
+def test_find_templates_filters_by_selector_path():
+    """Verify has_path criteria filters templates when selector provided."""
+    script_data = {
+        "label": "test_world",
+        "metadata": {"title": "Test World", "author": "Tests"},
+        "templates": {
+            "global_guard": {
+                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "label": "guard",
+                "path_pattern": "*",
+            },
+            "village_guard": {
+                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "label": "guard",
+                "path_pattern": "village.*",
+            },
+            "cave_guard": {
+                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "label": "guard",
+                "path_pattern": "cave.*",
+            },
+        },
+        "scenes": {
+            "village": {"label": "village", "blocks": {"tavern": {"label": "tavern"}}},
+        },
+    }
+
+    script = StoryScript(**script_data)
+    manager = ScriptManager.from_master_script(script)
+
+    graph = Graph()
+    village = graph.add_subgraph(label="village")
+    tavern = graph.add_node(label="tavern")
+    village.add_member(tavern)
+
+    templates = manager.find_templates(identifier="guard", selector=tavern)
+
+    path_patterns = {template.get_path_pattern() for template in templates}
+    assert "cave.*" not in path_patterns
+    assert {"*", "village.*"} <= path_patterns
 
 
 def test_find_scenes_basic():

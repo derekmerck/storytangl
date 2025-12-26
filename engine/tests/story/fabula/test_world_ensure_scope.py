@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from tangl.core.graph.subgraph import Subgraph
-from tangl.core.graph.scope_selectable import ScopeSelector
 from tangl.ir.story_ir import StoryScript
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
@@ -56,18 +55,17 @@ def minimal_world():
 def test_ensure_scope_returns_none_for_global_scope(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
 
-    result = minimal_world.ensure_scope(scope=None, graph=graph)
+    result = minimal_world.ensure_scope(parent_label=None, graph=graph)
 
     assert result is None
 
 
-def test_ensure_scope_returns_none_for_selector_without_parent(
+def test_ensure_scope_returns_none_for_missing_parent_label(
     minimal_world: World,
 ) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = ScopeSelector()
 
-    result = minimal_world.ensure_scope(scope=scope, graph=graph)
+    result = minimal_world.ensure_scope(parent_label=None, graph=graph)
 
     assert result is None
 
@@ -77,8 +75,7 @@ def test_ensure_scope_reuses_existing_scene(minimal_world: World) -> None:
 
     existing_scene = graph.add_subgraph(label="village")
 
-    scope = {"has_path": "village.*"}
-    result = minimal_world.ensure_scope(scope=scope, graph=graph)
+    result = minimal_world.ensure_scope(parent_label="village", graph=graph)
 
     assert result is existing_scene
     assert len(list(graph.subgraphs)) == 1
@@ -86,9 +83,8 @@ def test_ensure_scope_reuses_existing_scene(minimal_world: World) -> None:
 
 def test_ensure_scope_creates_scene_from_template(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = {"has_path": "village.*"}
 
-    created = minimal_world.ensure_scope(scope=scope, graph=graph)
+    created = minimal_world.ensure_scope(parent_label="village", graph=graph)
 
     assert isinstance(created, Subgraph)
     assert created.label == "village"
@@ -98,10 +94,9 @@ def test_ensure_scope_creates_scene_from_template(minimal_world: World) -> None:
 
 def test_ensure_scope_idempotent(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = {"has_path": "village.*"}
 
-    first = minimal_world.ensure_scope(scope=scope, graph=graph)
-    second = minimal_world.ensure_scope(scope=scope, graph=graph)
+    first = minimal_world.ensure_scope(parent_label="village", graph=graph)
+    second = minimal_world.ensure_scope(parent_label="village", graph=graph)
 
     assert first is second
     assert len(list(graph.subgraphs)) == 1
@@ -109,10 +104,9 @@ def test_ensure_scope_idempotent(minimal_world: World) -> None:
 
 def test_ensure_scope_errors_when_template_missing(minimal_world: World) -> None:
     graph = StoryGraph(label="test", world=minimal_world)
-    scope = {"has_path": "missing.*"}
 
     with pytest.raises(ValueError, match="no template found"):
-        minimal_world.ensure_scope(scope=scope, graph=graph)
+        minimal_world.ensure_scope(parent_label="missing", graph=graph)
 
 
 def test_ensure_scope_recursively_creates_parent_hierarchy() -> None:
@@ -125,11 +119,12 @@ def test_ensure_scope_recursively_creates_parent_hierarchy() -> None:
             "chapter1": {
                 "obj_cls": "tangl.core.graph.Subgraph",
                 "label": "chapter1",
-            },
-            "village": {
-                "obj_cls": "tangl.core.graph.Subgraph",
-                "label": "village",
-                "scope": {"parent_label": "chapter1"},
+                "templates": {
+                    "village": {
+                        "obj_cls": "tangl.core.graph.Subgraph",
+                        "label": "village",
+                    }
+                },
             },
         },
         "scenes": {},
@@ -148,9 +143,8 @@ def test_ensure_scope_recursively_creates_parent_hierarchy() -> None:
 
     try:
         graph = StoryGraph(label="test", world=world)
-        scope = {"has_path": "village.*"}
 
-        created = world.ensure_scope(scope=scope, graph=graph)
+        created = world.ensure_scope(parent_label="village", graph=graph)
 
         chapter = graph.find_subgraph(label="chapter1")
         village = graph.find_subgraph(label="village")

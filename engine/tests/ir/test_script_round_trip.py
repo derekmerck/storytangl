@@ -1,4 +1,4 @@
-"""Tests for :class:`tangl.ir.story_ir.story_script_models.ScopeSelector`."""
+"""Tests for script template path and ancestor tag serialization."""
 
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript

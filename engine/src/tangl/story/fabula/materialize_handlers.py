@@ -102,28 +102,11 @@ def standard_wiring_handler(
     for edge_type in ("actions", "continues", "redirects"):
         edge_scripts = getattr(template, edge_type, None)
         if edge_scripts:
-            scope = getattr(template, "scope", None)
-            if scope is not None and hasattr(scope, "is_global") and scope.is_global():
-                scope = None
-            if scope is None:
-                parent = getattr(template, "parent", None)
-                parent_label = getattr(parent, "label", None) if parent is not None else None
-                if parent_label:
-                    from tangl.core.graph.scope_selectable import ScopeSelector
-
-                    scope = ScopeSelector(parent_label=parent_label)
-                else:
-                    parent = getattr(node, "parent", None)
-                    parent_label = getattr(parent, "label", None) if parent is not None else None
-                    if parent_label:
-                        from tangl.core.graph.scope_selectable import ScopeSelector
-
-                        scope = ScopeSelector(parent_label=parent_label)
             world._attach_action_requirements(
                 ctx.graph,
                 node,
                 edge_scripts,
-                scope,
+                source_node=node,
             )
 
     if getattr(template, "roles", None):

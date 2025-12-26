@@ -223,6 +223,31 @@ def test_materialize_block_creates_action_edges(mock_world):
     assert requirement.policy.name == "CREATE"
 
 
+def test_materialize_block_action_without_parent_keeps_successor_unqualified(mock_world):
+    """Blocks without a parent scene should keep successor references unqualified."""
+
+    from tangl.story.episode.action import Action
+    from tangl.story.episode.block import Block
+    from tangl.vm.provision.open_edge import Dependency
+
+    template = BlockScript(
+        label="start",
+        obj_cls=Block,
+        text="Beginning",
+        actions=[{"text": "Continue", "successor": "next"}],
+    )
+
+    graph = StoryGraph(label="test", world=mock_world)
+    block = mock_world._materialize_from_template(template, graph)
+
+    actions = list(graph.find_edges(is_instance=Action))
+    assert actions
+    dependencies = list(graph.find_edges(is_instance=Dependency, source=actions[0]))
+    assert dependencies
+    requirement = dependencies[0].requirement
+    assert requirement.identifier == "next"
+
+
 def test_materialize_block_without_actions(mock_world):
     """Blocks without actions should work fine."""
 

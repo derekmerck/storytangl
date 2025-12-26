@@ -1,4 +1,4 @@
-"""Ensure :class:`StoryScript` is rebuilt with ``ScopeSelector`` available."""
+"""Ensure story script models rebuild with path and ancestor tag support."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_story_script_model_rebuild_runs_on_import() -> None:
 
 
 def test_master_script_model_rebuild_runs_on_import() -> None:
-    """Master script should also rebuild forward refs for scope handling."""
+    """Master script should rebuild without path selection defaults."""
 
     metadata = ScriptMetadata(title="Example", author="Tests")
     script = MasterScript(
@@ -42,4 +42,4 @@ def test_master_script_model_rebuild_runs_on_import() -> None:
     )
 
     assert script.label == "example"
-    assert script.scope is not None
+    assert script.get_selection_criteria() == {}
