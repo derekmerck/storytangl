@@ -18,7 +18,7 @@ def minimal_world():
         "metadata": {"title": "Test", "author": "Tests"},
         "templates": {
             "village": {
-                "obj_cls": "tangl.core.graph.Subgraph",
+                "obj_cls": "tangl.core.graph.subgraph.Subgraph",
                 "label": "village",
             }
         },
@@ -117,11 +117,11 @@ def test_ensure_scope_recursively_creates_parent_hierarchy() -> None:
         "metadata": {"title": "Test", "author": "Tests"},
         "templates": {
             "chapter1": {
-                "obj_cls": "tangl.core.graph.Subgraph",
+                "obj_cls": "tangl.core.graph.subgraph.Subgraph",
                 "label": "chapter1",
                 "templates": {
                     "village": {
-                        "obj_cls": "tangl.core.graph.Subgraph",
+                        "obj_cls": "tangl.core.graph.subgraph.Subgraph",
                         "label": "village",
                     }
                 },

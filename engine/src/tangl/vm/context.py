@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from .dispatch import Namespace as NS
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 # todo: bunch of story-related stuff embedded in here.  add an 'enrichment'
 #       layer to the ns or something, but don't be referencing concepts and

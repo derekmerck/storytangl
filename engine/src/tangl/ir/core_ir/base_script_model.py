@@ -58,16 +58,16 @@ class BaseScriptItem(HierarchicalTemplate):
                 pattern = pattern[:-2]
         return pattern
 
-    children: dict[str, BaseScriptItem] | list[BaseScriptItem] | None = Field(
-        default_factory=dict,
+    children: dict[str, BaseScriptItem] | list[BaseScriptItem] = Field(
+        None,
         alias="templates",
         json_schema_extra={"visit_field": True},
     )
 
     @property
-    def templates(self) -> dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None:
+    def templates(self) -> dict[str, BaseScriptItem] | list[BaseScriptItem]:
         return self.children
 
     @templates.setter
-    def templates(self, value: dict[str, "BaseScriptItem"] | list["BaseScriptItem"] | None) -> None:
+    def templates(self, value: dict[str, BaseScriptItem] | list[BaseScriptItem]) -> None:
         self.children = value

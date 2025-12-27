@@ -45,14 +45,17 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
     # todo: we _may_ want to include this in serialize->template, but it doesn't seem to respect serialize: False??
 
     # obj_cls is a field (not just init param like Entity)
-    obj_cls_: Typelike = Field(None, alias="obj_cls")
+    obj_cls_: Typelike = Field(None, alias="obj_cls", exclude_if=lambda v: v is None)
 
     @field_validator("obj_cls_", mode="after")
     @classmethod
     def _hydrate_obj_cls(cls, data):
         """Hydrate string obj_cls to Python type."""
+        logger.debug(f"hydrating obj_cls_ field for {cls}")
         if data is None:
             return None
+
+        logger.debug(f"found {type(data)}{data}")
 
         # Hydrate string to type
         if isinstance(data, str):
@@ -60,7 +63,9 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
             if resolved:
                 data = resolved
             else:
-                return data
+                raise ValueError(f"Could not resolve obj_cls {data}")
+
+        logger.debug(f"resolved to {data}")
 
         # Validate that it is a class and Entity subclass (or None)
         if not (data is Entity or (isclass(data) and issubclass(data, Entity))):
@@ -176,6 +181,7 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
                                   exclude_none=True)
         # Ensure unset obj_cls is discarded for round-trip; if it's
         # None, super().model_dump will include the wrong templ.__class__
+        logger.debug(self.model_fields_set)
         if "obj_cls_" not in self.model_fields_set:
             data.pop("obj_cls", None)
         return data

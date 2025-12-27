@@ -52,7 +52,7 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
         ['scene1', 'start', 'end']
     """
     parent: Optional[Self] = Field(None, exclude=True)
-    children: Optional[dict[str, Template]|list[Template]] = Field(default_factory=list, json_schema_extra={'visit_field': True})
+    children: Optional[dict[str, Template] | list[Template]] = Field(None, json_schema_extra={'visit_field': True})
     # Default field to hold generic children, subclasses are encouraged
     # to name and type-annotate their own children fields.  Remember to
     # tag it as a 'visit_field' to enable hierarchical handling.

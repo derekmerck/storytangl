@@ -1,6 +1,7 @@
 from pydantic import Field
 import pytest
 
+import tangl
 from tangl.core import GraphItem
 from tangl.core.factory.template import Template
 from tangl.core.factory.hierarchical_template import HierarchicalTemplate, ScopeSelectable
@@ -525,3 +526,39 @@ def test_set_label_from_key():
     # Labels should be set from keys
     assert root.children["block1"].label == "block1"
     assert root.children["block2"].label == "block2"
+
+
+# todo: scripts not hydrating/dehydrating obj_cls_ properly
+@pytest.mark.xfail(reason="Scripts not hydrating obj_cls_fields properly?")
+def test_node_type_on_children():
+    from tangl.core import Entity, Node
+
+    class MyNode(Node):
+        ...
+
+    data = {
+        'label': 'foo',
+        'obj_cls': 'test_templates.MyNode',
+        'children': [{'label': 'bar'}, {'label': 'baz', 'obj_cls': 'test_templates.MyNode'}]
+    }
+
+    templ = HierarchicalTemplate.structure(data)
+    assert templ.label == "foo"
+    assert templ.obj_cls_ == MyNode
+    assert templ.obj_cls == MyNode
+
+    ch0 = templ.children[0]
+    assert ch0.label == "bar"
+    assert ch0.obj_cls_ is None
+    assert ch0.obj_cls == Entity
+
+    ch0 = templ.children[1]
+    assert ch0.label == "baz"
+    assert ch0.obj_cls_ == MyNode
+    assert ch0.obj_cls == MyNode
+
+    exported = templ.unstructure_as_template()
+    print(exported)
+
+    assert exported['obj_cls'] == "test_templates.MyNode"
+

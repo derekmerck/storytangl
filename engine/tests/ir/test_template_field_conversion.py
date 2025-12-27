@@ -16,7 +16,7 @@ def test_templates_convert_to_basescriptitem():
                 "templates": {
                     "guard": {
                         "label": "guard",
-                        "obj_cls": "tangl.story.concepts.actor.Actor",
+                        "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                         "custom_field": "preserved",
                     }
                 },

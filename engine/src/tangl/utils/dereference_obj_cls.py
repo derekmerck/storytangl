@@ -1,8 +1,13 @@
 from typing import TypeVar, Type, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 TypeT = TypeVar("TypeT", bound=Type)
 
+# todo: this isn't actually used, the code in bm+ is simpler
 def subclass_by_name(base_cls: TypeT, cls_name: str) -> Optional[TypeT]:
+    logger.debug(f"subclass_by_name {base_cls.__name__} == {cls_name}")
     if base_cls.__name__ == cls_name:
         return base_cls
     for cls_ in base_cls.__subclasses__():

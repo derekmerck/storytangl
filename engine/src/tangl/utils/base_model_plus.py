@@ -281,7 +281,7 @@ class BaseModelPlus(BaseModel):
     def dereference_cls_name(cls, name: str) -> Type[Self]:
         # Call on upper bound
         # todo: Should memo-ize this
-        logger.debug(f"dereferenceing {name} on cls {cls} with fqn {cls.__fqn__()}")
+        logger.debug(f"dereferenceing {name} on cls {cls.__qualname__} with fqn {cls.__fqn__()}")
         if name == cls.__qualname__ or name == cls.__fqn__():
             return cls
         for _cls in cls.__subclasses__():

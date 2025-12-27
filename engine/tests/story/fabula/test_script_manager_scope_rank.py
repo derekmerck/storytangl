@@ -10,12 +10,12 @@ def test_find_template_prefers_closer_scope():
         "metadata": {"title": "Test World", "author": "Tests"},
         "templates": {
             "global_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "*",
             },
             "village_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "village.*",
             },
@@ -54,17 +54,17 @@ def test_find_template_without_selector_still_works():
         "metadata": {"title": "Test World", "author": "Tests"},
         "templates": {
             "global_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "*",
             },
             "village_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "village.*",
             },
             "market_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "village.market.*",
             },
@@ -89,17 +89,17 @@ def test_find_templates_orders_by_proximity():
         "metadata": {"title": "Test World", "author": "Tests"},
         "templates": {
             "guard1": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "*",
             },
             "guard2": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "village.*",
             },
             "guard3": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "village.market.*",
             },
@@ -140,17 +140,17 @@ def test_find_templates_filters_by_selector_path():
         "metadata": {"title": "Test World", "author": "Tests"},
         "templates": {
             "global_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "*",
             },
             "village_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "village.*",
             },
             "cave_guard": {
-                "obj_cls": "tangl.story.concepts.actor.Actor",
+                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
                 "label": "guard",
                 "path_pattern": "cave.*",
             },

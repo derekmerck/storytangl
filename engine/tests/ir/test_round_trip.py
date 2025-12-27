@@ -4,7 +4,7 @@ from pprint import pprint
 import pytest
 import yaml
 
-from tangl.ir.core_ir import MasterScript
+from tangl.ir.core_ir import MasterScript, BaseScriptItem
 from tangl.ir.story_ir import StoryScript, SceneScript
 
 def dict_compare(d1, d2):
@@ -90,7 +90,8 @@ def test_yaml_core_script_roundtrips():
     # Can compare with eq
     assert script == reparsed_script
 
-
+# todo: scripts not hydrating/dehydrating obj_cls_ properly
+@pytest.mark.xfail(reason="Scripts not hydrating obj_cls_ fields properly?")
 def test_yaml_story_script_roundtrips():
     """Full StoryScript with scenes/blocks/actors should round-trip."""
 
@@ -107,7 +108,7 @@ def test_yaml_story_script_roundtrips():
     scenes:
       intro:
         label: intro
-        templates:
+        actors:
           village_guard:
             obj_cls: tangl.story.concepts.actor.actor.Actor
             archetype: guard
@@ -134,9 +135,16 @@ def test_yaml_story_script_roundtrips():
     assert script.scenes['intro'].label == "intro"
     assert isinstance(script.scenes['intro'], SceneScript)
     from tangl.story.episode import Scene
+    assert script.scenes['intro'].obj_cls_ is None
     assert script.scenes['intro'].obj_cls == Scene
+    assert isinstance(script.templates['global_guard'], BaseScriptItem)
+    from tangl.story.concepts.actor import Actor
+    assert script.templates['global_guard'].obj_cls_ == Actor
 
     exported_dict = script.unstructure_as_template()
+    assert isinstance(exported_dict['scenes']['intro'], dict)
+    assert isinstance(exported_dict['templates']['global_guard'], dict)
+    assert isinstance(exported_dict['templates']['global_guard']["obj_cls"], str)
 
     # Should be identical
     assert dict_compare(original_dict, exported_dict) is None

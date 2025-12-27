@@ -103,7 +103,7 @@ def test_materialize_respects_custom_obj_cls():
 
     template = ActorScript(
         label="hero",
-        obj_cls="CustomWarrior",
+        obj_cls="story.fabula.test_world_materialization.CustomWarrior",
         power_level=9000,
     )
 
