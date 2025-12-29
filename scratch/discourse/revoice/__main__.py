@@ -1,11 +1,11 @@
-from tangl.lang.antlrnlpy import tokenize, parse
-from tangl.lang.rephrase.rephrase import rephrase
 import yaml
 
+from tangl.lang.antlrnlpy import tokenize, parse
+from tangl.lang.rephrase.rephrase import rephrase
 from tangl.lang.rephrase.voice import Voice
 
-import afc
-tangl.config.lexref_apis_enabled = True
+from tangl.config import settings
+settings.dev.lexref_apis_enabled = True
 
 with open("sample_context.yaml") as f:
     context_spec_ = yaml.safe_load(f)

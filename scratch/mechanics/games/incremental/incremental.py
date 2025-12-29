@@ -164,26 +164,33 @@ class Player(BaseModel):
 
 class GameManager(BaseModel):
     """
-    Clicker-like variant on :class:\`BasicGame\`
+    Clicker-like variant on :class:\`TokenGame\`
 
     Solitaire resource management strategy game model
 
-    Basic features:
+    Basic token exchanges:
     - fonts                           -> labor
     - factories  + labor              -> materials, cash
     - refineries + labor, materials   -> cash
 
-    buy new or improve fonts with cash
+    - buy new or improve fonts, factories, refiners with materials, labor, cash
+    - improve/unlock labor or materials with materials, labor, cash
+    - improvements: capacity/throughput, efficiency (wastage and conversion rate)
 
     num factories is actually just capacity...buy capacity in increments of 1.0
     uses uncapped factories -- a single factory is limited by input, not capacity
+
+    Could layer milling on top, spoilage of resources, maintenance of capital, or
+    other mandatory upkeep sinks like defense
     """
 
     win_at: Wallet
     player: Player = Field( default_factory=Player )
     num_rounds: int = 10
 
-    # assets that cannot be banked between rounds in this game
+    # Non-durable assets that cannot be banked between rounds in this game
+    # for example, labor is non-durable, cash is durable, materials and/or
+    # improved materials may be durable (metal) or not (food)
     ephemeral: set[UniqueLabel] = Field(default_factory=set)
 
     @property

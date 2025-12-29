@@ -13,12 +13,12 @@ class OutfitScript(BaseScriptItem, extra="allow"):
     wearables: list[ UniqueLabel | AssetScript ] = None
 
 class OrnamentationScript(BaseScriptItem):
-    ornaments: list[str]
+    ornaments: list[str] = None   # todo: should be OrnamentScripts
 
 class LookScript(BaseScriptItem, extra="allow"):
     hair_style: Optional[HairStyle] = None
     hair_color: Optional[HairColor] = None
-    hair_kws: Optional[str] = None   # for stableforge
+    hair_kws: Optional[str] = None   # for adapters
     eye_color: Optional[EyeColor] = None
 
     skin_tone: Optional[SkinTone] = None
@@ -32,5 +32,5 @@ class LookScript(BaseScriptItem, extra="allow"):
     # HasOutfit mixin
     outfit: Optional[OutfitScript] = None
     glasses: Optional[bool] = None      # override, if glasses in outfit, can be removed
-    outfit_kws: Optional[str] = None    # for stableforge
-    outfit_palette: Optional[str] = None
+    outfit_kws: Optional[str] = None    # for adapters
+    outfit_palette: Optional[str] = None # for adapters

@@ -3,7 +3,7 @@ him: # adopt "xy" references in phrase
   proper: Me
   pov: 1
   nominal: [ guy, dude ]
-  gens: XX
+  gens: XY
   adjective: [ friendly, handsome ]
   adverb: [ eagerly, hungrily ]
   assets:
@@ -14,7 +14,7 @@ him: # adopt "xy" references in phrase
 
 
 her:
-  proper: That Trap
+  proper: That Girl
   nominal: [girl, gal]
   gens: XX
   adjective: [ pretty ]

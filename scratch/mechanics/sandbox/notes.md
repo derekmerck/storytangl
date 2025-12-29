@@ -79,3 +79,9 @@ Response Model
 If a world map is available, the 'game_status' response may include a 'world_map' field.  By default, this includes a grid representation of the world map, the current world-time, and the player's current grid location.  It can be extended to also include map media and scheduled events, or to hide unexplored or distant locations, for example.  
 
 As usual, it is left up to the UI to interpret and display these cues to the player.  For example, the CLI interface has no mechanism for displaying a world map, although one could be implemented with `curses` or the like.
+
+## Notes
+
+MapSetting/Location -- a sandbox-visitable node with a setting, scheduled events, and links to other visitable nodes.
+
+MobileRole/Actor -- an actor that migrates between MapNodes according to a schedule, bringing affordances along with them.

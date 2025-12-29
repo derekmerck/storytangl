@@ -1,7 +1,7 @@
 Look Mechanic
 =============
 
-The complexity here is a bit out of proportion, but humans have a _very_ powerful eye for appearance and consistency details in other humans, hence the 'uncanny valley' phenomena.  We want to track as much as possible regarding important characters' general presentation, as well as their specific presentation in a given situation. 
+The complexity here is a bit out of proportion, but humans have a _very_ powerful eye for appearance and consistency details in other humans, hence the 'uncanny valley' phenomena.  We want to track as much as possible regarding important characters' general presentation, as well as their specific presentation in a given situation. This provides continuity for dynamic descriptions and media.
 
 There are 3 inter-related parts to an Actor's "Look"
 

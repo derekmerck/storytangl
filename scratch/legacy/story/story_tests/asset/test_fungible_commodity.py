@@ -44,7 +44,7 @@ def test_transactions():
         seller.send( diamonds=10000, other=buyer )
 
 #
-# from afc231.utils.singleton import SingletonsManager
+# from tangl.utils.singleton import SingletonsManager
 #
 # def test_asset_manager():
 #

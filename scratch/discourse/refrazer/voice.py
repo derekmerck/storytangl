@@ -13,7 +13,7 @@ from .eurynym import Eurynym
 class Voice:
 
     name: str = "tangldev"
-    surname: str = "v34"
+    surname: str = "v211"
     @property
     def full_name(self):
         return f"{self.name} {self.surname}"

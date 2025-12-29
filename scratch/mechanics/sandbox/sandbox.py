@@ -1,7 +1,7 @@
 from tangl.core import HasConditions
 from tangl.core.graph import DynamicEdge
-from tangl.story.concept.place import Location, Place
-from tangl.story.concept.actor import Role, Actor
+from tangl.story.concepts.location import Location as Place, Setting
+from tangl.story.concepts.actor import Role, Actor
 
 
 class SandboxConnection(HasConditions, DynamicEdge):

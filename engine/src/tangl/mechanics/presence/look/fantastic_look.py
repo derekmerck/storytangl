@@ -9,35 +9,36 @@ class FantasticType(Enum):
     DOG = "dog"
     GOAT = "goat"
     HORSE = "horse"
-    BIRD = "bird"     # feathered
-    SNAKE = "snake"
+    BIRD = AVIAN = "bird"     # feathered
+    SNAKE = SERPENT = "snake"
     SPIDER = "spider"
     INSECT = "insect"  # tags: butterfly, dragonfly, scorpion, wasp
-    TAUR = "taur"
 
+    DRAGON = DRACONIC = "dragon"
     ALIEN = "alien"
     TENTACLE = "tentacle"
-    GELATINOUS = "gelatinous"
+    SLIME = GELATINOUS = "slime"
 
-    ROBOT = "robot"
+    ROBOT = "robot"    # fully robotic
 
     DEMON = ONI = "demon"
     ANGEL = "angel"
 
-    FLOWER = "flower"
+    PLANT = FLOWER = "plant"
     TREE = "tree"
 
 
 class FantasticLook(Look):
     # For creatures with unusual features
-    # Quite probably need a BodyPart map for this
+    # Quite probably need a BodyPart extension map for wings, tails
 
-    body_type: FantasticType | str = None  # human, snakelike, taur, robot
+    body_type: FantasticType | str = None  # human, snakelike, robot
+    taur: bool = False  # non-bipedal, e.g., horse/spider body
 
     eye_type: FantasticType | str = None   # human, cat, spider (6)
     eye_count: int = 2
 
-    mandible_type: FantasticType | str = None # human (1, vertical), insectoid (2, lateral), snout
+    mandible_type: FantasticType | str = None  # human (1, vertical), insectoid (2, lateral), snout
     mandible_count: int = 1
 
     arm_type: FantasticType | str = None   # human, insect, tentacle, robot
@@ -49,8 +50,8 @@ class FantasticLook(Look):
     fur_color: str = None
 
     horn_count: int = 0
-    horn_type: FantasticType | str = None  # goat (2), oni (1), unicorn (1)
-    horn_color: str = None # bone
+    horn_type: FantasticType | str = None  # goat (2), oni (1), unicorn (1), antlers (2+)
+    horn_color: str = None  # bone
 
     wing_count: int = 0
     wing_type: FantasticType | str = None  # bug, dragonfly, butterfly, bird/feathered, bat/leather, robotic

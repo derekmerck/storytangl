@@ -1,0 +1,80 @@
+---
+uid: sfsf1
+
+info:
+  title: "Single-File Story Format Example Script"
+  date: "Summer 2023"
+  author: TanglDev
+  illustrator: TanglDev
+  publisher: t4nGl-f0rG3
+  url: 'https://app.storytan.gl/guide/user_guide'
+  desc: |-
+    This is a sample script for the user guide.  
+    
+    It's perfectly legitimate, and it loads just fine.  
+    
+    But it's not very interesting.
+
+globals:  # Global variables that can be accessed as "player.<var>"
+  has_hat: False
+
+actors:  # NPC descriptions
+  - label: "tangldev"
+    actor_template:
+      name: "TanglDev"
+      gens: "XY"
+  # more roles...
+
+assets:
+  - label: sword  # Singleton objects, nouns in the world
+  - label: armor
+
+scenes: # A list of scenes in the world
+  - label: "scene_1" # Unique Identifier for the scene
+    is_entry: True # Flag to indicate the default story entry scene
+    locals: { "foo": 0 } # Local variables for the scene
+    roles: # A list of actors that may be referenced by the scene
+      - actor_target_id: "actor_1" # Reference to a specific actor
+        actor_target_conditions: ["gender == 'male'", "age > 30"] # Search for an actor with these Conditions
+        actor_template: {name: "John Doe", gender: "male", age: 35} # Create a new Actor with these properties
+    blocks: # A list of blocks within the scene
+      - uid: "block_1" # Unique Identifier for each block
+        locals: { bar: 100 }  # Local variables for the block (cascades with scene locals)
+        text: |- # Text description to be rendered for the player when they enter the block
+          You are in a mysterious forest. There os a path leading north and another one leading south. {{ actor_1 }} is here.
+        media:   # dict of 'media types' with dict of parameters such as location or reference id
+          narrative_image: { media_ref: block_1_im}
+          avatar_image: { media_ref: actor_1 }
+        is_entry: True # Flag to indicate the default scene entry block
+        conditions: ["foo < 5"] # List of conditions for the block to be enterable
+        effects: ["foo = 10"]   # List of effects that occur upon entering the block
+        redirects:
+           # List of blocks to conditionally redirect to upon entry
+          - conditions: ["foo < 0"]
+            target_block_id: "block_2"
+        continues:
+          # List of blocks to conditionally continue to upon exit
+          - conditions: ["foo > 0"]
+            target_block_id: "block_3"
+        actions: # A list of actions/choices that can be taken in the block
+          - uid: "north" # Optional Unique Identifier for the action (anonymous actions are ok)
+            text: "Go north" # Description of the action
+            target_block_id: "block_2" # The id of the block that this action leads to
+          - uid: "south" # Another action
+            conditions: ["foo < 0"] # List of conditions for the action to be enterable
+            effects: [ "foo = 10" ] # List of effects that occur upon entering the action
+            text: "Go south"
+            target_block_id: "block_3"
+      - uid: "block_2"
+        node_cls: Challenge  # Challenge blocks carry a GameHandler
+        game_handler:
+          node_cls: TrivialGameHandler
+        text: "You are playing a trivial game. Will you win or lose?"
+        # actions "win" and "lose" are dynamically injected by this game handler
+        continues:  # exit conditions
+          - conditions: game_status == "won"
+            target_block_id: "block_3"
+          - conditions: game_status == "lost"
+            target_block_id: "block_4"
+      # More blocks...
+  # More scenes...

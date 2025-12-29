@@ -11,7 +11,7 @@ import pytest
 #     # Clear any existing entries
 #     Unit._instances = dict()
 #
-#     from afc231.entity import EntityFactory
+#     from tangl.entity import EntityFactory
 #     F = EntityFactory()
 #     F.add_entity_class(Unit)
 #     F.add_template(Unit, **paper_ )
@@ -48,7 +48,7 @@ import pytest
 #     assert Unit_.instance("paper") == paper
 #     assert Unit_.instance("rock") == rock
 #
-#     from afc231.utils.singleton import Singletons
+#     from tangl.utils.singleton import Singletons
 #     print( Singletons._instances )
 #     assert paper not in Singletons._instances.values()
 #     assert rock not in Singletons._instances.values()
@@ -60,7 +60,7 @@ import pytest
 #     Unit(**hob_)
 #     assert( "hob" in Unit._instances )
 #
-#     from afc231.world import World
+#     from tangl.world import World
 #     wo = World.load_world( "../scratch/worlds/TestWorld" )
 #
 #     assert( "hob" not in wo.units._instances )
@@ -75,8 +75,8 @@ if __name__ == "__main__":
 
 from typing import *
 
-from afc231.game import RpsMove
-from afc231.asset import Unit, UnitGroup
+from tangl.game import RpsMove
+from tangl.asset import Unit, UnitGroup
 
 import pytest
 
@@ -87,7 +87,7 @@ def test_unit_factory():
     # Clear any existing entries
     Unit._instances = dict()
 
-    from afc231.entity import EntityFactory
+    from tangl.entity import EntityFactory
     F = EntityFactory()
     F.add_entity_class(Unit)
     F.add_template(Unit, **paper_ )
@@ -124,7 +124,7 @@ def test_unit_factory():
     assert Unit_.instance("paper") == paper
     assert Unit_.instance("rock") == rock
 
-    from afc231.utils.singleton import Singletons
+    from tangl.utils.singleton import Singletons
     print( Singletons._instances )
     assert paper not in Singletons._instances.values()
     assert rock not in Singletons._instances.values()
@@ -136,7 +136,7 @@ def test_unit_factory():
 #     Unit(**hob_)
 #     assert( "hob" in Unit._instances )
 #
-#     from afc231.world import World
+#     from tangl.world import World
 #     wo = World.load_world( "../scratch/worlds/TestWorld" )
 #
 #     assert( "hob" not in wo.units._instances )

@@ -1,0 +1,10 @@
+sphinx
+myst-parser
+# sphinxcontrib-mermaid
+sphinxcontrib-openapi
+mistune==0.8.4  # openapi requires earlier version
+pydata_sphinx_theme
+livereload
+
+# reqs make
+#  $ xcode-select --install
