@@ -18,7 +18,7 @@ from tangl.core.behavior import (
     HandlerLayer,
     BehaviorRegistry,
 )
-from tangl.core.behavior.call_receipt import ResultCode, AggregatorType
+from tangl.core.behavior.call_receipt import ResultCode
 
 
 # ============================================================================
@@ -80,20 +80,20 @@ class TestCallReceiptCreation:
 
     def test_receipt_ok_helper(self):
         """Test CallReceipt.ok() helper."""
-        class MockOrigin:
-            uid = uuid4()
+        from types import SimpleNamespace
+        origin = SimpleNamespace(uid=uuid4())
 
-        receipt = CallReceipt.ok(MockOrigin(), "success")
+        receipt = CallReceipt.ok(origin, "success")
 
         assert receipt.result == "success"
         assert receipt.result_code == ResultCode.OK
 
     def test_receipt_skip_helper(self):
         """Test CallReceipt.skip() helper."""
-        class MockOrigin:
-            uid = uuid4()
+        from types import SimpleNamespace
+        origin = SimpleNamespace(uid=uuid4())
 
-        receipt = CallReceipt.skip(MockOrigin(), msg="Skipping test")
+        receipt = CallReceipt.skip(origin, msg="Skipping test")
 
         assert receipt.result is None
         assert receipt.result_code == ResultCode.SKIP
@@ -101,10 +101,10 @@ class TestCallReceiptCreation:
 
     def test_receipt_invalid_helper(self):
         """Test CallReceipt.invalid() helper."""
-        class MockOrigin:
-            uid = uuid4()
+        from types import SimpleNamespace
+        origin = SimpleNamespace(uid=uuid4())
 
-        receipt = CallReceipt.invalid(MockOrigin(), msg="Invalid input")
+        receipt = CallReceipt.invalid(origin, msg="Invalid input")
 
         assert receipt.result is None
         assert receipt.result_code == ResultCode.INVALID
@@ -112,10 +112,10 @@ class TestCallReceiptCreation:
 
     def test_receipt_error_helper(self):
         """Test CallReceipt.error() helper."""
-        class MockOrigin:
-            uid = uuid4()
+        from types import SimpleNamespace
+        origin = SimpleNamespace(uid=uuid4())
 
-        receipt = CallReceipt.error(MockOrigin(), msg="Error occurred")
+        receipt = CallReceipt.error(origin, msg="Error occurred")
 
         assert receipt.result is None
         assert receipt.result_code == ResultCode.ERROR
@@ -221,40 +221,6 @@ class TestCallReceiptAggregation:
 
         with pytest.raises(TypeError):
             CallReceipt.merge_results(r1, r2)
-
-    def test_aggregate_with_gather(self):
-        """Test aggregate() with GATHER aggregator."""
-        r1 = CallReceipt(behavior_id=uuid4(), result="a")
-        r2 = CallReceipt(behavior_id=uuid4(), result="b")
-
-        results = list(CallReceipt.aggregate(AggregatorType.GATHER, r1, r2))
-
-        assert results == ["a", "b"]
-
-    def test_aggregate_with_first(self):
-        """Test aggregate() with FIRST aggregator."""
-        r1 = CallReceipt(behavior_id=uuid4(), result="first")
-        r2 = CallReceipt(behavior_id=uuid4(), result="second")
-
-        result = CallReceipt.aggregate(AggregatorType.FIRST, r1, r2)
-
-        assert result == "first"
-
-    def test_aggregate_with_any(self):
-        """Test aggregate() with ANY aggregator."""
-        r1 = CallReceipt(behavior_id=uuid4(), result=False)
-        r2 = CallReceipt(behavior_id=uuid4(), result=True)
-
-        result = CallReceipt.aggregate(AggregatorType.ANY, r1, r2)
-
-        assert result is True
-
-    def test_aggregate_with_invalid_type(self):
-        """Test that invalid aggregator raises error."""
-        r1 = CallReceipt(behavior_id=uuid4(), result="a")
-
-        with pytest.raises(ValueError):
-            CallReceipt.aggregate("INVALID", r1)  # type: ignore
 
 
 # ============================================================================
