@@ -135,33 +135,33 @@ class CallReceipt(Record):
         AggregatorType.ALL: all_truthy,
     }
 
-    @classmethod
-    def aggregate(cls, aggregator: AggregatorType = AggregatorType.GATHER,
-                       *receipts: Self) -> Iterator[Any] | Any | bool | ChainMap:
-        # Helper to avoid lambdas
-        aggregation_func = cls.aggregation_func.get(aggregator)
-        if aggregation_func is None:
-            raise ValueError(f"Unknown aggregation type {aggregator}")
-        return aggregation_func(*receipts)
-
-    # -----------------------
-    # Result-like helpers
-
-    # Only invoke these directly to create a behavior-like response.
-    # todo: should we allow these to be passed through by behavior.__call__()?
-
-    @classmethod
-    def ok(cls, origin, result, **kw):
-        return cls(origin_id=origin.uid, result=result, result_code=ResultCode.OK, **kw)
-
-    @classmethod
-    def skip(cls, origin, msg=None, **kw):
-        return cls(origin_id=origin.uid, result=None, result_code=ResultCode.SKIP, message=msg, **kw)
-
-    @classmethod
-    def invalid(cls, origin, msg=None, **kw):
-        return cls(origin_id=origin.uid, result=None, result_code=ResultCode.INVALID, message=msg, **kw)
-
-    @classmethod
-    def error(cls, origin, msg, **kw):
-        return cls(origin_id=origin.uid, result=None, result_code=ResultCode.ERROR, message=msg, **kw)
+    # @classmethod
+    # def aggregate(cls, aggregator: AggregatorType = AggregatorType.GATHER,
+    #                    *receipts: Self) -> Iterator[Any] | Any | bool | ChainMap:
+    #     # Helper to avoid lambdas
+    #     aggregation_func = cls.aggregation_func.get(aggregator)
+    #     if aggregation_func is None:
+    #         raise ValueError(f"Unknown aggregation type {aggregator}")
+    #     return aggregation_func(*receipts)
+    #
+    # # -----------------------
+    # # Result-like helpers
+    #
+    # # Only invoke these directly to create a behavior-like response.
+    # # todo: should we allow these to be passed through by behavior.__call__()?
+    #
+    # @classmethod
+    # def ok(cls, origin, result, **kw):
+    #     return cls(origin_id=origin.uid, result=result, result_code=ResultCode.OK, **kw)
+    #
+    # @classmethod
+    # def skip(cls, origin, msg=None, **kw):
+    #     return cls(origin_id=origin.uid, result=None, result_code=ResultCode.SKIP, message=msg, **kw)
+    #
+    # @classmethod
+    # def invalid(cls, origin, msg=None, **kw):
+    #     return cls(origin_id=origin.uid, result=None, result_code=ResultCode.INVALID, message=msg, **kw)
+    #
+    # @classmethod
+    # def error(cls, origin, msg, **kw):
+    #     return cls(origin_id=origin.uid, result=None, result_code=ResultCode.ERROR, message=msg, **kw)

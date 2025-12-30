@@ -23,7 +23,7 @@ from tangl.core.singleton import Singleton, InheritingSingleton
 # Test Fixtures and Helper Classes
 # ============================================================================
 
-class MyTestSingleton(Singleton):
+class SingletonSubclass(Singleton):
     """Basic test singleton."""
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -34,12 +34,12 @@ class SimpleLabelSingleton(Singleton):
     value: int = Field(default=0)
 
 
-class ChildSingleton(MyTestSingleton):
+class ChildSingleton(SingletonSubclass):
     """Child singleton for testing subclass isolation."""
     pass
 
 
-class TestInheritingSingleton(InheritingSingleton):
+class InheritingSingletonSubclass(InheritingSingleton):
     """Test class for InheritingSingleton."""
     value: int = 0
     nested: dict = Field(default_factory=dict)
@@ -59,18 +59,18 @@ class Character(InheritingSingleton):
 @pytest.fixture(autouse=True)
 def clear_all_singletons():
     """Clear all singleton registries before and after each test."""
-    MyTestSingleton.clear_instances()
+    SingletonSubclass.clear_instances()
     SimpleLabelSingleton.clear_instances()
     ChildSingleton.clear_instances()
     Singleton.clear_instances()
-    TestInheritingSingleton.clear_instances()
+    InheritingSingletonSubclass.clear_instances()
     Character.clear_instances()
     yield
-    MyTestSingleton.clear_instances()
+    SingletonSubclass.clear_instances()
     SimpleLabelSingleton.clear_instances()
     ChildSingleton.clear_instances()
     Singleton.clear_instances()
-    TestInheritingSingleton.clear_instances()
+    InheritingSingletonSubclass.clear_instances()
     Character.clear_instances()
 
 
@@ -83,16 +83,16 @@ class TestSingletonBasics:
 
     def test_singleton_creation_and_retrieval(self):
         """Test that singleton can be created and retrieved."""
-        s1 = MyTestSingleton(label="unique")
-        s2 = MyTestSingleton.get_instance("unique")
+        s1 = SingletonSubclass(label="unique")
+        s2 = SingletonSubclass.get_instance("unique")
         assert s1 == s2
         assert s1 is s2
 
     def test_singleton_uniqueness_by_label(self):
         """Test that only one instance per label is allowed."""
-        s1 = MyTestSingleton(label="unique")
+        s1 = SingletonSubclass(label="unique")
         with pytest.raises((KeyError, ValueError)):
-            s2 = MyTestSingleton(label="unique")
+            s2 = SingletonSubclass(label="unique")
 
     def test_different_labels_create_different_instances(self):
         """Test that different labels create distinct instances."""
@@ -127,8 +127,8 @@ class TestSingletonRegistry:
 
     def test_get_instance_by_label(self):
         """Test retrieving instance by label."""
-        s1 = MyTestSingleton(label="test")
-        s2 = MyTestSingleton.get_instance("test")
+        s1 = SingletonSubclass(label="test")
+        s2 = SingletonSubclass.get_instance("test")
         assert s1 is s2
 
     def test_get_instance_by_uuid(self):
@@ -185,9 +185,9 @@ class TestSingletonRegistry:
 
     def test_registry_operations(self):
         """Test singleton is properly registered."""
-        s = MyTestSingleton(label="test")
-        assert MyTestSingleton._instances.get(s.uid) is s
-        assert MyTestSingleton.get_instance('test') is s
+        s = SingletonSubclass(label="test")
+        assert SingletonSubclass._instances.get(s.uid) is s
+        assert SingletonSubclass.get_instance('test') is s
 
     def test_duplicate_registration_error(self):
         """Test error on duplicate registration attempt."""
@@ -205,24 +205,24 @@ class TestSingletonInheritance:
 
     def test_subclass_has_separate_registry(self):
         """Test that subclasses maintain separate instance registries."""
-        parent = MyTestSingleton(label="test")
+        parent = SingletonSubclass(label="test")
         child = ChildSingleton(label="test")
 
         assert parent.uid != child.uid
         assert parent is not child
-        assert len(MyTestSingleton._instances) == 1
+        assert len(SingletonSubclass._instances) == 1
         assert len(ChildSingleton._instances) == 1
 
     def test_subclass_shadowing(self):
         """Test that subclass registries shadow parent registries appropriately."""
-        s1 = MyTestSingleton(label="unique")
+        s1 = SingletonSubclass(label="unique")
         s2 = ChildSingleton(label="unique")
 
         # Subclass get_instance should find subclass instance
         assert ChildSingleton.get_instance("unique") is s2
 
         # Parent class get_instance should not be shadowed
-        assert MyTestSingleton.get_instance("unique") is s1
+        assert SingletonSubclass.get_instance("unique") is s1
 
     def test_label_inheritance_separate_registries(self):
         """Test label singletons with inheritance."""
@@ -264,12 +264,12 @@ class TestSingletonHashing:
 
     def test_singleton_is_hashable(self):
         """Test that singletons are hashable (unlike regular entities)."""
-        s = MyTestSingleton(label="unique")
+        s = SingletonSubclass(label="unique")
         {s}  # Should not raise
 
     def test_singleton_hash_value(self):
         """Test singleton hash computation."""
-        e = MyTestSingleton(label='singleton1')
+        e = SingletonSubclass(label='singleton1')
         assert hash(e) == hash((e.__class__, e.label))
 
     def test_different_labels_different_hashes(self):
@@ -294,35 +294,35 @@ class TestSingletonSerialization:
 
     def test_unstructure_includes_class_and_label(self):
         """Test that unstructure includes obj_cls and label."""
-        s = MyTestSingleton(label="unique")
+        s = SingletonSubclass(label="unique")
         data = s.unstructure()
-        assert data == {"obj_cls": MyTestSingleton, "label": "unique"}
+        assert data == {"obj_cls": SingletonSubclass, "label": "unique"}
 
     def test_structure_returns_same_instance(self):
         """Test that structure returns the existing singleton instance."""
-        s = MyTestSingleton(label="unique")
+        s = SingletonSubclass(label="unique")
         data = s.unstructure()
-        restored = MyTestSingleton.structure(dict(data))
+        restored = SingletonSubclass.structure(dict(data))
         assert restored is s
 
     def test_roundtrip_unstructure_structure(self):
         """Test full roundtrip serialization."""
-        s1 = MyTestSingleton(label="unique")
+        s1 = SingletonSubclass(label="unique")
         structured = s1.unstructure()
-        restored = MyTestSingleton.structure(structured)
+        restored = SingletonSubclass.structure(structured)
         assert restored == s1
         assert restored is s1
 
     def test_pickle_singleton(self):
         """Test pickle serialization returns same instance."""
-        original = MyTestSingleton(label="test")
+        original = SingletonSubclass(label="test")
         pickled = pickle.dumps(original)
         unpickled = pickle.loads(pickled)
         assert original is unpickled
 
     def test_reduce_pickling_contract(self):
         """Test __reduce__ returns correct pickling contract."""
-        s = MyTestSingleton(label="epsilon")
+        s = SingletonSubclass(label="epsilon")
         func, args = s.__reduce__()
         assert callable(func)
         rebuilt = func(*args)
@@ -331,7 +331,7 @@ class TestSingletonSerialization:
     def test_pickling_support(self):
         """Test comprehensive pickling support."""
         label = "Entity"
-        entity = MyTestSingleton(label=label)
+        entity = SingletonSubclass(label=label)
 
         pickled_entity = pickle.dumps(entity)
         unpickled_entity = pickle.loads(pickled_entity)
@@ -348,7 +348,7 @@ class TestInheritingSingletonBasics:
 
     def test_basic_inheritance(self):
         """Test basic attribute inheritance from another instance."""
-        base = TestInheritingSingleton(
+        base = InheritingSingletonSubclass(
             label="base",
             value=1,
             nested={"key": "value"},
@@ -356,7 +356,7 @@ class TestInheritingSingletonBasics:
             optional="test"
         )
 
-        child = TestInheritingSingleton(
+        child = InheritingSingletonSubclass(
             label="child",
             from_ref="base"
         )
@@ -369,21 +369,21 @@ class TestInheritingSingletonBasics:
 
     def test_inheritance_from_existing_instance(self):
         """Test creating instance with from_ref."""
-        base = TestInheritingSingleton(label="base_entity", value=42)
-        new_instance = TestInheritingSingleton(label="new_label", from_ref="base_entity")
+        base = InheritingSingletonSubclass(label="base_entity", value=42)
+        new_instance = InheritingSingletonSubclass(label="new_label", from_ref="base_entity")
 
         assert new_instance.value == 42
         assert new_instance.label == "new_label"
 
     def test_override_inheritance(self):
         """Test overriding inherited values."""
-        base = TestInheritingSingleton(
+        base = InheritingSingletonSubclass(
             label="base",
             value=1,
             nested={"key": "value"}
         )
 
-        child = TestInheritingSingleton(
+        child = InheritingSingletonSubclass(
             label="child",
             from_ref="base",
             value=2,
@@ -396,8 +396,8 @@ class TestInheritingSingletonBasics:
 
     def test_data_overriding(self):
         """Test that explicit values override inherited ones."""
-        base = TestInheritingSingleton(label="base_entity", value=10)
-        overriding = TestInheritingSingleton(
+        base = InheritingSingletonSubclass(label="base_entity", value=10)
+        overriding = InheritingSingletonSubclass(
             label="overriding",
             from_ref="base_entity",
             value=20
@@ -406,20 +406,20 @@ class TestInheritingSingletonBasics:
 
     def test_label_not_inherited(self):
         """Test that label is not inherited."""
-        base = TestInheritingSingleton(label="base_entity", value=5)
-        derived = TestInheritingSingleton(label="unique_label", from_ref="base_entity")
+        base = InheritingSingletonSubclass(label="base_entity", value=5)
+        derived = InheritingSingletonSubclass(label="unique_label", from_ref="base_entity")
         assert derived.label == "unique_label"
 
     def test_error_on_nonexistent_ref(self):
         """Test proper error when referencing non-existent instance."""
         with pytest.raises(KeyError) as exc_info:
-            TestInheritingSingleton(label="faulty", from_ref="nonexistent")
+            InheritingSingletonSubclass(label="faulty", from_ref="nonexistent")
         assert "nonexistent" in str(exc_info.value) or "Cannot inherit" in str(exc_info.value)
 
     def test_missing_reference(self):
         """Test handling of missing reference instances."""
         with pytest.raises(KeyError) as exc_info:
-            TestInheritingSingleton(label="test", from_ref="nonexistent")
+            InheritingSingletonSubclass(label="test", from_ref="nonexistent")
         assert "Cannot inherit from non-existent instance" in str(exc_info.value) or "nonexistent" in str(exc_info.value)
 
 
@@ -432,13 +432,13 @@ class TestInheritingSingletonComplex:
 
     def test_mutable_independence(self):
         """Test that mutable attributes are independent copies."""
-        base = TestInheritingSingleton(
+        base = InheritingSingletonSubclass(
             label="base",
             nested={"key": "value"},
             items=[1, 2, 3]
         )
 
-        child = TestInheritingSingleton(
+        child = InheritingSingletonSubclass(
             label="child",
             from_ref="base"
         )
@@ -550,10 +550,10 @@ class TestInheritingSingletonComplex:
 
     def test_inheriting_singleton_hashes(self):
         """Test that InheritingSingleton instances are hashable."""
-        base = TestInheritingSingleton(label="base", value=1)
+        base = InheritingSingletonSubclass(label="base", value=1)
         {base}  # Should not raise
 
-        child = TestInheritingSingleton(label="child", from_ref="base")
+        child = InheritingSingletonSubclass(label="child", from_ref="base")
         {child}  # Should not raise
 
     @pytest.mark.parametrize("field_name,base_value,child_value", [
@@ -566,12 +566,12 @@ class TestInheritingSingletonComplex:
     ])
     def test_field_inheritance_cases(self, field_name, base_value, child_value):
         """Test various field inheritance scenarios."""
-        base = TestInheritingSingleton(
+        base = InheritingSingletonSubclass(
             label="base",
             **{field_name: base_value}
         )
 
-        child = TestInheritingSingleton(
+        child = InheritingSingletonSubclass(
             label="child",
             from_ref="base",
             **{field_name: child_value}
@@ -601,8 +601,8 @@ class TestSingletonEdgeCases:
 
     def test_pydantic_immutability(self):
         """Test that singleton instances are immutable."""
-        s = Singleton(label="test")
-        with pytest.raises((AttributeError, ValidationError)):
+        s = SimpleLabelSingleton(label="test")
+        with pytest.raises(ValidationError):
             s.value = "new value"  # type: ignore
 
     def test_inheritance_with_missing_ref_keyerror(self):

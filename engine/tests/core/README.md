@@ -11,25 +11,27 @@ Tests are organized by the core concept being tested, not by implementation deta
 ```
 tests/core/
 ├── entity/
-│   └── test_entity_consolidated.py    # Entity: identity, matching, tags, serialization
-├── singleton/
-│   └── test_singleton_consolidated.py # Singleton & InheritingSingleton
+│   ├── test_entity.py                 # Entity: identity, matching, tags, serialization
+│   └── test_structuring.py            # Serialization utilities
 ├── registry/
-│   └── test_registry.py               # Registry: CRUD, search, filtering
+│   ├── test_registry.py               # Registry: CRUD, search, filtering
+│   └── test_selection.py              # Registry filter with selector
 ├── graph/
 │   ├── test_graph.py                  # Graph, Node, Edge basics
 │   ├── test_node.py                   # Node-specific functionality
 │   ├── test_edge.py                   # Edge-specific functionality
 │   └── test_token.py                  # Token specialization
+├── singleton/
+│   └── test_singleton.py              # Singleton & InheritingSingleton
 ├── factory/
 │   ├── test_templates.py              # Template system
 │   └── test_token_factory.py          # Token factory
-├── dispatch/
-│   ├── test_dispatch_comprehensive.py # Core dispatch system
-│   └── test_handlers.py               # Dispatch handlers
-├── test_content_addressable.py        # ContentAddressable
-├── test_record_stream.py              # Record & StreamRegistry
-└── test_structuring.py                # Serialization utilities
+├── record/
+│   ├── test_content_addressable.py    # ContentAddressable
+│   └── test_record_stream.py          # Record & StreamRegistry
+└── dispatch/
+    ├── test_dispatch.py               # Core dispatch system
+    └── test_hooked_objs.py            # Dispatch handlers
 ```
 
 ## Test File Pattern
@@ -208,12 +210,12 @@ pytest tests/core/singleton/
 
 ### Run specific test class
 ```bash
-pytest tests/core/entity/test_entity_consolidated.py::TestEntityMatching
+pytest tests/core/entity/test_entity.py::TestEntityMatching
 ```
 
 ### Run specific test
 ```bash
-pytest tests/core/entity/test_entity_consolidated.py::TestEntityMatching::test_matches_by_label
+pytest tests/core/entity/test_entity.py::TestEntityMatching::test_matches_by_label
 ```
 
 ### Run with coverage
@@ -270,8 +272,8 @@ If a test file becomes too large (>1000 lines):
 
 See the consolidated test files for examples of good test organization:
 
-- `entity/test_entity_consolidated.py` - Comprehensive entity testing
-- `singleton/test_singleton_consolidated.py` - Singleton and inheritance testing
+- `entity/test_entity.py` - Comprehensive entity testing
+- `singleton/test_singleton.py` - Singleton and inheritance testing
 
 These files demonstrate:
 - Clear organization into test classes
