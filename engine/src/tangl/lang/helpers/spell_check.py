@@ -1,3 +1,4 @@
+# pragma: exclude file - optional deps and generally deprecated in favor of langtool
 """
 Spellcheck for 'text' fields is embedded in the test scripts.  Add words by hand to the world pwl file.
 
@@ -11,7 +12,7 @@ yq e '.blocks[].text' <scene>.yaml | aspell -a | cut -d ' ' -f 2 | grep -v '*' |
 
 requirements: enchant (and lib)
 
-Only called by manually for testing/validation
+Only called manually for testing/validation
 """
 import typing as typ
 import pathlib

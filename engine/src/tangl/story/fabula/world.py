@@ -503,45 +503,45 @@ class World(Singleton):
 
         return successor_ref
 
-    def _create_story_hybrid(self, story_label: str) -> StoryGraph:
-        """Create a graph with materialized nodes but open dependencies."""
-
-        from tangl.story.story_graph import StoryGraph
-
-        graph = StoryGraph(label=story_label, world=self)
-        graph.factory = self.script_manager.template_factory
-        globals_ns = self.script_manager.get_story_globals() or {}
-        if globals_ns:
-            graph.locals.update(globals_ns)
-        from tangl.story.concepts.item import Flag, Item
-
-        graph.locals.setdefault("Item", Item)
-        graph.locals.setdefault("Flag", Flag)
-
-        actor_map = self._build_actors(graph)
-        location_map = self._build_locations(graph)
-        item_map = self._build_items(graph)
-        flag_map = self._build_flags(graph)
-
-        block_map, action_scripts = self._build_blocks(graph)
-        scene_map = self._build_scenes(
-            graph,
-            block_map,
-            actor_map=actor_map,
-            location_map=location_map,
-            wire_dependencies=True,
-            resolve_dependencies=False,
-        )
-
-        self._build_action_edges(graph, block_map, action_scripts)
-
-        start_scene, start_block = self._get_starting_cursor()
-        start_uid = block_map.get(f"{start_scene}.{start_block}")
-        if start_uid is None:
-            raise ValueError(f"Start block '{start_scene}.{start_block}' not found in story graph")
-
-        graph.initial_cursor_id = start_uid
-        return graph
+    # def _create_story_hybrid(self, story_label: str) -> StoryGraph:
+    #     """Create a graph with materialized nodes but open dependencies."""
+    #
+    #     from tangl.story.story_graph import StoryGraph
+    #
+    #     graph = StoryGraph(label=story_label, world=self)
+    #     graph.factory = self.script_manager.template_factory
+    #     globals_ns = self.script_manager.get_story_globals() or {}
+    #     if globals_ns:
+    #         graph.locals.update(globals_ns)
+    #     from tangl.story.concepts.item import Flag, Item
+    #
+    #     graph.locals.setdefault("Item", Item)
+    #     graph.locals.setdefault("Flag", Flag)
+    #
+    #     actor_map = self._build_actors(graph)
+    #     location_map = self._build_locations(graph)
+    #     item_map = self._build_items(graph)
+    #     flag_map = self._build_flags(graph)
+    #
+    #     block_map, action_scripts = self._build_blocks(graph)
+    #     scene_map = self._build_scenes(
+    #         graph,
+    #         block_map,
+    #         actor_map=actor_map,
+    #         location_map=location_map,
+    #         wire_dependencies=True,
+    #         resolve_dependencies=False,
+    #     )
+    #
+    #     self._build_action_edges(graph, block_map, action_scripts)
+    #
+    #     start_scene, start_block = self._get_starting_cursor()
+    #     start_uid = block_map.get(f"{start_scene}.{start_block}")
+    #     if start_uid is None:
+    #         raise ValueError(f"Start block '{start_scene}.{start_block}' not found in story graph")
+    #
+    #     graph.initial_cursor_id = start_uid
+    #     return graph
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""

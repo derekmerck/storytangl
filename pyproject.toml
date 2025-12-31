@@ -183,7 +183,10 @@ exclude_also = [
 
     # Don't complain about abstract methods, they aren't run:
     "@(abc\\.)?abstractmethod",
-    "@ApiEndpoint\\.register"
+    "@ApiEndpoint\\.register",
+
+    # exclude entire file when "# pragma: exclude file" invoked:
+    "(?s:\\A.*# pragma: exclude file.*\\Z)"
     ]
 
 [tool.coverage.html]

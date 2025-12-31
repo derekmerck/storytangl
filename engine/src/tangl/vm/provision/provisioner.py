@@ -74,31 +74,32 @@ class Provisioner(Entity):
     ) -> Iterator[AffordanceOffer]:
         return iter(())
 
-    def get_offers(
-        self,
-        requirement: Requirement | "Dependency" | None = None,
-        *,
-        ctx: Context,
-        node: Node | None = None,
-    ) -> list[ProvisionOffer]:
-        """Compatibility shim returning a concrete list of offers."""
-
-        if requirement is not None:
-            req: Requirement
-            if hasattr(requirement, "requirement"):
-                dependency = requirement  # type: ignore[assignment]
-                req = dependency.requirement  # type: ignore[attr-defined]
-            else:
-                req = requirement  # type: ignore[assignment]
-            return list(self.get_dependency_offers(req, ctx=ctx))
-
-        if node is None:
-            cursor_id = getattr(ctx, "cursor_id", None)
-            if cursor_id is not None:
-                node = ctx.graph.get(cursor_id)
-        if node is None:
-            raise ValueError("node must be provided when collecting affordance offers")
-        return list(self.get_affordance_offers(node, ctx=ctx))
+    # How come this is unused?
+    # def get_offers(
+    #     self,
+    #     requirement: Requirement | "Dependency" | None = None,
+    #     *,
+    #     ctx: Context,
+    #     node: Node | None = None,
+    # ) -> list[ProvisionOffer]:
+    #     """Compatibility shim returning a concrete list of offers."""
+    #
+    #     if requirement is not None:
+    #         req: Requirement
+    #         if hasattr(requirement, "requirement"):
+    #             dependency = requirement  # type: ignore[assignment]
+    #             req = dependency.requirement  # type: ignore[attr-defined]
+    #         else:
+    #             req = requirement  # type: ignore[assignment]
+    #         return list(self.get_dependency_offers(req, ctx=ctx))
+    #
+    #     if node is None:
+    #         cursor_id = getattr(ctx, "cursor_id", None)
+    #         if cursor_id is not None:
+    #             node = ctx.graph.get(cursor_id)
+    #     if node is None:
+    #         raise ValueError("node must be provided when collecting affordance offers")
+    #     return list(self.get_affordance_offers(node, ctx=ctx))
 
 
 class GraphProvisioner(Provisioner):
@@ -293,52 +294,52 @@ class TemplateProvisioner(Provisioner):
         provenance.update(self._template_provenance(template))
         return template, provenance
 
-    @staticmethod
-    def _matches_scope(template_data: Mapping[str, Any] | Any, *, ctx: "Context") -> bool:
-        cursor = getattr(ctx, "cursor", None)
-        if cursor is None:
-            graph = getattr(ctx, "graph", None)
-            cursor_id = getattr(ctx, "cursor_id", None)
-            if graph is not None and cursor_id is not None:
-                cursor = graph.get(cursor_id)
-        criteria: dict[str, Any]
-        if hasattr(template_data, "get_selection_criteria"):
-            criteria = template_data.get_selection_criteria() or {}
-        elif isinstance(template_data, Mapping):
-            criteria = {}
-            path_pattern = template_data.get("path_pattern")
-            if path_pattern:
-                criteria["has_path"] = path_pattern
-            ancestor_tags = template_data.get("ancestor_tags")
-            if ancestor_tags:
-                criteria["has_ancestor_tags"] = set(ancestor_tags)
-            forbid_ancestor_tags = template_data.get("forbid_ancestor_tags")
-            if forbid_ancestor_tags:
-                criteria["has_ancestor_tags__not"] = set(forbid_ancestor_tags)
-        else:
-            criteria = {}
-
-        if not criteria:
-            return True
-
-        if cursor is None:
-            has_path = criteria.get("has_path")
-            requires_path = has_path not in (None, "*")
-            requires_tags = bool(
-                criteria.get("has_ancestor_tags") or criteria.get("has_ancestor_tags__not")
-            )
-            return not (requires_path or requires_tags)
-
-        has_path = criteria.get("has_path")
-        if has_path and not cursor.has_path(has_path):
-            return False
-        ancestor_tags = criteria.get("has_ancestor_tags")
-        if ancestor_tags and not cursor.has_ancestor_tags(ancestor_tags):
-            return False
-        forbid_ancestor_tags = criteria.get("has_ancestor_tags__not")
-        if forbid_ancestor_tags and not cursor.has_ancestor_tags__not(forbid_ancestor_tags):
-            return False
-        return True
+    # @staticmethod
+    # def _matches_scope(template_data: Mapping[str, Any] | Any, *, ctx: "Context") -> bool:
+    #     cursor = getattr(ctx, "cursor", None)
+    #     if cursor is None:
+    #         graph = getattr(ctx, "graph", None)
+    #         cursor_id = getattr(ctx, "cursor_id", None)
+    #         if graph is not None and cursor_id is not None:
+    #             cursor = graph.get(cursor_id)
+    #     criteria: dict[str, Any]
+    #     if hasattr(template_data, "get_selection_criteria"):
+    #         criteria = template_data.get_selection_criteria() or {}
+    #     elif isinstance(template_data, Mapping):
+    #         criteria = {}
+    #         path_pattern = template_data.get("path_pattern")
+    #         if path_pattern:
+    #             criteria["has_path"] = path_pattern
+    #         ancestor_tags = template_data.get("ancestor_tags")
+    #         if ancestor_tags:
+    #             criteria["has_ancestor_tags"] = set(ancestor_tags)
+    #         forbid_ancestor_tags = template_data.get("forbid_ancestor_tags")
+    #         if forbid_ancestor_tags:
+    #             criteria["has_ancestor_tags__not"] = set(forbid_ancestor_tags)
+    #     else:
+    #         criteria = {}
+    #
+    #     if not criteria:
+    #         return True
+    #
+    #     if cursor is None:
+    #         has_path = criteria.get("has_path")
+    #         requires_path = has_path not in (None, "*")
+    #         requires_tags = bool(
+    #             criteria.get("has_ancestor_tags") or criteria.get("has_ancestor_tags__not")
+    #         )
+    #         return not (requires_path or requires_tags)
+    #
+    #     has_path = criteria.get("has_path")
+    #     if has_path and not cursor.has_path(has_path):
+    #         return False
+    #     ancestor_tags = criteria.get("has_ancestor_tags")
+    #     if ancestor_tags and not cursor.has_ancestor_tags(ancestor_tags):
+    #         return False
+    #     forbid_ancestor_tags = criteria.get("has_ancestor_tags__not")
+    #     if forbid_ancestor_tags and not cursor.has_ancestor_tags__not(forbid_ancestor_tags):
+    #         return False
+    #     return True
 
     @staticmethod
     def _find_template(
