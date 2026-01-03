@@ -30,34 +30,24 @@ from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from tangl.type_hints import UniqueLabel
 from tangl.utils.sanitize_str import sanitize_path
-from tangl.core import Entity
-from tangl.core.graph.edge import Edge
 from tangl.core.graph.graph import Graph, GraphItem
 from tangl.core.graph.node import Node
 from tangl.core.graph.subgraph import Subgraph
 from tangl.core.singleton import Singleton
 from tangl.vm import ProvisioningPolicy
-from tangl.vm.context import MaterializationContext
-from tangl.vm.dispatch import vm_dispatch
-from tangl.vm.dispatch.materialize_task import MaterializeTask
 from tangl.vm.provision.open_edge import Dependency
 from tangl.vm.provision.requirement import Requirement
 from tangl.ir.core_ir import BaseScriptItem
-from tangl.ir.story_ir.scene_script_models import BlockScript, SceneScript
-from tangl.story.concepts.actor.role import Role
-from tangl.story.concepts.location.setting import Setting
-from tangl.story.episode import Scene, Block
+from tangl.ir.story_ir.scene_script_models import BlockScript
 
 # Integrated Story Domains
 from .domain_manager import DomainManager  # behaviors and classes
 from .script_manager import ScriptManager  # concept templates
 from .asset_manager import AssetManager    # platonic objects
-from .media import attach_media_deps_for_block
-
 # from tangl.discourse.voice_manager import VoiceManager   # narrative and character styles
 
 logger = logging.getLogger(__name__)
@@ -149,13 +139,35 @@ class World(Singleton):
         """Return a template by ``label`` if it has been registered."""
         return self.script_manager.find_template(*args, **criteria)
 
+    def _materialize_from_template(
+        self,
+        template: BaseScriptItem,
+        graph: StoryGraph,
+    ) -> Node:
+        """Materialize a template for dispatch-driven customization."""
+
+        from tangl.core.factory import TemplateFactory
+        from tangl.story.fabula.address_resolver import ensure_instance
+
+        address = self._normalize_template_address(template)
+        factory = TemplateFactory(label="world_materialize")
+        factory.add(template)
+        return ensure_instance(
+            graph,
+            address,
+            factory,
+            world=self,
+            allow_archetypes=True,
+        )
+
     def _create_story_lazy(self, story_label: str) -> StoryGraph:
         """Create story with only the seed block materialized."""
 
+        from tangl.story.fabula.address_resolver import ensure_instance
         from tangl.story.story_graph import StoryGraph
+
         graph = StoryGraph(label=story_label, world=self)
         graph.factory = self.script_manager.template_factory
-        factory = self.script_manager.template_factory
 
         globals_ns = self.script_manager.get_story_globals() or {}
         if globals_ns:
@@ -165,247 +177,46 @@ class World(Singleton):
         graph.locals.setdefault("Item", Item)
         graph.locals.setdefault("Flag", Flag)
 
-        start_scene_label, start_block_label = self._get_starting_cursor()
-
-        # Get block template from factory
-        script_label = getattr(self.script_manager.master_script, "label", None)
-        start_block_identifier = f"{start_scene_label}.{start_block_label}"
-        path_candidates = [
-            f"{script_label}.{start_block_identifier}" if script_label else start_block_identifier,
-            start_block_identifier,
-        ]
-        block_template = None
-        for path_value in path_candidates:
-            if not path_value:
-                continue
-            block_template = factory.find_one(path=path_value)
-            if block_template is not None:
-                break
-        if block_template is None:
-            block_template = factory.find_one(label=start_block_label)
-
-        if block_template is None:
-            raise ValueError(
-                f"Start block template '{start_block_identifier}' not found in registry. "
-                f"Ensure BlockScript templates are registered during compilation (Phase D)."
-            )
-
-        parent_label = self._template_parent_label(block_template)
-        parent_container = self.ensure_scope(parent_label, graph)
-
-        start_block = self._materialize_from_template(
-            template=block_template,
-            graph=graph,
-            parent_container=parent_container,
+        start_address = self._get_start_address()
+        start_node = ensure_instance(
+            graph,
+            start_address,
+            self.script_manager.template_factory,
+            world=self,
         )
 
-        scene_container = graph.find_subgraph(label=start_scene_label)
-        if scene_container is None:
-            scene_container = graph.add_subgraph(label=start_scene_label)
-        if start_block.uid not in scene_container.member_ids:
-            scene_container.add_member(start_block)
-
-        graph.initial_cursor_id = start_block.uid
+        graph.initial_cursor_id = start_node.uid
         return graph
 
     def ensure_scope(self, parent_label: str | None, graph: StoryGraph) -> Subgraph | None:
         """Ensure that a container described by ``parent_label`` exists in ``graph``.
 
-        The method is idempotent and will return an existing subgraph when one
-        matches ``parent_label``. When absent, it attempts to materialize
-        the container from the world's template registry or, as a fallback, from
-        scene definitions in the story script.
-
-        Parameters
-        ----------
-        parent_label:
-            Label identifying the parent container requirement.
-        graph:
-            Story graph that should own the ensured container.
-
-        Returns
-        -------
-        Subgraph | None
-            ``None`` when no container is required, otherwise the existing or
-            newly created subgraph.
-
-        Raises
-        ------
-        ValueError
-            When a parent label is requested but no template or scene definition
-            is available to create it.
-        NotImplementedError
-            When ancestor-based selectors are provided (unsupported today).
+        Deprecated: prefer :func:`tangl.story.fabula.address_resolver.ensure_namespace`
+        or :func:`tangl.story.fabula.address_resolver.ensure_instance`.
         """
 
+        import warnings
+
+        warnings.warn(
+            "World.ensure_scope is deprecated. Use ensure_namespace or ensure_instance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         if parent_label is None:
             return None
 
-        existing = graph.find_subgraph(label=parent_label)
-        if existing is not None:
-            return existing
+        from tangl.story.fabula.address_resolver import ensure_namespace
 
-        template = self.script_manager.template_factory.find_one(
-            sort_key=lambda item: item.scope_specificity(),
-            has_identifier=parent_label,
-        )
-
-        parent_container: Subgraph | None = None
-        if template is not None:
-            template_parent = getattr(template, "parent", None)
-            if template_parent is not None:
-                from tangl.ir.core_ir.master_script_model import MasterScript
-
-                if isinstance(template_parent, MasterScript):
-                    template_parent_label = None
-                else:
-                    template_parent_label = getattr(template_parent, "label", None)
-            else:
-                template_parent_label = None
-            parent_container = self.ensure_scope(template_parent_label, graph)
-
-            return self._materialize_from_template(
-                template=template,
-                graph=graph,
-                parent_container=parent_container,
-            )
-
-        scenes = self._get_scenes_dict()
-        scene_data = scenes.get(parent_label)
-
-        if scene_data is None:
-            raise ValueError(
-                f"Scope requires parent container '{parent_label}' but no template found in"
-                f" template registry or scene definitions."
-            )
-
-        scene_scope_data = scene_data.get("scope")
-        if scene_scope_data:
-            if hasattr(scene_scope_data, "parent_label"):
-                scene_parent_label = scene_scope_data.parent_label
-            elif isinstance(scene_scope_data, dict):
-                scene_parent_label = scene_scope_data.get("parent_label")
-            else:
-                scene_parent_label = None
-            parent_container = self.ensure_scope(scene_parent_label, graph)
-
-        scene_cls = self.domain_manager.resolve_class(
-            scene_data.get("obj_cls") or "tangl.core.graph.Subgraph"
-        )
-        try:
-            if not issubclass(scene_cls, Subgraph):
-                raise TypeError(
-                    f"Scene class {scene_cls.__name__} for '{parent_label}' must be a subclass of Subgraph."
-                )
-        except TypeError as err:  # pragma: no cover - defensive
-            raise TypeError(
-                f"Invalid scene class configured for '{parent_label}'. Expected a class, but got {scene_cls!r}."
-            ) from err
-
-        payload = self._prepare_payload(
-            scene_cls,
-            scene_data,
-            graph,
-            drop_keys=("blocks", "templates", "roles", "settings"),
-        )
-        payload.setdefault("label", parent_label)
-
-        scene = scene_cls.structure(payload)
-        graph.add(scene)
-
-        if parent_container:
-            parent_container.add_member(scene)
-
-        return scene
-
-    def _template_parent_label(self, template: BaseScriptItem) -> str | None:
-        parent = getattr(template, "parent", None)
-        if parent is None:
-            return None
-
-        from tangl.ir.core_ir.master_script_model import MasterScript
-
-        if isinstance(parent, MasterScript):
-            return None
-        parent_label = getattr(parent, "label", None)
-        if parent_label is None:
-            return None
-
-        obj_cls = getattr(parent, "obj_cls", None)
-        if obj_cls is None:
-            return parent_label
-
-        if isinstance(obj_cls, str):
-            resolved_cls = self.domain_manager.resolve_class(obj_cls)
-        else:
-            resolved_cls = obj_cls
-
-        from tangl.core.graph.subgraph import Subgraph
-
-        try:
-            if resolved_cls is None or not issubclass(resolved_cls, Subgraph):
-                return None
-        except TypeError:
-            return None
-
-        return parent_label
-
-    def _materialize_from_template(
-        self,
-        template: BaseScriptItem,
-        graph: StoryGraph,
-        parent_container: Subgraph | None = None,
-    ) -> Node:
-        """Dispatch-driven materialization of a single template."""
-
-        payload = template.model_dump(exclude={"scope"})
-        if getattr(template, "model_extra", None):
-            payload.update(template.model_extra)
-        payload.setdefault("label", template.label)
-        payload.pop("obj_cls", None)
-
-        ctx = MaterializationContext(
-            template=template,
-            graph=graph,
-            payload=payload,
-            parent_container=parent_container,
-            node=None,
-        )
-
-        caller = parent_container or graph
-        receipts = vm_dispatch.dispatch(
-            caller=caller,
-            ctx=ctx,
-            task=MaterializeTask.MATERIALIZE,
-        )
-        list(receipts)
-
-        if ctx.node is None:
-            raise RuntimeError(
-                "Materialization dispatch failed: no handler set ctx.node for "
-                f"template '{template.label}'. A NORMAL phase handler must create "
-                "the node and assign it to ctx.node."
-            )
-
-        return ctx.node
+        return ensure_namespace(graph, parent_label)
 
     def _attach_action_requirements(
         self,
         graph: StoryGraph,
         node: Node,
         action_scripts: list[dict[str, Any]],
-        block_map: Mapping[str, UUID] | None = None,
     ) -> None:
         """Create action edges with requirements for successor blocks."""
-
-        scene_label = node.parent.label if node.parent else None
-
-        if block_map is None:
-            block_map = {
-                getattr(node, "label", ""): node.uid
-                for node in graph.find_nodes()
-                if getattr(node, "label", None)
-            }
 
         for action_data in action_scripts:
             if hasattr(action_data, "model_dump"):
@@ -419,7 +230,10 @@ class World(Singleton):
             if not successor_ref:
                 continue
 
-            successor_identifier = self._qualify_successor_ref(successor_ref, scene_label)
+            successor_identifier = self._normalize_successor_address(
+                successor_ref=str(successor_ref),
+                source_node=node,
+            )
 
             action_cls = self.domain_manager.resolve_class(
                 payload_get("obj_cls") or "tangl.story.episode.action.Action"
@@ -438,19 +252,14 @@ class World(Singleton):
                 or []
             )
 
-            destination_id = None
-            try:
-                destination_id = self._resolve_successor(
-                    successor_identifier, scene_label or "", block_map
-                )
-            except ValueError:
-                destination_id = None
+            destination = graph.find_one(path=successor_identifier)
+            destination_id = destination.uid if destination is not None else None
 
             action = action_cls(
                 graph=graph,
                 source=node,
                 destination_id=destination_id,
-                destination=graph.get(destination_id) if destination_id else None,
+                destination=destination,
                 label=label,
                 content=payload_get("text"),
                 conditions=payload_get("conditions") or [],
@@ -479,74 +288,30 @@ class World(Singleton):
                 label="destination",
             )
 
-            if destination_id:
-                destination = graph.get(destination_id)
-                if destination is not None:
-                    dependency.destination = destination
-                    req.provider = destination
+            if destination is not None:
+                dependency.destination = destination
+                req.provider = destination
 
             graph.add(dependency)
 
-    def _qualify_successor_ref(self, successor_ref: str, scene_label: str | None) -> str:
-        """Convert successor reference to qualified identifier."""
+    def _normalize_successor_address(self, *, successor_ref: str, source_node: Node) -> str:
+        """Normalize successor references into address-based identifiers."""
 
         successor_ref = sanitize_path(successor_ref)
-
         if "." in successor_ref:
             return successor_ref
-
-        if successor_ref in self._get_scenes_dict():
-            return successor_ref
-
-        if scene_label:
-            return f"{scene_label}.{successor_ref}"
-
+        source_path = getattr(source_node, "path", "")
+        if "." in source_path:
+            parent_path = source_path.rsplit(".", 1)[0]
+            return f"{parent_path}.{successor_ref}"
         return successor_ref
-
-    # def _create_story_hybrid(self, story_label: str) -> StoryGraph:
-    #     """Create a graph with materialized nodes but open dependencies."""
-    #
-    #     from tangl.story.story_graph import StoryGraph
-    #
-    #     graph = StoryGraph(label=story_label, world=self)
-    #     graph.factory = self.script_manager.template_factory
-    #     globals_ns = self.script_manager.get_story_globals() or {}
-    #     if globals_ns:
-    #         graph.locals.update(globals_ns)
-    #     from tangl.story.concepts.item import Flag, Item
-    #
-    #     graph.locals.setdefault("Item", Item)
-    #     graph.locals.setdefault("Flag", Flag)
-    #
-    #     actor_map = self._build_actors(graph)
-    #     location_map = self._build_locations(graph)
-    #     item_map = self._build_items(graph)
-    #     flag_map = self._build_flags(graph)
-    #
-    #     block_map, action_scripts = self._build_blocks(graph)
-    #     scene_map = self._build_scenes(
-    #         graph,
-    #         block_map,
-    #         actor_map=actor_map,
-    #         location_map=location_map,
-    #         wire_dependencies=True,
-    #         resolve_dependencies=False,
-    #     )
-    #
-    #     self._build_action_edges(graph, block_map, action_scripts)
-    #
-    #     start_scene, start_block = self._get_starting_cursor()
-    #     start_uid = block_map.get(f"{start_scene}.{start_block}")
-    #     if start_uid is None:
-    #         raise ValueError(f"Start block '{start_scene}.{start_block}' not found in story graph")
-    #
-    #     graph.initial_cursor_id = start_uid
-    #     return graph
 
     def _create_story_full(self, story_label: str) -> StoryGraph:
         """Materialize a fully-instantiated :class:`StoryGraph`."""
 
+        from tangl.story.fabula.address_resolver import ensure_instance
         from tangl.story.story_graph import StoryGraph
+
         globals_ns = self.script_manager.get_story_globals() or {}
         graph = StoryGraph(label=story_label, world=self, locals=globals_ns)
         graph.factory = self.script_manager.template_factory
@@ -555,84 +320,99 @@ class World(Singleton):
         graph.locals.setdefault("Item", Item)
         graph.locals.setdefault("Flag", Flag)
 
-        actor_map = self._build_actors(graph)
-        location_map = self._build_locations(graph)
         self._build_items(graph)
         self._build_flags(graph)
+
+        declared_templates = self._get_declared_templates()
+        script_label = getattr(self.script_manager.master_script, "label", None)
+
+        def _normalize_address(template: BaseScriptItem) -> str:
+            address = getattr(template, "path", "")
+            if script_label and address.startswith(f"{script_label}."):
+                return address[len(script_label) + 1:]
+            return address
+
+        declared_templates.sort(key=lambda template: len(_normalize_address(template).split(".")))
+
+        for template in declared_templates:
+            try:
+                address = _normalize_address(template)
+                ensure_instance(
+                    graph,
+                    address,
+                    self.script_manager.template_factory,
+                    world=self,
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(
+                    "Failed to materialize '%s': %s",
+                    getattr(template, "path", None),
+                    exc,
+                    exc_info=True,
+                )
+
+        actor_map, location_map = self._build_dependency_maps(graph)
+        self._resolve_open_dependencies(
+            graph=graph,
+            actor_map=actor_map,
+            location_map=location_map,
+        )
+
+        start_address = self._get_start_address()
+        start_node = graph.find_one(path=start_address)
+        if start_node is None:
+            raise ValueError(f"Start node not found at '{start_address}'")
+
+        graph.initial_cursor_id = start_node.uid
+        return graph
+
+    def _get_declared_templates(self) -> list[BaseScriptItem]:
+        """Return templates that declare instances."""
+
+        return list(
+            self.script_manager.template_factory.find_all(declares_instance=True)
+        )
+
+    def _get_start_address(self) -> str:
+        """Return the address for the starting node."""
+
+        metadata = self.script_manager.get_story_metadata()
+        start_at = metadata.get("start_at")
+        if not start_at:
+            raise ValueError("No start_at specified in metadata")
+        script_label = getattr(self.script_manager.master_script, "label", None)
+        if script_label and start_at.startswith(f"{script_label}."):
+            return start_at[len(script_label) + 1:]
+        return start_at
+
+    def _build_dependency_maps(
+        self,
+        graph: StoryGraph,
+    ) -> tuple[dict[str, UUID], dict[str, UUID]]:
+        """Collect actor and location identifiers for dependency resolution."""
+
         from tangl.story.concepts.actor import Actor
         from tangl.story.concepts.location import Location
 
-        for template in self.script_manager.find_templates():
-            resolved_cls = self.domain_manager.resolve_class(template.obj_cls)
-            if not issubclass(resolved_cls, (Actor, Location)):
-                continue
-            if template.label and graph.find_node(label=template.label) is not None:
-                continue
-            parent_label = self._template_parent_label(template)
-            parent_container = self.ensure_scope(parent_label, graph)
-            self._materialize_from_template(
-                template=template,
-                graph=graph,
-                parent_container=parent_container,
-            )
+        actor_map = self._index_nodes_by_identifier(graph, Actor)
+        location_map = self._index_nodes_by_identifier(graph, Location)
+        return actor_map, location_map
 
-        block_map, action_scripts = self._build_blocks(graph)
-        self._build_scenes(
-            graph,
-            block_map,
-            actor_map=actor_map,
-            location_map=location_map,
-            wire_dependencies=True,
-            resolve_dependencies=True,
-        )
+    def _index_nodes_by_identifier(
+        self,
+        graph: StoryGraph,
+        node_cls: type[Node],
+    ) -> dict[str, UUID]:
+        """Return a map of labels and paths for nodes of a given class."""
 
-        self._build_action_edges(graph, block_map, action_scripts)
-
-        start_scene, start_block = self._get_starting_cursor()
-        start_uid = block_map.get(f"{start_scene}.{start_block}")
-        if start_uid is None:
-            raise ValueError(
-                f"Start block '{start_scene}.{start_block}' not found in story graph"
-            )
-
-        graph.initial_cursor_id = start_uid
-        return graph
-
-    def _build_actors(self, graph: StoryGraph) -> dict[str, UUID]:
-        """Instantiate actors described in the script into ``graph``."""
-        actor_map: dict[str, UUID] = {}
-        for actor_data in self.script_manager.get_unstructured("actors") or ():
-            payload = self._to_dict(actor_data)
-            label = payload.get("label")
-            if not label:
-                continue
-            obj_cls = (
-                actor_data.obj_cls
-                if hasattr(actor_data, "obj_cls")
-                else payload.get("obj_cls")
-            )
-            cls = self.domain_manager.resolve_class(obj_cls)
-            actor = cls.structure(self._prepare_payload(cls, payload, graph))
-            actor_map[label] = actor.uid
-        return actor_map
-
-    def _build_locations(self, graph: StoryGraph) -> dict[str, UUID]:
-        """Instantiate locations described in the script into ``graph``."""
-        location_map: dict[str, UUID] = {}
-        for location_data in self.script_manager.get_unstructured("locations") or ():
-            payload = self._to_dict(location_data)
-            label = payload.get("label")
-            if not label:
-                continue
-            obj_cls = (
-                location_data.obj_cls
-                if hasattr(location_data, "obj_cls")
-                else payload.get("obj_cls")
-            )
-            cls = self.domain_manager.resolve_class(obj_cls)
-            location = cls.structure(self._prepare_payload(cls, payload, graph))
-            location_map[label] = location.uid
-        return location_map
+        index: dict[str, UUID] = {}
+        for node in graph.find_nodes(is_instance=node_cls):
+            if node.label:
+                index.setdefault(node.label, node.uid)
+            path = getattr(node, "path", None)
+            if path:
+                index.setdefault(path, node.uid)
+        return index
 
     def _build_items(self, graph: StoryGraph) -> dict[str, UUID]:
         """Instantiate items defined in the script into ``graph``."""
@@ -662,284 +442,186 @@ class World(Singleton):
             flag_map[label] = flag.uid
         return flag_map
 
-    def _build_blocks(
+    def _resolve_open_dependencies(
         self,
-        graph: StoryGraph,
-    ) -> tuple[dict[str, UUID], dict[str, dict[str, list[dict[str, Any]]]]]:
-        """Instantiate block nodes and collect their scripted actions."""
-
-        node_map: dict[str, UUID] = {}
-        action_scripts: dict[str, dict[str, list[dict[str, Any]]]] = {}
-        scenes = self._get_scenes_dict()
-
-        for scene_label, scene_data in scenes.items():
-            scene_payload = self._to_dict(scene_data)
-            blocks = self._normalize_section(scene_payload.get("blocks"))
-            for block_label, block_data in blocks.items():
-                block_data = block_data or {}
-                block_payload = self._to_dict(block_data)
-                qualified_label = f"{scene_label}.{block_label}"
-                obj_cls = (
-                    block_data.obj_cls
-                    if hasattr(block_data, "obj_cls")
-                    else block_payload.get("obj_cls")
-                )
-                if obj_cls is None:
-                    obj_cls = block_payload.get("block_cls")
-                cls = self.domain_manager.resolve_class(obj_cls)
-
-                scripts = {
-                    key: [
-                        self._normalize_action_entry(self._to_dict(entry))
-                        for entry in (block_payload.get(key) or [])
-                    ]
-                    for key in ("actions", "continues", "redirects")
-                }
-                action_scripts[qualified_label] = scripts
-
-                block_script = BlockScript.model_validate(block_payload)
-
-                payload = self._prepare_payload(
-                    cls,
-                    block_payload,
-                    graph,
-                    drop_keys=("actions", "continues", "redirects", "media"),
-                )
-                payload.setdefault("label", block_label)
-
-                block = cls.structure(payload)
-                node_map[qualified_label] = block.uid
-                self._block_scripts[block.uid] = block_script
-                attach_media_deps_for_block(
-                    graph=graph,
-                    block=block,
-                    script=block_script,
-                )
-
-        return node_map, action_scripts
-
-    def _build_scenes(
-        self,
-        graph: StoryGraph,
-        block_map: dict[str, UUID],
         *,
+        graph: StoryGraph,
         actor_map: dict[str, UUID],
         location_map: dict[str, UUID],
-        wire_dependencies: bool = True,
-        resolve_dependencies: bool = False,
-    ) -> dict[str, UUID]:
-        """Instantiate scenes and associate their member blocks."""
-
-        scene_map: dict[str, UUID] = {}
-        scenes = self._get_scenes_dict()
-
-        for scene_label, scene_data in scenes.items():
-            scene_payload = self._to_dict(scene_data)
-            obj_cls = (
-                scene_data.obj_cls
-                if hasattr(scene_data, "obj_cls")
-                else scene_payload.get("obj_cls")
-            )
-            cls = self.domain_manager.resolve_class(obj_cls)
-            members = self._normalize_section(scene_payload.get("blocks"))
-            member_ids = [
-                block_map[f"{scene_label}.{block_label}"]
-                for block_label in members
-                if f"{scene_label}.{block_label}" in block_map
-            ]
-
-            payload = self._prepare_payload(
-                cls,
-                scene_payload,
-                graph,
-                drop_keys=("blocks", "roles", "settings", "assets"),
-            )
-            payload.setdefault("label", scene_label)
-
-            if member_ids and "member_ids" in getattr(cls, "model_fields", {}):
-                payload["member_ids"] = member_ids
-
-            scene = cls.structure(payload)
-            scene_map[scene_label] = scene.uid
-
-            if wire_dependencies:
-                self._wire_roles(
-                    graph=graph,
-                    source_node=scene,
-                    roles_data=scene_payload.get("roles"),
-                    actor_map=actor_map,
-                    resolve_dependencies=resolve_dependencies,
-                )
-                self._wire_settings(
-                    graph=graph,
-                    source_node=scene,
-                    settings_data=scene_payload.get("settings"),
-                    location_map=location_map,
-                    resolve_dependencies=resolve_dependencies,
-                )
-
-            for block_label, block_data in members.items():
-                qualified_label = f"{scene_label}.{block_label}"
-                block_uid = block_map.get(qualified_label)
-                if block_uid is None:
-                    continue
-
-                block = graph.get(block_uid)
-                if block is None:
-                    continue
-
-                block_payload = self._to_dict(block_data)
-                self._wire_roles(
-                    graph=graph,
-                    source_node=block,
-                    roles_data=block_payload.get("roles"),
-                    actor_map=actor_map,
-                    resolve_dependencies=resolve_dependencies,
-                )
-                self._wire_settings(
-                    graph=graph,
-                    source_node=block,
-                    settings_data=block_payload.get("settings"),
-                    location_map=location_map,
-                    resolve_dependencies=resolve_dependencies,
-                )
-
-        return scene_map
-
-    def _resolve_dependency_class(
-        self,
-        obj_cls: Any,
-        *,
-        fallback: type[Dependency],
-    ) -> type[Dependency]:
-        """Resolve ``obj_cls`` to a :class:`Dependency` subclass."""
-
-        candidate: type[Any] | None
-        if isinstance(obj_cls, type):
-            candidate = obj_cls
-        elif obj_cls:
-            candidate = self.domain_manager.resolve_class(obj_cls)
-        else:
-            candidate = fallback
-
-        try:
-            if issubclass(candidate, Dependency):  # type: ignore[arg-type]
-                return candidate  # type: ignore[return-value]
-        except TypeError:
-            pass
-
-        logger.warning(
-            "Dependency class %r is not a Dependency; using %s", obj_cls, fallback.__name__
-        )
-        return fallback
-
-    def _wire_roles(
-        self,
-        *,
-        graph: StoryGraph,
-        source_node: GraphItem,
-        roles_data: Any,
-        actor_map: dict[str, UUID],
-        resolve_dependencies: bool,
     ) -> None:
-        roles = self._normalize_section(roles_data)
-        if not roles:
-            return
+        """Resolve role and setting requirements against existing nodes."""
 
-        for role_label, role_spec in roles.items():
-            policy_value = (
-                self._get_spec_value(role_spec, "policy")
-                or self._get_spec_value(role_spec, "requirement_policy")
-                or ProvisioningPolicy.ANY
-            )
-            policy = (
-                ProvisioningPolicy[policy_value.upper()]
-                if isinstance(policy_value, str)
-                else policy_value
-            )
+        from tangl.story.concepts.actor.role import Role
+        from tangl.story.concepts.location.setting import Setting
 
-            role_cls = self._resolve_dependency_class(
-                self._get_spec_value(role_spec, "obj_cls"),
-                fallback=Role,
-            )
-            payload = self._prepare_payload(
-                role_cls,
-                role_spec,
-                graph,
-            )
-            payload.setdefault("label", role_label)
-            payload.setdefault("source_id", source_node.uid)
-            payload.setdefault("requirement_policy", policy)
-            payload.setdefault("hard_requirement", bool(self._get_spec_value(role_spec, "hard", True)))
+        for dependency in list(graph.find_edges(is_instance=Dependency)):
+            requirement = getattr(dependency, "requirement", None)
+            if requirement is None or requirement.satisfied:
+                continue
 
-            role = role_cls.structure(payload)
-
-            if resolve_dependencies and getattr(role, "requirement", None) is not None:
+            if isinstance(dependency, Role):
                 provider = self._resolve_role_provider(
-                    requirement=role.requirement,
+                    requirement=requirement,
                     actor_map=actor_map,
                     graph=graph,
                 )
-                if provider is not None:
-                    role.requirement.provider = provider
-
-    def _wire_settings(
-        self,
-        *,
-        graph: StoryGraph,
-        source_node: GraphItem,
-        settings_data: Any,
-        location_map: dict[str, UUID],
-        resolve_dependencies: bool,
-    ) -> None:
-        settings = self._normalize_section(settings_data)
-        if not settings:
-            return
-
-        for setting_label, setting_spec in settings.items():
-            policy_value = (
-                self._get_spec_value(setting_spec, "policy")
-                or self._get_spec_value(setting_spec, "requirement_policy")
-                or ProvisioningPolicy.ANY
-            )
-            policy = (
-                ProvisioningPolicy[policy_value.upper()]
-                if isinstance(policy_value, str)
-                else policy_value
-            )
-
-            setting_cls = self._resolve_dependency_class(
-                self._get_spec_value(setting_spec, "obj_cls"),
-                fallback=Setting,
-            )
-            payload = self._prepare_payload(
-                setting_cls,
-                setting_spec,
-                graph,
-            )
-            payload.setdefault("label", setting_label)
-            payload.setdefault("source_id", source_node.uid)
-            payload.setdefault("requirement_policy", policy)
-            payload.setdefault(
-                "hard_requirement", bool(self._get_spec_value(setting_spec, "hard", True))
-            )
-
-            setting = setting_cls.structure(payload)
-
-            if resolve_dependencies and getattr(setting, "requirement", None) is not None:
+            elif isinstance(dependency, Setting):
                 provider = self._resolve_setting_provider(
-                    requirement=setting.requirement,
+                    requirement=requirement,
                     location_map=location_map,
                     graph=graph,
                 )
-                if provider is not None:
-                    setting.requirement.provider = provider
+            else:
+                provider = self._resolve_dependency_provider(
+                    requirement=requirement,
+                    graph=graph,
+                    actor_map=actor_map,
+                    location_map=location_map,
+                )
+
+            if provider is not None:
+                requirement.provider = provider
+
+    def _resolve_dependency_provider(
+        self,
+        *,
+        requirement: Requirement,
+        graph: StoryGraph,
+        actor_map: dict[str, UUID],
+        location_map: dict[str, UUID],
+    ) -> Node | None:
+        keys = [str(req_key) for req_key in (requirement.identifier,) if req_key]
+        if requirement.template_ref:
+            keys.append(str(requirement.template_ref))
+
+        if requirement.policy is not ProvisioningPolicy.CREATE_TEMPLATE:
+            for key in keys:
+                uid = actor_map.get(key)
+                if uid:
+                    provider = graph.get(uid)
+                    if provider is not None:
+                        return provider
+                uid = location_map.get(key)
+                if uid:
+                    provider = graph.get(uid)
+                    if provider is not None:
+                        return provider
+
+        if not (requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE):
+            return None
+        if not requirement.template_ref:
+            return None
+
+        criteria = dict(requirement.criteria or {})
+        template = self.script_manager.find_template(
+            identifier=str(requirement.template_ref),
+            **criteria,
+        )
+        if template is None:
+            return None
+
+        provider = self._materialize_requirement_template(
+            template=template,
+            graph=graph,
+            allow_existing=requirement.policy is not ProvisioningPolicy.CREATE_TEMPLATE,
+        )
+        if provider is None:
+            return None
+
+        target_map = self._select_dependency_map(
+            template=template,
+            actor_map=actor_map,
+            location_map=location_map,
+        )
+        if target_map is not None:
+            self._index_dependency_provider(target_map, provider, keys)
+
+        return provider
+
+    def _materialize_requirement_template(
+        self,
+        *,
+        template: BaseScriptItem,
+        graph: StoryGraph,
+        allow_existing: bool = True,
+    ) -> Node | None:
+        from tangl.core.factory import TemplateFactory
+        from tangl.story.fabula.address_resolver import ensure_instance, ensure_namespace, _materialize_at_address
+
+        address = self._normalize_template_address(template)
+        if not allow_existing:
+            parent = None
+            if "." in address:
+                parent = ensure_namespace(graph, address.rsplit(".", 1)[0])
+            return _materialize_at_address(
+                template=template,
+                address=address,
+                parent=parent,
+                graph=graph,
+                domain_manager=self.domain_manager,
+            )
+
+        factory = TemplateFactory(label="dependency_template")
+        factory.add(template)
+        return ensure_instance(
+            graph,
+            address,
+            factory,
+            world=self,
+            allow_archetypes=True,
+        )
+
+    def _normalize_template_address(self, template: BaseScriptItem) -> str:
+        address = getattr(template, "path", None)
+        if not address:
+            label = getattr(template, "label", None)
+            if label:
+                return label
+            raise ValueError("Template does not define a path or label.")
+        script_label = getattr(self.script_manager.master_script, "label", None)
+        if script_label and address.startswith(f"{script_label}."):
+            return address[len(script_label) + 1:]
+        return address
 
     @staticmethod
-    def _get_spec_value(spec: Any, key: str, default: Any | None = None) -> Any:
-        if isinstance(spec, Mapping):
-            return spec.get(key, default)
-        return getattr(spec, key, default)
+    def _index_dependency_provider(
+        index: dict[str, UUID],
+        provider: Node,
+        keys: Iterable[str],
+    ) -> None:
+        for key in keys:
+            index.setdefault(key, provider.uid)
+        if provider.label:
+            index.setdefault(provider.label, provider.uid)
+        provider_path = getattr(provider, "path", None)
+        if provider_path:
+            index.setdefault(provider_path, provider.uid)
+
+    def _select_dependency_map(
+        self,
+        *,
+        template: BaseScriptItem,
+        actor_map: dict[str, UUID],
+        location_map: dict[str, UUID],
+    ) -> dict[str, UUID] | None:
+        from tangl.story.concepts.actor import Actor
+        from tangl.story.concepts.location import Location
+
+        obj_cls = template.obj_cls or template.get_default_obj_cls()
+        if isinstance(obj_cls, str):
+            obj_cls = self.domain_manager.resolve_class(obj_cls)
+
+        if obj_cls is None:
+            return None
+
+        try:
+            if issubclass(obj_cls, Actor):
+                return actor_map
+            if issubclass(obj_cls, Location):
+                return location_map
+        except TypeError:
+            return None
+        return None
 
     def _resolve_role_provider(
         self,
@@ -961,24 +643,22 @@ class World(Singleton):
                         return existing
 
         if requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE and requirement.template_ref:
-            template = self.script_manager.find_template(identifier=str(requirement.template_ref))
+            from tangl.story.concepts.actor import Actor
+
+            template = self.script_manager.find_template(
+                identifier=str(requirement.template_ref),
+                is_instance=Actor,
+            )
             if template is None:
                 return None
 
-            parent_label = self._template_parent_label(template)
-            parent_container = self.ensure_scope(parent_label, graph)
-            provider = self._materialize_from_template(
+            provider = self._materialize_requirement_template(
                 template=template,
                 graph=graph,
-                parent_container=parent_container,
+                allow_existing=requirement.policy is not ProvisioningPolicy.CREATE_TEMPLATE,
             )
-
             if provider is not None:
-                actor_map[provider.label] = provider.uid
-                if requirement.template_ref:
-                    actor_map[str(requirement.template_ref)] = provider.uid
-                if requirement.identifier:
-                    actor_map[str(requirement.identifier)] = provider.uid
+                self._index_dependency_provider(actor_map, provider, keys)
             return provider
 
         return None
@@ -1003,184 +683,25 @@ class World(Singleton):
                         return existing
 
         if requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE and requirement.template_ref:
-            template = self.script_manager.find_template(identifier=str(requirement.template_ref))
+            from tangl.story.concepts.location import Location
+
+            template = self.script_manager.find_template(
+                identifier=str(requirement.template_ref),
+                is_instance=Location,
+            )
             if template is None:
                 return None
 
-            parent_label = self._template_parent_label(template)
-            parent_container = self.ensure_scope(parent_label, graph)
-            provider = self._materialize_from_template(
+            provider = self._materialize_requirement_template(
                 template=template,
                 graph=graph,
-                parent_container=parent_container,
+                allow_existing=requirement.policy is not ProvisioningPolicy.CREATE_TEMPLATE,
             )
-
             if provider is not None:
-                location_map[provider.label] = provider.uid
-                if requirement.template_ref:
-                    location_map[str(requirement.template_ref)] = provider.uid
-                if requirement.identifier:
-                    location_map[str(requirement.identifier)] = provider.uid
+                self._index_dependency_provider(location_map, provider, keys)
             return provider
 
         return None
-
-    def _build_action_edges(
-        self,
-        graph: StoryGraph,
-        block_map: dict[str, UUID],
-        action_scripts: dict[str, dict[str, list[dict[str, Any]]]],
-    ) -> None:
-        """Create edges defined by block actions and redirects."""
-
-        scenes = self._get_scenes_dict()
-        for scene_label, scene_data in scenes.items():
-            scene_payload = self._to_dict(scene_data)
-            blocks = self._normalize_section(scene_payload.get("blocks"))
-            for block_label in blocks:
-                qualified_label = f"{scene_label}.{block_label}"
-                source_uid = block_map.get(qualified_label)
-                if source_uid is None:
-                    continue
-
-                scripts = action_scripts.get(qualified_label, {})
-                node = graph.get(source_uid)
-                if node is None:
-                    continue
-
-                for key in ("actions", "continues", "redirects"):
-                    edge_scripts = scripts.get(key, [])
-                    if not edge_scripts:
-                        continue
-                    self._attach_action_requirements(
-                        graph=graph,
-                        node=node,
-                        action_scripts=edge_scripts,
-                        block_map=block_map,
-                    )
-
-    def _resolve_successor(
-        self,
-        successor: str,
-        current_scene: str,
-        block_map: dict[str, UUID],
-    ) -> UUID:
-        """Resolve a successor reference to a block identifier."""
-
-        # successor may not have been given in sanitized form
-        logger.debug(f"resolving successor: {successor}")
-        successor = sanitize_path(successor)
-        logger.debug(f"sanitized successor: {successor}")
-
-        if successor in block_map:
-            return block_map[successor]
-
-        qualified = f"{current_scene}.{successor}"
-        if qualified in block_map:
-            return block_map[qualified]
-
-        scenes = self._get_scenes_dict()
-        if successor in scenes:
-            successor_payload = self._to_dict(scenes[successor])
-            blocks = self._normalize_section(successor_payload.get("blocks"))
-            for block_label in blocks:
-                candidate = f"{successor}.{block_label}"
-                if candidate in block_map:
-                    return block_map[candidate]
-
-        raise ValueError(f"Could not resolve successor reference: {successor}")
-
-    def _get_starting_cursor(self) -> tuple[str, str]:
-        """Determine the starting scene and block labels for traversal."""
-
-        metadata = self.script_manager.get_story_metadata() or {}
-        scenes = self._get_scenes_dict()
-
-        if not scenes:
-            raise ValueError("Story script does not define any scenes")
-
-        start_at = metadata.get("start_at")
-        if start_at:
-            if "." in start_at:
-                scene_label, block_label = start_at.split(".", 1)
-                return scene_label, block_label
-
-            if start_at in scenes:
-                blocks = self._normalize_section(scenes[start_at].get("blocks"))
-                if not blocks:
-                    raise ValueError(f"Start scene '{start_at}' has no blocks")
-                first_block = next(iter(blocks))
-                return start_at, first_block
-
-        scene_label, scene_data = next(iter(scenes.items()))
-        blocks = self._normalize_section(scene_data.get("blocks"))
-        if not blocks:
-            raise ValueError(f"Scene '{scene_label}' does not contain any blocks")
-        block_label = next(iter(blocks))
-        return scene_label, block_label
-
-    def _get_block_script(self, scene_label: str, block_label: str) -> BlockScript:
-        """Return the :class:`BlockScript` for ``scene_label`` and ``block_label``."""
-
-        scenes = self._get_scenes_dict()
-        scene_data = scenes.get(scene_label)
-        if scene_data is None:
-            raise ValueError(f"Scene '{scene_label}' not found in story script")
-
-        blocks = self._normalize_section(scene_data.get("blocks"))
-        block_data = blocks.get(block_label)
-        if block_data is None:
-            raise ValueError(f"Block '{scene_label}.{block_label}' not found in story script")
-
-        return BlockScript.model_validate(block_data)
-
-    def _get_scenes_dict(self) -> dict[str, dict[str, Any]]:
-        scenes_iter = self.script_manager.get_unstructured("scenes") or ()
-        scenes: dict[str, dict[str, Any]] = {}
-        for scene in scenes_iter:
-            scene_dict = self._to_dict(scene)
-            label = scene_dict.get("label") or getattr(scene, "label", None)
-            if not label:
-                label = scene.get_label()
-            if not label:
-                continue
-            scene_payload = dict(scene_dict)
-            scene_payload.setdefault("label", label)
-            scenes[label] = scene_payload
-        if scenes:
-            return scenes
-
-        raw_scenes = getattr(self.script_manager.master_script, "scenes", None)
-        return self._normalize_section(raw_scenes)
-
-    def _normalize_section(self, section: Any) -> dict[str, dict[str, Any]]:
-        """Normalize script sections into a label-indexed mapping."""
-
-        if not section:
-            return {}
-
-        items: Iterable[tuple[str, dict[str, Any]]]
-        if isinstance(section, dict):
-            items = (
-                (label, self._to_dict(value))
-                for label, value in section.items()
-            )
-        else:
-            normalized: list[tuple[str, dict[str, Any]]] = []
-            for entry in section:
-                entry_dict = self._to_dict(entry)
-                label = entry_dict.get("label") or getattr(entry, "label", None)
-                if label is None:
-                    continue
-                normalized.append((label, entry_dict))
-            items = normalized
-
-        result: dict[str, dict[str, Any]] = {}
-        for label, data in items:
-            item = dict(data)
-            item.setdefault("label", label)
-            result[label] = item
-        return result
 
     def _prepare_payload(
         self,
@@ -1228,23 +749,6 @@ class World(Singleton):
         return payload
 
     @staticmethod
-    def _ensure_edge_class(cls: type[Any]) -> type[Edge]:
-        try:
-            if issubclass(cls, Edge):
-                return cls
-        except TypeError:  # pragma: no cover - defensive fallback
-            from tangl.vm.frame import ChoiceEdge  # local import to avoid heavy dependency at module scope
-
-            return ChoiceEdge
-
-        if cls is Edge:
-            from tangl.vm.frame import ChoiceEdge
-
-            return ChoiceEdge
-
-        return cls
-
-    @staticmethod
     def _map_activation_to_phase(value: str | None) -> "ResolutionPhase | None":
         if value is None:
             return None
@@ -1262,30 +766,9 @@ class World(Singleton):
             return P.POSTREQS
         return None
 
-    def _normalize_action_entry(self, data: dict[str, Any]) -> dict[str, Any]:
-        payload = dict(data)
-        if "trigger_phase" not in payload:
-            phase = self._map_activation_to_phase(payload.get("activation") or payload.get("trigger"))
-            if phase is not None:
-                payload["trigger_phase"] = phase
-        payload.pop("activation", None)
-        return payload
-
     @staticmethod
     def _is_graph_item(cls: type[Any]) -> bool:
         try:
             return issubclass(cls, GraphItem)
         except TypeError:  # pragma: no cover - defensive fallback
             return False
-
-    @staticmethod
-    def _to_dict(data: Any) -> dict[str, Any]:
-        if isinstance(data, dict):
-            return dict(data)
-        if isinstance(data, BaseModel):
-            return data.model_dump()
-        if hasattr(data, "model_dump"):
-            return data.model_dump()  # pragma: no cover - protocol-style models
-        if data is None:
-            return {}
-        return dict(data)

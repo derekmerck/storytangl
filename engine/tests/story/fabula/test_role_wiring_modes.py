@@ -44,7 +44,11 @@ def _role_script(policy: str) -> dict:
 
     return {
         "label": "roles_test",
-        "metadata": {"title": "Roles Test", "author": "Tests"},
+        "metadata": {
+            "title": "Roles Test",
+            "author": "Tests",
+            "start_at": "tavern.main",
+        },
         "templates": {
             "bartender": {
                 "obj_cls": "tangl.story.concepts.actor.actor.Actor",
@@ -129,7 +133,11 @@ def test_policy_any_reuses_actor_instance():
     world = _build_world(
         {
             "label": "shared_actor",
-            "metadata": {"title": "Shared", "author": "Tests"},
+            "metadata": {
+                "title": "Shared",
+                "author": "Tests",
+                "start_at": "castle.gate",
+            },
             "templates": {
                 "guard": {
                     "obj_cls": "tangl.story.concepts.actor.actor.Actor",
@@ -196,7 +204,11 @@ def test_policy_create_makes_unique_instances():
     world = _build_world(
         {
             "label": "unique_actors",
-            "metadata": {"title": "Unique", "author": "Tests"},
+            "metadata": {
+                "title": "Unique",
+                "author": "Tests",
+                "start_at": "castle.gate",
+            },
             "templates": {
                 "guard": {
                     "obj_cls": "tangl.story.concepts.actor.actor.Actor",

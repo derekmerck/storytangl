@@ -53,6 +53,10 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
     """
     parent: Optional[Self] = Field(None, exclude=True)
     children: Optional[dict[str, Template] | list[Template]] = Field(None, json_schema_extra={'visit_field': True})
+    script_only: bool = Field(
+        default=False,
+        description="If True, this node is organizational and should not set child parents.",
+    )
     # Default field to hold generic children, subclasses are encouraged
     # to name and type-annotate their own children fields.  Remember to
     # tag it as a 'visit_field' to enable hierarchical handling.
@@ -85,24 +89,28 @@ class HierarchicalTemplate(Template[GIT],   # type: ignore[type-arg]
         # It also sets the correct label on v from the key
         # Setting it here will leave it as Unset, I think.
         # Uses update_attrs b/c that bypasses frozen
+        skip_parent = self.script_only
         for field in self._fields(visit_field=(True, False)):
             value = getattr(self, field)
             if value is None:
                 continue
             if isinstance(value, Template):
                 # single child
-                value.update_attrs(parent=self, force=True)
+                if not skip_parent:
+                    value.update_attrs(parent=self, force=True)
             elif isinstance(value, dict):
                 # dict of children by label
                 for k, v in value.items():
                     if v.label is None:
                         logger.debug(f"Updating label {k}")
                         v.update_attrs(label=k, force=True)
-                    v.update_attrs(parent=self, force=True)
+                    if not skip_parent:
+                        v.update_attrs(parent=self, force=True)
             elif isinstance(value, list):
                 # list of children
                 for v in value:
-                    v.update_attrs(parent=self, force=True)
+                    if not skip_parent:
+                        v.update_attrs(parent=self, force=True)
             else:
                 raise ValueError(f"Traversal found unexpected type {type(value)}")
         return self

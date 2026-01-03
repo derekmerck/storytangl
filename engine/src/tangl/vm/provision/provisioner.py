@@ -350,11 +350,7 @@ class TemplateProvisioner(Provisioner):
         if identifier is None:
             return None
         if isinstance(identifier, str) and "." in identifier:
-            template = factory.find_one(path=identifier, **criteria)
-            if template is not None:
-                return template
-            _, tail = identifier.rsplit(".", 1)
-            return factory.find_one(label=tail, **criteria)
+            return factory.find_one(path=identifier, **criteria)
         if isinstance(identifier, str):
             return factory.find_one(label=identifier, **criteria)
         return factory.find_one(uid=identifier, **criteria)
@@ -400,53 +396,48 @@ class TemplateProvisioner(Provisioner):
         ctx: "Context",
         factory: TemplateFactory | None,
     ) -> Node:
-        from tangl.ir.core_ir import BaseScriptItem
+        from tangl.core.factory import TemplateFactory
+        from tangl.story.fabula.address_resolver import ensure_instance
 
-        if isinstance(template, BaseScriptItem):
-            graph = getattr(ctx, "graph", None)
-            world = getattr(graph, "world", None) if graph is not None else None
-            if world is not None and hasattr(world, "_materialize_from_template"):
-                parent_container = None
-                parent = getattr(template, "parent", None)
-                if parent is not None and graph is not None:
-                    parent_label = world._template_parent_label(template)
-                    if parent_label and hasattr(world, "ensure_scope"):
-                        parent_container = world.ensure_scope(parent_label, graph)
-                    elif parent_label:
-                        parent_container = graph.find_subgraph(label=parent_label)
-                        if parent_container is None and hasattr(world, "_materialize_from_template"):
-                            from tangl.ir.story_ir.scene_script_models import SceneScript
+        graph = getattr(ctx, "graph", None)
+        if graph is None:
+            raise ValueError("Context must include a graph for materialization.")
 
-                            if isinstance(parent, SceneScript):
-                                parent_container = world._materialize_from_template(
-                                    template=parent,
-                                    graph=graph,
-                                    parent_container=None,
-                                )
-                if parent_container is None and graph is not None:
-                    criteria = template.get_selection_criteria() or {}
-                    has_path = criteria.get("has_path")
-                    if isinstance(has_path, str) and "." in has_path:
-                        parent_path = has_path.rsplit(".", 1)[0]
-                        parent_label = parent_path.split(".")[-1]
-                        parent_container = graph.find_subgraph(label=parent_label)
-                        if parent_container is None:
-                            parent_container = graph.add_subgraph(label=parent_label)
-                return world._materialize_from_template(
-                    template=template,
-                    graph=graph,
-                    parent_container=parent_container,
-                )
-            return template.materialize_item(obj_cls=getattr(template, "obj_cls", None))
+        world = getattr(graph, "world", None)
+        domain_manager = getattr(world, "domain_manager", None) if world is not None else None
+        cursor = getattr(ctx, "cursor", None)
+        if cursor is None:
+            cursor_id = getattr(ctx, "cursor_id", None)
+            if cursor_id is not None:
+                cursor = graph.get(cursor_id)
 
-        obj_cls = template.obj_cls
-        kwargs: dict[str, Any] = {}
-        if hasattr(obj_cls, "model_fields") and "graph" in obj_cls.model_fields:
-            kwargs["graph"] = ctx.graph
+        target_address = getattr(ctx, "target_address", None)
+        if not target_address and getattr(template, "declares_instance", False):
+            target_address = getattr(template, "path", None)
+        if not target_address and cursor is not None:
+            parent_path = cursor.path.rsplit(".", 1)[0] if "." in cursor.path else ""
+            label = getattr(template, "label", "node")
+            target_address = f"{parent_path}.{label}" if parent_path else label
+        if not target_address:
+            target_address = getattr(template, "label", "node")
 
-        if factory is not None:
-            return factory.materialize_templ(template, **kwargs)
-        return template.materialize(**kwargs)
+        factory = factory or getattr(graph, "factory", None)
+        if factory is None:
+            factory = TemplateFactory(label="provisioner_factory")
+        if template is not None:
+            factory.add(template)
+        if hasattr(graph, "factory") and getattr(graph, "factory", None) is None:
+            setattr(graph, "factory", factory)
+
+        return ensure_instance(
+            graph,
+            target_address,
+            factory,
+            anchor=cursor,
+            domain_manager=domain_manager,
+            world=world,
+            allow_archetypes=True,
+        )
 
     def get_dependency_offers(
         self,

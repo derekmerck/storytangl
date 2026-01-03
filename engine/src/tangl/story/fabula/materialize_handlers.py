@@ -118,6 +118,8 @@ def standard_wiring_handler(
 def _wire_roles(*, node: Node, roles_data: Any, graph: GraphItem) -> None:
     """Create :class:`Dependency` edges for each role declaration."""
 
+    from tangl.story.concepts.actor import Actor
+
     _wire_dependency(
         node=node,
         specs=roles_data,
@@ -126,11 +128,14 @@ def _wire_roles(*, node: Node, roles_data: Any, graph: GraphItem) -> None:
         ref_key="actor_ref",
         template_key="actor_template_ref",
         criteria_key="actor_criteria",
+        default_criteria={"is_instance": Actor},
     )
 
 
 def _wire_settings(*, node: Node, settings_data: Any, graph: GraphItem) -> None:
     """Create :class:`Dependency` edges for each setting declaration."""
+
+    from tangl.story.concepts.location import Location
 
     _wire_dependency(
         node=node,
@@ -140,6 +145,7 @@ def _wire_settings(*, node: Node, settings_data: Any, graph: GraphItem) -> None:
         ref_key="location_ref",
         template_key="location_template_ref",
         criteria_key="location_criteria",
+        default_criteria={"is_instance": Location},
     )
 
 
@@ -152,6 +158,7 @@ def _wire_dependency(
     ref_key: str,
     template_key: str,
     criteria_key: str,
+    default_criteria: dict[str, Any] | None = None,
 ) -> None:
     """Create :class:`Dependency` edges for a homogeneous dependency type."""
 
@@ -161,7 +168,13 @@ def _wire_dependency(
     for label, spec in _iter_specs(specs, default_label=default_label):
         identifier = _get_spec_value(spec, ref_key)
         template_ref = _get_spec_value(spec, template_key)
-        criteria = _get_spec_value(spec, criteria_key)
+        criteria = _get_spec_value(spec, criteria_key) or {}
+        if default_criteria:
+            criteria = dict(criteria)
+            for key, value in default_criteria.items():
+                criteria.setdefault(key, value)
+        if not criteria:
+            criteria = None
 
         if identifier is None and template_ref is not None:
             identifier = template_ref

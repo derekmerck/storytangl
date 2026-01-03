@@ -37,7 +37,11 @@ def test_phase4_complete_story_with_roles_and_settings() -> None:
     world = _build_world(
         {
             "label": "complete",
-            "metadata": {"title": "Complete", "author": "Tests"},
+            "metadata": {
+                "title": "Complete",
+                "author": "Tests",
+                "start_at": "inn.entrance",
+            },
             "templates": {
                 "innkeeper": {
                     "obj_cls": "tangl.story.concepts.actor.actor.Actor",
@@ -127,7 +131,11 @@ def test_phase4_script_to_graph_complete_translation() -> None:
     world = _build_world(
         {
             "label": "translation_test",
-            "metadata": {"title": "Translation", "author": "Tests"},
+            "metadata": {
+                "title": "Translation",
+                "author": "Tests",
+                "start_at": "city.gate",
+            },
             "templates": {
                 "guard": {
                     "obj_cls": "tangl.story.concepts.actor.actor.Actor",

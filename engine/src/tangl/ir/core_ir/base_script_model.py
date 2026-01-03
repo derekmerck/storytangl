@@ -12,6 +12,14 @@ class BaseScriptItem(HierarchicalTemplate):
 
     # todo: I think this is out of spec now -- templates are just actor scripts, location scripts, block scripts, etc.
     template_names: Optional[Label] = None
+    declares_instance: bool = Field(
+        default=False,
+        description="If True, eager mode materializes this item at its address.",
+    )
+    script_only: bool = Field(
+        default=False,
+        description="If True, this item is organizational and does not affect paths.",
+    )
 
     # todo: we haven't implemented this on story-node yet have we?
     locked: bool = False                      # Requires manual unlocking
