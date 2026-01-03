@@ -46,6 +46,10 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
 
     # obj_cls is a field (not just init param like Entity)
     obj_cls_: Typelike = Field(None, alias="obj_cls", exclude_if=lambda v: v is None)
+    declares_instance: bool = Field(
+        default=False,
+        description="If True, eager mode will materialize this at its address.",
+    )
 
     @field_validator("obj_cls_", mode="after")
     @classmethod

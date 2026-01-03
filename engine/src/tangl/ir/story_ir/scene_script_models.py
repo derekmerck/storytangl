@@ -187,6 +187,10 @@ class BlockScript(BaseScriptItem):
         return Block
 
     media: list[MediaItemScript] | None = None
+    declares_instance: bool = Field(
+        default=True,
+        description="When True, this block is a declared instance in the script.",
+    )
 
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.", json_schema_extra={"visit_field": True})
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.", json_schema_extra={"visit_field": True})
@@ -245,6 +249,10 @@ class SceneScript(BaseScriptItem):
         return Scene
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
+    declares_instance: bool = Field(
+        default=True,
+        description="When True, this scene is a declared instance in the script.",
+    )
 
     # todo: How do we inject other block types like menus, challenges (games) and activities (task)??  using discriminator fields?
     blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.", json_schema_extra={"visit_field": True})
@@ -266,5 +274,4 @@ class SceneScript(BaseScriptItem):
     @classmethod
     def _expand_setting_shorthands(cls, value):
         return _expand_setting_shorthands(value)
-
 

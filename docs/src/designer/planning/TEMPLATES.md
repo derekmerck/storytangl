@@ -26,6 +26,11 @@ while metadata fields (``label``, ``scope``, ``template_names``) do not.
 Templates can be declared at three levels. The world registry records where a template
 originated via the optional :class:`ScopeSelector` metadata.
 
+> **Note:** Story materialization now uses address-based templates directly. Legacy
+> ``scenes``/``blocks`` structures are treated as a compatibility format and can be
+> converted into hierarchical templates (see
+> ``tangl.loaders.legacy.scene_block_importer.SceneBlockImporter``).
+
 ### World Level (Global)
 ```yaml
 label: my_world

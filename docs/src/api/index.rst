@@ -7,4 +7,5 @@ tangl package
    tangl.core
    tangl.vm
    tangl.story
+   address_resolution
    tangl.service
