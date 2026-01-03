@@ -282,11 +282,30 @@ class TemplateProvisioner(Provisioner):
 
         template = None
         if requirement.template_ref:
-            template = self._find_template(factory, requirement.template_ref, criteria)
+            template, ref_provenance = self._find_template(
+                factory,
+                requirement.template_ref,
+                criteria,
+                context=ctx,
+            )
+            provenance.update(ref_provenance)
+            if template is not None:
+                provenance["source"] = "template_ref"
         if template is None and requirement.identifier:
-            template = self._find_template(factory, requirement.identifier, criteria)
+            template, id_provenance = self._find_template(
+                factory,
+                requirement.identifier,
+                criteria,
+                context=ctx,
+            )
+            provenance.update(id_provenance)
+            if template is not None:
+                provenance["source"] = "identifier"
         if template is None and requirement.criteria:
             template = factory.find_one(**criteria)
+            if template is not None:
+                provenance["source"] = "criteria"
+                provenance["lookup_method"] = "criteria_only"
 
         if template is None:
             return None, provenance
@@ -346,14 +365,106 @@ class TemplateProvisioner(Provisioner):
         factory: TemplateFactory,
         identifier: Any,
         criteria: dict[str, Any],
-    ) -> Template | None:
+        *,
+        context: Context | None = None,
+    ) -> tuple[Template | None, dict[str, Any]]:
+        provenance: dict[str, Any] = {}
         if identifier is None:
-            return None
-        if isinstance(identifier, str) and "." in identifier:
-            return factory.find_one(path=identifier, **criteria)
-        if isinstance(identifier, str):
-            return factory.find_one(label=identifier, **criteria)
-        return factory.find_one(uid=identifier, **criteria)
+            return None, provenance
+        if not isinstance(identifier, str):
+            template = factory.find_one(uid=identifier, **criteria)
+            if template is not None:
+                provenance["lookup_method"] = "uuid"
+            return template, provenance
+        if "." not in identifier:
+            template = factory.find_one(label=identifier, **criteria)
+            if template is not None:
+                provenance["lookup_method"] = "label"
+            return template, provenance
+
+        template = factory.find_one(path=identifier, **criteria)
+        if template is not None:
+            provenance["lookup_method"] = "strict_path"
+            return template, provenance
+
+        if context is None:
+            provenance["lookup_method"] = "path_failed_no_context"
+            return None, provenance
+
+        template = _resolve_as_location(
+            factory,
+            identifier,
+            criteria,
+            context,
+            provenance,
+        )
+
+        return template, provenance
+
+    def _get_all_template_offers(
+        self,
+        identifier: str,
+        requirement: Requirement,
+        *,
+        ctx: Context,
+    ) -> Iterator[DependencyOffer]:
+        """Generate offers for all templates matching an identifier."""
+
+        from tangl.story.fabula.address_resolver import iter_matching_templates
+
+        factory = self._get_factory(ctx)
+        if factory is None:
+            return
+
+        cursor = getattr(ctx, "cursor", None)
+        if cursor is None:
+            cursor_id = getattr(ctx, "cursor_id", None)
+            graph = getattr(ctx, "graph", None)
+            if cursor_id and graph:
+                cursor = graph.get(cursor_id)
+
+        allow_scope_matches = cursor is not None
+        for template, score, is_exact in iter_matching_templates(
+            factory,
+            identifier,
+            selector=cursor,
+            allow_archetypes=False,
+        ):
+            if not allow_scope_matches and not is_exact:
+                continue
+            if not is_exact and _is_global_only_template(template):
+                logger.debug(
+                    "Rejecting global-only template '%s' for qualified identifier '%s'",
+                    template.label,
+                    identifier,
+                )
+                continue
+            def create_node(context: Context, captured: Template = template) -> Node:
+                return self._materialize_template(captured, ctx=context, factory=factory)
+
+            provenance = self._template_provenance(template)
+            provenance["match_score"] = score
+            provenance["is_exact_match"] = is_exact
+
+            base_cost = float(ProvisionCost.CREATE)
+            score_penalty = score if isinstance(score, (int, float)) and score > 0 else 0.0
+            cost = base_cost + score_penalty
+
+            yield DependencyOffer(
+                requirement_id=requirement.uid,
+                requirement=requirement,
+                operation=ProvisioningPolicy.CREATE_TEMPLATE,
+                base_cost=ProvisionCost.CREATE,
+                cost=cost,
+                proximity=999.0,
+                proximity_detail="new instance",
+                accept_func=create_node,
+                source_provisioner_id=self.uid,
+                source_layer=self.layer,
+                template_ref=provenance.get("template_ref"),
+                template_hash=provenance.get("template_hash"),
+                template_content_id=provenance.get("template_content_id"),
+            )
 
     @staticmethod
     def _template_payload(
@@ -447,6 +558,10 @@ class TemplateProvisioner(Provisioner):
     ) -> Iterator[DependencyOffer]:
         if not (requirement.policy & ProvisioningPolicy.CREATE_TEMPLATE):
             return
+        identifier = requirement.template_ref or requirement.identifier
+        if isinstance(identifier, str) and "." in identifier:
+            yield from self._get_all_template_offers(identifier, requirement, ctx=ctx)
+            return
         template, provenance = self._resolve_template(requirement, ctx=ctx)
         if template is None:
             return
@@ -472,6 +587,83 @@ class TemplateProvisioner(Provisioner):
             template_hash=provenance.get("template_hash"),
             template_content_id=provenance.get("template_content_id"),
         )
+
+
+def _resolve_as_location(
+    factory: TemplateFactory,
+    identifier: str,
+    criteria: dict[str, Any],
+    context: Context,
+    provenance: dict[str, Any],
+) -> Template | None:
+    """Stage 2: try to resolve qualified identifiers as a location."""
+
+    from tangl.story.fabula.address_resolver import iter_matching_templates
+
+    cursor = getattr(context, "cursor", None)
+    if cursor is None:
+        cursor_id = getattr(context, "cursor_id", None)
+        graph = getattr(context, "graph", None)
+        if cursor_id and graph:
+            cursor = graph.get(cursor_id)
+
+    try:
+        matches = list(
+            iter_matching_templates(
+                factory,
+                identifier,
+                selector=cursor,
+                allow_archetypes=False,
+            )
+        )
+        if criteria:
+            matches = [
+                (template, score, is_exact)
+                for template, score, is_exact in matches
+                if template.matches(**criteria)
+            ]
+
+        if not matches:
+            provenance["lookup_method"] = "location_no_matches"
+            return None
+
+        matches.sort(key=lambda item: item[1])
+        template, score, is_exact = matches[0]
+
+        if _is_global_only_template(template):
+            logger.debug(
+                "Rejecting global-only template '%s' for qualified identifier '%s'",
+                template.label,
+                identifier,
+            )
+            provenance["lookup_method"] = "location_global_guard"
+            provenance["location_guard_triggered"] = True
+            return None
+
+        provenance["lookup_method"] = "location_based"
+        provenance["location_score"] = score
+        provenance["location_is_exact"] = is_exact
+        return template
+    except Exception as exc:
+        logger.debug(
+            "Location-based lookup failed for '%s': %s",
+            identifier,
+            exc,
+        )
+        provenance["lookup_method"] = "location_exception"
+        provenance["location_error"] = str(exc)
+        return None
+
+
+def _is_global_only_template(template: Template) -> bool:
+    """Return True when a template is global-only (path_pattern='*')."""
+
+    if hasattr(template, "get_path_pattern"):
+        pattern = template.get_path_pattern()
+    else:
+        pattern = getattr(template, "path_pattern", None)
+
+    return pattern == "*"
 
 
 class UpdatingProvisioner(TemplateProvisioner):

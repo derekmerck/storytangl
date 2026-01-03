@@ -19,8 +19,10 @@ def _iter_script_items(value: Any) -> list[Any]:
     if value is None:
         return []
     if isinstance(value, dict):
-        return value.values()
-    return value
+        return list(value.values())
+    if isinstance(value, list):
+        return value
+    return [value]
 
 
 def _mark_declared_instances(script: StoryScript) -> None:

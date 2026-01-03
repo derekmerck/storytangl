@@ -25,6 +25,7 @@ Tests can compile directly from bundles when bypassing discovery:
 """
 
 from __future__ import annotations
+
 import logging
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Iterator
@@ -143,11 +144,20 @@ class World(Singleton):
         self,
         template: BaseScriptItem,
         graph: StoryGraph,
+        *,
+        parent_container: Subgraph | None = None,
+        **kwargs,
     ) -> Node:
         """Materialize a template for dispatch-driven customization."""
 
         from tangl.core.factory import TemplateFactory
         from tangl.story.fabula.address_resolver import ensure_instance
+
+        if parent_container is not None or kwargs:
+            logger.warning(
+                "parent_container and additional kwargs are deprecated in "
+                "_materialize_from_template; parent selection is determined by template paths."
+            )
 
         address = self._normalize_template_address(template)
         factory = TemplateFactory(label="world_materialize")
@@ -334,6 +344,7 @@ class World(Singleton):
 
         declared_templates.sort(key=lambda template: len(_normalize_address(template).split(".")))
 
+        materialization_errors: list[dict[str, str]] = []
         for template in declared_templates:
             try:
                 address = _normalize_address(template)
@@ -343,13 +354,26 @@ class World(Singleton):
                     self.script_manager.template_factory,
                     world=self,
                 )
-            except Exception as exc:  # pragma: no cover - defensive
+            except (ValueError, RuntimeError, KeyError, TypeError) as exc:
                 logger.warning(
                     "Failed to materialize '%s': %s",
-                    getattr(template, "path", None),
+                    address,
                     exc,
                     exc_info=True,
                 )
+                materialization_errors.append(
+                    {
+                        "address": address,
+                        "template_label": getattr(template, "label", "unknown"),
+                        "error": str(exc),
+                    }
+                )
+
+        if materialization_errors:
+            logger.info(
+                "Materialization completed with %d errors. See previous warnings for details.",
+                len(materialization_errors),
+            )
 
         actor_map, location_map = self._build_dependency_maps(graph)
         self._resolve_open_dependencies(
@@ -361,7 +385,19 @@ class World(Singleton):
         start_address = self._get_start_address()
         start_node = graph.find_one(path=start_address)
         if start_node is None:
-            raise ValueError(f"Start node not found at '{start_address}'")
+            all_nodes = list(graph.nodes)
+            if not all_nodes:
+                suggestion = "Graph has no nodes. Check that templates are being materialized."
+            else:
+                available = ", ".join(node.label for node in all_nodes[:10])
+                suggestion = (
+                    f"Available nodes: {available}\n"
+                    "Try setting metadata.start_at to one of these addresses."
+                )
+            raise ValueError(
+                f"Start node not found at '{start_address}'.\n"
+                f"{suggestion}"
+            )
 
         graph.initial_cursor_id = start_node.uid
         return graph
@@ -378,12 +414,64 @@ class World(Singleton):
 
         metadata = self.script_manager.get_story_metadata()
         start_at = metadata.get("start_at")
-        if not start_at:
-            raise ValueError("No start_at specified in metadata")
-        script_label = getattr(self.script_manager.master_script, "label", None)
-        if script_label and start_at.startswith(f"{script_label}."):
-            return start_at[len(script_label) + 1:]
+        if start_at:
+            return self._normalize_start_address(start_at)
+
+        declared = self._get_declared_templates()
+        if not declared:
+            raise ValueError(
+                f"Cannot determine starting point for world '{self.label}': "
+                "No start_at in metadata and no declared templates found. "
+                "Please specify metadata.start_at explicitly."
+            )
+
+        normalized_addresses: list[str] = []
+        for template in declared:
+            path = getattr(template, "path", None)
+            if path:
+                normalized_addresses.append(self._normalize_start_address(path))
+            else:
+                normalized_addresses.append(template.label)
+
+        leaf_addresses = self._find_leaf_addresses_from_list(normalized_addresses)
+        if not leaf_addresses:
+            start_at = normalized_addresses[0]
+        else:
+            start_at = min(leaf_addresses)
+
+        logger.warning(
+            "No start_at specified in metadata for world '%s'. "
+            "Selected '%s' as starting point (lexicographically smallest leaf). "
+            "Specify metadata.start_at explicitly to avoid this heuristic.",
+            self.label,
+            start_at,
+        )
+
         return start_at
+
+    def _normalize_start_address(self, address: str) -> str:
+        """Remove script label prefix from address if present."""
+
+        script_label = getattr(self.script_manager.master_script, "label", None)
+        if script_label and address.startswith(f"{script_label}."):
+            return address[len(script_label) + 1:]
+        return address
+
+    def _find_leaf_addresses_from_list(self, addresses: list[str]) -> list[str]:
+        """Find addresses that are leaves (not prefixes of other addresses)."""
+
+        if not addresses:
+            return []
+
+        addr_set = set(addresses)
+        leaves: list[str] = []
+        for addr in sorted(addr_set):
+            prefix = f"{addr}."
+            if any(other != addr and other.startswith(prefix) for other in addr_set):
+                continue
+            leaves.append(addr)
+
+        return leaves
 
     def _build_dependency_maps(
         self,
@@ -552,7 +640,7 @@ class World(Singleton):
         if not allow_existing:
             parent = None
             if "." in address:
-                parent = ensure_namespace(graph, address.rsplit(".", 1)[0])
+                parent = ensure_namespace(graph, address)
             return _materialize_at_address(
                 template=template,
                 address=address,
@@ -573,15 +661,12 @@ class World(Singleton):
 
     def _normalize_template_address(self, template: BaseScriptItem) -> str:
         address = getattr(template, "path", None)
-        if not address:
-            label = getattr(template, "label", None)
-            if label:
-                return label
-            raise ValueError("Template does not define a path or label.")
-        script_label = getattr(self.script_manager.master_script, "label", None)
-        if script_label and address.startswith(f"{script_label}."):
-            return address[len(script_label) + 1:]
-        return address
+        if address:
+            return self._normalize_start_address(address)
+        label = getattr(template, "label", None)
+        if label:
+            return label
+        raise ValueError("Template does not define a path or label.")
 
     @staticmethod
     def _index_dependency_provider(

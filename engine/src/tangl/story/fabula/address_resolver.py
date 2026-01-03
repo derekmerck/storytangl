@@ -1,8 +1,124 @@
-"""Address-driven template resolution and namespace helpers."""
+"""Address-driven template resolution and namespace management.
+
+This module implements the core logic for materializing typed instances at
+specific graph addresses using scope-based template selection.
+
+Terminology
+-----------
+
+**address** (str)
+    Target location where an instance should live in the graph hierarchy.
+    Uses dotted notation for hierarchy: ``"book1.chapter2.scene3"``.
+    This is a *target location*, not necessarily an existing item.
+
+**path** (str)
+    Canonical address of an existing graph item.
+    Same format as address, but refers to something that already exists.
+    Example: ``node.path`` → ``"book1.chapter2.scene3"``.
+    Used interchangeably with "address" when referring to existing items.
+
+**path_pattern** (str)
+    Scope selector for templates using fnmatch-style patterns.
+    Defines where a template can be materialized.
+    Examples:
+        ``"*"``
+            Global (anywhere).
+        ``"scene1.*"``
+            Scoped to scene1 and children.
+        ``"**.tavern.**"``
+            Anywhere with ``tavern`` in the path.
+
+**template.path** (str)
+    Full address where a declared instance template lives.
+    Set during script compilation based on template hierarchy.
+    Example: Template in ``scenes.scene1.blocks.start`` → ``path="scene1.start"``.
+
+**has_path** (criterion)
+    Selection criterion for filtering graph items by their path.
+    Used in queries: ``graph.find_all(has_path="scene1.*")``.
+
+Key Concepts
+------------
+
+**Declared Instances vs Archetypes**
+    - Declared instances (``declares_instance=True``) are materialized in eager mode.
+    - Archetypes (``declares_instance=False``) stay in the factory for on-demand use.
+    - Scene and block templates are declared instances.
+    - Generic templates (like ``guard`` or ``shop``) are archetypes.
+
+**Namespace Containers**
+    - Addresses like ``"a.b.c"`` imply containers: ``"a"`` contains ``"b"`` contains ``"c"``.
+    - :func:`ensure_namespace` creates these containers as generic Subgraphs.
+    - Containers are created on-demand, not pre-declared.
+
+**Template Selection**
+    - Templates are selected by scope, not by parent relationships.
+    - More specific scopes win over general scopes.
+    - Exact path matches take priority over pattern matches.
+
+Resolution Flow
+---------------
+
+When materializing at address ``"book1.chapter2.shop"``:
+
+1. Ensure namespace: create containers for ``"book1"`` and ``"book1.chapter2"``.
+2. Find templates: search for templates matching this address.
+3. Exact match check: does any ``template.path`` equal the address?
+4. Pattern match: which templates' ``path_pattern`` includes this address?
+5. Rank by scope: score templates by specificity (cursor context helps).
+6. Materialize: use the best-matching template to create an instance.
+
+Key Invariants
+--------------
+
+- Address is distinct from template hierarchy.
+- Scope selects templates; parentage does not.
+- Parent containers are created before children.
+- Exact matches win over pattern matches.
+- Containers are not silently upgraded into nodes (or vice versa).
+
+Examples
+--------
+
+Create an instance at a specific address:
+
+.. code-block:: python
+
+    instance = ensure_instance(
+        graph,
+        address="village.market.shop",
+        factory=template_factory,
+        world=world,
+    )
+
+List all matching templates:
+
+.. code-block:: python
+
+    for template, score, is_exact in iter_matching_templates(
+        factory,
+        address="castle.throne_room",
+        selector=cursor,
+    ):
+        print(f"{template.label}: score={score}, exact={is_exact}")
+
+Resolve the best template:
+
+.. code-block:: python
+
+    template = resolve_template_for_address(
+        factory,
+        address="forest.clearing",
+        selector=cursor,
+        strict=True,
+    )
+"""
 
 from __future__ import annotations
 
+import logging
 from fnmatch import fnmatch
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -11,6 +127,7 @@ if TYPE_CHECKING:
     from tangl.core.graph import Graph, GraphItem, Subgraph
     from tangl.story.fabula.world import World
 
+logger = logging.getLogger(__name__)
 
 class AmbiguousTemplateError(ValueError):
     """Raised when multiple templates match an address equally well."""
@@ -39,7 +156,42 @@ def resolve_template_for_address(
         AmbiguousTemplateError: When strict and multiple templates tie for best match.
     """
 
-    candidates: list[tuple[Template, Any]] = []
+    matches = list(
+        iter_matching_templates(
+            factory,
+            address,
+            selector=selector,
+            allow_archetypes=allow_archetypes,
+        )
+    )
+
+    if not matches:
+        _log_resolution_trace(address, [], None, strict=strict)
+        return None
+
+    matches.sort(key=lambda item: item[1])
+    best_score = matches[0][1]
+    best_matches = [template for template, score, _ in matches if score == best_score]
+    selected = best_matches[0] if best_matches else None
+    _log_resolution_trace(address, matches, selected, strict=strict)
+
+    if strict and len(best_matches) > 1:
+        raise AmbiguousTemplateError(
+            f"Multiple templates match address '{address}': "
+            f"{[template.label for template in best_matches]}"
+        )
+
+    return selected
+
+
+def iter_matching_templates(
+    factory: TemplateFactory,
+    address: str,
+    *,
+    selector: GraphItem | None = None,
+    allow_archetypes: bool = False,
+) -> Iterator[tuple[Template, Any, bool]]:
+    """Yield templates matching an address with their scores."""
 
     templates = [
         template
@@ -54,7 +206,9 @@ def resolve_template_for_address(
         if _template_path_matches_address(template, address)
     ]
     if exact_matches:
-        templates = exact_matches
+        for template in exact_matches:
+            yield (template, -1.0, True)
+        return
 
     for template in templates:
         if not _template_matches_address(template, address):
@@ -65,25 +219,53 @@ def resolve_template_for_address(
         elif hasattr(template, "scope_specificity"):
             score = template.scope_specificity()
         else:
-            score = 0
+            score = 0.0
 
-        candidates.append((template, score))
+        yield (template, score, False)
 
-    if not candidates:
-        return None
 
-    candidates.sort(key=lambda item: item[1])
+def _log_resolution_trace(
+    address: str,
+    matches: list[tuple[Template, Any, bool]],
+    selected: Template | None,
+    *,
+    strict: bool = False,
+) -> None:
+    """Log a detailed trace of template resolution for debugging."""
 
-    if strict and len(candidates) > 1:
-        best_score = candidates[0][1]
-        tied = [template for template, score in candidates if score == best_score]
-        if len(tied) > 1:
-            raise AmbiguousTemplateError(
-                f"Multiple templates match address '{address}': "
-                f"{[template.label for template in tied]}"
-            )
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
 
-    return candidates[0][0]
+    logger.debug("=" * 60)
+    logger.debug("Address Resolution Trace")
+    logger.debug("=" * 60)
+    logger.debug("Target address: %s", address)
+    logger.debug("Strict mode: %s", strict)
+
+    if not matches:
+        logger.debug("No matching templates found")
+        logger.debug("=" * 60)
+        return
+
+    logger.debug("Matching templates (%d):", len(matches))
+    for index, (template, score, is_exact) in enumerate(matches, 1):
+        match_type = "EXACT PATH" if is_exact else "PATTERN"
+        logger.debug(
+            "  %d. %s (score=%s) [%s]",
+            index,
+            template.label,
+            score,
+            match_type,
+        )
+        logger.debug("     path=%s", getattr(template, "path", None))
+        logger.debug("     pattern=%s", getattr(template, "path_pattern", None))
+
+    if selected is not None:
+        logger.debug("Selected: %s", selected.label)
+    else:
+        logger.debug("Selected: None (no valid match)")
+
+    logger.debug("=" * 60)
 
 
 def _template_matches_address(template: Template, address: str) -> bool:
@@ -120,15 +302,18 @@ def _template_matches_address(template: Template, address: str) -> bool:
 
 
 def _template_path_matches_address(template: Template, address: str) -> bool:
+    """Check if template's path exactly matches the address.
+
+    This is a strict equality check, not a suffix match.
+    """
+
     template_path = getattr(template, "path", None)
     if not template_path:
         return False
-    if template_path == address:
-        return True
-    return template_path.endswith(f".{address}")
+    return template_path == address
 
 
-def ensure_namespace(graph: Graph, address: str) -> Subgraph:
+def ensure_namespace(graph: Graph, address: str) -> Subgraph | None:
     """Ensure prefix containers exist as generic subgraphs.
 
     Args:
@@ -136,12 +321,15 @@ def ensure_namespace(graph: Graph, address: str) -> Subgraph:
         address: Address defining the namespace to ensure.
 
     Returns:
-        The subgraph container corresponding to the full address.
+        The immediate parent container, or ``None`` for root-level addresses.
     """
 
     from tangl.core.graph import Subgraph
 
     prefixes = _get_prefixes(address)
+    if not prefixes:
+        return None
+
     parent: Subgraph | None = None
 
     for prefix in prefixes:
@@ -151,24 +339,25 @@ def ensure_namespace(graph: Graph, address: str) -> Subgraph:
             continue
 
         label = prefix.rsplit(".", 1)[-1] if "." in prefix else prefix
-        container = graph.add_subgraph(label=label)
 
         if parent is not None:
+            container = Subgraph(label=label, graph=graph)
             parent.add_member(container)
+        else:
+            container = graph.add_subgraph(label=label)
 
         parent = container
-
-    if parent is None:
-        raise ValueError(f"No prefixes resolved for address '{address}'")
 
     return parent
 
 
 def _get_prefixes(address: str) -> list[str]:
-    """Return ordered prefix addresses for a dotted address."""
+    """Return ordered parent prefixes for a dotted address."""
 
     parts = address.split(".")
-    return [".".join(parts[: index + 1]) for index in range(len(parts))]
+    if len(parts) == 1:
+        return []
+    return [".".join(parts[: index + 1]) for index in range(len(parts) - 1)]
 
 
 def ensure_instance(
@@ -198,9 +387,48 @@ def ensure_instance(
     if existing is not None:
         return existing
 
+    existing_subgraph = graph.find_subgraph(path=address)
+    if existing_subgraph is not None:
+        template = resolve_template_for_address(
+            factory,
+            address,
+            selector=anchor,
+            strict=True,
+            allow_archetypes=allow_archetypes,
+        )
+        if template is None:
+            logger.warning(
+                "Subgraph already exists at address '%s' but no template found. "
+                "Returning existing subgraph.",
+                address,
+            )
+            return existing_subgraph
+
+        obj_cls = template.obj_cls or template.get_default_obj_cls()
+        if isinstance(obj_cls, str):
+            if domain_manager is None and world is not None:
+                domain_manager = world.domain_manager
+            if domain_manager is not None:
+                obj_cls = domain_manager.resolve_class(obj_cls)
+
+        from tangl.core.graph import Subgraph
+
+        if obj_cls is Subgraph or (isinstance(obj_cls, type) and issubclass(obj_cls, Subgraph)):
+            logger.debug(
+                "Reusing existing subgraph at '%s' (template expects container type)",
+                address,
+            )
+            return existing_subgraph
+        obj_cls_name = obj_cls if isinstance(obj_cls, str) else obj_cls.__name__
+        raise TypeError(
+            f"Cannot create instance at '{address}': "
+            f"Subgraph already exists but template expects {obj_cls_name}. "
+            "This indicates a namespace container was incorrectly created at an instance address."
+        )
+
     parent_container: Subgraph | None = None
     if "." in address:
-        parent_container = ensure_namespace(graph, address.rsplit(".", 1)[0])
+        parent_container = ensure_namespace(graph, address)
 
     template = resolve_template_for_address(
         factory,
@@ -211,9 +439,50 @@ def ensure_instance(
     )
 
     if template is None:
+        available_templates = list(factory.find_all(declares_instance=True))
+        suggestion = "Check template path_pattern scopes or add a matching template."
+
+        if not available_templates:
+            suggestion = (
+                "No templates found with declares_instance=True. "
+                "Check that your script defines scenes/blocks or other declared instances."
+            )
+        elif "." not in address:
+            root_templates = [
+                template
+                for template in available_templates
+                if "." not in getattr(template, "path", "")
+            ]
+            if root_templates:
+                root_labels = ", ".join(template.label for template in root_templates[:5])
+                suggestion = f"Available root-level templates: {root_labels}"
+            else:
+                suggestion = (
+                    "No root-level templates found. "
+                    "All templates are nested. Did you mean to use a qualified address like "
+                    "'scene.block'?"
+                )
+        else:
+            parent_addr = address.rsplit(".", 1)[0]
+            similar = [
+                template
+                for template in available_templates
+                if getattr(template, "path", "").startswith(parent_addr)
+            ]
+            if similar:
+                similar_labels = ", ".join(template.label for template in similar[:5])
+                suggestion = f"Templates in '{parent_addr}': {similar_labels}"
+            else:
+                available_labels = ", ".join(template.label for template in available_templates[:5])
+                suggestion = (
+                    f"No templates found under '{parent_addr}'. "
+                    f"Available templates: {available_labels}"
+                )
+
         raise ValueError(
-            f"No template found for address '{address}'. "
-            "Check for a template with a matching scope pattern."
+            f"No template found for address '{address}'.\n"
+            f"{suggestion}\n"
+            "Check template path_pattern scopes or add a matching template."
         )
 
     if world is None:

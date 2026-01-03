@@ -9,42 +9,9 @@ Organized by functionality:
 
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
-
 from tangl.core.factory import HierarchicalTemplate, TemplateFactory
 from tangl.core.graph import Graph, Node
-from tangl.ir.story_ir import StoryScript
-from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
-
-
-# ============================================================================
-# Fixtures and Helpers
-# ============================================================================
-
-@pytest.fixture(autouse=True)
-def clear_world_singleton() -> None:
-    """Reset the ``World`` singleton registry between tests."""
-
-    World.clear_instances()
-    yield
-    World.clear_instances()
-
-
-def build_world(story_data: dict[str, Any]) -> World:
-    """Helper that validates ``story_data`` and instantiates a ``World``."""
-
-    script = StoryScript.model_validate(story_data)
-    manager = ScriptManager.from_master_script(master_script=script)
-    return World(
-        label=story_data["label"],
-        script_manager=manager,
-        domain_manager=DomainManager(),
-        asset_manager=AssetManager(),
-        resource_manager=None,
-        metadata=story_data.get("metadata", {}),
-    )
+from .conftest import build_world
 
 
 # ============================================================================
@@ -83,14 +50,12 @@ class TestNamespaceCreation:
 
         assert graph.find_subgraph(label="a") is not None
         assert graph.find_subgraph(label="b") is not None
-        assert graph.find_subgraph(label="c") is not None
+        assert graph.find_subgraph(label="c") is None
 
-        c = graph.find_subgraph(label="c")
-        assert c is not None
-        assert c.parent is not None
-        assert c.parent.label == "b"
-        assert c.parent.parent is not None
-        assert c.parent.parent.label == "a"
+        b = graph.find_subgraph(label="b")
+        assert b is not None
+        assert b.parent is not None
+        assert b.parent.label == "a"
 
 
 # ============================================================================
