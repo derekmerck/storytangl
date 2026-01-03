@@ -1,7 +1,14 @@
+"""Shared fixtures and helpers for fabula tests."""
+
+from __future__ import annotations
+
+from typing import Any
+
 import pytest
 
 from tangl.core.graph.edge import Edge
 from tangl.core.graph.node import Node
+from tangl.ir.story_ir import StoryScript
 from tangl.story.episode.block import Block as ReferenceBlock
 from tangl.story.fabula.asset_manager import AssetManager
 from tangl.story.fabula.domain_manager import DomainManager
@@ -15,6 +22,15 @@ class SimpleBlock(Node):
 
 class SimpleAction(Edge):
     text: str | None = None
+
+
+@pytest.fixture(autouse=True)
+def clear_world_singleton() -> None:
+    """Reset the World singleton registry between tests."""
+
+    World.clear_instances()
+    yield
+    World.clear_instances()
 
 
 def _make_world(script_data: dict) -> World:
@@ -45,4 +61,30 @@ def _base_script() -> dict:
         },
     }
 
+
+def build_world(story_data: dict[str, Any]) -> World:
+    """Helper that validates story_data and instantiates a World."""
+
+    script = StoryScript.model_validate(story_data)
+    manager = ScriptManager.from_master_script(master_script=script)
+    return World(
+        label=story_data["label"],
+        script_manager=manager,
+        domain_manager=DomainManager(),
+        asset_manager=AssetManager(),
+        resource_manager=None,
+        metadata=story_data.get("metadata", {}),
+    )
+
+
+def create_minimal_world() -> World:
+    """Create a minimal World for tests that don't need a full script."""
+
+    return build_world(
+        {
+            "label": "minimal",
+            "metadata": {"title": "Minimal", "author": "Tests"},
+            "scenes": {},
+        }
+    )
 
