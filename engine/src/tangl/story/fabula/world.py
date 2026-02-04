@@ -1090,6 +1090,7 @@ class World(Singleton):
 
         raise ValueError(f"Could not resolve successor reference: {successor}")
 
+    # todo: should NOT assume nesting here, get the cursor and then ensure scope
     def _get_starting_cursor(self) -> tuple[str, str]:
         """Determine the starting scene and block labels for traversal."""
 
@@ -1134,6 +1135,8 @@ class World(Singleton):
 
         return BlockScript.model_validate(block_data)
 
+    # todo: we really should not have anything like this, it's all in the script manager
+    #       we should not be unstructuring stuff willy nilly, use the factory.
     def _get_scenes_dict(self) -> dict[str, dict[str, Any]]:
         scenes_iter = self.script_manager.get_unstructured("scenes") or ()
         scenes: dict[str, dict[str, Any]] = {}

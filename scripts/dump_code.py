@@ -19,6 +19,8 @@ tests_root = project_root / "engine/tests"
 legacy_root = project_root / "scratch/legacy"
 scratch_root = project_root / "scratch"
 
+v38_root = project_root / "engine/src/v38"
+
 cwx_root = project_root.parent / "carwars-gamebooks/carwars"
 
 outfile_dir = project_root / "tmp/dumps"
@@ -218,7 +220,13 @@ if __name__ == "__main__":
 
     process_directory(scratch_root / "mechanics/progression", "tangl3x_progression_archive.py", include_notes=True)
     process_directory(scratch_root / "mechanics/presence", "tangl3x_presence_archive.py", include_notes=True)
-    process_directory(scratch_root / "old/docs", "tanglxx_docs_archive.py", include_notes=True)
+    process_directory(scratch_root / "legacy/docs", "tanglxx_docs_archive.py", include_notes=True)
 
     process_directory(cwx_root / "domain", "tangl2x_cwx_archive.py",
                       prepend_files=[cwx_root / 'world.yaml'])
+
+    process_directory(v38_root / "core",
+                      "tangl38_core_archive.py",
+                      include_notes=True,
+                      prepend_files= [pkg_root / "type_hints.py"],
+                      postpend_files=[pkg_root / "utils/safe_builtins.py"])
