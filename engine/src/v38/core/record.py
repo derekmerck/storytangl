@@ -1,6 +1,6 @@
 from typing import ClassVar, TypeVar, Union, TypeAlias
 
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, ValidationError
 
 from tangl.type_hints import Identifier
 from .bases import HasContent, HasOrder
@@ -21,9 +21,25 @@ class Record(HasContent, HasOrder, Entity):
     - Deterministic ordering via seq
     - Records should never have registry/graph dependencies, so dereferencing
       the origin requires passing the correct lookup index.
+
+    Example:
+        >>> r = Record(content='foo')
+        >>> r.get_content()
+        'foo'
+        >>> try:
+        ...     r.content = 'bar'
+        ... except ValidationError as e:
+        ...     print(e)  # doctest: +ELLIPSIS
+        1 validation error ...
     """
-    config: ClassVar[ConfigDict] = ConfigDict(extra="allow", frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", frozen=True)
     origin_id: Identifier = None
+
+    def get_content(self):
+        for field_name in ['content', 'payload', 'data']:
+            if hasattr(self, field_name):
+                return getattr(self, field_name)
+        raise AttributeError("No content available.")
 
     def origin(self, registry: Registry[ET]) -> ET:
         return registry.get(self.origin_id)
@@ -31,6 +47,7 @@ class Record(HasContent, HasOrder, Entity):
 OrderedEntity = TypeVar("OrderedEntity", bound=Union[Entity, HasOrder])
 
 class OrderedRegistry(Registry[OrderedEntity]):
+    """Ordered registries may be sliced and bookmarked by channel"""
 
     bookmarks: dict[str, list[int]] = Field(default_factory=dict)
 
@@ -42,10 +59,10 @@ class OrderedRegistry(Registry[OrderedEntity]):
             self.bookmarks[channel] = []
         self.bookmarks[channel].append(self.max_seq())
 
-    def slice(self, start=0, stop=-1, channel: str = "_") -> OrderedEntity:
+    def slice(self, start=0, stop=-1, channel: str = "_", selector: Selector = Selector()) -> OrderedEntity:
         bookmarks = self.bookmarks[channel]
         seq_start = bookmarks[start]
         seq_stop = bookmarks[stop]
-        selector = Selector(attributes={'seq': (seq_start, seq_stop)})
+        selector = selector.with_criteria(seq=(seq_start, seq_stop), channel=channel)
         return self.find_all(selector, sort_key=lambda v: v.sort_key())
 

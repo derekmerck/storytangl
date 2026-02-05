@@ -1,6 +1,8 @@
 # tangl/core/bases.py
 """
-Entities and variants are composed primarily of a few mostly-orthogonal features defined here:
+# Core Base Features
+
+Entities and variants in Core are mainly composed of the few independent feature axes defined here:
 - identity and compare by id
 - construction by structuring data and compare by value
 - carrying stable content and compare by content
@@ -12,7 +14,7 @@ Additional specialized features and shapes are provided as extensions or helper 
 - selection, requirements, satisfaction (in core.selector, core.requirement)
 - behaviors, job receipt and auditing, chained function dispatch (in core.behavior, core.dispatch)
 - singletons and singleton tokens with local state (in core.singleton)
-- graph item representations (in core.graph)
+- graph element surface (in core.graph)
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from typing import Callable, Iterator, Type, Self, ClassVar, Any, Optional, Unio
 import logging
 from abc import abstractmethod
 import time
+from copy import deepcopy
 
 from shortuuid import ShortUUID
 from pydantic import BaseModel, Field, field_validator
@@ -79,6 +82,10 @@ class BaseModelPlus(BaseModel):
             result[meth.__name__ + "()"] = meth()
         return result
 
+    def force_set(self, attrib_name, value):
+        # set field values on frozen instances directly, bypassing validation
+        self.__dict__[attrib_name] = value
+
 
 def is_identifier(meth):
     # deco for methods that return an identifier
@@ -101,20 +108,20 @@ class HasIdentity(BaseModelPlus):
     - Identity is NOT derived from content hashes or ordering
 
     Example:
-    >>> e = HasIdentity(label="test", tags={'foo', 'bar'})
-    >>> repr(e)
-    '<HasIdentity:test>'
-    >>> all( [e.has_identifier("test"),
-    ...       e.has_identifier(e.uid),
-    ...       e.has_identifier(e.shortcode()) ] ) # method and attribute schema annotations
-    True
-    >>> e.has_tags('foo', 'bar') and not e.has_tags("foobar")
-    True
-    >>> e.has_kind(BaseModelPlus)  # aliases 'is-instance'
-    True
-    >>> f = HasIdentity(uid=e.uid, label="not-test")
-    >>> e is not f and e.eq_by_id(f) and e == f and e != HasIdentity()  # compare by id
-    True
+        >>> e = HasIdentity(label="test", tags={'foo', 'bar'})
+        >>> repr(e)
+        '<HasIdentity:test>'
+        >>> all( [e.has_identifier("test"),
+        ...       e.has_identifier(e.uid),
+        ...       e.has_identifier(e.shortcode()) ] ) # method and attribute schema annotations
+        True
+        >>> e.has_tags('foo', 'bar') and not e.has_tags("foobar")
+        True
+        >>> e.has_kind(BaseModelPlus)  # aliases 'is-instance'
+        True
+        >>> f = HasIdentity(uid=e.uid, label="not-test")
+        >>> e is not f and e.eq_by_id(f) and e == f and e != HasIdentity()  # compare by id
+        True
     """
     uid: UUID = Field(default_factory=uuid4, json_schema_extra={"is_identifier": True})
     label: Optional[Label] = Field(None, json_schema_extra={'is_identifier': True})
@@ -166,23 +173,31 @@ class HasIdentity(BaseModelPlus):
 
 class Unstructurable(BaseModelPlus):
     """
-    There are 3 phases to model encoding/decoding for wire:
-    1. Un/Structuring -> convert models into `dict[str, Any]` ('UnstructuredData') suitable for constructing a new object.  Object class is stored a "kind" field for restructuring to the proper type.
+    'Structuring' is the basic way to create an entity from keyword initialization
+    data and 'Unstructuring' is the basic way to reduce an existing instance back to
+    constructor form.  Unstructured data reprsentation is useful for compare-by-value,
+    persistence, and encoding data transfer objects.
+
+    UnstructuredData may include a class override for in a "kind" field, for
+    restructuring to the proper type.  UnstructuredData may include recursively
+    unstructured data only in certain classes, such as Registry, by design.
+
+    There are 3 distinct phases encode/decode for wire:
+    1. Un/Structuring -> convert models into `dict[str, Any]` ('UnstructuredData') suitable for constructing a new object.
     2. Un/Flattening -> convert UnstructuredData into `dict[str, Primitive]` ('FlatData'), where Primitives are yaml/json safe (no types, uuids, timestamps, enums, sets, etc.).  For unflattening, Kind-resolution uses an explicit `KindRegistry`.
     3. De/Serialize -> dependent on backend choice, maybe binary (pickle/bson) or strings (json/yaml).
 
-    Flattening and Serialization are entirely independent of model type and managed by the persistence service.  They are not addressed in core.
+    Flattening and Serialization are entirely independent of model type and managed by the persistence service.  They are _not_ addressed in core.
 
     Example:
-    >>> class E(Unstructurable, HasIdentity): ...
-    >>> e = E(label="test")
-    >>> data = e.unstructure()
-    >>> data['kind'] is E and data['label'] == 'test'  # injects kind field
-    True
-    >>> ee = Unstructurable.structure(data)
-    >>> e is not ee and e.eq_by_value(ee) and ee == e  # round-trip compares by value
-    True
-
+        >>> class E(Unstructurable, HasIdentity): ...
+        >>> e = E(label="test")
+        >>> data = e.unstructure()
+        >>> data['kind'] is E and data['label'] == 'test'  # injects kind field
+        True
+        >>> ee = Unstructurable.structure(data)
+        >>> e is not ee and e.eq_by_value(ee) and ee == e  # round-trip compares by value
+        True
     """
     @classmethod
     def structure(cls, data) -> Self:
@@ -191,10 +206,19 @@ class Unstructurable(BaseModelPlus):
             raise TypeError(f"Expected {cls_} to be a class")
         return cls_(**data)
 
+    guard_unstructure: ClassVar[bool] = False
+
     def unstructure(self) -> UnstructuredData:
-        # all entities can _unstructure_ to data, not all entities can _serialize_
-        # reducing kind to a qualname is a _serialization_ concern NOT a structuring
-        # concern
+        """"
+        - If an entity class is allowed to carry non-serializable logic, set the
+          class flag 'guard_unstructure' to disabling unstructuring.
+        - Reducing kind to a qualname is a _serialization_ concern NOT a
+          structuring concern
+        """
+        if self.guard_unstructure:
+            raise TypeError(
+                f"Entities of type {type(self)} may carry non-serializable logic and should not need to be unstructured.")
+
         exclude_fields = set( self._match_fields(exclude=True) )
         data = self.model_dump(exclude=exclude_fields)
         data['kind'] = self.__class__
@@ -211,14 +235,12 @@ class Unstructurable(BaseModelPlus):
         # Order of inheritance matters for this, right-most wins
         return self.eq_by_value(other)
 
-class NonUnstructurable(BaseModelPlus):
-    # Most entities are _structurable_, but not everything is _serializable_.
-    # If an entity carries non-serializable logic, this mixin can guard
-    # serialization by disabling unstructuring.
-
-    def unstructure(self) -> UnstructuredData:
-        raise NotImplementedError(
-            f"Entities of type {type(self)} may carry non-serializable logic and should not need to be unstructured.")
+    def evolve(self, **updates) -> Self:
+        data = self.unstructure()
+        if updates:
+            data = data | updates
+        data = deepcopy(data)
+        return self.structure(data)
 
 
 class HasContent(BaseModelPlus):
@@ -226,11 +248,11 @@ class HasContent(BaseModelPlus):
     Entities that carry a stable content payload may be compared by content rather than identity or value.  This can be used as a singleton flag.
 
     Example:
-    >>> class E(HasContent):
-    ...     attrib: str
-    ...     def get_content(self): return self.attrib
-    >>> e = E(attrib="foo"); f = E(attrib="foo")
-    >>> assert e is not f and e.eq_by_content(f) and e == f and e != E(attrib="bar")  # compares by content
+        >>> class E(HasContent):
+        ...     attrib: str
+        ...     def get_content(self): return self.attrib
+        >>> e = E(attrib="foo"); f = E(attrib="foo")
+        >>> assert e is not f and e.eq_by_content(f) and e == f and e != E(attrib="bar")  # compares by content
     """
 
     @abstractmethod
@@ -257,10 +279,10 @@ class HasOrder(BaseModelPlus):
     can be added to any sort key as a deterministic tie-breaker.
 
     Example:
-    >>> e = HasOrder(seq=3); f = HasOrder(seq=1); g = HasOrder(seq=2)
-    >>> assert f < g < e     # forced order respected
-    >>> h = HasOrder(); i = HasOrder(); j = HasOrder()
-    >>> assert h < i < j     # default order respected
+        >>> e = HasOrder(seq=3); f = HasOrder(seq=1); g = HasOrder(seq=2)
+        >>> assert f < g < e     # forced order respected
+        >>> h = HasOrder(); i = HasOrder(); j = HasOrder()
+        >>> assert h < i < j     # default order respected
     """
 
     seq: int = Field(None, init=False, validate_default=True)

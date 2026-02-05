@@ -54,6 +54,12 @@ class Subgraph(EntityGroup, GraphItem):
 
 
 class Edge(GraphItem):
+    """
+    dangling edges and connection mutation is allowed bc edges get used for many types of
+    logical constructs, some of which don't require pre-resolved endpoints.  Subclasses
+    or user must manage consistency.
+    """
+
     predecessor_id: Optional[UUID] = None
     successor_id: Optional[UUID] = None
 
@@ -99,4 +105,16 @@ class HierarchicalNode(HierarchicalGroup, Node):
     # todo: should probably enforce uniqueness within hierarchies in the same registry
 
     # children are both members and items linked by outgoing edges?  No, that's logically too complicated to reason about.  They are distinct concepts.
-    ...
+
+    def predecessors(self) -> Iterator[Node]:
+        """Immediate predecessors via incoming edges."""
+        return (e.predecessor for e in self.edges_in() if e.predecessor)
+        # or use parent chain?
+
+    def successors(self) -> Iterator[Node]:
+        """Immediate successors via outgoing edges."""
+        return (e.successor for e in self.edges_out() if e.successor)
+
+    def ancestors(self) -> Iterator[Node]:
+        """Transitive predecessors (BFS traversal)."""
+        # Implementation needed

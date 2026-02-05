@@ -30,32 +30,33 @@ class Registry(Entity, Generic[ET]):
     - Broader identifier matching is done via selection (`find_*` with `Selector(identifier=...)` / `has_identifier` criteria), not via `get()`.
 
     Example:
-    >>> a = Entity(label="abc"); b = Entity(label="def")
-    >>> r = Registry(); r.add(a); r.add(b)
-    >>> len(r.members)
-    2
-    >>> r.get(a.uid)  # indexed by uid
-    <Entity:abc>
-    >>> r.all_labels() == {"abc", "def"}
-    True
-    >>> s = Selector.from_identifier("abc")
-    >>> r.find_one(s)
-    <Entity:abc>
-    >>> c = Entity(label="abc")
-    >>> q = Registry(); q.add(c)
-    >>> list( Registry.chain_find_all(r, q, selector=s) ) == [a, c]
-    True
-    >>> data = r.unstructure()
-    >>> rr = Registry.structure(data)
-    >>> len(rr.members)
-    2
-    >>> r is not rr and r == rr  # compare by value
-    True
-    >>> rr.add(Entity()) # compare by value includes members field
-    >>> rr != r
-    True
+        >>> a = Entity(label="abc"); b = Entity(label="def")
+        >>> r = Registry(); r.add(a); r.add(b)
+        >>> len(r.members)
+        2
+        >>> r.get(a.uid)  # indexed by uid
+        <Entity:abc>
+        >>> r.all_labels() == {"abc", "def"}
+        True
+        >>> s = Selector.from_identifier("abc")
+        >>> r.find_one(s)
+        <Entity:abc>
+        >>> c = Entity(label="abc")
+        >>> q = Registry(); q.add(c)
+        >>> list( Registry.chain_find_all(r, q, selector=s) ) == [a, c]
+        True
+        >>> data = r.unstructure()
+        >>> rr = Registry.structure(data)
+        >>> len(rr.members)
+        2
+        >>> r is not rr and r == rr  # compare by value
+        True
+        >>> rr.add(Entity()) # compare by value includes members field
+        >>> rr != r
+        True
     """
 
+    # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     members: dict[UUID, ET] = Field(default_factory=dict, exclude=True)
 
     def add(self, value: ET):
@@ -110,6 +111,35 @@ class Registry(Entity, Generic[ET]):
             obj.add(Entity.structure(v))
         return obj
 
+    # Provide mapping interface
+
+    def values(self) -> Iterable[ET]:
+        return self.members.values()
+
+    def clear(self):
+        self.members.clear()
+
+    def __len__(self) -> int:
+        return len(self.members)
+
+    def __bool__(self) -> bool:
+        return len(self.members) > 0
+
+    def __iter__(self) -> Iterator[ET]:
+        # iter values not keys
+        return iter(self.members.values())
+
+    def __getitem__(self, key: UUID):
+        return self.get(key)
+
+    def __delitem__(self, key: UUID):
+        self.remove(key)
+
+    def __setitem__(self, key, value):
+        # refer to add
+        raise KeyError(f"May not set items directly by key.  Use `registry.add(item)` instead.")
+
+
 # Additional bases for entities that can be gathered in a registry
 
 class RegistryAware(Entity):
@@ -117,13 +147,13 @@ class RegistryAware(Entity):
     Entities that will be managed by a single registry can be auto-registered.
 
     Example:
-    >>> a = RegistryAware(); r = Registry(); r.add(a)
-    >>> a.registry == r
-    True
-    >>> Registry().add(a)  # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-      ...
-    ValueError: Registry is already set
+        >>> a = RegistryAware(); r = Registry(); r.add(a)
+        >>> a.registry == r
+        True
+        >>> Registry().add(a)  # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+          ...
+        ValueError: Registry is already set
     """
 
     registry: Registry[RegistryAware] = Field(None, exclude=True)
@@ -140,15 +170,21 @@ class EntityGroup(RegistryAware):
     by id, entities _never_ carry direct pointers to other entities
     to avoid structure/unstructure complexity.
 
+    This looks like a registry, but it does not claim ownership of
+    any items.  It is a registry item itself and refers to its members
+    by uid, as peers.
+
+    Groups live _in_ the same registry that they provide a view of.
+
     Example:
-    >>> e = EntityGroup(registry=Registry())
-    >>> e.add_members(RegistryAware(label="abc"), RegistryAware(label="def"), RegistryAware(label="ghi"))
-    >>> [ m.get_label() for m in e.members() ]
-    ['abc', 'def', 'ghi']
-    >>> a = e.member(Selector.from_identifier("abc"))
-    >>> e.remove_member(a)
-    >>> [ m.get_label() for m in e.members() ]
-    ['def', 'ghi']
+        >>> e = EntityGroup(registry=Registry())
+        >>> e.add_members(RegistryAware(label="abc"), RegistryAware(label="def"), RegistryAware(label="ghi"))
+        >>> [ m.get_label() for m in e.members() ]
+        ['abc', 'def', 'ghi']
+        >>> a = e.member(Selector.from_identifier("abc"))
+        >>> e.remove_member(a)
+        >>> [ m.get_label() for m in e.members() ]
+        ['def', 'ghi']
     """
     member_ids: list[UUID] = Field(default_factory=list)
 
@@ -163,6 +199,8 @@ class EntityGroup(RegistryAware):
         return next(self.members(selector, sort_key=sort_key), None)
 
     def add_member(self, item: RegistryAware):
+        if item is self:
+            raise ValueError("Group cannot add itself to itself")
         self.registry.add(item)
         self.member_ids.append(item.uid)
 

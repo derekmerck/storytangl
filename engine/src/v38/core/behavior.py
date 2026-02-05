@@ -1,11 +1,13 @@
 from __future__ import annotations
-from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self
+
+import itertools
+from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self, ClassVar, runtime_checkable, Mapping
 from enum import IntEnum
-from functools import partial
+from collections import ChainMap
+
+from pydantic import ConfigDict
 
 from tangl.type_hints import Tag
-from .bases import NonUnstructurable
-# from .builder import BuildOffer
 from .entity import Entity
 from .registry import Registry, RegistryAware
 from .record import HasOrder, Record
@@ -28,61 +30,130 @@ class DispatchLayer(IntEnum):
     USER = 4
     LOCAL = 5
 
-
+@runtime_checkable
 class RTCtx(Protocol):
-    def get_caller(self) -> tuple[Any]: ...
-    def get_others(self) -> dict[str, Any]: ...
+    def get_args(self) -> tuple[Any]: ...
     def get_kwargs(self) -> dict[str, Any]: ...
     def get_dispatch_layers(self) -> Iterator[BehaviorRegistry]: ...
-    def get_selector(self) -> Selector: ...
     def get_receipts(self) -> list[CallReceipt]: ...
 
 
-class CallReceipt(NonUnstructurable, Record, arbitrary_types_allowed=True):
-    # carries context for reference, so don't serialize
+class CallReceipt(Record):
+    """
+
+    **Aggregation Modes:**
+
+    Receipt aggregation or folding summarizes dispatch traces into a concrete result or list of results.  One key detail is that behaviors that return a None result are tracked with a receipt for audit, but do not participate in result reduction. Several generic aggregators are implemented as class functions on Receipt (handling for collections of receipts).  Additional aggregators can be introduced at other layers.
+
+    | Mode             | Function                  | Use Case              |
+    |------------------|---------------------------|-----------------------|
+    | `first_result`   | First non-None result     | Single result needed  |
+    | `last_result`    | Last non-None result      | Override pattern      |
+    | `all_true`       | All results truthy        | Validation gates      |
+    | `gather_results` | Collect all results       | Accumulation          |
+    | `merge_results`  | Flatten lists/merge dicts | Contribution collection |
+
+    Examples:
+        >>> receipts = [ CallReceipt(result=None),
+        ...              CallReceipt(result=1),
+        ...              CallReceipt(result=0),
+        ...              CallReceipt(result=None) ]
+        >>> CallReceipt.gather_results(*receipts)
+        [1, 0]
+        >>> CallReceipt.first_result(*receipts)
+        1
+        >>> CallReceipt.last_result(*receipts)
+        0
+        >>> CallReceipt.all_true(*receipts)
+        False
+        >>> CallReceipt.merge_results(CallReceipt(result=[1,2,3]),
+        ...                           CallReceipt(result=[4,5,6]))  # flattens
+        [1, 2, 3, 4, 5, 6]
+        >>> dict( CallReceipt.merge_results(CallReceipt(result={'a': 'foo'}),
+        ...                                 CallReceipt(result={'b': 'bar'}),
+        ...                                 CallReceipt(result={'a': 'baz'})) )  # late overrides
+        {'a': 'baz', 'b': 'bar'}
+    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     result: Any
-    args: tuple[Any] = None
+    args: tuple[Any, ...] = None
     kwargs: dict[str, Any] = None
-    # ctx: RTCtx = None
+    ctx: Optional[RTCtx] = None
+
+    # carries context for reference, so don't serialize
+    guard_unstructure: ClassVar[bool] = True
 
     # Aggregation functions
+
+    # todo: force resolve any deferred receipts?
 
     @classmethod
     def iter_results(cls, *receipts) -> Iterator[Any]:
         return (receipt.result for receipt in receipts if receipt.result is not None)
 
     @classmethod
-    def last_result(cls, *receipts: Self):
+    def gather_results(cls, *receipts) -> list[Any]:
+        return list(cls.iter_results(*receipts))
+
+    @classmethod
+    def first_result(cls, *receipts: Self):
         if len(receipts) < 1:
             raise IndexError
         return next(cls.iter_results(*receipts), None)
 
     @classmethod
-    def first_result(cls, *receipts: Self):
+    def last_result(cls, *receipts: Self):
         # this is equivalent to _any_ result is true
         if len(receipts) < 1:
             raise IndexError
         return next(cls.iter_results(*reversed(receipts)), None)
 
     @classmethod
-    def all_results_true(cls, *receipts: Self):
+    def all_true(cls, *receipts: Self):
         return all([bool(r) for r in cls.iter_results(*receipts)])
+
+    @classmethod
+    def merge_results(cls, *receipts: Self) -> list[Any] | Mapping[Any, Any]:
+        results = cls.gather_results(*receipts)
+        if all( isinstance(r, list) for r in results ):
+            return list( itertools.chain.from_iterable(results) )
+        elif all( isinstance(r, dict) for r in results ):
+            return ChainMap(*reversed(results))  # early overrides late in chain map
+        return results
 
 
 class DeferredReceipt(CallReceipt):
     # carries callback and context, so don't serialize
+
     callback: Any
     result: Any = None  # No longer required, set by resolve
 
+    # carries callback and context for reference, so don't serialize
+    guard_unstructure: ClassVar[bool] = True
+
     def resolve(self, *args, **kwargs) -> Any:
+        self.force_set('args', args)  # by-pass frozen
+        self.force_set('kwargs', kwargs)
         result = self.callback(*self.args, ctx=self.ctx, **self.kwargs)
-        setattr(self, 'result', result)  # frozen
-        setattr(self, 'args', args)
-        setattr(self, 'kwargs', kwargs)
+        self.force_set('result', result)
         return result
 
 
-class Behavior(RegistryAware, NonUnstructurable, HasOrder, Entity):
+class Behavior(RegistryAware, HasOrder, Entity):
+    """
+    Example:
+        >>> b = Behavior(func=lambda *nums, **kwargs: sum(nums))
+        >>> receipt = b(1, 2, 3)
+        >>> f"sum{receipt.args}={receipt.result}"
+        'sum(1, 2, 3)=6'
+        >>> deferred = b.defer()
+        >>> assert deferred.result is None
+        >>> deferred.resolve(4, 5, 6)
+        15
+        >>> f"sum{deferred.args}={deferred.result}"
+        'sum(4, 5, 6)=15'
+    """
 
     func: Callable = lambda *_, **__: True
     task: Tag = None
@@ -90,33 +161,42 @@ class Behavior(RegistryAware, NonUnstructurable, HasOrder, Entity):
     dispatch_layer: int = DispatchLayer.LOCAL
 
     def __call__(self, *args, ctx: RTCtx = None, **kwargs) -> CallReceipt:
-        # could do some introspection here, if the func wants caller, etc.
+        # todo: could do some introspection here, if the func wants caller, etc., check
+        #       for default call args/kwargs in ctx
         return CallReceipt(
-            origin_id=self.origin_id,
+            origin_id=self.uid,
             result=self.func(*args, ctx=ctx, **kwargs),
             args=args,
             kwargs=kwargs,
             ctx=ctx
         )
 
-    def defer(self, ctx: RTCtx) -> DeferredReceipt:
+    def defer(self, ctx: RTCtx = None) -> DeferredReceipt:
         return DeferredReceipt(
-            origin_id=self.origin_id,
-            callback=self.func,
-            ctx=ctx
+            origin_id=self.uid,
+            ctx=ctx,
+            callback = self.func
         )
 
     @property
     def sort_key(self):
         return self.dispatch_layer, self.priority, self.seq
 
-# def dispatches(meth):
-#     # deco for methods that want a dispatch context for a task with their name
-#     setattr(meth, '_dispatches', True)
-#     return meth
-
 
 class BehaviorRegistry(Registry[Behavior]):
+    """
+    Example:
+    >>> br = BehaviorRegistry()
+    >>> f = br.register(lambda *nums, **kwargs: sum(nums), task="sum")
+    >>> g = br.register(lambda *args, **kwargs: ''.join([str(a) for a in args]), task="join", priority=0)
+    >>> next( br.execute_all(task="sum", call_args=(1, 2, 3)) ).result
+    6
+    >>> next( br.execute_all(task="join", call_args=('a', 'b', 'c')) ).result
+    'abc'
+    >>> CallReceipt.gather_results( *br.execute_all(call_args=(1, 2, 3)) )
+    ['123', 6]
+    >>> # join triggers first even tho registered last, b/c lower priority
+    """
 
     default_task: Tag = None
     default_priority: Priority = Priority.NORMAL
@@ -138,7 +218,7 @@ class BehaviorRegistry(Registry[Behavior]):
         yield from (b(*call_args, ctx=ctx, **call_kwargs) for b in behaviors)
 
     def execute_all(self, *,
-                    call_args: tuple[Any] = None,
+                    call_args: tuple[Any, ...] = None,
                     call_kwargs: dict[str, Any] = None,
                     ctx: RTCtx = None,
                     task: Tag = None,
@@ -148,7 +228,7 @@ class BehaviorRegistry(Registry[Behavior]):
 
         if task is not None:
             selector = selector or Selector()
-            selector = selector.with_attrib(task=task)
+            selector = selector.with_criteria(task=task)
 
         # selector from task, sort_key from prio, seq
         # if inline behaviors or ctx carries dispatch layers

@@ -27,25 +27,25 @@ class Selector(BaseModel, extra="allow"):
     - `Selector` is serializable only if criteria are serializable
     - If runtime-only callables needed, use a separate type
 
-    Examples:
-    >>> class E(Entity):
-    ...     @property
-    ...     def label_rev(self): return self.label[::-1]
-    >>> e = E(label='abc')
-    >>> Selector(predicate=lambda e: e.label == 'abc', # predicate
-    ...          label='abc',                          # field
-    ...          has_kind=E,                           # callable attrib
-    ...          label_rev='cba').matches(e)           # property
-    True
-    >>> s = Selector(has_identifier="abc"); assert s.matches(e)
-    >>> s.with_criteria(has_tags={'foo'}).matches(e)
-    False
-    >>> f = E(label='def')
-    >>> list( s.filter([e, f]) )
-    [<E:abc>]
+    Example:
+        >>> class E(Entity):
+        ...     @property
+        ...     def label_rev(self): return self.label[::-1]
+        >>> e = E(label='abc')
+        >>> Selector(predicate=lambda e: e.label == 'abc', # predicate
+        ...          label='abc',                          # field
+        ...          has_kind=E,                           # callable attrib
+        ...          label_rev='cba').matches(e)           # property
+        True
+        >>> s = Selector(has_identifier="abc"); assert s.matches(e)
+        >>> s.with_criteria(has_tags={'foo'}).matches(e)
+        False
+        >>> f = E(label='def')
+        >>> list( s.filter([e, f]) )
+        [<E:abc>]
     """
     # todo: suggests baking basic entity axes identifier, kind, tags into field definitions for type checking
-    # todo: if a selector is serializable, predicate need to be a string requirement or dsl type thing
+    # todo: if a selector is serializable, predicate need to be a Predicate RuntimeOp
 
     predicate: Callable[[Entity], bool] = None
 

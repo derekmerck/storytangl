@@ -9,7 +9,7 @@ class RuntimeOp(BaseModel):
     """
     Generic runtime expression evaluator.
 
-    This is the storage/serialization format for all runtime expressions.
+    This is the storage/serialization format for portable runtime expressions.
     Use Query/Predicate/Effect subclasses for semantic clarity in domain code.
 
     RuntimeOp provides:
@@ -20,7 +20,7 @@ class RuntimeOp(BaseModel):
     - apply(ns) -> StringMap: Execute and return namespace (alias for exec)
     - apply_all(*exprs, ns) -> StringMap: Execute all exprs and return mutated namespace
 
-    Examples:
+    Example:
         >>> RuntimeOp(expr="x + 5").eval({'x': 10})
         15
         >>> RuntimeOp(expr="x = 5").exec({'x': 10})
@@ -66,6 +66,8 @@ class RuntimeOp(BaseModel):
 
     @classmethod
     def apply_all(cls, *exprs: str, ns: StringMap = None) -> StringMap:
+        ns = ns or {}
+        # want to use a _shared_ default ns for mutation, otherwise default is per call
         for e in exprs:
             cls._exec_expr(e, ns)
         return ns
@@ -83,7 +85,7 @@ class Query(RuntimeOp):
 
     Cannot mutate state (exec() raises TypeError).
 
-    Examples:
+    Example:
         >>> health = Query(expr="base_health + vitality * 5")
         >>> health({'base_health': 100, 'vitality': 3})
         115
@@ -96,9 +98,10 @@ class Query(RuntimeOp):
     def __call__(self, ns: StringMap = None) -> Any:
         return self.eval(ns)
 
-    def exec(self, *_, **__) -> Any:
+    @classmethod
+    def _exec_expr(cls, *_, **__) -> Any:
         """Predicates/Queries are read-only expressions."""
-        raise TypeError(f"{self.__class__.__name__} cannot mutate state via exec()")
+        raise TypeError(f"{cls.__name__} cannot mutate state via exec()")
 
 class Predicate(RuntimeOp):
     """
@@ -111,7 +114,7 @@ class Predicate(RuntimeOp):
 
     Always returns bool. Cannot mutate state (exec() raises TypeError).
 
-    Examples:
+    Example:
         >>> can_enter = Predicate(expr="'key' in inventory")
         >>> can_enter({'inventory': ['key', 'sword']})
         True
@@ -126,9 +129,10 @@ class Predicate(RuntimeOp):
     def __call__(self, ns: StringMap = None) -> bool:
         return self.satisfied_by(ns)
 
-    def exec(self, *_, **__) -> Any:
+    @classmethod
+    def _exec_expr(cls, *_, **__) -> Any:
         """Predicates/Queries are read-only expressions."""
-        raise TypeError(f"{self.__class__.__name__} cannot mutate state via exec()")
+        raise TypeError(f"{cls.__name__} cannot mutate state via exec()")
 
 class Effect(RuntimeOp):
     """
@@ -155,6 +159,7 @@ class Effect(RuntimeOp):
     def __call__(self, ns: StringMap = None) -> Any:
         return self.apply(ns)
 
-    def eval(self, *_, **__) -> Any:
+    @classmethod
+    def _eval_expr(cls, *_, **__) -> Any:
         """Effects are imperative statements."""
-        raise TypeError(f"{self.__class__.__name__} cannot be evaluated for a value")
+        raise TypeError(f"{cls.__name__} cannot be evaluated for a value")

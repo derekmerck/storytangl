@@ -15,7 +15,7 @@ All operations reduce to compositions of:
 Higher layers (VM, Story, Service) express logic as compositions of these primitives, not parallel verbs.
 
 **Notes:**
-- "Dispatch" is a mechanism in Core; "which registries are active" is context selection (VM)
+- "Dispatch" is a mechanism in Core; "which behavior registries are active" is context selection (VM)
 - "Resolve" unifies: provisioning, templates, snapshots, singleton references, media
 
 ## 2. Separation of Concerns
@@ -72,9 +72,9 @@ The key insight: **anything requiring a shaped context for evaluation belongs in
 | Question                                        | If Yes →   |
 |-------------------------------------------------|------------|
 | Can I evaluate this with just the data?         | Core       |
+| Is this a pure transform of inputs to outputs?  | Core       |
 | Do I need to know "where we are" / "what step"? | VM         |
 | Does the answer change if the cursor moves?     | VM         |
-| Is this a pure transform of inputs to outputs?  | Core       |
 | Does it require narrative domain knowledge?     | Story      |
 | Does it manage persistence or access control?   | Service    |
 
@@ -83,26 +83,23 @@ The key insight: **anything requiring a shaped context for evaluation belongs in
 ```
 tangl.core
 ├── Lifecycle      → existence, frozen vs mutable, identity, uniqueness
-├── Shape          → structure/unstructure, Registry, Graph topology
+├── Shape          → structure/unstructure, Registry, Graph topology, Singleton
 ├── State          → HasState, locals dict, attribute access
 ├── Behavior       → dispatch, receipts, aggregation
 └── Selection      → Selector (query), Requirement (satisfaction)
 ```
 
-**Core provides shapes but not behaviors for:**
-- Singleton (archetype with prototype chain) — shape is Core, "world loading" is Story
-- Token (archetype reference + local state) — shape is Core, "promotion rules" are VM
-- Graph (nodes + edges) — shape is Core, "traversal semantics" are VM
+Core provides shapes and context-free behaviors for Graph, but traversal semantics are deferred to VM.
 
 ## VM — What HAPPENS (Contextual/Temporal)
 
 ```
 tangl.vm
-├── Evolution      → cursor movement, phase bus, step counter
+├── Evolution      → cursor movement, phase bus, step counter, traversal
 ├── Observation    → visibility, availability, frontier discovery
 ├── Provisioning   → find-or-create against requirements + scope
 ├── Journaling     → emit fragments to stream
-└── Snapshotting   → capture graph state for replay/rollback
+└── Snapshotting   → capture graph state and deltas for replay/rollback
 ```
 
 **VM interprets Core shapes:**
@@ -202,8 +199,7 @@ class TemplateOffer(Offer[T]):
 Core does NOT define:
 - Cursor, steps, epochs, ledgers (VM)
 - Phase lists or story semantics (VM/Story)
-- Token promotion rules, visibility rules (VM)
-- Scope pattern interpretation (VM)
+- Scope visibility and pattern interpretation (VM)
 - Persistence policies, transactions, access control (Service)
 - Global registries chosen implicitly (all layers explicit)
 
@@ -217,49 +213,56 @@ Core only provides vocabulary to implement these elsewhere.
 tangl/core/
 ├── __init__.py           # Public API exports
 ├── identity.py           # HasIdentity, uid, labels, tags
-├── unstructurable.py     # Unstructurable, un/structure
-├── order.py              # HasOrder, seq
 │
-├── select.py             # Selector, match()
-├── requirement.py        # Requirement, ProvisioningPolicy
-├── resolve.py            # Offer, Satisfier, resolve()
-├── runtime.py            # RuntimeOp, eval(), exec(), satisfied_by()
-│
+│   # Discovery
+├── selector.py           # Selector, match()
 ├── registry.py           # Registry, RegistryAware, EntityGroup, chain_find_all()
-├── record.py             # Record, HasContent, HasOrder, OrderedRegistry
 │
+│   # Lifecycle
+├── record.py             # Record, HasContent, HasOrder, OrderedRegistry, sort_key()
+├── singleton.py          # Singleton, InstanceInheritance, Token
+│
+│   # Relationships
+├── graph/
+│   ├── __init__.py
+│   ├── graph.py          # GraphItem, Graph (Registry[GraphItem])
+│   ├── subgraph.py       # Subgraph (EntityGroup[GraphItem])
+│   ├── node.py           # Node
+│   └── edge.py           # Edge
+│
+│   # Doing things
+├── runtime_op.py         # RuntimeOp, Query, Predicate, Effect
 ├── behavior/
 │   ├── __init__.py
 │   ├── behavior.py       # Behavior, Priority, DispatchLayer
-│   ├── receipt.py        # Receipt, aggregators
-│   └── behavior_registry.py  # BehaviorRegistry (Registry[Behavior]), dispatch()
+│   ├── receipt.py        # Audit receipt, aggregators
+│   └── behavior_registry.py  # BehaviorRegistry (Registry[Behavior])
+├── dispatch              # Specific pipelines for generic/core tasks
 │
-├── singleton.py          # Singleton
-│
-└── graph/
-    ├── __init__.py
-    ├── graph.py          # GraphItem, Graph (Registry[GraphItem])
-    ├── subgraph.py       # Subgraph (EntityGroup[GraphItem])
-    ├── node.py           # Node
-    ├── edge.py           # Edge
-    └── token.py          # Token (Wraps singleton ref with local state)
+│   # Creation
+├── unstructurable.py     # Unstructurable, un/structure()
+└── factory/
+    ├── template.py       # Semi-structured data, TemplateRegistry
+    ├── builder.py        # can_satisfy(Req), get_offers(Req), build(Offer)
+    ├── requirement.py    # Requirement, ProvisioningPolicy
+    └── resolve.py        # Offer, Satisfier, resolve()
+
 ```
 
 ---
 
 ## Exit Criteria (Semantic Tests)
 
-| Criterion                     | What It Validates                                  |
-|-------------------------------|----------------------------------------------------|
-| Identity invariants           | `uid` always in identifiers; identifiers stable    |
-| Reduce round-trip             | `unreduce(*reduce(x))` yields equivalent object    |
-| Encode/decode round-trip      | JSON-safe; kind resolves via registry              |
-| Selector purity               | Deterministic; no side effects                     |
-| Registry chain selection      | Stable, predictable ordering                       |
-| Dispatch trace + reducers     | Stable ordering + correct reducer semantics        |
-| Resolve protocol              | Can choose between offers; deterministic selection |
-| Singleton reference semantics | Reduces as reference; unreduces via lookup         |
-| Token attribute cascade       | `local → archetype chain` correctly resolved       |
-| Graph topology purity         | `successors/predecessors` need no runtime context  |
+| Criterion                      | What It Validates                                    |
+|--------------------------------|------------------------------------------------------|
+| Identity invariants            | `uid` always in identifiers; identifiers stable      |
+| Reduce round-trip              | `structure(unstructure(x))` yields equivalent object |
+| Selector purity                | Deterministic; no side effects                       |
+| Registry chain selection       | Stable, predictable ordering                         |
+| Dispatch trace + aggregation   | Stable ordering + clear aggregation semantics        |
+| Resolve protocol               | Can choose between offers; deterministic selection   |
+| Singleton reference semantics  | Unstructured as reference; structures via lookup     |
+| Singleton instance inheritance | Reference chain correctly resolves                   |
+| Graph topology purity          | `successors/predecessors` need no runtime context    |
 
 
