@@ -1,3 +1,4 @@
+# tangl/core/registry.py
 from __future__ import annotations
 from typing import TypeVar, Generic, Iterator, Iterable, Optional, Self
 from uuid import UUID
@@ -12,7 +13,6 @@ from .entity import Entity
 from .selector import Selector
 
 logger = logging.getLogger(__name__)
-
 
 ET = TypeVar('ET', bound=Entity)
 
@@ -127,7 +127,7 @@ class Registry(Entity, Generic[ET]):
         return len(self.members) > 0
 
     def __iter__(self) -> Iterator[ET]:
-        # iter values not keys
+        # iter values not keys, gets '__contains__(item)' for free
         return iter(self.members.values())
 
     def __getitem__(self, key: UUID):
@@ -218,7 +218,7 @@ class EntityGroup(RegistryAware):
             self.member_ids.remove(item.uid)
 
     def has_member(self, item: RegistryAware) -> bool:
-        # for selection criteria
+        # for selection criteria, uses __contains__ compare-by-uid
         return item in self
 
     def __iter__(self) -> Iterator[RegistryAware]:

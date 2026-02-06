@@ -1,5 +1,6 @@
+# tangl/core/template.py
 from __future__ import annotations
-from typing import Optional, Iterator, TypeVar, Generic, Type, Self, Any
+from typing import Optional, Iterator, TypeVar, Generic, Type, Self
 from uuid import uuid4
 
 from pydantic import Field

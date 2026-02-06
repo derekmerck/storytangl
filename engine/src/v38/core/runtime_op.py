@@ -1,3 +1,5 @@
+# tangl/core/runtime_op.py
+from __future__ import annotations
 from typing import Any
 
 from pydantic import BaseModel

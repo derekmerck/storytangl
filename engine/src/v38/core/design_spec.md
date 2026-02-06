@@ -142,17 +142,17 @@ tangl.service
 
 ## Dispatch Layer Mapping Parallels
 
-| Dispatch Layer | Code Layer     | Registry                | Typical Tasks                   |
-|----------------|----------------|-------------------------|---------------------------------|
-| GLOBAL         | core           | `core.dispatch`         | Auditing, logging               |
-| SYSTEM         | vm             | `vm.dispatch`           | Phase handlers, provisioning    |
-| SYSTEM         | service        | `service.dispatch`      | Api, persistence                |
-| APPLICATION    | story          | `story.dispatch`        | Content rendering, domain rules |
-| APPLICATION    | mechanics      | `story.dispatch`        | Extend story concepts           |
-| APPLICATION    | discourse      | `story.dispatch`        | Extend story narrative          |
-| APPLICATION    | media          | `story.dispatch`        | Extend story media              |
-| AUTHOR         | world config   | `world.dispatch`        | World-specific mechanics        |
-| LOCAL          | frame instance | `frame.local_behaviors` | One-off handlers                |
+| Layer       | Code      | Registry            | Typical Tasks                   |
+|-------------|-----------|---------------------|---------------------------------|
+| GLOBAL      | core      | `core.dispatch`     | Auditing, logging               |
+| SYSTEM      | vm        | `vm.dispatch`       | Phase handlers, provisioning    |
+| SYSTEM      | service   | `service.dispatch`  | Api, persistence                |
+| APPLICATION | story     | `story.dispatch`    | Content rendering, domain rules |
+| APPLICATION | mechanics | `story.dispatch`    | Extend story concepts           |
+| APPLICATION | discourse | `story.dispatch`    | Extend story narrative          |
+| APPLICATION | media     | `story.dispatch`    | Extend story media              |
+| AUTHOR      | world     | `world.dispatch`    | World-specific mechanics        |
+| LOCAL       | vm.frame  | `vm.frame.dispatch` | One-off handlers                |
 
 ---
 

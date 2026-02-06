@@ -1,6 +1,7 @@
+# tangl/core/graph.py
 from __future__ import annotations
 from uuid import UUID
-from typing import Iterator, Self, Optional
+from typing import Iterator, Optional
 import itertools
 
 from pydantic import Field

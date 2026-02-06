@@ -1,4 +1,6 @@
-from typing import ClassVar, TypeVar, Union, TypeAlias
+# tangl/core/record.py
+from __future__ import annotations
+from typing import ClassVar, TypeVar, Union
 
 from pydantic import Field, ConfigDict, ValidationError
 

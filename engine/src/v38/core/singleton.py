@@ -1,5 +1,6 @@
+# tangl/core/singleton.py
 from __future__ import annotations
-from typing import ClassVar, Self, Generic, TypeVar
+from typing import ClassVar, Self, Optional
 from inspect import isclass
 
 from pydantic import model_validator, ValidationError, Field
@@ -94,33 +95,31 @@ class InstanceInheritance(Singleton):
     """
     - Optional init-only ref_id for inheritance chain
     - Default values collected at creation-time ONLY
-    - No order optimization for creation, so use cautiously
+    - No order optimization for creation, so use cautiously and ensure items aren't referenced until _after_ they've been created.
+
+    Example:
+        >>> class S(InstanceInheritance): value: str = Field()
+        >>> S(label="foo", value="bar").value
+        'bar'
+        >>> S(label="baz", inherit_from="foo").value
+        'bar'
+        >>> S(label="foobar", inherit_from="baz").value
+        'bar'
     """
-    ref_id: str = None
+    inherit_from: Optional[str] = Field(None, init_var=True)
 
-    def ref_inst(self):
-        # irrelevant after creation, just for auditing
-        return self.get_instance(self.ref_id)
+    def __init__(self, *, label: str, inherit_from: str = None, **kwargs):
+        if inherit_from is not None:
+            # Copy defaults from reference, discard identity fields (label, uid)
+            # and inherit_from
+            field_names = [ f for f in self.__pydantic_fields__.keys()
+                            if f not in ['uid', 'inherit_from', 'label', *kwargs.keys()]
+                            and not f.startswith('_') ]
+            inherit_inst = self.get_instance(inherit_from)
+            if inherit_inst is None:
+                raise ValueError(f"'{inherit_from}' is not a valid heritage")
+            defaults = {f: getattr(inherit_inst, f) for f in field_names}
+            kwargs = defaults | kwargs
 
+        super().__init__(label=label, inherit_from=inherit_from, **kwargs)
 
-ST = TypeVar("ST", bound=Singleton)
-
-class SingletonToken(Entity, Generic[ST]):
-    """
-    class that masquerades as a Singleton template object with an overlay for local/dynamic vars and refers others to base class
-
-    This is almost always going to be mixed with GraphItem and used by a graph to materialize and link a 'platonic' singleton as a concrete node.  Singleton type might be 'weapon' and inst might be 'sword'.  A sword token delegates methods and attributes to its reference singleton, but adds a local 'sharpness' variable.
-
-    - Fields on the ref_kind annotated with 'local_field' will be added to the token on class creation and the field value on the ref_inst used for the default value on token construction
-    - Other field references will be delegated to the ref directly.
-
-    - No circular ref discovery is provided, use cautiously
-    """
-    ref_id: str = None
-
-    def ref_kind(self):
-        # helper to get generic type
-        ...
-
-    def ref_inst(self):
-        return self.ref_kind().get_instance(self.ref_id)

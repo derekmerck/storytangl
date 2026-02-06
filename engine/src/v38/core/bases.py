@@ -16,12 +16,11 @@ Additional specialized features and shapes are provided as extensions or helper 
 - singletons and singleton tokens with local state (in core.singleton)
 - graph element surface (in core.graph)
 """
-
 from __future__ import annotations
 from functools import total_ordering
 from inspect import isclass
 from uuid import UUID, uuid4
-from typing import Callable, Iterator, Type, Self, ClassVar, Any, Optional, Union
+from typing import Callable, Iterator, Type, Self, ClassVar, Any, Optional
 import logging
 from abc import abstractmethod
 import time
@@ -42,7 +41,8 @@ class BaseModelPlus(BaseModel):
     Adds schema introspection for method and field annotations.
     """
 
-    def _match_methods(self, **criteria) -> Iterator[str]:
+    @classmethod
+    def _match_methods(cls, **criteria) -> Iterator[str]:
         # check schema for annotated methods
 
         def _method_matches(method: Callable):
@@ -51,13 +51,14 @@ class BaseModelPlus(BaseModel):
                     return False
             return True
 
-        for cls in self.__class__.__mro__:
-            for name, attrib in cls.__dict__.items():
+        for cls_ in cls.__mro__:
+            for name, attrib in cls_.__dict__.items():
                 if callable(attrib):
                     if _method_matches(attrib):
                         yield name
 
-    def _match_fields(self, **criteria) -> Iterator[str]:
+    @classmethod
+    def _match_fields(cls, **criteria) -> Iterator[str]:
         # check schema for annotated fields
 
         def _field_matches(field_info: FieldInfo) -> bool:
@@ -68,7 +69,7 @@ class BaseModelPlus(BaseModel):
                     return False
             return True
 
-        for name, info in self.__pydantic_fields__.items():
+        for name, info in cls.__pydantic_fields__.items():
             if _field_matches(info):
                 yield name
 

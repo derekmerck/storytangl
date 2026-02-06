@@ -1,9 +1,10 @@
+# tangl/core/selector.py
 from __future__ import annotations
-from typing import Any, Iterator, TypeVar, Iterable, Callable, Type, Self, Optional
+from typing import Any, Iterator, TypeVar, Iterable, Callable, Type, Self
 
 from pydantic import BaseModel
 
-from tangl.type_hints import Identifier, StringMap
+from tangl.type_hints import Identifier
 from .entity import Entity
 
 ET = TypeVar('ET', bound=Entity)

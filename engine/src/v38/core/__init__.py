@@ -33,7 +33,8 @@ from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, DeferredRe
 # Provides:
 # - building
 # - flexible dispatch
-from .template import EntityTemplate, Snapshot, TemplateRegistry
+from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
+from .token import Token  # Delegated reference builder
 # from .dispatch import HookedRegistry, HookedBuilder
 
 # Systems Layers

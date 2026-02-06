@@ -1,3 +1,6 @@
+# tangl/core/entity.py
+from __future__ import annotations
+
 from .bases import HasIdentity, Unstructurable
 
 class Entity(Unstructurable, HasIdentity):
