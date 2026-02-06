@@ -3,6 +3,8 @@ from uuid import UUID
 from typing import Iterator, Self, Optional
 import itertools
 
+from pydantic import Field
+
 from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 from .selector import Selector
 
@@ -11,9 +13,10 @@ class GraphItem(RegistryAware):
     """
     Base for items managed by a Graph.
     """
+    registry: Graph = Field(None, exclude=True)  # change type hint
 
     @property
-    def graph(self) -> Registry[Self]:
+    def graph(self) -> Graph:
         return self.registry
 
 
@@ -32,15 +35,15 @@ class Graph(Registry[GraphItem]):
     - Frontier discovery
     """
 
-    def subgraphs(self, selector: Selector = Selector()) -> Iterator[Subgraph]:
+    def get_subgraphs(self, selector: Selector = Selector()) -> Iterator[Subgraph]:
         selector = selector.with_criteria(has_kind=Subgraph)
         return self.find_all(selector)
 
-    def edges(self, selector: Selector = Selector()) -> Iterator[Edge]:
+    def get_edges(self, selector: Selector = Selector()) -> Iterator[Edge]:
         selector = selector.with_criteria(has_kind=Edge)
         return self.find_all(selector)
 
-    def nodes(self, selector: Selector = Selector()) -> Iterator[Node]:
+    def get_nodes(self, selector: Selector = Selector()) -> Iterator[Node]:
         selector = selector.with_criteria(has_kind=Node)
         return self.find_all(selector)
 
@@ -65,7 +68,7 @@ class Edge(GraphItem):
 
     @property
     def predecessor(self) -> Optional[Node]:
-        return self.registry.get(self.predecessor_id)
+        return self.graph.get(self.predecessor_id)
 
     @predecessor.setter
     def predecessor(self, value: Node) -> None:
@@ -76,7 +79,7 @@ class Edge(GraphItem):
 
     @property
     def successor(self) -> Optional[Node]:
-        return self.registry.get(self.successor_id)
+        return self.graph.get(self.successor_id)
 
     @successor.setter
     def successor(self, value: Node) -> None:
@@ -89,32 +92,25 @@ class Edge(GraphItem):
 class Node(GraphItem):
     # Thing that can be connected by edges
 
-    def edges_in(self, selector: Selector) -> Iterator[Edge]:
+    def edges_in(self, selector: Selector = Selector()) -> Iterator[Edge]:
         selector = selector.with_criteria(successor=self)
         return self.graph.get_edges(selector)
 
-    def edges_out(self, selector: Selector) -> Iterator[Edge]:
+    def predecessors(self, selector: Selector = None) -> Iterator[Node]:
+        """Immediate predecessors via incoming edges."""
+        return (e.predecessor for e in self.edges_in(selector) if e.predecessor)
+
+    def edges_out(self, selector: Selector = Selector()) -> Iterator[Edge]:
         selector = selector.with_criteria(predecessor=self)
         return self.graph.get_edges(selector)
 
-    def edges(self, selector: Selector) -> Iterator[Edge]:
+    def successors(self, selector = None) -> Iterator[Node]:
+        """Immediate successors via outgoing edges."""
+        return (e.successor for e in self.edges_out(selector) if e.successor)
+
+    def edges(self, selector: Selector = None) -> Iterator[Edge]:
         return itertools.chain(self.edges_in(selector), self.edges_out(selector))
 
 
 class HierarchicalNode(HierarchicalGroup, Node):
-    # todo: should probably enforce uniqueness within hierarchies in the same registry
-
-    # children are both members and items linked by outgoing edges?  No, that's logically too complicated to reason about.  They are distinct concepts.
-
-    def predecessors(self) -> Iterator[Node]:
-        """Immediate predecessors via incoming edges."""
-        return (e.predecessor for e in self.edges_in() if e.predecessor)
-        # or use parent chain?
-
-    def successors(self) -> Iterator[Node]:
-        """Immediate successors via outgoing edges."""
-        return (e.successor for e in self.edges_out() if e.successor)
-
-    def ancestors(self) -> Iterator[Node]:
-        """Transitive predecessors (BFS traversal)."""
-        # Implementation needed
+    ...

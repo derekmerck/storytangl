@@ -236,10 +236,11 @@ class Unstructurable(BaseModelPlus):
         return self.eq_by_value(other)
 
     def evolve(self, **updates) -> Self:
+        # include a new uid in updates if you want a similar copy rather than an exact copy
         data = self.unstructure()
+        data = deepcopy(data)  # clean copy
         if updates:
             data = data | updates
-        data = deepcopy(data)
         return self.structure(data)
 
 

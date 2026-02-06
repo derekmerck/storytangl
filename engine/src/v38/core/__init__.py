@@ -8,7 +8,7 @@ from .entity import Entity
 # - identity
 # - un/structure
 # Provides:
-# - selection (Selector.from_ctx(ctx), .with_attribs(**_), .matches(entity))
+# - selection (Selector.from_kind(), .with_criteria(**_), .matches(entity))
 # - discovery (Reg.find_all(selector), .chain_find_all(*reg, selector)
 # - grouping/membership
 from .selector import Selector
@@ -20,8 +20,8 @@ from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 # Provides:
 # - specialized shapes
 # - provenance
-# - behaviors (Behavior.execute_for(ctx))
-# - groups of behaviors (Dispatch.execute_all_for(ctx), .chain_execute_all_for(ctx))
+# - behaviors (Behavior(), Behavior.defer())
+# - groups of behaviors (BehaviorRegistry.execute_all(), .chain_execute_al)
 from .runtime_op import RuntimeOp
 from .singleton import Singleton
 from .record import Record, OrderedRegistry

@@ -62,11 +62,7 @@ class Selector(BaseModel, extra="allow"):
             if not hasattr(entity, attrib_name):
                 return False
             attrib_value = getattr(entity, attrib_name)
-            if hasattr(attrib_value, 'fget'):
-                # it's a property, use fget
-                if not attrib_value.fget() == target_val:
-                    return False
-            elif callable(attrib_value):
+            if callable(attrib_value):
                 # it's a "has_" or "is_" callable, call with value
                 if not attrib_value(target_val):
                     return False

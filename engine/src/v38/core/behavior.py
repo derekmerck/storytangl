@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self, ClassVar, runtime_checkable, Mapping
-from enum import IntEnum
+from enum import IntEnum, Enum
 from collections import ChainMap
 
 from pydantic import ConfigDict
@@ -36,6 +36,14 @@ class RTCtx(Protocol):
     def get_kwargs(self) -> dict[str, Any]: ...
     def get_dispatch_layers(self) -> Iterator[BehaviorRegistry]: ...
     def get_receipts(self) -> list[CallReceipt]: ...
+
+class AggregationMode(Enum):
+    """How to reduce multiple receipts to a result."""
+    FIRST = "first_result"      # Early-exit, first wins
+    LAST = "last_result"        # Late-override, last wins
+    ALL_TRUE = "all_true"       # Validation gate
+    GATHER = "gather_results"   # Collect all
+    MERGE = "merge_results"     # Flatten/combine
 
 
 class CallReceipt(Record):
@@ -122,6 +130,22 @@ class CallReceipt(Record):
             return ChainMap(*reversed(results))  # early overrides late in chain map
         return results
 
+    @classmethod
+    def aggregate(cls, mode: AggregationMode, *receipts: Self):
+        match mode:
+            case AggregationMode.FIRST:
+                return cls.first_result(*receipts)
+            case AggregationMode.LAST:
+                return cls.last_result(*receipts)
+            case AggregationMode.ALL_TRUE:
+                return cls.all_true(*receipts)
+            case AggregationMode.GATHER:
+                return cls.gather_results(*receipts)
+            case AggregationMode.MERGE:
+                return cls.merge_results(*receipts)
+            case _:
+                raise ValueError(f"Unknown aggregation mode: {mode}")
+
 
 class DeferredReceipt(CallReceipt):
     # carries callback and context, so don't serialize
@@ -129,8 +153,9 @@ class DeferredReceipt(CallReceipt):
     callback: Any
     result: Any = None  # No longer required, set by resolve
 
-    # carries callback and context for reference, so don't serialize
-    guard_unstructure: ClassVar[bool] = True
+    # todo: could make CallReceipt just take a defer flag to register a callback
+    #       and not compute the result yet, then when the result is accessed,
+    #       deferred can call the callback if it's not already resolved
 
     def resolve(self, *args, **kwargs) -> Any:
         self.force_set('args', args)  # by-pass frozen
@@ -188,7 +213,7 @@ class BehaviorRegistry(Registry[Behavior]):
     Example:
     >>> br = BehaviorRegistry()
     >>> f = br.register(lambda *nums, **kwargs: sum(nums), task="sum")
-    >>> g = br.register(lambda *args, **kwargs: ''.join([str(a) for a in args]), task="join", priority=0)
+    >>> g = br.register(lambda *args, **kwargs: ''.join([str(a) for a in args]), task="join", priority=Priority.EARLY)
     >>> next( br.execute_all(task="sum", call_args=(1, 2, 3)) ).result
     6
     >>> next( br.execute_all(task="join", call_args=('a', 'b', 'c')) ).result
@@ -203,6 +228,7 @@ class BehaviorRegistry(Registry[Behavior]):
     default_dispatch_layer: DispatchLayer = DispatchLayer.APPLICATION
 
     def register(self, func: Callable, **kwargs) -> Callable:
+        """Decorator to register a behavior"""
         kwargs.setdefault("task", self.default_task)
         kwargs.setdefault("priority", self.default_priority)
         kwargs.setdefault("dispatch_layer", self.default_dispatch_layer)
@@ -225,7 +251,20 @@ class BehaviorRegistry(Registry[Behavior]):
                     selector: Selector = None,
                     inline_behaviors: Iterable[Behavior] = None
                     ) -> Iterator[CallReceipt]:
+        """
+        Execute all behaviors matching selector in sorted order.
 
+        Args:
+            call_args: Positional arguments for behavior functions
+            call_kwargs: Keyword arguments for behavior functions
+            ctx: Runtime context (optional)
+            task: Task tag to filter behaviors (convenience)
+            selector: Additional selection criteria
+            inline_behaviors: Additional behaviors to execute (not implemented)
+
+        Yields:
+            CallReceipt for each executed behavior in sort order
+        """
         if task is not None:
             selector = selector or Selector()
             selector = selector.with_criteria(task=task)
@@ -235,16 +274,32 @@ class BehaviorRegistry(Registry[Behavior]):
         #   do a chain_find_all
         behaviors = self.find_all(selector=selector,
                                   sort_key=lambda v: v.sort_key)
+        if inline_behaviors:
+            # todo: allow inline behaviors to be funcs and cast them to behaviors with layer local before adding them.
+            behaviors = list(behaviors)
+            behaviors.extend(inline_behaviors)
+            behaviors.sort(key=lambda v: v.sort_key)
         return self._get_receipts(behaviors, call_args=call_args, call_kwargs=call_kwargs, ctx=ctx)
 
     @classmethod
-    def chain_execute(cls, *registries, call_args = None, call_kwargs = None, ctx = None, task = None, selector) -> Iterator[CallReceipt]:
+    def chain_execute(cls, *registries,
+                      call_args = None,
+                      call_kwargs = None,
+                      ctx = None, task = None,
+                      selector: Selector = None,
+                      inline_behaviors: Iterable[Behavior] = None
+                      ) -> Iterator[CallReceipt]:
+
         if task is not None:
             selector = selector or Selector()
-            selector = selector.with_attrib(task=task)
+            selector = selector.with_criteria(task=task)
 
         behaviors = cls.chain_find_all(
             *registries,
             selector=selector,
             sort_key=lambda v: v.sort_key)
+        if inline_behaviors:
+            behaviors = list(behaviors)
+            behaviors.extend(inline_behaviors)
+            behaviors.sort(key=lambda v: v.sort_key)
         return cls._get_receipts(behaviors, call_args=call_args, call_kwargs=call_kwargs, ctx=ctx)

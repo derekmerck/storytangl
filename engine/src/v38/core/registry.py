@@ -3,6 +3,7 @@ from typing import TypeVar, Generic, Iterator, Iterable, Optional, Self
 from uuid import UUID
 import itertools
 import logging
+from functools import cached_property
 
 from pydantic import Field
 
@@ -144,7 +145,7 @@ class Registry(Entity, Generic[ET]):
 
 class RegistryAware(Entity):
     """
-    Entities that will be managed by a single registry can be auto-registered.
+    Entities that are managed by a single registry can be auto-registered.
 
     Example:
         >>> a = RegistryAware(); r = Registry(); r.add(a)
@@ -182,7 +183,11 @@ class EntityGroup(RegistryAware):
         >>> [ m.get_label() for m in e.members() ]
         ['abc', 'def', 'ghi']
         >>> a = e.member(Selector.from_identifier("abc"))
+        >>> e.has_member(a)
+        True
         >>> e.remove_member(a)
+        >>> e.has_member(a)
+        False
         >>> [ m.get_label() for m in e.members() ]
         ['def', 'ghi']
     """
@@ -214,26 +219,37 @@ class EntityGroup(RegistryAware):
 
     def has_member(self, item: RegistryAware) -> bool:
         # for selection criteria
+        return item in self
+
+    def __iter__(self) -> Iterator[RegistryAware]:
+        # get __contains__ for free
+        return iter(self.members())
+
+    def __contains__(self, item: RegistryAware) -> bool:
+        # although this is better than iter, b/c it doesn't have to deref id's
         return item.uid in self.member_ids
 
-
 class HierarchicalGroup(EntityGroup):
-    parent_id: UUID = None
 
-    @property
-    def parent(self) -> ET:
-        return self.registry.get(self.parent_id)
+    @cached_property
+    def parent(self) -> Self:
+        return self.registry.find_one(Selector(has_kind=HierarchicalGroup, has_member=self))
 
-    def children(self, selector: Selector) -> Iterator[ET]:
+    # Just aliases to membership ops
+    def children(self, selector: Selector) -> Iterator[Self]:
         return self.members(selector=selector)
 
-    def add_child(self, item: ET):
-        if item is not None and item.uid not in self.member_ids:
-            self.member_ids.append(item.uid)
+    def add_child(self, item: Self):
+        # Enforce uniqueness of membership
+        if item.parent is not None:
+            item.parent.remove_child(item)
+        return self.add_member(item)
 
     def remove_child(self, item: ET):
-        if item is not None:
-            self.member_ids.remove(item.uid)
+        self.remove_member(item)
+        if hasattr(item, "parent"):
+            # invalidate the cached parent
+            delattr(item, "parent")
 
     @property
     def root(self) -> Self:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Iterator, TypeVar, Generic, Type, Self, Any
+from uuid import uuid4
 
 from pydantic import Field
 
@@ -9,7 +10,8 @@ from .selector import Selector
 from .registry import Registry
 from .record import Record
 
-# todo: round tripping script items -- payload.unstructure() -> yaml, add script-specific flags to fields to indicate author-facing.
+# todo: round tripping script items -- payload.unstructure() -> yaml, add
+#       script-specific flags to fields to indicate author-facing.
 
 ET = TypeVar("ET", bound=Entity)
 
@@ -28,7 +30,13 @@ class EntityTemplate(Record, Generic[ET]):
         >>> class PseudoEntity2(PseudoEntity): ...
         >>> templ.materialize(kind=PseudoEntity2, label="def")
         <PseudoEntity2:def>
+        >>> templ.materialize().uid != templ.payload.uid  # created with fresh id
+        True
     """
+    # By default, templates are generic archetypes and may be used without restriction.
+    # In some cases, we want to impose other restrictions, for example, only allowing a
+    # template to be used within a scope, or once per scope.  that should be captured in
+    # metadata
 
     # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     payload: ET = Field(..., exclude=True)
@@ -38,19 +46,14 @@ class EntityTemplate(Record, Generic[ET]):
 
     @classmethod
     def from_entity(cls, entity: Entity):
-        return cls(payload=entity.evolve())
+        return cls(payload=entity.evolve())  # holds a clean, deep copy
 
     @classmethod
-    def from_data(cls, data: UnstructuredData, default_kind: Type[ET]=None) -> Self:
+    def from_data(cls, data: UnstructuredData, default_kind: Type[ET] = None) -> Self:
         if default_kind is not None:
             data.setdefault('kind', default_kind)
         entity = Entity.structure(data)
         return cls.from_entity(entity)
-
-    restrictions: Any = None
-    # By default, templates are generic archetypes and may be used without restriction.
-    # In some cases, we want to impose other restrictions, for example, only allowing a template
-    # to be used within a scope, or once per scope.
 
     # conflate/delegate identity matching
     def has_kind(self, kind: Type[Entity]) -> bool:
@@ -63,10 +66,15 @@ class EntityTemplate(Record, Generic[ET]):
         return super().get_identifiers().union( self.payload.get_identifiers() )
 
     # create copies
-    def materialize(self, **updates) -> ET:
+    def materialize(self, preserve_uid=False, **updates) -> ET:
+        # if preserve_uid is true
         if 'kind' in updates:
             if not issubclass(updates['kind'], self.payload.__class__):
                 raise TypeError("If update includes kind, result will be a different class, suggested to only use when increasing specificity.")
+        if not preserve_uid:
+            updates.setdefault('uid', uuid4())  # create a new uid if not provided
+        else:
+            updates.pop('uid', None)  # exact copy, discard any override uid
         return self.payload.evolve(**updates)
 
     def unstructure(self) -> UnstructuredData:
@@ -78,15 +86,25 @@ class EntityTemplate(Record, Generic[ET]):
     @classmethod
     def structure(cls, data: UnstructuredData) -> ET:
         data['payload'] = Entity.structure(data['payload'])
-        return cls.structure(data)
+        return super().structure(data)
 
 
 class Snapshot(EntityTemplate):
+    """
+    Example:
+        >>> e = Entity(label='abc')
+        >>> s = Snapshot.from_entity(e)
+        >>> ee = s.materialize()
+        >>> e is not ee and e == ee  # preserves uid
+        True
+    """
 
-    def materialize(self, **updates) -> ET:
+    def materialize(self, preserve_uid = True, **updates) -> ET:
         if updates:
             raise TypeError("Snapshot does not support updates")
-        return super().materialize()
+        if preserve_uid is not True:
+            raise TypeError("Snapshot does not support preserve_uid != True")
+        return super().materialize(preserve_uid=True)
 
 
 class TemplateRegistry(Registry[EntityTemplate]):
