@@ -9,7 +9,6 @@ import logging
 import pydantic
 from pydantic import Field, field_validator
 
-from tangl.type_hints import UniqueLabel
 from .entity import Entity
 from .singleton import Singleton
 

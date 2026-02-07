@@ -1,4 +1,5 @@
 # tangl/core/bases.py
+# language=markdown
 """
 # Core Base Features
 
@@ -8,6 +9,16 @@ Entities and variants in Core are mainly composed of the few independent feature
 - carrying stable content and compare by content
 - carrying local state
 - ordering (with a creation-time based default)
+
+Core types keep these concerns independent:
+
+| Concern       | Trait           | Contract                                                   |
+|---------------|-----------------|------------------------------------------------------------|
+| Identity      | `HasIdentity`   | Stable identifiers; never derived from ordering or content |
+| Content       | `HasContent`    | Content equality/hash meaningful only for frozen content   |
+| Ordering      | `HasOrder`      | Deterministic ordering; never participates in identity     |
+| State         | `HasState`      | Mutable locals; not used for content hashing               |
+| Structuring   | `Untructurable` | Internal constructor form                                  |
 
 Additional specialized features and shapes are provided as extensions or helper classes in other core modules:
 - grouping and group structuring/unstructuring (in core.registry)
@@ -183,6 +194,10 @@ class Unstructurable(BaseModelPlus):
     restructuring to the proper type.  UnstructuredData may include recursively
     unstructured data only in certain classes, such as Registry, by design.
 
+    Un/structuring is _not_ serialization. Unstructured data may carry Python-native
+    objects (including live Type references); data is flattened to be JSON/YAML-safe
+    in a separate service.
+
     There are 3 distinct phases encode/decode for wire:
     1. Un/Structuring -> convert models into `dict[str, Any]` ('UnstructuredData') suitable
        for constructing a new object.
@@ -248,6 +263,7 @@ class Unstructurable(BaseModelPlus):
             data = data | updates
         return self.structure(data)
 
+
 class HasContent(BaseModelPlus):
     """
     Entities that carry a stable content payload may be compared by content rather than identity or value.  This can be used as a singleton flag.
@@ -276,6 +292,7 @@ class HasContent(BaseModelPlus):
 
     def __eq__(self, other: Self) -> bool:
         return self.eq_by_content(other)
+
 
 @total_ordering
 class HasOrder(BaseModelPlus):

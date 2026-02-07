@@ -30,6 +30,9 @@ class Registry(Entity, Generic[ET]):
     - Registries are indexed by `uid: UUID`.
     - Broader identifier matching is done via selection (`find_*` with `Selector(identifier=...)` / `has_identifier` criteria), not via `get()`.
 
+    Registry is an "Owning boundary" that may embed nested unstructurable children.  Owning
+    boundaries must handle un/structuring children explicitly and guarantee round-trips.
+
     Example:
         >>> a = Entity(label="abc"); b = Entity(label="def")
         >>> r = Registry(); r.add(a); r.add(b)
@@ -159,6 +162,8 @@ class Registry(Entity, Generic[ET]):
 class RegistryAware(Entity):
     """
     Entities that are managed by a single registry can be auto-registered.
+
+    Registry-aware entities never hold direct pointers to other members of their registry. They store indirect references to other members via UUIDs.  These are usually resolved lazily on property access.
 
     Example:
         >>> a = RegistryAware(); r = Registry(); r.add(a)

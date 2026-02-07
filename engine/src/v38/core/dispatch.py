@@ -1,3 +1,5 @@
+# tangl/core/dispatch.py
+# language=markdown
 """
 Default global-layer behavior registry ('core.dispatch') and decorators ('on_task') and callbacks ('do_task') for global layer hooks:
 
@@ -19,18 +21,34 @@ See `vm.dispatch`, `story.dispatch`, `service.dispatch`, etc. for examples of ot
 Example:
     >>> Entity(label="bar")
     <Entity:bar>
-    >>> _ = on_init(func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "foo"),
-    ...             wants_kind=Entity)
+    >>> _ = on_init(func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "foo"))
     >>> Entity(label="bar", _ctx=SimpleNamespace(get_registries=lambda: []))  # calls global dispatch by default
     <Entity:foo>
     >>> q = BehaviorRegistry()
-    >>> _ = q.register(task="init", dispatch_layer=DispatchLayer.APPLICATION, wants_kind=Entity,
+    >>> _ = q.register(task="init", dispatch_layer=DispatchLayer.APPLICATION,
     ...                func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "baz"))
     >>> Entity(label="bar", _ctx=SimpleNamespace(get_registries=lambda: [q]))
     <Entity:baz>
     >>> dispatch.clear()  # always clean up global registries after using
+
+Layered Dispatch:
+
+
+## Dispatch Layer Mapping Parallels
+
+| Layer       | Package   | Registry            | Typical Tasks                   |
+|-------------|-----------|---------------------|---------------------------------|
+| GLOBAL      | core      | `core.dispatch`     | Auditing, logging               |
+| SYSTEM      | vm        | `vm.dispatch`       | Phase handlers, provisioning    |
+| SYSTEM      | service   | `service.dispatch`  | Api, persistence                |
+| APPLICATION | story     | `story.dispatch`    | Content rendering, domain rules |
+| APPLICATION | mechanics | `story.dispatch`    | Extend story semantics          |
+| APPLICATION | discourse | `story.dispatch`    | Extend story prose models       |
+| APPLICATION | media     | `story.dispatch`    | Extend story with media         |
+| AUTHOR      | world     | `world.dispatch`    | World-specific mechanics        |
+| LOCAL       | vm.frame  | `vm.frame.dispatch` | One-off handlers                |
+
 """
-# Note, if you don't restrict 'wants_kind' to exact Entity in this case, it will try to update the label for CallReceipt when it's created too and fail.
 from types import SimpleNamespace
 from copy import deepcopy
 
@@ -134,5 +152,4 @@ def do_remove_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
         call_kwargs={'registry': registry, 'item': item},
         task = "remove_item"
     )
-    CallReceipt.gather_results(*receipts) # force receipt evaluation
-
+    CallReceipt.gather_results(*receipts)  # force receipt evaluation

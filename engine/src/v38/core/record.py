@@ -12,6 +12,7 @@ from .selector import Selector
 
 ET = TypeVar('ET', bound='Entity')
 
+
 class Record(HasContent, HasOrder, Entity):
     """
     Frozen entity with content identity, ordering, and reference their

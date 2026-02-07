@@ -1,13 +1,13 @@
 # tangl/core/behavior.py
 from __future__ import annotations
 import itertools
-from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self, ClassVar, runtime_checkable, Mapping, Type
+from typing import Any, Callable, Protocol, Iterator, Iterable, Self, ClassVar, runtime_checkable, Mapping, Type
 from enum import IntEnum, Enum
 from collections import ChainMap
 from inspect import isclass
 import logging
 
-from pydantic import ConfigDict, model_validator, field_validator, Field, SkipValidation
+from pydantic import ConfigDict, model_validator, SkipValidation
 
 from tangl.type_hints import Tag
 from .entity import Entity
@@ -35,6 +35,7 @@ class DispatchLayer(IntEnum):
     USER = 4
     LOCAL = 5
 
+
 @runtime_checkable
 class RuntimeCtx(Protocol):
     def get_args(self) -> tuple[Any]: ...
@@ -44,6 +45,7 @@ class RuntimeCtx(Protocol):
     def get_aggregation_mode(self) -> AggregationMode: ...
     def get_registries(self) -> list[BehaviorRegistry]: ...
 
+
 class AggregationMode(Enum):
     """How to reduce multiple receipts to a result."""
     FIRST = "first_result"      # Early-exit, first wins
@@ -51,6 +53,7 @@ class AggregationMode(Enum):
     ALL_TRUE = "all_true"       # Validation gate
     GATHER = "gather_results"   # Collect all
     MERGE = "merge_results"     # Flatten/combine
+
 
 class CallReceipt(Record):
     """
@@ -116,7 +119,7 @@ class CallReceipt(Record):
 
     # Aggregation functions
 
-    # todo: force resolve any deferred receipts?
+    # todo: force resolve any deferred receipts?  otherwise they don't count as None's
 
     @classmethod
     def iter_results(cls, *receipts) -> Iterator[Any]:
@@ -194,6 +197,8 @@ class Behavior(RegistryAware, HasOrder, Entity):
 
     wants_kind: Type[Entity] = None
     wants_exact_kind: bool = True  # disallow caller-kind subclasses
+
+    # todo: could do this with wants_kind = x for exact match, has_wants_kind(x) for subclass match
 
     def caller_kind(self, kind: Type[Entity]) -> bool:
         logger.debug(f"checking if caller_kind(kind) in wants_kind")

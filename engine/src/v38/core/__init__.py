@@ -1,3 +1,52 @@
+# tangl/core/bases.py
+# language=markdown
+"""
+tangl.core
+==========
+
+Core defines shared vocabulary and foundational data structures and algorithms.
+
+Portability
+-----------
+
+Core types should be easy to reason about and implementable in any language with:
+- Algebraic data types or class inheritance
+- First-class functions
+- Associative collections (dict/map)
+- Ordered collections (list/array)
+
+Avoid Python-specific magic where possible. Document where unavoidable.
+
+File Organization
+-----------------
+
+```
+tangl/core/
+├── __init__.py           # Public API exports
+├── bases.py              # HasIdentity, uid/label/tags, Unstructurable, un/structure(),
+│                         #    HasContent, HasOrder, sort_key(), HasState
+│
+│   # Discovery
+├── selector.py           # Selector, match()
+├── registry.py           # Registry, RegistryAware, EntityGroup, find_all(), chain_find_all()
+│
+│   # Lifecycle
+├── record.py             # Record, OrderedRegistry, get_slice()
+├── singleton.py          # Singleton, InstanceInheritance
+│
+│   # Relationships
+├── graph.py              # GraphItem, Graph, Subgraph, Node, Edge
+│
+│   # Creation
+├── token.py              # Delegate to singleton
+├── template.py           # Semi-structured data, TemplateRegistry
+│
+│   # Doing things
+├── runtime_op.py         # RuntimeOp, Query, Predicate, Effect
+├── behavior.py           # Behavior, CallReceipt, Priority, DispatchLayer, AggregationMode
+└── dispatch.py           # Hooks for create(), new(), add(), get(), remove()
+```
+"""
 # Provides:
 # - identity
 # - state
@@ -18,8 +67,8 @@ from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 # - selection
 # - groups
 # Provides:
-# - specialized shapes
-# - provenance
+# - specialized shapes (singleton, record, graph)
+# - provenance (record)
 # - behaviors (Behavior(), Behavior.defer())
 # - groups of behaviors (BehaviorRegistry.execute_all(), .chain_execute_al)
 from .runtime_op import RuntimeOp
@@ -32,23 +81,7 @@ from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRe
 # - behaviors
 # Provides:
 # - building
-# - flexible dispatch
+# - dispatch hooks
 from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
 from .token import Token  # Delegated reference builder
-# from .dispatch import HookedRegistry, HookedBuilder
-
-# Systems Layers
-# --------------
-# VM -> graph traversal and provisioning rules, cursor controller, rollback/audit
-# Service -> persistence, user/account management, and lifecycle endpoints
-
-# Application Layers
-# ------------------
-# Story -> layers fabula concepts, episodic process, syuzhet on top of VM
-# Discourse -> extensions for adapting story concepts to text-narrative engine
-# Media -> extensions for adapting story concepts to media engine
-# Mechanics -> extensions for modeling specialized story concepts
-
-# Author Layers
-# -------------
-# Story.World -> content and rules for a particular story
+from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item
