@@ -184,9 +184,13 @@ class Unstructurable(BaseModelPlus):
     unstructured data only in certain classes, such as Registry, by design.
 
     There are 3 distinct phases encode/decode for wire:
-    1. Un/Structuring -> convert models into `dict[str, Any]` ('UnstructuredData') suitable for constructing a new object.
-    2. Un/Flattening -> convert UnstructuredData into `dict[str, Primitive]` ('FlatData'), where Primitives are yaml/json safe (no types, uuids, timestamps, enums, sets, etc.).  For unflattening, Kind-resolution uses an explicit `KindRegistry`.
-    3. De/Serialize -> dependent on backend choice, maybe binary (pickle/bson) or strings (json/yaml).
+    1. Un/Structuring -> convert models into `dict[str, Any]` ('UnstructuredData') suitable
+       for constructing a new object.
+    2. Un/Flattening -> convert UnstructuredData into `dict[str, Primitive]` ('FlatData'),
+       where Primitives are yaml/json safe (no types, uuids, timestamps, enums, sets, etc.).
+       For unflattening, Kind-resolution uses an explicit `KindRegistry`.
+    3. De/Serialize -> dependent on backend choice, maybe binary (pickle/bson) or strings
+       (json/yaml).
 
     Flattening and Serialization are entirely independent of model type and managed by the persistence service.  They are _not_ addressed in core.
 
@@ -244,25 +248,26 @@ class Unstructurable(BaseModelPlus):
             data = data | updates
         return self.structure(data)
 
-
 class HasContent(BaseModelPlus):
     """
     Entities that carry a stable content payload may be compared by content rather than identity or value.  This can be used as a singleton flag.
 
     Example:
         >>> class E(HasContent):
-        ...     attrib: str
-        ...     def get_content(self): return self.attrib
-        >>> e = E(attrib="foo"); f = E(attrib="foo")
-        >>> assert e is not f and e.eq_by_content(f) and e == f and e != E(attrib="bar")  # compares by content
+        ...     content: str
+        ...     def get_hashable_content(self): return self.content
+        >>> e = E(content="foo"); f = E(content="foo")
+        >>> e is not f and e.eq_by_content(f) and e == f and e != E(content="bar")
+        ...     # compares by content
+        True
     """
 
     @abstractmethod
-    def get_content(self) -> Any: ...
+    def get_hashable_content(self) -> Any: ...
 
     @is_identifier
     def content_hash(self) -> bytes:
-        return hashing_func(self.get_content())
+        return hashing_func(self.get_hashable_content())
 
     def eq_by_content(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:
@@ -303,9 +308,11 @@ class HasOrder(BaseModelPlus):
             # does 'before' activate prior to when the attribs get frozen?
         return data
 
-    def has_seq_in(self, low: int, high: int) -> bool:
+    def has_seq_in(self, low: int, high: int = None) -> bool:
         # foo.has_seq_in(1,2)  ->  1 <= foo.seq <= 2
-        # probably need to spread low if it arrives as a tuple and no high like tags
+        if isinstance(low, tuple) and len(low) == 2 and high is None:
+            # Spread low if it arrives as a tuple and no high
+            low, high = low
         return low <= self.seq < high
 
     def sort_key(self):

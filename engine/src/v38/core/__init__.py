@@ -26,7 +26,7 @@ from .runtime_op import RuntimeOp
 from .singleton import Singleton
 from .record import Record, OrderedRegistry
 from .graph import Graph, Subgraph, Edge, Node, HierarchicalNode
-from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, DeferredReceipt, BehaviorRegistry
+from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRegistry
 
 # Requires:
 # - behaviors

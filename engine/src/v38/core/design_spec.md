@@ -220,7 +220,7 @@ tangl/core/
 │
 │   # Lifecycle
 ├── record.py             # Record, HasContent, HasOrder, OrderedRegistry, sort_key()
-├── singleton.py          # Singleton, InstanceInheritance, Token
+├── singleton.py          # Singleton, InstanceInheritance
 │
 │   # Relationships
 ├── graph/
@@ -237,16 +237,12 @@ tangl/core/
 │   ├── behavior.py       # Behavior, Priority, DispatchLayer
 │   ├── receipt.py        # Audit receipt, aggregators
 │   └── behavior_registry.py  # BehaviorRegistry (Registry[Behavior])
-├── dispatch              # Specific pipelines for generic/core tasks
+├── dispatch              # Hooks for create(), new(), add(), get(), remove()
 │
 │   # Creation
 ├── unstructurable.py     # Unstructurable, un/structure()
-└── factory/
-    ├── template.py       # Semi-structured data, TemplateRegistry
-    ├── builder.py        # can_satisfy(Req), get_offers(Req), build(Offer)
-    ├── requirement.py    # Requirement, ProvisioningPolicy
-    └── resolve.py        # Offer, Satisfier, resolve()
-
+├── token.py              # Delegate to singleton
+└── template.py           # Semi-structured data, TemplateRegistry
 ```
 
 ---

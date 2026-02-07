@@ -60,19 +60,32 @@ class Registry(Entity, Generic[ET]):
     # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     members: dict[UUID, ET] = Field(default_factory=dict, exclude=True)
 
-    def add(self, value: ET):
+    def add(self, value: ET, ctx = None):
         if hasattr(value, 'set_registry'):
             value.set_registry(self)
+        if ctx is not None:
+            # chance to modify before inserting
+            from .dispatch import do_add_item
+            value = do_add_item(registry=self, item=value, ctx=ctx)
         self.members[value.uid] = value
 
-    def remove(self, key: UUID):
+    def remove(self, key: UUID, ctx = None):
         item = self.members.pop(key, None)
         if item is not None and hasattr(item, 'set_registry'):
             item.set_registry(None)
+        if ctx is not None:
+            # chance to review before discarding
+            from .dispatch import do_remove_item
+            do_remove_item(registry=self, item=item, ctx=ctx)
         # or del self.members[key] if you want to throw a key error
 
-    def get(self, key: UUID):
-        return self.members.get(key, None)
+    def get(self, key: UUID, ctx = None):
+        item = self.members.get(key, None)
+        if ctx is not None:
+            # chance to modify before returning
+            from .dispatch import do_get_item
+            item = do_get_item(registry=self, item=item)
+        return item
         # or return self.members[key] if you want to throw a key error
 
     def all_labels(self):
@@ -193,15 +206,15 @@ class EntityGroup(RegistryAware):
     """
     member_ids: list[UUID] = Field(default_factory=list)
 
+    def member(self, selector: Selector = None, sort_key = None) -> ET:
+        return next(self.members(selector, sort_key=sort_key), None)
+
     def members(self, selector: Selector = None, sort_key = None) -> Iterator[ET]:
         items = (self.registry.get(uid) for uid in self.member_ids)
         selector = selector or Selector()
         if self.registry is not None:
             return self.registry._filter_and_sort(items, selector=selector, sort_key=sort_key)
         raise ValueError("Group registry is not set")
-
-    def member(self, selector: Selector = None, sort_key = None) -> ET:
-        return next(self.members(selector, sort_key=sort_key), None)
 
     def add_member(self, item: RegistryAware):
         if item is self:
@@ -228,6 +241,7 @@ class EntityGroup(RegistryAware):
     def __contains__(self, item: RegistryAware) -> bool:
         # although this is better than iter, b/c it doesn't have to deref id's
         return item.uid in self.member_ids
+
 
 class HierarchicalGroup(EntityGroup):
 

@@ -42,7 +42,7 @@ class EntityTemplate(Record, Generic[ET]):
     # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     payload: ET = Field(..., exclude=True)
 
-    def get_content(self):
+    def get_hashable_content(self):
         return self.payload.unstructure()
 
     @classmethod
@@ -80,7 +80,9 @@ class EntityTemplate(Record, Generic[ET]):
 
     def unstructure(self) -> UnstructuredData:
         data = super().unstructure()
-        # todo: could use field annotation introspection to discover members and payload include nested entities and automatically structure/unstructure them recursively
+        # todo: could use field annotation introspection to discover members and
+        #       payload include nested entities and automatically structure/unstructure
+        #       them recursively
         data['payload'] = self.payload.unstructure()
         return data
 

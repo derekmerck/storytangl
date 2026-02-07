@@ -26,7 +26,7 @@ class Record(HasContent, HasOrder, Entity):
 
     Example:
         >>> r = Record(content='foo')
-        >>> r.get_content()
+        >>> r.get_hashable_content()
         'foo'
         >>> try:
         ...     r.content = 'bar'
@@ -37,7 +37,7 @@ class Record(HasContent, HasOrder, Entity):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", frozen=True)
     origin_id: Identifier = None
 
-    def get_content(self):
+    def get_hashable_content(self):
         for field_name in ['content', 'payload', 'data']:
             if hasattr(self, field_name):
                 return getattr(self, field_name)
@@ -61,10 +61,10 @@ class OrderedRegistry(Registry[OrderedEntity]):
             self.bookmarks[channel] = []
         self.bookmarks[channel].append(self.max_seq())
 
-    def slice(self, start=0, stop=-1, channel: str = "_", selector: Selector = Selector()) -> OrderedEntity:
+    def slice(self, start=0, stop=-1, channel: str = "_",
+              selector: Selector = Selector()) -> OrderedEntity:
         bookmarks = self.bookmarks[channel]
         seq_start = bookmarks[start]
         seq_stop = bookmarks[stop]
-        selector = selector.with_criteria(seq=(seq_start, seq_stop), channel=channel)
+        selector = selector.with_criteria(has_seq_in=(seq_start, seq_stop), channel=channel)
         return self.find_all(selector, sort_key=lambda v: v.sort_key())
-

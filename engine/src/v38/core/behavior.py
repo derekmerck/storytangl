@@ -1,12 +1,11 @@
 # tangl/core/behavior.py
 from __future__ import annotations
-
 import itertools
 from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self, ClassVar, runtime_checkable, Mapping
 from enum import IntEnum, Enum
 from collections import ChainMap
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, model_validator
 
 from tangl.type_hints import Tag
 from .entity import Entity
@@ -32,11 +31,12 @@ class DispatchLayer(IntEnum):
     LOCAL = 5
 
 @runtime_checkable
-class RTCtx(Protocol):
+class RuntimeCtx(Protocol):
     def get_args(self) -> tuple[Any]: ...
     def get_kwargs(self) -> dict[str, Any]: ...
-    def get_dispatch_layers(self) -> Iterator[BehaviorRegistry]: ...
+    def get_selector(self) -> Selector: ...
     def get_receipts(self) -> list[CallReceipt]: ...
+    def get_aggregation_mode(self) -> AggregationMode: ...
 
 class AggregationMode(Enum):
     """How to reduce multiple receipts to a result."""
@@ -45,7 +45,6 @@ class AggregationMode(Enum):
     ALL_TRUE = "all_true"       # Validation gate
     GATHER = "gather_results"   # Collect all
     MERGE = "merge_results"     # Flatten/combine
-
 
 class CallReceipt(Record):
     """
@@ -85,13 +84,28 @@ class CallReceipt(Record):
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    result: Any
+    result: Any = None
+    callback: Callable[[Any], Any] = None
     args: tuple[Any, ...] = None
     kwargs: dict[str, Any] = None
-    ctx: Optional[RTCtx] = None
+    ctx: Optional[RuntimeCtx] = None
 
     # carries context for reference, so don't serialize
     guard_unstructure: ClassVar[bool] = True
+
+    @model_validator(mode='after')
+    def _either_result_or_cb_specified(self):
+        value = sum(['callback' in self.model_fields_set, 'result' in self.model_fields_set])
+        if value != 1:
+            raise ValueError("Exactly one of 'callback' or 'result' should be specified")
+
+    def resolve(self, *args, **kwargs) -> Any:
+        if self.result is None and self.callback is not None:
+            self.force_set('args', args)  # by-pass frozen
+            self.force_set('kwargs', kwargs)
+            result = self.callback(*self.args, ctx=self.ctx, **self.kwargs)
+            self.force_set('result', result)
+        return self.result
 
     # Aggregation functions
 
@@ -148,24 +162,6 @@ class CallReceipt(Record):
                 raise ValueError(f"Unknown aggregation mode: {mode}")
 
 
-class DeferredReceipt(CallReceipt):
-    # carries callback and context, so don't serialize
-
-    callback: Any
-    result: Any = None  # No longer required, set by resolve
-
-    # todo: could make CallReceipt just take a defer flag to register a callback
-    #       and not compute the result yet, then when the result is accessed,
-    #       deferred can call the callback if it's not already resolved
-
-    def resolve(self, *args, **kwargs) -> Any:
-        self.force_set('args', args)  # by-pass frozen
-        self.force_set('kwargs', kwargs)
-        result = self.callback(*self.args, ctx=self.ctx, **self.kwargs)
-        self.force_set('result', result)
-        return result
-
-
 class Behavior(RegistryAware, HasOrder, Entity):
     """
     Example:
@@ -186,7 +182,7 @@ class Behavior(RegistryAware, HasOrder, Entity):
     priority: int = Priority.NORMAL
     dispatch_layer: int = DispatchLayer.LOCAL
 
-    def __call__(self, *args, ctx: RTCtx = None, **kwargs) -> CallReceipt:
+    def __call__(self, *args, ctx: RuntimeCtx = None, **kwargs) -> CallReceipt:
         # todo: could do some introspection here, if the func wants caller, etc., check
         #       for default call args/kwargs in ctx
         return CallReceipt(
@@ -197,8 +193,8 @@ class Behavior(RegistryAware, HasOrder, Entity):
             ctx=ctx
         )
 
-    def defer(self, ctx: RTCtx = None) -> DeferredReceipt:
-        return DeferredReceipt(
+    def defer(self, ctx: RuntimeCtx = None) -> CallReceipt:
+        return CallReceipt(
             origin_id=self.uid,
             ctx=ctx,
             callback = self.func
@@ -212,16 +208,17 @@ class Behavior(RegistryAware, HasOrder, Entity):
 class BehaviorRegistry(Registry[Behavior]):
     """
     Example:
-    >>> br = BehaviorRegistry()
-    >>> f = br.register(lambda *nums, **kwargs: sum(nums), task="sum")
-    >>> g = br.register(lambda *args, **kwargs: ''.join([str(a) for a in args]), task="join", priority=Priority.EARLY)
-    >>> next( br.execute_all(task="sum", call_args=(1, 2, 3)) ).result
-    6
-    >>> next( br.execute_all(task="join", call_args=('a', 'b', 'c')) ).result
-    'abc'
-    >>> CallReceipt.gather_results( *br.execute_all(call_args=(1, 2, 3)) )
-    ['123', 6]
-    >>> # join triggers first even tho registered last, b/c lower priority
+        >>> br = BehaviorRegistry()
+        >>> f = br.register(lambda *nums, **kwargs: sum(nums), task="sum")
+        >>> g = br.register(lambda *args, **kwargs: ''.join([str(a) for a in args]),
+        ...                 task="join", priority=Priority.EARLY)
+        >>> next( br.execute_all(task="sum", call_args=(1, 2, 3)) ).result
+        6
+        >>> next( br.execute_all(task="join", call_args=('a', 'b', 'c')) ).result
+        'abc'
+        >>> CallReceipt.gather_results( *br.execute_all(call_args=(1, 2, 3)) )
+        ...     # join triggers first even tho registered last, b/c lower priority
+        ['123', 6]
     """
 
     default_task: Tag = None
@@ -244,10 +241,11 @@ class BehaviorRegistry(Registry[Behavior]):
         call_kwargs = call_kwargs or {}
         yield from (b(*call_args, ctx=ctx, **call_kwargs) for b in behaviors)
 
+    # It would be nice to include aggregator here, but it makes type checking a pain
     def execute_all(self, *,
                     call_args: tuple[Any, ...] = None,
                     call_kwargs: dict[str, Any] = None,
-                    ctx: RTCtx = None,
+                    ctx: RuntimeCtx = None,
                     task: Tag = None,
                     selector: Selector = None,
                     inline_behaviors: Iterable[Behavior] = None
