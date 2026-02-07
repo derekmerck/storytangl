@@ -19,17 +19,16 @@ class Entity(Unstructurable, HasIdentity):
         True
     """
 
-    def __init__(self, ctx = None, **kwargs) -> None:
+    def __init__(self, _ctx = None, **kwargs) -> None:
         super().__init__(**kwargs)
-        if ctx is not None:
-            # chance to validate before finalizing
+        if _ctx is not None:
             from .dispatch import do_init
-            do_init(caller=self, ctx=ctx)
+            do_init(caller=self, ctx=_ctx)
 
     @classmethod
-    def structure(cls, data, ctx = None) -> Self:
-        if ctx is not None:
+    def structure(cls, data, _ctx = None) -> Self:
+        if _ctx is not None:
             # chance to modify kind-hint or construction kwargs
             from .dispatch import do_create
-            data = do_create(data=data, ctx=ctx)
+            data = do_create(data=data, ctx=_ctx)
         return super().structure(data)

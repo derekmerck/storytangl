@@ -1,17 +1,22 @@
 # tangl/core/behavior.py
 from __future__ import annotations
 import itertools
-from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self, ClassVar, runtime_checkable, Mapping
+from typing import Any, Callable, Protocol, Iterator, Optional, Iterable, Self, ClassVar, runtime_checkable, Mapping, Type
 from enum import IntEnum, Enum
 from collections import ChainMap
+from inspect import isclass
+import logging
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, model_validator, field_validator, Field, SkipValidation
 
 from tangl.type_hints import Tag
 from .entity import Entity
 from .registry import Registry, RegistryAware
 from .record import HasOrder, Record
 from .selector import Selector
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class Priority(IntEnum):
     FIRST = 0
@@ -37,6 +42,7 @@ class RuntimeCtx(Protocol):
     def get_selector(self) -> Selector: ...
     def get_receipts(self) -> list[CallReceipt]: ...
     def get_aggregation_mode(self) -> AggregationMode: ...
+    def get_registries(self) -> list[BehaviorRegistry]: ...
 
 class AggregationMode(Enum):
     """How to reduce multiple receipts to a result."""
@@ -88,7 +94,8 @@ class CallReceipt(Record):
     callback: Callable[[Any], Any] = None
     args: tuple[Any, ...] = None
     kwargs: dict[str, Any] = None
-    ctx: Optional[RuntimeCtx] = None
+    ctx: SkipValidation[RuntimeCtx] = None
+    # ctx: Any = None
 
     # carries context for reference, so don't serialize
     guard_unstructure: ClassVar[bool] = True
@@ -175,12 +182,29 @@ class Behavior(RegistryAware, HasOrder, Entity):
         15
         >>> f"sum{deferred.args}={deferred.result}"
         'sum(4, 5, 6)=15'
+        >>> c = Behavior(func=lambda *_, **__: True, wants_kind=Entity)
+        >>> Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
+        True
     """
 
     func: Callable = lambda *_, **__: True
     task: Tag = None
     priority: int = Priority.NORMAL
     dispatch_layer: int = DispatchLayer.LOCAL
+
+    wants_kind: Type[Entity] = None
+    wants_exact_kind: bool = True  # disallow caller-kind subclasses
+
+    def caller_kind(self, kind: Type[Entity]) -> bool:
+        logger.debug(f"checking if caller_kind(kind) in wants_kind")
+        if self.wants_kind is None:
+            return True
+        if isclass(kind):
+            if kind is self.wants_kind:
+                return True
+            elif not self.wants_exact_kind and issubclass(kind, self.wants_kind):
+                return True
+        return False
 
     def __call__(self, *args, ctx: RuntimeCtx = None, **kwargs) -> CallReceipt:
         # todo: could do some introspection here, if the func wants caller, etc., check

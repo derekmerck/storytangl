@@ -60,31 +60,31 @@ class Registry(Entity, Generic[ET]):
     # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     members: dict[UUID, ET] = Field(default_factory=dict, exclude=True)
 
-    def add(self, value: ET, ctx = None):
+    def add(self, value: ET, _ctx = None):
         if hasattr(value, 'set_registry'):
             value.set_registry(self)
-        if ctx is not None:
+        if _ctx is not None:
             # chance to modify before inserting
             from .dispatch import do_add_item
-            value = do_add_item(registry=self, item=value, ctx=ctx)
+            value = do_add_item(registry=self, item=value, ctx=_ctx)
         self.members[value.uid] = value
 
-    def remove(self, key: UUID, ctx = None):
+    def remove(self, key: UUID, _ctx = None):
         item = self.members.pop(key, None)
         if item is not None and hasattr(item, 'set_registry'):
             item.set_registry(None)
-        if ctx is not None:
+        if _ctx is not None:
             # chance to review before discarding
             from .dispatch import do_remove_item
-            do_remove_item(registry=self, item=item, ctx=ctx)
+            do_remove_item(registry=self, item=item, ctx=_ctx)
         # or del self.members[key] if you want to throw a key error
 
-    def get(self, key: UUID, ctx = None):
+    def get(self, key: UUID, _ctx = None):
         item = self.members.get(key, None)
-        if ctx is not None:
+        if _ctx is not None:
             # chance to modify before returning
             from .dispatch import do_get_item
-            item = do_get_item(registry=self, item=item)
+            item = do_get_item(registry=self, item=item, ctx=_ctx)
         return item
         # or return self.members[key] if you want to throw a key error
 
