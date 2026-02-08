@@ -14,8 +14,10 @@ Default global-layer behavior registry ('core.dispatch') and decorators ('on_tas
   - link node on edge or group
   - unlink node from edge or group
 
-Passing a ctx kwarg into any hooked method triggers any registered hooks in the responsible
+Passing a _ctx kwarg into any hooked method triggers any registered hooks in the responsible
 dispatch or any dispatch provided by ctx.
+
+Alternatively, using an ambient "ctx.using_ctx()" context manager will passively provide _ctx signals to any method expecting it.
 
 See `Entity.__init__()`, `Registry.add_item()`, etc. for injection examples.
 

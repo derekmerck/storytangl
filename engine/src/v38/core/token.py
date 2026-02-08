@@ -48,9 +48,7 @@ class Token(Entity, Generic[WST]):
     -----
     Prefer modeling behavior in the singleton; keep node-local overrides minimal and explicit.
 
-    See Also
-    --------
-    `tangl.core.factory.TokenFactory`
+    Token factory uses generic typing: `Token[SingletonType](token_from=foo)`
 
     Examples:
         >>> class SwordType(Singleton):
@@ -105,8 +103,8 @@ class Token(Entity, Generic[WST]):
     # noinspection PyNestedDecorators
     @field_validator("token_from")
     @classmethod
-    def _valid_wraps_for_wrapped_cls(cls, value: str) -> str:
-        if not cls.wrapped_cls.get_instance(value):
+    def _valid_label_for_wrapped_cls(cls, value: str) -> str:
+        if not cls.wrapped_cls.has_instance(value):
             raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref label `{value}`.")
         return value
 

@@ -20,6 +20,8 @@ class EntityTemplate(Record, Generic[ET]):
     """
     Semi-structured data representation.
 
+    Round-tripping as a script item can use `item = structure(payload=script)` or `script = item.payload.unstructure()`.
+
     Example:
         >>> class PseudoEntity(Entity): ...
         >>> data = {'label': 'abc'}
@@ -39,7 +41,6 @@ class EntityTemplate(Record, Generic[ET]):
     # template to be used within a scope, or once per scope.  that should be captured in
     # metadata
 
-    # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     payload: ET = Field(..., exclude=True)
 
     def get_hashable_content(self):
@@ -92,24 +93,6 @@ class EntityTemplate(Record, Generic[ET]):
         return super().structure(data)
 
 
-class Snapshot(EntityTemplate):
-    """
-    Example:
-        >>> e = Entity(label='abc')
-        >>> s = Snapshot.from_entity(e)
-        >>> ee = s.materialize()
-        >>> e is not ee and e == ee  # preserves uid
-        True
-    """
-
-    def materialize(self, preserve_uid: bool = True, **updates) -> ET:
-        if updates:
-            raise TypeError("Snapshot does not support updates")
-        if not preserve_uid:
-            raise TypeError("Snapshot does not support preserve_uid != True")
-        return super().materialize(preserve_uid=True)
-
-
 class TemplateRegistry(Registry[EntityTemplate]):
     """
     Example:
@@ -132,3 +115,25 @@ class TemplateRegistry(Registry[EntityTemplate]):
         # If you want to apply an update, do it one at a time.
         templs = self.find_all(selector=selector, sort_key=sort_key)
         return (templ.materialize() for templ in templs)
+
+
+class Snapshot(EntityTemplate):
+    """
+    Snapshot is a variant of a template that simply wraps an
+    existing entity and allows it to be recreated later, but
+    disallows any modificaton at materialization time.
+
+    Example:
+        >>> e = Entity(label='abc')
+        >>> s = Snapshot.from_entity(e)
+        >>> ee = s.materialize()
+        >>> e is not ee and e == ee  # preserves uid
+        True
+    """
+
+    def materialize(self, preserve_uid: bool = True, **updates) -> ET:
+        if updates:
+            raise TypeError("Snapshot does not support updates")
+        if not preserve_uid:
+            raise TypeError("Snapshot does not support preserve_uid != True")
+        return super().materialize(preserve_uid=True)

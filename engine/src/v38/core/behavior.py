@@ -189,6 +189,11 @@ class Behavior(RegistryAware, HasOrder, Entity):
         >>> Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
         True
     """
+    # todo: - detect class funcs as caller hint
+    #       - detect inst funcs as caller hint and bind to caller
+    #       - detect instance funcs and weakref bind source
+    #       this introspection was in v37, but complicated
+    #          and underutilized?
 
     func: Callable = lambda *_, **__: True
     task: Tag = None
@@ -197,8 +202,6 @@ class Behavior(RegistryAware, HasOrder, Entity):
 
     wants_kind: Type[Entity] = None
     wants_exact_kind: bool = True  # disallow caller-kind subclasses
-
-    # todo: could do this with wants_kind = x for exact match, has_wants_kind(x) for subclass match
 
     def caller_kind(self, kind: Type[Entity]) -> bool:
         logger.debug(f"checking if caller_kind(kind) in wants_kind")
@@ -231,7 +234,14 @@ class Behavior(RegistryAware, HasOrder, Entity):
 
     @property
     def sort_key(self):
-        return self.dispatch_layer, self.priority, self.seq
+        """
+        Sorts by:
+          - priority: low -> high,
+          - layer: global -> inline
+          - specificity: caller is exact cls -> subclass
+          - registration seq: earlier -> later
+        """
+        return self.dispatch_layer, self.priority, self.wants_exact_kind, self.seq
 
 
 class BehaviorRegistry(Registry[Behavior]):

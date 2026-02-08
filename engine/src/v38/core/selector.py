@@ -45,8 +45,10 @@ class Selector(BaseModel, extra="allow"):
         >>> list( s.filter([e, f]) )
         [<E:abc>]
     """
-    # todo: suggests baking basic entity axes identifier, kind, tags into field definitions for type checking
-    # todo: if a selector is serializable, predicate need to be a Predicate RuntimeOp
+    # todo: suggests baking basic entity axes identifier, kind,
+    #       tags into field definitions for type checking
+    # todo: if a selector is serializable, predicate need to
+    #       be a Predicate RuntimeOp
 
     predicate: Callable[[Entity], bool] = None
 
