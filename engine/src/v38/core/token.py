@@ -61,7 +61,8 @@ class Token(Entity, Generic[WST]):
         ...                 f"(damage={self.damage}, sharpness={self.sharpness})>" )
         >>> SwordType(label="short sword", damage="1d6")
         <SwordType:short sword(damage=1d6, sharpness=1.0)>
-        >>> t = Token[SwordType](token_from="short sword", label="Glamdring", sharpness=2.0); t
+        >>> t = Token[SwordType](token_from="short sword",
+        ...                      label="Glamdring", sharpness=2.0); t
         <Token[...SwordType]:Glamdring(damage=1d6, sharpness=2.0)>
         >>> t.has_kind(SwordType)
         True

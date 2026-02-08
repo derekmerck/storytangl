@@ -6,7 +6,7 @@ import itertools
 import logging
 from functools import cached_property
 
-from pydantic import Field
+from pydantic import Field, PrivateAttr, SkipValidation
 
 from tangl.type_hints import UnstructuredData
 from .entity import Entity
@@ -32,6 +32,10 @@ class Registry(Entity, Generic[ET]):
 
     Registry is an "Owning boundary" that may embed nested unstructurable children.  Owning
     boundaries must handle un/structuring children explicitly and guarantee round-trips.
+
+    **Dispatch Hooks:**
+
+    Pass `_ctx` to `add()`, `get()`, or `remove()` to trigger dispatch hooks. (See core.dispatch)
 
     Example:
         >>> a = Entity(label="abc"); b = Entity(label="def")
@@ -64,8 +68,10 @@ class Registry(Entity, Generic[ET]):
     members: dict[UUID, ET] = Field(default_factory=dict, exclude=True)
 
     def add(self, value: ET, _ctx = None):
-        if hasattr(value, 'set_registry'):
-            value.set_registry(self)
+        if hasattr(value, 'bind_registry'):
+            value.bind_registry(self)
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
             # chance to modify before inserting
             from .dispatch import do_add_item
@@ -76,6 +82,8 @@ class Registry(Entity, Generic[ET]):
         item = self.members.pop(key, None)
         if item is not None and hasattr(item, 'set_registry'):
             item.set_registry(None)
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
             # chance to review before discarding
             from .dispatch import do_remove_item
@@ -84,6 +92,8 @@ class Registry(Entity, Generic[ET]):
 
     def get(self, key: UUID, _ctx = None):
         item = self.members.get(key, None)
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
             # chance to modify before returning
             from .dispatch import do_get_item
@@ -165,22 +175,38 @@ class RegistryAware(Entity):
 
     Registry-aware entities never hold direct pointers to other members of their registry. They store indirect references to other members via UUIDs.  These are usually resolved lazily on property access.
 
+    Do _not_ treat a shared owning boundary reference as a field -- pydantic will try to copy it and behave generally inconsistently.  Always set it with an explicit binding function.
+
     Example:
         >>> a = RegistryAware(); r = Registry(); r.add(a)
-        >>> a.registry == r
+        >>> a.registry is r
         True
         >>> Registry().add(a)  # doctest: +ELLIPSIS
         Traceback (most recent call last):
           ...
-        ValueError: Registry is already set
+        ValueError: Registry is already set ...
+        >>> b = RegistryAware(registry=r)
+        >>> b.registry is r
+        True
+        >>> a.registry is b.registry
+        True
     """
 
-    registry: Registry[RegistryAware] = Field(None, exclude=True)
+    _registry: SkipValidation[Registry[RegistryAware]] = PrivateAttr(None)
 
-    def set_registry(self, registry: Registry):
-        if self.registry is not None and self.registry is not registry:
-            raise ValueError("Registry is already set")
-        self.registry = registry
+    @property
+    def registry(self) -> Registry[RegistryAware] | None:
+        return self._registry
+
+    def __init__(self, registry = None, **kwargs) -> None:
+        super().__init__(**kwargs)
+        if registry is not None:
+            registry.add(self)
+
+    def bind_registry(self, registry: Registry):
+        if self._registry is not None and (self._registry is not registry):
+            raise ValueError(f"Registry is already set {self._registry!r} != {registry!r}")
+        self._registry = registry
 
 
 class EntityGroup(RegistryAware):
@@ -237,6 +263,7 @@ class EntityGroup(RegistryAware):
 
     def has_member(self, item: RegistryAware) -> bool:
         # for selection criteria, uses __contains__ compare-by-uid
+        logger.debug(f"{self!r}: checking has_member({item!r}) = {item in self}")
         return item in self
 
     def __iter__(self) -> Iterator[RegistryAware]:
@@ -249,6 +276,19 @@ class EntityGroup(RegistryAware):
 
 
 class HierarchicalGroup(EntityGroup):
+    """
+    Example:
+        >>> r = Registry()
+        >>> g = HierarchicalGroup(label="g", registry=r)
+        >>> h = HierarchicalGroup(label="h", registry=r)
+        >>> g.add_member(h)
+        >>> h.parent
+        <HierarchicalGroup:g>
+        >>> h.path
+        'g.h'
+        >>> h.ancestors
+        [<HierarchicalGroup:h>, <HierarchicalGroup:g>]
+    """
 
     @cached_property
     def parent(self) -> Self:
@@ -280,14 +320,18 @@ class HierarchicalGroup(EntityGroup):
     @property
     def ancestors(self) -> list[Self]:
         root = self
-        result = []
+        result = [self]
         while root.parent is not None:
-            result.append(root)
             root = root.parent
+            result.append(root)
         return result
 
     @property
     def path(self) -> str:
-        labels = [a.get_label() for a in self.ancestors]
-        result = ".".join(reversed(labels))
-        return result
+        if self.parent:
+            return f"{self.parent.path}.{self.get_label()}"
+        return self.get_label()
+        # return self.parent.path
+        # labels = [a.get_label() for a in self.ancestors]
+        # result = ".".join(reversed(labels))
+        # return result

@@ -3,8 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from typing import Iterator, Optional
 import itertools
-
-from pydantic import Field
+from types import SimpleNamespace
 
 from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 from .selector import Selector
@@ -14,11 +13,9 @@ class GraphItem(RegistryAware):
     """
     Base for items managed by a Graph.
     """
-    registry: Graph = Field(None, exclude=True)  # change type hint
-
     @property
     def graph(self) -> Graph:
-        return self.registry
+        return self._registry
 
 
 class Graph(Registry[GraphItem]):
@@ -48,9 +45,43 @@ class Graph(Registry[GraphItem]):
         selector = selector.with_criteria(has_kind=Node)
         return self.find_all(selector)
 
+    def _validate_linkable(self, item: GraphItem):
+        if not isinstance(item, GraphItem):
+            raise TypeError(f"Expected GraphItem, got {type(item)}")
+        if item.graph != self:
+            raise ValueError(f"Link item must belong to the same graph")
+        if item.uid not in self.members:
+            raise ValueError(f"Link item must be added to graph first")
+        return True
+
+    def _do_link(self, caller: GraphItem, node: Node, _ctx):
+        # called by subgraphs for adding members, edges for setting predecessor/successor
+        from .dispatch import do_link
+        return do_link(caller=caller, node=node, ctx=_ctx)
+
+    def _do_unlink(self, caller: GraphItem, node: Node, _ctx):
+        # called by subgraphs for removing members, edges for setting predecessor/successor to None
+        from .dispatch import do_unlink
+        return do_unlink(caller=caller, node=node, ctx=_ctx)
+
 
 class Subgraph(EntityGroup, GraphItem):
     # Not necessarily hierarchical, just a bag of graph items
+
+    def add_member(self, item: GraphItem, _ctx = None):
+        self.graph._validate_linkable(item)
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is not None:
+            self.graph._do_link(self, item, _ctx)
+        return super().add_member(item)
+
+    def remove_member(self, item: GraphItem, _ctx = None):
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is not None:
+            self.graph._do_unlink(self, item, _ctx)
+        super().remove_member(item)
 
     def members(self, selector: Selector = None) -> Iterator[GraphItem]:
         # Just for type hint
@@ -62,6 +93,22 @@ class Edge(GraphItem):
     dangling edges and connection mutation is allowed bc edges get used for many types of
     logical constructs, some of which don't require pre-resolved endpoints.  Subclasses
     or user must manage consistency.
+
+    Example:
+        >>> g = Graph()
+        >>> n = Node(registry=g)
+        >>> e = Edge(label='e', registry=g, successor_id=n.uid)
+        >>> g.find_one(Selector(successor=n))
+        <Edge:e>
+        >>> from .behavior import BehaviorRegistry; br = BehaviorRegistry()
+        >>> _ = br.register(func=lambda *args, **kwargs: print('foo'), task="link")
+        >>> ctx = SimpleNamespace(get_registries=lambda: [br])
+        >>> e.set_predecessor(n, ctx)
+        foo
+        >>> from .ctx import using_ctx
+        >>> with using_ctx(ctx):  # use ambient ctx to trigger hooks when setting prop
+        ...     e.predecessor = n
+        foo
     """
 
     predecessor_id: Optional[UUID] = None
@@ -71,23 +118,50 @@ class Edge(GraphItem):
     def predecessor(self) -> Optional[Node]:
         return self.graph.get(self.predecessor_id)
 
-    @predecessor.setter
-    def predecessor(self, value: Node) -> None:
+    # todo: add global `with ctx` for signaling dispatch hooks if
+    #       _ctx can't be threaded through calls, like setting props
+
+    def set_predecessor(self, value: Node, _ctx = None):
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
         if value is not None:
+            self.graph._validate_linkable(value)
+            if _ctx is not None:
+                self.graph._do_link(self, value, _ctx)
             self.predecessor_id = value.uid
         else:
+            if _ctx is not None:
+                self.graph._do_unlink(self, self.predecessor, _ctx)
             self.predecessor_id = None
+
+    @predecessor.setter
+    def predecessor(self, value: Node) -> None:
+        # todo: setting prop directly won't trigger hooks until global
+        #       `with context` manager is implemented for dispatch
+        self.set_predecessor(value)
 
     @property
     def successor(self) -> Optional[Node]:
         return self.graph.get(self.successor_id)
 
-    @successor.setter
-    def successor(self, value: Node) -> None:
+    def set_successor(self, value: Node, _ctx = None):
+        from .ctx import resolve_ctx
+        _ctx = resolve_ctx(_ctx)
         if value is not None:
+            self.graph._validate_linkable(value)
+            if _ctx is not None:
+                self.graph._do_link(self, value, _ctx)
             self.successor_id = value.uid
         else:
+            if _ctx is not None:
+                self.graph._do_unlink(self, self.successor, _ctx)
             self.successor_id = None
+
+    @successor.setter
+    def successor(self, value: Node) -> None:
+        # todo: setting prop directly won't trigger hooks until global
+        #       `with context` manager is implemented for dispatch
+        self.set_successor(value)
 
 
 class Node(GraphItem):

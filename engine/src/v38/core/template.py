@@ -102,10 +102,10 @@ class Snapshot(EntityTemplate):
         True
     """
 
-    def materialize(self, preserve_uid = True, **updates) -> ET:
+    def materialize(self, preserve_uid: bool = True, **updates) -> ET:
         if updates:
             raise TypeError("Snapshot does not support updates")
-        if preserve_uid is not True:
+        if not preserve_uid:
             raise TypeError("Snapshot does not support preserve_uid != True")
         return super().materialize(preserve_uid=True)
 

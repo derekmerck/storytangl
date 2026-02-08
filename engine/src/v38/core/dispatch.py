@@ -10,6 +10,9 @@ Default global-layer behavior registry ('core.dispatch') and decorators ('on_tas
   - add item  (registry add, reg, item -> None)
   - get item  (registry get, reg, key -> item)
   - remove item (registry remove, reg, key -> None)
+- relationships:
+  - link node on edge or group
+  - unlink node from edge or group
 
 Passing a ctx kwarg into any hooked method triggers any registered hooks in the responsible
 dispatch or any dispatch provided by ctx.
@@ -31,10 +34,8 @@ Example:
     <Entity:baz>
     >>> dispatch.clear()  # always clean up global registries after using
 
-Layered Dispatch:
 
-
-## Dispatch Layer Mapping Parallels
+## Dispatch Layer Mapping
 
 | Layer       | Package   | Registry            | Typical Tasks                   |
 |-------------|-----------|---------------------|---------------------------------|
@@ -57,6 +58,7 @@ from .entity import Entity
 from .selector import Selector
 from .registry import Registry
 from .behavior import RuntimeCtx, BehaviorRegistry, DispatchLayer, CallReceipt
+from .graph import GraphItem, Node
 
 dispatch = BehaviorRegistry(default_dispatch_layer=DispatchLayer.GLOBAL)
 
@@ -108,7 +110,7 @@ def on_add_item(func, **kwargs):
     return dispatch.register(func=func, task="add_item", **kwargs)
 
 def do_add_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
-    # chance to modify the item before inserting it
+    # chance to audit or modify the item _before_ inserting it
     # todo: do we want to allow this to be mutated or, or is it read only for
     #       inspection/audit like remove?  can modify on `get` if we need to
     registries = ctx.get_registries() or []
@@ -142,7 +144,7 @@ def on_remove_item(func, **kwargs):
     return dispatch.register(func=func, task="remove_item", **kwargs)
 
 def do_remove_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
-    # chance to audit the requested object before discarding it
+    # chance to audit the requested object after removal but before discarding it
     registries = ctx.get_registries() or []
     if dispatch not in registries:
         registries.append(dispatch)
@@ -153,3 +155,38 @@ def do_remove_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
         task = "remove_item"
     )
     CallReceipt.gather_results(*receipts)  # force receipt evaluation
+
+# Graph hooks
+# --------------
+
+def on_link(func, **kwargs):
+    return dispatch.register(func=func, task="link", **kwargs)
+
+def do_link(caller: GraphItem, node: Node, ctx: RuntimeCtx):
+    # audit _before_ linking
+    registries = ctx.get_registries() or []
+    if dispatch not in registries:
+        registries.append(dispatch)
+    receipts = dispatch.chain_execute(
+        *registries,
+        ctx=ctx,
+        call_kwargs={'caller': caller, 'node': node},
+        task="link"
+    )
+    CallReceipt.gather_results(*receipts)
+
+def on_unlink(func, **kwargs):
+    return dispatch.register(func=func, task="unlink", **kwargs)
+
+def do_unlink(caller: GraphItem, node: Node, ctx: RuntimeCtx):
+    # audit _after_ unlinking (undiscarded, remains in graph)
+    registries = ctx.get_registries() or []
+    if dispatch not in registries:
+        registries.append(dispatch)
+    receipts = dispatch.chain_execute(
+        *registries,
+        ctx=ctx,
+        call_kwargs={'caller': caller, 'node': node},
+        task="unlink"
+    )
+    CallReceipt.gather_results(*receipts)

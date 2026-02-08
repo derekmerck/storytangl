@@ -84,4 +84,4 @@ from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRe
 # - dispatch hooks
 from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
 from .token import Token  # Delegated reference builder
-from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item
+from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
