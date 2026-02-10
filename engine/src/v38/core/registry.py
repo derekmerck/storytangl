@@ -1,6 +1,6 @@
 # tangl/core/registry.py
 from __future__ import annotations
-from typing import TypeVar, Generic, Iterator, Iterable, Optional, Self
+from typing import TypeVar, Generic, Iterator, Iterable, Optional, Self, TypeAlias
 from uuid import UUID
 import itertools
 import logging
@@ -13,6 +13,7 @@ from .entity import Entity
 from .selector import Selector
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 ET = TypeVar('ET', bound=Entity)
 
@@ -131,11 +132,11 @@ class Registry(Entity, Generic[ET]):
         return data
 
     @classmethod
-    def structure(cls, data: UnstructuredData):
+    def structure(cls, data: UnstructuredData, _ctx = None):
         _members = data.pop("members", [])
-        obj = super().structure(data)  # type: Self
+        obj = super().structure(data, _ctx =_ctx)  # type: Self
         for v in _members:
-            obj.add(Entity.structure(v))
+            obj.add(Entity.structure(v, _ctx = _ctx))
         return obj
 
     # Provide mapping interface
@@ -208,6 +209,23 @@ class RegistryAware(Entity):
             raise ValueError(f"Registry is already set {self._registry!r} != {registry!r}")
         self._registry = registry
 
+    @cached_property
+    def parent(self) -> Optional[RegistryAware]:
+        """
+        Return the first HierarchicalGroup in the owning registry that lists this template as a member.
+
+        Any registry member _might_ be included in a hierarchical group.  This is a convenience property that will not be relevant in registries with no hg's but enables any registry-aware item to participate in hierarchy queries.
+        """
+        return self.registry.find_one(
+            Selector(has_kind=HierarchicalGroup,
+                     has_member=self))
+
+    def _invalidate_parent_attr(self):
+        # On reparent
+        if hasattr(self, "parent"):
+            delattr(self, "parent")
+
+RT: TypeAlias = RegistryAware
 
 class EntityGroup(RegistryAware):
     """
@@ -237,31 +255,31 @@ class EntityGroup(RegistryAware):
     """
     member_ids: list[UUID] = Field(default_factory=list)
 
-    def member(self, selector: Selector = None, sort_key = None) -> ET:
+    def member(self, selector: Selector = None, sort_key = None) -> RT:
         return next(self.members(selector, sort_key=sort_key), None)
 
-    def members(self, selector: Selector = None, sort_key = None) -> Iterator[ET]:
+    def members(self, selector: Selector = None, sort_key = None) -> Iterator[RT]:
         items = (self.registry.get(uid) for uid in self.member_ids)
         selector = selector or Selector()
         if self.registry is not None:
             return self.registry._filter_and_sort(items, selector=selector, sort_key=sort_key)
         raise ValueError("Group registry is not set")
 
-    def add_member(self, item: RegistryAware):
+    def add_member(self, item: RT):
         if item is self:
             raise ValueError("Group cannot add itself to itself")
         self.registry.add(item)
         self.member_ids.append(item.uid)
 
-    def add_members(self, *items: RegistryAware):
+    def add_members(self, *items: RT):
         for item in items:
             self.add_member(item)
 
-    def remove_member(self, item: RegistryAware):
+    def remove_member(self, item: RT):
         if item.uid in self.member_ids:
             self.member_ids.remove(item.uid)
 
-    def has_member(self, item: RegistryAware) -> bool:
+    def has_member(self, item: RT) -> bool:
         # for selection criteria, uses __contains__ compare-by-uid
         logger.debug(f"{self!r}: checking has_member({item!r}) = {item in self}")
         return item in self
@@ -290,35 +308,30 @@ class HierarchicalGroup(EntityGroup):
         [<HierarchicalGroup:h>, <HierarchicalGroup:g>]
     """
 
-    @cached_property
-    def parent(self) -> Self:
-        return self.registry.find_one(Selector(has_kind=HierarchicalGroup, has_member=self))
-
     # Just aliases to membership ops
-    def children(self, selector: Selector) -> Iterator[Self]:
+    def children(self, selector: Selector) -> Iterator[RT]:
         return self.members(selector=selector)
 
-    def add_child(self, item: Self):
+    def add_child(self, item: RT):
         # Enforce uniqueness of membership
         if item.parent is not None:
-            item.parent.remove_child(item)
+            item.parent.remove_child(item)  # invalidates child's parent
         return self.add_member(item)
 
-    def remove_child(self, item: ET):
+    def remove_child(self, item: RT):
+        if item is not None and item.uid in self.member_ids:
+            item._invalidate_parent_attr()
         self.remove_member(item)
-        if hasattr(item, "parent"):
-            # invalidate the cached parent
-            delattr(item, "parent")
 
     @property
-    def root(self) -> Self:
+    def root(self) -> RT:
         root = self
         while root.parent is not None:
             root = root.parent
         return root
 
     @property
-    def ancestors(self) -> list[Self]:
+    def ancestors(self) -> list[RT]:
         root = self
         result = [self]
         while root.parent is not None:

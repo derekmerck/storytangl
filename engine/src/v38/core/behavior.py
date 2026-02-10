@@ -57,7 +57,6 @@ class AggregationMode(Enum):
 
 class CallReceipt(Record):
     """
-
     **Aggregation Modes:**
 
     Receipt aggregation or folding summarizes dispatch traces into a concrete result or list of results.  One key detail is that behaviors that return a None result are tracked with a receipt for audit, but do not participate in result reduction. Several generic aggregators are implemented as class functions on Receipt (handling for collections of receipts).  Additional aggregators can be introduced at other layers.
@@ -189,11 +188,10 @@ class Behavior(RegistryAware, HasOrder, Entity):
         >>> Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
         True
     """
-    # todo: - detect class funcs as caller hint
-    #       - detect inst funcs as caller hint and bind to caller
-    #       - detect instance funcs and weakref bind source
-    #       this introspection was in v37, but complicated
-    #          and underutilized?
+    # todo: method type introspection was in v37, but complicated and underutilized?
+    #       - detect class methods as caller hint
+    #       - detect inst methods as caller hint and bind func to caller dynamically
+    #       - detect instance funcs and bind source
 
     func: Callable = lambda *_, **__: True
     task: Tag = None

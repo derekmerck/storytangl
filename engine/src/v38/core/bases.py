@@ -240,7 +240,12 @@ class Unstructurable(BaseModelPlus):
                 f"Entities of type {type(self)} may carry non-serializable logic and should not need to be unstructured.")
 
         exclude_fields = set( self._match_fields(exclude=True) )
-        data = self.model_dump(exclude=exclude_fields)
+        data = self.model_dump(
+            exclude=exclude_fields,
+            exclude_unset=True,
+            exclude_defaults=True)
+        if 'uid' not in data and hasattr(self, 'uid'):
+            data['uid'] = self.uid
         data['kind'] = self.__class__
         return data
 

@@ -21,7 +21,8 @@ class Selector(BaseModel, extra="allow"):
 
     - Field with matching names will be compared directly with their target value
     - Methods should start with "is_", "has_" will be invoked and compared to their target value
-    - todo: Any attribute may be postfixed by a handler "_eq", "_in", "_lt", etc.  This defines the comparator, '_eq' is default.  '_in' assumes the key value is an iterable, if it's a tuple of two floats, it's compared with v0 <= x <= v1, otherwise it uses x in value
+    - Can use custom methods on classes and provide an iterator for richer comparison, like
+      "has_x_in=[values, ...]"
 
     **Rules:**
     - `matches()` is side-effect free
@@ -59,8 +60,9 @@ class Selector(BaseModel, extra="allow"):
         if self.predicate is not None and not self.predicate(entity):
             return False
         for attrib_name, target_val in self.__pydantic_extra__.items():
-            if target_val is None:
-                # Skip anything purposefully set to None in criteria
+            if target_val is Any:
+                # Skip anything purposefully set to Any in criteria
+                # Note, it will check target_val = None as a normal comparison
                 continue
             if not hasattr(entity, attrib_name):
                 return False
@@ -76,6 +78,7 @@ class Selector(BaseModel, extra="allow"):
         return True
 
     def with_criteria(self, **criteria: Any) -> Selector:
+        # maybe if there is already a 'kind', only replace it if it's more or less specific?
         return self.model_copy(update=criteria)
 
     @classmethod
