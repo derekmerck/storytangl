@@ -62,7 +62,7 @@ from .registry import Registry
 from .behavior import RuntimeCtx, BehaviorRegistry, DispatchLayer, CallReceipt
 from .graph import GraphItem, Node
 
-dispatch = BehaviorRegistry(default_dispatch_layer=DispatchLayer.GLOBAL)
+dispatch = BehaviorRegistry(label="global_dispatch", default_dispatch_layer=DispatchLayer.GLOBAL)
 
 # Creation hooks
 # --------------

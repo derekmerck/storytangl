@@ -38,6 +38,9 @@ class Requirement(Selector, Generic[RT]):
     def satisfied(self):
         return self.provider_id is not None or not self.hard_requirement
 
+    unsatisfiable: bool = None           # unknown
+    unambiguously_resolved: bool = None  # unknown
+
     def satisfied_by(self, entity: RT) -> bool:
         return self.matches(entity)
 
@@ -47,16 +50,8 @@ class Requirement(Selector, Generic[RT]):
         return True
 
     fallback_templ: Optional[EntityTemplate] = None
-
-    def get_fallback_offer(self) -> Iterable[ProvisionOffer]:
-        # a requirement can satisfy itself if it carries an inline template
-        # a cloner could take such an offer and combine it with an existing source
-        if self.fallback_templ is not None:
-            return [ ProvisionOffer(
-                origin_id=self.fallback_templ.get_label(),
-                policy=ProvisionPolicy.CREATE,
-                callback=self.fallback_templ.materialize) ]
-        return []
+    # a requirement can satisfy itself if it carries an inline template
+    # a cloner could take such an offer and combine it with an existing source
 
 
 class HasRequirement(RegistryAware, Generic[RT]):
