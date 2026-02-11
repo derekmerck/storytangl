@@ -82,9 +82,17 @@ class Graph(Registry[GraphItem]):
         selector = selector.with_criteria(has_kind=Subgraph)
         return self.find_one(selector)
 
+    @property
+    def subgraphs(self) -> list[Subgraph]:
+        return list(self.find_subgraphs())
+
     def find_edges(self, selector: Selector = Selector()) -> Iterator[Edge]:
         selector = selector.with_criteria(has_kind=Edge)
         return self.find_all(selector)
+
+    @property
+    def edges(self) -> list[Edge]:
+        return list(self.find_edges())
 
     def find_edge(self, selector: Selector = Selector()) -> Edge:
         selector = selector.with_criteria(has_kind=Edge)
@@ -93,6 +101,10 @@ class Graph(Registry[GraphItem]):
     def find_nodes(self, selector: Selector = Selector()) -> Iterator[Node]:
         selector = selector.with_criteria(has_kind=Node)
         return self.find_all(selector)
+
+    @property
+    def nodes(self) -> list[Node]:
+        return list(self.find_nodes())
 
     def find_node(self, selector: Selector = Selector()) -> Iterator[Node]:
         selector = selector.with_criteria(has_kind=Node)
