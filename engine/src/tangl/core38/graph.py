@@ -200,8 +200,8 @@ class Edge(GraphItem):
 
     @predecessor.setter
     def predecessor(self, value: Node) -> None:
-        # todo: setting prop directly won't trigger hooks until global
-        #       `with context` manager is implemented for dispatch
+        # setting the property directly will only trigger dispatch
+        # hooks if using the ambient "with_ctx" context manager.
         self.set_predecessor(value)
 
     @property
@@ -223,8 +223,8 @@ class Edge(GraphItem):
 
     @successor.setter
     def successor(self, value: Node) -> None:
-        # todo: setting prop directly won't trigger hooks until global
-        #       `with context` manager is implemented for dispatch
+        # setting the property directly will only trigger dispatch
+        # hooks if using the ambient "with_ctx" context manager.
         self.set_successor(value)
 
 
@@ -259,12 +259,12 @@ class Node(GraphItem):
         return self.graph.add_edge(self, node, kind=kind, **attrs)
 
     def remove_edge_to(self, node: Node) -> None:
-        edge = self.graph.find_edge(source=self, destination=node)
+        edge = self.graph.find_edge(predecessor=self, successor=node)
         if edge is not None:
             self.graph.remove(edge.uid)
 
     def remove_edge_from(self, node: Node) -> None:
-        edge = self.graph.find_edge(source=node, destination=self)
+        edge = self.graph.find_edge(predecessor=node, successor=self)
         if edge is not None:
             self.graph.remove(edge.uid)
 

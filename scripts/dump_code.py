@@ -225,7 +225,7 @@ if __name__ == "__main__":
     process_directory(cwx_root / "domain", "tangl2x_cwx_archive.py",
                       prepend_files=[cwx_root / 'world.yaml'])
 
-    process_directory(v38_root / "core",
+    process_directory(pkg_root / "core38",
                       "tangl38_core_archive.py",
                       include_notes=True,
                       prepend_files= [pkg_root / "type_hints.py"],
