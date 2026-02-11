@@ -1,4 +1,48 @@
 # tangl/core/template.py
+# language=markdown
+"""
+# Templates (v38): compile/decompile and materialization
+
+This module defines the **authoring boundary** for core.
+
+Templates are the bridge between two otherwise independent loops:
+
+1) **Authoring loop (compile/decompile)**
+
+```
+Script dict  ── compile ─▶  EntityTemplate  ── decompile ─▶  Script dict
+```
+
+- Used for script linting, normalization, and author-friendly export.
+- `decompile()` strips framework noise (uids, ordering, caches) by policy.
+- No live graph or materialization is required.
+
+2) **Runtime loop (persistence)**
+
+```
+Live Entity  ── unstructure ─▶  UnstructuredData  ── structure ─▶  Live Entity
+```
+
+- Defined on `core.bases.Unstructurable` / `core.entity.Entity`.
+- Preserves identifiers and runtime state.
+
+3) **Runtime entry (materialization)**
+
+```
+EntityTemplate  ── materialize ─▶  Live Entity
+```
+
+Materialization stamps out a live entity from a template payload. This is a one-way
+boundary into runtime: a live entity does not implicitly "become" a script item.
+
+## Vocabulary
+
+- **payload**: the prototype entity stored inside a template (an `Entity` instance).
+- **compile**: build a template from a script dict (validate/hydrate).
+- **decompile**: emit a script dict from a template payload (strip noise).
+- **materialize**: create a live entity instance from a template payload.
+
+"""
 from __future__ import annotations
 
 from typing import Optional, Iterator, TypeVar, Generic, Type, Self, Any
@@ -21,12 +65,37 @@ NONGENERIC_FIELDS = {'uid', 'seq'}  # discarded when decompiling to script
 
 
 class EntityTemplate(RegistryAware, Record, Generic[ET]):
-    # language=markdown
-    """
-    Semi-structured data representation.
+    """Template wrapper around an entity payload.
 
-    Round-trip as a script item can use `templ_inst = compile(script_item)` or
-    `script_item = templ_inst.decompile()`.
+    An `EntityTemplate` stores a prototype entity (`payload`) and provides three distinct
+    operations:
+
+    - **compile**: `dict → EntityTemplate` (authoring loop)
+    - **decompile**: `EntityTemplate → dict` (authoring loop)
+    - **materialize**: `EntityTemplate → Entity` (runtime entry)
+
+    ### What a template is (and is not)
+
+    - A template is **not** a live entity in the runtime graph.
+    - A template may be stored in a `TemplateRegistry` and searched using `Selector`.
+    - Templates can participate in hierarchy/grouping when combined with
+      `TemplateGroup` (see below).
+
+    ### Matching axes (important)
+
+    Templates expose two independent matching axes:
+
+    - **template-kind**: what wrapper record the template is (`EntityTemplate`, `Snapshot`, `TemplateGroup`)
+    - **payload-kind**: what entity kind the template would materialize (`Scene`, `Block`, `Entity`, ...)
+
+    Use `has_template_kind()` and `has_payload_kind()` to avoid ambiguity. The convenience
+    method `has_kind()` matches either axis.
+
+    ### Authoring vs persistence
+
+    - `compile()` / `decompile()` are for author scripts and strip framework noise by policy.
+    - `structure()` / `unstructure()` serialize the template record itself (including payload)
+      and are appropriate for caching/transport of templates, not authoring.
 
     ```
     Script ──compile─▶ Template ──materialize──▶ Live ◀──structure── Persistence
@@ -39,14 +108,14 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         >>> class PseudoEntity(Entity): ...
         >>> data = {'label': 'abc'}
         >>> templ = EntityTemplate.from_data(data, default_kind=PseudoEntity)
-        >>> templ.has_kind(EntityTemplate) and templ.has_kind(PseudoEntity)
+        >>> templ.has_template_kind(EntityTemplate) and templ.has_payload_kind(PseudoEntity)
         True
         >>> templ.materialize()
         <PseudoEntity:abc>
         >>> class PseudoEntity2(PseudoEntity): ...
         >>> templ.materialize(kind=PseudoEntity2, label="def")
         <PseudoEntity2:def>
-        >>> templ.materialize().uid != templ.payload.uid  # created with fresh id
+        >>> templ.materialize().uid != templ.payload.uid  # fresh id by default
         True
     """
 
@@ -139,7 +208,15 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         return cls.structure({'payload': data}, _ctx=_ctx)
 
 class TemplateRegistry(Registry[EntityTemplate]):
-    """A registry of templates.
+    """Registry of templates with convenience materialization and authoring helpers.
+
+    `TemplateRegistry` is the primary container for authoring-loop operations:
+
+    - `compile(script)` builds a flat registry from a list of script dicts.
+    - `decompile_all()` emits a list of script dicts from top-level template groups.
+
+    Materialization helpers (`materialize_one`, `materialize_all`) provide a simple bridge
+    into runtime, but they are not required for linting/compile/decompile.
 
     Example:
         >>> tr = TemplateRegistry()
@@ -192,31 +269,36 @@ class TemplateRegistry(Registry[EntityTemplate]):
 
 
 class TemplateGroup(EntityTemplate, HierarchicalGroup):
-    """Enables templates to _un/structure_ with inline children for hierarchical scripts.
+    """Template + hierarchical group membership for script-shaped trees.
 
-    They are registry aware and must be part of a template registry.
+    A `TemplateGroup` is both:
 
-    Children/members are used as scope-hints but stored independently.
-    Parent template identifiers are used to recreate hierarchical scripts that have
-    been decomposed into independent templates in a registry.
+    - an `EntityTemplate` wrapping a payload (the group node), and
+    - a `HierarchicalGroup` whose membership is stored as `member_ids: list[UUID]`.
 
-    Consider there are two forms of template-ir:
-    - "tree-ir", which is near-native format for template payloads with scope
-      and grouping represented by inlining templates within templates.
-    - "flat-ir", which is how templates wrapping a validated payload are stored
-      independently in a flat but searchable registry.
+    This enables *tree-shaped* scripts to be compiled into a flat registry and later
+    reconstructed.
 
-    There is exactly 1 flat-ir representation for a given configuration, but there
-    are many possible tree-ir representations for the same, depending on how grouping
-    is used. So we will need additional parsing and annotations for which items are
-    gathered into which groups in order to 'round-trip' tree-ir.
+    ## Representations
 
-    For script-ir groups that have members split across multiple fields, the field name
-    is usually the kind hint, i.e., Scenes: [ ... ]. For groups where members are in
-    a dictionary, the key is usually the label. i.e., Scenes: { scene1: ... , scene2: ... }
+    - **tree-IR**: author-facing dicts with inline `members`.
+    - **flat registry**: independent templates stored in a `TemplateRegistry`.
 
-    Example (tree-ir ⇄ flat registry round-trip):
-        >>> # Tree-IR payload (human-authored script shape)
+    `TemplateGroup.compile()` performs the tree-IR → flat registry conversion:
+
+    - yields templates in **depth-first** order (children first)
+    - records **direct** children for each group via `member_ids`
+
+    `TemplateGroup.decompile()` performs the inverse projection:
+
+    - emits the group payload as a script dict
+    - recursively decompiles children into inline `members`
+
+    Note: multiple tree-IR shapes can map to the same flat registry unless additional
+    annotations are provided (e.g., kind-hints on member fields). v38 keeps the core
+    mechanism minimal; higher layers may add richer script parsing.
+
+    Example (tree-IR ⇄ flat registry round-trip):
         >>> script = [
         ...   { 'label': 'chapter-1',
         ...     'members': [
@@ -227,9 +309,8 @@ class TemplateGroup(EntityTemplate, HierarchicalGroup):
         ...       { 'label': 'scene-1.2',
         ...         'members': [ {'label': 'block-1.2.1'} ] } ] } ]
         >>> tr = TemplateRegistry.compile(script)
-        >>> len(tr)  # 1 ch, 2 sc, 3 bl = 6
+        >>> len(tr)
         6
-        >>> # Decompile back to a nested tree-ir payload.
         >>> roundtrip = tr.decompile_all()
         >>> script == roundtrip
         True
@@ -285,8 +366,14 @@ class TemplateGroup(EntityTemplate, HierarchicalGroup):
 
 
 class Snapshot(EntityTemplate):
-    """Snapshot is a variant of a template that wraps an existing entity and allows it
-    to be recreated later, but disallows any modification at materialization time.
+    """Persistence convenience: a template that recreates an entity exactly.
+
+    A `Snapshot` is **not** part of the authoring loop. It is a persistence helper that
+    reuses the template/materialization machinery to recreate a live entity with the same
+    identifier and state.
+
+    - `materialize()` preserves uid and rejects updates.
+    - `decompile()` is not typically meaningful for snapshots.
 
     Example:
         >>> e = Entity(label='abc')

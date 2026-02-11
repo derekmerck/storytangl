@@ -1,4 +1,43 @@
 # tangl/core/registry.py
+# language=markdown
+"""
+# Registries and groups (v38)
+
+This module defines **ownership** and **membership** primitives for core.
+
+- A **Registry** owns a set of entities and is the canonical dereference boundary for
+  ID-linked structures.
+- A **Group** is itself a registry member that stores *only* member UUIDs, and resolves
+  those UUIDs back to entities via its owning registry.
+
+## Two related but distinct ideas
+
+1) **Owning boundary** (Registry)
+
+A registry is responsible for:
+
+- indexing members by `uid: UUID`
+- selection via `Selector` (`find_one`, `find_all`, `chain_find_all`)
+- structuring/unstructuring its members for persistence
+- binding registry-aware items (`bind_registry`, `set_registry`)
+
+2) **Views over a registry** (Groups)
+
+Groups do **not** own members. They only:
+
+- maintain `member_ids: list[UUID]`
+- provide iterators that dereference `member_ids` through the registry
+
+This keeps un/structuring simple: members are persisted once in the registry, and groups
+persist only the UUID references.
+
+## Hook points
+
+Registry operations accept an optional `_ctx` which higher layers may use to trigger
+behavior hooks (`do_add_item`, `do_get_item`, `do_remove_item`). Core remains usable
+without a dispatch system.
+
+"""
 from __future__ import annotations
 from typing import TypeVar, Generic, Iterator, Iterable, Optional, Self, TypeAlias
 from uuid import UUID
@@ -13,30 +52,39 @@ from .entity import Entity
 from .selector import Selector
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 ET = TypeVar('ET', bound=Entity)
 
 class Registry(Entity, Generic[ET]):
-    """
-    Indexed collection with selection and chaining.
+    """Indexed owning collection with selection and chaining.
 
-    Registry is the primary mechanism for groups of intra-related entities to be managed and serialized.
+    A `Registry` is core's **owning boundary** for intra-related entities.
+    It is the canonical dereference mechanism for ID-linked graphs:
 
-    **Rules:**
-    - Registries are the canonical dereference mechanism for ID-linked graphs
-    - `chain_find_all` is Core's primitive for layered composition
+    - members are indexed by `uid: UUID`
+    - other references should store only UUIDs and dereference through a registry
 
-    - **Indexing**
-    - Registries are indexed by `uid: UUID`.
-    - Broader identifier matching is done via selection (`find_*` with `Selector(identifier=...)` / `has_identifier` criteria), not via `get()`.
+    ### Selection
 
-    Registry is an "Owning boundary" that may embed nested unstructurable children.  Owning
-    boundaries must handle un/structuring children explicitly and guarantee round-trips.
+    Use `find_one` / `find_all` with a `Selector` for flexible matching.
+    Do not overload `get()` with fuzzy identifier logic; `get()` is strictly `UUID → entity`.
 
-    **Dispatch Hooks:**
+    ### Layering
 
-    Pass `_ctx` to `add()`, `get()`, or `remove()` to trigger dispatch hooks. (See core.dispatch)
+    `chain_find_all` is core's primitive for layered composition:
+
+    - treat multiple registries as a search chain
+    - yields matching members across all registries in order
+
+    ### Persistence
+
+    `Registry.unstructure()` includes *all* members as unstructured constructor-form dicts.
+    `Registry.structure()` recreates the registry and re-adds structured members.
+
+    ### Dispatch hooks
+
+    Pass `_ctx` to `add`, `get`, or `remove` to allow higher layers to intercept operations.
 
     Example:
         >>> a = Entity(label="abc"); b = Entity(label="def")
@@ -52,7 +100,7 @@ class Registry(Entity, Generic[ET]):
         <Entity:abc>
         >>> c = Entity(label="abc")
         >>> q = Registry(); q.add(c)
-        >>> list( Registry.chain_find_all(r, q, selector=s) ) == [a, c]
+        >>> list(Registry.chain_find_all(r, q, selector=s)) == [a, c]
         True
         >>> data = r.unstructure()
         >>> rr = Registry.structure(data)
@@ -65,8 +113,9 @@ class Registry(Entity, Generic[ET]):
         True
     """
 
-    # todo: should be unstructure=False, if we exclude it doesn't get used in eq
     members: dict[UUID, ET] = Field(default_factory=dict, exclude=True)
+    # exclude=True just means that structure takes care of it manually, it is
+    # still included in unstructured data used by eq_by_content
 
     def add(self, value: ET, _ctx = None):
         if hasattr(value, 'bind_registry'):
@@ -171,12 +220,30 @@ class Registry(Entity, Generic[ET]):
 # Additional bases for entities that can be gathered in a registry
 
 class RegistryAware(Entity):
-    """
-    Entities that are managed by a single registry can be auto-registered.
+    """Mixin for entities managed by a single registry.
 
-    Registry-aware entities never hold direct pointers to other members of their registry. They store indirect references to other members via UUIDs.  These are usually resolved lazily on property access.
+    Registry-aware entities do not store direct pointers to peer members.
+    Instead, they:
 
-    Do _not_ treat a shared owning boundary reference as a field -- pydantic will try to copy it and behave generally inconsistently.  Always set it with an explicit binding function.
+    - store UUID references (e.g., `member_ids` in groups)
+    - dereference through `self.registry.get(uid)` when needed
+
+    ### Binding contract
+
+    A registry binds itself to an item by calling `item.bind_registry(self)` during `Registry.add()`.
+    Registry-aware items should treat the registry reference as an implementation detail:
+
+    - store it as a private attribute (`PrivateAttr`) so pydantic will not copy it
+    - raise if rebound to a different registry
+
+    ### Parent convenience
+
+    `parent` is a convenience for hierarchical grouping:
+
+    - it returns the first `HierarchicalGroup` in the owning registry that lists this item
+      as a member
+    - it is meaningful only when the registry contains hierarchical groups
+    - it is cached and must be invalidated when membership changes (`_invalidate_parent_attr`)
 
     Example:
         >>> a = RegistryAware(); r = Registry(); r.add(a)
@@ -194,6 +261,7 @@ class RegistryAware(Entity):
     """
 
     _registry: SkipValidation[Registry[RegistryAware]] = PrivateAttr(None)
+    # do not want _registry included in unstructuring or copied on creation
 
     @property
     def registry(self) -> Registry[RegistryAware] | None:
@@ -228,30 +296,31 @@ class RegistryAware(Entity):
 RT: TypeAlias = RegistryAware
 
 class EntityGroup(RegistryAware):
-    """
-    RegistryAware Entities can reference peers in the same group
-    by id, entities _never_ carry direct pointers to other entities
-    to avoid structure/unstructure complexity.
+    """A registry member that provides a UUID-based view over peer members.
 
-    This looks like a registry, but it does not claim ownership of
-    any items.  It is a registry item itself and refers to its members
-    by uid, as peers.
+    An `EntityGroup` is itself stored *in* a registry and refers to other members of that
+    same registry by UUID.
 
-    Groups live _in_ the same registry that they provide a view of.
+    - Groups do not own members.
+    - Group membership is persisted as `member_ids: list[UUID]`.
+    - `members()` dereferences each UUID through the registry.
+
+    This pattern avoids deep nesting during structuring/unstructuring and keeps identity
+    and persistence straightforward.
 
     Example:
         >>> e = EntityGroup(registry=Registry())
         >>> e.add_members(RegistryAware(label="abc"), RegistryAware(label="def"), RegistryAware(label="ghi"))
-        >>> [ m.get_label() for m in e.members() ]
-        ['abc', 'def', 'ghi']
+        >>> list(e.members())
+        [<RegistryAware:abc>, <RegistryAware:def>, <RegistryAware:ghi>]
         >>> a = e.member(Selector.from_identifier("abc"))
         >>> e.has_member(a)
         True
         >>> e.remove_member(a)
         >>> e.has_member(a)
         False
-        >>> [ m.get_label() for m in e.members() ]
-        ['def', 'ghi']
+        >>> list(e.members())
+        [<RegistryAware:def>, <RegistryAware:ghi>]
     """
     member_ids: list[UUID] = Field(default_factory=list)
 
@@ -268,7 +337,8 @@ class EntityGroup(RegistryAware):
     def add_member(self, item: RT):
         if item is self:
             raise ValueError("Group cannot add itself to itself")
-        self.registry.add(item)
+        if item not in self.registry:
+            self.registry.add(item)
         self.member_ids.append(item.uid)
 
     def add_members(self, *items: RT):
@@ -276,7 +346,7 @@ class EntityGroup(RegistryAware):
             self.add_member(item)
 
     def remove_member(self, item: RT):
-        if item.uid in self.member_ids:
+        if item is not None and item.uid in self.member_ids:
             self.member_ids.remove(item.uid)
 
     def has_member(self, item: RT) -> bool:
@@ -294,33 +364,67 @@ class EntityGroup(RegistryAware):
 
 
 class HierarchicalGroup(EntityGroup):
-    """
+    """A group that supports parent/child nesting via group membership.
+
+    `HierarchicalGroup` is an `EntityGroup` with an additional convention:
+
+    - a child may belong to **at most one** parent at a time
+    - re-parenting is implemented as: remove from old parent → add to new parent
+
+    ### Derived hierarchy properties
+
+    - `parent`: cached lookup of the first `HierarchicalGroup` that lists this group as a member
+    - `root`: ascend parents until `None`
+    - `ancestors`: `[self, parent, grandparent, ...]`
+    - `path`: dotted label path from root (`root.child.grandchild`)
+
+    These are convenience properties intended for scripts and navigation. They rely on
+    correct invalidation of the cached `parent` when membership changes.
+
     Example:
         >>> r = Registry()
         >>> g = HierarchicalGroup(label="g", registry=r)
         >>> h = HierarchicalGroup(label="h", registry=r)
-        >>> g.add_member(h)
+        >>> g.add_child(h)
         >>> h.parent
         <HierarchicalGroup:g>
         >>> h.path
         'g.h'
         >>> h.ancestors
         [<HierarchicalGroup:h>, <HierarchicalGroup:g>]
+        >>> g.remove_child(h)
+        >>> h.parent is None
+        True
     """
 
-    # Just aliases to membership ops
+    # wraps member ops with parent management
+
+    def add_member(self, item: RT):
+        # forces re-parenting, or could throw an exception instead
+        logger.debug(f"{self!r}: adding member({item!r})")
+        if item.parent is not None:
+            # Remove also invalidates item's parent
+            item.parent.remove_child(item)
+        else:
+            # Just invalidate the None parent
+            item._invalidate_parent_attr()
+        return super().add_member(item)
+
+    def remove_member(self, item: RT):
+        if item is not None and item.uid in self.member_ids:
+            logger.debug(f"{self!r}: removing member {item!r} from parent {item.parent!r}")
+            item._invalidate_parent_attr()
+        super().remove_member(item)
+
+    # Aliases for membership ops -> children ops
+
     def children(self, selector: Selector) -> Iterator[RT]:
         return self.members(selector=selector)
 
     def add_child(self, item: RT):
-        # Enforce uniqueness of membership
-        if item.parent is not None:
-            item.parent.remove_child(item)  # invalidates child's parent
-        return self.add_member(item)
+        self.add_member(item)
 
     def remove_child(self, item: RT):
-        if item is not None and item.uid in self.member_ids:
-            item._invalidate_parent_attr()
         self.remove_member(item)
 
     @property
@@ -344,7 +448,3 @@ class HierarchicalGroup(EntityGroup):
         if self.parent:
             return f"{self.parent.path}.{self.get_label()}"
         return self.get_label()
-        # return self.parent.path
-        # labels = [a.get_label() for a in self.ancestors]
-        # result = ".".join(reversed(labels))
-        # return result

@@ -11,40 +11,70 @@ ET = TypeVar('ET', bound=Entity)
 
 class Selector(BaseModel, extra="allow"):
     """
-    Not an entity, transient logical construct, not serializable, just a namespace
-    for 'matches' terms.
+    Pure query predicate for selecting entities.
 
-    Pure query predicate. NO satisfaction semantics.  Satisfaction can be more
-    completely handled with a Requirement.
+    A `Selector` is a *transient* logical object used by registries and other core utilities
+    to filter collections. It has **no** satisfaction semantics (see `vm.requirement` for
+    "must be satisfied" logic).
 
-    Extras are allowed, whatever attributes are defined will be used as selection criteria.
+    ## What it matches
 
-    - Field with matching names will be compared directly with their target value
-    - Methods should start with "is_", "has_" will be invoked and compared to their target value
-    - Can use custom methods on classes and provide an iterator for richer comparison, like
-      "has_x_in=[values, ...]"
+    Selection criteria are supplied as keyword arguments. Because `extra="allow"` is enabled,
+    any criteria key is accepted and interpreted against the target entity:
 
-    **Rules:**
-    - `matches()` is side-effect free
-    - `Selector` is serializable only if criteria are serializable
-    - If runtime-only callables needed, use a separate type
+    - **Fields / properties**: if the entity has an attribute with the same name and that
+      attribute is not callable, it is compared by equality.
+    - **Predicates**: if the entity attribute is callable (typically methods named
+      `has_*` / `is_*`), it is called with the criterion value and must return truthy.
+    - **Custom predicate**: `predicate: Callable[[Entity], bool]` is applied first.
 
-    Example:
+    A criterion value of `Any` is treated as a wildcard (ignored).
+
+    ## Important semantics
+
+    - `matches()` is intended to be **side-effect free**.
+    - Missing attributes are a **hard non-match** (no implicit `None`).
+    - Callable attributes are treated as boolean predicates and must accept the criterion
+      value as their single argument.
+
+    ## Template matching caveat
+
+    In v38, templates may expose *two* matching axes:
+
+    - **template-kind**: what wrapper record the template is (e.g., `Snapshot`, `TemplateGroup`)
+    - **payload-kind**: what entity kind the template would materialize
+
+    When possible, avoid relying on the ambiguous `has_kind` implementation in template
+    that conflates these axes.  The default mixed-mode is primarily for mixing
+    potential objects defined by templates and live objects in the same query.
+
+    Prefer explicit predicate names such as `has_template_kind` and `has_payload_kind`
+    (defined on `core.template.EntityTemplate`) when selecting templates.
+
+    ## Examples
+
+    Basic field + callable matching:
+
         >>> class E(Entity):
         ...     @property
-        ...     def label_rev(self): return self.label[::-1]
+        ...     def label_rev(self):
+        ...         return self.label[::-1]
         >>> e = E(label='abc')
-        >>> Selector(predicate=lambda e: e.label == 'abc', # predicate
-        ...          label='abc',                          # field
-        ...          has_kind=E,                           # callable attrib
-        ...          label_rev='cba').matches(e)           # property
+        >>> Selector(
+        ...     predicate=lambda x: x.label == 'abc',  # custom predicate
+        ...     label='abc',                           # field
+        ...     has_kind=E,                            # callable attribute
+        ...     label_rev='cba',                       # property
+        ... ).matches(e)
         True
-        >>> s = Selector(has_identifier="abc"); assert s.matches(e)
-        >>> s.with_criteria(has_tags={'foo'}).matches(e)
-        False
+
+    Filtering an iterable:
+
+        >>> s = Selector(has_identifier='abc')
         >>> f = E(label='def')
-        >>> list( s.filter([e, f]) )
+        >>> list(s.filter([e, f]))
         [<E:abc>]
+
     """
     # todo: suggests baking basic entity axes identifier, kind,
     #       tags into field definitions for type checking
