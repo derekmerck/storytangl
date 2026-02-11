@@ -216,6 +216,14 @@ class Registry(Entity, Generic[ET]):
         # refer to add
         raise KeyError(f"May not set items directly by key.  Use `registry.add(item)` instead.")
 
+    def _validate_linkable(self, item: RegistryAware):
+        if not isinstance(item, RegistryAware):
+            raise TypeError(f"Expected type-bound RegistryAware, got {type(item)}")
+        if item.registry != self:
+            raise ValueError(f"Link item must belong to the same registry")
+        if item.uid not in self.members:
+            raise ValueError(f"Link item must be added to registry first")
+        return True
 
 # Additional bases for entities that can be gathered in a registry
 
@@ -309,8 +317,10 @@ class EntityGroup(RegistryAware):
     and persistence straightforward.
 
     Example:
-        >>> e = EntityGroup(registry=Registry())
-        >>> e.add_members(RegistryAware(label="abc"), RegistryAware(label="def"), RegistryAware(label="ghi"))
+        >>> reg = Registry()
+        >>> a = RegistryAware(label="abc"); reg.add(a); d = RegistryAware(label="def"); reg.add(d); g = RegistryAware(label="ghi"); reg.add(g)
+        >>> e = EntityGroup(); reg.add(e)
+        >>> e.add_members(a, d, g)
         >>> list(e.members())
         [<RegistryAware:abc>, <RegistryAware:def>, <RegistryAware:ghi>]
         >>> a = e.member(Selector.from_identifier("abc"))
@@ -337,9 +347,8 @@ class EntityGroup(RegistryAware):
     def add_member(self, item: RT):
         if item is self:
             raise ValueError("Group cannot add itself to itself")
-        if item not in self.registry:
-            self.registry.add(item)
-        self.member_ids.append(item.uid)
+        if self.registry._validate_linkable(item):
+            self.member_ids.append(item.uid)
 
     def add_members(self, *items: RT):
         for item in items:

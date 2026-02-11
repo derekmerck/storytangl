@@ -1,12 +1,11 @@
 # tangl/core/graph.py
 from __future__ import annotations
 from uuid import UUID
-from typing import Iterator, Optional, Iterable
+from typing import Iterator, Optional, Iterable, ClassVar
 import itertools
 from types import SimpleNamespace
 
-from pydantic import model_validator
-
+from .entity import Entity
 from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 from .selector import Selector
 
@@ -112,15 +111,6 @@ class Graph(Registry[GraphItem]):
 
     # Utilities
 
-    def _validate_linkable(self, item: GraphItem):
-        if not isinstance(item, GraphItem):
-            raise TypeError(f"Expected GraphItem, got {type(item)}")
-        if item.graph != self:
-            raise ValueError(f"Link item must belong to the same graph")
-        if item.uid not in self.members:
-            raise ValueError(f"Link item must be added to graph first")
-        return True
-
     def _do_link(self, caller: GraphItem, node: Node, _ctx):
         # called by subgraphs for adding members, edges for setting predecessor/successor
         from .dispatch import do_link
@@ -163,10 +153,10 @@ class Edge(GraphItem):
 
     Example:
         >>> g = Graph()
-        >>> n = Node(registry=g)
-        >>> e = Edge(label='e', registry=g, successor_id=n.uid)
+        >>> n = Node(label='n', registry=g)
+        >>> e = Edge(registry=g, successor_id=n.uid)
         >>> g.find_one(Selector(successor=n))
-        <Edge:e>
+        <Edge:anon->n>
         >>> from .behavior import BehaviorRegistry; br = BehaviorRegistry()
         >>> _ = br.register(func=lambda *args, **kwargs: print('foo'), task="link")
         >>> ctx = SimpleNamespace(get_registries=lambda: [br])
@@ -226,6 +216,45 @@ class Edge(GraphItem):
         # setting the property directly will only trigger dispatch
         # hooks if using the ambient "with_ctx" context manager.
         self.set_successor(value)
+
+    def __repr__(self) -> str:
+        if self.predecessor is not None:
+            src_label = self.predecessor.get_label()
+        else:
+            src_label = "anon"
+
+        if self.successor is not None:
+            dest_label = self.successor.get_label()
+        else:
+            dest_label = "anon"
+
+        return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
+
+
+class AnonymousEdge(Entity):
+    """
+    AnonymousEdge(predecessor: Node, successor: Node)
+
+    Lightweight edge without a managing graph (GC-friendly helper).
+
+    Why
+    ----
+    Useful for transient computations (e.g., previews, diffs) where full graph
+    membership and registration would be unnecessary overhead.
+
+    API
+    ---
+    - :attr:`predecessor` – optional node reference.
+    - :attr:`successor` – required node reference.
+    """
+    # Minimal Edge that does not require a graph, so it can be garbage collected
+    predecessor: Optional[Node] = None
+    successor: Node
+
+    # carries direct links to destination, so disallow unstructuring
+    guard_unstructure: ClassVar[bool] = True
+
+    __repr__ = Edge.__repr__
 
 
 class Node(GraphItem):

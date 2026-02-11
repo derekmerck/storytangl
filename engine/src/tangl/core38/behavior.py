@@ -91,16 +91,14 @@ class CallReceipt(Record):
         {'a': 'baz', 'b': 'bar'}
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    # carries arbitrary types in callbacks and context, so don't serialize
+    guard_unstructure: ClassVar[bool] = True
 
     result: Any = None
     callback: Callable[[Any], Any] = None
     args: tuple[Any, ...] = None
     kwargs: dict[str, Any] = None
     ctx: SkipValidation[RuntimeCtx] = None
-    # ctx: Any = None
-
-    # carries context for reference, so don't serialize
-    guard_unstructure: ClassVar[bool] = True
 
     @model_validator(mode='after')
     def _either_result_or_cb_specified(self):

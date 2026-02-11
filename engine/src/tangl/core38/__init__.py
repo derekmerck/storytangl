@@ -74,7 +74,7 @@ from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 from .runtime_op import RuntimeOp
 from .singleton import Singleton
 from .record import Record, OrderedRegistry
-from .graph import Graph, Subgraph, Edge, Node, HierarchicalNode
+from .graph import GraphItem, Graph, Subgraph, Edge, Node, HierarchicalNode
 from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRegistry
 
 # Requires:
@@ -85,3 +85,5 @@ from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRe
 from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
 from .token import Token  # Delegated reference builder
 from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
+
+from .ctx import resolve_ctx

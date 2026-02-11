@@ -115,6 +115,8 @@ class Selector(BaseModel, extra="allow"):
     def from_identifier(cls, identifier: Identifier) -> Self:
         return cls(has_identifier=identifier)
 
+    from_id = from_identifier  # shorter alias
+
     @classmethod
     def from_kind(cls, kind: Type[ET]) -> Self:
         return cls(has_kind=kind)
