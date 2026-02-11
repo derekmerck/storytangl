@@ -57,7 +57,8 @@ Inheritance order matters for `__eq__`:
 - `Unstructurable.__eq__` compares by value.
 - `HasContent.__eq__` compares by content.
 
-If you compose multiple traits, the **right-most** base class wins for `__eq__`.
+If you compose multiple traits, the **left-most** base class wins for `__eq__`.
+For example `class Foo(HasContent, HasIdentity)` will compare by content by default.
 
 ## UnstructuredData (what it is and is not)
 

@@ -1,9 +1,11 @@
 # tangl/core/graph.py
 from __future__ import annotations
 from uuid import UUID
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Iterable
 import itertools
 from types import SimpleNamespace
+
+from pydantic import model_validator
 
 from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 from .selector import Selector
@@ -33,17 +35,70 @@ class Graph(Registry[GraphItem]):
     - Frontier discovery
     """
 
-    def get_subgraphs(self, selector: Selector = Selector()) -> Iterator[Subgraph]:
+    # Typed creation helpers
+
+    def add_node(self, *, kind=None, **attrs) -> Node:
+        kind = kind or Node
+        n = kind.structure(**attrs)
+        self.add(n)
+        return n
+
+    def add_edge(self, predecessor: GraphItem, successor: GraphItem, *, kind=None, **attrs) -> Edge:
+        if predecessor is not None:
+            self._validate_linkable(predecessor)
+            predecessor_id = predecessor.uid
+        else:
+            predecessor_id = None
+
+        if successor is not None:
+            self._validate_linkable(successor)
+            successor_id = successor.uid
+        else:
+            successor_id = None
+
+        kind = kind or Edge
+        e = kind.structure(
+            predecessor_id=predecessor_id,
+            successor_id=successor_id,
+            **attrs)
+        self.add(e)
+        return e
+
+    def add_subgraph(self, *, kind=None, members: Iterable[GraphItem] = None, **attrs) -> Subgraph:
+        kind = kind or Subgraph
+        sg = kind.structure(**attrs)
+        self.add(sg)
+        for item in members or ():
+            sg.add_member(item)  # validates internally
+        return sg
+
+    # Typed finder helpers
+
+    def find_subgraphs(self, selector: Selector = Selector()) -> Iterator[Subgraph]:
         selector = selector.with_criteria(has_kind=Subgraph)
         return self.find_all(selector)
 
-    def get_edges(self, selector: Selector = Selector()) -> Iterator[Edge]:
+    def find_subgraph(self, selector: Selector = Selector()) -> Iterator[Subgraph]:
+        selector = selector.with_criteria(has_kind=Subgraph)
+        return self.find_one(selector)
+
+    def find_edges(self, selector: Selector = Selector()) -> Iterator[Edge]:
         selector = selector.with_criteria(has_kind=Edge)
         return self.find_all(selector)
 
-    def get_nodes(self, selector: Selector = Selector()) -> Iterator[Node]:
+    def find_edge(self, selector: Selector = Selector()) -> Edge:
+        selector = selector.with_criteria(has_kind=Edge)
+        return self.find_one(selector)
+
+    def find_nodes(self, selector: Selector = Selector()) -> Iterator[Node]:
         selector = selector.with_criteria(has_kind=Node)
         return self.find_all(selector)
+
+    def find_node(self, selector: Selector = Selector()) -> Iterator[Node]:
+        selector = selector.with_criteria(has_kind=Node)
+        return self.find_one(selector)
+
+    # Utilities
 
     def _validate_linkable(self, item: GraphItem):
         if not isinstance(item, GraphItem):
@@ -83,7 +138,7 @@ class Subgraph(EntityGroup, GraphItem):
             self.graph._do_unlink(self, item, _ctx)
         super().remove_member(item)
 
-    def members(self, selector: Selector = None) -> Iterator[GraphItem]:
+    def members(self, selector: Selector = None, sort_key = None) -> Iterator[GraphItem]:
         # Just for type hint
         return super().members(selector=selector)
 
@@ -117,9 +172,6 @@ class Edge(GraphItem):
     @property
     def predecessor(self) -> Optional[Node]:
         return self.graph.get(self.predecessor_id)
-
-    # todo: add global `with ctx` for signaling dispatch hooks if
-    #       _ctx can't be threaded through calls, like setting props
 
     def set_predecessor(self, value: Node, _ctx = None):
         from .ctx import resolve_ctx
@@ -185,6 +237,25 @@ class Node(GraphItem):
 
     def edges(self, selector: Selector = None) -> Iterator[Edge]:
         return itertools.chain(self.edges_in(selector), self.edges_out(selector))
+
+    # Connector helpers
+
+    def add_edge_to(self, node: Node, kind=None, **attrs) -> Edge:
+        return self.graph.add_edge(self, node, kind=kind, **attrs)
+
+    def add_edge_from(self, node: Node, kind=None, **attrs) -> Edge:
+        return self.graph.add_edge(self, node, kind=kind, **attrs)
+
+    def remove_edge_to(self, node: Node) -> None:
+        edge = self.graph.find_edge(source=self, destination=node)
+        if edge is not None:
+            self.graph.remove(edge.uid)
+
+    def remove_edge_from(self, node: Node) -> None:
+        edge = self.graph.find_edge(source=node, destination=self)
+        if edge is not None:
+            self.graph.remove(edge.uid)
+
 
 
 class HierarchicalNode(HierarchicalGroup, Node):
