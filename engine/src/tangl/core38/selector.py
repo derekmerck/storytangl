@@ -107,8 +107,20 @@ class Selector(BaseModel, extra="allow"):
                     return False
         return True
 
+    def with_defaults(self, **criteria: Any) -> Selector:
+        for k in list(criteria.keys()):
+            if hasattr(self, k):
+                criteria.pop(k)
+        return self.model_copy(update=criteria)
+
     def with_criteria(self, **criteria: Any) -> Selector:
-        # maybe if there is already a 'kind', only replace it if it's more or less specific?
+        # Only replace has_kind if it's more specific, i.e.,
+        # don't replace Dependency with Edge in find_edges()
+        # could also just use 'with_defaults' instead.
+        if 'has_kind' in criteria and hasattr(self, 'has_kind'):
+            if not issubclass( criteria['has_kind'], self.has_kind ):
+                # not a narrowing of scope
+                criteria.pop('has_kind')
         return self.model_copy(update=criteria)
 
     @classmethod

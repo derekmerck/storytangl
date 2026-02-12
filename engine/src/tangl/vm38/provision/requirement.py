@@ -79,6 +79,9 @@ class HasRequirement(RegistryAware, Generic[RT]):
         Requirement ... not satisfied by <RegistryAware:bar>
 
     """
+    # typically an entity will have only one requirement to avoid bookkeeping confusion.
+    # nodes may have multiple dependency edges, for example, but each dependency has
+    # a single requirement.
 
     requirement: Requirement[RT]
 

@@ -1,9 +1,7 @@
 from __future__ import annotations
 from enum import Flag, auto
-from functools import total_ordering
 from typing import ClassVar, Callable, Protocol, Iterable, Iterator, TYPE_CHECKING
 from dataclasses import dataclass
-from unittest import case
 
 from pydantic import ConfigDict, SkipValidation
 
@@ -26,8 +24,11 @@ class ProvisionPolicy(Flag):
         return self.value
 
 
-@total_ordering
 class ProvisionOffer(Record):
+    # todo: seems like we want to attach the accepted offer to the requirement or
+    #       requirement carrier, maybe exclude the callback and serialize as just the
+    #       origin, policy, priority?  Or just track the accepted-offer-id in the
+    #       requirement?
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     # has arbitrary types, don't allow serialization
@@ -38,14 +39,14 @@ class ProvisionOffer(Record):
     priority: int = Priority.NORMAL
 
     def sort_key(self):
-        # earliest policy, priority, seq wins
+        # earliest policy, priority, seq sorts to earliest
         # a couple of knobs here:
         # - if you set an offer _policy_ to FORCE it will beat everything else
         # - if you set an offer _priority_ to EARLY, it will beat anything in
         #   that policy tier and similarly for LATE will lose to anything in that
         #   tier
         # You can inject offers manually in the resolver do_resolve_req hook
-        return -int(self.policy), -self.priority, -self.seq
+        return int(self.policy), self.priority, self.seq
 
 
 class Provisioner(Protocol):
@@ -53,14 +54,14 @@ class Provisioner(Protocol):
     def get_dependency_offers(self, requirement: Requirement) -> Iterable[ProvisionOffer]:
         ...
 
-    def get_affordance_offers(self, node: Node):
+    def get_affordance_offers(self, node: Node) -> Iterable[ProvisionOffer]:
         ...
 
 
 @dataclass
 class FindProvisioner:
 
-    values: SkipValidation[Iterable[Entity]]  # current graph
+    values: SkipValidation[Iterable[Entity]]  # current graph, don't copy on create
     distance: int = 0
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:

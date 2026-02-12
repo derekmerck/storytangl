@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import Iterable, Optional, TypeAlias, Union
 
-from tangl.core38 import EntityGroup, EntityTemplate, resolve_ctx
-from .provisioner import ProvisionOffer, FindProvisioner, TemplateProvisioner, FallbackProvisioner
-from .requirement import Requirement
+from tangl.core38 import EntityGroup, EntityTemplate, resolve_ctx, Node, Selector
+from .provisioner import ProvisionOffer, FindProvisioner, TemplateProvisioner, FallbackProvisioner, ProvisionPolicy
+from .requirement import Requirement, RT, Dependency
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
@@ -22,7 +22,10 @@ class Resolver:
     entity_groups: Iterable[EntityGroup] = None       # existing sources by scope dist
     template_groups: Iterable[TemplateGroup] = None   # template sources by scope dist
 
-    def gather_offers(self, requirement: Requirement, _ctx) -> list[ProvisionOffer]:
+    def gather_offers(self, requirement: Requirement[RT], _ctx) -> list[ProvisionOffer]:
+
+        # todo: need an AffordanceProvider that can satisfy requirements with
+        #       an already linked affordance edge on this node
 
         offers: list[ProvisionOffer] = []
 
@@ -38,14 +41,18 @@ class Resolver:
 
         _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
-            from tangl.vm38.dispatch import do_resolve
-            offers = do_resolve(offers, _ctx)
+            from tangl.vm38.dispatch import do_resolve_requirement
+            offers = do_resolve_requirement(requirement=requirement, offers=offers, ctx=_ctx)
 
-        offers = filter(lambda offer: offer.policy in requirement.provision_policy, offers)
+        # force always passes, otherwise use flag.__contains__
+        offers = list(filter(
+            lambda offer: offer.policy is ProvisionPolicy.FORCE or
+                          offer.policy in requirement.provision_policy, offers))
         offers.sort(key=lambda v: v.sort_key())
         return offers
 
-    def resolve_requirement(self, requirement: Requirement, _ctx=None) -> Optional[ProvisionOffer]:
+    def resolve_requirement(self, requirement: Requirement[RT], _ctx=None) -> Optional[RT]:
+        # updates requirement in place, returns provider to allow linking at dependency level
 
         offers = self.gather_offers(requirement, _ctx)
 
@@ -62,4 +69,32 @@ class Resolver:
         else:
             requirement.unambiguously_resolved = False
 
+        # todo: should we return the selected offer and let caller invoke it later
+        #       and/or stash it somewhere for audit?
         return offers[0].callback()
+
+    def resolve_dependency(self, dependency: Dependency[RT], _ctx=None) -> bool:
+
+        provider = self.resolve_requirement(requirement=dependency.requirement, _ctx=_ctx)
+        if provider is not None:
+            dependency.set_provider(provider, _ctx=_ctx)
+            return True
+        return False
+
+    def resolve_frontier_node(self, node: Node, _ctx=None) -> bool:
+
+        # todo: need to link any available affordances first, then use an affordance
+        #       provider to provide very cheap provision offers?
+
+        # Note this is not unsatisfied deps, it's anyone without a provider
+        # satisfied could mean not a hard req
+        open_deps = node.edges_out(Selector(has_kind=Dependency, provider=None))
+        for dep in open_deps:
+            self.resolve_dependency(dep, _ctx=_ctx)
+
+        # Find unsat blockers with no provider and a hard-requirement
+        unsatisfied_deps = node.edges_out(Selector(has_kind=Dependency, satisfied=False))
+        if next(unsatisfied_deps, None) is not None:
+            return False
+
+        return True
