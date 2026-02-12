@@ -38,8 +38,8 @@ class Requirement(Selector, Generic[RT]):
     def satisfied(self):
         return self.provider_id is not None or not self.hard_requirement
 
-    unsatisfiable: bool = None           # unknown
-    unambiguously_resolved: bool = None  # unknown
+    unsatisfiable: Optional[bool] = None           # unknown
+    unambiguously_resolved: Optional[bool] = None  # unknown
 
     def satisfied_by(self, entity: RT) -> bool:
         return self.matches(entity)

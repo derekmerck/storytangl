@@ -230,3 +230,7 @@ if __name__ == "__main__":
                       include_notes=True,
                       prepend_files= [pkg_root / "type_hints.py"],
                       postpend_files=[pkg_root / "utils/safe_builtins.py"])
+
+    process_directory(pkg_root / "vm38",
+                      "tangl38_vm_archive.py",
+                      include_notes=True)

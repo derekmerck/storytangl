@@ -231,32 +231,6 @@ class Edge(GraphItem):
         return f"<{self.__class__.__name__}:{src_label[:6]}->{dest_label[:6]}>"
 
 
-class AnonymousEdge(Entity):
-    """
-    AnonymousEdge(predecessor: Node, successor: Node)
-
-    Lightweight edge without a managing graph (GC-friendly helper).
-
-    Why
-    ----
-    Useful for transient computations (e.g., previews, diffs) where full graph
-    membership and registration would be unnecessary overhead.
-
-    API
-    ---
-    - :attr:`predecessor` – optional node reference.
-    - :attr:`successor` – required node reference.
-    """
-    # Minimal Edge that does not require a graph, so it can be garbage collected
-    predecessor: Optional[Node] = None
-    successor: Node
-
-    # carries direct links to destination, so disallow unstructuring
-    guard_unstructure: ClassVar[bool] = True
-
-    __repr__ = Edge.__repr__
-
-
 class Node(GraphItem):
     # Thing that can be connected by edges
 

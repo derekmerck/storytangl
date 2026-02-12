@@ -42,6 +42,6 @@ class ResolutionPhase(IntEnum):
     @classmethod
     def ordered_phases(cls) -> list[Self]:
         """Return phases in execution order."""
-        return sorted(cls.__members__.values(), key=lambda phase: phase.value)
+        return sorted([ x for x in cls.__members__.values() if x is not cls.INIT], key=lambda phase: phase.value)
 
 

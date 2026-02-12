@@ -1,6 +1,6 @@
 # tangl/core/record.py
 from __future__ import annotations
-from typing import ClassVar, TypeVar, Union
+from typing import ClassVar, TypeVar, Union, Iterable
 
 from pydantic import Field, ConfigDict, ValidationError
 
@@ -53,6 +53,16 @@ class OrderedRegistry(Registry[OrderedEntity]):
     """Ordered registries may be sliced and bookmarked by channel"""
 
     bookmarks: dict[str, list[int]] = Field(default_factory=dict)
+
+    def append(self, record: OrderedEntity):
+        # actually want to verify this _sorts_ last, like sort_key is biggest
+        # if not record > self.max_seq():
+        #     raise IndexError("Record out of sequence for append")
+        self.add(record)
+
+    def extend(self, records: Iterable[OrderedEntity]):
+        for record in records:
+            self.append(record)
 
     def max_seq(self) -> int:
         return max([v.seq for v in self.members.values()]) or 0

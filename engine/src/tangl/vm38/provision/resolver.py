@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Iterable, Optional, TypeAlias, Union
+from typing import Iterable, Optional, TypeAlias, Union, Self
 
 from tangl.core38 import EntityGroup, EntityTemplate, resolve_ctx, Node, Selector
+from tangl.vm38.dispatch import on_provision
 from .provisioner import ProvisionOffer, FindProvisioner, TemplateProvisioner, FallbackProvisioner, ProvisionPolicy
 from .requirement import Requirement, RT, Dependency
 
@@ -22,7 +23,12 @@ class Resolver:
     entity_groups: Iterable[EntityGroup] = None       # existing sources by scope dist
     template_groups: Iterable[TemplateGroup] = None   # template sources by scope dist
 
-    def gather_offers(self, requirement: Requirement[RT], _ctx) -> list[ProvisionOffer]:
+    @classmethod
+    def from_ctx(cls, ctx) -> Self:
+        return cls(entity_groups=ctx.get_entity_groups(),
+                   template_groups=ctx.get_template_groups())
+
+    def gather_offers(self, requirement: Requirement[RT], *, _ctx=None) -> list[ProvisionOffer]:
 
         # todo: need an AffordanceProvider that can satisfy requirements with
         #       an already linked affordance edge on this node
@@ -41,8 +47,9 @@ class Resolver:
 
         _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
-            from tangl.vm38.dispatch import do_resolve_requirement
-            offers = do_resolve_requirement(requirement=requirement, offers=offers, ctx=_ctx)
+            # give dispatch a chance to modify the offers
+            from tangl.vm38.dispatch import do_resolve
+            offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
 
         # force always passes, otherwise use flag.__contains__
         offers = list(filter(
@@ -51,7 +58,7 @@ class Resolver:
         offers.sort(key=lambda v: v.sort_key())
         return offers
 
-    def resolve_requirement(self, requirement: Requirement[RT], _ctx=None) -> Optional[RT]:
+    def resolve_requirement(self, requirement: Requirement[RT], *, _ctx=None) -> Optional[RT]:
         # updates requirement in place, returns provider to allow linking at dependency level
 
         offers = self.gather_offers(requirement, _ctx)
@@ -71,9 +78,9 @@ class Resolver:
 
         # todo: should we return the selected offer and let caller invoke it later
         #       and/or stash it somewhere for audit?
-        return offers[0].callback()
+        return offers[0].callback(_ctx=_ctx)
 
-    def resolve_dependency(self, dependency: Dependency[RT], _ctx=None) -> bool:
+    def resolve_dependency(self, dependency: Dependency[RT], *, _ctx=None) -> bool:
 
         provider = self.resolve_requirement(requirement=dependency.requirement, _ctx=_ctx)
         if provider is not None:
@@ -98,3 +105,8 @@ class Resolver:
             return False
 
         return True
+
+# Register the resolution process with dispatch so it will be invoked from the phase bus
+@on_provision
+def provision_node(caller: Node, *, ctx):
+    Resolver.from_ctx(ctx).resolve_frontier_node(node=caller, _ctx=ctx)
