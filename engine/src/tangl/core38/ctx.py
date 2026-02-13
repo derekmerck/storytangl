@@ -7,7 +7,20 @@ from typing import Any, Iterator, Optional
 
 @dataclass(frozen=True)
 class Ctx:
-    """Opaque dispatch context."""
+    """Legacy placeholder context carrier.
+
+    Notes
+    -----
+    This dataclass is a transitional stub. Production dispatch contexts are duck-typed
+    and layer-specific (core/vm/story). Prefer explicit context protocols per layer.
+
+    TODO
+    ----
+    - Replace this placeholder with layer-specific Protocol types.
+    - Move receipt-subtask context helpers (for nested work units) from vm-layer
+      context models into core-level abstractions where appropriate.
+    """
+
     dispatch: Any | None = None  # e.g., BehaviorRegistry or resolver bundle
     meta: dict[str, Any] | None = None
 

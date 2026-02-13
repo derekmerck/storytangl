@@ -42,6 +42,7 @@ Script dict  ── compile ─▶  EntityTemplate  ── decompile ─▶  Scr
 | Content       | `HasContent`     | Stable content hashing; meaningful only for frozen content. |
 | Ordering      | `HasOrder`       | Deterministic ordering; never participates in identity. |
 | State         | `HasState`       | Mutable locals; not used for identity or content hashing. |
+| Utilities     | `BaseModelPlus`  | Schema introspection helpers and force-set escape hatch. |
 
 ### Composition rule of thumb
 
@@ -81,7 +82,10 @@ Core only defines step (1).
 - `core.selector`, `core.requirement` for matching and satisfaction.
 - `core.registry` for registry ownership and grouping.
 - `core.template` for the authoring loop (compile/decompile + materialize).
+- `core.entity.Entity` for the default composition (`Unstructurable + HasIdentity`).
 - `core.behavior`, `core.dispatch` for hookable behaviors and receipts.
+
+The :func:`is_identifier` symbol in this module is a decorator utility, not a trait.
 
 """
 
@@ -89,7 +93,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from copy import deepcopy
-from functools import total_ordering, cached_property
+from functools import total_ordering
 from inspect import isclass
 import logging
 import time
@@ -107,10 +111,52 @@ logger = logging.getLogger(__name__)
 
 
 class BaseModelPlus(BaseModel):
-    """Pydantic base model with schema introspection.
+    """Pydantic base model with schema introspection and escape hatches.
 
-    Core uses schema-level annotations on methods and fields (e.g., `is_identifier=True`)
-    to support generic matching and discovery.
+    Why
+    ---
+    The core trait system uses schema metadata instead of hardcoded field lists.
+    This keeps identifier and matching behavior composable across mixed traits.
+
+    Key Features
+    ------------
+    - :meth:`_match_fields` discovers fields by ``Field`` metadata and
+      ``json_schema_extra`` markers.
+    - :meth:`_match_methods` discovers methods by custom attributes.
+    - :meth:`_schema_matches` combines both into a single value map.
+    - :meth:`force_set` writes directly to ``__dict__`` for controlled bypasses
+      on frozen models.
+
+    Example:
+        >>> class F(BaseModelPlus):
+        ...     x: int = Field(0, json_schema_extra={"is_identifier": True})
+        ...     y: int = 0
+        >>> list(F._match_fields(is_identifier=True))
+        ['x']
+
+        >>> class M(BaseModelPlus):
+        ...     @property
+        ...     def nope(self):
+        ...         return 1
+        ...     def yes(self):
+        ...         return 2
+        >>> setattr(M.yes, "foo", True)
+        >>> list(M._match_methods(foo=True))
+        ['yes']
+
+        >>> class S(BaseModelPlus):
+        ...     x: int = Field(42, json_schema_extra={"magic": True})
+        >>> S()._schema_matches(magic=True)
+        {'x': 42}
+
+        >>> from pydantic import ConfigDict
+        >>> class Frozen(BaseModelPlus):
+        ...     model_config = ConfigDict(frozen=True)
+        ...     x: int = 0
+        >>> f = Frozen(x=1)
+        >>> f.force_set("x", 99)
+        >>> f.x
+        99
     """
 
     @classmethod
@@ -158,9 +204,27 @@ class BaseModelPlus(BaseModel):
         self.__dict__[attrib_name] = value
 
 
-def is_identifier(meth):
-    """Decorator for methods that return a stable identifier."""
-    setattr(meth, 'is_identifier', True)
+def is_identifier(meth: Callable[..., Any]) -> Callable[..., Any]:
+    """Mark a method as an identifier producer.
+
+    Why
+    ---
+    Identifier discovery combines field metadata and method annotations.
+    This decorator sets ``is_identifier=True`` on a method so
+    :meth:`BaseModelPlus._match_methods` can discover it.
+
+    Fields marked with ``json_schema_extra={"is_identifier": True}`` and methods
+    marked with this decorator are both collected by
+    :meth:`BaseModelPlus._schema_matches`.
+
+    Example:
+        >>> @is_identifier
+        ... def my_id():
+        ...     return "abc"
+        >>> my_id.is_identifier
+        True
+    """
+    setattr(meth, "is_identifier", True)
     return meth
 
 
@@ -177,6 +241,14 @@ class HasIdentity(BaseModelPlus):
     **Contract:**
     - `get_identifiers()` must be stable and cheap
     - At minimum yields `uid`; may yield `label` and computed aliases (shortcodes, hashes)
+    - Labels are stored as provided (sanitization is a higher-layer concern)
+
+    Notes
+    -----
+    - `get_identifiers()` returns a set built from *both* identifier fields and
+      `@is_identifier` method return values.
+    - This trait overrides `__eq__` and is intentionally unhashable; use `id_hash()`
+      when a stable hash-like identifier is needed.
 
     Example:
         >>> e = HasIdentity(label="test", tags={'foo', 'bar'})
@@ -190,6 +262,11 @@ class HasIdentity(BaseModelPlus):
         True
         >>> f = HasIdentity(uid=e.uid, label="not-test")
         >>> e is not f and e.eq_by_id(f) and e == f and e != HasIdentity()  # compare by id
+        True
+        >>> ids = e.get_identifiers()
+        >>> e.uid in ids and "test" in ids and e.shortcode() in ids and e.id_hash() in ids
+        True
+        >>> e.has_tags() and e.has_tags(None) and e.has_tags({"foo"})
         True
     """
 
@@ -226,6 +303,11 @@ class HasIdentity(BaseModelPlus):
         return identifier in self.get_identifiers()
 
     def has_tags(self, *tags: Tag) -> bool:
+        """Return ``True`` when all requested tags are present.
+
+        Accepts variadic input (`has_tags("a", "b")`) and a single tuple/list/set
+        (`has_tags(("a", "b"))`) for selector compatibility.
+        """
         # normalize first term
         if len(tags) == 0:
             return True
@@ -256,6 +338,14 @@ class Unstructurable(BaseModelPlus):
       objects (including live Type references).
     - Wire-safe flattening (JSON/YAML safe primitives) is handled by the persistence
       service layer.
+    - `evolve()` preserves ``uid`` by default; pass ``uid=uuid4()`` for a new identity.
+    - `evolve()` uses ``deepcopy`` internally; for entities with large mutable state,
+      consider field-level cloning if performance becomes a hotspot.
+    - `value_hash()` is recomputed from current constructor-form data on each call.
+    - Fields marked with ``json_schema_extra={"exclude": True}`` are omitted from
+      :meth:`unstructure` output.
+    - Set ``guard_unstructure = True`` for classes that should refuse constructor-form
+      export because they carry non-serializable behavior.
 
     Example:
         >>> class E(Unstructurable, HasIdentity): ...
@@ -265,6 +355,9 @@ class Unstructurable(BaseModelPlus):
         True
         >>> ee = Unstructurable.structure(data)
         >>> e is not ee and e.eq_by_value(ee) and ee == e
+        True
+        >>> e2 = e.evolve(label="next")
+        >>> e2.label == "next" and e2.uid == e.uid
         True
 
     See Also
@@ -307,7 +400,6 @@ class Unstructurable(BaseModelPlus):
         data['kind'] = self.__class__
         return data
 
-    @is_identifier
     def value_hash(self) -> bytes:
         # Not frozen, don't want to use cached- or shelved-property, so maybe
         # don't want to recompute for every id?
@@ -316,8 +408,7 @@ class Unstructurable(BaseModelPlus):
     def eq_by_value(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:
             return False
-        return self.unstructure() == other.unstructure()
-        # could compare value hashes directly
+        return self.value_hash() == other.value_hash()
 
     def __eq__(self, other: Self) -> bool:
         # Order of inheritance matters for this, right-most wins.
@@ -335,6 +426,13 @@ class HasContent(BaseModelPlus):
     """Adds stable content hashing and compare-by-content semantics.
 
     Content hashing is meaningful only when the hashable content is stable.
+
+    Subclasses must implement :meth:`get_hashable_content`.
+
+    Notes
+    -----
+    - `content_hash()` is conceptually stable for stable content but is not cached.
+    - If composed with other equality traits, Python MRO chooses the left-most `__eq__`.
 
     Example:
         >>> class E(HasContent):
@@ -370,9 +468,20 @@ class HasOrder(BaseModelPlus):
     `seq` is guaranteed to be monotonically increasing within a run and can be used as
     a deterministic tie-breaker.
 
+    Notes
+    -----
+    - `_seq` is seeded with `time.time_ns()` so sequence values are monotonic across runs.
+    - Sequence assignment is not thread-safe for strict uniqueness; collisions are harmless
+      because `seq` is a tie-breaker, not a primary key.
+    - `sort_key()` defaults to `seq`; subclasses may override to provide composite keys.
+
     Example:
         >>> e = HasOrder(seq=3); f = HasOrder(seq=1); g = HasOrder(seq=2)
         >>> assert f < g < e
+        >>> f.has_seq_in(1, 2) and not f.has_seq_in(2, 3)
+        True
+        >>> g.has_seq_in((1, 3))
+        True
         >>> h = HasOrder(); i = HasOrder(); j = HasOrder()
         >>> assert h < i < j
     """
@@ -408,8 +517,21 @@ class HasOrder(BaseModelPlus):
 class HasState(BaseModelPlus):
     """Adds mutable runtime locals.
 
-    Entities that carry mutable runtime state expose a `locals` mapping that may be
-    folded into a scoped namespace by higher layers.
+    Why
+    ---
+    Runtime execution frequently needs a scratchpad for transient values. This trait
+    provides that scratchpad as a mutable mapping.
+
+    Notes
+    -----
+    - `locals` is mutable working memory.
+    - Identity, content hashing, and ordering traits do not consume `locals`.
+
+    Example:
+        >>> s = HasState()
+        >>> s.locals["hp"] = 100
+        >>> s.locals
+        {'hp': 100}
     """
 
     locals: StringMap = Field(default_factory=dict)
