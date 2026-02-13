@@ -48,11 +48,11 @@ class RuntimeCtx(Protocol):
 
 class AggregationMode(Enum):
     """How to reduce multiple receipts to a result."""
-    FIRST = "first_result"      # Early-exit, first wins
-    LAST = "last_result"        # Late-override, last wins
-    ALL_TRUE = "all_true"       # Validation gate
-    GATHER = "gather_results"   # Collect all
-    MERGE = "merge_results"     # Flatten/combine
+    FIRST = "first_result"       # Early-exit, first wins
+    LAST = PIPE = "last_result"  # Composite result
+    ALL_TRUE = "all_true"        # Validation gate
+    GATHER = "gather_results"    # Collect all
+    MERGE = "merge_results"      # Flatten/combine, later wins
 
 
 class CallReceipt(Record):

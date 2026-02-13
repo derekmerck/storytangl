@@ -5,11 +5,12 @@ from types import MethodType
 from typing import TypeVar, Generic, ClassVar, Type, Self, Any
 import sys
 import logging
+from dataclasses import dataclass
 
 import pydantic
 from pydantic import Field, field_validator
 
-from .entity import Entity
+from .graph import Node
 from .singleton import Singleton
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ logger.setLevel(logging.WARNING)
 
 WST = TypeVar("WST", bound=Singleton)
 
-class Token(Entity, Generic[WST]):
+class Token(Node, Generic[WST]):
     """
     Token[Singleton](from_ref: UniqueStr)
 
@@ -116,7 +117,7 @@ class Token(Entity, Generic[WST]):
         return self.wrapped_cls.get_instance(self.token_from)
 
     # conflate/delegate identity matching
-    def has_kind(self, kind: Type[Entity]) -> bool:
+    def has_kind(self, kind: Type[Node]) -> bool:
         """
         Check against wrapped type, not just Token class.
 
@@ -190,3 +191,16 @@ class Token(Entity, Generic[WST]):
             # Sometimes we want to use a type var
             wrapped_cls = wrapped_cls.__bound__
         return cls._create_wrapper_cls(wrapped_cls)
+
+
+@dataclass
+class TokenFactory(Generic[WST]):
+
+    wst: Type[WST]
+
+    @classmethod
+    def _materialize_one(cls, wrapped_cls: Type[WST], token_from: str) -> Token[WST]:
+        return Token[wrapped_cls](token_from=token_from)
+
+    def materialize_one(self, token_from: str) -> Token[WST]:
+        return self._materialize(self.wst, token_from)

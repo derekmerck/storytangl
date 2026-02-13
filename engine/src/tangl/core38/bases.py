@@ -89,7 +89,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from copy import deepcopy
-from functools import total_ordering
+from functools import total_ordering, cached_property
 from inspect import isclass
 import logging
 import time
@@ -203,7 +203,8 @@ class HasIdentity(BaseModelPlus):
 
     @is_identifier
     def id_hash(self) -> bytes:
-        # distinct from content_hash
+        # distinct from value_hash, content_hash
+        # this _is_ frozen, so we could make this a cached- or shelved-property
         return hashing_func(self.__class__, self.uid)
 
     def eq_by_id(self, other: Self) -> bool:
@@ -306,10 +307,17 @@ class Unstructurable(BaseModelPlus):
         data['kind'] = self.__class__
         return data
 
+    @is_identifier
+    def value_hash(self) -> bytes:
+        # Not frozen, don't want to use cached- or shelved-property, so maybe
+        # don't want to recompute for every id?
+        return hashing_func(self.unstructure())
+
     def eq_by_value(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:
             return False
         return self.unstructure() == other.unstructure()
+        # could compare value hashes directly
 
     def __eq__(self, other: Self) -> bool:
         # Order of inheritance matters for this, right-most wins.
@@ -343,6 +351,7 @@ class HasContent(BaseModelPlus):
 
     @is_identifier
     def content_hash(self) -> bytes:
+        # frozen, could make this into a cached- or shelved-property
         return hashing_func(self.get_hashable_content())
 
     def eq_by_content(self, other: Self) -> bool:

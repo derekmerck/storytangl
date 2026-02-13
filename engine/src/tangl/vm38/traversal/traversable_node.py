@@ -8,6 +8,7 @@ from tangl.vm38.runtime import ResolutionPhase
 class TraversableNode(HierarchicalNode):
     ...
 
+
 class TraversableEdge(Edge):
 
     entry_phase: Optional[ResolutionPhase] = None

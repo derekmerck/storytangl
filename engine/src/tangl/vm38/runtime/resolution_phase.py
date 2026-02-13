@@ -1,7 +1,13 @@
 from __future__ import annotations
-from typing import Any, Callable, Type, Self
-from enum import IntEnum, Enum
+
+from typing import Any, Callable, Type, Self, Optional, Iterable
+from dataclasses import dataclass
+from enum import IntEnum
 import logging
+
+from tangl.core38 import AggregationMode, Record
+
+Fragment = Patch = Record
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -43,5 +49,32 @@ class ResolutionPhase(IntEnum):
     def ordered_phases(cls) -> list[Self]:
         """Return phases in execution order."""
         return sorted([ x for x in cls.__members__.values() if x is not cls.INIT], key=lambda phase: phase.value)
+
+    # @dataclass
+    # class PhaseSpec:
+    #     task: str
+    #     aggregation_mode: AggregationMode
+    #     result_kind: Type[Any]
+    #
+    #     def dispatch_func(self, *args, **kwargs):
+    #         # call do_validate etc here?  Really want to use this to assemble the dispatch api
+    #         ...
+    #
+    # def phase_spec(self) -> Optional[PhaseSpec]:
+    #     if self is self.INIT:
+    #         return None
+    #
+    #     from tangl.vm38.traversal import TraversableEdge
+    #     # from tangl.vm38.dispatch import do_validate, do_planning, do_prereqs, do_update, do_journal, do_finalize, do_postreqs
+    #     phase_specs = {
+    #         self.VALIDATE: self.PhaseSpec("validate", AggregationMode.ALL_TRUE, bool),
+    #         self.PLANNING: self.PhaseSpec("planning", AggregationMode.GATHER, Any),
+    #         self.PREREQS: self.PhaseSpec("prereqs", AggregationMode.FIRST, Optional[TraversableEdge]),
+    #         self.UPDATE: self.PhaseSpec("update", AggregationMode.GATHER, Any),
+    #         self.JOURNAL: self.PhaseSpec("journal", AggregationMode.PIPE, Iterable[Fragment]),
+    #         self.FINALIZE: self.PhaseSpec("finalize", AggregationMode.PIPE, Patch),
+    #         self.POSTREQS: self.PhaseSpec("postreqs", AggregationMode.FIRST, Optional[TraversableEdge]),
+    #     }
+    #     return phase_specs[self]
 
 
