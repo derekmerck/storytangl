@@ -1,45 +1,72 @@
 # tangl/core/record.py
-from __future__ import annotations
-from typing import ClassVar, TypeVar, Union, Iterable
+"""Immutable ordered records and append-only ordered registries.
 
-from pydantic import Field, ConfigDict, ValidationError
+This module defines :class:`Record` as a frozen, content-addressed artifact and
+:class:`OrderedRegistry` as an append-only :class:`~tangl.core38.registry.Registry`
+specialization with range slicing over a comparable sort-key space.
+
+See Also
+--------
+:mod:`tangl.core38.bases`
+    Record composition traits (:class:`HasContent`, :class:`HasOrder`).
+:mod:`tangl.core38.registry`
+    Base registry behavior, selector filtering, and mapping semantics.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable, ClassVar, Iterable, Iterator, TypeVar, Union
+
+from pydantic import ConfigDict, Field, ValidationError
 
 from tangl.type_hints import Identifier
+
 from .bases import HasContent, HasOrder
 from .entity import Entity
 from .registry import Registry
 from .selector import Selector
 
-ET = TypeVar('ET', bound='Entity')
+ET = TypeVar("ET", bound="Entity")
 
 
 class Record(HasContent, HasOrder, Entity):
-    """
-    Frozen entity with content identity, ordering, and reference their
-    origin by id.
+    """Frozen ordered artifact with content identity and optional origin reference.
 
-    Guarantees:
-    - Immutable after creation
-    - Content-based equality
-    - Deterministic ordering via seq
-    - Records should never have registry/graph dependencies, so dereferencing
-      the origin requires passing the correct lookup index.
+    Why
+    ---
+    Records capture immutable runtime facts that should compare by content and remain
+    orderable for stream-like processing.
+
+    Key Features
+    ------------
+    - **Three identity layers**: stable ``uid`` from :class:`Entity`, content equality
+      from :class:`HasContent`, and sequence ordering from :class:`HasOrder`.
+    - **Frozen + flexible schema**: ``frozen=True`` with ``extra='allow'`` supports
+      arbitrary payload fields in derived record families.
+    - **External origin dereference**: ``origin_id`` stores a producer reference, and
+      :meth:`origin` resolves it through an explicitly supplied registry.
+
+    Notes
+    -----
+    ``origin_id`` is not a registry-aware pointer. Dereference requires passing the
+    correct lookup registry at call time.
 
     Example:
-        >>> r = Record(content='foo')
+        >>> r = Record(content="foo")
         >>> r.get_hashable_content()
         'foo'
         >>> try:
-        ...     r.content = 'bar'
+        ...     r.content = "bar"
         ... except ValidationError as e:
         ...     print(e)  # doctest: +ELLIPSIS
         1 validation error ...
     """
+
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow", frozen=True)
     origin_id: Identifier = None
 
-    def get_hashable_content(self):
-        for field_name in ['content', 'payload', 'data']:
+    def get_hashable_content(self) -> Any:
+        for field_name in ["content", "payload", "data"]:
             if hasattr(self, field_name):
                 return getattr(self, field_name)
         raise AttributeError("No content available.")
@@ -47,35 +74,86 @@ class Record(HasContent, HasOrder, Entity):
     def origin(self, registry: Registry[ET]) -> ET:
         return registry.get(self.origin_id)
 
+
 OrderedEntity = TypeVar("OrderedEntity", bound=Union[Entity, HasOrder])
 
+
 class OrderedRegistry(Registry[OrderedEntity]):
-    """Ordered registries may be sliced and bookmarked by channel"""
+    """Append-only ordered registry with sort-key range slicing.
 
-    bookmarks: dict[str, list[int]] = Field(default_factory=dict)
+    Why
+    ---
+    Ordered registries provide deterministic range queries over members with
+    :meth:`sort_key` support while keeping the core primitive independent from
+    higher-level stream marker/bookmark policies.
 
-    def append(self, record: OrderedEntity):
-        # actually want to verify this _sorts_ last, like sort_key is biggest
-        # if not record > self.max_seq():
-        #     raise IndexError("Record out of sequence for append")
+    Key Features
+    ------------
+    - append-only mutation model via :meth:`append`/:meth:`extend`;
+    - generic key accessors :meth:`min_key` / :meth:`max_key`;
+    - half-open range queries through :meth:`get_slice` with optional selector
+      composition.
+
+    Notes
+    -----
+    Named bookmarks/sections are intentionally out of scope for this core type and
+    should be layered above it (for example in VM/story stream services).
+    """
+
+    def append(self, record: OrderedEntity) -> None:
         self.add(record)
 
-    def extend(self, records: Iterable[OrderedEntity]):
+    def extend(self, records: Iterable[OrderedEntity]) -> None:
         for record in records:
             self.append(record)
 
-    def max_seq(self) -> int:
-        return max([v.seq for v in self.members.values()]) or 0
+    def min_key(self, sort_key: Callable[[OrderedEntity], Any] | None = None) -> Any:
+        if not self.members:
+            return None
+        key_fn = sort_key or (lambda member: member.sort_key())
+        return min(key_fn(member) for member in self.members.values())
 
-    def set_bookmark(self, channel: str = "_"):
-        if channel not in self.bookmarks:
-            self.bookmarks[channel] = []
-        self.bookmarks[channel].append(self.max_seq())
+    def max_key(self, sort_key: Callable[[OrderedEntity], Any] | None = None) -> Any:
+        if not self.members:
+            return None
+        key_fn = sort_key or (lambda member: member.sort_key())
+        return max(key_fn(member) for member in self.members.values())
 
-    def slice(self, start=0, stop=-1, channel: str = "_",
-              selector: Selector = Selector()) -> OrderedEntity:
-        bookmarks = self.bookmarks[channel]
-        seq_start = bookmarks[start]
-        seq_stop = bookmarks[stop]
-        selector = selector.with_criteria(has_seq_in=(seq_start, seq_stop), channel=channel)
-        return self.find_all(selector, sort_key=lambda v: v.sort_key())
+    def get_slice(
+        self,
+        start_key: Any = None,
+        stop_key: Any = None,
+        selector: Selector | None = None,
+        sort_key: Callable[[OrderedEntity], Any] | None = None,
+    ) -> Iterator[OrderedEntity]:
+        """Yield members where ``start_key <= sort_key(member) < stop_key``.
+
+        Bounds are half-open and optional. Passing ``None`` for either bound means
+        unbounded in that direction.
+        """
+
+        key_fn = sort_key or (lambda member: member.sort_key())
+
+        def in_range(member: OrderedEntity) -> bool:
+            key = key_fn(member)
+            if start_key is not None and key < start_key:
+                return False
+            if stop_key is not None and key >= stop_key:
+                return False
+            return True
+
+        selector = selector or Selector()
+        base_predicate = selector.predicate
+
+        def combined_predicate(member: OrderedEntity) -> bool:
+            if not in_range(member):
+                return False
+            if base_predicate is not None and not base_predicate(member):
+                return False
+            return True
+
+        effective_selector = selector.with_criteria(predicate=combined_predicate)
+        return self.find_all(effective_selector, sort_key=key_fn)
+
+    def remove(self, *_args: Any, **_kwargs: Any) -> None:
+        raise NotImplementedError("Cannot remove records from an OrderedRegistry.")

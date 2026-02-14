@@ -1,44 +1,70 @@
 # tangl/core/singleton.py
-from __future__ import annotations
-from typing import ClassVar, Self, Optional
-from inspect import isclass
+"""Label-unique entities with per-class instance registries.
 
-from pydantic import model_validator, ValidationError, Field
+Singletons provide one instance per ``(class, label)`` within a process. They are
+immutable concept-level references and serialize as lightweight references rather than
+full entity payloads.
+
+See Also
+--------
+:class:`tangl.core38.registry.Registry`
+    Internal storage for per-class singleton instance tables.
+:mod:`tangl.core38.token`
+    Wrap singleton references into graph-native tokens when local runtime state is
+    required.
+"""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from inspect import isclass
+from typing import ClassVar, Optional, Self
+
+from pydantic import ConfigDict, Field, model_validator
 
 from tangl.type_hints import UnstructuredData
 from tangl.utils.hashing import hashing_func
+
 from .bases import is_identifier
 from .entity import Entity
 from .registry import Registry
 from .selector import Selector
 
+
 class Singleton(Entity):
-    """
-    - Unique label within class namespace
-    - unstrucctures as reference: (kind, {"label": ...})
-    - singletons allow linking otherwise unstructurable entities
-      carrying behaviors or other logic into a structurable group.
-    - they may be linked directly, or wrapped with local state by
-      a token-builder
+    """Process-local singleton keyed by ``label`` per concrete subclass.
+
+    Why
+    ---
+    Singletons represent immutable concept-level references that should not be
+    duplicated in-memory. They are identified by ``(class, label)`` rather than
+    ``(class, uid)``.
+
+    Key Features
+    ------------
+    - each subclass gets an isolated ``_instances`` registry via
+      :meth:`__init_subclass__`;
+    - duplicate labels are rejected before model construction;
+    - un/structuring is reference-only (`kind` + `label`), resolving to existing
+      instances.
+
+    Notes
+    -----
+    - ``structure()`` expects the referenced instance to already exist.
+    - use tokens when singleton concepts need graph-local mutable state.
 
     Example:
-        >>> a = Singleton(label="abc"); b = Singleton(label="def")
-        >>> try:
-        ...     c = Singleton(label="abc")
-        ... except ValidationError as e:
-        ...     print(e)  # doctest: +ELLIPSIS
-        1 validation error ...
+        >>> a = Singleton(label="abc"); _ = Singleton(label="def")
         >>> Singleton.has_instance("abc")
         True
-        >>> Singleton.has_instance("foo")
-        False
         >>> Singleton.get_instance("abc") is a
         True
         >>> data = a.unstructure()
-        >>> aa = Singleton.structure(data)
-        >>> aa is a
+        >>> Singleton.structure(data) is a
         True
     """
+
+    model_config = ConfigDict(frozen=True)
 
     _instances: ClassVar[Registry[Self]] = Registry()
 
@@ -56,14 +82,16 @@ class Singleton(Entity):
         return cls._instances.find_one(Selector.from_identifier(label))
 
     @classmethod
-    def clear_instances(cls):
+    def clear_instances(cls) -> None:
         cls._instances.clear()
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def _ensure_unique_label(cls, data):
-        label = data.get('label')
-        if label is None or cls.has_instance(label):
+        label = data.get("label")
+        if label is None:
+            raise ValueError("Singleton requires a non-None label")
+        if cls.has_instance(label):
             raise ValueError(f"Singleton inst with label '{label}' already exists")
         return data
 
@@ -73,29 +101,31 @@ class Singleton(Entity):
 
     @is_identifier
     def id_hash(self) -> bytes:
-        # Id is by class and _label_ rather than class and uid.
         return hashing_func(self.__class__, self.label)
 
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.label))
+
     def __reduce__(self):
-        # pickles like it un/structures
         return self.__class__.get_instance, (self.label,)
 
     def unstructure(self) -> UnstructuredData:
-        return {'kind': self.__class__, 'label': self.label}
+        return {"kind": self.__class__, "label": self.label}
 
     @classmethod
     def structure(cls, data) -> Self:
-        cls_ = data.pop('kind', cls)
+        cls_ = data.pop("kind", cls)
         if not isclass(cls_):
             raise TypeError(f"Expected {cls_} to be a class")
-        label = data.pop('label')
+        label = data.pop("label")
         return cls_.get_instance(label)
 
+
 class InstanceInheritance(Singleton):
-    """
-    - Optional init-only ref_id for inheritance chain
-    - Default values collected at creation-time ONLY
-    - No order optimization for creation, so use cautiously and ensure items aren't referenced until _after_ they've been created.
+    """Singleton with creation-time field inheritance from another instance.
+
+    ``inherit_from`` copies non-identity, non-private fields from the referent at
+    creation time only. Explicit kwargs override inherited values.
 
     Example:
         >>> class S(InstanceInheritance): value: str = Field()
@@ -106,20 +136,24 @@ class InstanceInheritance(Singleton):
         >>> S(label="foobar", inherit_from="baz").value
         'bar'
     """
+
     inherit_from: Optional[str] = Field(None, init_var=True)
 
     def __init__(self, *, label: str, inherit_from: str = None, **kwargs):
         if inherit_from is not None:
-            # Copy defaults from reference, discard identity fields (label, uid)
-            # and inherit_from
-            field_names = [ f for f in self.__pydantic_fields__.keys()
-                            if f not in ['uid', 'inherit_from', 'label', *kwargs.keys()]
-                            and not f.startswith('_') ]
+            field_names = [
+                field_name
+                for field_name in self.__pydantic_fields__.keys()
+                if field_name not in ["uid", "inherit_from", "label", *kwargs.keys()]
+                and not field_name.startswith("_")
+            ]
             inherit_inst = self.get_instance(inherit_from)
             if inherit_inst is None:
                 raise ValueError(f"'{inherit_from}' is not a valid heritage")
-            defaults = {f: getattr(inherit_inst, f) for f in field_names}
+            defaults = {
+                field_name: deepcopy(getattr(inherit_inst, field_name))
+                for field_name in field_names
+            }
             kwargs = defaults | kwargs
 
         super().__init__(label=label, inherit_from=inherit_from, **kwargs)
-

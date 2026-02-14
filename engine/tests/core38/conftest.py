@@ -15,6 +15,10 @@ from tangl.core38.bases import (
     Unstructurable,
     is_identifier,
 )
+from tangl.core38.singleton import Singleton
+from tangl.core38.token import Token
+from tangl.core38.record import Record
+from tangl.core38.entity import Entity
 
 
 class SimpleEntity(Unstructurable, HasIdentity):
@@ -60,6 +64,83 @@ class FullEntity(HasState, HasContent, HasOrder, Unstructurable, HasIdentity):
         return self.content
 
 
+class WeaponType(Singleton):
+    """Test singleton for token wrapping."""
+
+    damage: str
+    sharpness: float = Field(1.0, json_schema_extra={"instance_var": True})
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}:{self.get_label()}"
+            f"(damage={self.damage}, sharpness={self.sharpness})>"
+        )
+
+    def describe(self) -> str:
+        return f"A {self.get_label()} dealing {self.damage} damage"
+
+
+class ArmorType(Singleton):
+    """Second singleton type for cross-type token tests."""
+
+    defense: int
+    condition: float = Field(1.0, json_schema_extra={"instance_var": True})
+
+
+class NPCType(Singleton):
+    """Singleton for method rebinding tests."""
+
+    hp: int = 100
+    name: str = Field("unnamed", json_schema_extra={"instance_var": True})
+
+    def greet(self) -> str:
+        return f"I am {self.name}"
+
+
+class SimpleRecord(Record):
+    """Record subclass with canonical content field."""
+
+    content: str = ""
+
+
+class PayloadRecord(Record):
+    """Record subclass exposing payload-backed content."""
+
+    payload: dict = Field(default_factory=dict)
+
+
+class CustomRecord(Record):
+    """Record subclass used for extra-field allowance checks."""
+
+
+class PriorityRecord(Record):
+    """Record with a composite ordering key."""
+
+    content: str = ""
+    priority: int = 0
+
+    def sort_key(self):
+        return self.priority, self.seq
+
+
+class Scene(Entity):
+    """Test entity kind for template payload behavior."""
+
+    location: str = "unknown"
+
+
+class Block(Entity):
+    """Secondary test entity kind."""
+
+    content: str = ""
+
+
+class SpecialScene(Scene):
+    """Subtype used for template materialize kind narrowing tests."""
+
+    difficulty: int = 1
+
+
 @pytest.fixture
 def null_ctx() -> SimpleNamespace:
     """Minimal context satisfying dispatch's registry/inline behavior contract."""
@@ -98,3 +179,15 @@ def ensure_no_ambient_ctx() -> None:
     from tangl.core38.ctx import get_ctx
 
     assert get_ctx() is None, "Ambient ctx leaked between tests"
+
+
+@pytest.fixture(autouse=True)
+def clear_token_singletons() -> None:
+    """Clear token test singletons and wrapper cache around each test."""
+    for cls in [WeaponType, ArmorType, NPCType]:
+        cls.clear_instances()
+    Token._wrapper_cache.clear()
+    yield
+    for cls in [WeaponType, ArmorType, NPCType]:
+        cls.clear_instances()
+    Token._wrapper_cache.clear()

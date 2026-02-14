@@ -14,6 +14,8 @@ class ReversibleEntity(Entity):
 
     @property
     def label_rev(self) -> str:
+        if self.label is None:
+            return ""
         return self.label[::-1]
 
 
@@ -134,6 +136,11 @@ class TestSelectorMatching:
     def test_match_property_uses_equality(self) -> None:
         entity = ReversibleEntity(label="abc")
         assert Selector(label_rev="cba").matches(entity)
+
+    def test_match_property_none_safe(self) -> None:
+        entity = ReversibleEntity()
+        assert entity.label_rev == ""
+        assert Selector(label_rev="").matches(entity)
 
 
 class TestSelectorFilter:

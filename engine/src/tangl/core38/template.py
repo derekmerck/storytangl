@@ -1,47 +1,20 @@
 # tangl/core/template.py
 # language=markdown
-"""
-# Templates (v38): compile/decompile and materialization
+"""Templates (v38): compile/decompile and materialization.
 
-This module defines the **authoring boundary** for core.
+This module defines the authoring boundary for core templates and separates
+compile/decompile from runtime materialization.
 
-Templates are the bridge between two otherwise independent loops:
+See Also
+--------
+:class:`tangl.core38.record.Record`
+    Template records inherit frozen/content/seq behavior from ``Record``.
+:mod:`tangl.core38.registry`
+    Registry-aware and hierarchical behaviors used by template containers.
 
-1) **Authoring loop (compile/decompile)**
-
-```
-Script dict  ── compile ─▶  EntityTemplate  ── decompile ─▶  Script dict
-```
-
-- Used for script linting, normalization, and author-friendly export.
-- `decompile()` strips framework noise (uids, ordering, caches) by policy.
-- No live graph or materialization is required.
-
-2) **Runtime loop (persistence)**
-
-```
-Live Entity  ── unstructure ─▶  UnstructuredData  ── structure ─▶  Live Entity
-```
-
-- Defined on `core.bases.Unstructurable` / `core.entity.Entity`.
-- Preserves identifiers and runtime state.
-
-3) **Runtime entry (materialization)**
-
-```
-EntityTemplate  ── materialize ─▶  Live Entity
-```
-
-Materialization stamps out a live entity from a template payload. This is a one-way
-boundary into runtime: a live entity does not implicitly "become" a script item.
-
-## Vocabulary
-
-- **payload**: the prototype entity stored inside a template (an `Entity` instance).
-- **compile**: build a template from a script dict (validate/hydrate).
-- **decompile**: emit a script dict from a template payload (strip noise).
-- **materialize**: create a live entity instance from a template payload.
-
+Notes
+-----
+``NONGENERIC_FIELDS`` defines runtime-only fields stripped by ``decompile()``.
 """
 from __future__ import annotations
 
@@ -125,6 +98,7 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
     # metadata.
 
     payload: ET = Field(..., exclude=True)
+    # Excluded from pydantic model_dump; unstructure/structure handles payload explicitly.
 
     def get_label(self):
         return self.label or f"from-{self.payload.get_label()}"
@@ -138,9 +112,10 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
 
     @classmethod
     def from_data(cls, data: UnstructuredData, default_kind: Type[ET] = None) -> Self:
+        payload_data = dict(data)
         if default_kind is not None:
-            data.setdefault('kind', default_kind)
-        entity = Entity.structure(data)
+            payload_data.setdefault('kind', default_kind)
+        entity = Entity.structure(payload_data)
         return cls.from_entity(entity)
 
     # conflate/delegate identity matching
@@ -154,6 +129,12 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         return self.payload.has_kind(kind)
 
     def has_tags(self, *tags) -> bool:
+        if len(tags) == 0:
+            return True
+        if len(tags) == 1 and tags[0] is None:
+            return True
+        if len(tags) == 1 and isinstance(tags[0], (tuple, list, set)):
+            tags = tuple(tags[0])
         return set(tags).issubset(self.tags.union(self.payload.tags))
 
     def get_identifiers(self) -> set[Identifier]:
@@ -165,7 +146,8 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         if 'kind' in updates:
             if not issubclass(updates['kind'], self.payload.__class__):
                 raise TypeError(
-                    "If update includes kind, result will be a different class, suggested to only use when increasing specificity."
+                    "materialize kind must be a subclass of payload kind "
+                    f"{self.payload.__class__.__name__}, got {updates['kind'].__name__}"
                 )
         if not preserve_uid:
             updates.setdefault('uid', uuid4())  # create a new uid if not provided
@@ -312,8 +294,7 @@ class TemplateGroup(EntityTemplate, HierarchicalGroup):
         >>> len(tr)
         6
         >>> roundtrip = tr.decompile_all()
-        >>> script == roundtrip
-        True
+        >>> assert script == roundtrip
     """
 
     member_defaults: dict[str, Any] = Field(default_factory=dict)
