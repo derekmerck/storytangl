@@ -1,14 +1,31 @@
+"""Graph node wrappers over frozen singleton referents.
+
+Tokens combine immutable singleton definitions with mutable node-local overlay state.
+Subscribing ``Token[SomeSingleton]`` creates and caches a dynamic Pydantic wrapper class
+that materializes fields marked ``instance_var=True`` as local token fields.
+
+See Also
+--------
+:mod:`tangl.core38.singleton`
+    Frozen referent contract and per-class singleton registries.
+:mod:`tangl.core38.graph`
+    ``Token`` inherits :class:`~tangl.core38.graph.Node` for graph participation.
+:mod:`tangl.core38.entity`
+    ``_match_fields`` metadata discovery used to materialize instance vars.
+"""
+
 # tangl/core/token.py
 from __future__ import annotations
+
+from dataclasses import dataclass
 import re
-from types import MethodType
-from typing import TypeVar, Generic, ClassVar, Type, Self, Any
 import sys
 import logging
-from dataclasses import dataclass
+from types import MethodType
+from typing import Any, ClassVar, Generic, Self, Type, TypeVar
 
 import pydantic
-from pydantic import Field, field_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from .graph import Node
 from .singleton import Singleton
@@ -19,37 +36,40 @@ logger.setLevel(logging.WARNING)
 WST = TypeVar("WST", bound=Singleton)
 
 class Token(Node, Generic[WST]):
-    """
-    Token[Singleton](from_ref: UniqueStr)
-
-    Graph node wrapper that attaches a :class:`~tangl.core.Singleton` to a graph with node-local state.  Tokens are mid-way between templates and node-instances.  They delegate most features to a bound singleton reference object but provide a layer of instance-local state on top of that.
+    """Dynamic node wrapper around one singleton instance.
 
     Why
     ----
-    Let immutable singletons participate in topology while allowing per-node state (e.g.,
-    position, runtime flags) that does not mutate the singleton itself.
+    Tokens let frozen :class:`~tangl.core38.singleton.Singleton` definitions participate
+    in mutable topology. The singleton stores concept-level defaults, while each token
+    stores node-local state.
 
     Key Features
     ------------
-    * **Binding** – :attr:`wrapped_cls` points to the singleton class; :attr:`label` selects instance.
-    * **Delegation** – attribute access defers to the wrapped singleton; methods are rebound for convenience.
-    * **Instance vars** – singleton fields marked ``json_schema_extra={"instance_var": True}``
-      are materialized on the node for local override.
-    * **Dynamic wrappers** – :meth:`__class_getitem__` / :meth:`_create_wrapper_cls` generate typed wrappers on demand.
+    - **Split identity**: ``token_from`` references the singleton label; ``label`` names
+      the token node itself.
+    - **Delegation + override**: reads check token fields first, then delegate missing
+      attributes/methods to :attr:`reference_singleton`.
+    - **Local instance vars**: singleton fields marked
+      ``json_schema_extra={"instance_var": True}`` are materialized as mutable token
+      fields on the generated wrapper class.
+    - **Wrapper cache**: repeated ``Token[SomeType]`` subscriptions reuse the same
+      cached dynamic class keyed by ``(Token, SomeType)``.
 
     API
     ---
-    - :attr:`wrapped_cls` – singleton type bound to this wrapper.
-    - :attr:`label` – required label of the referenced instance; validated at creation.
+    - :attr:`wrapped_cls` – singleton type bound to the dynamic token wrapper.
+    - :attr:`token_from` – singleton label to resolve within :attr:`wrapped_cls`.
+    - :attr:`label` – graph-node name inherited from :class:`~tangl.core38.graph.Node`.
     - :attr:`reference_singleton` – access the underlying instance.
     - :meth:`_instance_vars` – collect instance-var field definitions from the wrapped class.
     - :meth:`_create_wrapper_cls` – emit a new wrapper subclass with those fields.
 
     Notes
     -----
-    Prefer modeling behavior in the singleton; keep node-local overrides minimal and explicit.
-
-    Token factory uses generic typing: `Token[SingletonType](token_from=foo)`
+    Writes are intentionally asymmetric: instance-var fields are writable on the token,
+    while delegated singleton fields remain frozen and cannot be reassigned through the
+    token.
 
     Examples:
         >>> class SwordType(Singleton):
@@ -69,18 +89,6 @@ class Token(Node, Generic[WST]):
         <Token[...SwordType]:Glamdring(damage=1d6, sharpness=1.5)>
         >>> SwordType.get_instance("short sword").sharpness  # reference unchanged
         1.0
-
-    class that masquerades as a Singleton template object with an overlay for local/dynamic vars and refers others to base class
-
-    This is almost always going to be mixed with GraphItem and used by a graph to materialize and link a 'platonic' singleton as a concrete node.  Singleton type might be 'weapon' and inst might be 'sword'.  A sword token delegates methods and attributes to its reference singleton, but adds a local 'sharpness' variable.
-
-    - Fields on the ref_kind annotated with 'local_field' will be added to the token on class creation and the field value on the ref_inst used for the default value on token construction
-    - Other field references will be delegated to the ref directly.
-
-    - If you invalidate the reference singleton (by clearing for example), all associated
-      tokens will be unable to resolve their referent unless they are already holding a
-      cached reference, in which case the reference singleton can _not_ be garbage
-      colleccted.  Use cautiously.
     """
     # Allows embedding a Singleton into a mutable node so its properties can be
     # referenced indirectly via a graph
@@ -92,6 +100,8 @@ class Token(Node, Generic[WST]):
 
     #: The singleton entity class that this wrapper is associated with.
     wrapped_cls: ClassVar[Type[Singleton]] = None
+
+    _registry: Any = PrivateAttr(None)
 
     token_from: str = Field(...)
 
@@ -109,12 +119,22 @@ class Token(Node, Generic[WST]):
             raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref label `{value}`.")
         return value
 
+
+    @model_validator(mode="after")
+    def _hydrate_instance_vars_from_referent(self) -> Self:
+        """Backfill unset instance vars from the referenced singleton instance."""
+        for field_name in self._instance_vars(self.wrapped_cls):
+            if field_name in self.model_fields_set:
+                continue
+            setattr(self, field_name, getattr(self.reference_singleton, field_name))
+        return self
+
     @property
     def reference_singleton(self) -> WST:
         res = self.wrapped_cls.get_instance(self.token_from)
         if not res:
             raise ValueError(f"No instance of `{self.wrapped_cls.__name__}` found for ref label `{self.token_from}`.")
-        return self.wrapped_cls.get_instance(self.token_from)
+        return res
 
     # conflate/delegate identity matching
     def has_kind(self, kind: Type[Node]) -> bool:
@@ -123,14 +143,29 @@ class Token(Node, Generic[WST]):
 
         Enables: Token[NPC].has_kind(NPC) → True
         """
+        if not (isinstance(kind, type) or (isinstance(kind, tuple) and all(isinstance(k, type) for k in kind))):
+            return False
         return super().has_kind(kind) or self.reference_singleton.has_kind(kind)
 
     def __repr__(self) -> str:
         return self.wrapped_cls.__repr__(self)
 
+    def bind_registry(self, registry) -> None:
+        """Bind registry pointer using a private dict slot on dynamic wrappers."""
+        current = self.__dict__.get("_registry")
+        if registry is None:
+            self.__dict__["_registry"] = None
+            return
+        if current is not None and current is not registry:
+            raise ValueError(f"Registry is already set {current!r} != {registry!r}")
+        self.__dict__["_registry"] = registry
+
     def __getattr__(self, name: str) -> Any:
-        """Delegates attribute access to non-instance-variables back to the reference singleton entity."""
-        # logger.debug(f"Getting attribute {name}")
+        """Delegate non-local attribute access to the referenced singleton."""
+        if name == "_registry":
+            return self.__dict__.get("_registry", None)
+        if name.startswith("_"):
+            raise AttributeError(f"{self.__class__.__name__} is missing attribute '{name}'")
         if hasattr(self.reference_singleton, name):
             attr = getattr(self.reference_singleton, name)
             # logger.debug(f"Delegating {name} attribute to {attr}")
@@ -195,6 +230,11 @@ class Token(Node, Generic[WST]):
 
 @dataclass
 class TokenFactory(Generic[WST]):
+    """Provisioner-facing adapter around ``Token[WST](token_from=...)``.
+
+    Each factory instance wraps one singleton type and exposes a tiny materialization
+    API compatible with builder-like provisioner flows.
+    """
 
     wst: Type[WST]
 
@@ -206,4 +246,4 @@ class TokenFactory(Generic[WST]):
         return Token[wrapped_cls](token_from=token_from)
 
     def materialize_one(self, token_from: str) -> Token[WST]:
-        return self._materialize(self.wst, token_from)
+        return self._materialize_one(self.wst, token_from)
