@@ -109,6 +109,16 @@ class TestRegistrySerialization:
         restored = Registry.structure(reg.unstructure())
         assert restored == reg
 
+    def test_structure_does_not_mutate_input(self) -> None:
+        reg = Registry(label="r")
+        reg.add(Entity(label="x"))
+        payload = reg.unstructure()
+        payload_copy = dict(payload)
+        Registry.structure(payload)
+        assert "members" in payload
+        assert payload == payload_copy
+
+
     def test_pickle_roundtrip(self) -> None:
         reg = Registry(label="r")
         reg.add(Entity(label="x"))
@@ -189,6 +199,15 @@ class TestRegistryAwareAndGroups:
         with pytest.raises(ValueError):
             list(group.members())
 
+    def test_group_members_skips_missing_member_ids(self) -> None:
+        reg = Registry()
+        group = SimpleGroup(label="g", registry=reg)
+        member = TrackedEntity(label="a", registry=reg)
+        group.add_member(member)
+        group.member_ids.append(uuid4())
+        assert list(group.members()) == [member]
+
+
     def test_hierarchical_group_reparenting_and_path(self) -> None:
         reg = Registry()
         root = NestedGroup(label="root", registry=reg)
@@ -213,3 +232,13 @@ class TestRegistryAwareAndGroups:
         assert child.parent is parent
         parent.remove_child(child)
         assert child.parent is None
+
+    def test_children_alias_accepts_sort_key(self) -> None:
+        reg = Registry()
+        parent = NestedGroup(label="parent", registry=reg)
+        low = TrackedEntity(label="low", value=1, registry=reg)
+        high = TrackedEntity(label="high", value=9, registry=reg)
+        parent.add_members(high, low)
+        ordered = list(parent.children(sort_key=lambda item: item.value))
+        assert ordered == [low, high]
+

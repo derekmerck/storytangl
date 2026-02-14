@@ -236,8 +236,9 @@ class Registry(Entity, Generic[ET]):
     @classmethod
     def structure(cls, data: UnstructuredData, _ctx=None):
         """Structure a registry and re-add structured members."""
-        _members = data.pop("members", [])
-        obj = super().structure(data, _ctx=_ctx)  # type: Self
+        payload = dict(data)
+        _members = payload.pop("members", [])
+        obj = super().structure(payload, _ctx=_ctx)  # type: Self
         for value in _members:
             obj.add(Entity.structure(value, _ctx=_ctx))
         return obj
@@ -396,9 +397,9 @@ class EntityGroup(RegistryAware):
 
     def members(self, selector: Selector = None, sort_key=None) -> Iterator[RT]:
         """Yield dereferenced members, optionally filtered and sorted."""
-        items = (self.registry.get(uid) for uid in self.member_ids)
         selector = selector or Selector()
         if self.registry is not None:
+            items = (item for uid in self.member_ids if (item := self.registry.get(uid)))
             return self.registry._filter_and_sort(items, selector=selector, sort_key=sort_key)
         raise ValueError("Group registry is not set")
 
@@ -493,9 +494,9 @@ class HierarchicalGroup(EntityGroup):
 
     # Aliases for membership ops -> children ops
 
-    def children(self, selector: Selector = None) -> Iterator[RT]:
+    def children(self, selector: Selector = None, sort_key=None) -> Iterator[RT]:
         """Alias of :meth:`members` for hierarchy semantics."""
-        return self.members(selector=selector)
+        return self.members(selector=selector, sort_key=sort_key)
 
     def add_child(self, item: RT):
         self.add_member(item)
