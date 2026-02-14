@@ -15,6 +15,8 @@ from tangl.core38.bases import (
     Unstructurable,
     is_identifier,
 )
+from tangl.core38.singleton import Singleton
+from tangl.core38.token import Token
 
 
 class SimpleEntity(Unstructurable, HasIdentity):
@@ -60,6 +62,39 @@ class FullEntity(HasState, HasContent, HasOrder, Unstructurable, HasIdentity):
         return self.content
 
 
+class WeaponType(Singleton):
+    """Test singleton for token wrapping."""
+
+    damage: str
+    sharpness: float = Field(1.0, json_schema_extra={"instance_var": True})
+
+    def __repr__(self) -> str:
+        return (
+            f"<{self.__class__.__name__}:{self.get_label()}"
+            f"(damage={self.damage}, sharpness={self.sharpness})>"
+        )
+
+    def describe(self) -> str:
+        return f"A {self.get_label()} dealing {self.damage} damage"
+
+
+class ArmorType(Singleton):
+    """Second singleton type for cross-type token tests."""
+
+    defense: int
+    condition: float = Field(1.0, json_schema_extra={"instance_var": True})
+
+
+class NPCType(Singleton):
+    """Singleton for method rebinding tests."""
+
+    hp: int = 100
+    name: str = Field("unnamed", json_schema_extra={"instance_var": True})
+
+    def greet(self) -> str:
+        return f"I am {self.name}"
+
+
 @pytest.fixture
 def null_ctx() -> SimpleNamespace:
     """Minimal context satisfying dispatch's registry/inline behavior contract."""
@@ -98,3 +133,15 @@ def ensure_no_ambient_ctx() -> None:
     from tangl.core38.ctx import get_ctx
 
     assert get_ctx() is None, "Ambient ctx leaked between tests"
+
+
+@pytest.fixture(autouse=True)
+def clear_token_singletons() -> None:
+    """Clear token test singletons and wrapper cache around each test."""
+    for cls in [WeaponType, ArmorType, NPCType]:
+        cls.clear_instances()
+    Token._wrapper_cache.clear()
+    yield
+    for cls in [WeaponType, ArmorType, NPCType]:
+        cls.clear_instances()
+    Token._wrapper_cache.clear()
