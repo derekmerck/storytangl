@@ -433,6 +433,12 @@ class EntityGroup(RegistryAware):
         # although this is better than iter, b/c it doesn't have to deref id's
         return item.uid in self.member_ids
 
+    def unstructure(self) -> UnstructuredData:
+        """Include ``member_ids`` explicitly for stable round-tripping."""
+        data = super().unstructure()
+        if self.member_ids:
+            data["member_ids"] = list(self.member_ids)
+        return data
 
 class HierarchicalGroup(EntityGroup):
     """A group that supports parent/child nesting via group membership.
