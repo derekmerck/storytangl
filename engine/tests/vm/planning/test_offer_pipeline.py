@@ -8,7 +8,7 @@ from tangl.vm.provision import (
     ProvisioningPolicy,
     PlanningReceipt,
 )
-from conftest import _collect_build_receipts
+from .conftest import _collect_build_receipts
 
 
 def _frame_with_provisioners():

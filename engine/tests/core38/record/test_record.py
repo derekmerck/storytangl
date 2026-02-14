@@ -12,7 +12,7 @@ from tangl.core38.record import OrderedRegistry, Record
 from tangl.core38.registry import Registry
 from tangl.core38.selector import Selector
 
-from conftest import CustomRecord, PayloadRecord, PriorityRecord, SimpleRecord
+from ..conftest import CustomRecord, PayloadRecord, PriorityRecord, SimpleRecord
 
 
 class DataRecord(Record):

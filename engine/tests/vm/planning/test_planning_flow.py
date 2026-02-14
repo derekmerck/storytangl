@@ -16,7 +16,7 @@ from tangl.vm.dispatch import planning
 from tangl.vm.provision import PlanningReceipt, BuildReceipt
 from tangl.utils.hashing import hashing_func
 
-from conftest import _collect_build_receipts
+from .conftest import _collect_build_receipts
 
 # @pytest.mark.xfail(reason="planning needs reimplemented")
 def test_plan_collect_offers_prioritizes_affordances_and_tags_sources():

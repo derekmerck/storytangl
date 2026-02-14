@@ -88,9 +88,9 @@ class TestEdgeAndNode:
         c = graph.add_node(label="c")
         ab = graph.add_edge(a, b)
         cb = graph.add_edge(c, b)
-        assert set(b.edges_in()) == {ab, cb}
+        assert set(x.uid for x in b.edges_in()) == {ab.uid, cb.uid}
         assert list(a.edges_out()) == [ab]
-        assert set(b.predecessors()) == {a, c}
+        assert set(x.uid for x in b.predecessors()) == {a.uid, c.uid}
 
     def test_remove_edge_helpers(self) -> None:
         graph = Graph()

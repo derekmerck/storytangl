@@ -14,7 +14,7 @@ from tangl.core38.selector import Selector
 from tangl.core38.singleton import Singleton
 from tangl.core38.token import Token, TokenFactory
 
-from conftest import ArmorType, NPCType, WeaponType
+from ..conftest import ArmorType, NPCType, WeaponType
 
 WST = TypeVar("WST", bound=Singleton)
 

@@ -11,7 +11,7 @@ from tangl.core38.entity import Entity
 from tangl.core38.selector import Selector
 from tangl.core38.template import EntityTemplate, Snapshot, TemplateGroup, TemplateRegistry
 
-from conftest import Block, Scene, SpecialScene
+from ..conftest import Block, Scene, SpecialScene
 
 
 class TestEntityTemplateCreation:
