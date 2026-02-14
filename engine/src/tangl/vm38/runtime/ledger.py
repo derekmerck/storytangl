@@ -5,7 +5,7 @@ from pydantic import Field
 
 from tangl.type_hints import UnstructuredData
 from tangl.core38 import Graph, OrderedRegistry, Entity, Snapshot, Selector
-from tangl.vm38.traversal import TraversableNode, TraversableEdge
+from ..traversable import TraversableNode, TraversableEdge
 from .frame import Frame
 
 class Ledger(Entity):

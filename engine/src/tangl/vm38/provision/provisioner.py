@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import ConfigDict, SkipValidation
 
-from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, resolve_ctx, Priority
+from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, resolve_ctx, Priority, TokenFactory
 
 if TYPE_CHECKING:
     from .requirement import Requirement, Affordance
@@ -119,3 +119,19 @@ class FallbackProvisioner:
         return []
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
+
+class TokenProvisioner:
+    # todo: This doesn't work yet b/c token factory doesn't present attribs that can be filtered by req
+
+    token_factories: Iterable[TokenFactory]  # has all token types for this provisioner
+
+    def get_dependency_offers(self, requirement: Requirement) -> Iterable[ProvisionOffer]:
+
+        candidates = requirement.filter(self.token_factories)
+        for c in candidates:
+            yield ProvisionOffer(
+                origin_id = f"{c.get_label()}:{requirement.token_from}",
+                policy = ProvisionPolicy.CREATE_TOKEN,
+                callback = c.materialize(requirement.token_from),
+                priority=Priority.EARLY  # tokens are considered to be cheaper than full nodes when available
+            )

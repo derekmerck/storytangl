@@ -5,7 +5,7 @@ from tangl.core38 import BehaviorRegistry, DispatchLayer, CallReceipt, Record
 
 if TYPE_CHECKING:
     from .provision import Requirement, ProvisionOffer
-    from .traversal import TraversableNode, TraversableEdge
+    from .traversable import TraversableNode, TraversableEdge
     Fragment = Record
     Patch = Record
 

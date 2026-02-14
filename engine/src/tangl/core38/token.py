@@ -198,6 +198,9 @@ class TokenFactory(Generic[WST]):
 
     wst: Type[WST]
 
+    def has_kind(self, kind: Type[Node]) -> bool:
+        return self.wst.has_kind(kind)
+
     @classmethod
     def _materialize_one(cls, wrapped_cls: Type[WST], token_from: str) -> Token[WST]:
         return Token[wrapped_cls](token_from=token_from)

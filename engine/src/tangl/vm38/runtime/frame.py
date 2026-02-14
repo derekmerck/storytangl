@@ -10,11 +10,11 @@ from contextlib import contextmanager
 from copy import copy
 
 from tangl.core38 import Graph, OrderedRegistry, CallReceipt, Node, Behavior, BehaviorRegistry
-from tangl.vm38.dispatch import dispatch as vm_dispatch, do_validate, do_provision, do_prereqs, do_update, do_journal, do_finalize, do_postreqs
-from tangl.vm38.traversal import TraversableNode, TraversableEdge, AnonymousEdge
-from .resolution_phase import ResolutionPhase
+from ..dispatch import dispatch as vm_dispatch, do_validate, do_provision, do_prereqs, do_update, do_journal, do_finalize, do_postreqs
+from ..traversable import TraversableNode, TraversableEdge, AnonymousEdge
+from ..resolution_phase import ResolutionPhase
 
-TraversableEdge: TypeAlias = TraversableEdge | AnonymousEdge
+AnyTraversableEdge: TypeAlias = TraversableEdge | AnonymousEdge
 NS: TypeAlias = Mapping[str, Any]
 
 @dataclass
@@ -101,7 +101,7 @@ class Frame:
         edge = AnonymousEdge(successor=node, entry_phase=ResolutionPhase.PLANNING)
         self.resolve_choice(edge)
 
-    def follow_edge(self, edge: TraversableEdge) -> Optional[TraversableEdge]:
+    def follow_edge(self, edge: AnyTraversableEdge) -> Optional[TraversableEdge]:
 
         entry_phase = edge.entry_phase or ResolutionPhase.VALIDATE
 
@@ -143,7 +143,7 @@ class Frame:
                 # type will be edge with return phase POSTREQ
                 return postreq
 
-    def resolve_choice(self, edge: TraversableEdge):
+    def resolve_choice(self, edge: AnyTraversableEdge):
 
         while edge is not None:
             edge = self.follow_edge(edge)

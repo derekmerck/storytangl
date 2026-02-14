@@ -2,7 +2,7 @@ from typing import Optional, Literal
 from dataclasses import dataclass
 
 from tangl.core38 import HierarchicalNode, Edge, Node
-from tangl.vm38.runtime import ResolutionPhase
+from .resolution_phase import ResolutionPhase
 
 
 class TraversableNode(HierarchicalNode):

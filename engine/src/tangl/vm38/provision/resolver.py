@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, TypeAlias, Union, Self
 
 from tangl.core38 import EntityGroup, EntityTemplate, resolve_ctx, Node, Selector
-from tangl.vm38.dispatch import on_provision
+from ..dispatch import on_provision
 from .provisioner import ProvisionOffer, FindProvisioner, TemplateProvisioner, FallbackProvisioner, ProvisionPolicy
 from .requirement import Requirement, RT, Dependency
 
