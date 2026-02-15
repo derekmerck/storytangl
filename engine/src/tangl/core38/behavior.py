@@ -284,7 +284,7 @@ class BehaviorRegistry(Registry[Behavior]):
                     ctx: RuntimeCtx = None,
                     task: Tag = None,
                     selector: Selector = None,
-                    inline_behaviors: Iterable[Behavior] = None
+                    inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None
                     ) -> Iterator[CallReceipt]:
         """
         Execute all behaviors matching selector in sorted order.
@@ -295,7 +295,7 @@ class BehaviorRegistry(Registry[Behavior]):
             ctx: Runtime context (optional)
             task: Task tag to filter behaviors (convenience)
             selector: Additional selection criteria
-            inline_behaviors: Additional behaviors to execute (not implemented)
+            inline_behaviors: Additional behaviors/callables to execute
 
         Yields:
             CallReceipt for each executed behavior in sort order
@@ -335,7 +335,7 @@ class BehaviorRegistry(Registry[Behavior]):
                       call_kwargs = None,
                       ctx = None, task = None,
                       selector: Selector = None,
-                      inline_behaviors: Iterable[Behavior] = None
+                      inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None
                       ) -> Iterator[CallReceipt]:
 
         assembled_registries = list(registries)

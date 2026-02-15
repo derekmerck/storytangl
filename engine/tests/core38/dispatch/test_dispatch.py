@@ -24,7 +24,7 @@ class ChildEntity(Entity):
 
 
 class TestDispatchFunctions:
-    def test_do_init_chains_ctx_registry_and_inline(self, null_ctx) -> None:
+    def test_do_init_chains_ctx_registry_and_inline(self) -> None:
         events: list[str] = []
 
         on_init(func=lambda *, caller, ctx=None, **_: events.append("global"))
