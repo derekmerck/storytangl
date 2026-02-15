@@ -24,16 +24,27 @@ See `Entity.__init__()`, `Registry.add_item()`, etc. for injection examples.
 See `vm.dispatch`, `story.dispatch`, `service.dispatch`, etc. for examples of other dispatch layers and pre-defined hook points.
 
 Example:
-    >>> Entity(label="bar")
-    <Entity:bar>
+    >>> assert Entity(label="bar").label == "bar"
     >>> _ = on_init(func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "foo"))
-    >>> Entity(label="bar", _ctx=SimpleNamespace(get_registries=lambda: []))  # calls global dispatch by default
-    <Entity:foo>
+    >>> item = Entity(
+    ...     label="bar",
+    ...     _ctx=SimpleNamespace(
+    ...         get_registries=lambda: [],
+    ...         get_inline_behaviors=lambda: [],
+    ...     ),
+    ... )  # calls global dispatch by default
+    >>> assert item.label == "foo"
     >>> q = BehaviorRegistry()
     >>> _ = q.register(task="init", dispatch_layer=DispatchLayer.APPLICATION,
     ...                func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "baz"))
-    >>> Entity(label="bar", _ctx=SimpleNamespace(get_registries=lambda: [q]))
-    <Entity:baz>
+    >>> item = Entity(
+    ...     label="bar",
+    ...     _ctx=SimpleNamespace(
+    ...         get_registries=lambda: [q],
+    ...         get_inline_behaviors=lambda: [],
+    ...     ),
+    ... )
+    >>> assert item.label == "baz"
     >>> dispatch.clear()  # always clean up global registries after using
 
 

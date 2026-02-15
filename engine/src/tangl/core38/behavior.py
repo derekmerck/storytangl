@@ -102,10 +102,11 @@ class CallReceipt(Record):
     ctx: SkipValidation[RuntimeCtx] = None
 
     @model_validator(mode='after')
-    def _either_result_or_cb_specified(self):
+    def _either_result_or_cb_specified(self) -> Self:
         value = sum(['callback' in self.model_fields_set, 'result' in self.model_fields_set])
         if value != 1:
             raise ValueError("Exactly one of 'callback' or 'result' should be specified")
+        return self
 
     def resolve(self, *args, **kwargs) -> Any:
         if self.result is None and self.callback is not None:
@@ -184,8 +185,7 @@ class Behavior(RegistryAware, HasOrder, Entity):
         >>> f"sum{deferred.args}={deferred.result}"
         'sum(4, 5, 6)=15'
         >>> c = Behavior(func=lambda *_, **__: True, wants_caller_kind=Entity)
-        >>> Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
-        True
+        >>> assert Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
     """
     # todo: method type introspection was in v37, but complicated and underutilized?
     #       - detect class methods as caller hint
