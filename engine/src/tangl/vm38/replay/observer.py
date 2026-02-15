@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Iterator
-from uuid import UUID
 
-from tangl.core38 import Selector, Registry
+from tangl.core38 import Registry
 from .patch import Event, Patch
 
 
@@ -17,7 +15,7 @@ class RegistryObserver:
         super().__init__(*args, **kwargs)
         self.initial_value_hash = self.registry.value_hash()
 
-    def observe(self, event: Event) -> None:
+    def submit_event(self, event: Event) -> None:
         self.events.append(event)
 
     def get_patch(self, label=None, tags=None) -> Patch:

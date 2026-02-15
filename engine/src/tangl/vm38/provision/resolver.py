@@ -4,7 +4,7 @@ from typing import Iterable, Optional, TypeAlias, Union, Self
 from tangl.core38 import EntityGroup, EntityTemplate, resolve_ctx, Node, Selector
 from ..dispatch import on_provision
 from .provisioner import ProvisionOffer, FindProvisioner, TemplateProvisioner, FallbackProvisioner, ProvisionPolicy
-from .requirement import Requirement, RT, Dependency
+from .requirement import Requirement, PT, Dependency
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
@@ -28,15 +28,16 @@ class Resolver:
         return cls(entity_groups=ctx.get_entity_groups(),
                    template_groups=ctx.get_template_groups())
 
-    def gather_offers(self, requirement: Requirement[RT], *, _ctx=None) -> list[ProvisionOffer]:
+    def gather_offers(self, requirement: Requirement[PT], *, _ctx=None) -> list[ProvisionOffer]:
 
         # todo: need an AffordanceProvider that can satisfy requirements with
         #       an already linked affordance edge on this node
 
         offers: list[ProvisionOffer] = []
 
-        # If there are more than 20 groups, the priorities will slip from NORMAL
-        # to LATE
+        # If there are more than 20 groups, the distance-based priorities will slip
+        # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
+        # out but not global into "far away" tier and then include globals as the last group.
         for i, entity_group in enumerate(self.entity_groups):
             offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
 
@@ -58,7 +59,7 @@ class Resolver:
         offers.sort(key=lambda v: v.sort_key())
         return offers
 
-    def resolve_requirement(self, requirement: Requirement[RT], *, _ctx=None) -> Optional[RT]:
+    def resolve_requirement(self, requirement: Requirement[PT], *, _ctx=None) -> Optional[PT]:
         # updates requirement in place, returns provider to allow linking at dependency level
 
         offers = self.gather_offers(requirement, _ctx)
@@ -80,7 +81,7 @@ class Resolver:
         #       and/or stash it somewhere for audit?
         return offers[0].callback(_ctx=_ctx)
 
-    def resolve_dependency(self, dependency: Dependency[RT], *, _ctx=None) -> bool:
+    def resolve_dependency(self, dependency: Dependency[PT], *, _ctx=None) -> bool:
 
         provider = self.resolve_requirement(requirement=dependency.requirement, _ctx=_ctx)
         if provider is not None:

@@ -2,13 +2,12 @@ from __future__ import annotations
 from typing import Optional, Generic, TypeVar, Iterable
 from uuid import UUID
 
-from tangl.core38 import Entity, Registry, RegistryAware, Selector, Edge, EntityTemplate
+from tangl.core38 import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
 from .provisioner import ProvisionPolicy, ProvisionOffer
 
-RT = TypeVar('RT', bound=RegistryAware)
+PT = TypeVar('PT', bound=RegistryAware)  # 'ProviderType'
 
-
-class Requirement(Selector, Generic[RT]):
+class Requirement(Selector, Generic[PT]):
     """
     Example:
         >>> e = Entity(label='foo')
@@ -41,10 +40,10 @@ class Requirement(Selector, Generic[RT]):
     unsatisfiable: Optional[bool] = None           # unknown
     unambiguously_resolved: Optional[bool] = None  # unknown
 
-    def satisfied_by(self, entity: RT) -> bool:
+    def satisfied_by(self, entity: PT) -> bool:
         return self.matches(entity)
 
-    def _validate_satisfied_by(self, entity: RT) -> bool:
+    def _validate_satisfied_by(self, entity: PT) -> bool:
         if not self.satisfied_by(entity):
             raise ValueError(f'Requirement {self} not satisfied by {entity!r}')
         return True
@@ -54,7 +53,7 @@ class Requirement(Selector, Generic[RT]):
     # a cloner could take such an offer and combine it with an existing source
 
 
-class HasRequirement(RegistryAware, Generic[RT]):
+class HasRequirement(RegistryAware, Generic[PT]):
     """
     Example:
         >>> reg = Registry()
@@ -83,29 +82,29 @@ class HasRequirement(RegistryAware, Generic[RT]):
     # nodes may have multiple dependency edges, for example, but each dependency has
     # a single requirement.
 
-    requirement: Requirement[RT]
+    requirement: Requirement[PT]
 
     # delegators
 
     @property
-    def provider(self) -> Optional[RT]:
+    def provider(self) -> Optional[PT]:
         if self.requirement.provider_id is not None:
             return self.registry.get(self.requirement.provider_id)
 
-    def set_provider(self, provider: RT, _ctx=None) -> None:
+    def set_provider(self, provider: PT, _ctx=None) -> None:
         if (self.requirement._validate_satisfied_by(provider) and
                 self.registry._validate_linkable(provider)):
             self.requirement.provider_id = provider.uid
 
     @provider.setter
-    def provider(self, value: RT) -> None:
+    def provider(self, value: PT) -> None:
         self.set_provider(value)
 
     @property
     def satisfied(self):
         return self.requirement.satisfied
 
-    def satisfied_by(self, entity: RT) -> bool:
+    def satisfied_by(self, entity: PT) -> bool:
         return self.requirement.satisfied_by(entity)
 
 
@@ -117,8 +116,13 @@ class HasRequirement(RegistryAware, Generic[RT]):
 # on their requirement component.  Need to be careful to watch that.
 
 
-class Dependency(Edge, HasRequirement, Generic[RT]):
+class Dependency(Edge, HasRequirement[PT], Generic[PT]):
     """
+    The frontier node is _always_ the source/predecessor, resource is _always_ the
+    dest/successor; dependenciess link from frontier to resources.
+
+    Deps are 'pull' resources.
+
     Example:
         >>> reg = Registry()
         >>> r = Dependency(requirement={'has_identifier': 'foo'}); reg.add(r)
@@ -135,21 +139,30 @@ class Dependency(Edge, HasRequirement, Generic[RT]):
 
     """
 
-    # another layer of delegators
+    # another layer of delegators, the important thing here is that the 'on_link'
+    # hook gets triggered when the provider is set.  Could do that by syncing the
+    # provider and successor, or by ignoring successor_id and rewiring set_provider to
+    # call the on_link hook.
 
-    # frontier is always the source/predecessor, resource is always the dest/successor
-    # deps link from frontier to resources
 
-    def set_provider(self, value: RT, _ctx=None) -> None:
+    def set_provider(self, value: PT, _ctx=None) -> None:
+        # could just leave successor_id None and defer to provider-id in all cases to
+        # entirely avoid syncing concern.  might also make the end-type more clear as
+        # the expected provider type.
         super().set_provider(value, _ctx=_ctx)
         super().set_successor(value, _ctx=_ctx)
 
-    def set_successor(self, value: RT, _ctx=None) -> None:
+    def set_successor(self, value: PT, _ctx=None) -> None:
         self.set_provider(value, _ctx=_ctx)
 
 
-class Affordance(Edge, HasRequirement, Generic[RT]):
+class Affordance(Edge, HasRequirement[PT], Generic[PT]):
     """
+    Frontier node is _always_ the source/predecessor, resource is always the
+    dest/successor; affordances provide resources to frontier.
+
+    Affordances are 'push' resources.
+
     Example:
             >>> reg = Registry()
             >>> r = Affordance(requirement={'has_identifier': 'foo'}); reg.add(r)
@@ -163,15 +176,12 @@ class Affordance(Edge, HasRequirement, Generic[RT]):
             <RegistryAware:foo>
             >>> r.predecessor
             <RegistryAware:foo>
-"""
+    """
     # another layer of delegators
 
-    # frontier is always the source/predecessor, resource is always the dest/successor
-    # affordances provide resources to frontier
-
-    def set_provider(self, value: RT, _ctx=None) -> None:
+    def set_provider(self, value: PT, _ctx=None) -> None:
         super().set_provider(value, _ctx=_ctx)
         super().set_predecessor(value, _ctx=_ctx)
 
-    def set_predecessor(self, value: RT, _ctx=None) -> None:
+    def set_predecessor(self, value: PT, _ctx=None) -> None:
         self.set_provider(value, _ctx=_ctx)

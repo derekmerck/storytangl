@@ -104,7 +104,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.fields import FieldInfo
 from shortuuid import ShortUUID
 
-from tangl.type_hints import Identifier, Label, StringMap, Tag, UnstructuredData
+from tangl.type_hints import Identifier, Label, StringMap, Tag, UnstructuredData, Hash
 from tangl.utils.hashing import hashing_func
 
 logger = logging.getLogger(__name__)
@@ -279,7 +279,7 @@ class HasIdentity(BaseModelPlus):
         return self.label or self.shortcode()
 
     @is_identifier
-    def id_hash(self) -> bytes:
+    def id_hash(self) -> Hash:
         # distinct from value_hash, content_hash
         # this _is_ frozen, so we could make this a cached- or shelved-property
         return hashing_func(self.__class__, self.uid)
@@ -400,9 +400,10 @@ class Unstructurable(BaseModelPlus):
         data['kind'] = self.__class__
         return data
 
-    def value_hash(self) -> bytes:
-        # Not frozen, don't want to use cached- or shelved-property, so maybe
-        # don't want to recompute for every id?
+    def value_hash(self) -> Hash:
+        # Distinct from content hash, this is always based on the Entity's
+        # unstructured dict.  For frozen entities, it _may_ be considered
+        # to be content.
         return hashing_func(self.unstructure())
 
     def eq_by_value(self, other: Self) -> bool:
@@ -425,7 +426,9 @@ class Unstructurable(BaseModelPlus):
 class HasContent(BaseModelPlus):
     """Adds stable content hashing and compare-by-content semantics.
 
-    Content hashing is meaningful only when the hashable content is stable.
+    Content hashing is meaningful as an identifier only when the hashable
+    content is stable.  However, it _is_ meaningful as a state comparator
+    for unstable content.
 
     Subclasses must implement :meth:`get_hashable_content`.
 
@@ -448,9 +451,12 @@ class HasContent(BaseModelPlus):
         ...
 
     @is_identifier
-    def content_hash(self) -> bytes:
+    def content_hash(self) -> Hash:
         # frozen, could make this into a cached- or shelved-property
         return hashing_func(self.get_hashable_content())
+
+    # todo: want to use a computed_property or cached property _iff_ the model config
+    #       is frozen, as with Record and descendents
 
     def eq_by_content(self, other: Self) -> bool:
         if self.__class__ is not other.__class__:

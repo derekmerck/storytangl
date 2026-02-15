@@ -17,6 +17,8 @@ dispatch = BehaviorRegistry(label="vm_dispatch", default_dispatch_layer=Dispatch
 # the registries business can be done inside chain-execute if it gets a context
 # converting named args to caller, etc. and aggregation is maybe a lookup table?
 
+# can simplify dispatch and use phase spec map for automated dispatch and return type checking
+
 # Provisioning Hooks
 # ------------------
 

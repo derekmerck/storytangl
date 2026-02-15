@@ -71,6 +71,9 @@ class Record(HasContent, HasOrder, Entity):
                 return getattr(self, field_name)
         raise AttributeError("No content available.")
 
+    # since a record is frozen, we _can_ cache the value hash minus non-generics
+    # (uid, label) and use it as the content hash in a pinch.
+
     def origin(self, registry: Registry[ET]) -> ET:
         return registry.get(self.origin_id)
 

@@ -12,15 +12,22 @@ if TYPE_CHECKING:
 
 
 class ProvisionPolicy(Flag):
-    FORCE = auto()  # for offers only, forces highest priority
+    # For offers only
+    FORCE = auto()  # forces highest priority and always allowed
+    TOKEN = auto()  # indicate offer is for a token
+
+    # Offer may include ONE of these, req may include multiple
     EXISTING = auto()
     UPDATE = auto()
     CREATE = auto()
     CLONE = auto()   # create + update
-    ANY = EXISTING | UPDATE | CREATE  # for requirements only, not offers
+
+    # for requirements only
+    ANY = EXISTING | UPDATE | CREATE
 
     def __int__(self):
-        # should be monotonic
+        # should be monotonic, force is lowest
+        # (create | token) should probably be cheaper than create alone?
         return self.value
 
 
@@ -131,7 +138,37 @@ class TokenProvisioner:
         for c in candidates:
             yield ProvisionOffer(
                 origin_id = f"{c.get_label()}:{requirement.token_from}",
-                policy = ProvisionPolicy.CREATE_TOKEN,
+                policy = ProvisionPolicy.CREATE | ProvisionPolicy.TOKEN,
                 callback = c.materialize(requirement.token_from),
                 priority=Priority.EARLY  # tokens are considered to be cheaper than full nodes when available
             )
+
+
+class CloneProvisioner:
+    """
+    Update/Clone
+
+    Requirement must include 2 parts:
+    - a reference selector to identify the reference object
+    - an update template selector or fallback template for the update
+
+    - For update we want to mutate while preserving uid and existing roles etc.
+      Example: "The npc that I met in the bar the next day, wearing their work outfit"
+    - For clone, we want to evolve and assign a new uid and fresh attribs constrained by template
+      Example: "The older brother of the npc that I met in the bar".
+
+    find a valid reference and evolve/update with:
+    - new uid
+    - new given name, same family name
+    - similar physiology
+    - slightly greater age
+    - add familial relationship back to reference (which triggers a
+      symmetric update on the reference back to the clone)
+
+    In both cases, we need a 'find' phase and an 'update reference' phase.
+    Clone is just copy with update.
+
+    - Inspect offers in context to identify any valid FIND offers
+    - Dispatch an update provision req based on each find target
+    """
+    ...

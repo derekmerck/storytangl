@@ -1,9 +1,10 @@
 # everything for resolving a single traversal step on a graph
 # frames are ephemeral, their output is strictly reproducible tho
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional, TypeAlias, Mapping, Any, Callable, Iterable
+from typing import Optional, TypeAlias, Mapping, Any, Callable, Iterable, Union
 from random import Random
 from uuid import UUID
 from contextlib import contextmanager
@@ -11,16 +12,15 @@ from copy import copy
 
 from tangl.core38 import Graph, OrderedRegistry, CallReceipt, Node, Behavior, BehaviorRegistry
 from ..dispatch import dispatch as vm_dispatch, do_validate, do_provision, do_prereqs, do_update, do_journal, do_finalize, do_postreqs
-from ..traversable import TraversableNode, TraversableEdge, AnonymousEdge
+from ..traversable import TraversableNode, TraversableEdge, AnonymousEdge, AnyTraversableEdge
 from ..resolution_phase import ResolutionPhase
 
-AnyTraversableEdge: TypeAlias = TraversableEdge | AnonymousEdge
-NS: TypeAlias = Mapping[str, Any]
+NS: TypeAlias = Mapping[str, Any]  # namespace of { symbol: value }, same format as unstructured data
 
 @dataclass
 class PhaseCtx:
-    # Phase-specific ctx
-    graph: Graph
+    # Phase-specific ctx, must provide DispatchCtx capabilities/protocol
+    graph: Union[Graph | 'WatchedRegistry']
     cursor_id: UUID
 
     @cached_property
@@ -29,15 +29,6 @@ class PhaseCtx:
         return self.graph.get(self.cursor_id)
 
     current_phase: ResolutionPhase
-    receipts: list[CallReceipt] = field(default_factory=list)
-
-    @contextmanager
-    def with_fresh_receipts(self):
-        # for sub-dispatches
-        receipts = copy(self.receipts)  # do we need to copy, or can we just grab the ptr?
-        self.receipts = []
-        yield self
-        self.receipts = receipts
 
     _ns_cache: dict[UUID, NS] = field(default_factory=dict)
 
@@ -52,6 +43,17 @@ class PhaseCtx:
 
     def get_templates(self):
         return self.graph.world.templates  # want to group these wrt scope-dist from caller
+
+    # pretty generic, probably should be in core DispatchCtx
+    receipts: list[CallReceipt] = field(default_factory=list)
+
+    @contextmanager
+    def with_fresh_receipts(self):
+        # for sub-dispatches
+        receipts = copy(self.receipts)  # do we need to copy, or can we just grab the ptr?
+        self.receipts = []
+        yield self
+        self.receipts = receipts
 
     # Dispatch ctx
     def get_dispatches(self) -> Iterable[BehaviorRegistry]:
@@ -88,7 +90,8 @@ class Frame:
         return PhaseCtx(
             random=self.frame_random,
             graph=self.graph,
-            cursor=self.cursor,
+            cursor_id=self.cursor.uid,
+            # use cursor_id, we want to force a get from a watched registry if using one
             current_phase=phase,
         )
 
