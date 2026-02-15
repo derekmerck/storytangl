@@ -163,6 +163,44 @@ def mock_ctx_with_registry() -> tuple[SimpleNamespace, object]:
     return ctx, registry
 
 
+@pytest.fixture
+def inline_ctx() -> callable:
+    """Build a context object carrying inline behaviors only."""
+
+    def _make(*funcs):
+        return SimpleNamespace(
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: list(funcs),
+        )
+
+    return _make
+
+
+@pytest.fixture
+def layered_ctx() -> callable:
+    """Build a context containing registries at named dispatch layers."""
+    from tangl.core38.behavior import BehaviorRegistry, DispatchLayer
+
+    def _make(**layer_funcs):
+        registries = []
+        for layer_name, funcs in layer_funcs.items():
+            layer = DispatchLayer[layer_name.upper()]
+            registry = BehaviorRegistry(default_dispatch_layer=layer)
+            for func_spec in funcs:
+                if isinstance(func_spec, tuple):
+                    func, task = func_spec
+                else:
+                    func, task = func_spec, None
+                registry.register(func=func, task=task)
+            registries.append(registry)
+        return SimpleNamespace(
+            get_registries=lambda: registries,
+            get_inline_behaviors=lambda: [],
+        )
+
+    return _make
+
+
 @pytest.fixture(autouse=True)
 def clean_global_dispatch() -> None:
     """Keep global dispatch state isolated between tests."""

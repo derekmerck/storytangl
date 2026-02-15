@@ -44,6 +44,7 @@ class RuntimeCtx(Protocol):
     def get_receipts(self) -> list[CallReceipt]: ...
     def get_aggregation_mode(self) -> AggregationMode: ...
     def get_registries(self) -> list[BehaviorRegistry]: ...
+    def get_inline_behaviors(self) -> Iterable[Behavior | Callable[..., Any]]: ...
 
 
 class AggregationMode(Enum):
@@ -182,7 +183,7 @@ class Behavior(RegistryAware, HasOrder, Entity):
         15
         >>> f"sum{deferred.args}={deferred.result}"
         'sum(4, 5, 6)=15'
-        >>> c = Behavior(func=lambda *_, **__: True, wants_kind=Entity)
+        >>> c = Behavior(func=lambda *_, **__: True, wants_caller_kind=Entity)
         >>> Selector(caller_kind=Entity).matches(c) and not Selector(caller_kind=dict).matches(c)
         True
     """
@@ -196,17 +197,17 @@ class Behavior(RegistryAware, HasOrder, Entity):
     priority: int = Priority.NORMAL
     dispatch_layer: int = DispatchLayer.LOCAL
 
-    wants_kind: Type[Entity] = None
+    wants_caller_kind: Type[Entity] = None
     wants_exact_kind: bool = True  # disallow caller-kind subclasses
 
     def caller_kind(self, kind: Type[Entity]) -> bool:
-        logger.debug(f"checking if caller_kind(kind) in wants_kind")
-        if self.wants_kind is None:
+        logger.debug("checking caller kind against wants_caller_kind")
+        if self.wants_caller_kind is None:
             return True
         if isclass(kind):
-            if kind is self.wants_kind:
+            if kind is self.wants_caller_kind:
                 return True
-            elif not self.wants_exact_kind and issubclass(kind, self.wants_kind):
+            elif not self.wants_exact_kind and issubclass(kind, self.wants_caller_kind):
                 return True
         return False
 
@@ -299,21 +300,34 @@ class BehaviorRegistry(Registry[Behavior]):
         Yields:
             CallReceipt for each executed behavior in sort order
         """
-        if task is not None:
-            selector = selector or Selector()
-            selector = selector.with_criteria(task=task)
+        return self.chain_execute(
+            self,
+            call_args=call_args,
+            call_kwargs=call_kwargs,
+            ctx=ctx,
+            task=task,
+            selector=selector,
+            inline_behaviors=inline_behaviors,
+        )
 
-        # selector from task, sort_key from prio, seq
-        # if inline behaviors or ctx carries dispatch layers
-        #   do a chain_find_all
-        behaviors = self.find_all(selector=selector,
-                                  sort_key=lambda v: v.sort_key)
-        if inline_behaviors:
-            # todo: allow inline behaviors to be funcs and cast them to behaviors with layer local before adding them.
-            behaviors = list(behaviors)
-            behaviors.extend(inline_behaviors)
-            behaviors.sort(key=lambda v: v.sort_key)
-        return self._get_receipts(behaviors, call_args=call_args, call_kwargs=call_kwargs, ctx=ctx)
+    @classmethod
+    def _wrap_inline(
+        cls,
+        behaviors: Iterable[Behavior | Callable[..., Any]],
+        *,
+        task: Tag = "inline",
+    ) -> BehaviorRegistry:
+        """Wrap ad-hoc inline callables/behaviors into a temporary local registry."""
+        registry = cls(default_dispatch_layer=DispatchLayer.LOCAL)
+        for behavior in behaviors:
+            if isinstance(behavior, Behavior):
+                registry.add(behavior)
+                continue
+            if callable(behavior):
+                registry.register(func=behavior, task=task)
+                continue
+            raise TypeError(f"Expected Behavior or callable, got {type(behavior)!r}")
+        return registry
 
     @classmethod
     def chain_execute(cls, *registries,
@@ -324,16 +338,37 @@ class BehaviorRegistry(Registry[Behavior]):
                       inline_behaviors: Iterable[Behavior] = None
                       ) -> Iterator[CallReceipt]:
 
+        assembled_registries = list(registries)
+
+        if ctx is not None:
+            get_registries = getattr(ctx, "get_registries", None)
+            if callable(get_registries):
+                assembled_registries.extend(get_registries() or ())
+
+            get_inline_behaviors = getattr(ctx, "get_inline_behaviors", None)
+            if callable(get_inline_behaviors):
+                inline_from_ctx = get_inline_behaviors() or ()
+                if inline_from_ctx:
+                    assembled_registries.append(cls._wrap_inline(inline_from_ctx, task=task or "inline"))
+
+        if inline_behaviors:
+            assembled_registries.append(cls._wrap_inline(inline_behaviors, task=task or "inline"))
+
+        deduplicated_registries: list[BehaviorRegistry] = []
+        seen_registry_ids: set[int] = set()
+        for registry in assembled_registries:
+            registry_id = id(registry)
+            if registry_id in seen_registry_ids:
+                continue
+            seen_registry_ids.add(registry_id)
+            deduplicated_registries.append(registry)
+
         if task is not None:
-            selector = selector or Selector()
-            selector = selector.with_criteria(task=task)
+            selector = (selector or Selector()).with_criteria(task=task)
 
         behaviors = cls.chain_find_all(
-            *registries,
+            *deduplicated_registries,
             selector=selector,
-            sort_key=lambda v: v.sort_key)
-        if inline_behaviors:
-            behaviors = list(behaviors)
-            behaviors.extend(inline_behaviors)
-            behaviors.sort(key=lambda v: v.sort_key)
+            sort_key=lambda v: v.sort_key,
+        )
         return cls._get_receipts(behaviors, call_args=call_args, call_kwargs=call_kwargs, ctx=ctx)
