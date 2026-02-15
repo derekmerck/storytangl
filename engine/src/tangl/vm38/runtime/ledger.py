@@ -5,7 +5,7 @@ from pydantic import Field
 
 from tangl.type_hints import UnstructuredData
 from tangl.core38 import Graph, OrderedRegistry, Entity, Snapshot, Selector
-from ..traversable import TraversableNode, TraversableEdge
+from tangl.vm38.traversable import TraversableNode, TraversableEdge
 from .frame import Frame
 
 class Ledger(Entity):
@@ -16,17 +16,6 @@ class Ledger(Entity):
 
     # - The cursor and return stack of edges to prior cursors are stored as UUIDs
     cursor_id: UUID
-    return_stack_ids: list[UUID] = Field(default_factory=list)
-
-    # - cursor counters for tracking traversal distance (pass these into frame ctx for game rounds, turns passed, etc.)
-    reentrant_steps: int = -1  # number of times logic reentered the current cursor without exit
-    cursor_steps: int = -1      # total number of cursor updates (non-reentrant follows)
-    choice_steps: int = -1      # total number of choice resolutions
-
-    # - User is attached/detached by the persistence layer
-    user: Optional[Entity] = Field(None, exclude=True)
-    # - convenience for checking persistence layer assumptions
-    user_id: Optional[UUID] = None
 
     @property
     def cursor(self) -> TraversableNode:
@@ -37,8 +26,33 @@ class Ledger(Entity):
         if value is not None:
             self.cursor_id = value
 
-    def get_return_stack(self) -> list[TraversableEdge]:
-        return [self.graph.get(e) for e in self.return_stack_ids]
+    call_stack_ids: list[UUID] = Field(default_factory=list)
+
+    def _call_stack(self) -> list[TraversableEdge]:
+        # do not push directly!  This is marked private b/c it's just
+        # for introspection of the actual members, use push_call and
+        # pop_call.
+        return [self.graph.get(e) for e in self.call_stack_ids]
+
+    def push_call(self, edge: TraversableEdge):
+        if not edge.return_phase is not None:
+            raise ValueError("Putting a call onto the stack requires a return phase/type")
+        self.call_stack_ids.append(edge.uid)
+
+    def pop_call(self) -> TraversableEdge:
+        # don't forget to reverse it to follow it back
+        call_edge_id = self.call_stack_ids.pop()
+        return self.graph.get(call_edge_id)  # type: TraversableEdge
+
+    # - cursor counters for tracking traversal distance (pass these into frame ctx for game rounds, turns passed, etc.)
+    reentrant_steps: int = -1  # number of times logic reentered the current cursor without exit
+    cursor_steps: int = -1      # total number of cursor updates (non-reentrant follows)
+    choice_steps: int = -1      # total number of choice resolutions
+
+    # - User is attached/detached by the persistence layer
+    user: Optional[Entity] = Field(None, exclude=True)
+    # - convenience for checking persistence layer assumptions
+    user_id: Optional[UUID] = None
 
     def get_frame(self) -> Frame:
         return Frame(self.graph, self.cursor, self.output_stream, self.get_return_stack())
