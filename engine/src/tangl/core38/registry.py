@@ -189,9 +189,9 @@ class Registry(Entity, Generic[ET]):
         return item
         # or return self.members[key] if you want to throw a key error
 
-    def all_labels(self) -> set[str | None]:
+    def all_labels(self) -> set[str]:
         """Return labels for all stored members."""
-        return {value.label for value in self.members.values()}
+        return {value.get_label() for value in self.members.values()}
 
     @classmethod
     def _filter_and_sort(cls, values, selector=None, sort_key=None) -> Iterator[ET]:

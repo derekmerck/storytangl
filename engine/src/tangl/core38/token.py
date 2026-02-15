@@ -23,6 +23,7 @@ import sys
 import logging
 from types import MethodType
 from typing import Any, ClassVar, Generic, Self, Type, TypeVar
+from copy import deepcopy
 
 import pydantic
 from pydantic import Field, PrivateAttr, field_validator, model_validator
@@ -119,14 +120,16 @@ class Token(Node, Generic[WST]):
             raise ValueError(f"No instance of `{cls.wrapped_cls.__name__}` found for ref label `{value}`.")
         return value
 
-
     @model_validator(mode="after")
     def _hydrate_instance_vars_from_referent(self) -> Self:
         """Backfill unset instance vars from the referenced singleton instance."""
         for field_name in self._instance_vars(self.wrapped_cls):
             if field_name in self.model_fields_set:
                 continue
-            setattr(self, field_name, getattr(self.reference_singleton, field_name))
+            # If this is a collection or object pointer, we don't want to accidentally
+            # mutate the frozen reference's reference data, so initialize with a copy.
+            value = deepcopy( getattr(self.reference_singleton, field_name) )
+            setattr(self, field_name, value)
         return self
 
     @property
