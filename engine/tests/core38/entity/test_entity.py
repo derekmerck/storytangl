@@ -194,7 +194,7 @@ class TestEntityDispatchHooks:
         entity = Entity(label="x", _ctx=ctx)
         assert entity.has_tags("global", "ctx")
 
-    def test_ctx_requires_get_registries(self) -> None:
+    def test_ctx_without_get_registries_is_graceful(self) -> None:
         bad_ctx = SimpleNamespace(get_inline_behaviors=lambda: [])
-        with pytest.raises(AttributeError):
-            Entity(label="x", _ctx=bad_ctx)
+        entity = Entity(label="x", _ctx=bad_ctx)
+        assert entity.label == "x"

@@ -24,16 +24,27 @@ See `Entity.__init__()`, `Registry.add_item()`, etc. for injection examples.
 See `vm.dispatch`, `story.dispatch`, `service.dispatch`, etc. for examples of other dispatch layers and pre-defined hook points.
 
 Example:
-    >>> Entity(label="bar")
-    <Entity:bar>
+    >>> assert Entity(label="bar").label == "bar"
     >>> _ = on_init(func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "foo"))
-    >>> Entity(label="bar", _ctx=SimpleNamespace(get_registries=lambda: []))  # calls global dispatch by default
-    <Entity:foo>
+    >>> item = Entity(
+    ...     label="bar",
+    ...     _ctx=SimpleNamespace(
+    ...         get_registries=lambda: [],
+    ...         get_inline_behaviors=lambda: [],
+    ...     ),
+    ... )  # calls global dispatch by default
+    >>> assert item.label == "foo"
     >>> q = BehaviorRegistry()
     >>> _ = q.register(task="init", dispatch_layer=DispatchLayer.APPLICATION,
     ...                func=lambda *, caller, ctx = None, **kwargs: setattr(caller, "label", "baz"))
-    >>> Entity(label="bar", _ctx=SimpleNamespace(get_registries=lambda: [q]))
-    <Entity:baz>
+    >>> item = Entity(
+    ...     label="bar",
+    ...     _ctx=SimpleNamespace(
+    ...         get_registries=lambda: [q],
+    ...         get_inline_behaviors=lambda: [],
+    ...     ),
+    ... )
+    >>> assert item.label == "baz"
     >>> dispatch.clear()  # always clean up global registries after using
 
 
@@ -74,15 +85,11 @@ def on_init(func, **kwargs):
 
 def do_init(*, caller: Entity, ctx: RuntimeCtx):
     # chance to validate in-place
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'caller': caller},
-        selector = Selector(caller_kind=type(caller)), # only match if behavior wants this caller type
-        task = "init"
+        selector=Selector(caller_kind=type(caller)),  # only match caller-compatible behaviors
+        task="init",
     )
     CallReceipt.gather_results(*receipts)  # force results to evaluate
 
@@ -91,14 +98,10 @@ def on_create(func, **kwargs):
 
 def do_create(*, data: UnstructuredData, ctx: RuntimeCtx):
     """Chance to fold in updates to unstructured data/inst kwargs, including the kind-hint"""
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'data': data},
-        task = "create"
+        task="create",
     )
     update = CallReceipt.merge_results(*receipts)
     if update:
@@ -115,46 +118,36 @@ def do_add_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
     # chance to audit or modify the item _before_ inserting it
     # todo: do we want to allow this to be mutated or, or is it read only for
     #       inspection/audit like remove?  can modify on `get` if we need to
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'registry': registry, 'item': item},
-        task = "add_item"
+        task="add_item",
     )
-    return CallReceipt.last_result(*receipts) or item
+    result = CallReceipt.last_result(*receipts)
+    return result if result is not None else item
 
 def on_get_item(func, **kwargs):
     return dispatch.register(func=func, task="get_item", **kwargs)
 
 def do_get_item(registry: Registry, item: Entity, ctx: RuntimeCtx) -> Entity:
     # chance to modify or update the requested object before returning it
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'registry': registry, 'item': item},
-        task = "get_item"
+        task="get_item",
     )
-    return CallReceipt.last_result(*receipts) or item
+    result = CallReceipt.last_result(*receipts)
+    return result if result is not None else item
 
 def on_remove_item(func, **kwargs):
     return dispatch.register(func=func, task="remove_item", **kwargs)
 
 def do_remove_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
     # chance to audit the requested object after removal but before discarding it
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'registry': registry, 'item': item},
-        task = "remove_item"
+        task="remove_item",
     )
     CallReceipt.gather_results(*receipts)  # force receipt evaluation
 
@@ -166,14 +159,10 @@ def on_link(func, **kwargs):
 
 def do_link(caller: GraphItem, node: Node, ctx: RuntimeCtx):
     # audit _before_ linking
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'caller': caller, 'node': node},
-        task="link"
+        task="link",
     )
     CallReceipt.gather_results(*receipts)
 
@@ -182,13 +171,9 @@ def on_unlink(func, **kwargs):
 
 def do_unlink(caller: GraphItem, node: Node, ctx: RuntimeCtx):
     # audit _after_ unlinking (undiscarded, remains in graph)
-    registries = ctx.get_registries() or []
-    if dispatch not in registries:
-        registries.append(dispatch)
-    receipts = dispatch.chain_execute(
-        *registries,
+    receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'caller': caller, 'node': node},
-        task="unlink"
+        task="unlink",
     )
     CallReceipt.gather_results(*receipts)

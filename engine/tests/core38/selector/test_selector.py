@@ -102,7 +102,7 @@ class TestSelectorMatching:
         assert Selector(has_identifier=entity.uid).matches(entity)
 
     def test_match_caller_kind(self) -> None:
-        behavior = Behavior(func=lambda **_: True, wants_kind=Entity)
+        behavior = Behavior(func=lambda **_: True, wants_caller_kind=Entity)
         assert Selector(caller_kind=Entity).matches(behavior)
         assert not Selector(caller_kind=dict).matches(behavior)
 
