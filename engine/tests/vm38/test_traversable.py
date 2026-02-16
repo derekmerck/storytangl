@@ -9,8 +9,11 @@ Organized by concept:
 
 from __future__ import annotations
 
+import doctest
+
 import pytest
 
+import tangl.vm38.traversable as traversable_module
 from tangl.core38 import Graph
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.traversable import (
@@ -326,3 +329,22 @@ class TestAnonymousEdge:
         b = _node(g, label="b")
         e = AnonymousEdge(successor=b)
         assert not hasattr(e, "return_phase")
+
+
+# ============================================================================
+# Doctest regression
+# ============================================================================
+
+
+class TestTraversableDocExamples:
+    """Regression coverage for ``traversable`` doctest examples."""
+
+    def test_doctest_examples_run_under_std_runner(self) -> None:
+        finder = doctest.DocTestFinder()
+        runner = doctest.DocTestRunner(optionflags=doctest.ELLIPSIS)
+
+        for test in finder.find(traversable_module):
+            runner.run(test)
+
+        result = runner.summarize(verbose=False)
+        assert result.failed == 0
