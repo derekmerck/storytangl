@@ -32,11 +32,11 @@ See Also
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, TypeAlias, Union
+from typing import Any, Mapping, Optional, TypeAlias, Union
 from uuid import UUID
 
-from tangl.core38 import HierarchicalNode, Edge, Node, Selector
-from tangl.core38.bases import HasState
+from tangl.core38 import Edge, Graph, HierarchicalNode, Node, Selector
+from tangl.core38.bases import HasAvailability, HasEffects, HasState
 from .resolution_phase import ResolutionPhase
 
 
@@ -45,6 +45,8 @@ __all__ = [
     "TraversableEdge",
     "AnonymousEdge",
     "AnyTraversableEdge",
+    "validate_traversal_contracts",
+    "assert_traversal_contracts",
     "lca",
     "decompose_move",
 ]
@@ -179,7 +181,7 @@ def decompose_move(
 # TraversableNode
 # ---------------------------------------------------------------------------
 
-class TraversableNode(HasState, HierarchicalNode):
+class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
     """Graph node that participates in cursor-driven traversal.
 
     Why
@@ -482,6 +484,22 @@ class TraversableEdge(Edge):
         """Type-narrowed successor."""
         return super().successor
 
+    def available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
+        """Availability check delegated to the successor node.
+
+        Judgment call
+        -------------
+        Edges do not carry separate guard registries in v38. Edge availability
+        delegates to successor node availability so a single guard model can
+        gate both auto-redirect and explicit traversal.
+        """
+        successor = self.successor
+        if successor is None:
+            return False
+        if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            ns = ctx.get_ns(successor)
+        return successor.available(ns=ns)
+
     def get_return_edge(self) -> AnonymousEdge:
         """Construct the return edge from this call edge.
 
@@ -573,6 +591,14 @@ class AnonymousEdge:
         phase = f"@{self.entry_phase.name}" if self.entry_phase else ""
         return f"<AnonymousEdge:{src}->{dst}{phase}>"
 
+    def available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
+        """Availability check delegated to successor node availability."""
+        if self.successor is None:
+            return False
+        if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            ns = ctx.get_ns(self.successor)
+        return self.successor.available(ns=ns)
+
 
 # ---------------------------------------------------------------------------
 # Type alias
@@ -584,3 +610,61 @@ AnyTraversableEdge: TypeAlias = Union[AnonymousEdge, TraversableEdge]
 ``Frame.follow_edge`` accepts both — the interface overlap (``successor``,
 ``predecessor``, ``entry_phase``) is sufficient for pipeline execution.
 """
+
+
+def validate_traversal_contracts(graph: Graph) -> list[str]:
+    """Return non-fatal traversal contract issues for preflight validation.
+
+    Judgment call (Option C)
+    ------------------------
+    Container source/sink references are allowed to remain unresolved while a
+    graph is under construction. We only fail at point-of-use (for example,
+    ``enter()`` requires a resolvable source). This function exists so callers
+    can run an explicit preflight before execution to surface likely failures.
+
+    Current checks
+    --------------
+    - ``source_id`` is set but does not resolve in the graph.
+    - ``source_id`` resolves but is not a child/member of the container.
+    - ``sink_id`` is set but does not resolve in the graph.
+    - ``sink_id`` resolves but is not a child/member of the container.
+
+    Returns
+    -------
+    list[str]
+        Human-readable issues. Empty list means no detected contract problems.
+    """
+    issues: list[str] = []
+    for node in Selector(has_kind=TraversableNode).filter(graph.values()):
+        source = node.source
+        sink = node.sink
+
+        if node.source_id is not None:
+            if source is None:
+                issues.append(
+                    f"{node!r}: source_id={node.source_id} does not resolve in graph"
+                )
+            elif not node.has_member(source):
+                issues.append(
+                    f"{node!r}: source {source!r} is not a member/child of container"
+                )
+
+        if node.sink_id is not None:
+            if sink is None:
+                issues.append(
+                    f"{node!r}: sink_id={node.sink_id} does not resolve in graph"
+                )
+            elif not node.has_member(sink):
+                issues.append(
+                    f"{node!r}: sink {sink!r} is not a member/child of container"
+                )
+
+    return issues
+
+
+def assert_traversal_contracts(graph: Graph) -> None:
+    """Raise ``ValueError`` if :func:`validate_traversal_contracts` finds issues."""
+    issues = validate_traversal_contracts(graph)
+    if issues:
+        message = "\n".join(issues)
+        raise ValueError(f"Traversal contract validation failed:\n{message}")

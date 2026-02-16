@@ -18,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from tangl.core38 import Graph, Selector
+from tangl.core38.runtime_op import Effect, Predicate
 from tangl.vm38.dispatch import (
     dispatch as vm_dispatch,
     do_gather_ns,
@@ -63,6 +64,7 @@ def register_system_handlers(clean_vm_dispatch):
     on_validate(sh.validate_successor_exists)
     on_prereqs(sh.descend_into_container)
     on_prereqs(sh.follow_triggered_prereqs)
+    on_update(sh.apply_runtime_effects)
     on_update(sh.mark_visited)
     on_postreqs(sh.follow_triggered_postreqs)
 
@@ -124,6 +126,14 @@ class TestValidateSuccessorExists:
         edge = AnonymousEdge(successor=b)
         result = sh.validate_successor_exists(caller=edge, ctx=None)
         assert result is True
+
+    def test_edge_with_unavailable_successor_fails(self, ctx) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b", availability=[Predicate(expr="False")])
+        edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        result = sh.validate_successor_exists(caller=edge, ctx=ctx)
+        assert result is False
 
     def test_fires_through_do_validate(self, ctx) -> None:
         g = Graph()
@@ -203,6 +213,19 @@ class TestFollowTriggeredPrereqs:
         result = sh.follow_triggered_prereqs(caller=a, ctx=None)
         assert result is None
 
+    def test_unavailable_prereq_triggered_edge_not_returned(self, ctx) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b", availability=[Predicate(expr="False")])
+        _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            trigger_phase=ResolutionPhase.PREREQS,
+        )
+        result = sh.follow_triggered_prereqs(caller=a, ctx=ctx)
+        assert result is None
+
 
 # ============================================================================
 # Update: mark_visited
@@ -210,6 +233,14 @@ class TestFollowTriggeredPrereqs:
 
 
 class TestMarkVisited:
+    def test_apply_runtime_effects(self, ctx) -> None:
+        g = Graph()
+        node = _node(g, label="n", effects=[Effect(expr="score = score + 1")])
+        node.locals = {"score": 1}
+        effect_ctx = SimpleNamespace(get_ns=lambda _caller: node.locals)
+        sh.apply_runtime_effects(caller=node, ctx=effect_ctx)
+        assert node.locals["score"] == 2
+
     def test_sets_visited_flag(self) -> None:
         g = Graph()
         node = _node(g, label="n")
@@ -266,4 +297,17 @@ class TestFollowTriggeredPostreqs:
             trigger_phase=ResolutionPhase.PREREQS,
         )
         result = sh.follow_triggered_postreqs(caller=a, ctx=None)
+        assert result is None
+
+    def test_unavailable_postreq_triggered_edge_not_returned(self, ctx) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b", availability=[Predicate(expr="False")])
+        _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            trigger_phase=ResolutionPhase.POSTREQS,
+        )
+        result = sh.follow_triggered_postreqs(caller=a, ctx=ctx)
         assert result is None

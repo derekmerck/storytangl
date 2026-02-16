@@ -10,19 +10,23 @@ Organized by concept:
 from __future__ import annotations
 
 import doctest
+from uuid import uuid4
 
 import pytest
 
 import tangl.vm38.traversable as traversable_module
 from tangl.core38 import Graph
+from tangl.core38.runtime_op import Effect, Predicate
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.traversable import (
     AnonymousEdge,
     AnyTraversableEdge,
     TraversableEdge,
     TraversableNode,
+    assert_traversal_contracts,
     decompose_move,
     lca,
+    validate_traversal_contracts,
 )
 
 
@@ -181,6 +185,11 @@ class TestTraversableNodeLeaf:
         node = _node(g, label="leaf")
         assert node.source is None
 
+    def test_available_defaults_true(self) -> None:
+        g = Graph()
+        node = _node(g, label="leaf")
+        assert node.available() is True
+
 
 class TestTraversableNodeContainer:
     """Container nodes with designated source/sink members."""
@@ -224,6 +233,23 @@ class TestTraversableNodeContainer:
         b = _node(g, label="b")
         # MVP stub always returns True
         assert a.has_forward_progress(b)
+
+    def test_availability_predicates_must_all_pass(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="gate",
+            availability=[Predicate(expr="has_key"), Predicate(expr="level > 2")],
+        )
+        assert node.available(ns={"has_key": True, "level": 3}) is True
+        assert node.available(ns={"has_key": True, "level": 1}) is False
+
+    def test_apply_effects_mutates_namespace(self) -> None:
+        g = Graph()
+        node = _node(g, label="gate", effects=[Effect(expr="counter = counter + 1")])
+        ns = {"counter": 1}
+        node.apply_effects(ns)
+        assert ns["counter"] == 2
 
 
 # ============================================================================
@@ -289,6 +315,13 @@ class TestTraversableEdge:
         assert e.predecessor is a
         assert e.successor is b
 
+    def test_available_delegates_to_successor(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b", availability=[Predicate(expr="False")])
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        assert e.available() is False
+
 
 # ============================================================================
 # AnonymousEdge
@@ -330,6 +363,12 @@ class TestAnonymousEdge:
         e = AnonymousEdge(successor=b)
         assert not hasattr(e, "return_phase")
 
+    def test_available_delegates_to_successor(self) -> None:
+        g = Graph()
+        b = _node(g, label="b", availability=[Predicate(expr="False")])
+        e = AnonymousEdge(successor=b)
+        assert e.available() is False
+
 
 # ============================================================================
 # Doctest regression
@@ -348,3 +387,41 @@ class TestTraversableDocExamples:
 
         result = runner.summarize(verbose=False)
         assert result.failed == 0
+
+
+class TestTraversalContractValidation:
+    def test_valid_container_has_no_issues(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        source = _node(g, label="entry")
+        sink = _node(g, label="exit")
+        container.add_child(source)
+        container.add_child(sink)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+
+        assert validate_traversal_contracts(g) == []
+        assert_traversal_contracts(g)
+
+    def test_unresolved_source_reports_issue(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        container.source_id = uuid4()
+
+        issues = validate_traversal_contracts(g)
+        assert len(issues) == 1
+        assert "source_id" in issues[0]
+        with pytest.raises(ValueError, match="Traversal contract validation failed"):
+            assert_traversal_contracts(g)
+
+    def test_sink_not_member_reports_issue(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        source = _node(g, label="entry")
+        sink = _node(g, label="elsewhere")
+        container.add_child(source)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+
+        issues = validate_traversal_contracts(g)
+        assert any("sink" in issue and "not a member/child" in issue for issue in issues)

@@ -11,17 +11,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
-
 from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
 from tangl.vm38.provision import (
     Dependency,
     FindProvisioner,
-    ProvisionOffer,
+    InlineTemplateProvisioner,
     ProvisionPolicy,
     Requirement,
     Resolver,
-    TemplateProvisioner,
     FallbackProvisioner,
 )
 from tangl.vm38.traversable import TraversableNode
@@ -91,15 +88,39 @@ class TestResolverOfferGathering:
         offers = resolver.gather_offers(req)
         assert len(offers) >= 1
 
-    @pytest.mark.xfail(reason="Not sure how force/missing interact yet.")
-    # fallback provider submits whatever is in the local template
-    # I guess we need a real fallback provider that creates a minimally satisfactory object of the proper kind; it won't tag it as 'force' though, force is the request policy that will match a fallback provision.
-    def test_empty_groups_yield_fallback(self) -> None:
+    def test_empty_groups_yield_force_fallback_only_when_forced(self) -> None:
         resolver = Resolver(entity_groups=[], template_groups=[])
         req = Requirement.from_identifier("missing")
-        offers = resolver.gather_offers(req)
-        # FallbackProvisioner should still offer something
+        offers = resolver.gather_offers(req, force=True)
         assert any(o.policy == ProvisionPolicy.FORCE for o in offers)
+
+        no_force_offers = resolver.gather_offers(req, force=False)
+        assert no_force_offers == []
+
+    def test_force_fallback_not_selected_when_non_force_offer_exists(self) -> None:
+        sword = Entity(label="sword")
+        resolver = Resolver(entity_groups=[[sword]], template_groups=[])
+        req = Requirement.from_identifier("sword")
+        offers = resolver.gather_offers(req, force=True)
+        assert len(offers) == 1
+        assert all(o.policy != ProvisionPolicy.FORCE for o in offers)
+
+    def test_force_fallback_synthesizes_kind_and_identifier(self) -> None:
+        class Person(Entity):
+            pass
+
+        resolver = Resolver(entity_groups=[], template_groups=[])
+        req = Requirement(has_kind=Person, has_identifier="joe")
+        provider = resolver.resolve_requirement(req, force=True)
+        assert isinstance(provider, Person)
+        assert provider.label == "joe"
+
+    def test_inline_template_provisioner_offers_create(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "castle"})
+        req = Requirement(has_identifier="castle", fallback_templ=template)
+        offers = list(InlineTemplateProvisioner.get_dependency_offers(req))
+        assert len(offers) == 1
+        assert offers[0].policy == ProvisionPolicy.CREATE
 
 
 class TestResolverRequirementResolution:
@@ -118,6 +139,14 @@ class TestResolverRequirementResolution:
         assert provider is None
         assert req.unsatisfiable is True
 
+    def test_force_with_existing_offer_prefers_existing(self) -> None:
+        sword = Entity(label="sword")
+        resolver = Resolver(entity_groups=[[sword]])
+        req = Requirement.from_identifier("sword")
+        provider = resolver.resolve_requirement(req, force=True)
+        assert provider is sword
+        assert req.selected_offer_policy == ProvisionPolicy.EXISTING
+
 
 class TestResolverDependencyResolution:
     def test_resolve_dependency_links_provider(self) -> None:
@@ -132,6 +161,29 @@ class TestResolverDependencyResolution:
         assert success is True
         assert dep.satisfied
         assert dep.provider is sword
+
+    def test_force_fallback_bypasses_requirement_validation(self) -> None:
+        class Person(RegistryAware):
+            pass
+
+        g = Graph()
+        node = _node(g, label="room")
+        dep = _dependency(
+            g,
+            requirement=Requirement(
+                has_kind=Person,
+                has_identifier=b"joe",  # deliberately unsatisfiable by synthesized label
+            ),
+            predecessor_id=node.uid,
+        )
+
+        resolver = Resolver(entity_groups=[], template_groups=[])
+        success = resolver.resolve_dependency(dep, force=True)
+        assert success is True
+        assert dep.provider is not None
+        assert isinstance(dep.provider, Person)
+        assert dep.satisfied
+        assert dep.requirement.selected_offer_policy == ProvisionPolicy.FORCE
 
 
 class TestResolverFrontierNode:

@@ -39,6 +39,7 @@ class Requirement(Selector, Generic[PT]):
 
     unsatisfiable: Optional[bool] = None           # unknown
     unambiguously_resolved: Optional[bool] = None  # unknown
+    selected_offer_policy: Optional[ProvisionPolicy] = None
 
     def satisfied_by(self, entity: PT) -> bool:
         return self.matches(entity)

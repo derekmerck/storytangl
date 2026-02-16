@@ -18,13 +18,14 @@ Handler Inventory
 - ``contribute_satisfied_deps`` — inject label→provider for satisfied deps
 
 **validate_edge**:
-- ``validate_successor_exists`` — successor must resolve from graph
+- ``validate_successor_exists`` — successor must resolve from graph and be available
 
 **get_prereqs** (PREREQS):
 - ``descend_into_container`` — if cursor is_container, return enter() edge
 - ``follow_triggered_prereqs`` — first available edge with trigger_phase=PREREQS
 
 **apply_update** (UPDATE):
+- ``apply_runtime_effects`` — apply node runtime effects to scoped namespace
 - ``mark_visited`` — set ``caller.locals['_visited'] = True``, increment visit count
 
 **render_journal** (JOURNAL):
@@ -139,19 +140,22 @@ def contribute_satisfied_deps(*, caller, ctx, **kw):
 
 @on_validate
 def validate_successor_exists(*, caller, ctx, **kw):
-    """Check that the edge's successor resolves to a node in the graph.
+    """Check that successor resolves and traversal is available.
 
-    This is the minimum validation: the destination exists.  Story-layer
-    handlers can add guard conditions (``edge.available(ns)``), requirement
-    checks, or access control.
+    This is the minimum traversal guard: destination exists and edge/node
+    availability passes for the destination namespace.
 
     ``caller`` here is the edge being validated, not the destination node.
     """
     successor = getattr(caller, "successor", None)
     if successor is None:
-        # AnonymousEdge — successor is a direct reference
-        successor = getattr(caller, "successor", None)
-    return successor is not None
+        return False
+    if hasattr(caller, "available"):
+        return bool(caller.available(ctx=ctx))
+    if hasattr(successor, "available"):
+        ns = ctx.get_ns(successor) if ctx is not None and hasattr(ctx, "get_ns") else None
+        return bool(successor.available(ns=ns))
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -206,8 +210,7 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
         # means "follow me automatically on arrival"
         trigger = getattr(edge, "trigger_phase", None)
         if trigger == ResolutionPhase.PREREQS:
-            # TODO: check edge.available(ns) when guard conditions are implemented
-            if edge.successor is not None:
+            if edge.successor is not None and edge.available(ctx=ctx):
                 logger.debug("Prereq redirect: %s → %s", caller.get_label(), edge.successor.get_label())
                 return edge
 
@@ -217,6 +220,22 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
 # ---------------------------------------------------------------------------
 # UPDATE — mutate state for arrival
 # ---------------------------------------------------------------------------
+
+@on_update
+def apply_runtime_effects(*, caller, ctx, **kw):
+    """Apply runtime effects attached to the current node.
+
+    Judgment call
+    -------------
+    Effects mutate the node's scoped namespace during UPDATE. This keeps
+    mutation semantics local to traversal concerns without introducing a
+    separate runtime effect registry in vm38.
+    """
+    if hasattr(caller, "apply_effects"):
+        ns = ctx.get_ns(caller) if ctx is not None and hasattr(ctx, "get_ns") else {}
+        caller.apply_effects(ns=ns)
+    return None
+
 
 @on_update
 def mark_visited(*, caller, ctx, **kw):
@@ -290,7 +309,7 @@ def follow_triggered_postreqs(*, caller, ctx, **kw):
             continue
         trigger = getattr(edge, "trigger_phase", None)
         if trigger == ResolutionPhase.POSTREQS:
-            if edge.successor is not None:
+            if edge.successor is not None and edge.available(ctx=ctx):
                 logger.debug("Postreq redirect: %s → %s", caller.get_label(), edge.successor.get_label())
                 return edge
 

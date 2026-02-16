@@ -105,6 +105,7 @@ from pydantic.fields import FieldInfo
 from shortuuid import ShortUUID
 
 from tangl.type_hints import Identifier, Label, StringMap, Tag, UnstructuredData, Hash
+from .runtime_op import Predicate, Effect
 from tangl.utils.hashing import hashing_func
 
 logger = logging.getLogger(__name__)
@@ -541,3 +542,46 @@ class HasState(BaseModelPlus):
     """
 
     locals: StringMap = Field(default_factory=dict)
+
+
+class HasAvailability(BaseModelPlus):
+    """Adds predicate-based runtime availability checks.
+
+    Why
+    ---
+    Many runtime entities need guard conditions that can be serialized and
+    evaluated against a scoped namespace. This trait stores those guards as
+    :class:`~tangl.core38.runtime_op.Predicate` values.
+
+    Notes
+    -----
+    - All predicates must evaluate truthy for availability to pass.
+    - Empty predicate list means available by default.
+    """
+
+    availability: list[Predicate] = Field(default_factory=list)
+
+    def available(self, ns: StringMap | None = None) -> bool:
+        if not self.availability:
+            return True
+        ns = ns or {}
+        return all(predicate.satisfied_by(ns) for predicate in self.availability)
+
+
+class HasEffects(BaseModelPlus):
+    """Adds runtime side effects as executable operations.
+
+    Why
+    ---
+    Runtime entities often need declarative effects that mutate execution
+    namespace state during a VM phase. This trait stores those effects as
+    :class:`~tangl.core38.runtime_op.Effect` values.
+    """
+
+    effects: list[Effect] = Field(default_factory=list)
+
+    def apply_effects(self, ns: StringMap | None = None) -> StringMap:
+        ns = ns or {}
+        for effect in self.effects:
+            effect.apply(ns)
+        return ns

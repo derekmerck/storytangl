@@ -112,20 +112,78 @@ class TemplateProvisioner:
     # Not sure what affordance providers look like in template form?
 
 
-class FallbackProvisioner:
+class InlineTemplateProvisioner:
+    """Offer inline requirement templates as normal CREATE candidates."""
 
     @classmethod
     def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
         if requirement.fallback_templ is not None:
-            # set priority to late b/c it's fallback
-            return [ ProvisionOffer(
+            return [ProvisionOffer(
                 origin_id=requirement.fallback_templ.get_label(),
                 policy=ProvisionPolicy.CREATE,
                 callback=requirement.fallback_templ.materialize,
-                priority=Priority.LATE) ]
+                priority=Priority.LATE,
+            )]
         return []
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
+
+
+class FallbackProvisioner:
+    """Force-only emergency provider that synthesizes minimal matching entities."""
+
+    HIGH_COST_PRIORITY = Priority.LAST + 10_000
+
+    @classmethod
+    def _extract_selector_value(cls, requirement: Requirement, key: str):
+        extra = requirement.__pydantic_extra__ or {}
+        return extra.get(key)
+
+    @classmethod
+    def _synthesize_entity(cls, requirement: Requirement) -> Entity | None:
+        kind = cls._extract_selector_value(requirement, "has_kind") or Entity
+        if not isinstance(kind, type) or not issubclass(kind, Entity):
+            kind = Entity
+
+        kwargs: dict = {}
+        identifier = cls._extract_selector_value(requirement, "has_identifier")
+        label = cls._extract_selector_value(requirement, "label")
+        tags = cls._extract_selector_value(requirement, "has_tags")
+
+        if isinstance(identifier, str):
+            kwargs["label"] = identifier
+        elif isinstance(label, str):
+            kwargs["label"] = label
+
+        if isinstance(tags, (set, list, tuple)):
+            kwargs["tags"] = set(tags)
+        elif isinstance(tags, str):
+            kwargs["tags"] = {tags}
+
+        try:
+            candidate = kind(**kwargs)
+        except Exception:
+            try:
+                candidate = kind()
+            except Exception:
+                return None
+            if "label" in kwargs and hasattr(candidate, "label"):
+                candidate.label = kwargs["label"]
+            if "tags" in kwargs and hasattr(candidate, "tags"):
+                candidate.tags = kwargs["tags"]
+
+        if requirement.satisfied_by(candidate):
+            return candidate
+        return candidate
+
+    @classmethod
+    def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
+        return [ProvisionOffer(
+            origin_id="FallbackProvisioner",
+            policy=ProvisionPolicy.FORCE,
+            priority=cls.HIGH_COST_PRIORITY,
+            callback=lambda *_, _req=requirement, **__: cls._synthesize_entity(_req),
+        )]
 
 
 class TokenProvisioner:

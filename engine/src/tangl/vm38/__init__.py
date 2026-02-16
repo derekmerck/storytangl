@@ -2,43 +2,109 @@
 # - stable names for phase bus stages
 from .resolution_phase import ResolutionPhase
 
-# Requires:
-# - core.selector, edges, materialize() pattern
 # Provides:
 # - requirements/providers
 # - resolution
 # - frontier planning
-from .provision import (Requirement, HasRequirement, Dependency, Affordance,
-                        ProvisionPolicy, ProvisionOffer, Provisioner,
-                        TemplateProvisioner, FallbackProvisioner, FindProvisioner, TokenProvisioner,
-                        Resolver)
+from .provision import (
+    Affordance,
+    Dependency,
+    FallbackProvisioner,
+    FindProvisioner,
+    HasRequirement,
+    InlineTemplateProvisioner,
+    Provisioner,
+    ProvisionOffer,
+    ProvisionPolicy,
+    Requirement,
+    Resolver,
+    TemplateProvisioner,
+    TokenProvisioner,
+)
 
-# Requires:
-# - core.graph
 # Provides:
 # - cursor traversal rules
-from .traversable import TraversableEdge, TraversableNode, AnonymousEdge
+from .traversable import (
+    TraversableEdge,
+    TraversableNode,
+    AnonymousEdge,
+    assert_traversal_contracts,
+    validate_traversal_contracts,
+)
+from .traversal import (
+    count_turns,
+    get_call_depth,
+    get_visit_count,
+    in_subroutine,
+    is_first_visit,
+    is_self_loop,
+    steps_since_last_visit,
+)
 
-# Requires:
-# - core.entity, graph
-# Provides:
-# - stable replay
-# from .replay import ObservedEntity, ObservedGraph, Observer, Event, Patch
-
-# Requires:
-# - core.graph
-# - vm.resolution_phase
-# - vm.planning
-# - vm.traversal
-# - vm.replay
 # Provides:
 # - phase bus
 # - serializable graph with state and trace artifacts
 # - jump and return stack
 from .runtime import Frame, Ledger
 
-# Requires:
-# - vm.resolution_phase
-# Provides
+# Provides:
+# - journal fragment records
+from .fragments import ChoiceFragment, ContentFragment, Fragment
+
+# Provides:
 # - phase bus hooks
-from .dispatch import on_validate, on_provision, on_prereqs, on_update, on_journal, on_finalize, on_postreqs, on_resolve, on_gather_ns
+from .dispatch import (
+    on_finalize,
+    on_gather_ns,
+    on_journal,
+    on_postreqs,
+    on_prereqs,
+    on_provision,
+    on_resolve,
+    on_update,
+    on_validate,
+)
+
+
+__all__ = [
+    "Affordance",
+    "AnonymousEdge",
+    "ChoiceFragment",
+    "ContentFragment",
+    "Dependency",
+    "FallbackProvisioner",
+    "FindProvisioner",
+    "Frame",
+    "Fragment",
+    "HasRequirement",
+    "InlineTemplateProvisioner",
+    "Ledger",
+    "Provisioner",
+    "ProvisionOffer",
+    "ProvisionPolicy",
+    "Requirement",
+    "ResolutionPhase",
+    "Resolver",
+    "TemplateProvisioner",
+    "TokenProvisioner",
+    "TraversableEdge",
+    "TraversableNode",
+    "count_turns",
+    "get_call_depth",
+    "get_visit_count",
+    "in_subroutine",
+    "is_first_visit",
+    "is_self_loop",
+    "assert_traversal_contracts",
+    "on_finalize",
+    "on_gather_ns",
+    "on_journal",
+    "on_postreqs",
+    "on_prereqs",
+    "on_provision",
+    "on_resolve",
+    "on_update",
+    "on_validate",
+    "steps_since_last_visit",
+    "validate_traversal_contracts",
+]

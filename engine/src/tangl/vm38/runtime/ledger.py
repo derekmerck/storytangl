@@ -1,113 +1,188 @@
-from uuid import UUID
+# tangl/vm38/runtime/ledger.py
+"""Persistent session state for a single traversal.
+
+The Ledger owns long-lived state that persists across player actions:
+the graph, cursor position and history, return stack, and accumulated output.
+"""
+
+from __future__ import annotations
+
 from typing import Optional, Self
+from uuid import UUID
 
 from pydantic import Field
 
+from tangl.core38 import Entity, Graph, OrderedRegistry, Selector, Snapshot
 from tangl.type_hints import UnstructuredData
-from tangl.core38 import Graph, OrderedRegistry, Entity, Snapshot, Selector
-from tangl.vm38.traversable import TraversableNode, TraversableEdge
+from tangl.vm38.traversable import TraversableEdge, TraversableNode
+
 from .frame import Frame
+from ..fragments import Fragment
+
+
+__all__ = ["Ledger"]
+
 
 class Ledger(Entity):
-    # Owning boundary for user, graph, and output
-    # - unstructure needs to deal with the graph and the output_stream
+    """Persistent traversal state across player actions."""
+
     graph: Graph
     output_stream: OrderedRegistry = Field(default_factory=OrderedRegistry)
 
-    # - The cursor and return stack of edges to prior cursors are stored as UUIDs
     cursor_id: UUID
+    cursor_history: list[UUID] = Field(default_factory=list)
 
     @property
     def cursor(self) -> TraversableNode:
+        """The current node, resolved from the graph."""
         return self.graph.get(self.cursor_id)
 
     @cursor.setter
-    def cursor(self, value: TraversableNode):
+    def cursor(self, value: TraversableNode) -> None:
         if value is not None:
             self.cursor_id = value.uid
+
+    @property
+    def turn(self) -> int:
+        """Distinct position changes, ignoring self-loops."""
+        from tangl.vm38.traversal import count_turns
+
+        return count_turns(self.cursor_history)
+
+    @property
+    def step(self) -> int:
+        """Alias for ``cursor_steps``."""
+        return self.cursor_steps
+
+    @step.setter
+    def step(self, value: int) -> None:
+        self.cursor_steps = value
 
     call_stack_ids: list[UUID] = Field(default_factory=list)
 
     def _call_stack(self) -> list[TraversableEdge]:
-        # do not push directly!  This is marked private b/c it's just
-        # for introspection of the actual members, use push_call and
-        # pop_call.
-        return [self.graph.get(e) for e in self.call_stack_ids]
+        """Resolve call stack UIDs to edge objects (introspection only)."""
+        call_stack: list[TraversableEdge] = []
+        for edge_id in self.call_stack_ids:
+            edge = self.graph.get(edge_id)
+            if edge is None:
+                raise ValueError(
+                    f"Call stack contains unresolved edge id: {edge_id}"
+                )
+            call_stack.append(edge)
+        return call_stack
 
-    def push_call(self, edge: TraversableEdge):
-        if not edge.return_phase is not None:
+    def push_call(self, edge: TraversableEdge) -> None:
+        """Push a call edge onto the return stack."""
+        if edge.return_phase is None:
             raise ValueError("Putting a call onto the stack requires a return phase/type")
         self.call_stack_ids.append(edge.uid)
 
     def pop_call(self) -> TraversableEdge:
-        # don't forget to reverse it to follow it back
+        """Pop and return the most recent call edge."""
         call_edge_id = self.call_stack_ids.pop()
-        return self.graph.get(call_edge_id)  # type: TraversableEdge
+        return self.graph.get(call_edge_id)
 
-    # - cursor counters for tracking traversal distance (pass these into frame ctx for game rounds, turns passed, etc.)
-    reentrant_steps: int = -1  # number of times logic reentered the current cursor without exit
-    cursor_steps: int = -1      # total number of cursor updates (non-reentrant follows)
-    choice_steps: int = -1      # total number of choice resolutions
+    reentrant_steps: int = -1
+    cursor_steps: int = -1
+    choice_steps: int = -1
 
-    # - User is attached/detached by the persistence layer
     user: Optional[Entity] = Field(None, exclude=True)
-    # - convenience for checking persistence layer assumptions
     user_id: Optional[UUID] = None
 
-    def get_frame(self) -> Frame:
-        return Frame(self.graph, self.cursor, self.output_stream, self._call_stack())
+    def model_post_init(self, __context) -> None:
+        """Seed cursor history with initial cursor position."""
+        if not self.cursor_history and self.cursor_id is not None:
+            self.cursor_history.append(self.cursor_id)
 
-    def resolve_choice(self, edge_id: UUID):
+    def get_frame(self) -> Frame:
+        """Create an ephemeral frame for the next pipeline execution."""
+        return Frame(
+            self.graph,
+            self.cursor,
+            self.output_stream,
+            self._call_stack(),
+        )
+
+    def resolve_choice(self, edge_id: UUID) -> None:
+        """Resolve a player choice and sync frame results into ledger state."""
         edge = self.graph.get(edge_id)
+        if edge is None:
+            raise ValueError(f"Choice edge not found: {edge_id}")
+
         frame = self.get_frame()
         frame.resolve_choice(edge)
-        # update the cursor and return stack
+
+        for call_edge in frame.return_stack:
+            if call_edge is None:
+                raise ValueError("Frame return stack contains a null edge")
+
         self.choice_steps += 1
         self.cursor_steps += frame.cursor_steps
-        self.cursor_id = frame.cursor.uid  # since this is a property, it might passthru updates directly?
-        self.call_stack_ids = [e.uid for e in frame.return_stack]
-        self.save_snapshot()
+        self.cursor_id = frame.cursor.uid
+        self.cursor_history.append(self.cursor_id)
+        self.call_stack_ids = [edge.uid for edge in frame.return_stack]
 
-    def save_snapshot(self):
-        snapshot = Snapshot(payload=self)
+    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
+        """Return output fragments in chronological order, optionally filtered."""
+        selector = Selector(has_kind=Fragment)
+        fragments: list[Fragment] = []
+
+        for record in selector.filter(self.output_stream):
+            if record.step >= since_step or record.step < 0:
+                fragments.append(record)
+
+        if limit > 0 and len(fragments) > limit:
+            fragments = fragments[-limit:]
+
+        return fragments
+
+    def unstructure(self) -> UnstructuredData:
+        """Serialize ledger state to plain data for persistence."""
+        return {
+            "uid": str(self.uid),
+            "label": self.label,
+            "cursor_id": str(self.cursor_id),
+            "cursor_history": [str(uid) for uid in self.cursor_history],
+            "cursor_steps": self.cursor_steps,
+            "choice_steps": self.choice_steps,
+            "reentrant_steps": self.reentrant_steps,
+            "call_stack_ids": [str(uid) for uid in self.call_stack_ids],
+            "user_id": str(self.user_id) if self.user_id else None,
+            "graph": self.graph.unstructure(),
+            "output_stream": self.output_stream.unstructure(),
+        }
+
+    @classmethod
+    def structure(cls, data: UnstructuredData) -> Self:
+        """Reconstruct a ledger from serialized data."""
+        graph = Graph.structure(data["graph"])
+        output_stream = OrderedRegistry.structure(data.get("output_stream", {}))
+
+        return cls(
+            uid=UUID(data["uid"]),
+            label=data.get("label", ""),
+            graph=graph,
+            output_stream=output_stream,
+            cursor_id=UUID(data["cursor_id"]),
+            cursor_history=[UUID(uid) for uid in data.get("cursor_history", [])],
+            cursor_steps=data.get("cursor_steps", -1),
+            choice_steps=data.get("choice_steps", -1),
+            reentrant_steps=data.get("reentrant_steps", -1),
+            call_stack_ids=[UUID(uid) for uid in data.get("call_stack_ids", [])],
+            user_id=UUID(data["user_id"]) if data.get("user_id") else None,
+        )
+
+    def save_snapshot(self, *, force: bool = False, cadence: int = 0) -> Optional[Snapshot]:
+        """Save a snapshot if forced or cadence says one is due."""
+        should_save = force or (
+            cadence > 0
+            and self.choice_steps >= 0
+            and (self.choice_steps % cadence) == 0
+        )
+        if not should_save:
+            return None
+
+        snapshot = Snapshot.from_entity(self)
         self.output_stream.append(snapshot)
-
-    # Creation
-    # --------
-
-    def initialize_ledger(self, entry_id: UUID):
-        entry_node = self.graph.get(entry_id)
-        frame = self.get_frame()
-        frame.goto_node(entry_node)
-        # update the cursor and return stack
-        self.cursor_steps += frame.cursor_steps
-        self.cursor_id = frame.cursor.uid  # since this is a property, it might passthru updates directly?
-        self.return_stack_ids = [e.uid for e in frame.return_stack]
-        self.save_snapshot()
-
-    @classmethod
-    def from_graph(cls, graph: Graph, entry_id: UUID):
-        inst = cls(graph=graph)
-        inst.initialize_ledger(entry_id)
-        return inst
-
-    def unstructure(self):
-        data = super().unstructure()
-        data['graph'] = self.graph.unstructure()
-        data['output_stream'] = self.output_stream.unstructure()
-
-    @classmethod
-    def structure(cls, data: UnstructuredData, _ctx=None) -> Self:
-        data['graph'] = Graph.structure(data['graph'], _ctx=_ctx)
-        data['output_stream'] = Graph.structure(data['output_stream'], _ctx=_ctx)
-        return super().structure(data, _ctx=_ctx)
-
-    @classmethod
-    def restore(cls, stream_registry: OrderedRegistry, base, restore):
-        base_snapshot = stream_registry.find_last(Selector(has_kind=Snapshot, seq_before=base))
-        patches = stream_registry.find_all(Selector(has_seq_in=(base, restore)))  # between base and restore point
-        inst = base_snapshot.materialize()
-        for patch in patches:
-            patch.apply_to(inst)
-        return inst
-
+        return snapshot

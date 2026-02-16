@@ -9,9 +9,11 @@ Organized by concept:
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 
-from tangl.core38 import Graph
+from tangl.core38 import Graph, Snapshot
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.runtime.frame import Frame
 from tangl.vm38.runtime.ledger import Ledger
@@ -20,6 +22,7 @@ from tangl.vm38.traversable import (
     TraversableEdge,
     TraversableNode,
 )
+from tangl.vm38.fragments import ChoiceFragment, ContentFragment
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -117,6 +120,12 @@ class TestLedgerGetFrame:
         assert frame.graph is ledger.graph
         assert frame.cursor is a
 
+    def test_raises_when_call_stack_contains_unresolved_edge_id(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        ledger.call_stack_ids = [uuid4()]
+        with pytest.raises(ValueError, match="unresolved edge id"):
+            ledger.get_frame()
+
 
 # ============================================================================
 # Choice resolution
@@ -137,3 +146,71 @@ class TestLedgerResolveChoice:
         edge = list(a.edges_out())[0]
         ledger.resolve_choice(edge.uid)
         assert ledger.choice_steps == initial_choice + 1
+
+    def test_resolve_raises_on_missing_edge_and_preserves_state(self) -> None:
+        ledger, [a, b] = _make_ledger("a", "b")
+        initial_choice = ledger.choice_steps
+        initial_cursor_steps = ledger.cursor_steps
+        initial_cursor_id = ledger.cursor_id
+        initial_history = list(ledger.cursor_history)
+
+        with pytest.raises(ValueError, match="Choice edge not found"):
+            ledger.resolve_choice(uuid4())
+
+        assert ledger.choice_steps == initial_choice
+        assert ledger.cursor_steps == initial_cursor_steps
+        assert ledger.cursor_id == initial_cursor_id
+        assert ledger.cursor_history == initial_history
+
+    def test_resolve_raises_on_null_return_stack_and_preserves_state(
+        self,
+        monkeypatch,
+    ) -> None:
+        ledger, [a, b] = _make_ledger("a", "b")
+        edge = list(a.edges_out())[0]
+        initial_choice = ledger.choice_steps
+        initial_cursor_steps = ledger.cursor_steps
+        initial_cursor_id = ledger.cursor_id
+        initial_history = list(ledger.cursor_history)
+
+        class _BadFrame:
+            cursor_steps = 0
+            cursor = a
+            return_stack = [None]
+
+            def resolve_choice(self, *_args, **_kwargs) -> None:
+                return None
+
+        monkeypatch.setattr(Ledger, "get_frame", lambda self: _BadFrame())
+
+        with pytest.raises(ValueError, match="null edge"):
+            ledger.resolve_choice(edge.uid)
+
+        assert ledger.choice_steps == initial_choice
+        assert ledger.cursor_steps == initial_cursor_steps
+        assert ledger.cursor_id == initial_cursor_id
+        assert ledger.cursor_history == initial_history
+
+
+class TestLedgerJournal:
+    def test_get_journal_filters_non_fragments(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        content = ContentFragment(content="hello", step=0)
+        choice = ChoiceFragment(text="go", step=1)
+        snapshot = Snapshot.from_entity(ledger)
+        ledger.output_stream.append(content)
+        ledger.output_stream.append(snapshot)
+        ledger.output_stream.append(choice)
+
+        journal = ledger.get_journal()
+        assert journal == [content, choice]
+
+    def test_get_journal_applies_since_step_and_limit(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        f1 = ContentFragment(content="one", step=0)
+        f2 = ContentFragment(content="two", step=2)
+        f3 = ChoiceFragment(text="three", step=3)
+        ledger.output_stream.extend([f1, f2, f3])
+
+        assert ledger.get_journal(since_step=2) == [f2, f3]
+        assert ledger.get_journal(limit=2) == [f2, f3]

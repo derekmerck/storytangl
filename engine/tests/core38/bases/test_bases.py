@@ -10,13 +10,16 @@ from shortuuid import ShortUUID
 
 from tangl.core38.bases import (
     BaseModelPlus,
+    HasAvailability,
     HasContent,
+    HasEffects,
     HasIdentity,
     HasOrder,
     HasState,
     Unstructurable,
     is_identifier,
 )
+from tangl.core38.runtime_op import Effect, Predicate
 from tangl.utils.hashing import hashing_func
 
 
@@ -214,6 +217,29 @@ class TestHasOrder:
         assert item.has_seq_in(1, 10)
         assert not item.has_seq_in(6, 10)
         assert item.has_seq_in((1, 10))
+
+
+class TestHasAvailability:
+    def test_available_true_when_empty(self) -> None:
+        item = HasAvailability()
+        assert item.available() is True
+
+    def test_all_predicates_must_pass(self) -> None:
+        item = HasAvailability(availability=[
+            Predicate(expr="has_key"),
+            Predicate(expr="level > 2"),
+        ])
+        assert item.available({"has_key": True, "level": 3}) is True
+        assert item.available({"has_key": True, "level": 1}) is False
+
+
+class TestHasEffects:
+    def test_apply_effects_mutates_namespace(self) -> None:
+        item = HasEffects(effects=[Effect(expr="count = count + 1")])
+        ns = {"count": 2}
+        result = item.apply_effects(ns)
+        assert ns["count"] == 3
+        assert result is ns
 
 
 class TestTraitComposition:
