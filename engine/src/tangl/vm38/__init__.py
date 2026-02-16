@@ -41,4 +41,4 @@ from .runtime import Frame, Ledger
 # - vm.resolution_phase
 # Provides
 # - phase bus hooks
-from .dispatch import on_validate, on_provision, on_resolve, on_prereqs, on_update, on_journal, on_finalize, on_postreqs
+from .dispatch import on_validate, on_provision, on_prereqs, on_update, on_journal, on_finalize, on_postreqs, on_resolve, on_gather_ns

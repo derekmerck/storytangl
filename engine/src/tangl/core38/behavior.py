@@ -130,15 +130,11 @@ class CallReceipt(Record):
 
     @classmethod
     def first_result(cls, *receipts: Self):
-        if len(receipts) < 1:
-            raise IndexError
+        # bool on this is equivalent to _any_ result is true
         return next(cls.iter_results(*receipts), None)
 
     @classmethod
     def last_result(cls, *receipts: Self):
-        # this is equivalent to _any_ result is true
-        if len(receipts) < 1:
-            raise IndexError
         return next(cls.iter_results(*reversed(receipts)), None)
 
     @classmethod
