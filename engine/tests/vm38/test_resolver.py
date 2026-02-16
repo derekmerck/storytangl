@@ -27,6 +27,18 @@ from tangl.vm38.provision import (
 from tangl.vm38.traversable import TraversableNode
 
 
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _dependency(graph: Graph, **kwargs) -> Dependency:
+    dependency = Dependency(**kwargs)
+    graph.add(dependency)
+    return dependency
+
+
 # ============================================================================
 # FindProvisioner — search existing entities
 # ============================================================================
@@ -125,12 +137,12 @@ class TestResolverDependencyResolution:
 class TestResolverFrontierNode:
     def test_node_with_all_deps_satisfied(self) -> None:
         g = Graph()
-        node = TraversableNode(label="room", registry=g)
-        sword = TraversableNode(label="sword", registry=g)
+        node = _node(g, label="room")
+        sword = _node(g, label="sword")
 
-        dep = Dependency(
+        dep = _dependency(
+            g,
             requirement=Requirement.from_identifier("sword"),
-            registry=g,
             predecessor_id=node.uid,
         )
 
@@ -141,14 +153,12 @@ class TestResolverFrontierNode:
 
     def test_node_with_unresolvable_deps(self) -> None:
         g = Graph()
-        node = TraversableNode(label="room", registry=g)
-        dep = Dependency(
+        node = _node(g, label="room")
+        dep = _dependency(g, 
             requirement=Requirement(
                 has_identifier="missing",
                 provision_policy=ProvisionPolicy.EXISTING,
-            ),
-            registry=g,
-            predecessor_id=node.uid,
+            ), predecessor_id=node.uid,
         )
 
         resolver = Resolver(entity_groups=[])

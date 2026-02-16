@@ -31,6 +31,18 @@ from tangl.vm38.traversable import (
 )
 
 
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _edge(graph: Graph, **kwargs) -> TraversableEdge:
+    edge = TraversableEdge(**kwargs)
+    graph.add(edge)
+    return edge
+
+
 # ============================================================================
 # Test record types
 # ============================================================================
@@ -121,11 +133,9 @@ def make_linear_graph(labels: list[str], *, graph: Graph | None = None) -> tuple
     ``TraversableEdge`` instances.
     """
     g = graph or Graph()
-    nodes = [TraversableNode(label=lbl, registry=g) for lbl in labels]
+    nodes = [_node(g, label=lbl) for lbl in labels]
     for i in range(len(nodes) - 1):
-        TraversableEdge(
-            registry=g,
-            predecessor_id=nodes[i].uid,
+        _edge(g, predecessor_id=nodes[i].uid,
             successor_id=nodes[i + 1].uid,
         )
     return g, nodes
@@ -142,20 +152,16 @@ def make_branching_graph(
     Returns ``(graph, root, [[branch0_nodes], [branch1_nodes], ...])``.
     """
     g = graph or Graph()
-    root = TraversableNode(label=root_label, registry=g)
+    root = _node(g, label=root_label)
     branches: list[list[TraversableNode]] = []
 
     for branch in branch_labels or [["b0a", "b0b"], ["b1a", "b1b"]]:
-        nodes = [TraversableNode(label=lbl, registry=g) for lbl in branch]
-        TraversableEdge(
-            registry=g,
-            predecessor_id=root.uid,
+        nodes = [_node(g, label=lbl) for lbl in branch]
+        _edge(g, predecessor_id=root.uid,
             successor_id=nodes[0].uid,
         )
         for i in range(len(nodes) - 1):
-            TraversableEdge(
-                registry=g,
-                predecessor_id=nodes[i].uid,
+            _edge(g, predecessor_id=nodes[i].uid,
                 successor_id=nodes[i + 1].uid,
             )
         branches.append(nodes)
@@ -178,8 +184,8 @@ def make_container(
     Returns ``(graph, container, [member0, member1, ...])``.
     """
     g = graph or Graph()
-    container = TraversableNode(label=container_label, registry=g)
-    members = [TraversableNode(label=lbl, registry=g) for lbl in member_labels]
+    container = _node(g, label=container_label)
+    members = [_node(g, label=lbl) for lbl in member_labels]
 
     for m in members:
         container.add_child(m)
@@ -189,9 +195,7 @@ def make_container(
     if len(members) > 1:
         container.sink_id = members[-1].uid
         for i in range(len(members) - 1):
-            TraversableEdge(
-                registry=g,
-                predecessor_id=members[i].uid,
+            _edge(g, predecessor_id=members[i].uid,
                 successor_id=members[i + 1].uid,
             )
 

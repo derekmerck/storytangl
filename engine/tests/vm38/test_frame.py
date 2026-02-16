@@ -31,6 +31,18 @@ from tangl.vm38.traversable import (
 )
 
 
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _edge(graph: Graph, **kwargs) -> TraversableEdge:
+    edge = TraversableEdge(**kwargs)
+    graph.add(edge)
+    return edge
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -42,11 +54,9 @@ class SimpleFragment(Record):
 def _simple_graph(*labels: str) -> tuple[Graph, list[TraversableNode]]:
     """Quick linear graph: a→b→c..."""
     g = Graph()
-    nodes = [TraversableNode(label=lbl, registry=g) for lbl in labels]
+    nodes = [_node(g, label=lbl) for lbl in labels]
     for i in range(len(nodes) - 1):
-        TraversableEdge(
-            registry=g,
-            predecessor_id=nodes[i].uid,
+        _edge(g, predecessor_id=nodes[i].uid,
             successor_id=nodes[i + 1].uid,
         )
     return g, nodes
@@ -60,7 +70,7 @@ def _simple_graph(*labels: str) -> tuple[Graph, list[TraversableNode]]:
 class TestPhaseCtx:
     def test_registries_include_vm_dispatch(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
+        a = _node(g, label="a")
         ctx = PhaseCtx(graph=g, cursor_id=a.uid)
         registries = ctx.get_registries()
         # Should include at least the module-level vm_dispatch
@@ -68,7 +78,7 @@ class TestPhaseCtx:
 
     def test_ns_caching(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
+        a = _node(g, label="a")
         a.locals = {"key": "val"}
 
         @on_journal  # just to have _something_ registered, ns uses gather_ns
@@ -180,9 +190,9 @@ class TestFollowEdgeRedirects:
 
     def test_prereq_redirect(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        c = TraversableNode(label="c", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
 
         @on_prereqs
         def redirect_to_c(*, caller, ctx, **kw):
@@ -198,9 +208,9 @@ class TestFollowEdgeRedirects:
 
     def test_postreq_redirect(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        c = TraversableNode(label="c", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
 
         @on_postreqs
         def redirect_to_c(*, caller, ctx, **kw):
@@ -229,9 +239,9 @@ class TestResolveChoice:
     def test_follows_redirect_chain(self) -> None:
         """a→b redirects to c via prereqs."""
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        c = TraversableNode(label="c", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
 
         @on_prereqs
         def redirect(*, caller, ctx, **kw):
@@ -247,8 +257,8 @@ class TestResolveChoice:
     def test_recursion_guard(self) -> None:
         """Infinite redirect loop raises RecursionError."""
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
 
         @on_prereqs
         def infinite_loop(*, caller, ctx, **kw):
@@ -268,12 +278,11 @@ class TestResolveChoiceReturnStack:
 
     def test_call_and_return(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
 
         # a→b is a call edge: push b, return to a at UPDATE
-        call_edge = TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        call_edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             return_phase=ResolutionPhase.UPDATE,
         )
 

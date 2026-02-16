@@ -36,6 +36,12 @@ from tangl.vm38.dispatch import (
 from tangl.vm38.traversable import TraversableNode
 
 
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
 # ============================================================================
 # Hook registration
 # ============================================================================
@@ -97,7 +103,7 @@ class TestDoValidate:
     def test_no_handlers_returns_true(self, null_ctx) -> None:
         """No validators registered → vacuously true."""
         g = Graph()
-        edge = TraversableNode(label="e", registry=g)
+        edge = _node(g, label="e")
         # all_true with no receipts returns True (vacuous truth)
         result = do_validate(edge, ctx=null_ctx)
         assert result is True
@@ -105,13 +111,13 @@ class TestDoValidate:
     def test_truthy_handler(self, null_ctx) -> None:
         on_validate(lambda *, caller, ctx, **kw: True)
         g = Graph()
-        edge = TraversableNode(label="e", registry=g)
+        edge = _node(g, label="e")
         assert do_validate(edge, ctx=null_ctx) is True
 
     def test_falsy_handler_blocks(self, null_ctx) -> None:
         on_validate(lambda *, caller, ctx, **kw: False)
         g = Graph()
-        edge = TraversableNode(label="e", registry=g)
+        edge = _node(g, label="e")
         assert do_validate(edge, ctx=null_ctx) is False
 
 
@@ -120,14 +126,14 @@ class TestDoPrereqs:
 
     def test_no_handlers_returns_none(self, null_ctx) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         assert do_prereqs(node, ctx=null_ctx) is None
 
     def test_first_non_none_returned(self, null_ctx) -> None:
         on_prereqs(lambda *, caller, ctx, **kw: None)
         on_prereqs(lambda *, caller, ctx, **kw: "redirect_edge")
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         assert do_prereqs(node, ctx=null_ctx) == "redirect_edge"
 
 
@@ -136,14 +142,14 @@ class TestDoJournal:
 
     def test_no_handlers_returns_none(self, null_ctx) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         assert do_journal(node, ctx=null_ctx) is None
 
     def test_last_handler_wins(self, null_ctx) -> None:
         on_journal(lambda *, caller, ctx, **kw: "first")
         on_journal(lambda *, caller, ctx, **kw: "second")
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         result = do_journal(node, ctx=null_ctx)
         assert result == "second"
 
@@ -155,7 +161,7 @@ class TestDoProvision:
         on_provision(lambda *, caller, ctx, **kw: "a")
         on_provision(lambda *, caller, ctx, **kw: "b")
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         result = do_provision(node, ctx=null_ctx)
         assert "a" in result and "b" in result
 
@@ -170,7 +176,7 @@ class TestDoGatherNs:
 
     def test_empty_ns_with_no_handlers(self, null_ctx) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         ns = do_gather_ns(node, ctx=null_ctx)
         assert isinstance(ns, ChainMap)
         assert len(ns) == 0
@@ -184,7 +190,7 @@ class TestDoGatherNs:
             return None
 
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {"mood": "angry"}
         ns = do_gather_ns(node, ctx=null_ctx)
         assert ns["mood"] == "angry"
@@ -198,8 +204,8 @@ class TestDoGatherNs:
             return None
 
         g = Graph()
-        parent = TraversableNode(label="scene", registry=g)
-        child = TraversableNode(label="block", registry=g)
+        parent = _node(g, label="scene")
+        child = _node(g, label="block")
         parent.add_child(child)
 
         parent.locals = {"color": "red", "shared": "parent"}
@@ -218,7 +224,7 @@ class TestDoGatherNs:
             return None
 
         g = Graph()
-        node = TraversableNode(label="orphan", registry=g)
+        node = _node(g, label="orphan")
         node.locals = {"key": "val"}
         ns = do_gather_ns(node, ctx=null_ctx)
         assert ns["key"] == "val"
