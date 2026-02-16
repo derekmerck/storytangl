@@ -22,6 +22,18 @@ from tangl.vm38.traversable import (
 )
 
 
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _edge(graph: Graph, **kwargs) -> TraversableEdge:
+    edge = TraversableEdge(**kwargs)
+    graph.add(edge)
+    return edge
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -30,11 +42,9 @@ from tangl.vm38.traversable import (
 def _make_ledger(*labels: str) -> tuple[Ledger, list[TraversableNode]]:
     """Build a ledger with a linear graph and cursor at the first node."""
     g = Graph()
-    nodes = [TraversableNode(label=lbl, registry=g) for lbl in labels]
+    nodes = [_node(g, label=lbl) for lbl in labels]
     for i in range(len(nodes) - 1):
-        TraversableEdge(
-            registry=g,
-            predecessor_id=nodes[i].uid,
+        _edge(g, predecessor_id=nodes[i].uid,
             successor_id=nodes[i + 1].uid,
         )
     ledger = Ledger(graph=g, cursor_id=nodes[0].uid)
@@ -66,10 +76,9 @@ class TestLedgerCursor:
 class TestLedgerCallStack:
     def test_push_call_requires_return_phase(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        edge = TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid,
         )
         ledger = Ledger(graph=g, cursor_id=a.uid)
         with pytest.raises(ValueError):
@@ -77,10 +86,9 @@ class TestLedgerCallStack:
 
     def test_push_and_pop(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        call_edge = TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        call_edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             return_phase=ResolutionPhase.UPDATE,
         )
         ledger = Ledger(graph=g, cursor_id=a.uid)
@@ -90,7 +98,7 @@ class TestLedgerCallStack:
 
     def test_empty_pop_raises(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
+        a = _node(g, label="a")
         ledger = Ledger(graph=g, cursor_id=a.uid)
         with pytest.raises(IndexError):
             ledger.pop_call()

@@ -33,6 +33,18 @@ from tangl.vm38.traversable import (
     TraversableNode,
 )
 
+
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _edge(graph: Graph, **kwargs) -> TraversableEdge:
+    edge = TraversableEdge(**kwargs)
+    graph.add(edge)
+    return edge
+
 # Import registers the handlers — must happen after clean_vm_dispatch yields
 import tangl.vm38.system_handlers as sh
 
@@ -71,14 +83,14 @@ def ctx() -> SimpleNamespace:
 class TestContributeLocals:
     def test_returns_locals_dict(self) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {"key": "val"}
         result = sh.contribute_locals(caller=node, ctx=None)
         assert result == {"key": "val"}
 
     def test_returns_none_if_no_locals(self) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {}
         result = sh.contribute_locals(caller=node, ctx=None)
         # falsy dict returns None
@@ -86,7 +98,7 @@ class TestContributeLocals:
 
     def test_fires_through_gather_ns(self, ctx) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {"mood": "happy"}
         ns = do_gather_ns(node, ctx=ctx)
         assert ns["mood"] == "happy"
@@ -100,24 +112,24 @@ class TestContributeLocals:
 class TestValidateSuccessorExists:
     def test_edge_with_successor_passes(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        edge = TraversableEdge(registry=g, predecessor_id=a.uid, successor_id=b.uid)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         result = sh.validate_successor_exists(caller=edge, ctx=None)
         assert result is True
 
     def test_anonymous_edge_passes(self) -> None:
         g = Graph()
-        b = TraversableNode(label="b", registry=g)
+        b = _node(g, label="b")
         edge = AnonymousEdge(successor=b)
         result = sh.validate_successor_exists(caller=edge, ctx=None)
         assert result is True
 
     def test_fires_through_do_validate(self, ctx) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        edge = TraversableEdge(registry=g, predecessor_id=a.uid, successor_id=b.uid)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         assert do_validate(edge, ctx=ctx) is True
 
 
@@ -129,8 +141,8 @@ class TestValidateSuccessorExists:
 class TestDescendIntoContainer:
     def test_container_returns_enter_edge(self) -> None:
         g = Graph()
-        container = TraversableNode(label="scene", registry=g)
-        entry = TraversableNode(label="entry", registry=g)
+        container = _node(g, label="scene")
+        entry = _node(g, label="entry")
         container.add_child(entry)
         container.source_id = entry.uid
 
@@ -140,14 +152,14 @@ class TestDescendIntoContainer:
 
     def test_leaf_returns_none(self) -> None:
         g = Graph()
-        leaf = TraversableNode(label="leaf", registry=g)
+        leaf = _node(g, label="leaf")
         result = sh.descend_into_container(caller=leaf, ctx=None)
         assert result is None
 
     def test_fires_through_do_prereqs(self, ctx) -> None:
         g = Graph()
-        container = TraversableNode(label="scene", registry=g)
-        entry = TraversableNode(label="entry", registry=g)
+        container = _node(g, label="scene")
+        entry = _node(g, label="entry")
         container.add_child(entry)
         container.source_id = entry.uid
 
@@ -164,10 +176,9 @@ class TestDescendIntoContainer:
 class TestFollowTriggeredPrereqs:
     def test_prereq_triggered_edge_returned(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             trigger_phase=ResolutionPhase.PREREQS,
         )
         result = sh.follow_triggered_prereqs(caller=a, ctx=None)
@@ -176,18 +187,17 @@ class TestFollowTriggeredPrereqs:
 
     def test_no_triggered_edges_returns_none(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        TraversableEdge(registry=g, predecessor_id=a.uid, successor_id=b.uid)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         result = sh.follow_triggered_prereqs(caller=a, ctx=None)
         assert result is None
 
     def test_postreq_triggered_not_returned(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             trigger_phase=ResolutionPhase.POSTREQS,
         )
         result = sh.follow_triggered_prereqs(caller=a, ctx=None)
@@ -202,7 +212,7 @@ class TestFollowTriggeredPrereqs:
 class TestMarkVisited:
     def test_sets_visited_flag(self) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {}
         sh.mark_visited(caller=node, ctx=None)
         assert node.locals["_visited"] is True
@@ -210,7 +220,7 @@ class TestMarkVisited:
 
     def test_increments_on_repeat(self) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {}
         sh.mark_visited(caller=node, ctx=None)
         sh.mark_visited(caller=node, ctx=None)
@@ -218,14 +228,14 @@ class TestMarkVisited:
 
     def test_initializes_none_locals(self) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = None
         sh.mark_visited(caller=node, ctx=None)
         assert node.locals["_visited"] is True
 
     def test_fires_through_do_update(self, ctx) -> None:
         g = Graph()
-        node = TraversableNode(label="n", registry=g)
+        node = _node(g, label="n")
         node.locals = {}
         do_update(node, ctx=ctx)
         assert node.locals["_visited"] is True
@@ -239,10 +249,9 @@ class TestMarkVisited:
 class TestFollowTriggeredPostreqs:
     def test_postreq_triggered_edge_returned(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             trigger_phase=ResolutionPhase.POSTREQS,
         )
         result = sh.follow_triggered_postreqs(caller=a, ctx=None)
@@ -251,10 +260,9 @@ class TestFollowTriggeredPostreqs:
 
     def test_prereq_triggered_not_returned(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             trigger_phase=ResolutionPhase.PREREQS,
         )
         result = sh.follow_triggered_postreqs(caller=a, ctx=None)

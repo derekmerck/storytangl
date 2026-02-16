@@ -23,6 +23,18 @@ from tangl.vm38.traversable import (
 )
 
 
+def _node(graph: Graph, **kwargs) -> TraversableNode:
+    node = TraversableNode(**kwargs)
+    graph.add(node)
+    return node
+
+
+def _edge(graph: Graph, **kwargs) -> TraversableEdge:
+    edge = TraversableEdge(**kwargs)
+    graph.add(edge)
+    return edge
+
+
 # ============================================================================
 # LCA
 # ============================================================================
@@ -33,32 +45,32 @@ class TestLCA:
 
     def test_same_node(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
+        a = _node(g, label="a")
         assert lca(a, a) is a
 
     def test_siblings_share_parent(self) -> None:
         g = Graph()
-        root = TraversableNode(label="root", registry=g)
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        root = _node(g, label="root")
+        a = _node(g, label="a")
+        b = _node(g, label="b")
         root.add_child(a)
         root.add_child(b)
         assert lca(a, b) is root
 
     def test_parent_child(self) -> None:
         g = Graph()
-        parent = TraversableNode(label="p", registry=g)
-        child = TraversableNode(label="c", registry=g)
+        parent = _node(g, label="p")
+        child = _node(g, label="c")
         parent.add_child(child)
         assert lca(parent, child) is parent
 
     def test_cousins(self) -> None:
         g = Graph()
-        root = TraversableNode(label="root", registry=g)
-        ch1 = TraversableNode(label="ch1", registry=g)
-        ch2 = TraversableNode(label="ch2", registry=g)
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        root = _node(g, label="root")
+        ch1 = _node(g, label="ch1")
+        ch2 = _node(g, label="ch2")
+        a = _node(g, label="a")
+        b = _node(g, label="b")
         root.add_child(ch1)
         root.add_child(ch2)
         ch1.add_child(a)
@@ -68,8 +80,8 @@ class TestLCA:
     def test_disjoint_returns_none(self) -> None:
         g1 = Graph()
         g2 = Graph()
-        a = TraversableNode(label="a", registry=g1)
-        b = TraversableNode(label="b", registry=g2)
+        a = _node(g1, label="a")
+        b = _node(g2, label="b")
         assert lca(a, b) is None
 
 
@@ -83,11 +95,11 @@ class TestDecomposeMove:
 
     def test_cross_branch_move(self) -> None:
         g = Graph()
-        root = TraversableNode(label="root", registry=g)
-        ch1 = TraversableNode(label="ch1", registry=g)
-        ch2 = TraversableNode(label="ch2", registry=g)
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        root = _node(g, label="root")
+        ch1 = _node(g, label="ch1")
+        ch2 = _node(g, label="ch2")
+        a = _node(g, label="a")
+        b = _node(g, label="b")
         root.add_child(ch1)
         root.add_child(ch2)
         ch1.add_child(a)
@@ -100,9 +112,9 @@ class TestDecomposeMove:
 
     def test_sibling_move(self) -> None:
         g = Graph()
-        parent = TraversableNode(label="p", registry=g)
-        a = TraversableNode(label="a", registry=g)
-        c = TraversableNode(label="c", registry=g)
+        parent = _node(g, label="p")
+        a = _node(g, label="a")
+        c = _node(g, label="c")
         parent.add_child(a)
         parent.add_child(c)
 
@@ -113,8 +125,8 @@ class TestDecomposeMove:
 
     def test_descent_into_child(self) -> None:
         g = Graph()
-        parent = TraversableNode(label="p", registry=g)
-        child = TraversableNode(label="c", registry=g)
+        parent = _node(g, label="p")
+        child = _node(g, label="c")
         parent.add_child(child)
 
         ex, en, pivot = decompose_move(parent, child)
@@ -124,8 +136,8 @@ class TestDecomposeMove:
 
     def test_ascent_to_parent(self) -> None:
         g = Graph()
-        parent = TraversableNode(label="p", registry=g)
-        child = TraversableNode(label="c", registry=g)
+        parent = _node(g, label="p")
+        child = _node(g, label="c")
         parent.add_child(child)
 
         ex, en, pivot = decompose_move(child, parent)
@@ -136,8 +148,8 @@ class TestDecomposeMove:
     def test_disjoint_raises(self) -> None:
         g1 = Graph()
         g2 = Graph()
-        a = TraversableNode(label="a", registry=g1)
-        b = TraversableNode(label="b", registry=g2)
+        a = _node(g1, label="a")
+        b = _node(g2, label="b")
         with pytest.raises(ValueError, match="no common ancestor"):
             decompose_move(a, b)
 
@@ -152,18 +164,18 @@ class TestTraversableNodeLeaf:
 
     def test_leaf_is_not_container(self) -> None:
         g = Graph()
-        node = TraversableNode(label="leaf", registry=g)
+        node = _node(g, label="leaf")
         assert not node.is_container
 
     def test_leaf_enter_raises(self) -> None:
         g = Graph()
-        node = TraversableNode(label="leaf", registry=g)
+        node = _node(g, label="leaf")
         with pytest.raises(ValueError, match="not a container"):
             node.enter()
 
     def test_source_none_for_leaf(self) -> None:
         g = Graph()
-        node = TraversableNode(label="leaf", registry=g)
+        node = _node(g, label="leaf")
         assert node.source is None
 
 
@@ -172,16 +184,16 @@ class TestTraversableNodeContainer:
 
     def test_is_container_when_source_set(self) -> None:
         g = Graph()
-        container = TraversableNode(label="scene", registry=g)
-        entry = TraversableNode(label="entry", registry=g)
+        container = _node(g, label="scene")
+        entry = _node(g, label="entry")
         container.add_child(entry)
         container.source_id = entry.uid
         assert container.is_container
 
     def test_enter_returns_anonymous_edge(self) -> None:
         g = Graph()
-        container = TraversableNode(label="scene", registry=g)
-        entry = TraversableNode(label="entry", registry=g)
+        container = _node(g, label="scene")
+        entry = _node(g, label="entry")
         container.add_child(entry)
         container.source_id = entry.uid
 
@@ -192,9 +204,9 @@ class TestTraversableNodeContainer:
 
     def test_sink_property(self) -> None:
         g = Graph()
-        container = TraversableNode(label="scene", registry=g)
-        entry = TraversableNode(label="entry", registry=g)
-        exit_node = TraversableNode(label="exit", registry=g)
+        container = _node(g, label="scene")
+        entry = _node(g, label="entry")
+        exit_node = _node(g, label="exit")
         container.add_child(entry)
         container.add_child(exit_node)
         container.source_id = entry.uid
@@ -205,8 +217,8 @@ class TestTraversableNodeContainer:
 
     def test_has_forward_progress_stub(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
         # MVP stub always returns True
         assert a.has_forward_progress(b)
 
@@ -221,29 +233,27 @@ class TestTraversableEdge:
 
     def test_default_phases_are_none(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        e = TraversableEdge(registry=g, predecessor_id=a.uid, successor_id=b.uid)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         assert e.entry_phase is None
         assert e.return_phase is None
         assert e.trigger_phase is None
 
     def test_entry_phase_set(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        e = TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             entry_phase=ResolutionPhase.UPDATE,
         )
         assert e.entry_phase == ResolutionPhase.UPDATE
 
     def test_call_edge_return(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        call = TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        call = _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             return_phase=ResolutionPhase.UPDATE,
         )
         ret = call.get_return_edge()
@@ -253,27 +263,26 @@ class TestTraversableEdge:
 
     def test_non_call_edge_return_raises(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        e = TraversableEdge(registry=g, predecessor_id=a.uid, successor_id=b.uid)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         with pytest.raises(ValueError, match="not a call edge"):
             e.get_return_edge()
 
     def test_trigger_phase_for_auto_redirect(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        e = TraversableEdge(
-            registry=g, predecessor_id=a.uid, successor_id=b.uid,
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid,
             trigger_phase=ResolutionPhase.PREREQS,
         )
         assert e.trigger_phase == ResolutionPhase.PREREQS
 
     def test_predecessor_successor_narrowing(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
-        e = TraversableEdge(registry=g, predecessor_id=a.uid, successor_id=b.uid)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         assert e.predecessor is a
         assert e.successor is b
 
@@ -288,7 +297,7 @@ class TestAnonymousEdge:
 
     def test_minimal_construction(self) -> None:
         g = Graph()
-        b = TraversableNode(label="b", registry=g)
+        b = _node(g, label="b")
         e = AnonymousEdge(successor=b)
         assert e.successor is b
         assert e.predecessor is None
@@ -296,8 +305,8 @@ class TestAnonymousEdge:
 
     def test_full_construction(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
         e = AnonymousEdge(predecessor=a, successor=b, entry_phase=ResolutionPhase.UPDATE)
         assert e.predecessor is a
         assert e.successor is b
@@ -305,8 +314,8 @@ class TestAnonymousEdge:
 
     def test_repr_includes_labels(self) -> None:
         g = Graph()
-        a = TraversableNode(label="a", registry=g)
-        b = TraversableNode(label="b", registry=g)
+        a = _node(g, label="a")
+        b = _node(g, label="b")
         e = AnonymousEdge(predecessor=a, successor=b)
         r = repr(e)
         assert "a" in r and "b" in r
@@ -314,6 +323,6 @@ class TestAnonymousEdge:
     def test_no_return_phase(self) -> None:
         """AnonymousEdge is never a call edge — no return_phase attribute."""
         g = Graph()
-        b = TraversableNode(label="b", registry=g)
+        b = _node(g, label="b")
         e = AnonymousEdge(successor=b)
         assert not hasattr(e, "return_phase")
