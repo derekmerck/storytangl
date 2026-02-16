@@ -78,18 +78,15 @@ def lca(a: HierarchicalNode, b: HierarchicalNode) -> Optional[HierarchicalNode]:
 
     Siblings share their parent:
 
-    >>> lca(a, b) is root
-    True
+    >>> assert lca(a, b) is root
 
     Children share the parent:
 
-    >>> lca(ch1, a) is ch1
-    True
+    >>> assert lca(ch1, a) is ch1
 
     Same node:
 
-    >>> lca(a, a) is a
-    True
+    >>> assert lca(a, a) is a
     """
     # ancestors includes self: [a, parent, grandparent, ...]
     ancestors_a = {id(n) for n in a.ancestors}
@@ -132,34 +129,25 @@ def decompose_move(
     Cross-branch move pops one side and pushes the other:
 
     >>> ex, en, pivot = decompose_move(a, b)
-    >>> [n.label for n in ex]
-    ['a', 'ch1']
-    >>> [n.label for n in en]
-    ['ch2', 'b']
-    >>> pivot.label
-    'root'
+    >>> assert [n.label for n in ex] == ["a", "ch1"]
+    >>> assert [n.label for n in en] == ["ch2", "b"]
+    >>> assert pivot.label == "root"
 
     Within-group move only swaps the leaf:
 
     >>> c = TraversableNode(label="c", registry=g)
     >>> ch1.add_child(c)
     >>> ex, en, pivot = decompose_move(a, c)
-    >>> [n.label for n in ex]
-    ['a']
-    >>> [n.label for n in en]
-    ['c']
-    >>> pivot.label
-    'ch1'
+    >>> assert [n.label for n in ex] == ["a"]
+    >>> assert [n.label for n in en] == ["c"]
+    >>> assert pivot.label == "ch1"
 
     Descent into child:
 
     >>> ex, en, pivot = decompose_move(ch1, a)
-    >>> [n.label for n in ex]
-    []
-    >>> [n.label for n in en]
-    ['a']
-    >>> pivot.label
-    'ch1'
+    >>> assert [n.label for n in ex] == []
+    >>> assert [n.label for n in en] == ["a"]
+    >>> assert pivot.label == "ch1"
     """
     pivot = lca(source, target)
     if pivot is None:
@@ -273,13 +261,10 @@ class TraversableNode(HasState, HierarchicalNode):
     >>> container.add_child(snk)
     >>> container.source_id = src.uid
     >>> container.sink_id = snk.uid
-    >>> container.is_container
-    True
+    >>> assert container.is_container
     >>> edge = container.enter()
-    >>> edge.successor is src
-    True
-    >>> edge.predecessor is container
-    True
+    >>> assert edge.successor is src
+    >>> assert edge.predecessor is container
     """
 
     source_id: Optional[UUID] = None
@@ -355,12 +340,9 @@ class TraversableNode(HasState, HierarchicalNode):
         >>> scene.add_child(enter)
         >>> scene.source_id = enter.uid
         >>> edge = scene.enter()
-        >>> edge.successor is enter
-        True
-        >>> edge.predecessor is scene
-        True
-        >>> edge.entry_phase is None
-        True
+        >>> assert edge.successor is enter
+        >>> assert edge.predecessor is scene
+        >>> assert edge.entry_phase is None
         """
         if not self.is_container:
             raise ValueError(f"{self!r} is not a container (source_id is None)")
