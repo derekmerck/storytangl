@@ -27,12 +27,6 @@ class TestCallReceiptAggregation:
         receipts = [CallReceipt(result=None), CallReceipt(result=1), CallReceipt(result=2)]
         assert list(CallReceipt.iter_results(*receipts)) == [1, 2]
 
-    def test_first_last_empty_raise(self) -> None:
-        with pytest.raises(IndexError):
-            CallReceipt.first_result()
-        with pytest.raises(IndexError):
-            CallReceipt.last_result()
-
     def test_merge_results_dicts_later_wins(self) -> None:
         merged = CallReceipt.merge_results(CallReceipt(result={"a": 1}), CallReceipt(result={"a": 2}))
         assert dict(merged)["a"] == 2

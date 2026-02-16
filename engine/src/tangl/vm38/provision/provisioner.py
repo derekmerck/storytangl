@@ -18,7 +18,7 @@ class ProvisionPolicy(Flag):
 
     # Offer may include ONE of these, req may include multiple
     EXISTING = auto()
-    UPDATE = auto()
+    UPDATE = auto()  # find + update
     CREATE = auto()
     CLONE = auto()   # create + update
 
@@ -127,6 +127,7 @@ class FallbackProvisioner:
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
 
+
 class TokenProvisioner:
     # todo: This doesn't work yet b/c token factory doesn't present attribs that can be filtered by req
 
@@ -169,6 +170,6 @@ class CloneProvisioner:
     Clone is just copy with update.
 
     - Inspect offers in context to identify any valid FIND offers
-    - Dispatch an update provision req based on each find target
+    - Dispatch an update provision sub req based on each find target
     """
     ...

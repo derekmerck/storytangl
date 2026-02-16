@@ -36,6 +36,7 @@ from typing import Optional, TypeAlias, Union
 from uuid import UUID
 
 from tangl.core38 import HierarchicalNode, Edge, Node, Selector
+from tangl.core38.bases import HasState
 from .resolution_phase import ResolutionPhase
 
 
@@ -190,7 +191,7 @@ def decompose_move(
 # TraversableNode
 # ---------------------------------------------------------------------------
 
-class TraversableNode(HierarchicalNode):
+class TraversableNode(HasState, HierarchicalNode):
     """Graph node that participates in cursor-driven traversal.
 
     Why

@@ -20,8 +20,8 @@ class Resolver:
     # Pushes entire 'scope' discussion into however the frontier wants to define
     # it and provides a working default with a single group, single distance.
 
-    entity_groups: Iterable[EntityGroup] = None       # existing sources by scope dist
-    template_groups: Iterable[TemplateGroup] = None   # template sources by scope dist
+    entity_groups: Iterable[EntityGroup] = ()       # existing sources by scope dist
+    template_groups: Iterable[TemplateGroup] = ()   # template sources by scope dist
 
     @classmethod
     def from_ctx(cls, ctx) -> Self:
@@ -62,7 +62,7 @@ class Resolver:
     def resolve_requirement(self, requirement: Requirement[PT], *, _ctx=None) -> Optional[PT]:
         # updates requirement in place, returns provider to allow linking at dependency level
 
-        offers = self.gather_offers(requirement, _ctx)
+        offers = self.gather_offers(requirement, _ctx=_ctx)
 
         if len(offers) == 0:
             # No valid offers available

@@ -24,7 +24,7 @@ class Ledger(Entity):
     @cursor.setter
     def cursor(self, value: TraversableNode):
         if value is not None:
-            self.cursor_id = value
+            self.cursor_id = value.uid
 
     call_stack_ids: list[UUID] = Field(default_factory=list)
 
@@ -55,7 +55,7 @@ class Ledger(Entity):
     user_id: Optional[UUID] = None
 
     def get_frame(self) -> Frame:
-        return Frame(self.graph, self.cursor, self.output_stream, self.get_return_stack())
+        return Frame(self.graph, self.cursor, self.output_stream, self._call_stack())
 
     def resolve_choice(self, edge_id: UUID):
         edge = self.graph.get(edge_id)
@@ -65,7 +65,7 @@ class Ledger(Entity):
         self.choice_steps += 1
         self.cursor_steps += frame.cursor_steps
         self.cursor_id = frame.cursor.uid  # since this is a property, it might passthru updates directly?
-        self.return_stack_ids = [e.uid for e in frame.return_stack]
+        self.call_stack_ids = [e.uid for e in frame.return_stack]
         self.save_snapshot()
 
     def save_snapshot(self):
