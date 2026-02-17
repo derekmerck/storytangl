@@ -31,7 +31,8 @@ from __future__ import annotations
 
 import logging
 from collections import ChainMap
-from typing import Any, Callable, Iterable, Optional, TYPE_CHECKING
+from collections.abc import Iterable as IterableABC
+from typing import Any, Callable, Iterable, Optional, TYPE_CHECKING, Protocol, runtime_checkable
 
 from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record
 
@@ -43,6 +44,17 @@ if TYPE_CHECKING:
     Patch = Record
 
 logger = logging.getLogger(__name__)
+
+Fragment = Record
+Patch = Record
+
+
+@runtime_checkable
+class VmDispatchCtx(Protocol):
+    """Minimal context contract required by vm38 dispatch hooks."""
+
+    def get_registries(self) -> list[BehaviorRegistry]: ...
+    def get_inline_behaviors(self) -> Iterable[Callable | Any]: ...
 
 
 dispatch = BehaviorRegistry(
@@ -62,6 +74,10 @@ automatically alongside any registries provided by the dispatch context.
 
 def _assemble_registries(ctx) -> list[BehaviorRegistry]:
     """Collect registries from ctx and ensure vm_dispatch is included."""
+    if not isinstance(ctx, VmDispatchCtx):
+        raise TypeError(
+            "Dispatch context must provide get_registries() and get_inline_behaviors()"
+        )
     registries = list((ctx.get_registries() if ctx else None) or [])
     if dispatch not in registries:
         registries.append(dispatch)
@@ -82,20 +98,44 @@ def _make_on_hook(task: str) -> Callable:
     return on_hook
 
 
-def _make_do_hook(task: str, aggregator: Callable) -> Callable:
-    """Create an execution function for a phase task."""
-    def do_hook(caller, *, ctx, **kwargs):
-        registries = _assemble_registries(ctx)
-        receipts = BehaviorRegistry.chain_execute(
-            *registries,
-            task=task,
-            call_kwargs={"caller": caller, **kwargs},
-            ctx=ctx,
-        )
-        return aggregator(*receipts)
-    do_hook.__name__ = f"do_{task}"
-    do_hook.__doc__ = f"Execute all ``{task}`` handlers and aggregate results."
-    return do_hook
+def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
+    registries = _assemble_registries(ctx)
+    receipts = BehaviorRegistry.chain_execute(
+        *registries,
+        task=task,
+        call_kwargs={"caller": caller, **kwargs},
+        ctx=ctx,
+    )
+    return list(receipts)
+
+
+def _assert_redirect_result(value, *, task: str):
+    if value is None:
+        return None
+    from .traversable import AnonymousEdge, TraversableEdge
+    if isinstance(value, (AnonymousEdge, TraversableEdge)):
+        return value
+    raise TypeError(f"{task} must return a traversable edge or None, got {type(value)!r}")
+
+
+def _assert_journal_result(value):
+    if value is None:
+        return None
+    if isinstance(value, Record):
+        return value
+    if isinstance(value, IterableABC) and not isinstance(value, (str, bytes, dict)):
+        fragments = list(value)
+        if all(isinstance(fragment, Record) for fragment in fragments):
+            return fragments
+    raise TypeError(
+        "render_journal must return Record | Iterable[Record] | None"
+    )
+
+
+def _assert_patch_result(value):
+    if value is None or isinstance(value, Record):
+        return value
+    raise TypeError(f"finalize_step must return Record | None, got {type(value)!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -111,14 +151,50 @@ on_journal   = _make_on_hook("render_journal")
 on_finalize  = _make_on_hook("finalize_step")
 on_postreqs  = _make_on_hook("get_postreqs")
 
-# Execution hooks
-do_validate  = _make_do_hook("validate_edge",   CallReceipt.all_true)
-do_provision = _make_do_hook("provision_node",   CallReceipt.gather_results)
-do_prereqs   = _make_do_hook("get_prereqs",      CallReceipt.first_result)
-do_update    = _make_do_hook("apply_update",     CallReceipt.gather_results)
-do_journal   = _make_do_hook("render_journal",   CallReceipt.last_result)
-do_finalize  = _make_do_hook("finalize_step",    CallReceipt.last_result)
-do_postreqs  = _make_do_hook("get_postreqs",     CallReceipt.first_result)
+# Execution hooks with explicit phase-level type contracts
+def do_validate(caller, *, ctx, **kwargs) -> bool:
+    result = CallReceipt.all_true(*_run_task("validate_edge", caller=caller, ctx=ctx, **kwargs))
+    if not isinstance(result, bool):
+        raise TypeError(f"validate_edge must return bool, got {type(result)!r}")
+    return result
+
+
+def do_provision(caller, *, ctx, **kwargs) -> None:
+    results = CallReceipt.gather_results(*_run_task("provision_node", caller=caller, ctx=ctx, **kwargs))
+    if results:
+        raise TypeError(
+            "provision_node handlers must return None; non-None planning receipts are not supported in vm38"
+        )
+    return None
+
+
+def do_prereqs(caller, *, ctx, **kwargs):
+    result = CallReceipt.first_result(*_run_task("get_prereqs", caller=caller, ctx=ctx, **kwargs))
+    return _assert_redirect_result(result, task="get_prereqs")
+
+
+def do_update(caller, *, ctx, **kwargs) -> None:
+    results = CallReceipt.gather_results(*_run_task("apply_update", caller=caller, ctx=ctx, **kwargs))
+    if results:
+        raise TypeError(
+            "apply_update handlers must return None; update side effects must be in-place"
+        )
+    return None
+
+
+def do_journal(caller, *, ctx, **kwargs):
+    result = CallReceipt.last_result(*_run_task("render_journal", caller=caller, ctx=ctx, **kwargs))
+    return _assert_journal_result(result)
+
+
+def do_finalize(caller, *, ctx, **kwargs):
+    result = CallReceipt.last_result(*_run_task("finalize_step", caller=caller, ctx=ctx, **kwargs))
+    return _assert_patch_result(result)
+
+
+def do_postreqs(caller, *, ctx, **kwargs):
+    result = CallReceipt.first_result(*_run_task("get_postreqs", caller=caller, ctx=ctx, **kwargs))
+    return _assert_redirect_result(result, task="get_postreqs")
 
 
 # ---------------------------------------------------------------------------

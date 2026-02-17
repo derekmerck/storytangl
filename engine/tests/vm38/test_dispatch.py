@@ -9,11 +9,10 @@ Organized by concept:
 from __future__ import annotations
 
 from collections import ChainMap
-from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import BehaviorRegistry, Graph, Node, Selector
+from tangl.core38 import Graph, Record, Selector
 from tangl.vm38.dispatch import (
     dispatch as vm_dispatch,
     do_finalize,
@@ -33,7 +32,7 @@ from tangl.vm38.dispatch import (
     on_update,
     on_validate,
 )
-from tangl.vm38.traversable import TraversableNode
+from tangl.vm38.traversable import AnonymousEdge, TraversableNode
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -59,9 +58,11 @@ class TestHookRegistration:
         assert len(behaviors) >= 1
 
     def test_on_journal_registers(self) -> None:
+        fragment = Record()
+
         @on_journal
         def my_journal(*, caller, ctx, **kw):
-            return "fragment"
+            return fragment
 
         behaviors = list(vm_dispatch.find_all(Selector(task="render_journal")))
         assert len(behaviors) >= 1
@@ -120,6 +121,12 @@ class TestDoValidate:
         edge = _node(g, label="e")
         assert do_validate(edge, ctx=null_ctx) is False
 
+    def test_bad_ctx_shape_raises(self) -> None:
+        g = Graph()
+        edge = _node(g, label="e")
+        with pytest.raises(TypeError, match="Dispatch context"):
+            do_validate(edge, ctx=object())
+
 
 class TestDoPrereqs:
     """do_prereqs uses first_result aggregation."""
@@ -130,11 +137,20 @@ class TestDoPrereqs:
         assert do_prereqs(node, ctx=null_ctx) is None
 
     def test_first_non_none_returned(self, null_ctx) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        redirect = AnonymousEdge(predecessor=a, successor=b)
         on_prereqs(lambda *, caller, ctx, **kw: None)
-        on_prereqs(lambda *, caller, ctx, **kw: "redirect_edge")
+        on_prereqs(lambda *, caller, ctx, **kw: redirect)
+        assert do_prereqs(a, ctx=null_ctx) is redirect
+
+    def test_bad_redirect_type_raises(self, null_ctx) -> None:
         g = Graph()
         node = _node(g, label="n")
-        assert do_prereqs(node, ctx=null_ctx) == "redirect_edge"
+        on_prereqs(lambda *, caller, ctx, **kw: "redirect_edge")
+        with pytest.raises(TypeError, match="traversable edge"):
+            do_prereqs(node, ctx=null_ctx)
 
 
 class TestDoJournal:
@@ -146,24 +162,48 @@ class TestDoJournal:
         assert do_journal(node, ctx=null_ctx) is None
 
     def test_last_handler_wins(self, null_ctx) -> None:
-        on_journal(lambda *, caller, ctx, **kw: "first")
-        on_journal(lambda *, caller, ctx, **kw: "second")
+        first = Record(label="first")
+        second = Record(label="second")
+        on_journal(lambda *, caller, ctx, **kw: first)
+        on_journal(lambda *, caller, ctx, **kw: second)
         g = Graph()
         node = _node(g, label="n")
         result = do_journal(node, ctx=null_ctx)
-        assert result == "second"
+        assert result is second
+
+    def test_invalid_journal_payload_raises(self, null_ctx) -> None:
+        on_journal(lambda *, caller, ctx, **kw: "second")
+        g = Graph()
+        node = _node(g, label="n")
+        with pytest.raises(TypeError, match="render_journal"):
+            do_journal(node, ctx=null_ctx)
 
 
 class TestDoProvision:
-    """do_provision uses gather_results aggregation."""
+    """do_provision enforces no non-None handler returns."""
 
-    def test_gathers_from_multiple_handlers(self, null_ctx) -> None:
-        on_provision(lambda *, caller, ctx, **kw: "a")
-        on_provision(lambda *, caller, ctx, **kw: "b")
+    def test_no_result_handlers_return_none(self, null_ctx) -> None:
+        on_provision(lambda *, caller, ctx, **kw: None)
+        on_provision(lambda *, caller, ctx, **kw: None)
         g = Graph()
         node = _node(g, label="n")
-        result = do_provision(node, ctx=null_ctx)
-        assert "a" in result and "b" in result
+        assert do_provision(node, ctx=null_ctx) is None
+
+    def test_non_none_result_raises(self, null_ctx) -> None:
+        on_provision(lambda *, caller, ctx, **kw: "a")
+        g = Graph()
+        node = _node(g, label="n")
+        with pytest.raises(TypeError, match="provision_node"):
+            do_provision(node, ctx=null_ctx)
+
+
+class TestDoUpdate:
+    def test_non_none_result_raises(self, null_ctx) -> None:
+        on_update(lambda *, caller, ctx, **kw: "unexpected")
+        g = Graph()
+        node = _node(g, label="n")
+        with pytest.raises(TypeError, match="apply_update"):
+            do_update(node, ctx=null_ctx)
 
 
 # ============================================================================

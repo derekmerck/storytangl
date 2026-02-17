@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
 from tangl.vm38.provision import (
     Dependency,
@@ -147,6 +149,11 @@ class TestResolverRequirementResolution:
         assert provider is sword
         assert req.selected_offer_policy == ProvisionPolicy.EXISTING
 
+    def test_from_ctx_requires_provision_context_shape(self) -> None:
+        ctx = SimpleNamespace()
+        with pytest.raises(TypeError, match="get_entity_groups"):
+            Resolver.from_ctx(ctx)
+
 
 class TestResolverDependencyResolution:
     def test_resolve_dependency_links_provider(self) -> None:
@@ -161,6 +168,28 @@ class TestResolverDependencyResolution:
         assert success is True
         assert dep.satisfied
         assert dep.provider is sword
+
+    def test_resolve_dependency_sets_resolution_metadata(self) -> None:
+        g = Graph()
+        node = _node(g, label="room")
+        sword = _node(g, label="sword")
+        dep = _dependency(
+            g,
+            requirement=Requirement.from_identifier("sword"),
+            predecessor_id=node.uid,
+        )
+        ctx = SimpleNamespace(
+            step=3,
+            cursor_id=node.uid,
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: [],
+        )
+
+        resolver = Resolver(entity_groups=[[sword]])
+        success = resolver.resolve_dependency(dep, _ctx=ctx)
+        assert success is True
+        assert dep.requirement.resolved_step == 3
+        assert dep.requirement.resolved_cursor_id == node.uid
 
     def test_force_fallback_bypasses_requirement_validation(self) -> None:
         class Person(RegistryAware):
@@ -178,12 +207,20 @@ class TestResolverDependencyResolution:
         )
 
         resolver = Resolver(entity_groups=[], template_groups=[])
-        success = resolver.resolve_dependency(dep, force=True)
+        ctx = SimpleNamespace(
+            step=11,
+            cursor_id=node.uid,
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: [],
+        )
+        success = resolver.resolve_dependency(dep, force=True, _ctx=ctx)
         assert success is True
         assert dep.provider is not None
         assert isinstance(dep.provider, Person)
         assert dep.satisfied
         assert dep.requirement.selected_offer_policy == ProvisionPolicy.FORCE
+        assert dep.requirement.resolved_step == 11
+        assert dep.requirement.resolved_cursor_id == node.uid
 
 
 class TestResolverFrontierNode:

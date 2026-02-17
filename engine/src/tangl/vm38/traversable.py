@@ -479,10 +479,18 @@ class TraversableEdge(Edge):
         """Type-narrowed predecessor."""
         return super().predecessor
 
+    @predecessor.setter
+    def predecessor(self, value: TraversableNode) -> None:
+        self.set_predecessor(value)
+
     @property
     def successor(self) -> Optional[TraversableNode]:
         """Type-narrowed successor."""
         return super().successor
+
+    @successor.setter
+    def successor(self, value: TraversableNode) -> None:
+        self.set_successor(value)
 
     def available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
         """Availability check delegated to the successor node.
@@ -514,6 +522,8 @@ class TraversableEdge(Edge):
         """
         if self.return_phase is None:
             raise ValueError(f"{self!r} is not a call edge (return_phase is None)")
+        if self.predecessor is None:
+            raise ValueError(f"{self!r} has no predecessor; cannot build return edge")
         return AnonymousEdge(
             successor=self.predecessor,
             entry_phase=self.return_phase,

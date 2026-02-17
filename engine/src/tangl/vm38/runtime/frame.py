@@ -59,8 +59,10 @@ from tangl.core38 import (
     Graph,
     Node,
     OrderedRegistry,
+    Record,
     Selector,
 )
+from tangl.utils.hashing import hashing_func
 from ..dispatch import (
     dispatch as vm_dispatch,
     do_finalize,
@@ -133,6 +135,7 @@ class PhaseCtx:
 
     graph: Graph
     cursor_id: UUID
+    step: int = 0
     current_phase: ResolutionPhase = ResolutionPhase.INIT
 
     random: Random = field(default_factory=Random)
@@ -213,10 +216,18 @@ class PhaseCtx:
     def get_template_groups(self) -> list[Iterable]:
         """Template pools for provisioning, ordered by scope distance.
 
-        Stub — returns an empty list.  Story layer will provide template
-        registries via the world object.
+        By convention, story graphs expose ``graph.factory`` as a template
+        registry-like object. When present, include it as the nearest
+        template pool so PLANNING can resolve CREATE offers.
         """
-        return []
+        factory = getattr(self.graph, "factory", None)
+        if factory is None:
+            return []
+
+        if hasattr(factory, "values"):
+            return [factory.values()]
+
+        return [factory]
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +315,24 @@ class Frame:
     cursor_steps: int = 0
     """Number of cursor movements in this frame's lifetime."""
 
+    cursor_trace: list[UUID] = field(default_factory=list)
+    """Visited cursor positions for this resolve cycle, in order."""
+
+    step_base: int = 0
+    """Absolute step offset at frame start (usually ledger.cursor_steps)."""
+
     _random: Random = field(default_factory=Random)
+
+    def __post_init__(self) -> None:
+        """Seed RNG deterministically from graph state + cursor + starting step."""
+        seed_hash = hashing_func(
+            self.graph.value_hash(),
+            self.cursor.uid,
+            self.step_base,
+            digest_size=8,
+        )
+        seed = int.from_bytes(seed_hash[:8], byteorder="big", signed=False)
+        self._random.seed(seed)
 
     # -- Context factory ----------------------------------------------------
 
@@ -318,6 +346,7 @@ class Frame:
         return PhaseCtx(
             graph=self.graph,
             cursor_id=self.cursor.uid,
+            step=self.step_base + self.cursor_steps,
             random=self._random,
         )
 
@@ -351,6 +380,7 @@ class Frame:
         # -- Update cursor --------------------------------------------------
         self.cursor = edge.successor
         self.cursor_steps += 1
+        self.cursor_trace.append(self.cursor.uid)
 
         # -- Build context at new position ----------------------------------
         ctx = self._make_ctx()
@@ -380,7 +410,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.JOURNAL
             fragments = do_journal(self.cursor, ctx=ctx)
             if fragments:
-                if isinstance(fragments, (list, tuple)):
+                if isinstance(fragments, Iterable) and not isinstance(fragments, (Record, str, bytes)):
                     for f in fragments:
                         self.output_stream.append(f)
                 else:
@@ -438,13 +468,14 @@ class Frame:
                     f"likely a redirect loop at {self.cursor!r}"
                 )
 
-            result = self.follow_edge(edge)
+            current_edge = edge
+            result = self.follow_edge(current_edge)
             depth += 1
 
+            if getattr(current_edge, "return_phase", None) is not None:
+                self.return_stack.append(current_edge)
+
             if result is not None:
-                if (hasattr(result, "return_phase")
-                        and result.return_phase is not None):
-                    self.return_stack.append(result)
                 edge = result
 
             elif self.return_stack:

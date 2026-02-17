@@ -97,6 +97,36 @@ class TestPhaseCtx:
         # Same object — cached
         assert ns1 is ns2
 
+    def test_step_passes_through_constructor(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid, step=9)
+        assert ctx.step == 9
+
+
+class TestFrameRandomDeterminism:
+    def test_same_inputs_seed_same_sequence(self) -> None:
+        g, [a] = _simple_graph("a")
+        frame_a = Frame(graph=g, cursor=a, step_base=2)
+        frame_b = Frame(graph=g, cursor=a, step_base=2)
+
+        ctx_a = frame_a._make_ctx()
+        ctx_b = frame_b._make_ctx()
+        seq_a = [ctx_a.get_random().random() for _ in range(5)]
+        seq_b = [ctx_b.get_random().random() for _ in range(5)]
+        assert seq_a == seq_b
+
+    def test_step_base_changes_sequence(self) -> None:
+        g, [a] = _simple_graph("a")
+        frame_a = Frame(graph=g, cursor=a, step_base=2)
+        frame_b = Frame(graph=g, cursor=a, step_base=3)
+
+        ctx_a = frame_a._make_ctx()
+        ctx_b = frame_b._make_ctx()
+        seq_a = [ctx_a.get_random().random() for _ in range(3)]
+        seq_b = [ctx_b.get_random().random() for _ in range(3)]
+        assert seq_a != seq_b
+
 
 # ============================================================================
 # Frame.follow_edge — basic pipeline
@@ -116,6 +146,12 @@ class TestFollowEdge:
         frame = Frame(graph=g, cursor=a)
         frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
         assert frame.cursor_steps == 1
+
+    def test_records_cursor_trace(self) -> None:
+        g, [a, b] = _simple_graph("a", "b")
+        frame = Frame(graph=g, cursor=a)
+        frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
+        assert frame.cursor_trace == [b.uid]
 
     def test_no_redirect_returns_none(self) -> None:
         g, [a, b] = _simple_graph("a", "b")
@@ -253,6 +289,7 @@ class TestResolveChoice:
         frame.resolve_choice(AnonymousEdge(predecessor=a, successor=b))
         # Lands on c after the redirect chain
         assert frame.cursor is c
+        assert frame.cursor_trace == [b.uid, c.uid]
 
     def test_recursion_guard(self) -> None:
         """Infinite redirect loop raises RecursionError."""
@@ -275,6 +312,22 @@ class TestResolveChoice:
 
 class TestResolveChoiceReturnStack:
     """Call edges push to return stack; terminals pop back."""
+
+    def test_direct_call_edge_pushes_and_returns(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+
+        call_edge = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+
+        frame = Frame(graph=g, cursor=a)
+        frame.resolve_choice(call_edge)
+        assert frame.cursor is a
 
     def test_call_and_return(self) -> None:
         g = Graph()

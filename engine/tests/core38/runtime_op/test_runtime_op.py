@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.core38.runtime_op import RuntimeOp
 
 
@@ -22,3 +24,7 @@ class TestRuntimeOpNamespaceHandling:
         result = RuntimeOp.apply_all("x = 1", "x = x + 1", ns=ns)
         assert result is ns
         assert ns["x"] == 2
+
+    def test_eval_restricts_unsafe_builtins(self) -> None:
+        with pytest.raises(NameError):
+            RuntimeOp(expr="__import__('os')").eval({})

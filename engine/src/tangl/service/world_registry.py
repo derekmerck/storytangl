@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tangl.config import get_world_dirs
 from tangl.story.fabula import World
+from tangl.story38.fabula import World38
 
 from tangl.loaders import UniqueLabel, WorldBundle, WorldCompiler
 
@@ -18,6 +19,7 @@ class WorldRegistry:
         self.compiler = compiler or WorldCompiler()
         self.bundles: dict[UniqueLabel, WorldBundle] = {}
         self.worlds: dict[UniqueLabel, World] = {}
+        self.worlds38: dict[UniqueLabel, World38] = {}
 
         if world_dirs is None:
             world_dirs = get_world_dirs()
@@ -57,7 +59,16 @@ class WorldRegistry:
             for bundle in self.bundles.values()
         ]
 
-    def get_world(self, label: UniqueLabel) -> World:
+    def get_world(self, label: UniqueLabel, *, runtime_version: str = "37") -> World | World38:
+        if runtime_version == "38":
+            if label not in self.worlds38:
+                bundle = self.bundles.get(label)
+                if not bundle:
+                    msg = f"Unknown world: {label}"
+                    raise ValueError(msg)
+                self.worlds38[label] = self.compiler.compile(bundle, runtime_version="38")
+            return self.worlds38[label]
+
         if label not in self.worlds:
             bundle = self.bundles.get(label)
             if not bundle:
@@ -67,7 +78,12 @@ class WorldRegistry:
             self.worlds[label] = self.compiler.compile(bundle)
         return self.worlds[label]
 
-    def get_anthology(self, label: UniqueLabel) -> dict[str, World]:
+    def get_anthology(
+        self,
+        label: UniqueLabel,
+        *,
+        runtime_version: str = "37",
+    ) -> dict[str, World] | dict[str, World38]:
         bundle = self.bundles.get(label)
         if not bundle:
             msg = f"Unknown world: {label}"
@@ -77,4 +93,4 @@ class WorldRegistry:
             msg = f"World {label} is not an anthology"
             raise ValueError(msg)
 
-        return self.compiler.compile_anthology(bundle)
+        return self.compiler.compile_anthology(bundle, runtime_version=runtime_version)

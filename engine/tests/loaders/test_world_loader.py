@@ -6,8 +6,20 @@ from pathlib import Path
 import pytest
 
 from tangl.loaders.bundle import WorldBundle
-from tangl.loaders.compiler import WorldCompiler
+from tangl.loaders.compiler import ScriptCompiler, WorldCompiler
 from tangl.service.world_registry import WorldRegistry
+
+
+class _BridgeScriptCompiler(ScriptCompiler):
+    """Test helper exposing a custom per-file loader."""
+
+    def load_from_path(self, script_path: Path) -> dict:
+        text = script_path.read_text(encoding="utf-8").strip()
+        return {
+            "label": "bridge_world",
+            "metadata": {"title": text or "bridge", "author": "tests"},
+            "scenes": {},
+        }
 
 
 def test_bundle_loads_from_directory(media_mvp_path: Path) -> None:
@@ -154,6 +166,123 @@ def test_script_discovery_uses_scripts_directory(tmp_path: Path) -> None:
     paths = bundle.get_script_paths()
 
     assert paths == [script_a, script_b]
+
+
+def test_story_map_manifest_drives_script_resolution_and_codec(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "stories_world"
+    scripts_dir = bundle_root / "content"
+    scripts_dir.mkdir(parents=True)
+
+    (bundle_root / "world.yaml").write_text(
+        """
+        label: stories_world
+        codec: near_native
+        stories:
+          book1:
+            scripts:
+              - content/book1.yaml
+          book2:
+            codec: yaml
+            scripts:
+              - content/book2.yaml
+        """,
+        encoding="utf-8",
+    )
+
+    (scripts_dir / "book1.yaml").write_text("label: book1\nscenes: {}\n", encoding="utf-8")
+    (scripts_dir / "book2.yaml").write_text("label: book2\nscenes: {}\n", encoding="utf-8")
+
+    bundle = WorldBundle.load(bundle_root)
+
+    assert bundle.manifest.is_anthology
+    assert bundle.manifest.story_keys() == ["book1", "book2"]
+    assert bundle.get_script_paths("book1") == [scripts_dir / "book1.yaml"]
+    assert bundle.get_story_codec("book1") == "near_native"
+    assert bundle.get_story_codec("book2") == "yaml"
+
+
+def test_custom_script_loader_bridge_used_when_codec_not_explicit(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bridge_world"
+    bundle_root.mkdir()
+
+    (bundle_root / "world.yaml").write_text(
+        """
+        label: bridge_world
+        scripts: story.custom
+        """,
+        encoding="utf-8",
+    )
+    (bundle_root / "story.custom").write_text("Bridge Story", encoding="utf-8")
+
+    bundle = WorldBundle.load(bundle_root)
+    world = WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(bundle)
+
+    assert world.label == "bridge_world"
+    assert world.metadata.get("title") == "Bridge Story"
+
+
+def test_explicit_codec_disables_custom_script_loader_bridge(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bridge_world_explicit"
+    bundle_root.mkdir()
+
+    (bundle_root / "world.yaml").write_text(
+        """
+        label: bridge_world_explicit
+        codec: near_native
+        scripts: story.custom
+        """,
+        encoding="utf-8",
+    )
+    (bundle_root / "story.custom").write_text("not: [valid", encoding="utf-8")
+
+    bundle = WorldBundle.load(bundle_root)
+
+    with pytest.raises(Exception):
+        WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(bundle)
+
+
+def test_codec_merge_collisions_are_reported(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "merge_world"
+    bundle_root.mkdir()
+    scripts_dir = bundle_root / "scripts"
+    scripts_dir.mkdir()
+
+    (bundle_root / "world.yaml").write_text(
+        """
+        label: merge_world
+        scripts:
+          - scripts/a.yaml
+          - scripts/b.yaml
+        metadata:
+          author: Tests
+        """,
+        encoding="utf-8",
+    )
+
+    (scripts_dir / "a.yaml").write_text(
+        """
+        label: merge_world
+        metadata:
+          title: A
+        scenes: {}
+        """,
+        encoding="utf-8",
+    )
+    (scripts_dir / "b.yaml").write_text(
+        """
+        label: merge_world
+        metadata:
+          title: B
+        scenes: {}
+        """,
+        encoding="utf-8",
+    )
+
+    bundle = WorldBundle.load(bundle_root)
+    warnings = WorldCompiler()._decode_story_data(bundle=bundle, story_key=None).warnings
+
+    assert warnings
+    assert any("overwrote top-level keys" in warning for warning in warnings)
 
 
 def test_compile_anthology_shares_domain_and_media(tmp_path: Path) -> None:

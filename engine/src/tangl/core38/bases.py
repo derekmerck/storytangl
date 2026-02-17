@@ -413,7 +413,7 @@ class Unstructurable(BaseModelPlus):
         return self.value_hash() == other.value_hash()
 
     def __eq__(self, other: Self) -> bool:
-        # Order of inheritance matters for this, right-most wins.
+        # Order of inheritance matters for this, left-most wins.
         return self.eq_by_value(other)
 
     def evolve(self, **updates) -> Self:

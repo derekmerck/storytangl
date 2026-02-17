@@ -14,9 +14,11 @@ from uuid import uuid4
 import pytest
 
 from tangl.core38 import Graph, Snapshot
+from tangl.vm38.dispatch import on_prereqs
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.runtime.frame import Frame
 from tangl.vm38.runtime.ledger import Ledger
+from tangl.vm38.traversal import get_visit_count
 from tangl.vm38.traversable import (
     AnonymousEdge,
     TraversableEdge,
@@ -101,6 +103,15 @@ class TestLedgerCursor:
         ledger.initialize_ledger(entry_id=a.uid)
         assert ledger.call_stack_ids == [call_edge.uid]
 
+    def test_fresh_construction_initializes_counters(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        ledger = Ledger(graph=g, cursor_id=a.uid)
+        assert ledger.cursor_steps == 0
+        assert ledger.choice_steps == 0
+        assert ledger.reentrant_steps == 0
+        assert ledger.cursor_history == [a.uid]
+
 
 # ============================================================================
 # Call stack
@@ -178,6 +189,56 @@ class TestLedgerResolveChoice:
         ledger.resolve_choice(edge.uid)
         assert ledger.choice_steps == initial_choice + 1
 
+    def test_resolve_choice_extends_full_cursor_trace(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+
+        @on_prereqs
+        def redirect(*, caller, ctx, **kw):
+            if caller is b:
+                return AnonymousEdge(predecessor=b, successor=c)
+            return None
+
+        ledger = Ledger(graph=g, cursor_id=a.uid)
+        edge = list(a.edges_out())[0]
+        ledger.resolve_choice(edge.uid)
+
+        assert ledger.cursor_history == [a.uid, b.uid, c.uid]
+        assert ledger.cursor_id == c.uid
+        assert get_visit_count(b.uid, ledger.cursor_history) == 1
+
+    def test_container_descent_positions_appear_in_history(self) -> None:
+        g = Graph()
+        root = _node(g, label="root")
+        container = _node(g, label="scene")
+        entry = _node(g, label="entry")
+        container.add_child(entry)
+        container.source_id = entry.uid
+        _edge(g, predecessor_id=root.uid, successor_id=container.uid)
+
+        # Register just the container descent prereq handler for this test.
+        import tangl.vm38.system_handlers as sh
+        on_prereqs(sh.descend_into_container)
+
+        ledger = Ledger(graph=g, cursor_id=root.uid)
+        edge = list(root.edges_out())[0]
+        ledger.resolve_choice(edge.uid)
+
+        assert ledger.cursor_history == [root.uid, container.uid, entry.uid]
+
+    def test_reentrant_steps_increments_on_self_loop_hops(self) -> None:
+        ledger, [a, _b] = _make_ledger("a", "b")
+
+        # Drive through ledger path so counters are synchronized from frame trace.
+        g = ledger.graph
+        edge = _edge(g, predecessor_id=a.uid, successor_id=a.uid)
+        before = ledger.reentrant_steps
+        ledger.resolve_choice(edge.uid)
+        assert ledger.reentrant_steps == before + 1
+
     def test_resolve_raises_on_missing_edge_and_preserves_state(self) -> None:
         ledger, [a, b] = _make_ledger("a", "b")
         initial_choice = ledger.choice_steps
@@ -245,3 +306,10 @@ class TestLedgerJournal:
 
         assert ledger.get_journal(since_step=2) == [f2, f3]
         assert ledger.get_journal(limit=2) == [f2, f3]
+
+
+class TestLedgerReplayStub:
+    def test_rollback_to_step_raises_not_implemented(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        with pytest.raises(NotImplementedError, match="event-sourcing"):
+            ledger.rollback_to_step(0)

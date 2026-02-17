@@ -86,13 +86,47 @@ tangl play reference
 
 ```yaml
 label: my_world          # Must match directory name
-scripts: script.yaml     # Optional (convention-based)
+codec: near_native       # Optional (default: near_native)
+scripts: script.yaml     # Optional (legacy single-story shorthand)
 media_dir: media         # Optional (defaults to "media")
 metadata:
   title: "My Story"
   author: "Your Name"
   version: "1.0.0"
 ```
+
+### Multi-Story Manifest (anthology)
+
+```yaml
+label: my_anthology
+codec: near_native
+metadata:
+  title: "My Anthology"
+stories:
+  book1:
+    scripts:
+      - content/book1.yaml
+  book2:
+    codec: near_native
+    scripts:
+      - content/book2_part1.yaml
+      - content/book2_part2.yaml
+```
+
+### Codec contract (first pass)
+
+StoryTangl now treats the runtime representation as canonical and delegates
+on-disk translation to codecs.
+
+- `decode`: on-disk source -> runtime-ready script data (+ provenance map)
+- `encode`: runtime data -> on-disk source shape
+
+Current status:
+1. Built-in near-native YAML codec is included.
+2. Source mapping is file-level only (`__source_files__`) in MVP.
+3. Per-node/per-span mapping is intentionally deferred.
+4. Unknown codecs can still be bridged by custom script compilers that expose
+   `load_from_path` (migration shortcut, not long-term architecture).
 
 ### Script (script.yaml)
 
@@ -114,10 +148,12 @@ scenes:
 ## Best Practices
 
 1. Directory name = manifest label
-2. Include README.md
-3. Use conventions (script.yaml, media/)
-4. Test with WorldRegistry
-5. Version in metadata
+2. Prefer explicit `stories:` for multi-story bundles.
+3. Keep codec choice explicit when you are not using near-native YAML.
+4. Include README.md
+5. Use conventions (script.yaml, media/)
+6. Test with WorldRegistry
+7. Version in metadata
 
 ## Troubleshooting
 

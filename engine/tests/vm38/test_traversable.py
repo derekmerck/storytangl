@@ -298,6 +298,13 @@ class TestTraversableEdge:
         with pytest.raises(ValueError, match="not a call edge"):
             e.get_return_edge()
 
+    def test_call_edge_without_predecessor_raises(self) -> None:
+        g = Graph()
+        b = _node(g, label="b")
+        e = _edge(g, successor_id=b.uid, return_phase=ResolutionPhase.UPDATE)
+        with pytest.raises(ValueError, match="no predecessor"):
+            e.get_return_edge()
+
     def test_trigger_phase_for_auto_redirect(self) -> None:
         g = Graph()
         a = _node(g, label="a")
@@ -314,6 +321,17 @@ class TestTraversableEdge:
         e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         assert e.predecessor is a
         assert e.successor is b
+
+    def test_property_setters_delegate_to_core_edge_accessors(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        e.successor = c
+        e.predecessor = b
+        assert e.successor is c
+        assert e.predecessor is b
 
     def test_available_delegates_to_successor(self) -> None:
         g = Graph()

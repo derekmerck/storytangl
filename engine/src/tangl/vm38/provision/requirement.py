@@ -40,6 +40,8 @@ class Requirement(Selector, Generic[PT]):
     unsatisfiable: Optional[bool] = None           # unknown
     unambiguously_resolved: Optional[bool] = None  # unknown
     selected_offer_policy: Optional[ProvisionPolicy] = None
+    resolved_step: Optional[int] = None
+    resolved_cursor_id: Optional[UUID] = None
 
     def satisfied_by(self, entity: PT) -> bool:
         return self.matches(entity)
@@ -96,6 +98,20 @@ class HasRequirement(RegistryAware, Generic[PT]):
         if (self.requirement._validate_satisfied_by(provider) and
                 self.registry._validate_linkable(provider)):
             self.requirement.provider_id = provider.uid
+            step = getattr(_ctx, "step", None)
+            if isinstance(step, int):
+                self.requirement.resolved_step = step
+            else:
+                self.requirement.resolved_step = None
+
+            cursor_id = getattr(_ctx, "cursor_id", None)
+            if cursor_id is None:
+                cursor = getattr(_ctx, "cursor", None)
+                cursor_id = getattr(cursor, "uid", None)
+            if isinstance(cursor_id, UUID):
+                self.requirement.resolved_cursor_id = cursor_id
+            else:
+                self.requirement.resolved_cursor_id = None
 
     @provider.setter
     def provider(self, value: PT) -> None:

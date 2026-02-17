@@ -13,6 +13,7 @@ __all__ = [
     "get_visit_count",
     "is_first_visit",
     "steps_since_last_visit",
+    "get_round",
     "is_self_loop",
     "count_turns",
     "in_subroutine",
@@ -45,6 +46,27 @@ def steps_since_last_visit(cursor_id: UUID, history: list[UUID]) -> int:
         if history[index] == cursor_id:
             return len(history) - 1 - index
     return -1
+
+
+def get_round(cursor_id: UUID, history: list[UUID]) -> int:
+    """Count trailing consecutive visits to ``cursor_id``.
+
+    Returns
+    -------
+    int
+        ``0`` if ``cursor_id`` is not current position, otherwise
+        ``1`` on first arrival, ``2`` after one self-loop, etc.
+    """
+    if not history or history[-1] != cursor_id:
+        return 0
+
+    count = 0
+    for index in range(len(history) - 1, -1, -1):
+        if history[index] == cursor_id:
+            count += 1
+        else:
+            break
+    return count
 
 
 def is_self_loop(history: list[UUID]) -> bool:
