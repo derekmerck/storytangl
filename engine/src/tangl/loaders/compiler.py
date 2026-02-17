@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
+from tangl.story38.fabula import StoryCompiler38, World38
 
 from .bundle import WorldBundle
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
@@ -21,13 +22,21 @@ class WorldCompiler:
         asset_compiler: AssetCompiler | None = None,
         domain_compiler: DomainCompiler | None = None,
         media_compiler: MediaCompiler | None = None,
+        story38_compiler: StoryCompiler38 | None = None,
     ) -> None:
         self.script_compiler = script_compiler or ScriptCompiler()
         self.asset_compiler = asset_compiler or AssetCompiler()
         self.domain_compiler = domain_compiler or DomainCompiler()
         self.media_compiler = media_compiler or MediaCompiler()
+        self.story38_compiler = story38_compiler or StoryCompiler38()
 
-    def compile(self, bundle: WorldBundle, story_key: str | None = None) -> World:
+    def compile(
+        self,
+        bundle: WorldBundle,
+        story_key: str | None = None,
+        *,
+        runtime_version: str = "37",
+    ) -> World | World38:
         base_metadata = bundle.manifest.metadata.copy()
 
         script_paths = bundle.get_script_paths(story_key)
@@ -41,6 +50,12 @@ class WorldCompiler:
         if story_key is not None and default_title == bundle.manifest.label:
             default_title = f"{bundle.manifest.label}_{story_key}"
         script_metadata.setdefault("title", default_title)
+
+        if runtime_version == "38":
+            story38_bundle = self.story38_compiler.compile(script_data)
+            label = bundle.manifest.label if story_key is None else f"{bundle.manifest.label}_{story_key}"
+            world38 = World38(label=label, bundle=story38_bundle)
+            return world38
 
         script_manager = self.script_compiler.compile(script_data)
 
@@ -73,7 +88,12 @@ class WorldCompiler:
         world._bundle = bundle  # noqa: SLF001
         return world
 
-    def compile_anthology(self, bundle: WorldBundle) -> dict[str, World]:
+    def compile_anthology(
+        self,
+        bundle: WorldBundle,
+        *,
+        runtime_version: str = "37",
+    ) -> dict[str, World] | dict[str, World38]:
         if not bundle.manifest.is_anthology:
             msg = f"{bundle.manifest.label} is not an anthology"
             raise ValueError(msg)
@@ -103,6 +123,14 @@ class WorldCompiler:
             if default_title == bundle.manifest.label:
                 default_title = f"{bundle.manifest.label}_{story_key}"
             script_metadata.setdefault("title", default_title)
+
+            if runtime_version == "38":
+                story38_bundle = self.story38_compiler.compile(script_data)
+                worlds[story_key] = World38(
+                    label=f"{bundle.manifest.label}_{story_key}",
+                    bundle=story38_bundle,
+                )
+                continue
 
             script_manager = self.script_compiler.compile(script_data)
             asset_manager = AssetManager()

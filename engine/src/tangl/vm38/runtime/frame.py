@@ -213,10 +213,18 @@ class PhaseCtx:
     def get_template_groups(self) -> list[Iterable]:
         """Template pools for provisioning, ordered by scope distance.
 
-        Stub — returns an empty list.  Story layer will provide template
-        registries via the world object.
+        By convention, story graphs expose ``graph.factory`` as a template
+        registry-like object. When present, include it as the nearest
+        template pool so PLANNING can resolve CREATE offers.
         """
-        return []
+        factory = getattr(self.graph, "factory", None)
+        if factory is None:
+            return []
+
+        if hasattr(factory, "values"):
+            return [factory.values()]
+
+        return [factory]
 
 
 # ---------------------------------------------------------------------------

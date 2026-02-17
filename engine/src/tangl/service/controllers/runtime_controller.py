@@ -355,6 +355,55 @@ class RuntimeController(HasApiEndpoints):
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
+        method_type=MethodType.CREATE,
+    )
+    def create_story38(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
+        """Create a story38 graph and bootstrap a vm38 ledger for ``user``."""
+        from tangl.service.world_registry import WorldRegistry
+        from tangl.story38.fabula import InitMode
+        from tangl.vm38.runtime.ledger import Ledger as Ledger38
+
+        world = kwargs.pop("world", None)
+        if world is None:
+            registry = WorldRegistry()
+            world = registry.get_world(world_id, runtime_version="38")
+
+        story_label = kwargs.get("story_label") or f"story_{user.uid}"
+        mode_raw = kwargs.get("init_mode") or kwargs.get("mode") or InitMode.FULLY_SPECIFIED.value
+        mode = InitMode(mode_raw)
+        init_result = world.create_story(story_label, init_mode=mode)
+        story_graph = init_result.graph
+
+        if story_graph.initial_cursor_id is None:
+            raise RuntimeError("Story38 graph did not define an initial cursor")
+
+        ledger = Ledger38.from_graph(graph=story_graph, entry_id=story_graph.initial_cursor_id)
+        user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
+
+        cursor_node = story_graph.get(ledger.cursor_id)
+        cursor_label = cursor_node.label if cursor_node is not None else "unknown"
+
+        return RuntimeInfo.ok(
+            cursor_id=ledger.cursor_id,
+            step=ledger.step,
+            message="Story38 created",
+            ledger_id=str(ledger.uid),
+            world_id=world_id,
+            title=story_graph.label,
+            cursor_label=cursor_label,
+            ledger=ledger,
+            init_report={
+                "mode": init_result.report.mode.value,
+                "materialized_counts": init_result.report.materialized_counts,
+                "prelinked_counts": init_result.report.prelinked_counts,
+                "unresolved_hard": len(init_result.report.unresolved_hard),
+                "unresolved_soft": len(init_result.report.unresolved_soft),
+                "warnings": init_result.report.warnings,
+            },
+        )
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.PUBLIC,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
     )
