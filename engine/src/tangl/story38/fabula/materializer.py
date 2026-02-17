@@ -240,6 +240,12 @@ class StoryMaterializer38:
             successor_ref = self._coerce_str(
                 spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
             )
+            if not successor_ref:
+                msg = (
+                    f"Block '{node.get_label()}' action[{index}] is missing successor "
+                    "(expected one of: successor, target_ref, target_node)"
+                )
+                raise ValueError(msg)
             activation = self._coerce_str(spec.get("trigger") or spec.get("activation"))
             trigger_phase = Action.trigger_phase_from_activation(activation)
 
@@ -271,6 +277,11 @@ class StoryMaterializer38:
                         predecessor_id=action.uid,
                         requirement=requirement,
                     )
+                    if state.report.mode is InitMode.MINIMAL:
+                        state.report.warnings.append(
+                            "MINIMAL init left action destination unresolved; "
+                            f"action={action.get_label()!r}, expected={qualified_ref!r}"
+                        )
 
     def _wire_dependencies_for_specs(
         self,

@@ -93,6 +93,7 @@ class NearNativeYamlCodec:
     ) -> DecodeResult:
         merged: dict[str, Any] = {}
         refs: list[SourceRef] = []
+        warnings: list[str] = []
 
         for script_path in script_paths:
             with open(script_path, encoding="utf-8") as file_obj:
@@ -100,7 +101,13 @@ class NearNativeYamlCodec:
             if not isinstance(data, dict):
                 msg = f"Script file {script_path} must decode to a mapping"
                 raise ValueError(msg)
-            merged |= data
+            collisions = sorted(set(merged.keys()) & set(data.keys()))
+            if collisions:
+                warnings.append(
+                    "Codec merge overwrote top-level keys "
+                    f"(story_key={story_key!r}, path={script_path}, keys={collisions})"
+                )
+            merged.update(data)
             refs.append(SourceRef(path=str(script_path), story_key=story_key))
 
         return DecodeResult(
@@ -112,6 +119,7 @@ class NearNativeYamlCodec:
                 "story_key": story_key,
                 "world_label": bundle.manifest.label,
             },
+            warnings=warnings,
         )
 
     def encode(
@@ -125,7 +133,10 @@ class NearNativeYamlCodec:
         script_paths = (codec_state or {}).get("script_paths")
         if script_paths:
             target = Path(script_paths[0])
-            rel_path = str(target.relative_to(bundle.bundle_root))
+            try:
+                rel_path = str(target.relative_to(bundle.bundle_root))
+            except ValueError:
+                rel_path = target.name or "script.yaml"
         else:
             rel_path = "script.yaml"
         content = yaml.safe_dump(runtime_data, sort_keys=False, allow_unicode=True)
@@ -156,4 +167,3 @@ class CodecRegistry:
             msg = f"Unknown story codec: {key}"
             raise ValueError(msg)
         return codec
-

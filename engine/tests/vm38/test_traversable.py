@@ -298,6 +298,13 @@ class TestTraversableEdge:
         with pytest.raises(ValueError, match="not a call edge"):
             e.get_return_edge()
 
+    def test_call_edge_without_predecessor_raises(self) -> None:
+        g = Graph()
+        b = _node(g, label="b")
+        e = _edge(g, successor_id=b.uid, return_phase=ResolutionPhase.UPDATE)
+        with pytest.raises(ValueError, match="no predecessor"):
+            e.get_return_edge()
+
     def test_trigger_phase_for_auto_redirect(self) -> None:
         g = Graph()
         a = _node(g, label="a")

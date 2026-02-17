@@ -105,7 +105,7 @@ class JsonSerializationHandler:
         return obj
 
     @classmethod
-    def deserialize(self, flat: str) -> UnstructuredData:
+    def deserialize(cls, flat: str) -> UnstructuredData:
         unstructured = json.loads(flat, object_hook=JsonSerializationHandler.decode_object_hook)
         return unstructured
 

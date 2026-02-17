@@ -313,6 +313,22 @@ class TestResolveChoice:
 class TestResolveChoiceReturnStack:
     """Call edges push to return stack; terminals pop back."""
 
+    def test_direct_call_edge_pushes_and_returns(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+
+        call_edge = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+
+        frame = Frame(graph=g, cursor=a)
+        frame.resolve_choice(call_edge)
+        assert frame.cursor is a
+
     def test_call_and_return(self) -> None:
         g = Graph()
         a = _node(g, label="a")

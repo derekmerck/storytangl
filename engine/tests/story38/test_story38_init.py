@@ -1,3 +1,9 @@
+"""Story38 initialization integration tests.
+
+Covers compiler output, MINIMAL/FULLY_SPECIFIED initialization behavior,
+dependency prelinking expectations, and runtime/loader guardrails.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -77,6 +83,7 @@ def test_minimal_mode_materializes_entry_and_ancestor_only() -> None:
     assert actor_nodes == []
     assert location_nodes == []
     assert graph.initial_cursor_id == block_nodes[0].uid
+    assert any("action destination unresolved" in warning for warning in result.report.warnings)
 
 
 def test_full_mode_materializes_all_and_wires_dependencies() -> None:
@@ -203,7 +210,7 @@ scenes:
     assert isinstance(compiled, World38)
     result = compiled.create_story("loader_story", init_mode=InitMode.MINIMAL)
     assert result.graph.initial_cursor_id is not None
-    assert result.codec_id == "near_native"
+    assert result.codec_id in {"near_native", "near_native_yaml"}
     assert "__source_files__" in result.source_map
     assert len(result.source_map["__source_files__"]) == 1
 
@@ -228,7 +235,8 @@ def test_runtime_controller_create_story38_with_world_param() -> None:
 
 
 def test_story38_source_has_no_legacy_core_vm_imports() -> None:
-    src_root = Path("engine/src/tangl/story38")
+    src_root = Path(__file__).resolve().parents[2] / "src" / "tangl" / "story38"
+    assert src_root.exists(), str(src_root)
     bad_markers = ("from tangl.core ", "from tangl.vm ", "import tangl.core", "import tangl.vm")
 
     for file_path in src_root.rglob("*.py"):

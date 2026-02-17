@@ -41,16 +41,19 @@ class WorldCompiler:
 
         decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
         script_data = decode_result.story_data
-        codec_id = bundle.get_story_codec(story_key)
+        codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
 
         script_metadata = script_data.setdefault("metadata", {})
         for key, value in base_metadata.items():
             script_metadata.setdefault(key, value)
         script_metadata.setdefault("codec_id", codec_id)
+        if decode_result.warnings:
+            script_metadata.setdefault("codec_warnings", [])
+            script_metadata["codec_warnings"].extend(decode_result.warnings)
 
         default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
         if story_key is not None and default_title == bundle.manifest.label:
-            default_title = f"{bundle.manifest.label}_{story_key}"
+            default_title = bundle.manifest.story_label(story_key)
         script_metadata.setdefault("title", default_title)
 
         if runtime_version == "38":
@@ -60,8 +63,7 @@ class WorldCompiler:
                 codec_state=decode_result.codec_state,
                 codec_id=codec_id,
             )
-            label = bundle.manifest.label if story_key is None else f"{bundle.manifest.label}_{story_key}"
-            world38 = World38(label=label, bundle=story38_bundle)
+            world38 = World38(label=bundle.manifest.story_label(story_key), bundle=story38_bundle)
             return world38
 
         script_manager = self.script_compiler.compile(script_data)
@@ -82,10 +84,8 @@ class WorldCompiler:
         world_metadata = base_metadata.copy()
         world_metadata.update(script_manager.get_story_metadata())
 
-        label = bundle.manifest.label if story_key is None else f"{bundle.manifest.label}_{story_key}"
-
         world = World(
-            label=label,
+            label=bundle.manifest.story_label(story_key),
             script_manager=script_manager,
             domain_manager=domain_manager,
             asset_manager=asset_manager,
@@ -100,7 +100,7 @@ class WorldCompiler:
         bundle: WorldBundle,
         *,
         runtime_version: str = "37",
-    ) -> dict[str, World] | dict[str, World38]:
+    ) -> dict[str, World | World38]:
         if not bundle.manifest.is_anthology:
             msg = f"{bundle.manifest.label} is not an anthology"
             raise ValueError(msg)
@@ -117,20 +117,23 @@ class WorldCompiler:
             organization_hints=bundle.manifest.media_organization,
         )
 
-        worlds: dict[str, World] = {}
+        worlds: dict[str, World | World38] = {}
         for story_key in bundle.manifest.story_keys():
             decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
             script_data = decode_result.story_data
-            codec_id = bundle.get_story_codec(story_key)
+            codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
 
             script_metadata = script_data.setdefault("metadata", {})
             for key, value in base_metadata.items():
                 script_metadata.setdefault(key, value)
             script_metadata.setdefault("codec_id", codec_id)
+            if decode_result.warnings:
+                script_metadata.setdefault("codec_warnings", [])
+                script_metadata["codec_warnings"].extend(decode_result.warnings)
 
             default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
             if default_title == bundle.manifest.label:
-                default_title = f"{bundle.manifest.label}_{story_key}"
+                default_title = bundle.manifest.story_label(story_key)
             script_metadata.setdefault("title", default_title)
 
             if runtime_version == "38":
@@ -141,7 +144,7 @@ class WorldCompiler:
                     codec_id=codec_id,
                 )
                 worlds[story_key] = World38(
-                    label=f"{bundle.manifest.label}_{story_key}",
+                    label=bundle.manifest.story_label(story_key),
                     bundle=story38_bundle,
                 )
                 continue
@@ -154,7 +157,7 @@ class WorldCompiler:
             world_metadata.update(script_manager.get_story_metadata())
 
             world = World(
-                label=f"{bundle.manifest.label}_{story_key}",
+                label=bundle.manifest.story_label(story_key),
                 script_manager=script_manager,
                 domain_manager=domain_manager,
                 asset_manager=asset_manager,
@@ -183,6 +186,28 @@ class WorldCompiler:
 
         script_paths = bundle.get_script_paths(story_key)
         codec_id = bundle.get_story_codec(story_key)
+        if hasattr(self.script_compiler, "load_from_path") and not bundle.manifest.is_story_codec_explicit(story_key):
+            merged: dict[str, Any] = {}
+            for script_path in script_paths:
+                loaded = self.script_compiler.load_from_path(script_path)
+                if not isinstance(loaded, dict):
+                    msg = f"Custom script compiler returned non-mapping for {script_path}"
+                    raise ValueError(msg)
+                merged |= loaded
+            return DecodeResult(
+                story_data=merged,
+                source_map={"__source_files__": []},
+                codec_state={
+                    "codec_id": "script_compiler_bridge",
+                    "script_paths": [str(path) for path in script_paths],
+                    "story_key": story_key,
+                },
+                warnings=[
+                    "Using legacy script compiler loading bridge; "
+                    "set manifest codec explicitly to disable this fallback."
+                ],
+            )
+
         try:
             codec = self.codec_registry.get(codec_id)
         except ValueError:
@@ -196,6 +221,7 @@ class WorldCompiler:
                     merged |= loaded
                 return DecodeResult(
                     story_data=merged,
+                    source_map={"__source_files__": []},
                     codec_state={
                         "codec_id": "script_compiler_bridge",
                         "script_paths": [str(path) for path in script_paths],

@@ -264,6 +264,13 @@ class StoryCompiler38:
 
     @staticmethod
     def _build_payload(kind: type[Entity], payload: dict[str, Any], default_label: str) -> Entity:
+        if kind is Action:
+            payload = dict(payload)
+            if payload.get("successor_ref") is None:
+                mapped_ref = payload.get("successor") or payload.get("target_ref") or payload.get("target_node")
+                if mapped_ref is not None:
+                    payload["successor_ref"] = mapped_ref
+
         allowed = set(getattr(kind, "model_fields", {}).keys())
         filtered = {k: v for k, v in payload.items() if k in allowed}
         filtered.setdefault("label", payload.get("label") or default_label)

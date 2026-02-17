@@ -522,6 +522,8 @@ class TraversableEdge(Edge):
         """
         if self.return_phase is None:
             raise ValueError(f"{self!r} is not a call edge (return_phase is None)")
+        if self.predecessor is None:
+            raise ValueError(f"{self!r} has no predecessor; cannot build return edge")
         return AnonymousEdge(
             successor=self.predecessor,
             entry_phase=self.return_phase,

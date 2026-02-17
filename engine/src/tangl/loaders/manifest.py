@@ -84,6 +84,18 @@ class WorldManifest(BaseModel):
                 return story_codec
         return self.codec
 
+    def is_story_codec_explicit(self, story_key: str | None = None) -> bool:
+        """Return whether codec was explicitly declared for this story source."""
+        if story_key and self.stories and story_key in self.stories:
+            return "codec" in self.stories[story_key].model_fields_set
+        return "codec" in self.model_fields_set
+
+    def story_label(self, story_key: str | None = None) -> str:
+        """Normalized runtime label for a world story."""
+        if story_key is None:
+            return self.label
+        return f"{self.label}_{story_key}"
+
     def get_story_scripts(self, story_key: str | None = None) -> list[str] | None:
         if self.stories is not None:
             if story_key is None:

@@ -43,13 +43,13 @@ class RuntimeOp(BaseModel):
     def _eval_expr(cls, s: str, ns: StringMap = None) -> Any:
         if ns is None:
             ns = {}
-        return eval(s, safe_builtins, ns)
+        return eval(s, {"__builtins__": safe_builtins}, ns)
 
     @classmethod
     def _exec_expr(cls, s: str, ns: StringMap = None) -> StringMap:
         if ns is None:
             ns = {}
-        exec(s, safe_builtins, ns)
+        exec(s, {"__builtins__": safe_builtins}, ns)
         return ns
 
     def eval(self, ns: StringMap = None) -> Any:

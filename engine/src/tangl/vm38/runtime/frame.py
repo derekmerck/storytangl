@@ -410,7 +410,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.JOURNAL
             fragments = do_journal(self.cursor, ctx=ctx)
             if fragments:
-                if isinstance(fragments, Iterable) and not isinstance(fragments, Record):
+                if isinstance(fragments, Iterable) and not isinstance(fragments, (Record, str, bytes)):
                     for f in fragments:
                         self.output_stream.append(f)
                 else:
@@ -468,13 +468,14 @@ class Frame:
                     f"likely a redirect loop at {self.cursor!r}"
                 )
 
-            result = self.follow_edge(edge)
+            current_edge = edge
+            result = self.follow_edge(current_edge)
             depth += 1
 
+            if getattr(current_edge, "return_phase", None) is not None:
+                self.return_stack.append(current_edge)
+
             if result is not None:
-                if (hasattr(result, "return_phase")
-                        and result.return_phase is not None):
-                    self.return_stack.append(result)
                 edge = result
 
             elif self.return_stack:

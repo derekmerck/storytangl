@@ -175,8 +175,10 @@ class Token(Node, Generic[WST]):
             if callable(attr):
                 # If it's a method, bind it to the reference_entity
                 # This only works with instance methods that take 'self' 1st param, see Wearable
-                return MethodType(attr.__func__, self)
-                # return functools.partial(attr, self)
+                func = getattr(attr, "__func__", None)
+                if func is not None:
+                    return MethodType(func, self)
+                return attr
             return attr
         raise AttributeError(f"{self.__class__.__name__} is missing attribute '{name}'")
 
