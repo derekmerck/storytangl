@@ -7,6 +7,7 @@ from uuid import uuid4
 from tangl.vm38.traversal import (
     count_turns,
     get_call_depth,
+    get_round,
     get_visit_count,
     in_subroutine,
     is_first_visit,
@@ -81,6 +82,23 @@ class TestStepsSinceLastVisit:
 
     def test_empty_history(self) -> None:
         assert steps_since_last_visit(uuid4(), []) == -1
+
+
+class TestGetRound:
+    def test_empty_history(self) -> None:
+        assert get_round(uuid4(), []) == 0
+
+    def test_not_current_position(self) -> None:
+        a, b, c = uuid4(), uuid4(), uuid4()
+        assert get_round(b, [a, b, c]) == 0
+
+    def test_first_arrival(self) -> None:
+        a, b = uuid4(), uuid4()
+        assert get_round(b, [a, b]) == 1
+
+    def test_self_loop_rounds(self) -> None:
+        a, b = uuid4(), uuid4()
+        assert get_round(b, [a, b, b, b]) == 3
 
 
 class TestIsSelfLoop:

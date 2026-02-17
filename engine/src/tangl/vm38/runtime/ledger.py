@@ -94,11 +94,12 @@ class Ledger(Entity):
     def from_graph(cls, graph: Graph, entry_id: UUID) -> Self:
         """Construct and initialize a ledger at a graph entry node."""
         ledger = cls(graph=graph, cursor_id=entry_id)
-        ledger.initialize_ledger(entry_id=entry_id)
+        ledger._seed_counters(entry_id=entry_id)
+        ledger.initialize_entry()
         return ledger
 
-    def initialize_ledger(self, entry_id: UUID | None = None) -> None:
-        """Reset runtime counters and position the cursor at the entry node."""
+    def _seed_counters(self, entry_id: UUID | None = None) -> None:
+        """Initialize cursor and counters without dispatch/pipeline execution."""
         entry_id = entry_id or self.cursor_id
         entry_node = self.graph.get(entry_id)
         if entry_node is None:
@@ -109,14 +110,24 @@ class Ledger(Entity):
         self.reentrant_steps = 0
         self.cursor_steps = 0
         self.choice_steps = 0
+        self.call_stack_ids = []
 
+    def initialize_entry(self) -> None:
+        """Finalize entry initialization and persist initial snapshot."""
         frame = self.get_frame()
         self.call_stack_ids = [e.uid for e in frame.return_stack]
         self.save_snapshot()
 
+    def initialize_ledger(self, entry_id: UUID | None = None) -> None:
+        """Backward-compatible initializer for entry setup."""
+        self._seed_counters(entry_id=entry_id)
+        self.initialize_entry()
+
     def model_post_init(self, __context) -> None:
-        """Seed cursor history with initial cursor position."""
-        if not self.cursor_history and self.cursor_id is not None:
+        """Initialize fresh ledgers; preserve structured ledgers as provided."""
+        if self.cursor_steps < 0:
+            self._seed_counters()
+        elif not self.cursor_history and self.cursor_id is not None:
             self.cursor_history.append(self.cursor_id)
 
     def get_frame(self) -> Frame:
@@ -143,8 +154,13 @@ class Ledger(Entity):
 
         self.choice_steps += 1
         self.cursor_steps += frame.cursor_steps
+        prev_id = self.cursor_history[-1] if self.cursor_history else None
+        for node_id in frame.cursor_trace:
+            if prev_id is not None and node_id == prev_id:
+                self.reentrant_steps += 1
+            prev_id = node_id
         self.cursor_id = frame.cursor.uid
-        self.cursor_history.append(self.cursor_id)
+        self.cursor_history.extend(frame.cursor_trace)
         self.call_stack_ids = [edge.uid for edge in frame.return_stack]
 
     def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
@@ -210,3 +226,22 @@ class Ledger(Entity):
         snapshot = Snapshot.from_entity(self)
         self.output_stream.append(snapshot)
         return snapshot
+
+    def rollback_to_step(self, target_step: int) -> None:
+        """Restore ledger state to a previous step.
+
+        Restores the graph from the most recent snapshot at or before
+        ``target_step``, applies patches forward, and truncates
+        ``cursor_history`` and ``output_stream`` to match.
+
+        Post-MVP — requires StepRecord, patch-based event sourcing,
+        and snapshot cadence infrastructure.
+
+        See Also
+        --------
+        vm38/replay/design_notes.md
+            Full replay architecture specification.
+        """
+        raise NotImplementedError(
+            "rollback_to_step requires event-sourcing infrastructure (post-MVP)"
+        )

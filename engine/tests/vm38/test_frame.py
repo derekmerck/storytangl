@@ -117,6 +117,12 @@ class TestFollowEdge:
         frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
         assert frame.cursor_steps == 1
 
+    def test_records_cursor_trace(self) -> None:
+        g, [a, b] = _simple_graph("a", "b")
+        frame = Frame(graph=g, cursor=a)
+        frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
+        assert frame.cursor_trace == [b.uid]
+
     def test_no_redirect_returns_none(self) -> None:
         g, [a, b] = _simple_graph("a", "b")
         frame = Frame(graph=g, cursor=a)
@@ -253,6 +259,7 @@ class TestResolveChoice:
         frame.resolve_choice(AnonymousEdge(predecessor=a, successor=b))
         # Lands on c after the redirect chain
         assert frame.cursor is c
+        assert frame.cursor_trace == [b.uid, c.uid]
 
     def test_recursion_guard(self) -> None:
         """Infinite redirect loop raises RecursionError."""

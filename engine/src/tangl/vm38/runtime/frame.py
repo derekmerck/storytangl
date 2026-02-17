@@ -304,6 +304,9 @@ class Frame:
     cursor_steps: int = 0
     """Number of cursor movements in this frame's lifetime."""
 
+    cursor_trace: list[UUID] = field(default_factory=list)
+    """Visited cursor positions for this resolve cycle, in order."""
+
     _random: Random = field(default_factory=Random)
 
     # -- Context factory ----------------------------------------------------
@@ -351,6 +354,7 @@ class Frame:
         # -- Update cursor --------------------------------------------------
         self.cursor = edge.successor
         self.cursor_steps += 1
+        self.cursor_trace.append(self.cursor.uid)
 
         # -- Build context at new position ----------------------------------
         ctx = self._make_ctx()
