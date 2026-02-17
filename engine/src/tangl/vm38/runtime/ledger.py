@@ -90,6 +90,30 @@ class Ledger(Entity):
     user: Optional[Entity] = Field(None, exclude=True)
     user_id: Optional[UUID] = None
 
+    @classmethod
+    def from_graph(cls, graph: Graph, entry_id: UUID) -> Self:
+        """Construct and initialize a ledger at a graph entry node."""
+        ledger = cls(graph=graph, cursor_id=entry_id)
+        ledger.initialize_ledger(entry_id=entry_id)
+        return ledger
+
+    def initialize_ledger(self, entry_id: UUID | None = None) -> None:
+        """Reset runtime counters and position the cursor at the entry node."""
+        entry_id = entry_id or self.cursor_id
+        entry_node = self.graph.get(entry_id)
+        if entry_node is None:
+            raise ValueError(f"Entry node not found: {entry_id}")
+
+        self.cursor_id = entry_node.uid
+        self.cursor_history = [entry_node.uid]
+        self.reentrant_steps = 0
+        self.cursor_steps = 0
+        self.choice_steps = 0
+
+        frame = self.get_frame()
+        self.call_stack_ids = [e.uid for e in frame.return_stack]
+        self.save_snapshot()
+
     def model_post_init(self, __context) -> None:
         """Seed cursor history with initial cursor position."""
         if not self.cursor_history and self.cursor_id is not None:

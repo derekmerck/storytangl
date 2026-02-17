@@ -149,7 +149,9 @@ norecursedirs = [
 #    "--cov-report=html"
 #]
 
-addopts = ["--doctest-modules", "--import-mode=importlib", "--ignore=engine/tests/*"]
+# Run doctests explicitly against source modules to avoid importing test fixture trees:
+#   poetry run pytest --doctest-modules engine/src
+addopts = ["--import-mode=importlib"]
 
 [tool.coverage.run]
 relative_files = true

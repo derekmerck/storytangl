@@ -70,6 +70,37 @@ class TestLedgerCursor:
         ledger.cursor = b
         assert ledger.cursor_id == b.uid
 
+    def test_from_graph_initializes_with_entry_cursor_id(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        _node(g, label="b")
+
+        ledger = Ledger.from_graph(graph=g, entry_id=a.uid)
+        assert ledger.cursor_id == a.uid
+        assert ledger.cursor is a
+        assert ledger.cursor_history == [a.uid]
+        assert ledger.choice_steps == 0
+        assert ledger.cursor_steps == 0
+
+    def test_initialize_ledger_updates_call_stack_ids(self, monkeypatch) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        call_edge = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            return_phase=ResolutionPhase.UPDATE,
+        )
+        ledger = Ledger(graph=g, cursor_id=a.uid)
+
+        class _FrameWithReturn:
+            return_stack = [call_edge]
+
+        monkeypatch.setattr(Ledger, "get_frame", lambda self: _FrameWithReturn())
+        ledger.initialize_ledger(entry_id=a.uid)
+        assert ledger.call_stack_ids == [call_edge.uid]
+
 
 # ============================================================================
 # Call stack

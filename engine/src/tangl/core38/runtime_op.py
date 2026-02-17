@@ -41,12 +41,14 @@ class RuntimeOp(BaseModel):
 
     @classmethod
     def _eval_expr(cls, s: str, ns: StringMap = None) -> Any:
-        ns = ns or {}
+        if ns is None:
+            ns = {}
         return eval(s, safe_builtins, ns)
 
     @classmethod
     def _exec_expr(cls, s: str, ns: StringMap = None) -> StringMap:
-        ns = ns or {}
+        if ns is None:
+            ns = {}
         exec(s, safe_builtins, ns)
         return ns
 
@@ -68,7 +70,8 @@ class RuntimeOp(BaseModel):
 
     @classmethod
     def apply_all(cls, *exprs: str, ns: StringMap = None) -> StringMap:
-        ns = ns or {}
+        if ns is None:
+            ns = {}
         # want to use a _shared_ default ns for mutation, otherwise default is per call
         for e in exprs:
             cls._exec_expr(e, ns)
