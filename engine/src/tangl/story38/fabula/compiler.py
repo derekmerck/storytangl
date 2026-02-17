@@ -21,12 +21,22 @@ class StoryTemplateBundle:
     locals: dict[str, Any]
     template_registry: TemplateRegistry
     entry_template_ids: list[str]
+    source_map: dict[str, Any]
+    codec_state: dict[str, Any]
+    codec_id: str | None
 
 
 class StoryCompiler38:
     """Compile story script data into a core38 TemplateRegistry bundle."""
 
-    def compile(self, script_data: dict[str, Any] | StoryScript) -> StoryTemplateBundle:
+    def compile(
+        self,
+        script_data: dict[str, Any] | StoryScript,
+        *,
+        source_map: dict[str, Any] | None = None,
+        codec_state: dict[str, Any] | None = None,
+        codec_id: str | None = None,
+    ) -> StoryTemplateBundle:
         script = script_data if isinstance(script_data, StoryScript) else StoryScript.model_validate(script_data)
         data = script.model_dump(by_alias=True, exclude_none=True)
 
@@ -116,6 +126,9 @@ class StoryCompiler38:
             locals=locals_ns,
             template_registry=registry,
             entry_template_ids=entry_template_ids,
+            source_map=source_map or {},
+            codec_state=codec_state or {},
+            codec_id=codec_id,
         )
 
     def _compile_section(

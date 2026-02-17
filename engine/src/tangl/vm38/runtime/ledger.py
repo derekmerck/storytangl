@@ -137,6 +137,7 @@ class Ledger(Entity):
             self.cursor,
             self.output_stream,
             self._call_stack(),
+            step_base=self.cursor_steps,
         )
 
     def resolve_choice(self, edge_id: UUID) -> None:

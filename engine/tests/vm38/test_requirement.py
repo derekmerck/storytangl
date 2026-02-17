@@ -9,6 +9,8 @@ Organized by concept:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from tangl.core38 import Entity, Graph, Registry, RegistryAware, Selector
@@ -91,6 +93,18 @@ class TestHasRequirement:
 
         with pytest.raises(ValueError, match="not satisfied"):
             carrier.provider = wrong
+
+    def test_provider_sets_resolution_metadata_from_ctx(self) -> None:
+        reg = Registry()
+        carrier = HasRequirement(requirement=Requirement(has_identifier="foo"))
+        reg.add(carrier)
+        provider = RegistryAware(label="foo")
+        reg.add(provider)
+        ctx = SimpleNamespace(step=7, cursor_id=provider.uid)
+
+        carrier.set_provider(provider, _ctx=ctx)
+        assert carrier.requirement.resolved_step == 7
+        assert carrier.requirement.resolved_cursor_id == provider.uid
 
 
 # ============================================================================

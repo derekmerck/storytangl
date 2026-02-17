@@ -60,3 +60,6 @@ class StoryInitResult:
     graph: Any
     report: InitReport
     entry_ids: list[UUID]
+    source_map: dict[str, Any] = field(default_factory=dict)
+    codec_state: dict[str, Any] = field(default_factory=dict)
+    codec_id: str | None = None

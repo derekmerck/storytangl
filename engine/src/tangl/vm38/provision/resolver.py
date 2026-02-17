@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Iterable, Optional, TypeAlias, Union, Self
+from typing import Iterable, Optional, Protocol, TypeAlias, Union, Self, runtime_checkable
+from uuid import UUID
 
 from tangl.core38 import (
     Edge,
@@ -26,6 +27,12 @@ from .requirement import Requirement, PT, Dependency
 TemplateGroup: TypeAlias = Union[EntityGroup, EntityTemplate]
 
 
+@runtime_checkable
+class ResolverCtx(Protocol):
+    def get_entity_groups(self) -> Iterable[EntityGroup]: ...
+    def get_template_groups(self) -> Iterable[TemplateGroup]: ...
+
+
 @dataclass
 class Resolver:
 
@@ -39,7 +46,11 @@ class Resolver:
     template_groups: Iterable[TemplateGroup] = ()   # template sources by scope dist
 
     @classmethod
-    def from_ctx(cls, ctx) -> Self:
+    def from_ctx(cls, ctx: ResolverCtx) -> Self:
+        if not isinstance(ctx, ResolverCtx):
+            raise TypeError(
+                "Resolver context must provide get_entity_groups() and get_template_groups()"
+            )
         return cls(entity_groups=ctx.get_entity_groups(),
                    template_groups=ctx.get_template_groups())
 
@@ -71,7 +82,9 @@ class Resolver:
         if _ctx is not None:
             # give dispatch a chance to modify the offers
             from tangl.vm38.dispatch import do_resolve
-            offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
+            resolved_offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
+            if resolved_offers:
+                offers = resolved_offers
 
         def _allowed(offer: ProvisionOffer) -> bool:
             if offer.policy is ProvisionPolicy.FORCE:
@@ -102,7 +115,10 @@ class Resolver:
         if len(offers) == 0:
             # No valid offers available
             requirement.unsatisfiable = True
+            requirement.unambiguously_resolved = None
             requirement.selected_offer_policy = None
+            requirement.resolved_step = None
+            requirement.resolved_cursor_id = None
             return None
         else:
             requirement.unsatisfiable = False
@@ -138,6 +154,18 @@ class Resolver:
                 if provider.registry is not dependency.registry:
                     dependency.registry.add(provider, _ctx=_ctx)
                 dependency.requirement.provider_id = provider.uid
+                dependency.requirement.resolved_step = (
+                    getattr(_ctx, "step", None)
+                    if isinstance(getattr(_ctx, "step", None), int)
+                    else None
+                )
+                cursor_id = getattr(_ctx, "cursor_id", None)
+                if cursor_id is None:
+                    cursor = getattr(_ctx, "cursor", None)
+                    cursor_id = getattr(cursor, "uid", None)
+                dependency.requirement.resolved_cursor_id = (
+                    cursor_id if isinstance(cursor_id, UUID) else None
+                )
                 Edge.set_successor(dependency, provider, _ctx=_ctx)
                 return True
             dependency.set_provider(provider, _ctx=_ctx)

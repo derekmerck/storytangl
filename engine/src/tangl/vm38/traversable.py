@@ -479,10 +479,18 @@ class TraversableEdge(Edge):
         """Type-narrowed predecessor."""
         return super().predecessor
 
+    @predecessor.setter
+    def predecessor(self, value: TraversableNode) -> None:
+        self.set_predecessor(value)
+
     @property
     def successor(self) -> Optional[TraversableNode]:
         """Type-narrowed successor."""
         return super().successor
+
+    @successor.setter
+    def successor(self, value: TraversableNode) -> None:
+        self.set_successor(value)
 
     def available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
         """Availability check delegated to the successor node.

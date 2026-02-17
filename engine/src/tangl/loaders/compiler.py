@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import Any
-
-import yaml
 
 from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
 from tangl.story38.fabula import StoryCompiler38, World38
 
 from .bundle import WorldBundle
+from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
 
 
@@ -23,12 +21,14 @@ class WorldCompiler:
         domain_compiler: DomainCompiler | None = None,
         media_compiler: MediaCompiler | None = None,
         story38_compiler: StoryCompiler38 | None = None,
+        codec_registry: CodecRegistry | None = None,
     ) -> None:
         self.script_compiler = script_compiler or ScriptCompiler()
         self.asset_compiler = asset_compiler or AssetCompiler()
         self.domain_compiler = domain_compiler or DomainCompiler()
         self.media_compiler = media_compiler or MediaCompiler()
         self.story38_compiler = story38_compiler or StoryCompiler38()
+        self.codec_registry = codec_registry or CodecRegistry()
 
     def compile(
         self,
@@ -39,12 +39,14 @@ class WorldCompiler:
     ) -> World | World38:
         base_metadata = bundle.manifest.metadata.copy()
 
-        script_paths = bundle.get_script_paths(story_key)
-        script_data = self._load_and_merge_scripts(script_paths)
+        decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+        script_data = decode_result.story_data
+        codec_id = bundle.get_story_codec(story_key)
 
         script_metadata = script_data.setdefault("metadata", {})
         for key, value in base_metadata.items():
             script_metadata.setdefault(key, value)
+        script_metadata.setdefault("codec_id", codec_id)
 
         default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
         if story_key is not None and default_title == bundle.manifest.label:
@@ -52,7 +54,12 @@ class WorldCompiler:
         script_metadata.setdefault("title", default_title)
 
         if runtime_version == "38":
-            story38_bundle = self.story38_compiler.compile(script_data)
+            story38_bundle = self.story38_compiler.compile(
+                script_data,
+                source_map=decode_result.source_map,
+                codec_state=decode_result.codec_state,
+                codec_id=codec_id,
+            )
             label = bundle.manifest.label if story_key is None else f"{bundle.manifest.label}_{story_key}"
             world38 = World38(label=label, bundle=story38_bundle)
             return world38
@@ -112,12 +119,14 @@ class WorldCompiler:
 
         worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
-            script_paths = bundle.get_script_paths(story_key)
-            script_data = self._load_and_merge_scripts(script_paths)
+            decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+            script_data = decode_result.story_data
+            codec_id = bundle.get_story_codec(story_key)
 
             script_metadata = script_data.setdefault("metadata", {})
             for key, value in base_metadata.items():
                 script_metadata.setdefault(key, value)
+            script_metadata.setdefault("codec_id", codec_id)
 
             default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
             if default_title == bundle.manifest.label:
@@ -125,7 +134,12 @@ class WorldCompiler:
             script_metadata.setdefault("title", default_title)
 
             if runtime_version == "38":
-                story38_bundle = self.story38_compiler.compile(script_data)
+                story38_bundle = self.story38_compiler.compile(
+                    script_data,
+                    source_map=decode_result.source_map,
+                    codec_state=decode_result.codec_state,
+                    codec_id=codec_id,
+                )
                 worlds[story_key] = World38(
                     label=f"{bundle.manifest.label}_{story_key}",
                     bundle=story38_bundle,
@@ -152,22 +166,49 @@ class WorldCompiler:
 
         return worlds
 
-    # In tangl/loaders/compiler.py
-    def _load_and_merge_scripts(self, script_paths: list[Path]) -> dict[str, Any]:
-        script_data = {}
+    def _decode_story_data(
+        self,
+        *,
+        bundle: WorldBundle,
+        story_key: str | None,
+    ) -> DecodeResult:
+        """Decode source files into runtime-ready script data.
 
-        for script_path in script_paths:
-            # Check if compiler has custom loading
-            if hasattr(self.script_compiler, 'load_from_path'):
-                data = self.script_compiler.load_from_path(script_path)
-            else:
-                # Fallback to raw YAML
-                with open(script_path) as f:
-                    data = yaml.safe_load(f)
+        Notes
+        -----
+        During migration we preserve an escape hatch for custom script compilers
+        that expose ``load_from_path``. This keeps research bundles usable while
+        codecs are being ported to the new explicit interface.
+        """
 
-            script_data |= data
+        script_paths = bundle.get_script_paths(story_key)
+        codec_id = bundle.get_story_codec(story_key)
+        try:
+            codec = self.codec_registry.get(codec_id)
+        except ValueError:
+            if hasattr(self.script_compiler, "load_from_path"):
+                merged: dict[str, Any] = {}
+                for script_path in script_paths:
+                    loaded = self.script_compiler.load_from_path(script_path)
+                    if not isinstance(loaded, dict):
+                        msg = f"Custom script compiler returned non-mapping for {script_path}"
+                        raise ValueError(msg)
+                    merged |= loaded
+                return DecodeResult(
+                    story_data=merged,
+                    codec_state={
+                        "codec_id": "script_compiler_bridge",
+                        "script_paths": [str(path) for path in script_paths],
+                        "story_key": story_key,
+                    },
+                    warnings=[
+                        "Using legacy script compiler loading bridge; "
+                        "define a manifest codec for deterministic decode semantics."
+                    ],
+                )
+            raise
 
-        return script_data
+        return codec.decode(bundle=bundle, script_paths=script_paths, story_key=story_key)
 
     def _get_domain_module(self, bundle: WorldBundle) -> str | None:
         if bundle.manifest.domain_module is not None:

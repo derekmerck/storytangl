@@ -97,6 +97,36 @@ class TestPhaseCtx:
         # Same object — cached
         assert ns1 is ns2
 
+    def test_step_passes_through_constructor(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid, step=9)
+        assert ctx.step == 9
+
+
+class TestFrameRandomDeterminism:
+    def test_same_inputs_seed_same_sequence(self) -> None:
+        g, [a] = _simple_graph("a")
+        frame_a = Frame(graph=g, cursor=a, step_base=2)
+        frame_b = Frame(graph=g, cursor=a, step_base=2)
+
+        ctx_a = frame_a._make_ctx()
+        ctx_b = frame_b._make_ctx()
+        seq_a = [ctx_a.get_random().random() for _ in range(5)]
+        seq_b = [ctx_b.get_random().random() for _ in range(5)]
+        assert seq_a == seq_b
+
+    def test_step_base_changes_sequence(self) -> None:
+        g, [a] = _simple_graph("a")
+        frame_a = Frame(graph=g, cursor=a, step_base=2)
+        frame_b = Frame(graph=g, cursor=a, step_base=3)
+
+        ctx_a = frame_a._make_ctx()
+        ctx_b = frame_b._make_ctx()
+        seq_a = [ctx_a.get_random().random() for _ in range(3)]
+        seq_b = [ctx_b.get_random().random() for _ in range(3)]
+        assert seq_a != seq_b
+
 
 # ============================================================================
 # Frame.follow_edge — basic pipeline

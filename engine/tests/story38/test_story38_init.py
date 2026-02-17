@@ -203,6 +203,9 @@ scenes:
     assert isinstance(compiled, World38)
     result = compiled.create_story("loader_story", init_mode=InitMode.MINIMAL)
     assert result.graph.initial_cursor_id is not None
+    assert result.codec_id == "near_native"
+    assert "__source_files__" in result.source_map
+    assert len(result.source_map["__source_files__"]) == 1
 
 
 def test_runtime_controller_create_story38_with_world_param() -> None:

@@ -59,8 +59,10 @@ from tangl.core38 import (
     Graph,
     Node,
     OrderedRegistry,
+    Record,
     Selector,
 )
+from tangl.utils.hashing import hashing_func
 from ..dispatch import (
     dispatch as vm_dispatch,
     do_finalize,
@@ -133,6 +135,7 @@ class PhaseCtx:
 
     graph: Graph
     cursor_id: UUID
+    step: int = 0
     current_phase: ResolutionPhase = ResolutionPhase.INIT
 
     random: Random = field(default_factory=Random)
@@ -315,7 +318,21 @@ class Frame:
     cursor_trace: list[UUID] = field(default_factory=list)
     """Visited cursor positions for this resolve cycle, in order."""
 
+    step_base: int = 0
+    """Absolute step offset at frame start (usually ledger.cursor_steps)."""
+
     _random: Random = field(default_factory=Random)
+
+    def __post_init__(self) -> None:
+        """Seed RNG deterministically from graph state + cursor + starting step."""
+        seed_hash = hashing_func(
+            self.graph.value_hash(),
+            self.cursor.uid,
+            self.step_base,
+            digest_size=8,
+        )
+        seed = int.from_bytes(seed_hash[:8], byteorder="big", signed=False)
+        self._random.seed(seed)
 
     # -- Context factory ----------------------------------------------------
 
@@ -329,6 +346,7 @@ class Frame:
         return PhaseCtx(
             graph=self.graph,
             cursor_id=self.cursor.uid,
+            step=self.step_base + self.cursor_steps,
             random=self._random,
         )
 
@@ -392,7 +410,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.JOURNAL
             fragments = do_journal(self.cursor, ctx=ctx)
             if fragments:
-                if isinstance(fragments, (list, tuple)):
+                if isinstance(fragments, Iterable) and not isinstance(fragments, Record):
                     for f in fragments:
                         self.output_stream.append(f)
                 else:

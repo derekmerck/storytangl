@@ -101,7 +101,14 @@ class StoryMaterializer38:
         graph.initial_cursor_ids = [node.uid for node in entry_nodes]
         graph.initial_cursor_id = graph.initial_cursor_ids[0]
 
-        return StoryInitResult(graph=graph, report=state.report, entry_ids=graph.initial_cursor_ids)
+        return StoryInitResult(
+            graph=graph,
+            report=state.report,
+            entry_ids=graph.initial_cursor_ids,
+            source_map=dict(bundle.source_map),
+            codec_state=dict(bundle.codec_state),
+            codec_id=bundle.codec_id,
+        )
 
     @staticmethod
     def _template_depth(templ: Any) -> tuple[int, int, str]:

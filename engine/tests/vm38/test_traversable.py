@@ -315,6 +315,17 @@ class TestTraversableEdge:
         assert e.predecessor is a
         assert e.successor is b
 
+    def test_property_setters_delegate_to_core_edge_accessors(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        e.successor = c
+        e.predecessor = b
+        assert e.successor is c
+        assert e.predecessor is b
+
     def test_available_delegates_to_successor(self) -> None:
         g = Graph()
         a = _node(g, label="a")
