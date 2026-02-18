@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import Graph, OrderedRegistry, Record
+from tangl.core38 import BehaviorRegistry, DispatchLayer, Graph, OrderedRegistry, Record
 from tangl.vm38.dispatch import (
     dispatch as vm_dispatch,
     on_journal,
@@ -102,6 +102,23 @@ class TestPhaseCtx:
         a = _node(g, label="a")
         ctx = PhaseCtx(graph=g, cursor_id=a.uid, step=9)
         assert ctx.step == 9
+
+    def test_registries_include_graph_authorities_when_available(self) -> None:
+        authority = BehaviorRegistry(
+            label="story.auth",
+            default_dispatch_layer=DispatchLayer.APPLICATION,
+        )
+
+        class AuthorityGraph(Graph):
+            def get_authorities(self):
+                return [authority]
+
+        g = AuthorityGraph()
+        a = _node(g, label="a")
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid)
+        registries = ctx.get_registries()
+        assert vm_dispatch in registries
+        assert authority in registries
 
 
 class TestFrameRandomDeterminism:

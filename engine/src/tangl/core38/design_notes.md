@@ -527,6 +527,11 @@ Higher layers provide policy (which registries are active, what scope rules appl
 bookmarks map to key values). This separation is why OrderedRegistry doesn't have
 bookmarks and why Graph doesn't have traversal algorithms.
 
+The optional `Graph.get_authorities()` hook is a provisional convenience for this boundary.
+Its intended role is to expose application/story-owned registries when present, while keeping
+core itself policy-free. If higher layers converge on a better authority protocol, this hook
+can move out of core without changing core dispatch mechanics.
+
 ### Hook Points, Not Hook Logic
 
 Every `do_*` function is 4-6 lines. The base classes provide hook injection points

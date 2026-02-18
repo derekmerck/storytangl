@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Optional, Generic, TypeVar, Iterable
+from typing import Any, Optional, Generic, TypeVar
 from uuid import UUID
 
 from tangl.core38 import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
-from .provisioner import ProvisionPolicy, ProvisionOffer
+from .provisioner import ProvisionPolicy
 
 PT = TypeVar('PT', bound=RegistryAware)  # 'ProviderType'
 
@@ -42,6 +42,8 @@ class Requirement(Selector, Generic[PT]):
     selected_offer_policy: Optional[ProvisionPolicy] = None
     resolved_step: Optional[int] = None
     resolved_cursor_id: Optional[UUID] = None
+    resolution_reason: Optional[str] = None
+    resolution_meta: Optional[dict[str, Any]] = None
 
     def satisfied_by(self, entity: PT) -> bool:
         return self.matches(entity)
@@ -120,6 +122,14 @@ class HasRequirement(RegistryAware, Generic[PT]):
     @property
     def satisfied(self):
         return self.requirement.satisfied
+
+    @property
+    def resolution_reason(self) -> Optional[str]:
+        return self.requirement.resolution_reason
+
+    @property
+    def resolution_meta(self) -> Optional[dict[str, Any]]:
+        return self.requirement.resolution_meta
 
     def satisfied_by(self, entity: PT) -> bool:
         return self.requirement.satisfied_by(entity)

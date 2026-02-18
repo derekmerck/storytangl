@@ -7,6 +7,7 @@ dependency prelinking expectations, and runtime/loader guardrails.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,7 +18,8 @@ from tangl.story38 import InitMode, World38
 from tangl.story38.concepts import Actor, Location, Role, Setting
 from tangl.story38.fabula import GraphInitializationError, StoryCompiler38
 from tangl.story38.episode import Action, Block, Scene
-from tangl.core38 import Selector
+from tangl.core38 import BehaviorRegistry, DispatchLayer, Selector
+from tangl.story38.dispatch import story_dispatch
 from tangl.vm38 import Ledger
 
 
@@ -232,6 +234,21 @@ def test_runtime_controller_create_story38_with_world_param() -> None:
     assert result.cursor_id is not None
     assert result.details is not None
     assert result.details.get("world_id") == world.label
+
+
+def test_story_graph_authorities_include_story_and_world_authorities() -> None:
+    world = World38.from_script_data(script_data=_base_script())
+    result = world.create_story("auth_story", init_mode=InitMode.MINIMAL)
+
+    world_authority = BehaviorRegistry(
+        label="world.auth",
+        default_dispatch_layer=DispatchLayer.APPLICATION,
+    )
+    result.graph.world = SimpleNamespace(get_authorities=lambda: [world_authority])
+
+    authorities = result.graph.get_authorities()
+    assert story_dispatch in authorities
+    assert world_authority in authorities
 
 
 def test_story38_source_has_no_legacy_core_vm_imports() -> None:

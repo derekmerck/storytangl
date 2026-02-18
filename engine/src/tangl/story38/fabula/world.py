@@ -25,7 +25,12 @@ class World38:
             bundle=self.bundle,
             story_label=story_label,
             init_mode=init_mode,
+            world=self,
         )
+
+    def get_authorities(self) -> list[object]:
+        """Return optional author/world behavior registries."""
+        return []
 
     @classmethod
     def from_script_data(

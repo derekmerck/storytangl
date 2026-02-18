@@ -106,6 +106,15 @@ class TestHasRequirement:
         assert carrier.requirement.resolved_step == 7
         assert carrier.requirement.resolved_cursor_id == provider.uid
 
+    def test_resolution_reason_and_meta_delegate_from_requirement(self) -> None:
+        reg = Registry()
+        carrier = HasRequirement(requirement=Requirement(has_identifier="foo"))
+        reg.add(carrier)
+        carrier.requirement.resolution_reason = "no_offers"
+        carrier.requirement.resolution_meta = {"alternatives": []}
+        assert carrier.resolution_reason == "no_offers"
+        assert carrier.resolution_meta == {"alternatives": []}
+
 
 # ============================================================================
 # Dependency — pull resource

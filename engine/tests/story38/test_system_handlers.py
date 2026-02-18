@@ -6,9 +6,10 @@ from types import SimpleNamespace
 
 from tangl.core38 import Graph
 from tangl.core38.runtime_op import Predicate
+from tangl.story38.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.story38.episode import Action, Block
 from tangl.story38.system_handlers import render_block
-from tangl.vm38 import ChoiceFragment, ContentFragment, Dependency, MediaFragment
+from tangl.vm38 import Dependency
 
 
 def _ctx_with_ns(ns: dict[str, object] | None = None) -> SimpleNamespace:

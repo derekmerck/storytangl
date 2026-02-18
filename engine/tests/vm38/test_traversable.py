@@ -227,12 +227,34 @@ class TestTraversableNodeContainer:
         assert container.source is entry
         assert container.sink is exit_node
 
-    def test_has_forward_progress_stub(self) -> None:
+    def test_has_forward_progress_true_when_sink_reachable(self) -> None:
         g = Graph()
-        a = _node(g, label="a")
-        b = _node(g, label="b")
-        # MVP stub always returns True
-        assert a.has_forward_progress(b)
+        container = _node(g, label="scene")
+        source = _node(g, label="entry")
+        mid = _node(g, label="mid")
+        sink = _node(g, label="exit")
+        container.add_child(source)
+        container.add_child(mid)
+        container.add_child(sink)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        _edge(g, predecessor_id=source.uid, successor_id=mid.uid)
+        _edge(g, predecessor_id=mid.uid, successor_id=sink.uid)
+        assert container.has_forward_progress(source) is True
+
+    def test_has_forward_progress_false_when_sink_unreachable(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        source = _node(g, label="entry")
+        mid = _node(g, label="mid")
+        sink = _node(g, label="exit")
+        container.add_child(source)
+        container.add_child(mid)
+        container.add_child(sink)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        _edge(g, predecessor_id=source.uid, successor_id=mid.uid)
+        assert container.has_forward_progress(source) is False
 
     def test_availability_predicates_must_all_pass(self) -> None:
         g = Graph()
@@ -444,8 +466,8 @@ class TestTraversalContractValidation:
         container.source_id = uuid4()
 
         issues = validate_traversal_contracts(g)
-        assert len(issues) == 1
-        assert "source_id" in issues[0]
+        assert any("source_id" in issue for issue in issues)
+        assert any("sink_id is missing" in issue for issue in issues)
         with pytest.raises(ValueError, match="Traversal contract validation failed"):
             assert_traversal_contracts(g)
 
@@ -460,3 +482,23 @@ class TestTraversalContractValidation:
 
         issues = validate_traversal_contracts(g)
         assert any("sink" in issue and "not a member/child" in issue for issue in issues)
+
+    def test_source_without_sink_reports_issue(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        source = _node(g, label="entry")
+        container.add_child(source)
+        container.source_id = source.uid
+
+        issues = validate_traversal_contracts(g)
+        assert any("source_id is set but sink_id is missing" in issue for issue in issues)
+
+    def test_sink_without_source_reports_issue(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        sink = _node(g, label="exit")
+        container.add_child(sink)
+        container.sink_id = sink.uid
+
+        issues = validate_traversal_contracts(g)
+        assert any("sink_id is set but source_id is missing" in issue for issue in issues)

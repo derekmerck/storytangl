@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
+from tangl.vm38.dispatch import on_resolve
 from tangl.vm38.provision import (
     Dependency,
     FindProvisioner,
@@ -124,6 +125,26 @@ class TestResolverOfferGathering:
         assert len(offers) == 1
         assert offers[0].policy == ProvisionPolicy.CREATE
 
+    def test_distance_prefers_nearest_group(self) -> None:
+        near = Entity(label="provider")
+        far = Entity(label="provider")
+        resolver = Resolver(location_entity_groups=[[near], [far]])
+        req = Requirement(has_identifier="provider")
+        provider = resolver.resolve_requirement(req)
+        assert provider is near
+
+    def test_specificity_prefers_exact_kind_when_distance_equal(self) -> None:
+        class SpecialEntity(Entity):
+            pass
+
+        special = SpecialEntity(label="special")
+        plain = Entity(label="plain")
+        resolver = Resolver(location_entity_groups=[[special, plain]])
+        req = Requirement(has_kind=Entity)
+        offers = resolver.gather_offers(req)
+        assert offers
+        assert offers[0].candidate is plain
+
 
 class TestResolverRequirementResolution:
     def test_resolves_existing_entity(self) -> None:
@@ -140,6 +161,7 @@ class TestResolverRequirementResolution:
         # EXISTING-only policy filters out FORCE fallbacks
         assert provider is None
         assert req.unsatisfiable is True
+        assert req.resolution_reason == "no_offers"
 
     def test_force_with_existing_offer_prefers_existing(self) -> None:
         sword = Entity(label="sword")
@@ -151,8 +173,25 @@ class TestResolverRequirementResolution:
 
     def test_from_ctx_requires_provision_context_shape(self) -> None:
         ctx = SimpleNamespace()
-        with pytest.raises(TypeError, match="get_entity_groups"):
+        with pytest.raises(TypeError, match="get_location_entity_groups|get_entity_groups"):
             Resolver.from_ctx(ctx)
+
+    def test_invalid_resolve_override_sets_override_reason(self) -> None:
+        @on_resolve
+        def bad_override(*, caller, offers, ctx, **kw):
+            return ["not-an-offer"]
+
+        ctx = SimpleNamespace(
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: [],
+        )
+        resolver = Resolver(entity_groups=[])
+        req = Requirement(has_identifier="missing", provision_policy=ProvisionPolicy.EXISTING)
+        provider = resolver.resolve_requirement(req, _ctx=ctx)
+        assert provider is None
+        assert req.resolution_reason == "override_invalid"
+        assert req.resolution_meta is not None
+        assert "error" in req.resolution_meta
 
 
 class TestResolverDependencyResolution:
@@ -253,3 +292,15 @@ class TestResolverFrontierNode:
         resolver = Resolver(entity_groups=[])
         result = resolver.resolve_frontier_node(node)
         assert result is False
+
+    def test_container_without_progress_is_not_viable(self) -> None:
+        g = Graph()
+        container = _node(g, label="scene")
+        source = _node(g, label="entry")
+        sink = _node(g, label="exit")
+        container.add_child(source)
+        container.add_child(sink)
+        container.source_id = source.uid
+        container.sink_id = sink.uid
+        resolver = Resolver(entity_groups=[])
+        assert resolver.resolve_frontier_node(container) is False

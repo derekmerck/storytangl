@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from tangl.core38 import Selector
-from tangl.vm38 import ChoiceFragment, ContentFragment, Dependency, MediaFragment, on_journal
+from tangl.vm38 import Dependency
 
+from .dispatch import on_journal
 from .episode import Action, Block
+from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 
 
 class _SafeFormatDict(dict):
@@ -45,7 +47,7 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
 
 @on_journal
 def render_block(*, caller, ctx, **_kw):
-    """Render block content and available choices into vm38 fragments."""
+    """Render block content and available choices into story38 fragments."""
     if not isinstance(caller, Block):
         return None
 

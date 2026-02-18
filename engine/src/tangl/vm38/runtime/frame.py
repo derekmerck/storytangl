@@ -148,11 +148,17 @@ class PhaseCtx:
     def get_registries(self) -> list[BehaviorRegistry]:
         """Registries to include in ``chain_execute``.
 
-        Returns the module-level ``vm_dispatch`` registry.  Additional
-        registries (application-level, story-level) can be added by
-        wrapping or extending this context.
+        Always includes the module-level ``vm_dispatch`` registry. If the
+        graph exposes a ``get_authorities()`` hook, those registries are
+        appended in declaration order.
         """
-        return [vm_dispatch]
+        registries: list[BehaviorRegistry] = [vm_dispatch]
+        get_authorities = getattr(self.graph, "get_authorities", None)
+        if callable(get_authorities):
+            for registry in get_authorities() or ():
+                if isinstance(registry, BehaviorRegistry) and registry not in registries:
+                    registries.append(registry)
+        return registries
 
     def get_inline_behaviors(self) -> list[Callable | Behavior]:
         return self.inline_behaviors
@@ -204,22 +210,47 @@ class PhaseCtx:
 
         return self._ns_cache[uid]
 
-    def get_entity_groups(self) -> list[Iterable]:
-        """Entity pools for provisioning, ordered by distance from cursor.
+    def get_location_entity_groups(self) -> list[Iterable]:
+        """Entity pools ordered by runtime location distance from cursor."""
+        cursor = self.cursor
+        if cursor is None:
+            return [self.graph.values()]
 
-        For MVP, returns the entire graph as a single group.  A future
-        version would walk ``cursor.ancestors`` and group each ancestor's
-        satisfied dependencies at increasing distance.
-        """
-        return [self.graph.values()]
+        groups: list[list[Any]] = []
+        seen_ids: set[UUID] = set()
 
-    def get_template_groups(self) -> list[Iterable]:
-        """Template pools for provisioning, ordered by scope distance.
+        def add_group(values: Iterable[Any]) -> None:
+            bucket: list[Any] = []
+            for value in values:
+                uid = getattr(value, "uid", None)
+                if uid is None:
+                    continue
+                if uid in seen_ids:
+                    continue
+                seen_ids.add(uid)
+                bucket.append(value)
+            if bucket:
+                groups.append(bucket)
 
-        By convention, story graphs expose ``graph.factory`` as a template
-        registry-like object. When present, include it as the nearest
-        template pool so PLANNING can resolve CREATE offers.
-        """
+        # Closest scope first: cursor, then each ancestor's child set.
+        add_group([cursor])
+        if hasattr(cursor, "ancestors"):
+            for ancestor in cursor.ancestors:
+                if hasattr(ancestor, "children"):
+                    add_group(ancestor.children())
+
+        # Final fallback group: any remaining graph members.
+        add_group(self.graph.values())
+        return groups or [list(self.graph.values())]
+
+    def get_template_scope_groups(self) -> list[Iterable]:
+        """Template pools ordered by authoring/template scope distance."""
+        get_groups = getattr(self.graph, "get_template_scope_groups", None)
+        if callable(get_groups):
+            groups = list(get_groups(self.cursor) or [])
+            if groups:
+                return groups
+
         factory = getattr(self.graph, "factory", None)
         if factory is None:
             return []
@@ -228,6 +259,13 @@ class PhaseCtx:
             return [factory.values()]
 
         return [factory]
+
+    # Backwards-compatible aliases for existing resolver contexts.
+    def get_entity_groups(self) -> list[Iterable]:
+        return self.get_location_entity_groups()
+
+    def get_template_groups(self) -> list[Iterable]:
+        return self.get_template_scope_groups()
 
 
 # ---------------------------------------------------------------------------

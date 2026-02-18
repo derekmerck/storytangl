@@ -67,6 +67,19 @@ class Graph(Registry[GraphItem]):
         True
     """
 
+    def get_authorities(self) -> list[object]:
+        """Return optional application-level behavior registries.
+
+        Notes
+        -----
+        This hook is intentionally minimal and provisional. Authorities are
+        primarily an application/story concern (for example a story graph may
+        return story/world registries). Core exposes this no-op hook so runtime
+        layers can discover authorities via protocol (`if hook exists`) without
+        type-coupling to higher-order graph types.
+        """
+        return []
+
     def add_node(self, *, kind=None, **attrs) -> Node:
         """Create and add a node-like graph item."""
         kind = kind or Node

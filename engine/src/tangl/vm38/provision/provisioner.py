@@ -1,11 +1,11 @@
 from __future__ import annotations
 from enum import Flag, auto
-from typing import ClassVar, Callable, Protocol, Iterable, Iterator, TYPE_CHECKING
+from typing import Any, ClassVar, Callable, Protocol, Iterable, Iterator, TYPE_CHECKING
 from dataclasses import dataclass
 
 from pydantic import ConfigDict, SkipValidation
 
-from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, resolve_ctx, Priority, TokenFactory
+from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, Priority, TokenFactory
 
 if TYPE_CHECKING:
     from .requirement import Requirement, Affordance
@@ -44,16 +44,14 @@ class ProvisionOffer(Record):
     policy: ProvisionPolicy  # but not ANY
     callback: Callable
     priority: int = Priority.NORMAL
+    distance_from_caller: int = 999
+    specificity: int = 0
+    candidate: Any = None
 
     def sort_key(self):
-        # earliest policy, priority, seq sorts to earliest
-        # a couple of knobs here:
-        # - if you set an offer _policy_ to FORCE it will beat everything else
-        # - if you set an offer _priority_ to EARLY, it will beat anything in
-        #   that policy tier and similarly for LATE will lose to anything in that
-        #   tier
-        # You can inject offers manually in the resolver do_resolve_req hook
-        return int(self.policy), self.priority, self.seq
+        from .matching import offer_sort_key
+
+        return offer_sort_key(self)
 
 
 class Provisioner(Protocol):
@@ -77,7 +75,9 @@ class FindProvisioner:
             yield ProvisionOffer(
                 origin_id = "FindProvisioner",
                 policy = ProvisionPolicy.EXISTING,
-                priority = Priority.NORMAL + self.distance,
+                priority = Priority.NORMAL,
+                distance_from_caller=self.distance,
+                candidate=c,
                 callback = lambda *_, _c=c, **__: _c # need to freeze ref to _this_ c
             )
 
@@ -88,7 +88,9 @@ class FindProvisioner:
             yield ProvisionOffer(
                 origin_id = "FindProvisioner",
                 policy = ProvisionPolicy.EXISTING,
-                priority = Priority.NORMAL + self.distance,
+                priority = Priority.NORMAL,
+                distance_from_caller=self.distance,
+                candidate=c,
                 callback = lambda *_, _c=c, **__: _c  # need to freeze ref to _this_ c
             )
 
@@ -101,11 +103,12 @@ class TemplateProvisioner:
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
         candidates = requirement.filter(self.templates)
         for c in candidates:
-            # can set priority from scope-distance once we have defined that
             yield ProvisionOffer(
                 origin_id = "TemplateProvisioner",
                 policy = ProvisionPolicy.CREATE,
-                priority = Priority.NORMAL + self.distance,
+                priority = Priority.NORMAL,
+                distance_from_caller=self.distance,
+                candidate=c,
                 callback = c.materialize
             )
 
@@ -123,6 +126,8 @@ class InlineTemplateProvisioner:
                 policy=ProvisionPolicy.CREATE,
                 callback=requirement.fallback_templ.materialize,
                 priority=Priority.LATE,
+                distance_from_caller=0,
+                candidate=requirement.fallback_templ,
             )]
         return []
 
@@ -182,6 +187,7 @@ class FallbackProvisioner:
             origin_id="FallbackProvisioner",
             policy=ProvisionPolicy.FORCE,
             priority=cls.HIGH_COST_PRIORITY,
+            distance_from_caller=999_999,
             callback=lambda *_, _req=requirement, **__: cls._synthesize_entity(_req),
         )]
 
