@@ -314,6 +314,23 @@ class TestTraversableEdge:
         )
         assert e.trigger_phase == ResolutionPhase.PREREQS
 
+    def test_phase_fields_have_distinct_semantics(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            trigger_phase=ResolutionPhase.PREREQS,
+            entry_phase=ResolutionPhase.UPDATE,
+            return_phase=ResolutionPhase.POSTREQS,
+        )
+        assert e.trigger_phase == ResolutionPhase.PREREQS
+        assert e.entry_phase == ResolutionPhase.UPDATE
+        ret = e.get_return_edge()
+        assert ret.entry_phase == ResolutionPhase.POSTREQS
+
     def test_predecessor_successor_narrowing(self) -> None:
         g = Graph()
         a = _node(g, label="a")

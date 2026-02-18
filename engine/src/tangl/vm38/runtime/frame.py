@@ -318,6 +318,12 @@ class Frame:
     cursor_trace: list[UUID] = field(default_factory=list)
     """Visited cursor positions for this resolve cycle, in order."""
 
+    last_redirect: dict[str, Any] | None = None
+    """Last redirect record captured during this resolve cycle."""
+
+    redirect_trace: list[dict[str, Any]] = field(default_factory=list)
+    """Ordered redirect records captured during this resolve cycle."""
+
     step_base: int = 0
     """Absolute step offset at frame start (usually ledger.cursor_steps)."""
 
@@ -349,6 +355,31 @@ class Frame:
             step=self.step_base + self.cursor_steps,
             random=self._random,
         )
+
+    @staticmethod
+    def _with_step(record: Record, *, step: int) -> Record:
+        """Return a step-annotated record, preserving immutability."""
+        if not hasattr(record, "step"):
+            return record
+        current = getattr(record, "step", None)
+        if isinstance(current, int) and current >= 0:
+            return record
+        if hasattr(record, "evolve"):
+            return record.evolve(step=step)
+        return record
+
+    def _record_redirect(self, *, phase: ResolutionPhase, edge: AnyTraversableEdge) -> None:
+        """Capture minimal redirect observability for service/debug surfaces."""
+        predecessor = getattr(edge, "predecessor", None)
+        successor = getattr(edge, "successor", None)
+        record = {
+            "phase": phase.name.lower(),
+            "edge_id": str(getattr(edge, "uid", "")) or None,
+            "predecessor_id": str(getattr(predecessor, "uid", "")) or None,
+            "successor_id": str(getattr(successor, "uid", "")) or None,
+        }
+        self.last_redirect = record
+        self.redirect_trace.append(record)
 
     # -- Pipeline execution -------------------------------------------------
 
@@ -398,6 +429,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.PREREQS
             prereq_result = do_prereqs(self.cursor, ctx=ctx)
             if prereq_result is not None:
+                self._record_redirect(phase=ResolutionPhase.PREREQS, edge=prereq_result)
                 return prereq_result
 
         # -- UPDATE ---------------------------------------------------------
@@ -412,8 +444,12 @@ class Frame:
             if fragments:
                 if isinstance(fragments, Iterable) and not isinstance(fragments, (Record, str, bytes)):
                     for f in fragments:
+                        if isinstance(f, Record):
+                            f = self._with_step(f, step=ctx.step)
                         self.output_stream.append(f)
                 else:
+                    if isinstance(fragments, Record):
+                        fragments = self._with_step(fragments, step=ctx.step)
                     self.output_stream.append(fragments)
 
         # -- FINALIZE -------------------------------------------------------
@@ -421,6 +457,8 @@ class Frame:
             ctx.current_phase = ResolutionPhase.FINALIZE
             patch = do_finalize(self.cursor, ctx=ctx)
             if patch:
+                if isinstance(patch, Record):
+                    patch = self._with_step(patch, step=ctx.step)
                 self.output_stream.append(patch)
 
         # -- POSTREQS -------------------------------------------------------
@@ -428,6 +466,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.POSTREQS
             postreq_result = do_postreqs(self.cursor, ctx=ctx)
             if postreq_result is not None:
+                self._record_redirect(phase=ResolutionPhase.POSTREQS, edge=postreq_result)
                 return postreq_result
 
         return None

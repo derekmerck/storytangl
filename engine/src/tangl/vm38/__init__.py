@@ -49,7 +49,7 @@ from .runtime import Frame, Ledger
 
 # Provides:
 # - journal fragment records
-from .fragments import ChoiceFragment, ContentFragment, Fragment
+from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
 
 # Provides:
 # - phase bus hooks
@@ -76,6 +76,7 @@ __all__ = [
     "FindProvisioner",
     "Frame",
     "Fragment",
+    "MediaFragment",
     "HasRequirement",
     "InlineTemplateProvisioner",
     "Ledger",

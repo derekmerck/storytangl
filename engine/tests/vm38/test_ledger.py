@@ -210,6 +210,28 @@ class TestLedgerResolveChoice:
         assert ledger.cursor_id == c.uid
         assert get_visit_count(b.uid, ledger.cursor_history) == 1
 
+    def test_resolve_choice_copies_redirect_observability(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+
+        @on_prereqs
+        def redirect(*, caller, ctx, **kw):
+            if caller is b:
+                return AnonymousEdge(predecessor=b, successor=c)
+            return None
+
+        ledger = Ledger(graph=g, cursor_id=a.uid)
+        edge = list(a.edges_out())[0]
+        ledger.resolve_choice(edge.uid)
+
+        assert ledger.last_redirect is not None
+        assert ledger.last_redirect["phase"] == "prereqs"
+        assert ledger.last_redirect["successor_id"] == str(c.uid)
+        assert len(ledger.redirect_trace) == 1
+
     def test_container_descent_positions_appear_in_history(self) -> None:
         g = Graph()
         root = _node(g, label="root")

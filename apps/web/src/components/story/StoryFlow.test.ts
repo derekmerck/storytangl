@@ -114,6 +114,29 @@ describe('StoryFlow', () => {
     expect(blocks.length).toBeGreaterThan(0)
   })
 
+  it('normalizes story38 envelope fragments into display blocks', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({
+          cursor_id: 'cursor-1',
+          step: 1,
+          fragments: [
+            { fragment_type: 'content', content: 'From envelope' },
+            { fragment_type: 'choice', edge_id: 'choice-1', text: 'Continue' },
+          ],
+        }),
+      ),
+    )
+
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    const block = wrapper.findComponent(StoryBlock)
+    expect(block.exists()).toBe(true)
+    expect((block.props('block') as any).text).toContain('From envelope')
+    expect((block.props('block') as any).actions?.[0]?.text).toBe('Continue')
+  })
+
   it('assigns unique keys to blocks', async () => {
     const wrapper = mountFlow()
     await flushPromises()

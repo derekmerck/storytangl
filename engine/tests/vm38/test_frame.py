@@ -241,6 +241,10 @@ class TestFollowEdgeRedirects:
         # follow_edge returns the redirect edge
         assert result is not None
         assert result.successor is c
+        assert frame.last_redirect is not None
+        assert frame.last_redirect["phase"] == "prereqs"
+        assert frame.last_redirect["successor_id"] == str(c.uid)
+        assert len(frame.redirect_trace) == 1
 
     def test_postreq_redirect(self) -> None:
         g = Graph()
@@ -258,6 +262,10 @@ class TestFollowEdgeRedirects:
         result = frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
         assert result is not None
         assert result.successor is c
+        assert frame.last_redirect is not None
+        assert frame.last_redirect["phase"] == "postreqs"
+        assert frame.last_redirect["successor_id"] == str(c.uid)
+        assert len(frame.redirect_trace) == 1
 
 
 # ============================================================================

@@ -167,6 +167,14 @@ class Orchestrator:
         if hasattr(data, "get_frame") and hasattr(data, "unstructure"):
             return data
         if isinstance(data, Mapping):
+            if (
+                "graph" in data
+                and "output_stream" in data
+                and "cursor_history" in data
+            ):
+                from tangl.vm38.runtime.ledger import Ledger as Ledger38
+
+                return Ledger38.structure(dict(data))
             from tangl.vm.ledger import Ledger
 
             return Ledger.structure(dict(data))

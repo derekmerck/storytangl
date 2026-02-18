@@ -9,6 +9,7 @@ from .info_response import ChoiceInfo, StoryInfo, SystemInfo, UserInfo, WorldInf
 from .base_response import BaseResponse
 from .content_response import ContentResponse
 from .content_response_handler import ResponseHandler
+from .runtime38_response import RuntimeEnvelope38
 
 __all__ = [
     "FragmentStream",
@@ -24,4 +25,5 @@ __all__ = [
     "BaseResponse",
     "ContentResponse",
     "ResponseHandler",
+    "RuntimeEnvelope38",
 ]

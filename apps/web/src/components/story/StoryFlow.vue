@@ -6,6 +6,9 @@ import type { DialogBlock, JournalAction, JournalStoryUpdate } from '@/types'
 import { useGlobal } from '@/composables/globals'
 
 const { $http, $debug, $verbose, remapURL, makeMediaDict } = useGlobal()
+const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
+
+type UnknownRecord = Record<string, unknown>
 
 const blocks = ref<JournalStoryUpdate[]>([])
 const blockRefs = ref<InstanceType<typeof StoryBlock>[]>([])
@@ -69,6 +72,133 @@ const processBlock = (incoming: JournalStoryUpdate): JournalStoryUpdate => {
   return processed
 }
 
+const isRecord = (value: unknown): value is UnknownRecord =>
+  typeof value === 'object' && value !== null
+
+const isLegacyBlock = (value: unknown): value is JournalStoryUpdate => {
+  if (!isRecord(value)) {
+    return false
+  }
+  return (
+    value.fragment_type === 'block' ||
+    Array.isArray(value.actions) ||
+    Array.isArray(value.dialog) ||
+    typeof value.text === 'string' ||
+    typeof value.title === 'string'
+  )
+}
+
+const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => {
+  const normalized: JournalStoryUpdate[] = []
+
+  let current: JournalStoryUpdate | null = null
+  let counter = 0
+  const openBlock = () => {
+    if (current === null) {
+      counter += 1
+      current = {
+        uid: `vm38-${counter}`,
+        text: '',
+        actions: [],
+        media: [],
+      }
+    }
+    return current
+  }
+  const closeBlock = () => {
+    if (current === null) {
+      return
+    }
+    if (
+      current.text ||
+      (current.actions && current.actions.length > 0) ||
+      (current.media && current.media.length > 0)
+    ) {
+      normalized.push(current)
+    }
+    current = null
+  }
+
+  for (const fragment of fragments) {
+    if (!isRecord(fragment)) {
+      continue
+    }
+
+    const kind = String(fragment.fragment_type ?? '')
+    if (kind === 'block' && isLegacyBlock(fragment)) {
+      closeBlock()
+      normalized.push(fragment)
+      continue
+    }
+
+    if (kind === 'content') {
+      const block = openBlock()
+      const content = typeof fragment.content === 'string' ? fragment.content : ''
+      block.text = block.text ? `${block.text}\n${content}` : content
+      if (!block.uid && fragment.uid) {
+        block.uid = String(fragment.uid)
+      }
+      continue
+    }
+
+    if (kind === 'choice') {
+      const block = openBlock()
+      const edgeId = fragment.edge_id ?? fragment.uid
+      if (!edgeId) {
+        continue
+      }
+      const text = String(fragment.text ?? fragment.label ?? 'Continue')
+      const actions = block.actions ? [...block.actions] : []
+      actions.push({ uid: String(edgeId), text } as JournalAction)
+      block.actions = actions
+      continue
+    }
+
+    if (kind === 'media') {
+      const block = openBlock()
+      const payload = isRecord(fragment.payload) ? fragment.payload : {}
+      const rawUrl = payload.url ?? payload.src
+      const url = typeof rawUrl === 'string' ? rawUrl : undefined
+      const role = typeof payload.media_role === 'string' ? payload.media_role : 'narrative_im'
+      const media = block.media ? [...block.media] : []
+      media.push({ media_role: role as any, url })
+      block.media = media
+      continue
+    }
+  }
+
+  closeBlock()
+  return normalized
+}
+
+const normalizePayload = (payload: unknown): JournalStoryUpdate[] => {
+  if (Array.isArray(payload)) {
+    if (payload.every((item) => isLegacyBlock(item))) {
+      return payload as JournalStoryUpdate[]
+    }
+    return normalizeFragmentStream(payload)
+  }
+
+  if (!isRecord(payload)) {
+    return []
+  }
+
+  if (Array.isArray(payload.fragments)) {
+    const fragments = payload.fragments
+    if (fragments.every((item) => isLegacyBlock(item))) {
+      return fragments as JournalStoryUpdate[]
+    }
+    return normalizeFragmentStream(fragments)
+  }
+
+  const envelope = payload.envelope
+  if (isRecord(envelope) && Array.isArray(envelope.fragments)) {
+    return normalizeFragmentStream(envelope.fragments)
+  }
+
+  return []
+}
+
 const handleResponse = async (payload: JournalStoryUpdate[]) => {
   if (!Array.isArray(payload) || payload.length === 0) {
     return
@@ -96,8 +226,8 @@ const fetchInitialBlocks = async () => {
   try {
     loading.value = true
     error.value = null
-    const response = await $http.value.get<JournalStoryUpdate[]>('/story/update')
-    await handleResponse(response.data)
+    const response = await $http.value.get<unknown>(`${storyRoutePrefix}/update`)
+    await handleResponse(normalizePayload(response.data))
   } catch (err) {
     console.error('Failed to fetch initial story.', err)
     error.value = 'Failed to load story. Please refresh the page.'
@@ -116,11 +246,11 @@ const doAction = async (
   try {
     loading.value = true
     error.value = null
-    const response = await $http.value.post<JournalStoryUpdate[]>('/story/do', {
+    const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
       uid: actionUid,
       passback,
     })
-    await handleResponse(response.data)
+    await handleResponse(normalizePayload(response.data))
   } catch (err) {
     console.error('Failed to execute action.', err)
     error.value = 'Failed to execute action. Please try again.'

@@ -59,6 +59,8 @@ class Ledger(Entity):
         self.cursor_steps = value
 
     call_stack_ids: list[UUID] = Field(default_factory=list)
+    last_redirect: dict | None = None
+    redirect_trace: list[dict] = Field(default_factory=list)
 
     def _call_stack(self) -> list[TraversableEdge]:
         """Resolve call stack UIDs to edge objects (introspection only)."""
@@ -111,6 +113,8 @@ class Ledger(Entity):
         self.cursor_steps = 0
         self.choice_steps = 0
         self.call_stack_ids = []
+        self.last_redirect = None
+        self.redirect_trace = []
 
     def initialize_entry(self) -> None:
         """Finalize entry initialization and persist initial snapshot."""
@@ -163,6 +167,8 @@ class Ledger(Entity):
         self.cursor_id = frame.cursor.uid
         self.cursor_history.extend(frame.cursor_trace)
         self.call_stack_ids = [edge.uid for edge in frame.return_stack]
+        self.last_redirect = frame.last_redirect
+        self.redirect_trace = list(frame.redirect_trace)
 
     def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
         """Return output fragments in chronological order, optionally filtered."""
@@ -189,6 +195,8 @@ class Ledger(Entity):
             "choice_steps": self.choice_steps,
             "reentrant_steps": self.reentrant_steps,
             "call_stack_ids": [str(uid) for uid in self.call_stack_ids],
+            "last_redirect": self.last_redirect,
+            "redirect_trace": self.redirect_trace,
             "user_id": str(self.user_id) if self.user_id else None,
             "graph": self.graph.unstructure(),
             "output_stream": self.output_stream.unstructure(),
@@ -211,6 +219,8 @@ class Ledger(Entity):
             choice_steps=data.get("choice_steps", -1),
             reentrant_steps=data.get("reentrant_steps", -1),
             call_stack_ids=[UUID(uid) for uid in data.get("call_stack_ids", [])],
+            last_redirect=data.get("last_redirect"),
+            redirect_trace=list(data.get("redirect_trace", [])),
             user_id=UUID(data["user_id"]) if data.get("user_id") else None,
         )
 
