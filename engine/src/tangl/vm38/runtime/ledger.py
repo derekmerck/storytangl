@@ -12,12 +12,14 @@ from uuid import UUID
 
 from pydantic import Field
 
-from tangl.core38 import Entity, Graph, OrderedRegistry, Selector, Snapshot
+from tangl.core38 import Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
 from tangl.vm38.traversable import TraversableEdge, TraversableNode
 
-from .frame import Frame
+from .frame import Frame, StepTrace
 from ..fragments import Fragment
+from ..replay import CheckpointRecord, RollbackRecord, StepRecord, get_replay_engine
+from ..replay.contracts import ReplayDelta
 
 
 __all__ = ["Ledger"]
@@ -31,6 +33,9 @@ class Ledger(Entity):
 
     cursor_id: UUID
     cursor_history: list[UUID] = Field(default_factory=list)
+
+    replay_algorithm_id: str = "diff_v1"
+    checkpoint_cadence: int = 1
 
     @property
     def cursor(self) -> TraversableNode:
@@ -117,10 +122,10 @@ class Ledger(Entity):
         self.redirect_trace = []
 
     def initialize_entry(self) -> None:
-        """Finalize entry initialization and persist initial snapshot."""
+        """Finalize entry initialization and persist initial checkpoint."""
         frame = self.get_frame()
         self.call_stack_ids = [e.uid for e in frame.return_stack]
-        self.save_snapshot()
+        self.save_snapshot(force=True)
 
     def initialize_ledger(self, entry_id: UUID | None = None) -> None:
         """Backward-compatible initializer for entry setup."""
@@ -144,6 +149,30 @@ class Ledger(Entity):
             step_base=self.cursor_steps,
         )
 
+    def _record_step(self, trace: StepTrace) -> None:
+        """Build and append replay records for one traced frame hop."""
+        engine = get_replay_engine(self.replay_algorithm_id)
+        delta = engine.build_delta(before_graph=trace.before_graph, after_graph=trace.after_graph)
+        delta_id: UUID | None = None
+
+        if delta is not None:
+            self.output_stream.append(delta)
+            delta_id = delta.uid
+
+        self.output_stream.append(
+            StepRecord(
+                step=trace.step,
+                edge_id=trace.edge_id,
+                cursor_id=trace.cursor_id,
+                entry_phase=trace.entry_phase.name if trace.entry_phase is not None else None,
+                was_choice=trace.was_choice,
+                delta_id=delta_id,
+                state_hash=trace.state_hash,
+                call_stack_ids=list(trace.call_stack_ids),
+                algorithm_id=self.replay_algorithm_id,
+            )
+        )
+
     def resolve_choice(self, edge_id: UUID) -> None:
         """Resolve a player choice and sync frame results into ledger state."""
         edge = self.graph.get(edge_id)
@@ -151,6 +180,8 @@ class Ledger(Entity):
             raise ValueError(f"Choice edge not found: {edge_id}")
 
         frame = self.get_frame()
+        if hasattr(frame, "step_observer"):
+            frame.step_observer = self._record_step
         frame.resolve_choice(edge)
 
         for call_edge in frame.return_stack:
@@ -169,6 +200,8 @@ class Ledger(Entity):
         self.call_stack_ids = [edge.uid for edge in frame.return_stack]
         self.last_redirect = frame.last_redirect
         self.redirect_trace = list(frame.redirect_trace)
+
+        self.save_snapshot(cadence=self.checkpoint_cadence)
 
     def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
         """Return output fragments in chronological order, optionally filtered."""
@@ -198,6 +231,8 @@ class Ledger(Entity):
             "last_redirect": self.last_redirect,
             "redirect_trace": self.redirect_trace,
             "user_id": str(self.user_id) if self.user_id else None,
+            "replay_algorithm_id": self.replay_algorithm_id,
+            "checkpoint_cadence": self.checkpoint_cadence,
             "graph": self.graph.unstructure(),
             "output_stream": self.output_stream.unstructure(),
         }
@@ -222,10 +257,13 @@ class Ledger(Entity):
             last_redirect=data.get("last_redirect"),
             redirect_trace=list(data.get("redirect_trace", [])),
             user_id=UUID(data["user_id"]) if data.get("user_id") else None,
+            replay_algorithm_id=data.get("replay_algorithm_id", "diff_v1"),
+            checkpoint_cadence=data.get("checkpoint_cadence", 1),
         )
 
-    def save_snapshot(self, *, force: bool = False, cadence: int = 0) -> Optional[Snapshot]:
-        """Save a snapshot if forced or cadence says one is due."""
+    def save_snapshot(self, *, force: bool = False, cadence: int = 0) -> Optional[CheckpointRecord]:
+        """Save a checkpoint if forced or cadence says one is due."""
+        cadence = cadence if cadence > 0 else self.checkpoint_cadence
         should_save = force or (
             cadence > 0
             and self.choice_steps >= 0
@@ -234,25 +272,127 @@ class Ledger(Entity):
         if not should_save:
             return None
 
-        snapshot = Snapshot.from_entity(self)
-        self.output_stream.append(snapshot)
-        return snapshot
-
-    def rollback_to_step(self, target_step: int) -> None:
-        """Restore ledger state to a previous step.
-
-        Restores the graph from the most recent snapshot at or before
-        ``target_step``, applies patches forward, and truncates
-        ``cursor_history`` and ``output_stream`` to match.
-
-        Post-MVP — requires StepRecord, patch-based event sourcing,
-        and snapshot cadence infrastructure.
-
-        See Also
-        --------
-        vm38/replay/design_notes.md
-            Full replay architecture specification.
-        """
-        raise NotImplementedError(
-            "rollback_to_step requires event-sourcing infrastructure (post-MVP)"
+        engine = get_replay_engine(self.replay_algorithm_id)
+        checkpoint = engine.make_checkpoint(
+            graph=self.graph,
+            step=self.cursor_steps,
+            cursor_id=self.cursor_id,
+            call_stack_ids=self.call_stack_ids,
         )
+        self.output_stream.append(checkpoint)
+        return checkpoint
+
+    def _ordered_records(self) -> list[Entity]:
+        return sorted(self.output_stream.values(), key=lambda record: record.seq)
+
+    def _step_records(self, *, upto_step: int | None = None) -> list[StepRecord]:
+        selector = Selector(has_kind=StepRecord)
+        records = [
+            record for record in selector.filter(self.output_stream)
+            if record.algorithm_id == self.replay_algorithm_id
+        ]
+        if upto_step is not None:
+            records = [record for record in records if record.step <= upto_step]
+        return sorted(records, key=lambda record: (record.step, record.seq))
+
+    def _checkpoint_records(self) -> list[CheckpointRecord]:
+        selector = Selector(has_kind=CheckpointRecord)
+        records = [
+            record for record in selector.filter(self.output_stream)
+            if record.algorithm_id == self.replay_algorithm_id
+        ]
+        return sorted(records, key=lambda record: (record.step, record.seq))
+
+    def rollback_to_step(self, target_step: int, *, reason: str | None = None) -> None:
+        """Restore ledger state to ``target_step`` with destructive truncation."""
+        if target_step < 0:
+            raise ValueError("target_step must be >= 0")
+        if target_step > self.cursor_steps:
+            raise ValueError(
+                f"target_step {target_step} must be <= current step {self.cursor_steps}"
+            )
+        if target_step == self.cursor_steps:
+            return
+
+        prior_step = self.cursor_steps
+        engine = get_replay_engine(self.replay_algorithm_id)
+        checkpoints = self._checkpoint_records()
+        checkpoint = next(
+            (record for record in reversed(checkpoints) if record.step <= target_step),
+            None,
+        )
+        if checkpoint is None:
+            raise RuntimeError("No checkpoint available for rollback")
+
+        graph = engine.restore_checkpoint(checkpoint)
+        all_active_steps = self._step_records(upto_step=target_step)
+        replay_steps = [
+            record for record in all_active_steps
+            if checkpoint.step < record.step <= target_step
+        ]
+
+        for record in replay_steps:
+            if record.delta_id is None:
+                continue
+            delta = self.output_stream.get(record.delta_id)
+            if delta is None:
+                raise RuntimeError(f"Missing delta for StepRecord {record.uid}")
+            if not isinstance(delta, ReplayDelta):
+                raise RuntimeError(f"Invalid delta type for StepRecord {record.uid}")
+            graph = engine.apply_delta(graph=graph, delta=delta)
+
+        final_cursor_id = checkpoint.cursor_id
+        final_call_stack_ids = list(checkpoint.call_stack_ids)
+        if all_active_steps:
+            final_cursor_id = all_active_steps[-1].cursor_id
+            final_call_stack_ids = list(all_active_steps[-1].call_stack_ids)
+
+        history_start = self.cursor_history[0] if self.cursor_history else checkpoint.cursor_id
+        if checkpoints and checkpoints[0].step == 0:
+            history_start = checkpoints[0].cursor_id
+        history: list[UUID] = [history_start]
+        history.extend(record.cursor_id for record in all_active_steps)
+
+        reentrant_steps = 0
+        for index in range(1, len(history)):
+            if history[index] == history[index - 1]:
+                reentrant_steps += 1
+
+        choice_steps = sum(1 for record in all_active_steps if record.was_choice)
+
+        ordered_records = self._ordered_records()
+        candidate_cutoff_seqs = [
+            record.seq
+            for record in ordered_records
+            if isinstance(getattr(record, "step", None), int)
+            and getattr(record, "step") <= target_step
+        ]
+        cutoff_seq = max(candidate_cutoff_seqs) if candidate_cutoff_seqs else 0
+        kept_records = [record for record in ordered_records if record.seq <= cutoff_seq]
+
+        truncated_record_count = len(ordered_records) - len(kept_records)
+        truncated_step_count = sum(1 for record in self._step_records() if record.step > target_step)
+
+        new_stream = OrderedRegistry()
+        new_stream.extend(kept_records)
+        new_stream.append(
+            RollbackRecord(
+                resumed_step=target_step,
+                prior_step=prior_step,
+                truncated_record_count=truncated_record_count,
+                truncated_step_count=truncated_step_count,
+                reason=reason,
+            )
+        )
+
+        self.output_stream = new_stream
+        self.graph = graph
+        self.cursor_id = final_cursor_id
+        self.call_stack_ids = final_call_stack_ids
+        self.cursor_steps = target_step
+        self.choice_steps = choice_steps
+        self.cursor_history = history
+        self.reentrant_steps = reentrant_steps
+        self.last_redirect = None
+        self.redirect_trace = []
+

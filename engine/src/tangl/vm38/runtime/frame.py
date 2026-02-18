@@ -277,6 +277,21 @@ MAX_RESOLVE_DEPTH = 50
 
 
 @dataclass
+class StepTrace:
+    """Replay trace emitted for one completed ``follow_edge`` hop."""
+
+    step: int
+    edge_id: UUID | None
+    cursor_id: UUID
+    entry_phase: ResolutionPhase
+    was_choice: bool
+    state_hash: bytes
+    before_graph: Graph
+    after_graph: Graph
+    call_stack_ids: list[UUID] = field(default_factory=list)
+
+
+@dataclass
 class Frame:
     """Drives cursor traversal through the phase pipeline.
 
@@ -365,6 +380,11 @@ class Frame:
     step_base: int = 0
     """Absolute step offset at frame start (usually ledger.cursor_steps)."""
 
+    step_observer: Callable[[StepTrace], None] | None = None
+    """Optional observer called once for each completed cursor hop."""
+
+    _last_step_trace: StepTrace | None = field(default=None, init=False, repr=False)
+
     _random: Random = field(default_factory=Random)
 
     def __post_init__(self) -> None:
@@ -419,9 +439,49 @@ class Frame:
         self.last_redirect = record
         self.redirect_trace.append(record)
 
+    def _snapshot_graph(self) -> Graph:
+        """Create a detached snapshot graph for replay tracing."""
+        return Graph.structure(self.graph.unstructure())
+
+    def _capture_step_trace(
+        self,
+        *,
+        edge: AnyTraversableEdge,
+        entry_phase: ResolutionPhase,
+        was_choice: bool,
+        before_graph: Graph | None,
+    ) -> None:
+        if self.step_observer is None or before_graph is None:
+            self._last_step_trace = None
+            return
+        edge_id = getattr(edge, "uid", None)
+        self._last_step_trace = StepTrace(
+            step=self.step_base + self.cursor_steps,
+            edge_id=edge_id,
+            cursor_id=self.cursor.uid,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            state_hash=self.graph.value_hash(),
+            before_graph=before_graph,
+            after_graph=self._snapshot_graph(),
+        )
+
+    def _emit_step_trace(self) -> None:
+        if self.step_observer is None or self._last_step_trace is None:
+            return
+        trace = self._last_step_trace
+        trace.call_stack_ids = [edge.uid for edge in self.return_stack]
+        self.step_observer(trace)
+        self._last_step_trace = None
+
     # -- Pipeline execution -------------------------------------------------
 
-    def follow_edge(self, edge: AnyTraversableEdge) -> Optional[AnyTraversableEdge]:
+    def follow_edge(
+        self,
+        edge: AnyTraversableEdge,
+        *,
+        was_choice: bool = False,
+    ) -> Optional[AnyTraversableEdge]:
         """Move cursor along ``edge`` and run the phase pipeline.
 
         Returns an edge if PREREQS or POSTREQS produced a redirect, or
@@ -438,6 +498,9 @@ class Frame:
             If VALIDATE fails (the edge is not traversable).
         """
         entry_phase = getattr(edge, "entry_phase", None) or ResolutionPhase.VALIDATE
+        before_graph: Graph | None = None
+        if self.step_observer is not None:
+            before_graph = self._snapshot_graph()
 
         # -- VALIDATE (pre-move) --------------------------------------------
         if entry_phase <= ResolutionPhase.VALIDATE:
@@ -468,6 +531,12 @@ class Frame:
             prereq_result = do_prereqs(self.cursor, ctx=ctx)
             if prereq_result is not None:
                 self._record_redirect(phase=ResolutionPhase.PREREQS, edge=prereq_result)
+                self._capture_step_trace(
+                    edge=edge,
+                    entry_phase=entry_phase,
+                    was_choice=was_choice,
+                    before_graph=before_graph,
+                )
                 return prereq_result
 
         # -- UPDATE ---------------------------------------------------------
@@ -505,8 +574,20 @@ class Frame:
             postreq_result = do_postreqs(self.cursor, ctx=ctx)
             if postreq_result is not None:
                 self._record_redirect(phase=ResolutionPhase.POSTREQS, edge=postreq_result)
+                self._capture_step_trace(
+                    edge=edge,
+                    entry_phase=entry_phase,
+                    was_choice=was_choice,
+                    before_graph=before_graph,
+                )
                 return postreq_result
 
+        self._capture_step_trace(
+            edge=edge,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
         return None
 
     # -- Choice resolution --------------------------------------------------
@@ -537,6 +618,7 @@ class Frame:
             If the redirect chain exceeds ``max_depth``.
         """
         depth = 0
+        is_choice_edge = True
 
         while edge is not None:
             if depth >= max_depth:
@@ -546,7 +628,7 @@ class Frame:
                 )
 
             current_edge = edge
-            result = self.follow_edge(current_edge)
+            result = self.follow_edge(current_edge, was_choice=is_choice_edge)
             depth += 1
 
             if getattr(current_edge, "return_phase", None) is not None:
@@ -561,6 +643,9 @@ class Frame:
 
             else:
                 edge = None
+
+            self._emit_step_trace()
+            is_choice_edge = False
 
     # -- Direct jump --------------------------------------------------------
 
