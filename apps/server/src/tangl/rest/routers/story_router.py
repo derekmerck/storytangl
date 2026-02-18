@@ -281,7 +281,6 @@ async def create_story38(
     if not isinstance(result, RuntimeInfo):
         return _serialize(result)
 
-    details = dict(result.details or {})
     envelope = _extract_story38_envelope(
         result,
         orchestrator=orchestrator,
@@ -294,7 +293,6 @@ async def create_story38(
         flatten_details=True,
     )
     payload["envelope"] = envelope
-    payload["init_report"] = details.get("init_report")
     return payload
 
 
@@ -304,7 +302,10 @@ async def get_story_update38(
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
-    since_step: int | None = Query(None, description="Return fragments since this step."),
+    since_step: int | None = Query(
+        None,
+        description="Inclusive starting step; defaults to 0 (full history).",
+    ),
     limit: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
     """Return vm38 envelope with ordered fragments."""

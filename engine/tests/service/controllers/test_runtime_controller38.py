@@ -28,7 +28,7 @@ def _story38_script() -> dict:
     }
 
 
-def test_runtime_controller38_flow_create_resolve_update_info_drop() -> None:
+def test_runtime_controller38_flow_create_info_update_resolve_drop() -> None:
     world = World38.from_script_data(script_data=_story38_script())
     controller = RuntimeController()
     user = User(label="runtime38-user")
@@ -78,3 +78,32 @@ def test_runtime_controller38_flow_create_resolve_update_info_drop() -> None:
     assert dropped.details is not None
     assert dropped.details["_delete_ledger_id"] == str(ledger.uid)
     assert user.current_ledger_id is None
+
+
+def test_runtime_controller38_update_default_since_step_returns_full_history() -> None:
+    world = World38.from_script_data(script_data=_story38_script())
+    controller = RuntimeController()
+    user = User(label="runtime38-user-default-update")
+
+    created = controller.create_story38(
+        user=user,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.FULLY_SPECIFIED.value,
+        story_label="svc38_story_default_update",
+    )
+    ledger = created.details.get("ledger") if created.details else None
+    assert isinstance(ledger, Ledger)
+
+    start = ledger.cursor
+    choice = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
+    controller.resolve_choice38(ledger, choice.uid)
+
+    update_default = controller.get_story_update38(ledger)
+    update_full = controller.get_story_update38(ledger, since_step=0)
+
+    assert update_default.status == "ok"
+    assert update_full.status == "ok"
+    assert update_default.details is not None
+    assert update_full.details is not None
+    assert update_default.details["envelope"]["fragments"] == update_full.details["envelope"]["fragments"]

@@ -2,13 +2,32 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 
 import StoryBlock from './StoryBlock.vue'
-import type { DialogBlock, JournalAction, JournalStoryUpdate } from '@/types'
+import type { DialogBlock, JournalAction, JournalStoryUpdate, MediaRole } from '@/types'
 import { useGlobal } from '@/composables/globals'
 
 const { $http, $debug, $verbose, remapURL, makeMediaDict } = useGlobal()
 const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
 
 type UnknownRecord = Record<string, unknown>
+const MEDIA_ROLES: readonly MediaRole[] = [
+  'none',
+  'image',
+  'narrative_im',
+  'info_im',
+  'logo_im',
+  'portrait_im',
+  'avatar_im',
+  'dialog_im',
+  'cover_im',
+  'audio',
+  'voice_over',
+  'dialog_vo',
+  'music',
+  'sfx',
+  'video',
+  'animation',
+]
+const MEDIA_ROLE_SET: ReadonlySet<MediaRole> = new Set(MEDIA_ROLES)
 
 const blocks = ref<JournalStoryUpdate[]>([])
 const blockRefs = ref<InstanceType<typeof StoryBlock>[]>([])
@@ -73,7 +92,10 @@ const processBlock = (incoming: JournalStoryUpdate): JournalStoryUpdate => {
 }
 
 const isRecord = (value: unknown): value is UnknownRecord =>
-  typeof value === 'object' && value !== null
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isMediaRole = (value: unknown): value is MediaRole =>
+  typeof value === 'string' && MEDIA_ROLE_SET.has(value as MediaRole)
 
 const isLegacyBlock = (value: unknown): value is JournalStoryUpdate => {
   if (!isRecord(value)) {
@@ -135,7 +157,7 @@ const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => 
       const block = openBlock()
       const content = typeof fragment.content === 'string' ? fragment.content : ''
       block.text = block.text ? `${block.text}\n${content}` : content
-      if (!block.uid && fragment.uid) {
+      if (fragment.uid) {
         block.uid = String(fragment.uid)
       }
       continue
@@ -143,6 +165,9 @@ const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => 
 
     if (kind === 'choice') {
       const block = openBlock()
+      if (fragment.uid) {
+        block.uid = String(fragment.uid)
+      }
       const edgeId = fragment.edge_id ?? fragment.uid
       if (!edgeId) {
         continue
@@ -156,12 +181,15 @@ const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => 
 
     if (kind === 'media') {
       const block = openBlock()
+      if (fragment.uid) {
+        block.uid = String(fragment.uid)
+      }
       const payload = isRecord(fragment.payload) ? fragment.payload : {}
       const rawUrl = payload.url ?? payload.src
       const url = typeof rawUrl === 'string' ? rawUrl : undefined
-      const role = typeof payload.media_role === 'string' ? payload.media_role : 'narrative_im'
+      const role = isMediaRole(payload.media_role) ? payload.media_role : 'narrative_im'
       const media = block.media ? [...block.media] : []
-      media.push({ media_role: role as any, url })
+      media.push({ media_role: role, url })
       block.media = media
       continue
     }

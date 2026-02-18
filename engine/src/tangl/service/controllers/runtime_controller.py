@@ -470,8 +470,12 @@ class RuntimeController(HasApiEndpoints):
         since_step: int | None = None,
         limit: int = 0,
     ) -> RuntimeInfo:
-        """Return vm38 ordered fragments in an envelope."""
-        effective_since = ledger.step if since_step is None else since_step
+        """Return vm38 ordered fragments in an envelope.
+
+        If ``since_step`` is not provided, the stream starts at step ``0``
+        (full session history).
+        """
+        effective_since = 0 if since_step is None else since_step
         fragments = ledger.get_journal(since_step=effective_since, limit=limit)
         envelope = self._runtime38_envelope(ledger=ledger, fragments=fragments)
         return RuntimeInfo.ok(

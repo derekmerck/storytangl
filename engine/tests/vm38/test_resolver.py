@@ -13,8 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
-from tangl.vm38.dispatch import on_resolve
+from tangl.core38 import BehaviorRegistry, Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
 from tangl.vm38.provision import (
     Dependency,
     FindProvisioner,
@@ -177,12 +176,13 @@ class TestResolverRequirementResolution:
             Resolver.from_ctx(ctx)
 
     def test_invalid_resolve_override_sets_override_reason(self) -> None:
-        @on_resolve
         def bad_override(*, caller, offers, ctx, **kw):
             return ["not-an-offer"]
 
+        local_registry = BehaviorRegistry(label="test_resolve_req_registry")
+        local_registry.register(func=bad_override, task="resolve_req")
         ctx = SimpleNamespace(
-            get_registries=lambda: [],
+            get_registries=lambda: [local_registry],
             get_inline_behaviors=lambda: [],
         )
         resolver = Resolver(entity_groups=[])

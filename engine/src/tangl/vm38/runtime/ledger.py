@@ -283,7 +283,9 @@ class Ledger(Entity):
         return checkpoint
 
     def _ordered_records(self) -> list[Entity]:
-        return sorted(self.output_stream.values(), key=lambda record: record.seq)
+        # Preserve actual stream append order. HasOrder.seq is class-local and
+        # cannot be used to globally sort mixed record kinds.
+        return list(self.output_stream.values())
 
     def _step_records(self, *, upto_step: int | None = None) -> list[StepRecord]:
         selector = Selector(has_kind=StepRecord)
@@ -361,14 +363,12 @@ class Ledger(Entity):
         choice_steps = sum(1 for record in all_active_steps if record.was_choice)
 
         ordered_records = self._ordered_records()
-        candidate_cutoff_seqs = [
-            record.seq
-            for record in ordered_records
-            if isinstance(getattr(record, "step", None), int)
-            and getattr(record, "step") <= target_step
-        ]
-        cutoff_seq = max(candidate_cutoff_seqs) if candidate_cutoff_seqs else 0
-        kept_records = [record for record in ordered_records if record.seq <= cutoff_seq]
+        cutoff_index = -1
+        for index, record in enumerate(ordered_records):
+            record_step = getattr(record, "step", None)
+            if isinstance(record_step, int) and record_step <= target_step:
+                cutoff_index = index
+        kept_records = ordered_records[: cutoff_index + 1] if cutoff_index >= 0 else []
 
         truncated_record_count = len(ordered_records) - len(kept_records)
         truncated_step_count = sum(1 for record in self._step_records() if record.step > target_step)
@@ -395,4 +395,3 @@ class Ledger(Entity):
         self.reentrant_steps = reentrant_steps
         self.last_redirect = None
         self.redirect_trace = []
-
