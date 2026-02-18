@@ -13,8 +13,9 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core38 import Graph, Snapshot
+from tangl.core38 import Graph, Selector, Snapshot
 from tangl.vm38.dispatch import on_prereqs
+from tangl.vm38.replay import RollbackRecord, StepRecord
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.runtime.frame import Frame
 from tangl.vm38.runtime.ledger import Ledger
@@ -210,6 +211,28 @@ class TestLedgerResolveChoice:
         assert ledger.cursor_id == c.uid
         assert get_visit_count(b.uid, ledger.cursor_history) == 1
 
+    def test_resolve_choice_copies_redirect_observability(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+
+        @on_prereqs
+        def redirect(*, caller, ctx, **kw):
+            if caller is b:
+                return AnonymousEdge(predecessor=b, successor=c)
+            return None
+
+        ledger = Ledger(graph=g, cursor_id=a.uid)
+        edge = list(a.edges_out())[0]
+        ledger.resolve_choice(edge.uid)
+
+        assert ledger.last_redirect is not None
+        assert ledger.last_redirect["phase"] == "prereqs"
+        assert ledger.last_redirect["successor_id"] == str(c.uid)
+        assert len(ledger.redirect_trace) == 1
+
     def test_container_descent_positions_appear_in_history(self) -> None:
         g = Graph()
         root = _node(g, label="root")
@@ -308,8 +331,57 @@ class TestLedgerJournal:
         assert ledger.get_journal(limit=2) == [f2, f3]
 
 
-class TestLedgerReplayStub:
-    def test_rollback_to_step_raises_not_implemented(self) -> None:
-        ledger, _ = _make_ledger("a", "b")
-        with pytest.raises(NotImplementedError, match="event-sourcing"):
-            ledger.rollback_to_step(0)
+class TestLedgerReplayRollback:
+    def test_rollback_truncates_and_appends_monument(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        _edge(g, predecessor_id=b.uid, successor_id=c.uid)
+
+        ledger = Ledger.from_graph(graph=g, entry_id=a.uid)
+        edge_ab = next(a.edges_out())
+        edge_bc = next(b.edges_out())
+        ledger.resolve_choice(edge_ab.uid)
+        ledger.resolve_choice(edge_bc.uid)
+
+        before_count = len(list(ledger.output_stream.values()))
+        assert ledger.step == 2
+        assert ledger.cursor_id == c.uid
+
+        ledger.rollback_to_step(1, reason="test rollback")
+
+        assert ledger.step == 1
+        assert ledger.cursor_id == b.uid
+        assert len(list(ledger.output_stream.values())) <= before_count
+
+        monuments = list(Selector(has_kind=RollbackRecord).filter(ledger.output_stream))
+        assert len(monuments) == 1
+        assert monuments[0].resumed_step == 1
+        assert monuments[0].prior_step == 2
+        assert monuments[0].truncated_step_count >= 1
+
+        step_records = list(Selector(has_kind=StepRecord).filter(ledger.output_stream))
+        assert step_records
+        assert all(record.step <= 1 for record in step_records)
+
+    def test_rollback_allows_rebranch_after_truncation(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        _edge(g, predecessor_id=b.uid, successor_id=c.uid)
+
+        ledger = Ledger.from_graph(graph=g, entry_id=a.uid)
+        edge_ab = next(a.edges_out())
+        edge_bc = next(b.edges_out())
+        ledger.resolve_choice(edge_ab.uid)
+        ledger.resolve_choice(edge_bc.uid)
+        ledger.rollback_to_step(1)
+
+        # Re-apply from resumed position.
+        ledger.resolve_choice(edge_bc.uid)
+        assert ledger.step == 2
+        assert ledger.cursor_id == c.uid

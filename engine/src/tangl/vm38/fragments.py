@@ -20,6 +20,7 @@ from tangl.core38 import Record
 __all__ = [
     "Fragment",
     "ContentFragment",
+    "MediaFragment",
     "ChoiceFragment",
 ]
 
@@ -68,4 +69,13 @@ class ChoiceFragment(Fragment):
     edge_id: Optional[UUID] = None
     text: str = ""
     available: bool = True
+    unavailable_reason: str | None = None
     fragment_type: str = "choice"
+
+
+class MediaFragment(Fragment):
+    """A media fragment emitted in stream order with narrative content."""
+
+    source_id: Optional[UUID] = None
+    payload: dict[str, object] | None = None
+    fragment_type: str = "media"

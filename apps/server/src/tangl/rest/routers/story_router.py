@@ -92,6 +92,67 @@ def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
     return orchestrator.execute(endpoint, **params)
 
 
+def _runtime_info_payload(
+    result: RuntimeInfo,
+    *,
+    orchestrator: Orchestrator | None = None,
+    persist_ledger: bool = False,
+    flatten_details: bool = False,
+) -> dict[str, Any]:
+    """Serialize RuntimeInfo with optional ledger persistence."""
+
+    details = dict(result.details or {})
+    ledger_obj = details.pop("ledger", None)
+    if (
+        persist_ledger
+        and ledger_obj is not None
+        and orchestrator is not None
+        and orchestrator.persistence is not None
+    ):
+        orchestrator.persistence.save(ledger_obj)
+
+    payload: dict[str, Any] = {
+        "status": result.status,
+        "code": result.code,
+        "message": result.message,
+        "cursor_id": result.cursor_id,
+        "step": result.step,
+    }
+    payload = {k: v for k, v in payload.items() if v is not None}
+
+    if details:
+        if flatten_details:
+            payload.update(details)
+        else:
+            payload["details"] = details
+
+    return _serialize(payload)
+
+
+def _extract_story38_envelope(
+    result: RuntimeInfo,
+    *,
+    orchestrator: Orchestrator | None = None,
+    persist_ledger: bool = False,
+) -> dict[str, Any]:
+    """Return the vm38 envelope payload from RuntimeInfo."""
+
+    details = dict(result.details or {})
+    ledger_obj = details.pop("ledger", None)
+    if (
+        persist_ledger
+        and ledger_obj is not None
+        and orchestrator is not None
+        and orchestrator.persistence is not None
+    ):
+        orchestrator.persistence.save(ledger_obj)
+
+    envelope = details.get("envelope")
+    if not isinstance(envelope, dict):
+        raise ValueError("Missing or invalid story38 envelope")
+    return _serialize(envelope)
+
+
 @router.post("/story/create")
 async def create_story(
     world_id: str = Query(..., description="World template to instantiate"),
@@ -107,16 +168,12 @@ async def create_story(
         kwargs["story_label"] = story_label
     result = _call(orchestrator, "RuntimeController.create_story", user_id=user_id, **kwargs)
     if isinstance(result, RuntimeInfo):
-        details = dict(result.details or {})
-        ledger_obj = details.pop("ledger", None)
-        if ledger_obj is not None and orchestrator.persistence is not None:
-            orchestrator.persistence.save(ledger_obj)
-        result = result.model_copy(update={"details": details})
-        payload = result.model_dump(mode="python", exclude_none=True)
-        if isinstance(payload.get("details"), dict):
-            details_payload = payload.pop("details")
-            payload.update(details_payload)
-        return _serialize(payload)
+        return _runtime_info_payload(
+            result,
+            orchestrator=orchestrator,
+            persist_ledger=True,
+            flatten_details=True,
+        )
     return _serialize(result)
 
 
@@ -200,6 +257,116 @@ async def do_story_action(
     return payload
 
 
+@router.post("/story38/create")
+async def create_story38(
+    world_id: str = Query(..., description="World template to instantiate"),
+    story_label: str | None = Query(None, description="Optional story label"),
+    init_mode: str | None = Query(
+        None,
+        description="Initialization mode: MINIMAL or FULLY_SPECIFIED",
+    ),
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: str = Header(..., alias="X-API-Key"),
+) -> dict[str, Any]:
+    """Create a vm38/story38 session and return the initial envelope."""
+
+    user_id = uuid_for_key(api_key)
+    kwargs: dict[str, Any] = {"world_id": world_id}
+    if story_label:
+        kwargs["story_label"] = story_label
+    if init_mode:
+        kwargs["init_mode"] = init_mode
+
+    result = _call(orchestrator, "RuntimeController.create_story38", user_id=user_id, **kwargs)
+    if not isinstance(result, RuntimeInfo):
+        return _serialize(result)
+
+    envelope = _extract_story38_envelope(
+        result,
+        orchestrator=orchestrator,
+        persist_ledger=True,
+    )
+    payload = _runtime_info_payload(
+        result,
+        orchestrator=orchestrator,
+        persist_ledger=False,
+        flatten_details=True,
+    )
+    payload["envelope"] = envelope
+    return payload
+
+
+@router.get("/story38/update")
+async def get_story_update38(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
+    since_step: int | None = Query(
+        None,
+        description="Inclusive starting step; defaults to 0 (full history).",
+    ),
+    limit: int = Query(default=0, ge=0),
+) -> dict[str, Any]:
+    """Return vm38 envelope with ordered fragments."""
+
+    user_id = uuid_for_key(api_key)
+    kwargs: dict[str, Any] = {"user_id": user_id, "limit": limit}
+    if since_step is not None:
+        kwargs["since_step"] = since_step
+    result = _call(orchestrator, "RuntimeController.get_story_update38", **kwargs)
+
+    if not isinstance(result, RuntimeInfo):
+        return _serialize(result)
+    return _extract_story38_envelope(result)
+
+
+@router.post("/story38/do")
+async def do_story_action38(
+    request: ChoiceRequest = Body(...),
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    user_locks=Depends(get_user_locks),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
+) -> dict[str, Any]:
+    """Resolve a choice and return the vm38 envelope."""
+
+    user_id = uuid_for_key(api_key)
+    try:
+        choice_id = request.resolve_choice_id()
+    except ValueError as exc:  # pragma: no cover - FastAPI handles validation
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async with user_locks[user_id]:
+        result = _call(
+            orchestrator,
+            "RuntimeController.resolve_choice38",
+            user_id=user_id,
+            choice_id=choice_id,
+        )
+
+    if not isinstance(result, RuntimeInfo):
+        return _serialize(result)
+    return _extract_story38_envelope(result)
+
+
+@router.get("/story38/status")
+async def get_story_status38(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
+) -> dict[str, Any]:
+    """Return vm38 runtime status details."""
+
+    user_id = uuid_for_key(api_key)
+    result = _call(orchestrator, "RuntimeController.get_story_info38", user_id=user_id)
+    if isinstance(result, RuntimeInfo):
+        return _runtime_info_payload(result, flatten_details=True)
+    return _serialize(result)
+
+
 @router.get("/status")
 async def get_story_status(
     orchestrator: Orchestrator = Depends(get_orchestrator),
@@ -248,4 +415,32 @@ async def reset_story(
             payload["status"] = "dropped"
         return _serialize(payload)
 
+    return _serialize(result)
+
+
+@router.delete("/story38/drop")
+async def reset_story38(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    user_locks=Depends(get_user_locks),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
+    archive: bool = Query(default=False, description="Retain the ledger if true."),
+) -> dict[str, Any]:
+    """End the active vm38 story and optionally archive the ledger."""
+
+    user_id = uuid_for_key(api_key)
+    try:
+        async with user_locks[user_id]:
+            result = _call(
+                orchestrator,
+                "RuntimeController.drop_story38",
+                user_id=user_id,
+                archive=archive,
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if isinstance(result, RuntimeInfo):
+        return _runtime_info_payload(result, flatten_details=True)
     return _serialize(result)

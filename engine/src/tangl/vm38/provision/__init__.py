@@ -6,7 +6,6 @@ from .provisioner import (
     TemplateProvisioner,
     InlineTemplateProvisioner,
     FindProvisioner,
-    TokenProvisioner,
     FallbackProvisioner,
 )
 from .resolver import Resolver

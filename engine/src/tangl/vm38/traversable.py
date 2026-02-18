@@ -31,6 +31,7 @@ See Also
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional, TypeAlias, Union
 from uuid import UUID
@@ -367,12 +368,46 @@ class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
         conditions are satisfied in the given namespace.  Used for
         softlock detection.
 
-        .. note::
-           Stub for MVP.  Returns ``True`` unconditionally.
+        For leaf nodes (no container contract), returns ``True``.
         """
-        # TODO: BFS/DFS over members checking edge availability,
-        #       similar to legacy TraversableSubgraph.has_forward_progress
-        return True
+        if not self.is_container:
+            return True
+
+        source = self.source
+        sink = self.sink
+        if source is None or sink is None:
+            return False
+
+        allowed: set[UUID] = set(self.member_ids)
+        if source.uid not in allowed or sink.uid not in allowed:
+            return False
+        if from_node.uid not in allowed:
+            raise ValueError("from_node must be a member of the container")
+
+        visited: set[UUID] = set()
+        queue = deque([from_node])
+        ns = ns or {}
+
+        while queue:
+            current = queue.popleft()
+            if current.uid in visited:
+                continue
+            visited.add(current.uid)
+
+            if current.uid == sink.uid:
+                return True
+
+            for edge in current.edges_out(Selector(has_kind=TraversableEdge)):
+                destination = edge.successor
+                if destination is None or destination.uid not in allowed:
+                    continue
+                if not edge.available(ns=ns):
+                    continue
+                if not getattr(edge, "satisfied", True):
+                    continue
+                queue.append(destination)
+
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -658,6 +693,8 @@ def validate_traversal_contracts(graph: Graph) -> list[str]:
                 issues.append(
                     f"{node!r}: source {source!r} is not a member/child of container"
                 )
+            if node.sink_id is None:
+                issues.append(f"{node!r}: source_id is set but sink_id is missing")
 
         if node.sink_id is not None:
             if sink is None:
@@ -668,6 +705,8 @@ def validate_traversal_contracts(graph: Graph) -> list[str]:
                 issues.append(
                     f"{node!r}: sink {sink!r} is not a member/child of container"
                 )
+            if node.source_id is None:
+                issues.append(f"{node!r}: sink_id is set but source_id is missing")
 
     return issues
 

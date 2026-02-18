@@ -187,15 +187,11 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
     """Follow the first available auto-triggering PREREQS edge.
 
     Scans edges out from ``caller`` for ``TraversableEdge`` instances with
-    ``entry_phase == PREREQS`` (the v38 equivalent of legacy's
-    ``trigger_phase == PREREQS``).  Returns the first one whose guard
+    ``trigger_phase == PREREQS``. Returns the first one whose guard
     condition passes against the current namespace.
 
-    For v38 MVP, "available" means the edge exists and isn't explicitly
-    disabled.  Full guard/condition evaluation against the namespace is
-    a story-layer concern that can be added by registering a higher-priority
-    handler or by adding an ``available(ns)`` method to a TraversableEdge
-    subclass.
+    For v38 MVP, availability delegates to ``edge.available(ctx=ctx)``
+    (which currently delegates to successor availability).
 
     This handler should fire AFTER ``descend_into_container`` — if the
     cursor is a container, descent takes priority.  We rely on registration
@@ -206,8 +202,8 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
     for edge in caller.edges_out():
         if not isinstance(edge, TraversableEdge):
             continue
-        # Prereq-triggered edges: entry_phase explicitly set to PREREQS
-        # means "follow me automatically on arrival"
+        # trigger_phase controls auto-activation timing.
+        # entry_phase controls where the pipeline starts after taking the edge.
         trigger = getattr(edge, "trigger_phase", None)
         if trigger == ResolutionPhase.PREREQS:
             if edge.successor is not None and edge.available(ctx=ctx):

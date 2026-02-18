@@ -41,11 +41,46 @@ class _MaterializationState:
 class _PrelinkCtx:
     graph: StoryGraph38
     template_registry: TemplateRegistry
+    cursor_id: UUID | None = None
 
-    def get_entity_groups(self):
-        return [self.graph.values()]
+    @property
+    def cursor(self):
+        if self.cursor_id is None:
+            return None
+        return self.graph.get(self.cursor_id)
 
-    def get_template_groups(self):
+    def get_location_entity_groups(self):
+        cursor = self.cursor
+        if cursor is None:
+            return [self.graph.values()]
+
+        groups: list[list[Any]] = []
+        seen_ids: set[UUID] = set()
+
+        def add_group(values):
+            bucket: list[Any] = []
+            for value in values:
+                uid = getattr(value, "uid", None)
+                if uid is None or uid in seen_ids:
+                    continue
+                seen_ids.add(uid)
+                bucket.append(value)
+            if bucket:
+                groups.append(bucket)
+
+        add_group([cursor])
+        if hasattr(cursor, "ancestors"):
+            for ancestor in cursor.ancestors:
+                if hasattr(ancestor, "children"):
+                    add_group(ancestor.children())
+        add_group(self.graph.values())
+        return groups or [list(self.graph.values())]
+
+    def get_template_scope_groups(self):
+        if hasattr(self.graph, "get_template_scope_groups"):
+            groups = self.graph.get_template_scope_groups(self.cursor)
+            if groups:
+                return groups
         return [self.template_registry.values()]
 
 
@@ -58,11 +93,13 @@ class StoryMaterializer38:
         bundle: StoryTemplateBundle,
         story_label: str,
         init_mode: InitMode,
+        world: object | None = None,
     ) -> StoryInitResult:
         graph = StoryGraph38(
             label=story_label,
             locals=dict(bundle.locals),
             factory=bundle.template_registry,
+            world=world,
         )
         report = InitReport(mode=init_mode)
         state = _MaterializationState(graph=graph, bundle=bundle, report=report)
@@ -154,6 +191,8 @@ class StoryMaterializer38:
 
         state.graph.add(entity)
         state.template_to_entity[templ.uid] = entity
+        state.graph.template_by_entity_id[entity.uid] = templ.uid
+        state.graph.template_lineage_by_entity_id[entity.uid] = self._template_lineage_ids(templ)
         state.report.bump_materialized(entity.__class__.__name__)
 
         templ_label = templ.get_label() if hasattr(templ, "get_label") else None
@@ -172,6 +211,18 @@ class StoryMaterializer38:
                     parent_entity.add_child(entity)
 
         return entity
+
+    @staticmethod
+    def _template_lineage_ids(templ: Any) -> list[UUID]:
+        """Return template lineage from nearest scope outward."""
+        lineage: list[UUID] = []
+        current = templ
+        while current is not None:
+            uid = getattr(current, "uid", None)
+            if isinstance(uid, UUID):
+                lineage.append(uid)
+            current = getattr(current, "parent", None)
+        return lineage
 
     def _finalize_scene_contracts(self, *, state: _MaterializationState) -> None:
         for scene in Selector(has_kind=Scene).filter(state.graph.values()):
@@ -322,15 +373,18 @@ class StoryMaterializer38:
                     dep.set_provider(candidate)
 
     def _prelink_all_dependencies(self, *, state: _MaterializationState) -> None:
-        ctx = _PrelinkCtx(graph=state.graph, template_registry=state.bundle.template_registry)
-        resolver = Resolver.from_ctx(ctx)
-
         dependencies = sorted(
             Selector(has_kind=Dependency).filter(state.graph.values()),
             key=self._order_key,
         )
 
         for dep in dependencies:
+            ctx = _PrelinkCtx(
+                graph=state.graph,
+                template_registry=state.bundle.template_registry,
+                cursor_id=dep.predecessor_id,
+            )
+            resolver = Resolver.from_ctx(ctx)
             was_satisfied = dep.satisfied
             resolved = resolver.resolve_dependency(dep, force=False)
 

@@ -12,6 +12,8 @@ from .fabula import (
     World38,
 )
 from .story_graph import StoryGraph38
+from .dispatch import on_journal, story_dispatch
+from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
 
 # Register story-level journal handlers.
 from . import system_handlers  # noqa: F401
@@ -20,6 +22,9 @@ __all__ = [
     "Action",
     "Actor",
     "Block",
+    "ChoiceFragment",
+    "ContentFragment",
+    "Fragment",
     "GraphInitializationError",
     "InitMode",
     "InitReport",
@@ -34,4 +39,7 @@ __all__ = [
     "StoryTemplateBundle",
     "UnresolvedDependency",
     "World38",
+    "on_journal",
+    "story_dispatch",
+    "MediaFragment",
 ]

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from tangl.core38 import Record, Registry
+from tangl.core38 import Entity, Graph, Record, Registry
 
 class OpEnum(Enum):
     CREATE = "create"
@@ -17,9 +17,9 @@ class Event(Record):
 
     operation: OpEnum
 
-    item_id: UUID = None          # entity.uid
-    field: str = None             # entity.locals
-    key: str | int | UUID = None  # entity.locals[foo] or registry.get(key)
+    item_id: UUID | None = None          # entity.uid
+    field: str | None = None             # entity.locals
+    key: str | int | UUID | None = None  # entity.locals[foo] or registry.get(key)
     value: Any = None             # entity.locals[foo] = bar or registry.add(value)
 
     prior_value: Any = None
@@ -27,46 +27,49 @@ class Event(Record):
     def apply(self, registry: Registry) -> None:
         if not isinstance(registry, Registry):
             raise ValueError(f"Invalid registry type {type(registry)} for patch")
-        # should also check called on an unwatched registry
+        item_id = self.item_id
 
-        if self.item_id == registry.uid:
-            item = registry
-        else:
-            item = registry.get(self.item_id)
-
-        # member manipulation
-        if item is registry and self.field is None:
-            match self.operation:
-                case OpEnum.CREATE:
-                    # adding item to registry
-                    # key should be None, value is an entity
-                    registry.add(self.value)
-                case OpEnum.DELETE:
-                    # deleting an item from registry
-                    # key should be UUID, value should be None
-                    registry.remove(self.key)
-                case _:
-                    # registry UPDATE without a field is invalid, READ is irrelevant
-                    raise ValueError(f"Invalid member event {self!r} for registry {registry!r}.")
+        # MVP replay uses entity-level CRUD deltas.
+        if self.operation == OpEnum.CREATE:
+            value = self.value
+            if isinstance(value, dict):
+                value = Entity.structure(value)
+            if not isinstance(value, Entity):
+                raise ValueError("CREATE event requires entity payload")
+            if item_id is not None and value.uid != item_id:
+                raise ValueError("CREATE event item_id does not match payload uid")
+            registry.add(value)
             return
 
-        # unkeyed field manipulation
-        if self.key is None:
-            # unkeyed field manipulation
-            match self.operation:
-                case OpEnum.UPDATE:
-                    setattr(item, self.field, self.value)
-                case OpEnum.DELETE:
-                    # seems unlikely to be used
-                    delattr(item, self.field)
-                case _:
-                    # item CREATE is always an UPDATE, READ is irrelevant
-                    raise ValueError(f"Invalid event {self!r} for entity.")
+        if self.operation == OpEnum.DELETE and item_id is not None and self.field is None:
+            registry.remove(item_id)
             return
 
-        # general case: item.field[key0.key1.key2] = value
-        ...
+        if self.operation == OpEnum.UPDATE and item_id is not None and self.field is None:
+            value = self.value
+            if isinstance(value, dict):
+                value = Entity.structure(value)
+            if not isinstance(value, Entity):
+                raise ValueError("UPDATE event requires entity payload")
+            if value.uid != item_id:
+                raise ValueError("UPDATE event item_id does not match payload uid")
+            # overwrite by uid while preserving key order
+            registry.add(value)
+            return
 
+        # Backward-compatible narrow field update path.
+        if item_id is None:
+            raise ValueError(f"Invalid event {self!r}: missing item_id")
+        item = registry.get(item_id)
+        if item is None:
+            raise ValueError(f"Invalid event {self!r}: target item not found")
+        if self.key is None and self.field is not None:
+            if self.operation == OpEnum.UPDATE:
+                setattr(item, self.field, self.value)
+                return
+            if self.operation == OpEnum.DELETE:
+                delattr(item, self.field)
+                return
         raise ValueError(f"Invalid event {self!r} for item {item!r}.")
 
 
@@ -93,8 +96,14 @@ class Patch(Record):
             raise ValueError("Patch failed!  Invalid final registry state for patch")
         return True
 
-    def apply(self, registry: Registry) -> None:
+    def apply(self, registry: Registry) -> Registry:
         self._validate_registry_pre(registry)
         for event in self.events:
             event.apply(registry)
         self._validate_registry_post(registry)
+        return registry
+
+    def apply_to(self, graph: Graph) -> Graph:
+        """Protocol hook used by replay engines."""
+        self.apply(graph)
+        return graph

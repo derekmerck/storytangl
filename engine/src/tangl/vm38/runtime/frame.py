@@ -148,11 +148,17 @@ class PhaseCtx:
     def get_registries(self) -> list[BehaviorRegistry]:
         """Registries to include in ``chain_execute``.
 
-        Returns the module-level ``vm_dispatch`` registry.  Additional
-        registries (application-level, story-level) can be added by
-        wrapping or extending this context.
+        Always includes the module-level ``vm_dispatch`` registry. If the
+        graph exposes a ``get_authorities()`` hook, those registries are
+        appended in declaration order.
         """
-        return [vm_dispatch]
+        registries: list[BehaviorRegistry] = [vm_dispatch]
+        get_authorities = getattr(self.graph, "get_authorities", None)
+        if callable(get_authorities):
+            for registry in get_authorities() or ():
+                if isinstance(registry, BehaviorRegistry) and registry not in registries:
+                    registries.append(registry)
+        return registries
 
     def get_inline_behaviors(self) -> list[Callable | Behavior]:
         return self.inline_behaviors
@@ -204,22 +210,47 @@ class PhaseCtx:
 
         return self._ns_cache[uid]
 
-    def get_entity_groups(self) -> list[Iterable]:
-        """Entity pools for provisioning, ordered by distance from cursor.
+    def get_location_entity_groups(self) -> list[Iterable]:
+        """Entity pools ordered by runtime location distance from cursor."""
+        cursor = self.cursor
+        if cursor is None:
+            return [self.graph.values()]
 
-        For MVP, returns the entire graph as a single group.  A future
-        version would walk ``cursor.ancestors`` and group each ancestor's
-        satisfied dependencies at increasing distance.
-        """
-        return [self.graph.values()]
+        groups: list[list[Any]] = []
+        seen_ids: set[UUID] = set()
 
-    def get_template_groups(self) -> list[Iterable]:
-        """Template pools for provisioning, ordered by scope distance.
+        def add_group(values: Iterable[Any]) -> None:
+            bucket: list[Any] = []
+            for value in values:
+                uid = getattr(value, "uid", None)
+                if uid is None:
+                    continue
+                if uid in seen_ids:
+                    continue
+                seen_ids.add(uid)
+                bucket.append(value)
+            if bucket:
+                groups.append(bucket)
 
-        By convention, story graphs expose ``graph.factory`` as a template
-        registry-like object. When present, include it as the nearest
-        template pool so PLANNING can resolve CREATE offers.
-        """
+        # Closest scope first: cursor, then each ancestor's child set.
+        add_group([cursor])
+        if hasattr(cursor, "ancestors"):
+            for ancestor in cursor.ancestors:
+                if hasattr(ancestor, "children"):
+                    add_group(ancestor.children())
+
+        # Final fallback group: any remaining graph members.
+        add_group(self.graph.values())
+        return groups or [list(self.graph.values())]
+
+    def get_template_scope_groups(self) -> list[Iterable]:
+        """Template pools ordered by authoring/template scope distance."""
+        get_groups = getattr(self.graph, "get_template_scope_groups", None)
+        if callable(get_groups):
+            groups = list(get_groups(self.cursor) or [])
+            if groups:
+                return groups
+
         factory = getattr(self.graph, "factory", None)
         if factory is None:
             return []
@@ -229,6 +260,13 @@ class PhaseCtx:
 
         return [factory]
 
+    # Backwards-compatible aliases for existing resolver contexts.
+    def get_entity_groups(self) -> list[Iterable]:
+        return self.get_location_entity_groups()
+
+    def get_template_groups(self) -> list[Iterable]:
+        return self.get_template_scope_groups()
+
 
 # ---------------------------------------------------------------------------
 # Frame — the pipeline driver
@@ -236,6 +274,21 @@ class PhaseCtx:
 
 MAX_RESOLVE_DEPTH = 50
 """Safety limit for ``resolve_choice`` to prevent runaway redirect chains."""
+
+
+@dataclass
+class StepTrace:
+    """Replay trace emitted for one completed ``follow_edge`` hop."""
+
+    step: int
+    edge_id: UUID | None
+    cursor_id: UUID
+    entry_phase: ResolutionPhase
+    was_choice: bool
+    state_hash: bytes
+    before_graph: Graph
+    after_graph: Graph
+    call_stack_ids: list[UUID] = field(default_factory=list)
 
 
 @dataclass
@@ -318,8 +371,19 @@ class Frame:
     cursor_trace: list[UUID] = field(default_factory=list)
     """Visited cursor positions for this resolve cycle, in order."""
 
+    last_redirect: dict[str, Any] | None = None
+    """Last redirect record captured during this resolve cycle."""
+
+    redirect_trace: list[dict[str, Any]] = field(default_factory=list)
+    """Ordered redirect records captured during this resolve cycle."""
+
     step_base: int = 0
     """Absolute step offset at frame start (usually ledger.cursor_steps)."""
+
+    step_observer: Callable[[StepTrace], None] | None = None
+    """Optional observer called once for each completed cursor hop."""
+
+    _last_step_trace: StepTrace | None = field(default=None, init=False, repr=False)
 
     _random: Random = field(default_factory=Random)
 
@@ -350,9 +414,74 @@ class Frame:
             random=self._random,
         )
 
+    @staticmethod
+    def _with_step(record: Record, *, step: int) -> Record:
+        """Return a step-annotated record, preserving immutability."""
+        if not hasattr(record, "step"):
+            return record
+        current = getattr(record, "step", None)
+        if isinstance(current, int) and current >= 0:
+            return record
+        if hasattr(record, "evolve"):
+            return record.evolve(step=step)
+        return record
+
+    def _record_redirect(self, *, phase: ResolutionPhase, edge: AnyTraversableEdge) -> None:
+        """Capture minimal redirect observability for service/debug surfaces."""
+        predecessor = getattr(edge, "predecessor", None)
+        successor = getattr(edge, "successor", None)
+        record = {
+            "phase": phase.name.lower(),
+            "edge_id": str(getattr(edge, "uid", "")) or None,
+            "predecessor_id": str(getattr(predecessor, "uid", "")) or None,
+            "successor_id": str(getattr(successor, "uid", "")) or None,
+        }
+        self.last_redirect = record
+        self.redirect_trace.append(record)
+
+    def _snapshot_graph(self) -> Graph:
+        """Create a detached snapshot graph for replay tracing."""
+        return Graph.structure(self.graph.unstructure())
+
+    def _capture_step_trace(
+        self,
+        *,
+        edge: AnyTraversableEdge,
+        entry_phase: ResolutionPhase,
+        was_choice: bool,
+        before_graph: Graph | None,
+    ) -> None:
+        if self.step_observer is None or before_graph is None:
+            self._last_step_trace = None
+            return
+        edge_id = getattr(edge, "uid", None)
+        self._last_step_trace = StepTrace(
+            step=self.step_base + self.cursor_steps,
+            edge_id=edge_id,
+            cursor_id=self.cursor.uid,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            state_hash=self.graph.value_hash(),
+            before_graph=before_graph,
+            after_graph=self._snapshot_graph(),
+        )
+
+    def _emit_step_trace(self) -> None:
+        if self.step_observer is None or self._last_step_trace is None:
+            return
+        trace = self._last_step_trace
+        trace.call_stack_ids = [edge.uid for edge in self.return_stack]
+        self.step_observer(trace)
+        self._last_step_trace = None
+
     # -- Pipeline execution -------------------------------------------------
 
-    def follow_edge(self, edge: AnyTraversableEdge) -> Optional[AnyTraversableEdge]:
+    def follow_edge(
+        self,
+        edge: AnyTraversableEdge,
+        *,
+        was_choice: bool = False,
+    ) -> Optional[AnyTraversableEdge]:
         """Move cursor along ``edge`` and run the phase pipeline.
 
         Returns an edge if PREREQS or POSTREQS produced a redirect, or
@@ -369,6 +498,9 @@ class Frame:
             If VALIDATE fails (the edge is not traversable).
         """
         entry_phase = getattr(edge, "entry_phase", None) or ResolutionPhase.VALIDATE
+        before_graph: Graph | None = None
+        if self.step_observer is not None:
+            before_graph = self._snapshot_graph()
 
         # -- VALIDATE (pre-move) --------------------------------------------
         if entry_phase <= ResolutionPhase.VALIDATE:
@@ -398,6 +530,13 @@ class Frame:
             ctx.current_phase = ResolutionPhase.PREREQS
             prereq_result = do_prereqs(self.cursor, ctx=ctx)
             if prereq_result is not None:
+                self._record_redirect(phase=ResolutionPhase.PREREQS, edge=prereq_result)
+                self._capture_step_trace(
+                    edge=edge,
+                    entry_phase=entry_phase,
+                    was_choice=was_choice,
+                    before_graph=before_graph,
+                )
                 return prereq_result
 
         # -- UPDATE ---------------------------------------------------------
@@ -412,8 +551,12 @@ class Frame:
             if fragments:
                 if isinstance(fragments, Iterable) and not isinstance(fragments, (Record, str, bytes)):
                     for f in fragments:
+                        if isinstance(f, Record):
+                            f = self._with_step(f, step=ctx.step)
                         self.output_stream.append(f)
                 else:
+                    if isinstance(fragments, Record):
+                        fragments = self._with_step(fragments, step=ctx.step)
                     self.output_stream.append(fragments)
 
         # -- FINALIZE -------------------------------------------------------
@@ -421,6 +564,8 @@ class Frame:
             ctx.current_phase = ResolutionPhase.FINALIZE
             patch = do_finalize(self.cursor, ctx=ctx)
             if patch:
+                if isinstance(patch, Record):
+                    patch = self._with_step(patch, step=ctx.step)
                 self.output_stream.append(patch)
 
         # -- POSTREQS -------------------------------------------------------
@@ -428,8 +573,21 @@ class Frame:
             ctx.current_phase = ResolutionPhase.POSTREQS
             postreq_result = do_postreqs(self.cursor, ctx=ctx)
             if postreq_result is not None:
+                self._record_redirect(phase=ResolutionPhase.POSTREQS, edge=postreq_result)
+                self._capture_step_trace(
+                    edge=edge,
+                    entry_phase=entry_phase,
+                    was_choice=was_choice,
+                    before_graph=before_graph,
+                )
                 return postreq_result
 
+        self._capture_step_trace(
+            edge=edge,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
         return None
 
     # -- Choice resolution --------------------------------------------------
@@ -460,6 +618,7 @@ class Frame:
             If the redirect chain exceeds ``max_depth``.
         """
         depth = 0
+        is_choice_edge = True
 
         while edge is not None:
             if depth >= max_depth:
@@ -469,7 +628,7 @@ class Frame:
                 )
 
             current_edge = edge
-            result = self.follow_edge(current_edge)
+            result = self.follow_edge(current_edge, was_choice=is_choice_edge)
             depth += 1
 
             if getattr(current_edge, "return_phase", None) is not None:
@@ -484,6 +643,9 @@ class Frame:
 
             else:
                 edge = None
+
+            self._emit_step_trace()
+            is_choice_edge = False
 
     # -- Direct jump --------------------------------------------------------
 

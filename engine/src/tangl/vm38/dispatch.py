@@ -293,7 +293,12 @@ def on_resolve(func=None, **kwargs):
 
 
 def do_resolve(requirement: Requirement, *, offers: Iterable[ProvisionOffer], ctx):
-    """Execute all ``resolve_req`` handlers and gather results."""
+    """Execute ``resolve_req`` handlers and flatten validated offer overrides.
+
+    Contract:
+    - handler returns ``None`` to keep existing offers unchanged
+    - handler returns ``Iterable[ProvisionOffer]`` to contribute overrides
+    """
     registries = _assemble_registries(ctx)
     receipts = BehaviorRegistry.chain_execute(
         *registries,
@@ -301,7 +306,25 @@ def do_resolve(requirement: Requirement, *, offers: Iterable[ProvisionOffer], ct
         call_kwargs={"caller": requirement, "offers": offers},
         ctx=ctx,
     )
-    return CallReceipt.gather_results(*receipts)
+    results = CallReceipt.gather_results(*receipts)
+    if not results:
+        return None
+
+    from .provision import ProvisionOffer as _ProvisionOffer
+
+    flattened: list[_ProvisionOffer] = []
+    for result in results:
+        if isinstance(result, (str, bytes, dict)) or not isinstance(result, IterableABC):
+            raise TypeError(
+                "resolve_req handlers must return None or Iterable[ProvisionOffer]"
+            )
+        for offer in result:
+            if not isinstance(offer, _ProvisionOffer):
+                raise TypeError(
+                    "resolve_req handlers must return iterables containing only ProvisionOffer"
+                )
+            flattened.append(offer)
+    return flattened
 
 
 # ---------------------------------------------------------------------------
