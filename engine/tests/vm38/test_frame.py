@@ -9,6 +9,7 @@ Organized by concept:
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -120,6 +121,22 @@ class TestPhaseCtx:
         assert vm_dispatch in registries
         assert authority in registries
 
+    def test_location_groups_include_immediate_neighbors_at_distance_zero(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        c = _node(g, label="c")
+        _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        _edge(g, predecessor_id=c.uid, successor_id=a.uid)
+
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid)
+        groups = ctx.get_location_entity_groups()
+        assert groups
+        near_ids = {node.uid for node in groups[0]}
+        assert a.uid in near_ids
+        assert b.uid in near_ids
+        assert c.uid in near_ids
+
 
 class TestFrameRandomDeterminism:
     def test_same_inputs_seed_same_sequence(self) -> None:
@@ -203,6 +220,24 @@ class TestFollowEdge:
         frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
         values = list(frame.output_stream.values())
         assert f1 in values and f2 in values
+
+    def test_journal_mutation_logs_debug_diagnostic(self, caplog: pytest.LogCaptureFixture) -> None:
+        @on_journal
+        def mutate(*, caller, ctx, **kw):
+            if hasattr(caller, "locals"):
+                caller.locals["journal_mark"] = "set"
+            return None
+
+        g, [a, b] = _simple_graph("a", "b")
+        b.locals = {}
+        frame = Frame(graph=g, cursor=a)
+        caplog.set_level(logging.DEBUG, logger="tangl.vm38.runtime.frame")
+
+        frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
+
+        assert any(
+            "JOURNAL mutation detected" in record.message for record in caplog.records
+        )
 
 
 class TestFollowEdgeEntryPhase:
@@ -296,6 +331,49 @@ class TestResolveChoice:
         frame = Frame(graph=g, cursor=a)
         frame.resolve_choice(AnonymousEdge(predecessor=a, successor=b))
         assert frame.cursor is b
+
+    def test_update_ctx_exposes_selected_payload_from_edge(self) -> None:
+        g, [a, b] = _simple_graph("a", "b")
+        captured: list[tuple[object, object]] = []
+
+        @on_update
+        def capture_payload(*, caller, ctx, **kw):
+            if caller is b:
+                captured.append((ctx.selected_edge, ctx.selected_payload))
+            return None
+
+        edge = AnonymousEdge(predecessor=a, successor=b)
+        edge.payload = {"move": "rock"}  # dynamic attribute for anonymous traversal edges
+        frame = Frame(graph=g, cursor=a)
+        frame.resolve_choice(edge)
+
+        assert captured
+        assert captured[-1][0] is edge
+        assert captured[-1][1] == {"move": "rock"}
+        assert frame.selected_payload == {"move": "rock"}
+
+    def test_choice_payload_overrides_and_merges_edge_payload(self) -> None:
+        g, [a, b] = _simple_graph("a", "b")
+        seen: list[object] = []
+
+        @on_update
+        def capture_payload(*, caller, ctx, **kw):
+            if caller is b:
+                seen.append(ctx.selected_payload)
+            return None
+
+        edge = AnonymousEdge(predecessor=a, successor=b)
+        edge.payload = {"move": "knight", "from": "g8", "to": "f6"}
+        frame = Frame(graph=g, cursor=a)
+        frame.resolve_choice(edge, choice_payload={"to": "e7", "capture": "queen"})
+
+        assert seen
+        assert seen[-1] == {
+            "move": "knight",
+            "from": "g8",
+            "to": "e7",
+            "capture": "queen",
+        }
 
     def test_follows_redirect_chain(self) -> None:
         """a→b redirects to c via prereqs."""

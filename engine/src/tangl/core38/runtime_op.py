@@ -1,4 +1,18 @@
 # tangl/core/runtime_op.py
+"""Portable runtime expression wrappers for query, predicate, and effect operations.
+
+The runtime-op family is intentionally small and serializable:
+
+- :class:`RuntimeOp` stores the expression string and exposes eval/exec helpers.
+- :class:`Query` is read-only value computation.
+- :class:`Predicate` is read-only boolean computation.
+- :class:`Effect` is write-oriented namespace mutation.
+
+Notes
+-----
+Execution uses ``safe_builtins`` rather than full Python builtins.
+"""
+
 from __future__ import annotations
 from typing import Any
 
@@ -31,11 +45,8 @@ class RuntimeOp(BaseModel):
         True
         >>> RuntimeOp.all_satisfied_by("abc + 1 == 124", "abc/3 == 41", ns={'abc': 123})
         True
-        >>> RuntimeOp.apply_all("print(f'before: {abc}')", "abc = 456",
-        ...                     "print(f'after: {abc}')", ns={'abc': 123})
-        before: 123
-        after: 456
-        {'abc': 456}
+        >>> RuntimeOp.apply_all("abc = abc + 1", "abc = abc * 2", ns={"abc": 123})
+        {'abc': 248}
     """
     expr: str
 
@@ -53,23 +64,29 @@ class RuntimeOp(BaseModel):
         return ns
 
     def eval(self, ns: StringMap = None) -> Any:
+        """Evaluate this expression and return the result."""
         return self._eval_expr(self.expr, ns)
 
     def exec(self, ns: StringMap = None) -> StringMap:
+        """Execute this statement and return the mutated namespace."""
         return self._exec_expr(self.expr, ns)
 
     def satisfied_by(self, ns: StringMap = None) -> bool:
+        """Evaluate this expression as a truthy/falsey guard."""
         return bool(self.eval(ns))
 
     @classmethod
     def all_satisfied_by(cls, *exprs: str, ns: StringMap = None) -> Any:
+        """Return ``True`` when all expressions evaluate truthy in the same namespace."""
         return all([bool(cls._eval_expr(e, ns)) for e in exprs])
 
     def apply(self, ns: StringMap = None) -> StringMap:
+        """Alias of :meth:`exec` for effect-oriented call sites."""
         return self._exec_expr(self.expr, ns)
 
     @classmethod
     def apply_all(cls, *exprs: str, ns: StringMap = None) -> StringMap:
+        """Execute expressions sequentially against one shared namespace."""
         if ns is None:
             ns = {}
         # want to use a _shared_ default ns for mutation, otherwise default is per call

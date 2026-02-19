@@ -7,7 +7,7 @@ the graph, cursor position and history, return stack, and accumulated output.
 
 from __future__ import annotations
 
-from typing import Optional, Self
+from typing import Any, Optional, Self
 from uuid import UUID
 
 from pydantic import Field
@@ -173,7 +173,7 @@ class Ledger(Entity):
             )
         )
 
-    def resolve_choice(self, edge_id: UUID) -> None:
+    def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
         """Resolve a player choice and sync frame results into ledger state."""
         edge = self.graph.get(edge_id)
         if edge is None:
@@ -182,7 +182,7 @@ class Ledger(Entity):
         frame = self.get_frame()
         if hasattr(frame, "step_observer"):
             frame.step_observer = self._record_step
-        frame.resolve_choice(edge)
+        frame.resolve_choice(edge, choice_payload=choice_payload)
 
         for call_edge in frame.return_stack:
             if call_edge is None:

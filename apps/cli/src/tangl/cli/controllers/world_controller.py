@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from pathlib import Path
 
 from cmd2 import CommandSet, with_argparser, with_default_category
+from tangl.service38 import ServiceOperation38
+from tangl.service38.operations import endpoint_for_operation
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
@@ -17,8 +19,14 @@ class WorldController(CommandSet):
 
     _cmd: StoryTanglCLI
 
+    def _call_service(self, operation: ServiceOperation38, **params):
+        call_operation = getattr(self._cmd, "call_operation", None)
+        if callable(call_operation):
+            return call_operation(operation, **params)
+        return self._cmd.call_endpoint(endpoint_for_operation(operation), **params)
+
     def do_worlds(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
-        worlds = self._cmd.call_endpoint("WorldController.list_worlds")
+        worlds = self._call_service(ServiceOperation38.WORLD_LIST)
         self._cmd.poutput(pformat(worlds))
 
     world_parser = argparse.ArgumentParser()
@@ -26,7 +34,7 @@ class WorldController(CommandSet):
 
     @with_argparser(world_parser)
     def do_world_info(self, args: argparse.Namespace) -> None:
-        info = self._cmd.call_endpoint("WorldController.get_world_info", world_id=args.world)
+        info = self._call_service(ServiceOperation38.WORLD_INFO, world_id=args.world)
         self._cmd.poutput(pformat(info))
 
     script_path_parser = argparse.ArgumentParser()
@@ -37,8 +45,8 @@ class WorldController(CommandSet):
         import yaml
         script_data = yaml.safe_load(args.script_path.read_text())
         from tangl.story.fabula.world import World
-        result = self._cmd.call_endpoint(
-            "WorldController.load_world",
+        result = self._call_service(
+            ServiceOperation38.WORLD_LOAD,
             script_data=script_data,
         )
 

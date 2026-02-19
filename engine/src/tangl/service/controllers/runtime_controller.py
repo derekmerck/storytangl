@@ -207,6 +207,30 @@ class RuntimeController(HasApiEndpoints):
             return data
         return {"fragment_type": "unknown", "content": str(fragment)}
 
+    @staticmethod
+    def _collect_blocker_diagnostics(
+        fragments: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Collect unavailable-choice blocker diagnostics from serialized fragments."""
+        diagnostics: list[dict[str, Any]] = []
+        for fragment in fragments:
+            fragment_type = fragment.get("fragment_type")
+            kind = fragment.get("kind")
+            kind_value = kind.lower() if isinstance(kind, str) else None
+            is_choice = fragment_type == "choice" or kind_value == "choice"
+            if not is_choice:
+                continue
+            if bool(fragment.get("available", True)):
+                continue
+            diagnostics.append(
+                {
+                    "edge_id": fragment.get("edge_id"),
+                    "unavailable_reason": fragment.get("unavailable_reason"),
+                    "blockers": fragment.get("blockers"),
+                }
+            )
+        return diagnostics
+
     def _runtime38_envelope(
         self,
         *,
@@ -214,13 +238,21 @@ class RuntimeController(HasApiEndpoints):
         fragments: list[Any],
         metadata: dict[str, Any] | None = None,
     ) -> RuntimeEnvelope38:
+        serialized_fragments = [
+            self._serialize_vm38_fragment(fragment) for fragment in fragments
+        ]
+        merged_metadata = dict(metadata or {})
+        blockers = self._collect_blocker_diagnostics(serialized_fragments)
+        if blockers:
+            merged_metadata["blockers"] = blockers
+
         return RuntimeEnvelope38(
             cursor_id=ledger.cursor_id,
             step=ledger.step,
-            fragments=[self._serialize_vm38_fragment(fragment) for fragment in fragments],
+            fragments=serialized_fragments,
             last_redirect=ledger.last_redirect,
             redirect_trace=ledger.redirect_trace,
-            metadata=metadata or {},
+            metadata=merged_metadata,
         )
 
     @ApiEndpoint.annotate(
@@ -272,6 +304,7 @@ class RuntimeController(HasApiEndpoints):
         ledger: Ledger,
         frame: Frame,
         choice_id: UUID,
+        choice_payload: Any = None,
     ) -> RuntimeInfo:
         """Resolve a player choice and update the ledger cursor."""
 
@@ -279,6 +312,7 @@ class RuntimeController(HasApiEndpoints):
         if not isinstance(choice, ChoiceEdge):
             raise InvalidOperationError(f"Choice {choice_id} not found")
 
+        _ = choice_payload  # reserved for legacy vm payload support
         frame.resolve_choice(choice)
 
         ledger.cursor_id = frame.cursor_id
@@ -444,10 +478,15 @@ class RuntimeController(HasApiEndpoints):
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
     )
-    def resolve_choice38(self, ledger: Ledger38, choice_id: UUID) -> RuntimeInfo:
+    def resolve_choice38(
+        self,
+        ledger: Ledger38,
+        choice_id: UUID,
+        choice_payload: Any = None,
+    ) -> RuntimeInfo:
         """Resolve one vm38 choice edge and return the latest runtime envelope."""
         before_step = ledger.step
-        ledger.resolve_choice(choice_id)
+        ledger.resolve_choice(choice_id, choice_payload=choice_payload)
         fragments = ledger.get_journal(since_step=max(before_step + 1, 0))
         envelope = self._runtime38_envelope(ledger=ledger, fragments=fragments)
         return RuntimeInfo.ok(
@@ -503,6 +542,7 @@ class RuntimeController(HasApiEndpoints):
             cursor_steps=ledger.cursor_steps,
             journal_size=len(ledger.get_journal()),
             last_redirect=ledger.last_redirect,
+            redirect_trace=ledger.redirect_trace,
         )
 
     @ApiEndpoint.annotate(

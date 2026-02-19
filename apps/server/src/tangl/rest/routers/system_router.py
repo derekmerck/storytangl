@@ -5,18 +5,25 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 
 from tangl.config import settings
-from tangl.rest.dependencies import get_orchestrator
-from tangl.service import Orchestrator
+from tangl.rest.dependencies38 import get_service_gateway38
 from tangl.service.response.info_response.user_info import UserSecret
 from tangl.service.response.info_response import SystemInfo
+from tangl.service38 import ServiceGateway38, ServiceOperation38
 from tangl.utils.hash_secret import key_for_secret
 
 
 router = APIRouter(tags=["System"])
 
 
-def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
-    return orchestrator.execute(endpoint, **params)
+def _call(
+    gateway: ServiceGateway38,
+    operation: ServiceOperation38,
+    /,
+    *,
+    render_profile: str = "raw",
+    **params: Any,
+) -> Any:
+    return gateway.execute(operation, render_profile=render_profile, **params)
 
 
 def _serialize(value: Any) -> Any:
@@ -41,10 +48,17 @@ def _serialize(value: Any) -> Any:
 
 
 @router.get("/info")
-async def get_system_info(orchestrator: Orchestrator = Depends(get_orchestrator)) -> SystemInfo:
+async def get_system_info(
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
+) -> SystemInfo:
     """Return high-level information about the running service."""
 
-    status = _call(orchestrator, "SystemController.get_system_info")
+    status = _call(
+        gateway,
+        ServiceOperation38.SYSTEM_INFO,
+        render_profile=render_profile,
+    )
     if hasattr(status, "guide_url"):
         setattr(status, "guide_url", "/guide")
     elif isinstance(status, dict):
@@ -54,21 +68,34 @@ async def get_system_info(orchestrator: Orchestrator = Depends(get_orchestrator)
 
 @router.get("/worlds")
 async def get_worlds(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> list[dict[str, object]]:
     """List the available worlds registered with the service."""
 
-    return _serialize(_call(orchestrator, "WorldController.list_worlds"))
+    return _serialize(
+        _call(
+            gateway,
+            ServiceOperation38.WORLD_LIST,
+            render_profile=render_profile,
+        )
+    )
 
 
 @router.get("/secret")
 async def get_key_for_secret(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     secret: str = Query(example=settings.client.secret, default=None),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:
     """Encode ``secret`` as an API key for clients."""
 
-    info = _call(orchestrator, "UserController.get_key_for_secret", secret=secret)
+    info = _call(
+        gateway,
+        ServiceOperation38.USER_KEY,
+        render_profile=render_profile,
+        secret=secret,
+    )
     api_key = getattr(info, "api_key", None) or key_for_secret(secret)
     secret_value = getattr(info, "secret", secret)
     # user_id = getattr(info, "user_id", None)

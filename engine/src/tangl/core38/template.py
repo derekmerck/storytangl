@@ -101,17 +101,21 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
     # Excluded from pydantic model_dump; unstructure/structure handles payload explicitly.
 
     def get_label(self):
+        """Return template label, falling back to a payload-derived label."""
         return self.label or f"from-{self.payload.get_label()}"
 
     def get_hashable_content(self):
+        """Use payload constructor-form data as template content identity."""
         return self.payload.unstructure()
 
     @classmethod
     def from_entity(cls, entity: Entity):
+        """Build a template from a deep-evolved payload copy."""
         return cls(payload=entity.evolve())  # holds a clean, deep copy
 
     @classmethod
     def from_data(cls, data: UnstructuredData, default_kind: Type[ET] = None) -> Self:
+        """Build a template from constructor-form payload data."""
         payload_data = dict(data)
         if default_kind is not None:
             payload_data.setdefault('kind', default_kind)
@@ -120,15 +124,19 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
 
     # conflate/delegate identity matching
     def has_kind(self, kind: Type[Entity]) -> bool:
+        """Return ``True`` when kind matches template wrapper or payload kind."""
         return super().has_kind(kind) or self.payload.has_kind(kind)
 
     def has_template_kind(self, kind: Type[Entity]) -> bool:
+        """Return ``True`` when kind matches only the template wrapper kind."""
         return super().has_kind(kind)
 
     def has_payload_kind(self, kind: Type[Entity]) -> bool:
+        """Return ``True`` when kind matches only the payload kind."""
         return self.payload.has_kind(kind)
 
     def has_tags(self, *tags) -> bool:
+        """Match tags against the union of template tags and payload tags."""
         if len(tags) == 0:
             return True
         if len(tags) == 1 and tags[0] is None:
@@ -138,10 +146,15 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         return set(tags).issubset(self.tags.union(self.payload.tags))
 
     def get_identifiers(self) -> set[Identifier]:
+        """Return combined identifier set from template and payload."""
         return super().get_identifiers().union(self.payload.get_identifiers())
 
     # create copies
     def materialize(self, preserve_uid: bool = False, **updates) -> ET:
+        """Materialize a payload copy with optional overrides.
+
+        ``kind`` overrides must narrow (subclass) relative to payload kind.
+        """
         # if preserve_uid is true
         if 'kind' in updates:
             if not issubclass(updates['kind'], self.payload.__class__):
@@ -156,6 +169,7 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
         return self.payload.evolve(**updates)
 
     def unstructure(self) -> UnstructuredData:
+        """Serialize template record data plus explicitly serialized payload."""
         data = super().unstructure()
         # TODO: could use field annotation introspection to discover members and
         #       payload include nested entities and automatically structure/unstructure
@@ -165,11 +179,16 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
 
     @classmethod
     def structure(cls, data: UnstructuredData, _ctx=None) -> Self:
+        """Structure template record data plus structured payload."""
         data = dict(data)
         data['payload'] = Entity.structure(data['payload'], _ctx=_ctx)
         return super().structure(data)
 
     def decompile(self, generify = True) -> UnstructuredData:
+        """Return author-facing payload script data.
+
+        When ``generify`` is true, runtime-only fields in ``NONGENERIC_FIELDS`` are removed.
+        """
         # typically decompile will be used to go back to an author-facing
         # script format, so we want to generify the payload as much as
         # possible by removing irrelevant live instance fields.
@@ -186,6 +205,7 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
 
     @classmethod
     def compile(cls, data: UnstructuredData, _ctx=None) -> Self:
+        """Compile author-facing payload script data into a template record."""
         # Convenience for `structure(payload=<unstructured entity>)`
         return cls.structure({'payload': data}, _ctx=_ctx)
 
@@ -211,18 +231,21 @@ class TemplateRegistry(Registry[EntityTemplate]):
     """
 
     def materialize_one(self, selector: Selector = None, sort_key=None, update: dict = None) -> Optional[ET]:
+        """Materialize the first matching template, or ``None`` when not found."""
         templ = self.find_one(selector=selector, sort_key=sort_key)
         if templ is not None:
             update = update or {}
             return templ.materialize(**update)
 
     def materialize_all(self, selector: Selector = None, sort_key=None) -> Iterator[ET]:
+        """Materialize all matching templates lazily."""
         # If you want to apply an update, do it one at a time.
         templs = self.find_all(selector=selector, sort_key=sort_key)
         return (templ.materialize() for templ in templs)
 
     @classmethod
     def compile(cls, data: list[UnstructuredData], _ctx=None, **kwargs) -> Self:
+        """Compile top-level script list into a flat template registry."""
         # this is 'registry = compile(script)' when script is a list of top-level template groups.
         inst = cls(**kwargs)
         for item in data:
@@ -238,6 +261,7 @@ class TemplateRegistry(Registry[EntityTemplate]):
         return inst
 
     def decompile_all(self, generify = True) -> list[UnstructuredData]:
+        """Decompile top-level template groups into author-facing script data."""
         # this is 'script = decompile(registry)' when script is a list of top-level template groups
         data: list[UnstructuredData] = []
 
@@ -339,6 +363,7 @@ class TemplateGroup(EntityTemplate, HierarchicalGroup):
         yield from _flatten(data)
 
     def decompile(self, generify: bool = True) -> UnstructuredData:
+        """Decompile this group and recursively inline child member script entries."""
         data = super().decompile(generify=generify)
         data['members'] = []
         for member in self.members():
@@ -365,6 +390,7 @@ class Snapshot(EntityTemplate):
     """
 
     def materialize(self, preserve_uid: bool = True, **updates) -> ET:
+        """Materialize exact copy semantics; reject updates and uid replacement flags."""
         if updates:
             raise TypeError("Snapshot does not support updates")
         if not preserve_uid:

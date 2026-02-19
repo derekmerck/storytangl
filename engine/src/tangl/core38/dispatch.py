@@ -1,27 +1,40 @@
 # tangl/core/dispatch.py
 # language=markdown
 """
-Default global-layer behavior registry ('core.dispatch') and decorators ('on_task') and callbacks ('do_task') for global layer hooks:
+Default global dispatch registry and explicit hook pairs for core38 lifecycle events.
+
+Hook pairs are exposed as explicit decorators and runners:
 
 - creation:
-  - create (pre-structuring, data -> data)
-  - init (post-init, item -> None)
-- indexing:
-  - add item  (registry add, reg, item -> None)
-  - get item  (registry get, reg, key -> item)
-  - remove item (registry remove, reg, key -> None)
-- relationships:
-  - link node on edge or group
-  - unlink node from edge or group
+  - ``on_create`` / ``do_create`` (pre-structuring, ``data -> data``)
+  - ``on_init`` / ``do_init`` (post-init, ``caller -> None``)
+- registry indexing:
+  - ``on_add_item`` / ``do_add_item`` (``registry, item -> item``)
+  - ``on_get_item`` / ``do_get_item`` (``registry, item -> item``)
+  - ``on_remove_item`` / ``do_remove_item`` (``registry, item -> None``)
+- graph relationships:
+  - ``on_link`` / ``do_link`` (``caller, node -> None``)
+  - ``on_unlink`` / ``do_unlink`` (``caller, node -> None``)
 
-Passing a _ctx kwarg into any hooked method triggers any registered hooks in the responsible
-dispatch or any dispatch provided by ctx.
+Context contract
+----------------
+Dispatch chaining is driven by the runtime context protocol used by
+:class:`tangl.core38.behavior.BehaviorRegistry`:
 
-Alternatively, using an ambient "ctx.using_ctx()" context manager will passively provide _ctx signals to any method expecting it.
+- ``ctx.get_registries()`` contributes extra registries by layer.
+- ``ctx.get_inline_behaviors()`` contributes one-off callables.
 
-See `Entity.__init__()`, `Registry.add_item()`, etc. for injection examples.
+Callers normally pass ``_ctx`` to hook-aware APIs (for example ``Entity(..., _ctx=ctx)``,
+``Entity.structure(..., _ctx=ctx)``, ``Registry.add(..., _ctx=ctx)``), or rely on ambient
+context via :func:`tangl.core38.ctx.using_ctx`.
 
-See `vm.dispatch`, `story.dispatch`, `service.dispatch`, etc. for examples of other dispatch layers and pre-defined hook points.
+Aggregation contracts
+---------------------
+
+- ``do_create`` folds hook results with :meth:`CallReceipt.merge_results`.
+- ``do_add_item`` and ``do_get_item`` use :meth:`CallReceipt.last_result`.
+- ``do_init``, ``do_remove_item``, ``do_link``, and ``do_unlink`` force receipt
+  evaluation with :meth:`CallReceipt.gather_results`.
 
 Example:
     >>> assert Entity(label="bar").label == "bar"
@@ -79,12 +92,11 @@ dispatch = BehaviorRegistry(label="global_dispatch", default_dispatch_layer=Disp
 # --------------
 
 def on_init(func, **kwargs):
-    # restrict caller type to exact?
-    # registration deco
+    """Register an ``init`` hook on the global dispatch registry."""
     return dispatch.register(func=func, task="init", **kwargs)
 
 def do_init(*, caller: Entity, ctx: RuntimeCtx):
-    # chance to validate in-place
+    """Run ``init`` hooks for a newly constructed caller."""
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'caller': caller},
@@ -94,10 +106,11 @@ def do_init(*, caller: Entity, ctx: RuntimeCtx):
     CallReceipt.gather_results(*receipts)  # force results to evaluate
 
 def on_create(func, **kwargs):
+    """Register a ``create`` hook on the global dispatch registry."""
     return dispatch.register(func=func, task="create", **kwargs)
 
 def do_create(*, data: UnstructuredData, ctx: RuntimeCtx):
-    """Chance to fold in updates to unstructured data/inst kwargs, including the kind-hint"""
+    """Run ``create`` hooks and merge returned mapping updates into structuring input."""
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'data': data},
@@ -112,12 +125,15 @@ def do_create(*, data: UnstructuredData, ctx: RuntimeCtx):
 # --------------
 
 def on_add_item(func, **kwargs):
+    """Register an ``add_item`` hook for registry insertion."""
     return dispatch.register(func=func, task="add_item", **kwargs)
 
 def do_add_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
-    # chance to audit or modify the item _before_ inserting it
-    # todo: do we want to allow this to be mutated or, or is it read only for
-    #       inspection/audit like remove?  can modify on `get` if we need to
+    """Run ``add_item`` hooks and return the final inserted entity.
+
+    The last non-``None`` receipt result wins. If no hook returns a replacement,
+    the original ``item`` is returned.
+    """
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'registry': registry, 'item': item},
@@ -127,10 +143,11 @@ def do_add_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
     return result if result is not None else item
 
 def on_get_item(func, **kwargs):
+    """Register a ``get_item`` hook for registry lookup interception."""
     return dispatch.register(func=func, task="get_item", **kwargs)
 
 def do_get_item(registry: Registry, item: Entity, ctx: RuntimeCtx) -> Entity:
-    # chance to modify or update the requested object before returning it
+    """Run ``get_item`` hooks and return the final fetched entity."""
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'registry': registry, 'item': item},
@@ -140,10 +157,11 @@ def do_get_item(registry: Registry, item: Entity, ctx: RuntimeCtx) -> Entity:
     return result if result is not None else item
 
 def on_remove_item(func, **kwargs):
+    """Register a ``remove_item`` hook for post-removal inspection."""
     return dispatch.register(func=func, task="remove_item", **kwargs)
 
 def do_remove_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
-    # chance to audit the requested object after removal but before discarding it
+    """Run ``remove_item`` hooks after registry removal."""
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'registry': registry, 'item': item},
@@ -155,10 +173,11 @@ def do_remove_item(registry: Registry, item: Entity, ctx: RuntimeCtx):
 # --------------
 
 def on_link(func, **kwargs):
+    """Register a ``link`` hook for graph relationships."""
     return dispatch.register(func=func, task="link", **kwargs)
 
 def do_link(caller: GraphItem, node: Node, ctx: RuntimeCtx):
-    # audit _before_ linking
+    """Run ``link`` hooks for edge endpoint or group membership linking."""
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'caller': caller, 'node': node},
@@ -167,10 +186,11 @@ def do_link(caller: GraphItem, node: Node, ctx: RuntimeCtx):
     CallReceipt.gather_results(*receipts)
 
 def on_unlink(func, **kwargs):
+    """Register an ``unlink`` hook for graph relationship teardown."""
     return dispatch.register(func=func, task="unlink", **kwargs)
 
 def do_unlink(caller: GraphItem, node: Node, ctx: RuntimeCtx):
-    # audit _after_ unlinking (undiscarded, remains in graph)
+    """Run ``unlink`` hooks after edge endpoint or group membership unlinking."""
     receipts = dispatch.execute_all(
         ctx=ctx,
         call_kwargs={'caller': caller, 'node': node},

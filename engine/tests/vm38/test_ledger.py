@@ -190,6 +190,30 @@ class TestLedgerResolveChoice:
         ledger.resolve_choice(edge.uid)
         assert ledger.choice_steps == initial_choice + 1
 
+    def test_resolve_choice_forwards_choice_payload_to_frame(self, monkeypatch) -> None:
+        ledger, [a, b] = _make_ledger("a", "b")
+        edge = list(a.edges_out())[0]
+        captured: dict[str, object] = {}
+
+        class _FrameWithCapture:
+            cursor_steps = 0
+            cursor = b
+            return_stack = []
+            cursor_trace = [b.uid]
+            last_redirect = None
+            redirect_trace = []
+
+            def resolve_choice(self, arg_edge, *, choice_payload=None, **_kwargs) -> None:
+                captured["edge"] = arg_edge
+                captured["choice_payload"] = choice_payload
+
+        monkeypatch.setattr(Ledger, "get_frame", lambda self: _FrameWithCapture())
+        payload = {"move": "knight", "to": "b6"}
+        ledger.resolve_choice(edge.uid, choice_payload=payload)
+
+        assert captured["edge"] is edge
+        assert captured["choice_payload"] == payload
+
     def test_resolve_choice_extends_full_cursor_trace(self) -> None:
         g = Graph()
         a = _node(g, label="a")

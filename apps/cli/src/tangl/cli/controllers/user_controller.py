@@ -6,6 +6,8 @@ from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
 from tangl.service.response import RuntimeInfo
+from tangl.service38 import ServiceOperation38
+from tangl.service38.operations import endpoint_for_operation
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
@@ -17,12 +19,18 @@ class UserController(CommandSet):
 
     _cmd: StoryTanglCLI
 
+    def _call_service(self, operation: ServiceOperation38, **params: Any) -> Any:
+        call_operation = getattr(self._cmd, "call_operation", None)
+        if callable(call_operation):
+            return call_operation(operation, **params)
+        return self._cmd.call_endpoint(endpoint_for_operation(operation), **params)
+
     create_user_parser = argparse.ArgumentParser()
     create_user_parser.add_argument("secret", type=str, help="Secret used to seed the user key")
 
     @with_argparser(create_user_parser)
     def do_create_user(self, args: argparse.Namespace) -> None:
-        result = self._cmd.call_endpoint("UserController.create_user", secret=args.secret)
+        result = self._call_service(ServiceOperation38.USER_CREATE, secret=args.secret)
         user_id: UUID | None = None
         user_obj: object | None = None
 
@@ -45,8 +53,6 @@ class UserController(CommandSet):
 
         if user_id is not None:
             self._cmd.set_user(user_id)
-        if self._cmd.persistence is not None and user_obj is not None:
-            self._cmd.persistence.save(user_obj)
         self._cmd.poutput(f"User created with secret '{args.secret}'.")
         if user_id is not None:
             self._cmd.poutput(f"Active user id: {user_id}")
@@ -85,14 +91,14 @@ class UserController(CommandSet):
         if self._cmd.user_id is None:
             self._cmd.poutput("No active user. Use `user use_user` first.")
             return
-        info = self._cmd.call_endpoint("UserController.update_user", secret=args.secret)
+        info = self._call_service(ServiceOperation38.USER_UPDATE, secret=args.secret)
         self._cmd.poutput(f"Secret updated. API key: {getattr(info, 'api_key', info)}")
 
     def do_user_info(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
         if self._cmd.user_id is None:
             self._cmd.poutput("No active user.")
             return
-        info = self._cmd.call_endpoint("UserController.get_user_info")
+        info = self._call_service(ServiceOperation38.USER_INFO)
         self._render_info(info)
 
     key_parser = argparse.ArgumentParser()
@@ -100,7 +106,7 @@ class UserController(CommandSet):
 
     @with_argparser(key_parser)
     def do_key(self, args: argparse.Namespace) -> None:
-        info = self._cmd.call_endpoint("UserController.get_key_for_secret", secret=args.secret)
+        info = self._call_service(ServiceOperation38.USER_KEY, secret=args.secret)
         api_key = getattr(info, "api_key", None) or info
         self._cmd.poutput(f"API key: {api_key}")
 
@@ -108,7 +114,7 @@ class UserController(CommandSet):
         if self._cmd.user_id is None:
             self._cmd.poutput("No active user.")
             return
-        result = self._cmd.call_endpoint("UserController.drop_user")
+        result = self._call_service(ServiceOperation38.USER_DROP)
         removed_ids: list[UUID] = []
 
         if isinstance(result, RuntimeInfo):

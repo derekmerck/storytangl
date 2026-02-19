@@ -66,6 +66,10 @@ class Record(HasContent, HasOrder, Entity):
     origin_id: Identifier = None
 
     def get_hashable_content(self) -> Any:
+        """Return the primary content field used for content hashing.
+
+        Resolution order is ``content`` then ``payload`` then ``data``.
+        """
         for field_name in ["content", "payload", "data"]:
             if hasattr(self, field_name):
                 return getattr(self, field_name)
@@ -75,6 +79,7 @@ class Record(HasContent, HasOrder, Entity):
     # (uid, label) and use it as the content hash in a pinch.
 
     def origin(self, registry: Registry[ET]) -> ET:
+        """Resolve ``origin_id`` through an explicit registry."""
         return registry.get(self.origin_id)
 
 
@@ -104,19 +109,23 @@ class OrderedRegistry(Registry[OrderedEntity]):
     """
 
     def append(self, record: OrderedEntity) -> None:
+        """Append one ordered entity to the registry."""
         self.add(record)
 
     def extend(self, records: Iterable[OrderedEntity]) -> None:
+        """Append many ordered entities in input order."""
         for record in records:
             self.append(record)
 
     def min_key(self, sort_key: Callable[[OrderedEntity], Any] | None = None) -> Any:
+        """Return minimum member sort key, or ``None`` for an empty registry."""
         if not self.members:
             return None
         key_fn = sort_key or (lambda member: member.sort_key())
         return min(key_fn(member) for member in self.members.values())
 
     def max_key(self, sort_key: Callable[[OrderedEntity], Any] | None = None) -> Any:
+        """Return maximum member sort key, or ``None`` for an empty registry."""
         if not self.members:
             return None
         key_fn = sort_key or (lambda member: member.sort_key())
@@ -159,4 +168,5 @@ class OrderedRegistry(Registry[OrderedEntity]):
         return self.find_all(effective_selector, sort_key=key_fn)
 
     def remove(self, *_args: Any, **_kwargs: Any) -> None:
+        """Disallow removal to preserve append-only history semantics."""
         raise NotImplementedError("Cannot remove records from an OrderedRegistry.")

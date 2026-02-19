@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
+from tangl.service38 import ServiceOperation38
+from tangl.service38.operations import endpoint_for_operation
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI
@@ -15,6 +17,12 @@ class DevController(CommandSet):
     """Development utilities that lean on runtime endpoints."""
 
     _cmd: StoryTanglCLI
+
+    def _call_service(self, operation: ServiceOperation38, **params):
+        call_operation = getattr(self._cmd, "call_operation", None)
+        if callable(call_operation):
+            return call_operation(operation, **params)
+        return self._cmd.call_endpoint(endpoint_for_operation(operation), **params)
 
     node_parser = argparse.ArgumentParser()
     node_parser.add_argument("node_id", type=str, help="Node identifier")
@@ -29,7 +37,7 @@ class DevController(CommandSet):
         except ValueError:
             self._cmd.poutput("Invalid node id.")
             return
-        result = self._cmd.call_endpoint("RuntimeController.jump_to_node", node_id=node_id)
+        result = self._call_service(ServiceOperation38.STORY_JUMP, node_id=node_id)
         fragments = result.get("fragments", []) if isinstance(result, dict) else result
         for fragment in fragments:
             self._cmd.poutput(getattr(fragment, "content", fragment))

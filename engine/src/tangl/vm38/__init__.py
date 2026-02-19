@@ -1,3 +1,41 @@
+"""
+.. currentmodule:: tangl.vm38
+
+Virtual machine mechanisms for phase-driven traversal, provisioning, and replay.
+
+Conceptual layers
+-----------------
+
+1. Resolution runtime
+
+   - :class:`Frame` executes one choice resolution loop.
+   - :class:`Ledger` persists cursor, stack, and replay artifacts across choices.
+   - :class:`ResolutionPhase` defines causal phase ordering.
+
+2. Traversal contracts
+
+   - :class:`TraversableNode` / :class:`TraversableEdge` define cursor movement.
+   - :mod:`tangl.vm38.traversal` provides pure history/call-stack queries.
+
+3. Provisioning
+
+   - :class:`Requirement`, :class:`Dependency`, :class:`Affordance` define frontier
+     constraints.
+   - :class:`Resolver` and provisioners satisfy constraints from
+     entity/template scopes.
+
+4. Replay artifacts
+
+   - :class:`Event`, :class:`Patch`, :class:`StepRecord`,
+     :class:`CheckpointRecord` provide deterministic replay and rollback
+     primitives.
+
+Design intent
+-------------
+`vm38` defines deterministic execution mechanics and contracts while remaining
+policy-agnostic about story/domain semantics, which belong in higher layers.
+"""
+
 # Provides:
 # - stable names for phase bus stages
 from .resolution_phase import ResolutionPhase

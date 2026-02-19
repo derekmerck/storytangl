@@ -45,6 +45,38 @@ def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     return "guard_failed_or_unavailable"
 
 
+def _dependency_blocker(dep: Dependency) -> dict[str, Any]:
+    """Serialize one dependency blocker with standardized resolver diagnostics."""
+    requirement = dep.requirement
+    return {
+        "type": "dependency",
+        "dependency_id": str(dep.uid),
+        "label": dep.get_label(),
+        "hard_requirement": requirement.hard_requirement,
+        "resolution_reason": requirement.resolution_reason,
+        "resolution_meta": requirement.resolution_meta,
+    }
+
+
+def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
+    """Return structured blocker diagnostics for an unavailable choice edge."""
+    if edge.successor is None:
+        return [{"type": "edge", "reason": "missing_successor"}]
+
+    successor = edge.successor
+    blockers = [
+        _dependency_blocker(dep)
+        for dep in successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
+    ]
+    if blockers:
+        return blockers
+
+    if not edge.available(ctx=ctx):
+        return [{"type": "edge", "reason": "guard_failed_or_unavailable"}]
+
+    return []
+
+
 @on_journal
 def render_block(*, caller, ctx, **_kw):
     """Render block content and available choices into story38 fragments."""
@@ -62,6 +94,7 @@ def render_block(*, caller, ctx, **_kw):
 
     for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
         available = edge.available(ctx=ctx)
+        blockers = [] if available else _choice_blockers(edge=edge, ctx=ctx)
         fragments.append(
             ChoiceFragment(
                 edge_id=edge.uid,
@@ -70,6 +103,9 @@ def render_block(*, caller, ctx, **_kw):
                 unavailable_reason=(
                     None if available else _choice_unavailable_reason(edge=edge, ctx=ctx)
                 ),
+                blockers=blockers or None,
+                accepts=(dict(edge.accepts) if isinstance(edge.accepts, dict) else None),
+                ui_hints=(dict(edge.ui_hints) if isinstance(edge.ui_hints, dict) else None),
             )
         )
 

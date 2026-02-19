@@ -15,6 +15,7 @@ import pytest
 
 from tangl.core38 import BehaviorRegistry, Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
 from tangl.vm38.provision import (
+    Affordance,
     Dependency,
     FindProvisioner,
     InlineTemplateProvisioner,
@@ -229,6 +230,28 @@ class TestResolverDependencyResolution:
         assert success is True
         assert dep.requirement.resolved_step == 3
         assert dep.requirement.resolved_cursor_id == node.uid
+
+    def test_resolve_dependency_prefers_linked_affordance_provider(self) -> None:
+        g = Graph()
+        frontier = _node(g, label="frontier")
+        bob = _node(g, label="bob")
+        _ = Affordance(
+            registry=g,
+            label="friend_here",
+            predecessor_id=frontier.uid,
+            successor_id=bob.uid,
+            requirement=Requirement.from_identifier("bob"),
+        )
+        dep = _dependency(
+            g,
+            requirement=Requirement.from_identifier("bob"),
+            predecessor_id=frontier.uid,
+        )
+
+        resolver = Resolver(entity_groups=[])
+        success = resolver.resolve_dependency(dep)
+        assert success is True
+        assert dep.provider is bob
 
     def test_force_fallback_bypasses_requirement_validation(self) -> None:
         class Person(RegistryAware):
