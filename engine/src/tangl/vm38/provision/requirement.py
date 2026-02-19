@@ -172,14 +172,26 @@ class Dependency(Edge, HasRequirement[PT], Generic[PT]):
     # call the on_link hook.
 
 
-    def set_provider(self, value: PT, _ctx=None) -> None:
+    def set_provider(self, value: Optional[PT], _ctx=None) -> None:
         # could just leave successor_id None and defer to provider-id in all cases to
         # entirely avoid syncing concern.  might also make the end-type more clear as
         # the expected provider type.
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
         super().set_provider(value, _ctx=_ctx)
         super().set_successor(value, _ctx=_ctx)
 
-    def set_successor(self, value: PT, _ctx=None) -> None:
+    def set_successor(self, value: Optional[PT], _ctx=None) -> None:
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
         self.set_provider(value, _ctx=_ctx)
 
 
@@ -206,11 +218,23 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
     """
     # another layer of delegators
 
-    def set_provider(self, value: PT, _ctx=None) -> None:
+    def set_provider(self, value: Optional[PT], _ctx=None) -> None:
         """Bind provider and synchronize to ``successor`` (push resource)."""
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
         super().set_provider(value, _ctx=_ctx)
         super().set_successor(value, _ctx=_ctx)
 
-    def set_successor(self, value: PT, _ctx=None) -> None:
+    def set_successor(self, value: Optional[PT], _ctx=None) -> None:
         """Provider alias for ``successor`` on affordance edges."""
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
         self.set_provider(value, _ctx=_ctx)

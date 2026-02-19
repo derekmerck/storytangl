@@ -151,6 +151,19 @@ class TestDependency:
         assert dep.satisfied
         assert dep.provider is provider
 
+    def test_set_provider_none_clears_linked_state(self) -> None:
+        reg = Registry()
+        dep = Dependency(requirement=Requirement(has_identifier="foo"))
+        reg.add(dep)
+        provider = RegistryAware(label="foo")
+        reg.add(provider)
+
+        dep.set_provider(provider)
+        dep.set_provider(None)
+        assert dep.provider is None
+        assert dep.successor is None
+        assert not dep.satisfied
+
 
 # ============================================================================
 # Affordance — push resource
@@ -186,6 +199,19 @@ class TestAffordance:
         aff.set_successor(provider)
         assert aff.satisfied
         assert aff.provider is provider
+
+    def test_set_successor_none_clears_provider(self) -> None:
+        reg = Registry()
+        aff = Affordance(requirement=Requirement(has_identifier="foo"))
+        reg.add(aff)
+        provider = RegistryAware(label="foo")
+        reg.add(provider)
+
+        aff.set_provider(provider)
+        aff.set_successor(None)
+        assert aff.provider is None
+        assert aff.successor is None
+        assert not aff.satisfied
 
     def test_set_predecessor_does_not_bind_provider(self) -> None:
         reg = Registry()

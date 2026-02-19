@@ -214,7 +214,11 @@ class RuntimeController(HasApiEndpoints):
         """Collect unavailable-choice blocker diagnostics from serialized fragments."""
         diagnostics: list[dict[str, Any]] = []
         for fragment in fragments:
-            if fragment.get("fragment_type") != "choice":
+            fragment_type = fragment.get("fragment_type")
+            kind = fragment.get("kind")
+            kind_value = kind.lower() if isinstance(kind, str) else None
+            is_choice = fragment_type == "choice" or kind_value == "choice"
+            if not is_choice:
                 continue
             if bool(fragment.get("available", True)):
                 continue

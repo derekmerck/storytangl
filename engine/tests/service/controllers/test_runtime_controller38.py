@@ -182,3 +182,30 @@ def test_runtime_controller38_envelope_includes_blocker_diagnostics_metadata() -
     )
     assert envelope.metadata["blockers"][0]["unavailable_reason"] == "missing_dependency"
     assert envelope.metadata["blockers"][0]["blockers"] == blockers
+
+
+def test_collect_blocker_diagnostics_accepts_legacy_kind_choice() -> None:
+    blockers = [
+        {
+            "type": "dependency",
+            "resolution_reason": "no_offers",
+            "resolution_meta": {"alternatives": []},
+        }
+    ]
+    fragments = [
+        {
+            "kind": "choice",
+            "edge_id": "edge-1",
+            "available": False,
+            "unavailable_reason": "missing_dependency",
+            "blockers": blockers,
+        }
+    ]
+    diagnostics = RuntimeController._collect_blocker_diagnostics(fragments)
+    assert diagnostics == [
+        {
+            "edge_id": "edge-1",
+            "unavailable_reason": "missing_dependency",
+            "blockers": blockers,
+        }
+    ]

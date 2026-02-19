@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 from typing import Any, Iterable, Optional, Protocol, TypeAlias, Union, Self, runtime_checkable
 from uuid import UUID
 
@@ -27,6 +28,7 @@ from .requirement import Requirement, PT, Dependency, Affordance
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
 TemplateGroup: TypeAlias = Union[EntityGroup, EntityTemplate]
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -176,7 +178,13 @@ class Resolver:
             try:
                 if not requirement.satisfied_by(provider):
                     continue
-            except Exception:
+            except Exception as exc:
+                logger.debug(
+                    "requirement.satisfied_by failed for requirement=%s provider=%s",
+                    requirement,
+                    provider,
+                    exc_info=exc,
+                )
                 continue
             offers.append(
                 ProvisionOffer(
