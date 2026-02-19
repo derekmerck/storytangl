@@ -7,9 +7,9 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
-from tangl.rest.dependencies import get_orchestrator, get_user_locks
-from tangl.service import Orchestrator
+from tangl.rest.dependencies38 import get_service_gateway38, get_user_locks38
 from tangl.service.response import RuntimeInfo
+from tangl.service38 import ServiceGateway38, ServiceOperation38
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret, uuid_for_key
 
@@ -88,28 +88,32 @@ def _extract_choices_from_fragments(fragments: list[Any]) -> list[dict[str, Any]
     return choices
 
 
-def _call(orchestrator: Orchestrator, endpoint: str, /, **params: Any) -> Any:
-    return orchestrator.execute(endpoint, **params)
+def _call(
+    gateway: ServiceGateway38,
+    operation: ServiceOperation38,
+    /,
+    *,
+    render_profile: str = "raw",
+    user_id: UUID | None = None,
+    **params: Any,
+) -> Any:
+    return gateway.execute(
+        operation,
+        user_id=user_id,
+        render_profile=render_profile,
+        **params,
+    )
 
 
 def _runtime_info_payload(
     result: RuntimeInfo,
     *,
-    orchestrator: Orchestrator | None = None,
-    persist_ledger: bool = False,
     flatten_details: bool = False,
 ) -> dict[str, Any]:
-    """Serialize RuntimeInfo with optional ledger persistence."""
+    """Serialize RuntimeInfo into a JSON-safe payload."""
 
     details = dict(result.details or {})
-    ledger_obj = details.pop("ledger", None)
-    if (
-        persist_ledger
-        and ledger_obj is not None
-        and orchestrator is not None
-        and orchestrator.persistence is not None
-    ):
-        orchestrator.persistence.save(ledger_obj)
+    details.pop("ledger", None)
 
     payload: dict[str, Any] = {
         "status": result.status,
@@ -131,21 +135,11 @@ def _runtime_info_payload(
 
 def _extract_story38_envelope(
     result: RuntimeInfo,
-    *,
-    orchestrator: Orchestrator | None = None,
-    persist_ledger: bool = False,
 ) -> dict[str, Any]:
     """Return the vm38 envelope payload from RuntimeInfo."""
 
     details = dict(result.details or {})
-    ledger_obj = details.pop("ledger", None)
-    if (
-        persist_ledger
-        and ledger_obj is not None
-        and orchestrator is not None
-        and orchestrator.persistence is not None
-    ):
-        orchestrator.persistence.save(ledger_obj)
+    details.pop("ledger", None)
 
     envelope = details.get("envelope")
     if not isinstance(envelope, dict):
@@ -157,7 +151,8 @@ def _extract_story38_envelope(
 async def create_story(
     world_id: str = Query(..., description="World template to instantiate"),
     story_label: str | None = Query(None, description="Optional story label"),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     api_key: str = Header(..., alias="X-API-Key"),
 ):
     """Create a new story instance for the authenticated user."""
@@ -166,24 +161,26 @@ async def create_story(
     kwargs: dict[str, Any] = {"world_id": world_id}
     if story_label:
         kwargs["story_label"] = story_label
-    result = _call(orchestrator, "RuntimeController.create_story", user_id=user_id, **kwargs)
+    result = _call(
+        gateway,
+        ServiceOperation38.STORY_CREATE,
+        user_id=user_id,
+        render_profile=render_profile,
+        **kwargs,
+    )
     if isinstance(result, RuntimeInfo):
-        return _runtime_info_payload(
-            result,
-            orchestrator=orchestrator,
-            persist_ledger=True,
-            flatten_details=True,
-        )
+        return _runtime_info_payload(result, flatten_details=True)
     return _serialize(result)
 
 
 # todo: maybe "journal" since update is used as a phase?
 @router.get("/update")
 async def get_story_update(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
     limit: int = Query(default=0, ge=0),
     marker: str | None = Query(
         default=None,
@@ -202,9 +199,10 @@ async def get_story_update(
 
     user_id = uuid_for_key(api_key)
     fragments = _call(
-        orchestrator,
-        "RuntimeController.get_journal_entries",
+        gateway,
+        ServiceOperation38.STORY_UPDATE,
         user_id=user_id,
+        render_profile=render_profile,
         limit=limit,
         marker=marker,
         start_marker=start_marker,
@@ -221,11 +219,12 @@ async def get_story_update(
 @router.post("/do")
 async def do_story_action(
     request: ChoiceRequest = Body(...),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
-    user_locks = Depends(get_user_locks),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    user_locks = Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Resolve a player choice and return the resulting journal fragments."""
 
@@ -237,16 +236,18 @@ async def do_story_action(
 
     async with user_locks[user_id]:
         status = _call(
-            orchestrator,
-            "RuntimeController.resolve_choice",
+            gateway,
+            ServiceOperation38.STORY_DO,
             user_id=user_id,
+            render_profile=render_profile,
             choice_id=choice_id,
         )
 
         fragments = _call(
-            orchestrator,
-            "RuntimeController.get_journal_entries",
+            gateway,
+            ServiceOperation38.STORY_UPDATE,
             user_id=user_id,
+            render_profile=render_profile,
             limit=0,
         )
 
@@ -265,7 +266,8 @@ async def create_story38(
         None,
         description="Initialization mode: MINIMAL or FULLY_SPECIFIED",
     ),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     api_key: str = Header(..., alias="X-API-Key"),
 ) -> dict[str, Any]:
     """Create a vm38/story38 session and return the initial envelope."""
@@ -277,31 +279,29 @@ async def create_story38(
     if init_mode:
         kwargs["init_mode"] = init_mode
 
-    result = _call(orchestrator, "RuntimeController.create_story38", user_id=user_id, **kwargs)
+    result = _call(
+        gateway,
+        ServiceOperation38.STORY38_CREATE,
+        user_id=user_id,
+        render_profile=render_profile,
+        **kwargs,
+    )
     if not isinstance(result, RuntimeInfo):
         return _serialize(result)
 
-    envelope = _extract_story38_envelope(
-        result,
-        orchestrator=orchestrator,
-        persist_ledger=True,
-    )
-    payload = _runtime_info_payload(
-        result,
-        orchestrator=orchestrator,
-        persist_ledger=False,
-        flatten_details=True,
-    )
+    envelope = _extract_story38_envelope(result)
+    payload = _runtime_info_payload(result, flatten_details=True)
     payload["envelope"] = envelope
     return payload
 
 
 @router.get("/story38/update")
 async def get_story_update38(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
     since_step: int | None = Query(
         None,
         description="Inclusive starting step; defaults to 0 (full history).",
@@ -311,10 +311,14 @@ async def get_story_update38(
     """Return vm38 envelope with ordered fragments."""
 
     user_id = uuid_for_key(api_key)
-    kwargs: dict[str, Any] = {"user_id": user_id, "limit": limit}
-    if since_step is not None:
-        kwargs["since_step"] = since_step
-    result = _call(orchestrator, "RuntimeController.get_story_update38", **kwargs)
+    result = _call(
+        gateway,
+        ServiceOperation38.STORY38_UPDATE,
+        user_id=user_id,
+        render_profile=render_profile,
+        limit=limit,
+        **({"since_step": since_step} if since_step is not None else {}),
+    )
 
     if not isinstance(result, RuntimeInfo):
         return _serialize(result)
@@ -324,11 +328,12 @@ async def get_story_update38(
 @router.post("/story38/do")
 async def do_story_action38(
     request: ChoiceRequest = Body(...),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
-    user_locks=Depends(get_user_locks),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict[str, Any]:
     """Resolve a choice and return the vm38 envelope."""
 
@@ -340,9 +345,10 @@ async def do_story_action38(
 
     async with user_locks[user_id]:
         result = _call(
-            orchestrator,
-            "RuntimeController.resolve_choice38",
+            gateway,
+            ServiceOperation38.STORY38_DO,
             user_id=user_id,
+            render_profile=render_profile,
             choice_id=choice_id,
         )
 
@@ -353,15 +359,21 @@ async def do_story_action38(
 
 @router.get("/story38/status")
 async def get_story_status38(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict[str, Any]:
     """Return vm38 runtime status details."""
 
     user_id = uuid_for_key(api_key)
-    result = _call(orchestrator, "RuntimeController.get_story_info38", user_id=user_id)
+    result = _call(
+        gateway,
+        ServiceOperation38.STORY38_STATUS,
+        user_id=user_id,
+        render_profile=render_profile,
+    )
     if isinstance(result, RuntimeInfo):
         return _runtime_info_payload(result, flatten_details=True)
     return _serialize(result)
@@ -369,27 +381,34 @@ async def get_story_status38(
 
 @router.get("/status")
 async def get_story_status(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Return a lightweight summary of the current story state."""
 
     user_id = uuid_for_key(api_key)
     return _serialize(
-        _call(orchestrator, "RuntimeController.get_story_info", user_id=user_id)
+        _call(
+            gateway,
+            ServiceOperation38.STORY_STATUS,
+            user_id=user_id,
+            render_profile=render_profile,
+        )
     )
 
 
 @router.delete("/drop")
 async def reset_story(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
-    user_locks=Depends(get_user_locks),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     archive: bool = Query(default=False, description="Retain the ledger if true."),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """End the user's active story and optionally archive the ledger."""
 
@@ -398,9 +417,10 @@ async def reset_story(
     try:
         async with user_locks[user_id]:
             result = _call(
-                orchestrator,
-                "RuntimeController.drop_story",
+                gateway,
+                ServiceOperation38.STORY_DROP,
                 user_id=user_id,
+                render_profile=render_profile,
                 archive=archive,
             )
     except ValueError as exc:
@@ -420,12 +440,13 @@ async def reset_story(
 
 @router.delete("/story38/drop")
 async def reset_story38(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
-    user_locks=Depends(get_user_locks),
+    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     archive: bool = Query(default=False, description="Retain the ledger if true."),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict[str, Any]:
     """End the active vm38 story and optionally archive the ledger."""
 
@@ -433,9 +454,10 @@ async def reset_story38(
     try:
         async with user_locks[user_id]:
             result = _call(
-                orchestrator,
-                "RuntimeController.drop_story38",
+                gateway,
+                ServiceOperation38.STORY38_DROP,
                 user_id=user_id,
+                render_profile=render_profile,
                 archive=archive,
             )
     except ValueError as exc:

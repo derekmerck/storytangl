@@ -15,6 +15,9 @@ from tangl.service.controllers import (
     UserController as UserServiceController,
     WorldController as WorldServiceController,
 )
+from tangl.service38 import ServiceGateway38, ServiceOperation38, build_service_gateway38
+from tangl.service38.operations import endpoint_for_operation
+
 
 class StoryTanglCLI(cmd2.Cmd):
     """Cmd2 shell that delegates all operations to the orchestrator."""
@@ -22,12 +25,14 @@ class StoryTanglCLI(cmd2.Cmd):
     prompt = "⅁$ "
 
     def __init__(
-            self,
-            orchestrator: Orchestrator,
-            *,
-            user_id: UUID | None = None,
-            ledger_id: UUID | None = None,
-            register_controllers: bool = True,
+        self,
+        orchestrator: Orchestrator,
+        *,
+        service_gateway: ServiceGateway38 | None = None,
+        render_profile: str = "cli_ascii",
+        user_id: UUID | None = None,
+        ledger_id: UUID | None = None,
+        register_controllers: bool = True,
     ) -> None:
         super().__init__(
             allow_cli_args=False,
@@ -35,7 +40,9 @@ class StoryTanglCLI(cmd2.Cmd):
         )
 
         self.orchestrator = orchestrator
+        self.service_gateway = service_gateway
         self.persistence = orchestrator.persistence
+        self.render_profile = render_profile
         self.user_id = user_id
         self.ledger_id = ledger_id
 
@@ -73,14 +80,39 @@ class StoryTanglCLI(cmd2.Cmd):
 
         self.ledger_id = ledger_id
 
-    def call_endpoint(self, endpoint: str, /, **params) -> object:
-        """Execute ``endpoint`` through the orchestrator with implicit context."""
+    def call_operation(self, operation: ServiceOperation38, /, **params) -> object:
+        """Execute ``operation`` with explicit per-request render profile."""
 
         kwargs = dict(params)
         if "user_id" not in kwargs and self.user_id is not None:
             kwargs["user_id"] = self.user_id
         if "ledger_id" not in kwargs and self.ledger_id is not None:
             kwargs["ledger_id"] = self.ledger_id
+
+        if self.service_gateway is not None:
+            return self.service_gateway.execute(
+                operation,
+                render_profile=self.render_profile,
+                **kwargs,
+            )
+
+        endpoint = endpoint_for_operation(operation)
+        return self.orchestrator.execute(endpoint, **kwargs)
+
+    def call_endpoint(self, endpoint: str, /, **params) -> object:
+        """Execute ``endpoint`` directly (legacy helper)."""
+
+        kwargs = dict(params)
+        if "user_id" not in kwargs and self.user_id is not None:
+            kwargs["user_id"] = self.user_id
+        if "ledger_id" not in kwargs and self.ledger_id is not None:
+            kwargs["ledger_id"] = self.ledger_id
+        if self.service_gateway is not None:
+            return self.service_gateway.execute_endpoint(
+                endpoint,
+                render_profile=self.render_profile,
+                **kwargs,
+            )
         return self.orchestrator.execute(endpoint, **kwargs)
 
     def remove_resources(self, identifiers: Iterable[UUID]) -> None:
@@ -107,7 +139,8 @@ def create_cli_app() -> StoryTanglCLI:
         WorldServiceController,
     ):
         orchestrator.register_controller(controller)
-    return StoryTanglCLI(orchestrator=orchestrator)
+    service_gateway = build_service_gateway38(persistence, default_render_profile="cli_ascii")
+    return StoryTanglCLI(orchestrator=orchestrator, service_gateway=service_gateway)
 
 
 __all__ = ["StoryTanglCLI", "create_cli_app"]

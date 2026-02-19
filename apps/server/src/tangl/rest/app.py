@@ -35,26 +35,26 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 
 from tangl.config import settings
-from tangl.rest.dependencies import get_orchestrator
+from tangl.rest.dependencies38 import get_service_gateway38
 from tangl.rest.media_mounts import mount_system_media
-from tangl.service import Orchestrator
 from tangl.service.response import RuntimeInfo
+from tangl.service38 import ServiceGateway38, ServiceOperation38
 
 logger = logging.getLogger(__name__)
 
 
 # todo: this is a placeholder that creates a default user for testing
-def get_user_credentials(orchestrator: Orchestrator) -> UUID:
+def get_user_credentials(gateway: ServiceGateway38) -> UUID:
     secret = settings.client.secret
-    result = orchestrator.execute("UserController.create_user", secret=secret)
-    logger.debug("Created dev user via orchestrator", extra={"user": result})
+    result = gateway.execute(ServiceOperation38.USER_CREATE, secret=secret)
+    logger.debug("Created dev user via service38 gateway", extra={"user": result})
 
     user_id: UUID | None = None
     user_obj = None
 
     if isinstance(result, RuntimeInfo):
         if result.status != "ok":
-            raise RuntimeError("Orchestrator failed to create dev user")
+            raise RuntimeError("Service gateway failed to create dev user")
         details = result.details or {}
         user_obj = details.get("user")
         raw_user_id = details.get("user_id")
@@ -70,20 +70,14 @@ def get_user_credentials(orchestrator: Orchestrator) -> UUID:
         user_id = getattr(result, "uid", None)
 
     if user_id is None:
-        raise RuntimeError("Orchestrator failed to return a user identifier")
+        raise RuntimeError("Service gateway failed to return a user identifier")
 
-    persistence = getattr(orchestrator, "persistence", None)
-    if persistence is not None and user_obj is not None:
-        persistence.save(user_obj)
-    else:
-        logger.warning("Skipping user persistence: orchestrator missing persistence manager")
-
-    info = orchestrator.execute("UserController.get_user_info", user_id=user_id)
+    info = gateway.execute(ServiceOperation38.USER_INFO, user_id=user_id)
     logger.debug("Fetched dev user info", extra={"info": info})
     return user_id
 
 
-get_user_credentials(get_orchestrator())
+get_user_credentials(get_service_gateway38())
 
 app = FastAPI(
     docs_url=None,
