@@ -18,31 +18,30 @@ class ResolutionPhase(IntEnum):
 
     Why
     ----
-    Defines the ordered pipeline for one frame and specifies how to **reduce**
-    the list of :class:`~tangl.core.dispatch.call_receipt.CallReceipt` objects
-    produced during each phase into a single outcome.
+    Defines the ordered pipeline for one frame and the vm38 phase-bus
+    aggregation contracts used by :mod:`tangl.vm38.dispatch`.
 
     Key Features
     ------------
     * **Order** – ``INIT → VALIDATE → PLANNING → PREREQS → UPDATE → JOURNAL → FINALIZE → POSTREQS``.
-    * **Separation of concerns** – planning/journal/finalize have distinct outputs
-      (choices or receipts, fragments, patch), enabling auditing and replay.
+    * **Explicit reduction** – each phase has a concrete aggregated result
+      shape enforced by ``do_*`` dispatch helpers.
 
     Notes
     -----
-    * The *planning* phase typically composes to a
-      :class:`~tangl.vm.planning.PlanningReceipt`.
-    * The *journal* phase composes authored output into :class:`list`\\[:class:`~tangl.core.BaseFragment`] (UX).
-    * The *finalize* phase serializes event‑sourced mutations into a :class:`~tangl.vm.replay.Patch`.
+    * ``PLANNING`` in vm38 is side-effect-only provisioning; handlers must
+      return ``None`` (non-``None`` raises ``TypeError`` in ``do_provision``).
+    * ``JOURNAL`` returns ``Record | Iterable[Record] | None``.
+    * ``FINALIZE`` returns ``Record | None``.
     """
 
     INIT = 0         # Does not run, just indicates not started
     VALIDATE = 10    # check avail new cursor Predicate, return ALL true or None
-    PLANNING = 20    # resolve Dependencies and Affordances; updates graph/data on frontier in place and GATHERS receipts
+    PLANNING = 20    # resolve Dependencies and Affordances; side effects only
     PREREQS = 30     # return ANY (first) avail prereq edge to a provisioned node to break and redirect
-    UPDATE = 40      # mutates graph/data in place and GATHERS receipts
-    JOURNAL = 50     # return PIPES receipts to compose a list of FRAGMENTS
-    FINALIZE = 60    # cleanup, commit events, consume resources, etc.; updates graph/data in place and PIPE receipts to compose a Patch
+    UPDATE = 40      # mutates graph/data in place; handlers return None
+    JOURNAL = 50     # returns Record | Iterable[Record] | None
+    FINALIZE = 60    # returns Record | None
     POSTREQS = 70    # return ANY (first) avail postreq edge to avail, provisioned node to break and redirect
 
     @classmethod
@@ -76,5 +75,4 @@ class ResolutionPhase(IntEnum):
     #         self.POSTREQS: self.PhaseSpec("postreqs", AggregationMode.FIRST, Optional[TraversableEdge]),
     #     }
     #     return phase_specs[self]
-
 

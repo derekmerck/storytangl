@@ -206,7 +206,7 @@ on_gather_ns = _make_on_hook("gather_ns")
 
 Namespace handlers receive ``caller=<ancestor_node>`` and return a dict of
 symbols to contribute.  They are fired once per ancestor in the hierarchy
-walk (from root to node), so a handler registered for a specific caller kind
+walk (from node to root), so a handler registered for a specific caller kind
 only fires when an ancestor of that kind is encountered.
 
 Examples::
@@ -228,8 +228,8 @@ Examples::
 def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
     """Build a scoped namespace by walking the ancestor chain.
 
-    Walks ``node.ancestors`` (which includes ``node`` itself) from root to
-    node.  At each ancestor, fires all ``gather_ns`` handlers with
+    Walks ``node.ancestors`` (which includes ``node`` itself) from node to
+    root.  At each ancestor, fires all ``gather_ns`` handlers with
     ``caller=ancestor``.  Results are merged into a :class:`ChainMap` where
     closer scope (node) overrides more distant scope (root).
 

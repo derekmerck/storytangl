@@ -4,7 +4,7 @@ Organized by concept:
 - Requirement: satisfaction, matching, policy
 - HasRequirement: provider linking
 - Dependency: pull-resource edge, provider syncs successor
-- Affordance: push-resource edge, provider syncs predecessor
+- Affordance: push-resource edge, provider syncs successor
 """
 
 from __future__ import annotations
@@ -164,7 +164,7 @@ class TestAffordance:
         reg.add(aff)
         assert not aff.satisfied
 
-    def test_set_provider_syncs_predecessor(self) -> None:
+    def test_set_provider_syncs_successor(self) -> None:
         reg = Registry()
         aff = Affordance(requirement=Requirement(has_identifier="foo"))
         reg.add(aff)
@@ -174,15 +174,27 @@ class TestAffordance:
         aff.set_provider(provider)
         assert aff.satisfied
         assert aff.provider is provider
-        assert aff.predecessor is provider
+        assert aff.successor is provider
 
-    def test_set_predecessor_syncs_provider(self) -> None:
+    def test_set_successor_syncs_provider(self) -> None:
         reg = Registry()
         aff = Affordance(requirement=Requirement(has_identifier="foo"))
         reg.add(aff)
         provider = RegistryAware(label="foo")
         reg.add(provider)
 
-        aff.set_predecessor(provider)
+        aff.set_successor(provider)
         assert aff.satisfied
         assert aff.provider is provider
+
+    def test_set_predecessor_does_not_bind_provider(self) -> None:
+        reg = Registry()
+        aff = Affordance(requirement=Requirement(has_identifier="foo"))
+        reg.add(aff)
+        frontier = RegistryAware(label="frontier")
+        reg.add(frontier)
+
+        aff.set_predecessor(frontier)
+        assert aff.predecessor is frontier
+        assert aff.provider is None
+        assert not aff.satisfied

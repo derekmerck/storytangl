@@ -238,8 +238,8 @@ class TestResolverDependencyResolution:
         _ = Affordance(
             registry=g,
             label="friend_here",
-            predecessor_id=bob.uid,
-            successor_id=frontier.uid,
+            predecessor_id=frontier.uid,
+            successor_id=bob.uid,
             requirement=Requirement.from_identifier("bob"),
         )
         dep = _dependency(

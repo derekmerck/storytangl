@@ -142,22 +142,20 @@ class Resolver:
 
     @staticmethod
     def _iter_local_affordance_providers(frontier: Node | None) -> Iterable[RegistryAware]:
-        """Yield unique providers from affordance edges already linked to ``frontier``."""
+        """Yield unique providers from affordances pushed out of ``frontier``.
+
+        Contract: frontier is affordance ``predecessor`` and provider/resource is
+        affordance ``successor``.
+        """
         if frontier is None:
             return
 
         seen_ids: set[UUID] = set()
-        for affordance in frontier.edges(Selector(has_kind=Affordance)):
-            provider = affordance.provider
+        for affordance in frontier.edges_out(Selector(has_kind=Affordance)):
+            provider = affordance.successor
             if provider is None:
-                predecessor = affordance.predecessor
-                successor = affordance.successor
-                if predecessor is frontier:
-                    provider = successor
-                elif successor is frontier:
-                    provider = predecessor
-                else:
-                    provider = predecessor or successor
+                # Backward compatibility for stale serialized affordances.
+                provider = affordance.provider
 
             if not isinstance(provider, RegistryAware):
                 continue

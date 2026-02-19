@@ -70,19 +70,23 @@ class Singleton(Entity):
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
+        """Allocate an isolated instance registry for each concrete subclass."""
         super().__init_subclass__(**kwargs)
         cls._instances = Registry()
 
     @classmethod
     def has_instance(cls, label: str) -> bool:
+        """Return whether an instance with ``label`` is registered for this subclass."""
         return label in cls._instances.all_labels()
 
     @classmethod
     def get_instance(cls, label: str) -> Self:
+        """Return the registered instance for ``label``, or ``None`` when missing."""
         return cls._instances.find_one(Selector.from_identifier(label))
 
     @classmethod
     def clear_instances(cls) -> None:
+        """Clear all process-local instances for this subclass."""
         cls._instances.clear()
 
     @model_validator(mode="before")
@@ -101,6 +105,7 @@ class Singleton(Entity):
 
     @is_identifier
     def id_hash(self) -> bytes:
+        """Return identity hash keyed by concrete class and label."""
         return hashing_func(self.__class__, self.label)
 
     def __hash__(self) -> int:
@@ -110,10 +115,12 @@ class Singleton(Entity):
         return self.__class__.get_instance, (self.label,)
 
     def unstructure(self) -> UnstructuredData:
+        """Serialize singleton references by ``kind`` and ``label`` only."""
         return {"kind": self.__class__, "label": self.label}
 
     @classmethod
     def structure(cls, data) -> Self:
+        """Resolve serialized singleton reference back to an existing live instance."""
         cls_ = data.pop("kind", cls)
         if not isclass(cls_):
             raise TypeError(f"Expected {cls_} to be a class")

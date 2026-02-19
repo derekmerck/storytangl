@@ -1,4 +1,17 @@
 # tangl/core/behavior.py
+"""Behavior dispatch primitives and receipt aggregation for core38.
+
+This module provides:
+
+- behavior metadata and invocation wrappers (:class:`Behavior`);
+- registry composition and execution plumbing (:class:`BehaviorRegistry`);
+- execution receipts and aggregation helpers (:class:`CallReceipt`);
+- shared ordering enums (:class:`Priority`, :class:`DispatchLayer`).
+
+Higher layers supply policy by deciding which registries are active in context.
+Core only defines deterministic selection, ordering, and result folding.
+"""
+
 from __future__ import annotations
 import itertools
 from typing import Any, Callable, Protocol, Iterator, Iterable, Self, ClassVar, runtime_checkable, Mapping, Type
@@ -19,6 +32,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 class Priority(IntEnum):
+    """Execution priority within one dispatch layer (lower values run earlier)."""
     FIRST = 0
     EARLY = 25
     NORMAL = 50
@@ -27,6 +41,7 @@ class Priority(IntEnum):
 
 
 class DispatchLayer(IntEnum):
+    """Registry layer ordering used before per-layer priority ordering."""
     # local sorts _later_ in execution priority so it can observe and aggregate globals
     GLOBAL = 0
     SYSTEM = 1
@@ -38,6 +53,7 @@ class DispatchLayer(IntEnum):
 
 @runtime_checkable
 class RuntimeCtx(Protocol):
+    """Minimal context protocol used by behavior execution chains."""
     def get_args(self) -> tuple[Any]: ...
     def get_kwargs(self) -> dict[str, Any]: ...
     def get_selector(self) -> Selector: ...
@@ -103,12 +119,14 @@ class CallReceipt(Record):
 
     @model_validator(mode='after')
     def _either_result_or_cb_specified(self) -> Self:
+        """Require exactly one of ``result`` or ``callback``."""
         value = sum(['callback' in self.model_fields_set, 'result' in self.model_fields_set])
         if value != 1:
             raise ValueError("Exactly one of 'callback' or 'result' should be specified")
         return self
 
     def resolve(self, *args, **kwargs) -> Any:
+        """Resolve deferred callback receipts once and cache the result."""
         if self.result is None and self.callback is not None:
             self.force_set('args', args)  # by-pass frozen
             self.force_set('kwargs', kwargs)
@@ -122,36 +140,42 @@ class CallReceipt(Record):
 
     @classmethod
     def iter_results(cls, *receipts) -> Iterator[Any]:
+        """Yield non-``None`` receipt results in order."""
         return (receipt.result for receipt in receipts if receipt.result is not None)
 
     @classmethod
     def gather_results(cls, *receipts) -> list[Any]:
+        """Collect non-``None`` receipt results in order."""
         return list(cls.iter_results(*receipts))
 
     @classmethod
     def first_result(cls, *receipts: Self):
-        # bool on this is equivalent to _any_ result is true
+        """Return first non-``None`` receipt result, or ``None``."""
         return next(cls.iter_results(*receipts), None)
 
     @classmethod
     def last_result(cls, *receipts: Self):
+        """Return last non-``None`` receipt result, or ``None``."""
         return next(cls.iter_results(*reversed(receipts)), None)
 
     @classmethod
     def all_true(cls, *receipts: Self):
+        """Return ``True`` when all non-``None`` results are truthy."""
         return all([bool(r) for r in cls.iter_results(*receipts)])
 
     @classmethod
     def merge_results(cls, *receipts: Self) -> list[Any] | Mapping[Any, Any]:
+        """Merge homogeneous results (lists/dicts) or return gathered mixed results."""
         results = cls.gather_results(*receipts)
         if all( isinstance(r, list) for r in results ):
             return list( itertools.chain.from_iterable(results) )
         elif all( isinstance(r, dict) for r in results ):
-            return ChainMap(*reversed(results))  # early overrides late in chain map
+            return ChainMap(*reversed(results))  # later dict values override earlier ones
         return results
 
     @classmethod
     def aggregate(cls, mode: AggregationMode, *receipts: Self):
+        """Dispatch aggregation by :class:`AggregationMode`."""
         match mode:
             case AggregationMode.FIRST:
                 return cls.first_result(*receipts)
@@ -197,6 +221,7 @@ class Behavior(RegistryAware, HasOrder, Entity):
     wants_exact_kind: bool = True  # disallow caller-kind subclasses
 
     def caller_kind(self, kind: Type[Entity]) -> bool:
+        """Return whether this behavior accepts a caller of ``kind``."""
         logger.debug("checking caller kind against wants_caller_kind")
         if self.wants_caller_kind is None:
             return True
@@ -208,6 +233,7 @@ class Behavior(RegistryAware, HasOrder, Entity):
         return False
 
     def __call__(self, *args, ctx: RuntimeCtx = None, **kwargs) -> CallReceipt:
+        """Invoke behavior function and return a resolved :class:`CallReceipt`."""
         # todo: could do some introspection here, if the func wants caller, etc., check
         #       for default call args/kwargs in ctx
         return CallReceipt(
@@ -219,6 +245,7 @@ class Behavior(RegistryAware, HasOrder, Entity):
         )
 
     def defer(self, ctx: RuntimeCtx = None) -> CallReceipt:
+        """Return a deferred receipt that resolves the callback later."""
         return CallReceipt(
             origin_id=self.uid,
             ctx=ctx,
@@ -229,9 +256,9 @@ class Behavior(RegistryAware, HasOrder, Entity):
     def sort_key(self):
         """
         Sorts by:
-          - priority: low -> high,
-          - layer: global -> inline
-          - specificity: caller is exact cls -> subclass
+          - layer: global -> local
+          - priority: low -> high
+          - wants_exact_kind: ``False`` then ``True``
           - registration seq: earlier -> later
         """
         return self.dispatch_layer, self.priority, self.wants_exact_kind, self.seq
@@ -258,7 +285,7 @@ class BehaviorRegistry(Registry[Behavior]):
     default_dispatch_layer: DispatchLayer = DispatchLayer.APPLICATION
 
     def register(self, func: Callable, **kwargs) -> Callable:
-        """Decorator to register a behavior"""
+        """Register ``func`` as a :class:`Behavior` and return the original callable."""
         kwargs.setdefault("task", self.default_task)
         kwargs.setdefault("priority", self.default_priority)
         kwargs.setdefault("dispatch_layer", self.default_dispatch_layer)
@@ -269,6 +296,7 @@ class BehaviorRegistry(Registry[Behavior]):
 
     @classmethod
     def _get_receipts(cls, behaviors, *, call_args, call_kwargs, ctx) -> Iterator[CallReceipt]:
+        """Yield receipts for each behavior call with normalized args/kwargs."""
         call_args = call_args or ()
         call_kwargs = call_kwargs or {}
         yield from (b(*call_args, ctx=ctx, **call_kwargs) for b in behaviors)
@@ -333,6 +361,17 @@ class BehaviorRegistry(Registry[Behavior]):
                       selector: Selector = None,
                       inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None
                       ) -> Iterator[CallReceipt]:
+        """Execute behaviors across multiple registries plus context-provided sources.
+
+        Registry sources are assembled in this order:
+
+        1. Explicit ``registries`` arguments.
+        2. ``ctx.get_registries()`` when available.
+        3. Inline callables from ``ctx.get_inline_behaviors()`` and ``inline_behaviors``.
+
+        Registries are deduplicated by object identity, then behaviors are filtered and
+        sorted by :attr:`Behavior.sort_key`.
+        """
 
         assembled_registries = list(registries)
 
