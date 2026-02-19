@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Operation tokens for service38 call sites."""
+
+from __future__ import annotations
 
 from enum import Enum
 

@@ -10,7 +10,8 @@ from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
 from tangl.service.response import InfoModel, RuntimeInfo
 from tangl.service.user.user import User
 from tangl.service38 import Orchestrator38, ServiceOperation38, WritebackMode
-from tangl.service38.hooks import GatewayHooks
+from tangl.service38.gateway import ServiceGateway38
+from tangl.service38.hooks import GatewayHooks, HookPhase
 from tangl.vm import Ledger
 
 
@@ -201,3 +202,57 @@ def test_gateway_hooks_raw_and_html_profiles() -> None:
     assert isinstance(html_result, RuntimeInfo)
     assert html_result.details is not None
     assert "<strong>bold</strong>" in str(html_result.details.get("content"))
+
+
+def test_orchestrator38_postprocessor_none_is_noop() -> None:
+    def noop_postprocessor(_: Any) -> None:
+        return None
+
+    class _WorldController(HasApiEndpoints):
+        @ApiEndpoint.annotate(
+            postprocessors=[noop_postprocessor],
+            response_type=ResponseType.INFO,
+            method_type=MethodType.READ,
+        )
+        def get_world_info(self, world: str) -> WorldInfo:
+            return WorldInfo(world=world)
+
+    orchestrator = Orchestrator38(persistence_manager={})
+    orchestrator.register_controller(_WorldController)
+
+    result = orchestrator.execute("_WorldController.get_world_info", world="demo")
+
+    assert isinstance(result, WorldInfo)
+    assert result.world == "demo"
+
+
+def test_gateway_execute_endpoint_runs_inbound_hooks_for_unmapped_endpoint() -> None:
+    hooks = GatewayHooks()
+    hooks.install_default_hooks()
+
+    @hooks.register_inbound(HookPhase.LATE)
+    def _mark_unmapped_endpoint(
+        params: dict[str, Any],
+        *,
+        operation: ServiceOperation38 | str,
+        **_: Any,
+    ):
+        if isinstance(operation, str) and operation.startswith("endpoint:"):
+            updated = dict(params)
+            updated["world"] = f"hooked:{params.get('world')}"
+            return updated
+        return params
+
+    class _WorldController(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+        def get_world_info(self, world: str) -> WorldInfo:
+            return WorldInfo(world=world)
+
+    orchestrator = Orchestrator38(persistence_manager={})
+    orchestrator.register_controller(_WorldController)
+    gateway = ServiceGateway38(orchestrator, hooks=hooks)
+
+    result = gateway.execute_endpoint("_WorldController.get_world_info", world="demo")
+
+    assert isinstance(result, WorldInfo)
+    assert result.world == "hooked:demo"

@@ -53,9 +53,6 @@ def reset_orchestrator_for_testing() -> None:
     global _orchestrator
     _orchestrator = None
     _user_locks.clear()
-    try:
-        from tangl.rest.dependencies38 import reset_service_gateway38_for_testing
+    from tangl.rest.dependencies38 import reset_service_gateway38_for_testing
 
-        reset_service_gateway38_for_testing()
-    except Exception:  # pragma: no cover - best-effort cross-reset for tests
-        pass
+    reset_service_gateway38_for_testing()

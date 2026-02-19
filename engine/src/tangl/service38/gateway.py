@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Public service38 gateway for operation-token based execution."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -94,10 +94,18 @@ class ServiceGateway38:
     ) -> Any:
         """Execute by endpoint name, internally resolving an operation token."""
 
+        profile = render_profile if render_profile is not None else self.default_render_profile
+
         try:
             operation = operation_for_endpoint(endpoint_name)
         except KeyError:
-            profile = render_profile if render_profile is not None else self.default_render_profile
+            hook_operation = f"endpoint:{endpoint_name}"
+            inbound_params = self.hooks.run_inbound(
+                dict(params),
+                operation=hook_operation,
+                render_profile=profile,
+                user_id=user_id,
+            )
             result = self.orchestrator.execute(
                 endpoint_name,
                 user_id=user_id,
@@ -105,11 +113,11 @@ class ServiceGateway38:
                     writeback_mode=writeback_mode,
                     persist_paths=persist_paths,
                 ),
-                **dict(params),
+                **inbound_params,
             )
-            return result if profile == "raw" else self.hooks.run_outbound(
+            return self.hooks.run_outbound(
                 result,
-                operation=ServiceOperation38.SYSTEM_INFO,
+                operation=hook_operation,
                 render_profile=profile,
                 user_id=user_id,
             )

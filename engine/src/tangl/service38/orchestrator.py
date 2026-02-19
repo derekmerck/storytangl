@@ -260,9 +260,9 @@ class Orchestrator38:
                 continue
 
             if decision is None:
-                result = None
-            else:
-                result = decision
+                continue
+
+            result = decision
 
         return result
 

@@ -1,8 +1,9 @@
-from __future__ import annotations
-
 """Gateway-level inbound/outbound hook registries for service38."""
 
+from __future__ import annotations
+
 from enum import Enum
+import logging
 import re
 from typing import Any, Callable, Iterable
 
@@ -12,6 +13,8 @@ from pydantic import BaseModel
 from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Priority
 
 from .operations import ServiceOperation38
+
+logger = logging.getLogger(__name__)
 
 
 class HookPhase(str, Enum):
@@ -75,7 +78,7 @@ class GatewayHooks:
         self,
         params: dict[str, Any],
         *,
-        operation: ServiceOperation38,
+        operation: ServiceOperation38 | str,
         render_profile: str | Iterable[str] | None,
         user_id: Any,
     ) -> dict[str, Any]:
@@ -103,7 +106,7 @@ class GatewayHooks:
         self,
         result: Any,
         *,
-        operation: ServiceOperation38,
+        operation: ServiceOperation38 | str,
         render_profile: str | Iterable[str] | None,
         user_id: Any,
     ) -> Any:
@@ -128,7 +131,12 @@ class GatewayHooks:
         return current
 
     def install_default_hooks(self) -> None:
-        """Install built-in outbound transforms used by service38."""
+        """Install built-in inbound/outbound hooks for service38.
+
+        Registers ``_normalize_story38_init_mode`` on inbound normal phase and
+        outbound transforms ``_html_transform``, ``_media_url_transform``, and
+        ``_cli_ascii_transform`` on their respective phases.
+        """
 
         @self.register_inbound(HookPhase.NORMAL, priority=Priority.NORMAL)
         def _normalize_story38_init_mode(
@@ -165,14 +173,29 @@ class GatewayHooks:
 
     def _transform_text_fields(self, value: Any, text_transform: Callable[[str], str]) -> Any:
         if isinstance(value, str):
-            return text_transform(value)
+            try:
+                return text_transform(value)
+            except Exception as exc:
+                logger.debug(
+                    "Text transform failed for string value",
+                    exc_info=exc,
+                )
+                return value
         if isinstance(value, list):
             return [self._transform_text_fields(item, text_transform) for item in value]
         if isinstance(value, dict):
             transformed: dict[str, Any] = {}
             for key, item in value.items():
                 if key in {"text", "content"} and isinstance(item, str):
-                    transformed[key] = text_transform(item)
+                    try:
+                        transformed[key] = text_transform(item)
+                    except Exception as exc:
+                        logger.debug(
+                            "Text transform failed for dict field",
+                            extra={"field": key},
+                            exc_info=exc,
+                        )
+                        transformed[key] = item
                 else:
                     transformed[key] = self._transform_text_fields(item, text_transform)
             return transformed
@@ -185,13 +208,21 @@ class GatewayHooks:
         if hasattr(value, "text") and isinstance(getattr(value, "text", None), str):
             try:
                 value.text = text_transform(value.text)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Failed to transform attribute on %s",
+                    type(value).__name__,
+                    exc_info=exc,
+                )
         if hasattr(value, "content") and isinstance(getattr(value, "content", None), str):
             try:
                 value.content = text_transform(value.content)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Failed to transform attribute on %s",
+                    type(value).__name__,
+                    exc_info=exc,
+                )
         return value
 
     def _transform_media_fields(self, value: Any) -> Any:

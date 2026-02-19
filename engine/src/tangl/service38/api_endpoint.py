@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Service38 endpoint metadata and compatibility wrappers."""
+
+from __future__ import annotations
 
 from enum import Enum
 import functools

@@ -25,6 +25,7 @@ Default mounts:
 - media: `/media`
 
 """
+from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
 from uuid import UUID
@@ -47,7 +48,6 @@ logger = logging.getLogger(__name__)
 def get_user_credentials(gateway: ServiceGateway38) -> UUID:
     secret = settings.client.secret
     result = gateway.execute(ServiceOperation38.USER_CREATE, secret=secret)
-    logger.debug("Created dev user via service38 gateway", extra={"user": result})
 
     user_id: UUID | None = None
     user_obj = None
@@ -72,16 +72,24 @@ def get_user_credentials(gateway: ServiceGateway38) -> UUID:
     if user_id is None:
         raise RuntimeError("Service gateway failed to return a user identifier")
 
-    info = gateway.execute(ServiceOperation38.USER_INFO, user_id=user_id)
-    logger.debug("Fetched dev user info", extra={"info": info})
+    logger.debug("Created dev user via service38 gateway", extra={"user_id": str(user_id)})
     return user_id
 
 
-get_user_credentials(get_service_gateway38())
+@asynccontextmanager
+async def _app_lifespan(_: FastAPI):
+    """Run startup initialization for service38-backed REST app."""
+    try:
+        get_user_credentials(get_service_gateway38())
+    except Exception:
+        logger.exception("Failed to initialize dev user credentials during startup")
+        raise
+    yield
 
 app = FastAPI(
     docs_url=None,
-    redoc_url=None
+    redoc_url=None,
+    lifespan=_app_lifespan,
 )
 
 DEFAULT_APP_URL = "localhost:8000"
