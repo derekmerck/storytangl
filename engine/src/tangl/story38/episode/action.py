@@ -12,6 +12,8 @@ class Action(TraversableEdge):
     successor_ref: str | None = None
     activation: str | None = None
     payload: Any = None
+    accepts: dict[str, Any] | None = None
+    ui_hints: dict[str, Any] | None = None
 
     @classmethod
     def trigger_phase_from_activation(cls, activation: str | None) -> ResolutionPhase | None:

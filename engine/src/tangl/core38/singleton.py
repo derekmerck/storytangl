@@ -143,7 +143,7 @@ class InstanceInheritance(Singleton):
         if inherit_from is not None:
             field_names = [
                 field_name
-                for field_name in self.__pydantic_fields__.keys()
+                for field_name in type(self).model_fields.keys()
                 if field_name not in ["uid", "inherit_from", "label", *kwargs.keys()]
                 and not field_name.startswith("_")
             ]

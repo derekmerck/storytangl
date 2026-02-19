@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from typing import Optional
 from uuid import UUID
 
@@ -24,6 +25,9 @@ class ChoiceFragment(Fragment):
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
+    blockers: list[dict[str, Any]] | None = None
+    accepts: dict[str, Any] | None = None
+    ui_hints: dict[str, Any] | None = None
     fragment_type: str = "choice"
 
 

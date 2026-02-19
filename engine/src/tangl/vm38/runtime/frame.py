@@ -33,6 +33,13 @@ If PREREQS or POSTREQS returns an edge, ``follow_edge`` returns it and
 ``resolve_choice`` loops.  Otherwise the pipeline completes and
 ``resolve_choice`` checks the return stack or yields to the caller.
 
+JOURNAL Mutation Policy
+-----------------------
+JOURNAL handlers are expected to primarily emit records. UPDATE/FINALIZE remain
+the canonical mutation phases. If JOURNAL mutates graph state, vm38 logs a
+debug diagnostic so authors can audit and decide whether to move that logic or
+emit explicit annotation records.
+
 See Also
 --------
 :mod:`tangl.vm38.traversable`
@@ -140,6 +147,8 @@ class PhaseCtx:
 
     random: Random = field(default_factory=Random)
     inline_behaviors: list[Callable | Behavior] = field(default_factory=list)
+    incoming_edge: Any | None = None
+    incoming_payload: Any = None
 
     _ns_cache: dict[UUID, ChainMap[str, Any]] = field(default_factory=dict)
 
@@ -165,6 +174,16 @@ class PhaseCtx:
 
     def get_random(self) -> Random:
         return self.random
+
+    @property
+    def selected_edge(self) -> Any | None:
+        """Alias for incoming edge during this pipeline pass."""
+        return self.incoming_edge
+
+    @property
+    def selected_payload(self) -> Any:
+        """Alias for incoming payload during this pipeline pass."""
+        return self.incoming_payload
 
     # -- VM-specific accessors ----------------------------------------------
 
@@ -232,12 +251,22 @@ class PhaseCtx:
             if bucket:
                 groups.append(bucket)
 
-        # Closest scope first: cursor, then each ancestor's child set.
-        add_group([cursor])
+        # Closest scope first: cursor + immediate linked neighbors.
+        near_values: list[Any] = [cursor]
+        if hasattr(cursor, "successors"):
+            near_values.extend(cursor.successors())
+        if hasattr(cursor, "predecessors"):
+            near_values.extend(cursor.predecessors())
+        add_group(near_values)
+
+        # Then each ancestor's child set (template/location neighborhood).
         if hasattr(cursor, "ancestors"):
             for ancestor in cursor.ancestors:
-                if hasattr(ancestor, "children"):
-                    add_group(ancestor.children())
+                children = getattr(ancestor, "children", None)
+                if callable(children):
+                    add_group(children())
+                elif isinstance(children, Iterable):
+                    add_group(children)
 
         # Final fallback group: any remaining graph members.
         add_group(self.graph.values())
@@ -386,6 +415,8 @@ class Frame:
     _last_step_trace: StepTrace | None = field(default=None, init=False, repr=False)
 
     _random: Random = field(default_factory=Random)
+    selected_edge: AnyTraversableEdge | None = None
+    selected_payload: Any = None
 
     def __post_init__(self) -> None:
         """Seed RNG deterministically from graph state + cursor + starting step."""
@@ -400,7 +431,12 @@ class Frame:
 
     # -- Context factory ----------------------------------------------------
 
-    def _make_ctx(self) -> PhaseCtx:
+    def _make_ctx(
+        self,
+        *,
+        incoming_edge: AnyTraversableEdge | None = None,
+        incoming_payload: Any = None,
+    ) -> PhaseCtx:
         """Build a fresh PhaseCtx for the current cursor position.
 
         A new context is created for each ``follow_edge`` call because the
@@ -412,7 +448,24 @@ class Frame:
             cursor_id=self.cursor.uid,
             step=self.step_base + self.cursor_steps,
             random=self._random,
+            incoming_edge=incoming_edge,
+            incoming_payload=incoming_payload,
         )
+
+    @staticmethod
+    def _resolve_incoming_payload(
+        edge: AnyTraversableEdge,
+        override: Any = None,
+    ) -> Any:
+        """Build effective incoming payload for the current traversal hop."""
+        edge_payload = getattr(edge, "payload", None)
+        if override is None:
+            return edge_payload
+        if isinstance(edge_payload, Mapping) and isinstance(override, Mapping):
+            merged = dict(edge_payload)
+            merged.update(override)
+            return merged
+        return override
 
     @staticmethod
     def _with_step(record: Record, *, step: int) -> Record:
@@ -481,6 +534,7 @@ class Frame:
         edge: AnyTraversableEdge,
         *,
         was_choice: bool = False,
+        selected_payload_override: Any = None,
     ) -> Optional[AnyTraversableEdge]:
         """Move cursor along ``edge`` and run the phase pipeline.
 
@@ -498,13 +552,20 @@ class Frame:
             If VALIDATE fails (the edge is not traversable).
         """
         entry_phase = getattr(edge, "entry_phase", None) or ResolutionPhase.VALIDATE
+        incoming_payload = self._resolve_incoming_payload(edge, selected_payload_override)
+        self.selected_edge = edge
+        self.selected_payload = incoming_payload
+
         before_graph: Graph | None = None
         if self.step_observer is not None:
             before_graph = self._snapshot_graph()
 
         # -- VALIDATE (pre-move) --------------------------------------------
         if entry_phase <= ResolutionPhase.VALIDATE:
-            pre_ctx = self._make_ctx()
+            pre_ctx = self._make_ctx(
+                incoming_edge=edge,
+                incoming_payload=incoming_payload,
+            )
             pre_ctx.current_phase = ResolutionPhase.VALIDATE
             if not do_validate(edge, ctx=pre_ctx):
                 raise ValueError(f"Edge validation failed: {edge!r}")
@@ -515,7 +576,10 @@ class Frame:
         self.cursor_trace.append(self.cursor.uid)
 
         # -- Build context at new position ----------------------------------
-        ctx = self._make_ctx()
+        ctx = self._make_ctx(
+            incoming_edge=edge,
+            incoming_payload=incoming_payload,
+        )
 
         # -- PLANNING -------------------------------------------------------
         if entry_phase <= ResolutionPhase.PLANNING:
@@ -547,6 +611,7 @@ class Frame:
         # -- JOURNAL --------------------------------------------------------
         if entry_phase <= ResolutionPhase.JOURNAL:
             ctx.current_phase = ResolutionPhase.JOURNAL
+            journal_hash_before = self.graph.value_hash()
             fragments = do_journal(self.cursor, ctx=ctx)
             if fragments:
                 if isinstance(fragments, Iterable) and not isinstance(fragments, (Record, str, bytes)):
@@ -558,6 +623,15 @@ class Frame:
                     if isinstance(fragments, Record):
                         fragments = self._with_step(fragments, step=ctx.step)
                     self.output_stream.append(fragments)
+            if logger.isEnabledFor(logging.DEBUG):
+                journal_hash_after = self.graph.value_hash()
+                if journal_hash_after != journal_hash_before:
+                    logger.debug(
+                        "JOURNAL mutation detected at step=%s cursor_id=%s; "
+                        "prefer UPDATE/FINALIZE for state mutation or emit annotation records",
+                        ctx.step,
+                        self.cursor.uid,
+                    )
 
         # -- FINALIZE -------------------------------------------------------
         if entry_phase <= ResolutionPhase.FINALIZE:
@@ -592,7 +666,13 @@ class Frame:
 
     # -- Choice resolution --------------------------------------------------
 
-    def resolve_choice(self, edge: AnyTraversableEdge, *, max_depth: int = MAX_RESOLVE_DEPTH):
+    def resolve_choice(
+        self,
+        edge: AnyTraversableEdge,
+        *,
+        max_depth: int = MAX_RESOLVE_DEPTH,
+        choice_payload: Any = None,
+    ):
         """Follow edges until the pipeline blocks or the return stack empties.
 
         This is the main entry point called by the Ledger.  It loops:
@@ -628,7 +708,12 @@ class Frame:
                 )
 
             current_edge = edge
-            result = self.follow_edge(current_edge, was_choice=is_choice_edge)
+            payload_override = choice_payload if is_choice_edge else None
+            result = self.follow_edge(
+                current_edge,
+                was_choice=is_choice_edge,
+                selected_payload_override=payload_override,
+            )
             depth += 1
 
             if getattr(current_edge, "return_phase", None) is not None:

@@ -9,7 +9,7 @@ from tangl.core38.runtime_op import Predicate
 from tangl.story38.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.story38.episode import Action, Block
 from tangl.story38.system_handlers import render_block
-from tangl.vm38 import Dependency
+from tangl.vm38 import Dependency, Requirement
 
 
 def _ctx_with_ns(ns: dict[str, object] | None = None) -> SimpleNamespace:
@@ -47,6 +47,7 @@ def test_render_block_choice_unavailable_reason_missing_successor() -> None:
     choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
     assert choice.available is False
     assert choice.unavailable_reason == "missing_successor"
+    assert choice.blockers == [{"type": "edge", "reason": "missing_successor"}]
 
 
 def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
@@ -56,13 +57,20 @@ def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
     graph.add(start)
     graph.add(locked)
     graph.add(Action(predecessor_id=start.uid, successor_id=locked.uid, text="Try door"))
-    graph.add(Dependency(predecessor_id=locked.uid, requirement={"has_label": "key"}))
+    requirement = Requirement(has_label="key")
+    requirement.resolution_reason = "no_offers"
+    requirement.resolution_meta = {"alternatives": []}
+    graph.add(Dependency(predecessor_id=locked.uid, requirement=requirement))
 
     fragments = render_block(caller=start, ctx=_ctx_with_ns())
     assert fragments is not None
     choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
     assert choice.available is False
     assert choice.unavailable_reason == "missing_dependency"
+    assert choice.blockers is not None
+    assert choice.blockers[0]["type"] == "dependency"
+    assert choice.blockers[0]["resolution_reason"] == "no_offers"
+    assert choice.blockers[0]["resolution_meta"] == {"alternatives": []}
 
 
 def test_render_block_choice_unavailable_reason_guard_failed() -> None:
@@ -78,3 +86,26 @@ def test_render_block_choice_unavailable_reason_guard_failed() -> None:
     choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
     assert choice.available is False
     assert choice.unavailable_reason == "guard_failed_or_unavailable"
+
+
+def test_render_block_emits_choice_payload_accepts_and_ui_hints() -> None:
+    graph = Graph()
+    start = Block(label="start")
+    end = Block(label="end")
+    graph.add(start)
+    graph.add(end)
+    graph.add(
+        Action(
+            predecessor_id=start.uid,
+            successor_id=end.uid,
+            text="Pick a color",
+            accepts={"type": "string", "enum": ["red", "blue", "green"]},
+            ui_hints={"widget": "select", "framework": "vuetify"},
+        )
+    )
+
+    fragments = render_block(caller=start, ctx=_ctx_with_ns())
+    assert fragments is not None
+    choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
+    assert choice.accepts == {"type": "string", "enum": ["red", "blue", "green"]}
+    assert choice.ui_hints == {"widget": "select", "framework": "vuetify"}

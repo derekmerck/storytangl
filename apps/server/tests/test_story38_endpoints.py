@@ -12,6 +12,7 @@ from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_tes
 from tangl.service.user.user import User
 from tangl.story38.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
+from tangl.vm38.runtime.ledger import Ledger as Ledger38
 
 
 def _write_story38_bundle(root: Path) -> str:
@@ -73,7 +74,10 @@ def story38_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, s
         reset_orchestrator_for_testing()
 
 
-def test_story38_rest_envelope_flow(story38_client: tuple[TestClient, dict[str, str], str]) -> None:
+def test_story38_rest_envelope_flow(
+    story38_client: tuple[TestClient, dict[str, str], str],
+    monkeypatch,
+) -> None:
     client, headers, world_label = story38_client
 
     create = client.post(
@@ -104,11 +108,28 @@ def test_story38_rest_envelope_flow(story38_client: tuple[TestClient, dict[str, 
     envelope = update.json()
     assert isinstance(envelope.get("fragments"), list)
 
-    do = client.post("story/story38/do", json={"uid": choice_id}, headers=headers)
+    captured: dict[str, object] = {}
+    original_resolve = Ledger38.resolve_choice
+
+    def _capture_resolve(self, edge_id, *, choice_payload=None):
+        captured["edge_id"] = edge_id
+        captured["choice_payload"] = choice_payload
+        return original_resolve(self, edge_id, choice_payload=choice_payload)
+
+    monkeypatch.setattr(Ledger38, "resolve_choice", _capture_resolve)
+
+    payload = {"move": "knight", "to": "b6"}
+    do = client.post(
+        "story/story38/do",
+        json={"uid": choice_id, "payload": payload},
+        headers=headers,
+    )
     assert do.status_code == 200
     post_do_envelope = do.json()
     assert isinstance(post_do_envelope.get("fragments"), list)
     assert post_do_envelope.get("step", 0) >= envelope.get("step", 0)
+    assert captured.get("edge_id") == choice.uid
+    assert captured.get("choice_payload") == payload
 
     status = client.get("story/story38/status", headers=headers)
     assert status.status_code == 200

@@ -6,6 +6,7 @@ from tangl.core38 import (
     Edge,
     EntityGroup,
     EntityTemplate,
+    Priority,
     RegistryAware,
     resolve_ctx,
     Node,
@@ -21,7 +22,7 @@ from .provisioner import (
     ProvisionPolicy,
 )
 from .matching import annotate_offer_specificity, summarize_offer
-from .requirement import Requirement, PT, Dependency
+from .requirement import Requirement, PT, Dependency, Affordance
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
@@ -93,13 +94,10 @@ class Resolver:
         requirement: Requirement[PT],
         *,
         force: bool = False,
+        preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> list[ProvisionOffer]:
-
-        # todo: need an AffordanceProvider that can satisfy requirements with
-        #       an already linked affordance edge on this node
-
-        offers: list[ProvisionOffer] = []
+        offers: list[ProvisionOffer] = list(preferred_offers or [])
 
         # If there are more than 20 groups, the distance-based priorities will slip
         # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
@@ -142,16 +140,74 @@ class Resolver:
         offers.sort(key=lambda v: v.sort_key())
         return offers
 
+    @staticmethod
+    def _iter_local_affordance_providers(frontier: Node | None) -> Iterable[RegistryAware]:
+        """Yield unique providers from affordance edges already linked to ``frontier``."""
+        if frontier is None:
+            return
+
+        seen_ids: set[UUID] = set()
+        for affordance in frontier.edges(Selector(has_kind=Affordance)):
+            provider = affordance.provider
+            if provider is None:
+                predecessor = affordance.predecessor
+                successor = affordance.successor
+                if predecessor is frontier:
+                    provider = successor
+                elif successor is frontier:
+                    provider = predecessor
+                else:
+                    provider = predecessor or successor
+
+            if not isinstance(provider, RegistryAware):
+                continue
+            if provider.uid in seen_ids:
+                continue
+            seen_ids.add(provider.uid)
+            yield provider
+
+    def _linked_affordance_offers(
+        self,
+        *,
+        requirement: Requirement[PT],
+        frontier: Node | None,
+    ) -> list[ProvisionOffer]:
+        """Build EXISTING offers from already-linked local affordance providers."""
+        offers: list[ProvisionOffer] = []
+        for provider in self._iter_local_affordance_providers(frontier):
+            try:
+                if not requirement.satisfied_by(provider):
+                    continue
+            except Exception:
+                continue
+            offers.append(
+                ProvisionOffer(
+                    origin_id="LinkedAffordance",
+                    policy=ProvisionPolicy.EXISTING,
+                    priority=Priority.EARLY,
+                    distance_from_caller=0,
+                    candidate=provider,
+                    callback=lambda *_, _provider=provider, **__: _provider,
+                )
+            )
+        return offers
+
     def resolve_requirement(
         self,
         requirement: Requirement[PT],
         *,
         force: bool = False,
+        preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> Optional[PT]:
         # updates requirement in place, returns provider to allow linking at dependency level
 
-        offers = self.gather_offers(requirement, force=force, _ctx=_ctx)
+        offers = self.gather_offers(
+            requirement,
+            force=force,
+            preferred_offers=preferred_offers,
+            _ctx=_ctx,
+        )
 
         if len(offers) == 0:
             # No valid offers available
@@ -193,10 +249,15 @@ class Resolver:
         return provider
 
     def resolve_dependency(self, dependency: Dependency[PT], *, force: bool = False, _ctx=None) -> bool:
+        preferred_offers = self._linked_affordance_offers(
+            requirement=dependency.requirement,
+            frontier=dependency.predecessor,
+        )
 
         provider = self.resolve_requirement(
             requirement=dependency.requirement,
             force=force,
+            preferred_offers=preferred_offers,
             _ctx=_ctx,
         )
         if provider is not None:
@@ -230,15 +291,12 @@ class Resolver:
             except ValueError:
                 dependency.requirement.resolution_reason = "provider_rejected"
                 return False
-            dependency.requirement.resolution_reason = "resolved"
+            if dependency.requirement.resolution_reason is None:
+                dependency.requirement.resolution_reason = "resolved"
             return True
         return False
 
     def resolve_frontier_node(self, node: Node, *, force: bool = False, _ctx=None) -> bool:
-
-        # todo: need to link any available affordances first, then use an affordance
-        #       provider to provide very cheap provision offers?
-
         # Note this is not unsatisfied deps, it's anyone without a provider
         # satisfied could mean not a hard req
         open_deps = node.edges_out(Selector(has_kind=Dependency, provider=None))

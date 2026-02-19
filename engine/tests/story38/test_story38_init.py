@@ -179,6 +179,56 @@ def test_static_cyoa_traversal_needs_no_runtime_provisioning() -> None:
     assert ledger.cursor.label == "middle"
 
 
+def test_action_payload_is_materialized_from_script() -> None:
+    script = _base_script()
+    script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["payload"] = {
+        "move": "rock",
+        "weight": 1,
+    }
+    script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["accepts"] = {
+        "type": "object",
+        "properties": {
+            "move": {"type": "string", "enum": ["rock", "paper", "scissors"]},
+        },
+        "required": ["move"],
+    }
+    script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["ui_hints"] = {
+        "widget": "radio",
+        "framework": "wx",
+    }
+
+    world = World38.from_script_data(script_data=script)
+    result = world.create_story("payload_story", init_mode=InitMode.FULLY_SPECIFIED)
+    start = result.graph.get(result.graph.initial_cursor_id)
+    assert isinstance(start, Block)
+    action = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
+    assert action.payload == {"move": "rock", "weight": 1}
+    assert action.accepts is not None
+    assert action.accepts["type"] == "object"
+    assert action.accepts["properties"]["move"]["enum"] == ["rock", "paper", "scissors"]
+    assert action.ui_hints == {"widget": "radio", "framework": "wx"}
+
+
+def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
+    script = _base_script()
+    script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["payload_schema"] = {
+        "type": "string",
+        "enum": ["red", "blue"],
+    }
+    script["scenes"]["intro"]["blocks"]["start"]["actions"][0]["presentation_hints"] = {
+        "style_tags": ["choice", "inline"],
+        "widget": "chips",
+    }
+
+    world = World38.from_script_data(script_data=script)
+    result = world.create_story("payload_alias_story", init_mode=InitMode.FULLY_SPECIFIED)
+    start = result.graph.get(result.graph.initial_cursor_id)
+    assert isinstance(start, Block)
+    action = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
+    assert action.accepts == {"type": "string", "enum": ["red", "blue"]}
+    assert action.ui_hints == {"style_tags": ["choice", "inline"], "widget": "chips"}
+
+
 def test_loader_compiler_runtime_38_path(tmp_path: Path) -> None:
     world_root = tmp_path / "loader_world"
     world_root.mkdir()

@@ -186,7 +186,7 @@ class BaseModelPlus(BaseModel):
                     return False
             return True
 
-        for name, info in cls.__pydantic_fields__.items():
+        for name, info in cls.model_fields.items():
             if _field_matches(info):
                 yield name
 

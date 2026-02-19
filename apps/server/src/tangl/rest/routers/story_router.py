@@ -19,6 +19,7 @@ class ChoiceRequest(BaseModel):
 
     choice_id: UUID | None = None
     uid: UUID | None = None
+    payload: Any = None
 
     def resolve_choice_id(self) -> UUID:
         if self.choice_id is not None:
@@ -241,6 +242,7 @@ async def do_story_action(
             user_id=user_id,
             render_profile=render_profile,
             choice_id=choice_id,
+            choice_payload=request.payload,
         )
 
         fragments = _call(
@@ -350,6 +352,7 @@ async def do_story_action38(
             user_id=user_id,
             render_profile=render_profile,
             choice_id=choice_id,
+            choice_payload=request.payload,
         )
 
     if not isinstance(result, RuntimeInfo):

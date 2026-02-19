@@ -307,6 +307,14 @@ class StoryMaterializer38:
                 text=self._coerce_str(spec.get("text")) or "",
                 successor_ref=successor_ref,
                 activation=activation,
+                payload=spec.get("payload"),
+                accepts=spec.get("accepts") or spec.get("payload_schema"),
+                ui_hints=(
+                    spec.get("ui_hints")
+                    or spec.get("ui_hint")
+                    or spec.get("hints")
+                    or spec.get("presentation_hints")
+                ),
                 trigger_phase=trigger_phase,
             )
 
