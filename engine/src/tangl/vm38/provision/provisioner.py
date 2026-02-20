@@ -1,7 +1,8 @@
 from __future__ import annotations
 from enum import Flag, auto
-from typing import Any, ClassVar, Callable, Protocol, Iterable, Iterator, TYPE_CHECKING
+from typing import Any, ClassVar, Callable, Protocol, Iterable, Iterator, TYPE_CHECKING, Mapping
 from dataclasses import dataclass
+from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, SkipValidation
 
@@ -63,6 +64,17 @@ class Provisioner(Protocol):
         ...
 
 
+def _next_provision_uid(*, _ctx: Any = None) -> UUID:
+    """Return a deterministic uid when vm context RNG is available."""
+    if _ctx is not None:
+        get_random = getattr(_ctx, "get_random", None)
+        if callable(get_random):
+            rng = get_random()
+            if hasattr(rng, "getrandbits"):
+                return UUID(int=rng.getrandbits(128), version=4)
+    return uuid4()
+
+
 @dataclass
 class FindProvisioner:
 
@@ -109,7 +121,9 @@ class TemplateProvisioner:
                 priority = Priority.NORMAL,
                 distance_from_caller=self.distance,
                 candidate=c,
-                callback = c.materialize
+                callback = lambda *_, _c=c, **kwargs: _c.materialize(
+                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx"))
+                ),
             )
 
     # Not sure what affordance providers look like in template form?
@@ -124,7 +138,9 @@ class InlineTemplateProvisioner:
             return [ProvisionOffer(
                 origin_id=requirement.fallback_templ.get_label(),
                 policy=ProvisionPolicy.CREATE,
-                callback=requirement.fallback_templ.materialize,
+                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: _t.materialize(
+                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx"))
+                ),
                 priority=Priority.LATE,
                 distance_from_caller=0,
                 candidate=requirement.fallback_templ,
@@ -209,31 +225,236 @@ class TokenProvisioner:
             )
 
 
-class CloneProvisioner:
+class UpdateCloneProvisioner:
+    """Synthesizes deferred UPDATE/CLONE offers from selected FIND/CREATE offers.
+
+    This provisioner never executes upstream callbacks while constructing offers.
+    It selects the best FIND and CREATE candidates by sort key and emits deferred
+    composite callbacks that sub-accept only when the composite offer itself is
+    accepted by the resolver.
     """
-    Update/Clone
 
-    Requirement must include 2 parts:
-    - a reference selector to identify the reference object
-    - an update template selector or fallback template for the update
+    _REFERENCE_SELECTOR_KEYS: ClassVar[tuple[str, ...]] = (
+        "reference_selector",
+        "reference",
+        "reference_req",
+    )
+    _TEMPLATE_SELECTOR_KEYS: ClassVar[tuple[str, ...]] = (
+        "update_template_selector",
+        "template_selector",
+        "update_selector",
+    )
+    _STRIP_UPDATE_KEYS: ClassVar[set[str]] = {
+        "kind",
+        "uid",
+        "registry",
+        "registry_id",
+        "_registry",
+    }
 
-    - For update we want to mutate while preserving uid and existing roles etc.
-      Example: "The npc that I met in the bar the next day, wearing their work outfit"
-    - For clone, we want to evolve and assign a new uid and fresh attribs constrained by template
-      Example: "The older brother of the npc that I met in the bar".
+    @classmethod
+    def _coerce_selector(cls, value: Any) -> Selector | None:
+        if value is None:
+            return None
+        if isinstance(value, Selector):
+            return value
+        if isinstance(value, Mapping):
+            return Selector(**dict(value))
+        return None
 
-    find a valid reference and evolve/update with:
-    - new uid
-    - new given name, same family name
-    - similar physiology
-    - slightly greater age
-    - add familial relationship back to reference (which triggers a
-      symmetric update on the reference back to the clone)
+    @classmethod
+    def _selector_from_requirement(
+        cls,
+        requirement: "Requirement",
+        *,
+        field_name: str,
+        fallback_keys: tuple[str, ...],
+    ) -> Selector | None:
+        selector = cls._coerce_selector(getattr(requirement, field_name, None))
+        if selector is not None:
+            return selector
 
-    In both cases, we need a 'find' phase and an 'update reference' phase.
-    Clone is just copy with update.
+        extra = requirement.__pydantic_extra__ or {}
+        for key in fallback_keys:
+            selector = cls._coerce_selector(extra.get(key))
+            if selector is not None:
+                return selector
+        return None
 
-    - Inspect offers in context to identify any valid FIND offers
-    - Dispatch an update provision sub req based on each find target
-    """
-    ...
+    @staticmethod
+    def _offer_matches_selector(offer: ProvisionOffer, selector: Selector) -> bool:
+        candidate = getattr(offer, "candidate", None)
+        if candidate is None:
+            return False
+        try:
+            return selector.matches(candidate)
+        except (TypeError, ValueError):
+            return False
+
+    @classmethod
+    def _best_offer(cls, offers: Iterable[ProvisionOffer]) -> ProvisionOffer | None:
+        values = list(offers)
+        if not values:
+            return None
+        values.sort(key=lambda offer: offer.sort_key())
+        return values[0]
+
+    @classmethod
+    def _sanitize_updates(cls, value: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            key: val
+            for key, val in dict(value).items()
+            if key not in cls._STRIP_UPDATE_KEYS
+        }
+
+    @classmethod
+    def _extract_update_payload(
+        cls,
+        offer: ProvisionOffer,
+        *,
+        _ctx: Any = None,
+    ) -> dict[str, Any]:
+        created = offer.callback(_ctx=_ctx)
+        if isinstance(created, EntityTemplate):
+            return cls._sanitize_updates(created.payload.unstructure())
+        if isinstance(created, Entity):
+            return cls._sanitize_updates(created.unstructure())
+        if isinstance(created, Mapping):
+            return cls._sanitize_updates(created)
+
+        candidate = getattr(offer, "candidate", None)
+        if isinstance(candidate, EntityTemplate):
+            return cls._sanitize_updates(candidate.payload.unstructure())
+        return {}
+
+    @staticmethod
+    def _apply_updates_in_place(reference: Any, updates: Mapping[str, Any]) -> Any:
+        if not updates:
+            return reference
+        if hasattr(reference, "update_attrs"):
+            reference.update_attrs(**dict(updates))
+            return reference
+        for key, value in dict(updates).items():
+            if hasattr(reference, key):
+                setattr(reference, key, value)
+        return reference
+
+    @staticmethod
+    def _clone_with_updates(
+        reference: Any,
+        updates: Mapping[str, Any],
+        *,
+        _ctx: Any = None,
+    ) -> Any:
+        if not hasattr(reference, "evolve"):
+            raise TypeError(f"{type(reference).__name__} is not cloneable (missing evolve)")
+        return reference.evolve(
+            uid=_next_provision_uid(_ctx=_ctx),
+            **dict(updates),
+        )
+
+    @classmethod
+    def _make_offer(
+        cls,
+        *,
+        policy: ProvisionPolicy,
+        find_offer: ProvisionOffer,
+        create_offer: ProvisionOffer,
+    ) -> ProvisionOffer:
+        def _accept(*_, _ctx=None, **__) -> Any:
+            reference = find_offer.callback(_ctx=_ctx)
+            if reference is None:
+                return None
+            updates = cls._extract_update_payload(create_offer, _ctx=_ctx)
+            if policy & ProvisionPolicy.UPDATE:
+                return cls._apply_updates_in_place(reference, updates)
+            if policy & ProvisionPolicy.CLONE:
+                return cls._clone_with_updates(reference, updates, _ctx=_ctx)
+            return None
+
+        distance = max(
+            int(getattr(find_offer, "distance_from_caller", 999)),
+            int(getattr(create_offer, "distance_from_caller", 999)),
+        )
+        specificity = max(
+            int(getattr(find_offer, "specificity", 0)),
+            int(getattr(create_offer, "specificity", 0)),
+        )
+        priority = max(
+            int(getattr(find_offer, "priority", Priority.NORMAL)),
+            int(getattr(create_offer, "priority", Priority.NORMAL)),
+        )
+        return ProvisionOffer(
+            origin_id=f"UpdateCloneProvisioner:{policy.name.lower()}",
+            policy=policy,
+            callback=_accept,
+            priority=priority,
+            distance_from_caller=distance,
+            specificity=specificity,
+            candidate=getattr(find_offer, "candidate", None),
+        )
+
+    @classmethod
+    def get_dependency_offers(
+        cls,
+        requirement: "Requirement",
+        offers: Iterable[ProvisionOffer],
+    ) -> list[ProvisionOffer]:
+        wants_update = bool(requirement.provision_policy & ProvisionPolicy.UPDATE)
+        wants_clone = bool(requirement.provision_policy & ProvisionPolicy.CLONE)
+        if not (wants_update or wants_clone):
+            return []
+
+        reference_selector = cls._selector_from_requirement(
+            requirement,
+            field_name="reference_selector",
+            fallback_keys=cls._REFERENCE_SELECTOR_KEYS,
+        )
+        template_selector = cls._selector_from_requirement(
+            requirement,
+            field_name="update_template_selector",
+            fallback_keys=cls._TEMPLATE_SELECTOR_KEYS,
+        )
+        if reference_selector is None or template_selector is None:
+            return []
+
+        find_offers = [
+            offer
+            for offer in offers
+            if (offer.policy & ProvisionPolicy.EXISTING)
+            and cls._offer_matches_selector(offer, reference_selector)
+        ]
+        create_offers = [
+            offer
+            for offer in offers
+            if (offer.policy & ProvisionPolicy.CREATE)
+            and cls._offer_matches_selector(offer, template_selector)
+        ]
+
+        best_find = cls._best_offer(find_offers)
+        best_create = cls._best_offer(create_offers)
+        if best_find is None or best_create is None:
+            return []
+
+        synthesized: list[ProvisionOffer] = []
+        if wants_update:
+            synthesized.append(
+                cls._make_offer(
+                    policy=ProvisionPolicy.UPDATE,
+                    find_offer=best_find,
+                    create_offer=best_create,
+                )
+            )
+        if wants_clone:
+            synthesized.append(
+                cls._make_offer(
+                    policy=ProvisionPolicy.CLONE,
+                    find_offer=best_find,
+                    create_offer=best_create,
+                )
+            )
+        return synthesized
+
+
+# Backward-compatible alias while feature is still evolving.
+CloneProvisioner = UpdateCloneProvisioner

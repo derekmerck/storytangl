@@ -70,6 +70,7 @@ from tangl.core38 import (
     Selector,
 )
 from tangl.utils.hashing import hashing_func
+from ..ctx import VmPhaseCtx
 from ..dispatch import (
     dispatch as vm_dispatch,
     do_finalize,
@@ -138,6 +139,11 @@ class PhaseCtx:
     - ``get_ns(node)`` — cached scoped namespace from ancestor chain.
     - ``get_random()`` — deterministic RNG for this frame.
     - ``cursor`` — the current node (resolved from ``cursor_id``).
+
+    Implements
+    ----------
+    :class:`tangl.vm38.ctx.VmPhaseCtx`
+        Protocol consumed by vm38 phase handlers and resolver helpers.
     """
 
     graph: Graph
@@ -436,7 +442,7 @@ class Frame:
         *,
         incoming_edge: AnyTraversableEdge | None = None,
         incoming_payload: Any = None,
-    ) -> PhaseCtx:
+    ) -> VmPhaseCtx:
         """Build a fresh PhaseCtx for the current cursor position.
 
         A new context is created for each ``follow_edge`` call because the

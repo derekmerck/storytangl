@@ -301,6 +301,39 @@ def test_story_graph_authorities_include_story_and_world_authorities() -> None:
     assert world_authority in authorities
 
 
+def test_story_graph_template_lineage_is_nearest_first() -> None:
+    world = World38.from_script_data(script_data=_base_script())
+    result = world.create_story("scope_lineage_story", init_mode=InitMode.FULLY_SPECIFIED)
+
+    graph = result.graph
+    cursor = graph.get(graph.initial_cursor_id)
+    assert cursor is not None
+
+    lineage = graph.template_lineage_by_entity_id.get(cursor.uid, [])
+    assert lineage
+    assert lineage[0] == graph.template_by_entity_id[cursor.uid]
+
+
+def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
+    world = World38.from_script_data(script_data=_base_script())
+    result = world.create_story("scope_groups_story", init_mode=InitMode.FULLY_SPECIFIED)
+
+    graph = result.graph
+    cursor = graph.get(graph.initial_cursor_id)
+    assert cursor is not None
+
+    groups = graph.get_template_scope_groups(cursor)
+    assert groups
+
+    lineage = [
+        templ_id
+        for templ_id in graph.template_lineage_by_entity_id.get(cursor.uid, [])
+        if graph.factory.get(templ_id) is not None
+    ]
+    group_heads = [getattr(group[0], "uid", None) for group in groups if group]
+    assert group_heads[: len(lineage)] == lineage
+
+
 def test_story38_source_has_no_legacy_core_vm_imports() -> None:
     src_root = Path(__file__).resolve().parents[2] / "src" / "tangl" / "story38"
     assert src_root.exists(), str(src_root)

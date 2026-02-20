@@ -24,6 +24,7 @@ from tangl.vm38.dispatch import (
     do_update,
     do_validate,
     on_finalize,
+    on_get_ns,
     on_gather_ns,
     on_journal,
     on_postreqs,
@@ -86,11 +87,22 @@ class TestHookRegistration:
             (on_finalize,  "finalize_step"),
             (on_postreqs,  "get_postreqs"),
             (on_gather_ns, "gather_ns"),
+            (on_get_ns,    "gather_ns"),
         ]
         for on_hook, expected_task in pairs:
             on_hook(lambda *, caller, ctx, **kw: None)
             # Just verify no exception — task mapping is correct
             assert list(vm_dispatch.find_all(Selector(task=expected_task)))
+
+    def test_on_get_ns_marks_instance_methods_without_global_registration(self) -> None:
+        class _NodeWithNs(TraversableNode):
+            @on_get_ns
+            def provide_locals(self, ctx):
+                return {"ok": True}
+
+        _ = _NodeWithNs
+        behaviors = list(vm_dispatch.find_all(Selector(task="gather_ns")))
+        assert behaviors == []
 
 
 # ============================================================================
@@ -268,3 +280,40 @@ class TestDoGatherNs:
         node.locals = {"key": "val"}
         ns = do_gather_ns(node, ctx=null_ctx)
         assert ns["key"] == "val"
+
+    def test_on_get_ns_alias_registers_global_contributors(self, null_ctx) -> None:
+        @on_get_ns
+        def add_flag(*, caller, ctx, **kw):
+            return {"via_alias": caller.get_label()}
+
+        g = Graph()
+        node = _node(g, label="n")
+        ns = do_gather_ns(node, ctx=null_ctx)
+        assert ns["via_alias"] == "n"
+
+    def test_on_get_ns_marked_method_contributes_namespace(self, null_ctx) -> None:
+        class _MethodNode(TraversableNode):
+            @on_get_ns
+            def provide_locals(self, ctx):
+                return {"from_method": self.get_label()}
+
+        g = Graph()
+        node = _MethodNode(label="method-node")
+        g.add(node)
+
+        ns = do_gather_ns(node, ctx=null_ctx)
+        assert ns["from_method"] == "method-node"
+
+    def test_on_get_ns_marked_method_accepts_caller_and_ctx(self, null_ctx) -> None:
+        class _MethodNode(TraversableNode):
+            @on_get_ns
+            def provide_locals(self, caller, ctx):
+                return {"same_caller": caller.uid == self.uid, "has_ctx": ctx is not None}
+
+        g = Graph()
+        node = _MethodNode(label="method-node")
+        g.add(node)
+
+        ns = do_gather_ns(node, ctx=null_ctx)
+        assert ns["same_caller"] is True
+        assert ns["has_ctx"] is True

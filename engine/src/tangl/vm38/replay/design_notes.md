@@ -232,14 +232,14 @@ If dual-phase patches are implemented:
 - [x] Event CRUD operations with registry application
 - [x] Frame has dual mutation windows (UPDATE before JOURNAL, FINALIZE after)
 - [x] Pipeline is deterministic (seeded RNG on PhaseCtx)
+- [x] Graph diff implementation in `DiffReplayEngine.build_delta()`
+- [x] StepRecord definition and population
+- [x] Rollback implementation
+- [x] Snapshot cadence hook (`checkpoint_cadence`) at choice boundaries
+- [x] Step timeline persistence via StepRecords in `Ledger.output_stream`
 - [ ] `_structured_hash` on Unstructurable (birth hash at structure/init time)
 - [ ] Compositional graph hash from member hashes
-- [ ] `diff_graphs()` function (replaces WatchedRegistry/ObservedEntity)
 - [ ] Copy-on-write graph for pipeline execution
-- [ ] StepRecord definition and population
-- [ ] Ledger.step_history storage
-- [ ] Snapshot intervals (every N steps? on player choice?)
-- [ ] Rollback implementation
 - [ ] Re-rendering replay driver
 - [ ] Patch canonicalization (optimization)
 
