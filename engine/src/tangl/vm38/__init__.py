@@ -57,6 +57,8 @@ from .provision import (
     Requirement,
     Resolver,
     TemplateProvisioner,
+    UpdateCloneProvisioner,
+    CloneProvisioner,
 )
 
 # Provides:
@@ -92,6 +94,7 @@ from .fragments import Fragment
 # - phase bus hooks
 from .dispatch import (
     on_finalize,
+    on_get_ns,
     on_gather_ns,
     on_journal,
     on_postreqs,
@@ -101,6 +104,7 @@ from .dispatch import (
     on_update,
     on_validate,
 )
+from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
 
 
 __all__ = [
@@ -121,6 +125,8 @@ __all__ = [
     "ResolutionPhase",
     "Resolver",
     "TemplateProvisioner",
+    "UpdateCloneProvisioner",
+    "CloneProvisioner",
     "TraversableEdge",
     "TraversableNode",
     "count_turns",
@@ -131,6 +137,7 @@ __all__ = [
     "is_self_loop",
     "assert_traversal_contracts",
     "on_finalize",
+    "on_get_ns",
     "on_gather_ns",
     "on_journal",
     "on_postreqs",
@@ -141,4 +148,7 @@ __all__ = [
     "on_validate",
     "steps_since_last_visit",
     "validate_traversal_contracts",
+    "VmDispatchCtx",
+    "VmPhaseCtx",
+    "VmResolverCtx",
 ]

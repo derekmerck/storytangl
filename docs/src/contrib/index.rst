@@ -11,3 +11,5 @@ Contribution Guide
    custom_world_handlers
    core38-doc-audit
    vm38-doc-audit
+   v38-parity-matrix
+   v38-phase1-review

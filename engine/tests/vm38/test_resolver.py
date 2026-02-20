@@ -145,6 +145,66 @@ class TestResolverOfferGathering:
         assert offers
         assert offers[0].candidate is plain
 
+    def test_update_clone_declines_without_two_part_formula(self) -> None:
+        source = Entity(label="source")
+        template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+        resolver = Resolver(
+            location_entity_groups=[[source]],
+            template_scope_groups=[[template]],
+        )
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.UPDATE | ProvisionPolicy.CLONE,
+        )
+        offers = resolver.gather_offers(req)
+        assert offers == []
+
+    def test_update_offer_is_deferred_until_selected(self) -> None:
+        source = Entity(label="source")
+        template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+        resolver = Resolver(
+            location_entity_groups=[[source]],
+            template_scope_groups=[[template]],
+        )
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.UPDATE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        offers = resolver.gather_offers(req)
+        assert len(offers) == 1
+        assert offers[0].policy == ProvisionPolicy.UPDATE
+        assert source.label == "source"
+
+        provider = resolver.resolve_requirement(req)
+        assert provider is source
+        assert source.label == "patched"
+        assert req.selected_offer_policy == ProvisionPolicy.UPDATE
+
+    def test_clone_offer_uses_selected_reference_and_template(self) -> None:
+        source = Entity(label="source")
+        template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+        resolver = Resolver(
+            location_entity_groups=[[source]],
+            template_scope_groups=[[template]],
+        )
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.CLONE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        clone = resolver.resolve_requirement(req)
+        assert clone is not None
+        assert clone is not source
+        assert clone.uid != source.uid
+        assert clone.label == "patched"
+        assert source.label == "source"
+        assert req.selected_offer_policy == ProvisionPolicy.CLONE
+
 
 class TestResolverRequirementResolution:
     def test_resolves_existing_entity(self) -> None:

@@ -57,6 +57,12 @@ class Requirement(Selector, Generic[PT]):
     # a requirement can satisfy itself if it carries an inline template
     # a cloner could take such an offer and combine it with an existing source
 
+    # Optional two-part formula for late synthesized UPDATE/CLONE offers.
+    # These are typed fields (not selector extras), so they do not participate
+    # in provider matching criteria.
+    reference_selector: Optional[Selector] = None
+    update_template_selector: Optional[Selector] = None
+
 
 class HasRequirement(RegistryAware, Generic[PT]):
     """

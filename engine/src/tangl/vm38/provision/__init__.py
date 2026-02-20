@@ -7,5 +7,7 @@ from .provisioner import (
     InlineTemplateProvisioner,
     FindProvisioner,
     FallbackProvisioner,
+    UpdateCloneProvisioner,
+    CloneProvisioner,
 )
 from .resolver import Resolver

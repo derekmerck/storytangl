@@ -7,9 +7,10 @@ import inspect
 from typing import Any, Iterable, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
 from uuid import UUID
 
+from pydantic import BaseModel
+
 from tangl.core import BaseFragment
 from tangl.service.exceptions import ServiceError
-from tangl.service.response import InfoModel, NativeResponse, RuntimeInfo
 
 from .api_endpoint import (
     EndpointPolicy,
@@ -19,6 +20,12 @@ from .api_endpoint import (
     PreprocessResult,
     ResponseType,
     WritebackMode,
+)
+from .response import (
+    InfoModel,
+    NativeResponse,
+    RuntimeInfo,
+    coerce_runtime_info,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
@@ -122,6 +129,7 @@ class Orchestrator38:
 
         try:
             result = self._invoke_endpoint(binding.controller, endpoint, resolved_params)
+            result = self._normalize_runtime_result(endpoint, result)
             self._validate_response(endpoint, result)
             result = self._handle_result_cleanup(result)
 
@@ -374,7 +382,7 @@ class Orchestrator38:
                 )
 
         elif response_type == ResponseType.INFO:
-            if not isinstance(result, InfoModel):
+            if not isinstance(result, (InfoModel, BaseModel)):
                 raise TypeError(
                     f"{endpoint.func.__qualname__} declared ResponseType.INFO "
                     f"but returned {type(result).__name__}, expected InfoModel."
@@ -389,6 +397,15 @@ class Orchestrator38:
 
         elif response_type == ResponseType.MEDIA:
             return
+
+    @staticmethod
+    def _normalize_runtime_result(endpoint: LegacyApiEndpoint, result: Any) -> Any:
+        """Coerce runtime-like payloads onto service38-native ``RuntimeInfo``."""
+
+        response_type = getattr(endpoint, "response_type", None)
+        if response_type != ResponseType.RUNTIME:
+            return result
+        return coerce_runtime_info(result) or result
 
     @staticmethod
     def _update_runtime_details(result: RuntimeInfo, **updates: Any) -> None:

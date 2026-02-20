@@ -14,8 +14,9 @@ helper keyed by task name and aggregation mode.
 The ``on_resolve`` / ``do_resolve`` hook is separate because it has a different call
 signature (takes ``requirement`` + ``offers``, not ``caller``).
 
-The ``on_gather_ns`` / ``do_gather_ns`` hook is separate because it walks the ancestor
-chain (scoped dispatch semantic) rather than firing once at the cursor.
+The ``on_gather_ns`` / ``on_get_ns`` / ``do_gather_ns`` hook family is separate
+because it walks the ancestor chain (scoped dispatch semantic) rather than
+firing once at the cursor.
 
 See Also
 --------
@@ -29,12 +30,14 @@ See Also
 
 from __future__ import annotations
 
+import inspect
 import logging
 from collections import ChainMap
 from collections.abc import Iterable as IterableABC
-from typing import Any, Callable, Iterable, Optional, TYPE_CHECKING, Protocol, runtime_checkable
+from typing import Any, Callable, Iterable, Optional, TYPE_CHECKING
 
 from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record
+from .ctx import VmDispatchCtx
 
 if TYPE_CHECKING:
     from .provision import Requirement, ProvisionOffer
@@ -47,15 +50,6 @@ logger = logging.getLogger(__name__)
 
 Fragment = Record
 Patch = Record
-
-
-@runtime_checkable
-class VmDispatchCtx(Protocol):
-    """Minimal context contract required by vm38 dispatch hooks."""
-
-    def get_registries(self) -> list[BehaviorRegistry]: ...
-    def get_inline_behaviors(self) -> Iterable[Callable | Any]: ...
-
 
 dispatch = BehaviorRegistry(
     label="vm_dispatch",
@@ -224,6 +218,118 @@ Examples::
         return {r.get_label(): r.successor for r in reqs if r.satisfied}
 """
 
+_CALLER_NS_METHOD_ATTR = "_vm38_on_get_ns_method"
+
+
+def _mark_caller_ns_method(func: Callable[..., Any]) -> Callable[..., Any]:
+    setattr(func, _CALLER_NS_METHOD_ATTR, True)
+    return func
+
+
+def _looks_like_instance_method(func: Callable[..., Any]) -> bool:
+    """Detect ``self``-style methods declared on caller classes."""
+    try:
+        params = list(inspect.signature(func).parameters.values())
+    except (TypeError, ValueError):
+        return False
+    if not params:
+        return False
+    first = params[0]
+    if first.kind not in (
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    ):
+        return False
+    return first.name in {"self", "this"}
+
+
+def on_get_ns(func=None, **kwargs):
+    """Register a namespace hook or mark an instance method namespace provider.
+
+    Temporary compatibility surface:
+    ``on_get_ns`` is a bridge for legacy-style namespace extension while scoped
+    dispatch is being reintroduced in v38. Prefer ``on_gather_ns`` for new
+    global handlers and treat method-mode ``@on_get_ns`` as transitional.
+
+    Usage modes:
+    - ``@on_get_ns`` or ``@on_get_ns(priority=...)`` on module-level functions:
+      registers a normal ``gather_ns`` handler.
+    - ``@on_get_ns`` on instance methods (``self`` first arg):
+      marks the method for per-caller invocation during ``do_gather_ns``.
+    """
+
+    if func is None:
+        return lambda f: on_get_ns(f, **kwargs)
+    if _looks_like_instance_method(func):
+        return _mark_caller_ns_method(func)
+    return on_gather_ns(func=func, **kwargs)
+
+
+def _invoke_caller_ns_provider(provider: Callable[..., Any], *, caller: Any, ctx: Any) -> Any:
+    """Invoke a caller-bound namespace provider with flexible signatures."""
+    try:
+        signature = inspect.signature(provider)
+    except (TypeError, ValueError):
+        return provider()
+
+    params = signature.parameters
+    kwargs: dict[str, Any] = {}
+    if "caller" in params:
+        kwargs["caller"] = caller
+    if "ctx" in params:
+        kwargs["ctx"] = ctx
+
+    if kwargs:
+        return provider(**kwargs)
+
+    positional = [
+        param
+        for param in params.values()
+        if param.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+    if len(positional) == 0:
+        return provider()
+    if len(positional) == 1:
+        return provider(ctx)
+    return provider(caller, ctx)
+
+
+def _gather_caller_ns(caller: Any, *, ctx: Any) -> dict[str, Any]:
+    """Collect namespace contributions from caller-bound provider methods."""
+    contributions: dict[str, Any] = {}
+    seen_names: set[str] = set()
+
+    method_names: list[str] = []
+    for cls in type(caller).__mro__:
+        for name, raw in cls.__dict__.items():
+            if name in seen_names:
+                continue
+            if callable(raw) and getattr(raw, _CALLER_NS_METHOD_ATTR, False):
+                seen_names.add(name)
+                method_names.append(name)
+
+    if "on_get_ns" not in seen_names and callable(
+        getattr(caller, "on_get_ns", None)
+    ):
+        method_names.append("on_get_ns")
+
+    for name in method_names:
+        provider = getattr(caller, name, None)
+        if not callable(provider):
+            continue
+        result = _invoke_caller_ns_provider(provider, caller=caller, ctx=ctx)
+        if result is None:
+            continue
+        if isinstance(result, dict):
+            contributions.update(result)
+            continue
+        contributions.update(dict(result))
+
+    return contributions
+
 
 def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
     """Build a scoped namespace by walking the ancestor chain.
@@ -272,9 +378,17 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
             call_kwargs={"caller": ancestor},
             ctx=ctx,
         )
-        layer = CallReceipt.merge_results(*receipts)
+        layer_result = CallReceipt.merge_results(*receipts)
+        layer: dict[str, Any] = {}
+        if layer_result:
+            layer = layer_result if isinstance(layer_result, dict) else dict(layer_result)
+
+        caller_layer = _gather_caller_ns(ancestor, ctx=ctx)
+        if caller_layer:
+            layer.update(caller_layer)
+
         if layer:
-            layers.append(layer if isinstance(layer, dict) else dict(layer))
+            layers.append(layer)
 
     # ChainMap: first map wins on lookup → closest scope overrides
     # ancestors list is [node, parent, ..., root], which is already closest-first
@@ -342,6 +456,6 @@ __all__ = [
     "on_finalize", "do_finalize",
     "on_postreqs", "do_postreqs",
     # helper decos and invocation
-    "on_gather_ns", "do_gather_ns",
+    "on_gather_ns", "on_get_ns", "do_gather_ns",
     "on_resolve", "do_resolve",
 ]
