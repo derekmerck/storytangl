@@ -9,7 +9,9 @@ Organized by concept:
 
 from __future__ import annotations
 
+from random import Random
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 
@@ -37,6 +39,15 @@ def _dependency(graph: Graph, **kwargs) -> Dependency:
     dependency = Dependency(**kwargs)
     graph.add(dependency)
     return dependency
+
+
+def _ctx_with_seed(seed: int) -> SimpleNamespace:
+    rng = Random(seed)
+    return SimpleNamespace(
+        get_registries=lambda: [],
+        get_inline_behaviors=lambda: [],
+        get_random=lambda: rng,
+    )
 
 
 # ============================================================================
@@ -84,6 +95,32 @@ class TestFindProvisioner:
 
 
 class TestResolverOfferGathering:
+    def test_template_create_offer_uses_ctx_rng_for_uid(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[[template]])
+        req = Requirement(has_identifier="crafted", provision_policy=ProvisionPolicy.CREATE)
+
+        seed = 1729
+        provider = resolver.resolve_requirement(req, _ctx=_ctx_with_seed(seed))
+
+        assert provider is not None
+        assert provider.uid == UUID(int=Random(seed).getrandbits(128), version=4)
+        assert req.selected_offer_policy == ProvisionPolicy.CREATE
+
+    def test_inline_template_offer_uses_ctx_rng_for_uid(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "inline"})
+        req = Requirement(
+            has_identifier="inline",
+            fallback_templ=template,
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+        offer = list(InlineTemplateProvisioner.get_dependency_offers(req))[0]
+
+        seed = 71
+        provider = offer.callback(_ctx=_ctx_with_seed(seed))
+
+        assert provider.uid == UUID(int=Random(seed).getrandbits(128), version=4)
+
     def test_gathers_from_entity_groups(self) -> None:
         e = Entity(label="sword")
         resolver = Resolver(entity_groups=[[e]])
@@ -204,6 +241,52 @@ class TestResolverOfferGathering:
         assert clone.label == "patched"
         assert source.label == "source"
         assert req.selected_offer_policy == ProvisionPolicy.CLONE
+
+    def test_clone_offer_uid_is_deterministic_for_same_seed(self) -> None:
+        def _resolve(seed: int) -> tuple[Entity, Entity]:
+            source = Entity(label="source")
+            template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+            resolver = Resolver(
+                location_entity_groups=[[source]],
+                template_scope_groups=[[template]],
+            )
+            req = Requirement(
+                has_kind=Entity,
+                provision_policy=ProvisionPolicy.CLONE,
+                reference_selector=Selector(has_identifier="source"),
+                update_template_selector=Selector(has_identifier="patched"),
+            )
+            clone = resolver.resolve_requirement(req, _ctx=_ctx_with_seed(seed))
+            assert clone is not None
+            return source, clone
+
+        source_a, clone_a = _resolve(seed=2026)
+        source_b, clone_b = _resolve(seed=2026)
+
+        assert clone_a.uid == clone_b.uid
+        assert clone_a.uid != source_a.uid
+        assert clone_a.label == "patched"
+
+    def test_clone_offer_raises_if_reference_rejects_uid_override(self) -> None:
+        class NoUidClone(Entity):
+            def evolve(self, *, label: str):
+                return NoUidClone(uid=self.uid, label=label)
+
+        source = NoUidClone(label="source")
+        template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+        resolver = Resolver(
+            location_entity_groups=[[source]],
+            template_scope_groups=[[template]],
+        )
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.CLONE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        with pytest.raises(TypeError, match="uid"):
+            resolver.resolve_requirement(req, _ctx=_ctx_with_seed(9))
 
 
 class TestResolverRequirementResolution:

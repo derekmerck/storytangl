@@ -90,9 +90,15 @@ def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
     if isinstance(value, Mapping):
         payload = dict(value)
     elif isinstance(value, BaseModel):
-        payload = value.model_dump(mode="python")
+        try:
+            payload = value.model_dump(mode="python")
+        except TypeError:
+            payload = None
     elif hasattr(value, "model_dump") and callable(getattr(value, "model_dump")):
-        payload = value.model_dump(mode="python")
+        try:
+            payload = value.model_dump(mode="python")
+        except TypeError:
+            payload = None
 
     if payload is None or "status" not in payload:
         return None

@@ -385,7 +385,7 @@ class Orchestrator38:
             if not isinstance(result, (InfoModel, BaseModel)):
                 raise TypeError(
                     f"{endpoint.func.__qualname__} declared ResponseType.INFO "
-                    f"but returned {type(result).__name__}, expected InfoModel."
+                    f"but returned {type(result).__name__}, expected InfoModel or BaseModel."
                 )
 
         elif response_type == ResponseType.RUNTIME:

@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import Flag, auto
 from typing import Any, ClassVar, Callable, Protocol, Iterable, Iterator, TYPE_CHECKING, Mapping
 from dataclasses import dataclass
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, SkipValidation
 
@@ -64,6 +64,17 @@ class Provisioner(Protocol):
         ...
 
 
+def _next_provision_uid(*, _ctx: Any = None) -> UUID:
+    """Return a deterministic uid when vm context RNG is available."""
+    if _ctx is not None:
+        get_random = getattr(_ctx, "get_random", None)
+        if callable(get_random):
+            rng = get_random()
+            if hasattr(rng, "getrandbits"):
+                return UUID(int=rng.getrandbits(128), version=4)
+    return uuid4()
+
+
 @dataclass
 class FindProvisioner:
 
@@ -110,7 +121,9 @@ class TemplateProvisioner:
                 priority = Priority.NORMAL,
                 distance_from_caller=self.distance,
                 candidate=c,
-                callback = c.materialize
+                callback = lambda *_, _c=c, **kwargs: _c.materialize(
+                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx"))
+                ),
             )
 
     # Not sure what affordance providers look like in template form?
@@ -125,7 +138,9 @@ class InlineTemplateProvisioner:
             return [ProvisionOffer(
                 origin_id=requirement.fallback_templ.get_label(),
                 policy=ProvisionPolicy.CREATE,
-                callback=requirement.fallback_templ.materialize,
+                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: _t.materialize(
+                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx"))
+                ),
                 priority=Priority.LATE,
                 distance_from_caller=0,
                 candidate=requirement.fallback_templ,
@@ -273,7 +288,7 @@ class UpdateCloneProvisioner:
             return False
         try:
             return selector.matches(candidate)
-        except Exception:
+        except (TypeError, ValueError):
             return False
 
     @classmethod
@@ -325,13 +340,18 @@ class UpdateCloneProvisioner:
         return reference
 
     @staticmethod
-    def _clone_with_updates(reference: Any, updates: Mapping[str, Any]) -> Any:
+    def _clone_with_updates(
+        reference: Any,
+        updates: Mapping[str, Any],
+        *,
+        _ctx: Any = None,
+    ) -> Any:
         if not hasattr(reference, "evolve"):
-            return None
-        try:
-            return reference.evolve(uid=uuid4(), **dict(updates))
-        except TypeError:
-            return reference.evolve(**dict(updates))
+            raise TypeError(f"{type(reference).__name__} is not cloneable (missing evolve)")
+        return reference.evolve(
+            uid=_next_provision_uid(_ctx=_ctx),
+            **dict(updates),
+        )
 
     @classmethod
     def _make_offer(
@@ -349,7 +369,7 @@ class UpdateCloneProvisioner:
             if policy & ProvisionPolicy.UPDATE:
                 return cls._apply_updates_in_place(reference, updates)
             if policy & ProvisionPolicy.CLONE:
-                return cls._clone_with_updates(reference, updates)
+                return cls._clone_with_updates(reference, updates, _ctx=_ctx)
             return None
 
         distance = max(

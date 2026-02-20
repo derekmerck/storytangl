@@ -17,6 +17,8 @@ from tangl.service38.response import InfoModel, RuntimeInfo
 from tangl.vm import Ledger
 from tangl.vm38.runtime.ledger import Ledger as Ledger38
 
+SAVE_KEY_ERROR = "missing save key"
+
 
 class FakePersistence(dict):
     def __init__(self) -> None:
@@ -44,7 +46,7 @@ class RoundTripPersistence(dict):
     def save(self, value) -> None:
         key = getattr(value, "uid", None)
         if key is None:
-            raise ValueError("Unable to determine key for saved value")
+            raise ValueError(SAVE_KEY_ERROR)
         if hasattr(value, "unstructure"):
             super().__setitem__(key, value.unstructure())
         else:
