@@ -105,7 +105,9 @@ class OrderedRegistry(Registry[OrderedEntity]):
     Notes
     -----
     Named bookmarks/sections are intentionally out of scope for this core type and
-    should be layered above it (for example in VM/story stream services).
+    should be layered above it (for example in VM/story stream services). Core
+    keeps append/slice only; bookmark channels and destructive undo truncation are
+    runtime-policy concerns.
     """
 
     def append(self, record: OrderedEntity) -> None:

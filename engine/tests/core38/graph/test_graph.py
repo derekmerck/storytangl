@@ -158,3 +158,45 @@ class TestGraphItemHierarchyAndSerialization:
         b = other.add_node(label="b")
         with pytest.raises(ValueError):
             graph.add_edge(a, b)
+
+
+class TestGraphValueHashContracts:
+    def test_value_hash_is_stable_for_unchanged_graph(self) -> None:
+        graph = Graph(label="g")
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        graph.add_edge(a, b, label="ab")
+
+        first = graph.value_hash()
+        second = graph.value_hash()
+        assert first == second
+
+    def test_value_hash_changes_for_graph_membership_mutations(self) -> None:
+        graph = Graph(label="g")
+        baseline = graph.value_hash()
+
+        node = graph.add_node(label="a")
+        after_add = graph.value_hash()
+        assert after_add != baseline
+
+        graph.remove(node.uid)
+        after_remove = graph.value_hash()
+        assert after_remove != after_add
+        assert after_remove == baseline
+
+    def test_value_hash_changes_when_member_data_changes(self) -> None:
+        graph = Graph(label="g")
+        node = graph.add_node(label="a")
+        before = graph.value_hash()
+        node.label = "renamed"
+        after = graph.value_hash()
+        assert after != before
+
+    def test_value_hash_preserved_through_unstructure_structure_roundtrip(self) -> None:
+        graph = Graph(label="g")
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        graph.add_edge(a, b, label="ab")
+
+        restored = Graph.structure(graph.unstructure())
+        assert restored.value_hash() == graph.value_hash()

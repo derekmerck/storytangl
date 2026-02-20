@@ -14,7 +14,18 @@ Core only defines deterministic selection, ordering, and result folding.
 
 from __future__ import annotations
 import itertools
-from typing import Any, Callable, Protocol, Iterator, Iterable, Self, ClassVar, runtime_checkable, Mapping, Type
+from typing import (
+    Any,
+    Callable,
+    Protocol,
+    Iterator,
+    Iterable,
+    Self,
+    ClassVar,
+    runtime_checkable,
+    Mapping,
+    Type,
+)
 from enum import IntEnum, Enum
 from collections import ChainMap
 from inspect import isclass
@@ -27,6 +38,7 @@ from .entity import Entity
 from .registry import Registry, RegistryAware
 from .record import HasOrder, Record
 from .selector import Selector
+from .ctx import DispatchCtx
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -52,14 +64,14 @@ class DispatchLayer(IntEnum):
 
 
 @runtime_checkable
-class RuntimeCtx(Protocol):
-    """Minimal context protocol used by behavior execution chains."""
-    def get_args(self) -> tuple[Any]: ...
-    def get_kwargs(self) -> dict[str, Any]: ...
-    def get_selector(self) -> Selector: ...
-    def get_receipts(self) -> list[CallReceipt]: ...
-    def get_aggregation_mode(self) -> AggregationMode: ...
-    def get_registries(self) -> list[BehaviorRegistry]: ...
+class RuntimeCtx(DispatchCtx, Protocol):
+    """Runtime context protocol used by behavior execution chains.
+
+    Core dispatch only requires registry and inline behavior access. Higher
+    layers may expose additional fields and helper methods.
+    """
+
+    def get_registries(self) -> Iterable[BehaviorRegistry]: ...
     def get_inline_behaviors(self) -> Iterable[Behavior | Callable[..., Any]]: ...
 
 

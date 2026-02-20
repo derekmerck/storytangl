@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import logging
-from typing import Any, Iterable, Optional, Protocol, TypeAlias, Union, Self, runtime_checkable
+from typing import Any, Iterable, Optional, TypeAlias, Union, Self
 from uuid import UUID
 
 from tangl.core38 import (
@@ -20,23 +20,17 @@ from .provisioner import (
     TemplateProvisioner,
     InlineTemplateProvisioner,
     FallbackProvisioner,
+    UpdateCloneProvisioner,
     ProvisionPolicy,
 )
 from .matching import annotate_offer_specificity, summarize_offer
 from .requirement import Requirement, PT, Dependency, Affordance
+from ..ctx import VmResolverCtx
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
 TemplateGroup: TypeAlias = Union[EntityGroup, EntityTemplate]
 logger = logging.getLogger(__name__)
-
-
-@runtime_checkable
-class ResolverCtx(Protocol):
-    def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
-    def get_template_scope_groups(self) -> Iterable[TemplateGroup]: ...
-    def get_entity_groups(self) -> Iterable[EntityGroup]: ...
-    def get_template_groups(self) -> Iterable[TemplateGroup]: ...
 
 
 @dataclass
@@ -85,7 +79,7 @@ class Resolver:
         )
 
     @classmethod
-    def from_ctx(cls, ctx: ResolverCtx) -> Self:
+    def from_ctx(cls, ctx: VmResolverCtx) -> Self:
         return cls(
             location_entity_groups=cls._ctx_location_entity_groups(ctx),
             template_scope_groups=cls._ctx_template_scope_groups(ctx),
@@ -111,6 +105,7 @@ class Resolver:
             offers.extend(TemplateProvisioner(templates=template_group, distance=i).get_dependency_offers(requirement))
 
         offers.extend(InlineTemplateProvisioner.get_dependency_offers(requirement))
+        offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
 
         _ctx = resolve_ctx(_ctx)
         if _ctx is not None:

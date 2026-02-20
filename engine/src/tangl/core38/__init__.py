@@ -86,4 +86,4 @@ from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe build
 from .token import Token, TokenFactory  # Delegated reference builder
 from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
 
-from .ctx import resolve_ctx
+from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx

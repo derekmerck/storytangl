@@ -6,13 +6,18 @@ from uuid import UUID, uuid4
 import pytest
 
 from tangl.core import Graph, StreamRegistry
+from tangl.core38 import Graph as Graph38
 from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
-from tangl.service.response import InfoModel, RuntimeInfo
+from tangl.service.response import RuntimeInfo as LegacyRuntimeInfo
 from tangl.service.user.user import User
 from tangl.service38 import Orchestrator38, ServiceOperation38, WritebackMode
 from tangl.service38.gateway import ServiceGateway38
 from tangl.service38.hooks import GatewayHooks, HookPhase
+from tangl.service38.response import InfoModel, RuntimeInfo
 from tangl.vm import Ledger
+from tangl.vm38.runtime.ledger import Ledger as Ledger38
+
+SAVE_KEY_ERROR = "missing save key"
 
 
 class FakePersistence(dict):
@@ -33,6 +38,19 @@ class FakePersistence(dict):
         if key is None:
             raise ValueError("Unable to determine key for saved value")
         super().__setitem__(key, value)
+
+
+class RoundTripPersistence(dict):
+    """Persistence shim that stores ledgers as unstructured payloads."""
+
+    def save(self, value) -> None:
+        key = getattr(value, "uid", None)
+        if key is None:
+            raise ValueError(SAVE_KEY_ERROR)
+        if hasattr(value, "unstructure"):
+            super().__setitem__(key, value.unstructure())
+        else:
+            super().__setitem__(key, value)
 
 
 class WorldInfo(InfoModel):
@@ -256,3 +274,93 @@ def test_gateway_execute_endpoint_runs_inbound_hooks_for_unmapped_endpoint() -> 
 
     assert isinstance(result, WorldInfo)
     assert result.world == "hooked:demo"
+
+
+def test_orchestrator38_runtime_response_coerces_legacy_runtimeinfo() -> None:
+    class _LegacyController(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.UPDATE)
+        def update_step(self) -> LegacyRuntimeInfo:
+            return LegacyRuntimeInfo.ok(message="legacy", step=7)
+
+    orchestrator = Orchestrator38(persistence_manager={})
+    orchestrator.register_controller(_LegacyController)
+
+    result = orchestrator.execute("_LegacyController.update_step")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.message == "legacy"
+    assert result.step == 7
+
+
+def test_orchestrator38_round_trip_excluded_runtime_fields() -> None:
+    class _LedgerController(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.READ)
+        def inspect_ledger(self, ledger: Ledger38) -> RuntimeInfo:
+            return RuntimeInfo.ok(
+                has_runtime_user=ledger.user is not None,
+                user_id=str(ledger.user_id) if ledger.user_id else None,
+            )
+
+    graph = Graph38()
+    start = graph.add_node(label="start")
+    user = User(label="rt-player")
+    ledger = Ledger38(graph=graph, cursor_id=start.uid)
+    ledger.user = user
+    ledger.user_id = user.uid
+
+    persistence = RoundTripPersistence()
+    persistence[ledger.uid] = ledger.unstructure()
+
+    orchestrator = Orchestrator38(persistence)
+    orchestrator.register_controller(_LedgerController)
+
+    result = orchestrator.execute("_LedgerController.inspect_ledger", ledger_id=ledger.uid)
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.details is not None
+    assert result.details.get("has_runtime_user") is False
+    assert result.details.get("user_id") == str(user.uid)
+
+
+def test_orchestrator38_round_trip_ledger_writeback_remains_hydratable() -> None:
+    class _LedgerController(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.UPDATE)
+        def advance(self, ledger: Ledger38) -> RuntimeInfo:
+            had_runtime_user = ledger.user is not None
+            ledger.step += 1
+            return RuntimeInfo.ok(
+                step=ledger.step,
+                had_runtime_user=had_runtime_user,
+                user_id=str(ledger.user_id) if ledger.user_id else None,
+            )
+
+    graph = Graph38()
+    start = graph.add_node(label="start")
+    user = User(label="rt-player")
+    ledger = Ledger38(graph=graph, cursor_id=start.uid)
+    ledger.user = user
+    ledger.user_id = user.uid
+
+    persistence = RoundTripPersistence()
+    persistence[ledger.uid] = ledger.unstructure()
+
+    orchestrator = Orchestrator38(persistence)
+    orchestrator.register_controller(_LedgerController)
+
+    first = orchestrator.execute("_LedgerController.advance", ledger_id=ledger.uid)
+    assert isinstance(first, RuntimeInfo)
+    assert first.step == 1
+    assert first.details is not None
+    assert first.details.get("had_runtime_user") is False
+    assert first.details.get("user_id") == str(user.uid)
+
+    stored_after_first = persistence[ledger.uid]
+    assert isinstance(stored_after_first, dict)
+    assert stored_after_first.get("user_id") == str(user.uid)
+    assert "user" not in stored_after_first
+
+    second = orchestrator.execute("_LedgerController.advance", ledger_id=ledger.uid)
+    assert isinstance(second, RuntimeInfo)
+    assert second.step == 2
+    assert second.details is not None
+    assert second.details.get("had_runtime_user") is False
