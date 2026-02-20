@@ -8,8 +8,8 @@ from pydantic import BaseModel
 
 from tangl.config import settings
 from tangl.rest.dependencies38 import get_service_gateway38, get_user_locks38
-from tangl.service.response import RuntimeInfo
 from tangl.service38 import ServiceGateway38, ServiceOperation38
+from tangl.service38.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret, uuid_for_key
 

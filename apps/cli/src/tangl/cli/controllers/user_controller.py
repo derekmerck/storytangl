@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
-from tangl.service.response import RuntimeInfo
 from tangl.service38 import ServiceOperation38
 from tangl.service38.operations import endpoint_for_operation
+from tangl.service38.response import RuntimeInfo
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI

@@ -38,8 +38,8 @@ from starlette.responses import RedirectResponse
 from tangl.config import settings
 from tangl.rest.dependencies38 import get_service_gateway38
 from tangl.rest.media_mounts import mount_system_media
-from tangl.service.response import RuntimeInfo
 from tangl.service38 import ServiceGateway38, ServiceOperation38
+from tangl.service38.response import RuntimeInfo
 
 logger = logging.getLogger(__name__)
 

@@ -71,6 +71,21 @@ def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
     if isinstance(value, RuntimeInfo):
         return value
 
+    # Preserve runtime details payloads (for example hydrated ledger objects)
+    # when converting sibling runtime model classes.
+    if hasattr(value, "status") and hasattr(value, "details"):
+        try:
+            return RuntimeInfo(
+                status=getattr(value, "status"),
+                code=getattr(value, "code", None),
+                message=getattr(value, "message", None),
+                cursor_id=getattr(value, "cursor_id", None),
+                step=getattr(value, "step", None),
+                details=getattr(value, "details", None),
+            )
+        except (TypeError, ValidationError):
+            pass
+
     payload: dict[str, Any] | None = None
     if isinstance(value, Mapping):
         payload = dict(value)
