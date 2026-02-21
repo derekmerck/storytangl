@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.core38 import GraphItem, Selector, TemplateRegistry
@@ -18,6 +18,7 @@ from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, Scene
 from ..story_graph import StoryGraph38
 from .compiler import StoryTemplateBundle
+from .script_manager38 import ScriptManager38
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -42,12 +43,27 @@ class _PrelinkCtx:
     graph: StoryGraph38
     template_registry: TemplateRegistry
     cursor_id: UUID | None = None
+    correlation_id: UUID | str | None = None
+    logger: Any | None = None
+    meta: Mapping[str, Any] | None = field(default_factory=dict)
 
     @property
     def cursor(self):
         if self.cursor_id is None:
             return None
         return self.graph.get(self.cursor_id)
+
+    def get_registries(self):
+        return []
+
+    def get_inline_behaviors(self):
+        return []
+
+    def get_meta(self) -> Mapping[str, Any]:
+        return dict(self.meta or {})
+
+    def get_story_locals(self) -> Mapping[str, Any]:
+        return self.graph.get_story_locals()
 
     def get_location_entity_groups(self):
         cursor = self.cursor
@@ -83,6 +99,13 @@ class _PrelinkCtx:
                 return groups
         return [self.template_registry.values()]
 
+    # Legacy aliases retained for compatibility with old resolver contexts.
+    def get_entity_groups(self):
+        return self.get_location_entity_groups()
+
+    def get_template_groups(self):
+        return self.get_template_scope_groups()
+
 
 class StoryMaterializer38:
     """Materialize story38 graphs from a compiled template bundle."""
@@ -95,10 +118,15 @@ class StoryMaterializer38:
         init_mode: InitMode,
         world: object | None = None,
     ) -> StoryInitResult:
+        script_manager = getattr(world, "script_manager", None) if world is not None else None
+        if script_manager is None:
+            script_manager = ScriptManager38(template_registry=bundle.template_registry)
+
         graph = StoryGraph38(
             label=story_label,
             locals=dict(bundle.locals),
             factory=bundle.template_registry,
+            script_manager=script_manager,
             world=world,
         )
         report = InitReport(mode=init_mode)
@@ -109,6 +137,15 @@ class StoryMaterializer38:
             raise ValueError("No entry templates resolved for story initialization")
 
         if init_mode is InitMode.MINIMAL:
+            for templ in entry_templates:
+                self._materialize_with_ancestors(templ=templ, state=state)
+        elif init_mode is InitMode.HYBRID:
+            # Provisional behavior: materialize containers plus entry chain.
+            # Final production semantics are deferred until container provisioning
+            # rules for unresolved scene/block links are finalized.
+            for templ in sorted(bundle.template_registry.values(), key=self._template_depth):
+                if self._is_container_template(templ):
+                    self._materialize_with_ancestors(templ=templ, state=state)
             for templ in entry_templates:
                 self._materialize_with_ancestors(templ=templ, state=state)
         elif init_mode is InitMode.FULLY_SPECIFIED:
@@ -157,6 +194,17 @@ class StoryMaterializer38:
         seq = getattr(templ, "seq", 0)
         label = templ.get_label() if hasattr(templ, "get_label") else ""
         return depth, seq, label
+
+    @staticmethod
+    def _is_container_template(templ: Any) -> bool:
+        payload = getattr(templ, "payload", None)
+        if isinstance(payload, Scene):
+            return True
+
+        members = getattr(templ, "members", None)
+        if callable(members):
+            return any(True for _ in members())
+        return False
 
     def _resolve_entry_templates(self, bundle: StoryTemplateBundle) -> list[Any]:
         templates = []
@@ -336,9 +384,9 @@ class StoryMaterializer38:
                         predecessor_id=action.uid,
                         requirement=requirement,
                     )
-                    if state.report.mode is InitMode.MINIMAL:
+                    if state.report.mode in {InitMode.MINIMAL, InitMode.HYBRID}:
                         state.report.warnings.append(
-                            "MINIMAL init left action destination unresolved; "
+                            f"{state.report.mode.value.upper()} init left action destination unresolved; "
                             f"action={action.get_label()!r}, expected={qualified_ref!r}"
                         )
 

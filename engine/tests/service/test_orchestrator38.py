@@ -10,7 +10,7 @@ from tangl.core38 import Graph as Graph38
 from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
 from tangl.service.response import RuntimeInfo as LegacyRuntimeInfo
 from tangl.service.user.user import User
-from tangl.service38 import Orchestrator38, ServiceOperation38, WritebackMode
+from tangl.service38 import ApiEndpoint38, Orchestrator38, ServiceOperation38, WritebackMode
 from tangl.service38.gateway import ServiceGateway38
 from tangl.service38.hooks import GatewayHooks, HookPhase
 from tangl.service38.response import InfoModel, RuntimeInfo
@@ -364,3 +364,55 @@ def test_orchestrator38_round_trip_ledger_writeback_remains_hydratable() -> None
     assert second.step == 2
     assert second.details is not None
     assert second.details.get("had_runtime_user") is False
+
+
+def test_orchestrator38_hydrates_user_by_param_name_not_type_suffix(
+    fake_persistence: FakePersistence,
+) -> None:
+    class AccountState:
+        def __init__(self, uid: UUID) -> None:
+            self.uid = uid
+            self.current_ledger_id = None
+
+    class UserEcho(InfoModel):
+        user_id: UUID
+
+    class _AccountController(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.INFO, method_type=MethodType.READ)
+        def who(self, user: AccountState) -> UserEcho:
+            return UserEcho(user_id=user.uid)
+
+    user_id = uuid4()
+    fake_persistence[user_id] = AccountState(user_id)
+
+    orchestrator = Orchestrator38(fake_persistence)
+    orchestrator.register_controller(_AccountController)
+
+    result = orchestrator.execute("_AccountController.who", user_id=user_id)
+    assert isinstance(result, UserEcho)
+    assert result.user_id == user_id
+
+
+def test_orchestrator38_explicit_binds_override_signature_inference(
+    fake_persistence: FakePersistence,
+) -> None:
+    class UserEcho(InfoModel):
+        user_id: UUID
+
+    class _AccountController(HasApiEndpoints):
+        @ApiEndpoint38.annotate(
+            response_type=ResponseType.INFO,
+            method_type=MethodType.READ,
+            binds=(),
+        )
+        def who(self, user: User) -> UserEcho:
+            return UserEcho(user_id=user.uid)
+
+    user_id = uuid4()
+    fake_persistence[user_id] = User(uid=user_id)
+
+    orchestrator = Orchestrator38(fake_persistence)
+    orchestrator.register_controller(_AccountController)
+
+    with pytest.raises(TypeError, match="argument binding failed"):
+        orchestrator.execute("_AccountController.who", user_id=user_id)

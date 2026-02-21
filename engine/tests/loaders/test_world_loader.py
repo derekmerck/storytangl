@@ -8,6 +8,7 @@ import pytest
 from tangl.loaders.bundle import WorldBundle
 from tangl.loaders.compiler import ScriptCompiler, WorldCompiler
 from tangl.service.world_registry import WorldRegistry
+from tangl.story38 import World38
 
 
 class _BridgeScriptCompiler(ScriptCompiler):
@@ -361,6 +362,79 @@ class DomainCharacter(Entity):
     assert world_one.metadata["title"] == "Book One"
     assert world_two.metadata["author"] == "Steve"
     assert world_two.metadata["title"] == "book2"
+
+
+def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "anthology38"
+    scripts_dir = bundle_root / "scripts"
+    media_dir = bundle_root / "media"
+    scripts_dir.mkdir(parents=True)
+    media_dir.mkdir()
+    (media_dir / "cover.svg").write_text(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"></svg>",
+        encoding="utf-8",
+    )
+
+    (bundle_root / "world.yaml").write_text(
+        """
+        label: anthology38
+        scripts:
+          book1: scripts/book1.yaml
+          book2: scripts/book2.yaml
+        metadata:
+          author: Steve
+        """,
+        encoding="utf-8",
+    )
+
+    (scripts_dir / "book1.yaml").write_text(
+        """
+        label: book1
+        metadata:
+          title: Book One
+        scenes: {}
+        """,
+        encoding="utf-8",
+    )
+    (scripts_dir / "book2.yaml").write_text(
+        """
+        label: book2
+        scenes: {}
+        """,
+        encoding="utf-8",
+    )
+
+    (bundle_root / "domain").mkdir()
+    domain_pkg = bundle_root / "anthology38"
+    domain_pkg.mkdir(parents=True)
+    (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
+    (domain_pkg / "domain.py").write_text(
+        """
+from tangl.core.entity import Entity
+
+
+class DomainCharacter(Entity):
+    ...
+        """,
+        encoding="utf-8",
+    )
+
+    bundle = WorldBundle.load(bundle_root)
+    compiler = WorldCompiler()
+    anthology = compiler.compile_anthology(bundle, runtime_version="38")
+
+    world_one = anthology["book1"]
+    world_two = anthology["book2"]
+
+    assert isinstance(world_one, World38)
+    assert isinstance(world_two, World38)
+    assert world_one.domain is world_two.domain
+    assert world_one.assets is world_two.assets
+    assert world_one.resources is world_two.resources
+    assert world_one.script_manager is not world_two.script_manager
+    assert world_one.templates is world_one.bundle.template_registry
+    assert world_two.templates is world_two.bundle.template_registry
+    assert "DomainCharacter" in world_one.domain.class_registry
 
 
 def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:

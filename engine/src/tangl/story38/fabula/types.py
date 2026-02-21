@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable, Protocol, runtime_checkable
 from uuid import UUID
 
 
@@ -10,7 +10,32 @@ class InitMode(str, Enum):
     """Graph initialization modes for story38."""
 
     MINIMAL = "minimal"
+    HYBRID = "hybrid"
     FULLY_SPECIFIED = "fully_specified"
+
+
+@runtime_checkable
+class WorldDomainFacet(Protocol):
+    """Lightweight domain facet contract for world-level authorities."""
+
+    def get_authorities(self) -> Iterable[object]: ...
+
+
+@runtime_checkable
+class WorldTemplatesFacet(Protocol):
+    """Lightweight templates facet contract for provisioning scope groups."""
+
+    def get_template_scope_groups(self, *, caller: Any = None, graph: Any = None) -> Iterable[Iterable[Any]]: ...
+
+
+@runtime_checkable
+class WorldAssetsFacet(Protocol):
+    """Lightweight assets facet contract (token/platonic factories)."""
+
+
+@runtime_checkable
+class WorldResourcesFacet(Protocol):
+    """Lightweight resources facet contract (media/data inventories)."""
 
 
 @dataclass(slots=True)

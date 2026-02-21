@@ -79,6 +79,16 @@ def test_drop_story_without_active_story_returns_400(
     assert "no active story" in response.json()["detail"].lower()
 
 
+def test_drop_story_with_invalid_api_key_returns_401(
+    multi_world_client: tuple[TestClient, dict[str, str], UUID]
+) -> None:
+    client, _, _ = multi_world_client
+
+    response = client.delete("story/drop", headers={"X-API-Key": "invalid-key"})
+    assert response.status_code == 401
+    assert "invalid api key" in response.json()["detail"].lower()
+
+
 def test_drop_story_archive_preserves_ledger(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:

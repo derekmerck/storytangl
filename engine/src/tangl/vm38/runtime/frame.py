@@ -25,7 +25,7 @@ The pipeline phases in causal order:
 - **PLANNING** — provision this node + frontier for availability (gather)
 - **PREREQS** — auto-redirect? container descent? (first_result → edge)
 - **UPDATE** — mutate state for arrival (gather)
-- **JOURNAL** — emit content fragments (last_result → fragments)
+- **JOURNAL** — emit content fragments (merge all handler contributions)
 - **FINALIZE** — commit step record, emit patch (last_result → patch)
 - **POSTREQS** — continuation redirect? (first_result → edge)
 
@@ -150,6 +150,9 @@ class PhaseCtx:
     cursor_id: UUID
     step: int = 0
     current_phase: ResolutionPhase = ResolutionPhase.INIT
+    correlation_id: UUID | str | None = None
+    logger: Any | None = None
+    meta: Mapping[str, Any] | None = field(default_factory=dict)
 
     random: Random = field(default_factory=Random)
     inline_behaviors: list[Callable | Behavior] = field(default_factory=list)
@@ -180,6 +183,9 @@ class PhaseCtx:
 
     def get_random(self) -> Random:
         return self.random
+
+    def get_meta(self) -> Mapping[str, Any]:
+        return dict(self.meta or {})
 
     @property
     def selected_edge(self) -> Any | None:
@@ -420,6 +426,10 @@ class Frame:
 
     _last_step_trace: StepTrace | None = field(default=None, init=False, repr=False)
 
+    correlation_id: UUID | str | None = None
+    logger: Any | None = None
+    meta: Mapping[str, Any] | None = field(default_factory=dict)
+
     _random: Random = field(default_factory=Random)
     selected_edge: AnyTraversableEdge | None = None
     selected_payload: Any = None
@@ -453,6 +463,9 @@ class Frame:
             graph=self.graph,
             cursor_id=self.cursor.uid,
             step=self.step_base + self.cursor_steps,
+            correlation_id=self.correlation_id,
+            logger=self.logger,
+            meta=dict(self.meta or {}),
             random=self._random,
             incoming_edge=incoming_edge,
             incoming_payload=incoming_payload,

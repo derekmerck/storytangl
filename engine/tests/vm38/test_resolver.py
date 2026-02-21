@@ -15,7 +15,16 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core38 import BehaviorRegistry, Entity, EntityTemplate, Graph, Registry, RegistryAware, Selector
+from tangl.core38 import (
+    BehaviorRegistry,
+    Entity,
+    EntityTemplate,
+    Graph,
+    Priority,
+    Registry,
+    RegistryAware,
+    Selector,
+)
 from tangl.vm38.provision import (
     Affordance,
     Dependency,
@@ -25,6 +34,7 @@ from tangl.vm38.provision import (
     Requirement,
     Resolver,
     FallbackProvisioner,
+    ProvisionOffer,
 )
 from tangl.vm38.traversable import TraversableNode
 
@@ -267,6 +277,72 @@ class TestResolverOfferGathering:
         assert clone_a.uid != source_a.uid
         assert clone_a.label == "patched"
 
+    def test_update_clone_prefers_ranked_pair_without_eager_callbacks(self) -> None:
+        source_primary = Entity(label="source")
+        source_secondary = Entity(label="source")
+        template_primary = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+        template_secondary = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+
+        invocations: list[str] = []
+
+        find_best = ProvisionOffer(
+            origin_id="find.best",
+            policy=ProvisionPolicy.EXISTING,
+            priority=Priority.EARLY,
+            distance_from_caller=0,
+            candidate=source_primary,
+            callback=lambda *_, **__: (invocations.append("find.best"), source_primary)[1],
+        )
+        find_worse = ProvisionOffer(
+            origin_id="find.worse",
+            policy=ProvisionPolicy.EXISTING,
+            priority=Priority.LATE,
+            distance_from_caller=3,
+            candidate=source_secondary,
+            callback=lambda *_, **__: (invocations.append("find.worse"), source_secondary)[1],
+        )
+        create_best = ProvisionOffer(
+            origin_id="create.best",
+            policy=ProvisionPolicy.CREATE,
+            priority=Priority.EARLY,
+            distance_from_caller=0,
+            candidate=template_primary,
+            callback=lambda *_, **__: (invocations.append("create.best"), {"label": "patched_best"})[1],
+        )
+        create_worse = ProvisionOffer(
+            origin_id="create.worse",
+            policy=ProvisionPolicy.CREATE,
+            priority=Priority.LATE,
+            distance_from_caller=3,
+            candidate=template_secondary,
+            callback=lambda *_, **__: (invocations.append("create.worse"), {"label": "patched_worse"})[1],
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.UPDATE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        offers = resolver.gather_offers(
+            req,
+            preferred_offers=[find_worse, create_worse, find_best, create_best],
+        )
+        assert len(offers) == 1
+        assert offers[0].policy == ProvisionPolicy.UPDATE
+        assert invocations == []
+
+        provider = resolver.resolve_requirement(
+            req,
+            preferred_offers=[find_worse, create_worse, find_best, create_best],
+        )
+        assert provider is source_primary
+        assert source_primary.label == "patched_best"
+        assert source_secondary.label == "source"
+        assert invocations == ["find.best", "create.best"]
+
     def test_clone_offer_raises_if_reference_rejects_uid_override(self) -> None:
         class NoUidClone(Entity):
             def evolve(self, *, label: str):
@@ -336,6 +412,40 @@ class TestResolverRequirementResolution:
         assert req.resolution_reason == "override_invalid"
         assert req.resolution_meta is not None
         assert "error" in req.resolution_meta
+
+    def test_from_ctx_prefers_new_scope_methods_when_both_exist(self) -> None:
+        provider = Entity(label="provider")
+        template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
+        ctx = SimpleNamespace(
+            get_location_entity_groups=lambda: [[provider]],
+            get_entity_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy entity groups called")),
+            get_template_scope_groups=lambda: [[template]],
+            get_template_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy template groups called")),
+        )
+
+        resolver = Resolver.from_ctx(ctx)
+        assert list(resolver.location_entity_groups)[0][0] is provider
+        assert list(resolver.template_scope_groups)[0][0] is template
+
+    def test_from_ctx_legacy_entity_groups_warns(self) -> None:
+        provider = Entity(label="provider")
+        ctx = SimpleNamespace(
+            get_entity_groups=lambda: [[provider]],
+            get_template_scope_groups=lambda: [],
+        )
+        with pytest.deprecated_call(match="get_entity_groups"):
+            resolver = Resolver.from_ctx(ctx)
+        assert resolver.location_entity_groups
+
+    def test_from_ctx_legacy_template_groups_warns(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
+        ctx = SimpleNamespace(
+            get_location_entity_groups=lambda: [],
+            get_template_groups=lambda: [[template]],
+        )
+        with pytest.deprecated_call(match="get_template_groups"):
+            resolver = Resolver.from_ctx(ctx)
+        assert resolver.template_scope_groups
 
 
 class TestResolverDependencyResolution:
