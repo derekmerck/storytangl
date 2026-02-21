@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38
+from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38, resolve_user_id38
 from tangl.service.response.info_response import UserInfo
 from tangl.service.response.info_response.user_info import UserSecret
 from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
@@ -43,7 +43,7 @@ async def get_user_info(
 ) -> UserInfo:
     """Return profile information for the authenticated user."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     return _call(
         adapter,
         ServiceOperation38.USER_INFO,
@@ -101,7 +101,7 @@ async def update_user_secret(
 ):
     """Update the secret for the authenticated user and surface the new API key."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     async with user_locks[user_id]:
         info = _call(
             adapter,
@@ -125,7 +125,7 @@ async def drop_user(
 ):
     """Remove the authenticated user and purge persisted resources."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     identifiers = _call(
         adapter,
         ServiceOperation38.USER_DROP,

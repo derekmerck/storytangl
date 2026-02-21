@@ -16,17 +16,14 @@ class Role(Dependency):
         provider_hook = getattr(provider, "on_get_ns", None)
         if not callable(provider_hook):
             return {}
-        try:
-            value = provider_hook(ctx)
-        except TypeError:
-            try:
-                value = provider_hook(provider, ctx)
-            except TypeError:
-                value = provider_hook()
+
+        value = provider_hook(ctx)
         if value is None:
             return {}
-        if isinstance(value, Mapping):
-            return dict(value)
+        if not isinstance(value, Mapping):
+            raise TypeError(
+                f"{type(provider).__name__}.on_get_ns must return Mapping | None"
+            )
         return dict(value)
 
     @on_get_ns

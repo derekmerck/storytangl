@@ -181,7 +181,7 @@ class RuntimeController(LegacyRuntimeController):
 
     @ApiEndpoint38.annotate(
         access_level=AccessLevel.PUBLIC,
-        method_type=MethodType.UPDATE,
+        method_type=MethodType.DELETE,
         response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.USER, ResourceBinding.LEDGER),
     )
@@ -309,8 +309,7 @@ class SystemController(LegacySystemController):
         response_type=ResponseType.INFO,
         binds=(),
     )
-    @staticmethod
-    def get_system_info(*args: Any, **kwargs: Any) -> SystemInfo:
+    def get_system_info(self, *args: Any, **kwargs: Any) -> SystemInfo:
         return LegacySystemController.get_system_info(*args, **kwargs)
 
     @ApiEndpoint38.annotate(
@@ -319,8 +318,7 @@ class SystemController(LegacySystemController):
         response_type=ResponseType.RUNTIME,
         binds=(),
     )
-    @staticmethod
-    def reset_system(*args: Any, hard: bool = False, **kwargs: Any) -> RuntimeInfo:
+    def reset_system(self, *args: Any, hard: bool = False, **kwargs: Any) -> RuntimeInfo:
         return LegacySystemController.reset_system(*args, hard=hard, **kwargs)
 
 

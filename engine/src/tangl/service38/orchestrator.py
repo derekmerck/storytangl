@@ -245,7 +245,7 @@ class Orchestrator38:
         parameter = inspect.signature(endpoint.func).parameters.get(param_name)
         if parameter is None:
             return False
-        return parameter.default is inspect._empty
+        return parameter.default is inspect.Parameter.empty
 
     def _invoke_endpoint(
         self,

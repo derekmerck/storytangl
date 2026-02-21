@@ -25,7 +25,12 @@ def user_id_by_key(
     *,
     reverse_index: MutableMapping[str, UUID] | None = None,
 ) -> UserAuthInfo | None:
-    """Resolve ``api_key`` to ``(user_id, access_level)``.
+    """Resolve ``api_key`` to :class:`UserAuthInfo` when possible.
+
+    Returns
+    -------
+    UserAuthInfo | None
+        ``UserAuthInfo`` when the key resolves; otherwise ``None``.
 
     Lookup order:
     1) reverse index cache (if provided),
@@ -54,7 +59,10 @@ def user_id_by_key(
         return _auth_info_from_user(candidate)
 
     # Compatibility path for older "uid derived from key" workflows.
-    legacy_uid = uuid_for_key(api_key)
+    try:
+        legacy_uid = uuid_for_key(api_key)
+    except (ValueError, TypeError):
+        return None
     legacy_user = _get_from_persistence(persistence, legacy_uid)
     if _looks_like_user(legacy_user):
         if reverse_index is not None:
@@ -70,8 +78,10 @@ def _auth_info_from_user(user: Any) -> UserAuthInfo:
 
 
 def _decode_key_hash(api_key: str) -> bytes | None:
+    missing_padding = (-len(api_key)) % 4
+    padded_key = api_key + ("=" * missing_padding)
     try:
-        return base64.urlsafe_b64decode(api_key)
+        return base64.urlsafe_b64decode(padded_key)
     except (ValueError, TypeError):
         return None
 

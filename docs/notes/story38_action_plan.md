@@ -114,7 +114,7 @@ Target code:
 
 Tests:
 - [x] Extend `engine/tests/loaders/test_world_loader.py`
-- [ ] Extend `engine/tests/loaders/test_world_bundle.py`
+- [x] Extend `engine/tests/loaders/test_world_bundle.py`
 - [x] Extend `engine/tests/story38/test_story38_init.py`
 
 ### Phase 5.5 - Gateway Transport Adapter Alignment
@@ -154,15 +154,22 @@ Tests:
 ## Testing Plan (Per Phase)
 
 - [x] Unit gate for each phase (target package tests only).
-- [ ] Integration gate after Phases 3, 5, and 6:
+- [x] Integration gate after Phases 3, 5, and 6:
 - [x] `apps/server/tests/test_story38_endpoints.py`
 - [x] `apps/server/tests/test_story_branching_endpoints.py`
 - [x] `apps/server/tests/test_story_linear_endpoints.py`
 - [x] `apps/cli/tests/test_story_cli_integration.py`
 - [x] `apps/server/tests/test_multi_world_switching.py`
-- [ ] Replay/determinism checks after provisioning changes:
-- [ ] `engine/tests/vm38/test_replay_engine.py`
-- [ ] `engine/tests/vm38/test_ledger.py`
+- [x] Replay/determinism checks after provisioning changes:
+- [x] `engine/tests/vm38/test_replay_mvp.py`
+- [x] `engine/tests/vm38/test_ledger.py`
+
+Validation snapshot (2026-02-21):
+- [x] `engine/tests/vm38/test_replay_mvp.py`
+- [x] `engine/tests/vm38/test_ledger.py`
+- [x] `engine/tests/loaders/test_world_bundle.py`
+- [x] `engine/tests/story38/test_story38_init.py`
+- [x] `engine/tests/vm38/test_resolver.py`
 
 ## Definition Of Done
 

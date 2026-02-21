@@ -4,7 +4,7 @@ from fastapi import Depends, Header, HTTPException, Path, Query
 
 from tangl.service.response.info_response import RuntimeInfo
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38
+from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38, resolve_user_id38
 from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -41,7 +41,7 @@ async def goto_story_block(
 ):
     """Jump the active frame to ``block_id``."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     async with user_locks[user_id]:
         return _call(
             adapter,
@@ -60,7 +60,7 @@ async def inspect_story_node(
 ) -> RuntimeInfo:
     """Return diagnostic story information for the active user."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     return _call(
         adapter,
         ServiceOperation38.STORY_STATUS,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.story38.concepts import Actor, Location, Role, Setting
 from tangl.story38.episode import Block, Scene
 from tangl.story38.story_graph import StoryGraph38
@@ -115,3 +117,47 @@ def test_nearer_scope_role_symbols_override_parent_scope() -> None:
     assert ns_1 is ns_2
     assert ns_1["guide"] is block_actor
     assert ns_1["guide_name"] == "Block Guide"
+
+
+def test_role_provider_hook_type_errors_are_not_swallowed() -> None:
+    graph, scene, block = _build_scene_with_block()
+
+    class ExplodingActor(Actor):
+        def on_get_ns(self, ctx) -> dict[str, object]:
+            raise TypeError("provider boom")
+
+    actor = ExplodingActor(label="guard", name="Joe")
+    role = Role(
+        label="host",
+        predecessor_id=scene.uid,
+        requirement=Requirement(has_kind=Actor, hard_requirement=False),
+    )
+    graph.add(actor)
+    graph.add(role)
+    role.set_provider(actor)
+
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    with pytest.raises(TypeError, match="provider boom"):
+        ctx.get_ns(block)
+
+
+def test_setting_provider_hook_requires_mapping_or_none() -> None:
+    graph, scene, block = _build_scene_with_block()
+
+    class BadLocation(Location):
+        def on_get_ns(self, ctx) -> list[str]:
+            return ["bad"]
+
+    location = BadLocation(label="castle", name="Castle")
+    setting = Setting(
+        label="place",
+        predecessor_id=scene.uid,
+        requirement=Requirement(has_kind=Location, hard_requirement=False),
+    )
+    graph.add(location)
+    graph.add(setting)
+    setting.set_provider(location)
+
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    with pytest.raises(TypeError, match="on_get_ns must return Mapping \\| None"):
+        ctx.get_ns(block)

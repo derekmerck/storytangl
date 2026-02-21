@@ -7,6 +7,8 @@ from collections import defaultdict
 from typing import Callable
 from uuid import UUID
 
+from fastapi import HTTPException
+
 from tangl.rest.dependencies import get_orchestrator
 from tangl.service38 import (
     GatewayRestAdapter38,
@@ -79,20 +81,27 @@ def resolve_user_auth38(
     api_key: str,
     *,
     gateway: ServiceGateway38 | None = None,  # backward-compat call sites
+    adapter: GatewayRestAdapter38 | None = None,
 ) -> UserAuthInfo:
     """Resolve API key to user auth context for route handlers."""
 
-    return _resolve_user_auth_from_key(api_key, gateway=gateway)
+    try:
+        if adapter is not None:
+            return adapter.resolve_user_auth(api_key)
+        return _resolve_user_auth_from_key(api_key, gateway=gateway)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 def resolve_user_id38(
     api_key: str,
     *,
     gateway: ServiceGateway38 | None = None,  # backward-compat call sites
+    adapter: GatewayRestAdapter38 | None = None,
 ) -> UUID:
     """Resolve API key to user id for user-scoped operations."""
 
-    return resolve_user_auth38(api_key, gateway=gateway).user_id
+    return resolve_user_auth38(api_key, gateway=gateway, adapter=adapter).user_id
 
 
 def reset_service_gateway38_for_testing() -> None:

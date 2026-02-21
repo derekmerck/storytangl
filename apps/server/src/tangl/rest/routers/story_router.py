@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38
+from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38, resolve_user_id38
 from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
 from tangl.service38.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel
@@ -158,7 +158,7 @@ async def create_story(
 ):
     """Create a new story instance for the authenticated user."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     kwargs: dict[str, Any] = {"world_id": world_id}
     if story_label:
         kwargs["story_label"] = story_label
@@ -198,7 +198,7 @@ async def get_story_update(
 ) -> dict[str, Any]:
     """Return journal fragments (including atomic blocks with embedded choices)."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     fragments = _call(
         adapter,
         ServiceOperation38.STORY_UPDATE,
@@ -229,7 +229,7 @@ async def do_story_action(
 ):
     """Resolve a player choice and return the resulting journal fragments."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     try:
         choice_id = request.resolve_choice_id()
     except ValueError as exc:  # pragma: no cover - FastAPI handles validation
@@ -274,7 +274,7 @@ async def create_story38(
 ) -> dict[str, Any]:
     """Create a vm38/story38 session and return the initial envelope."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     kwargs: dict[str, Any] = {"world_id": world_id}
     if story_label:
         kwargs["story_label"] = story_label
@@ -312,7 +312,7 @@ async def get_story_update38(
 ) -> dict[str, Any]:
     """Return vm38 envelope with ordered fragments."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     result = _call(
         adapter,
         ServiceOperation38.STORY38_UPDATE,
@@ -339,7 +339,7 @@ async def do_story_action38(
 ) -> dict[str, Any]:
     """Resolve a choice and return the vm38 envelope."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     try:
         choice_id = request.resolve_choice_id()
     except ValueError as exc:  # pragma: no cover - FastAPI handles validation
@@ -370,7 +370,7 @@ async def get_story_status38(
 ) -> dict[str, Any]:
     """Return vm38 runtime status details."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     result = _call(
         adapter,
         ServiceOperation38.STORY38_STATUS,
@@ -392,7 +392,7 @@ async def get_story_status(
 ):
     """Return a lightweight summary of the current story state."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     return _serialize(
         _call(
             adapter,
@@ -415,7 +415,7 @@ async def reset_story(
 ):
     """End the user's active story and optionally archive the ledger."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
 
     try:
         async with user_locks[user_id]:
@@ -453,7 +453,7 @@ async def reset_story38(
 ) -> dict[str, Any]:
     """End the active vm38 story and optionally archive the ledger."""
 
-    user_id = adapter.resolve_user_id(api_key)
+    user_id = resolve_user_id38(api_key, adapter=adapter)
     try:
         async with user_locks[user_id]:
             result = _call(
