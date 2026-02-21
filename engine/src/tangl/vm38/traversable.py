@@ -31,17 +31,26 @@ See Also
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from collections import deque
 from dataclasses import dataclass
+from random import Random
 from typing import Any, Mapping, Optional, TypeAlias, Union
 from uuid import UUID
 
+from pydantic import Field
+
 from tangl.core38 import Edge, Graph, HierarchicalNode, Node, Selector
-from tangl.core38.bases import HasAvailability, HasEffects, HasState
+from tangl.core38.bases import BaseModelPlus, HasState
+from tangl.core38.runtime_op import Effect, Predicate
+from tangl.type_hints import StringMap
 from .resolution_phase import ResolutionPhase
 
 
 __all__ = [
+    "TraversableEffect",
+    "HasAvailability",
+    "HasEffects",
     "TraversableNode",
     "TraversableEdge",
     "AnonymousEdge",
@@ -51,6 +60,142 @@ __all__ = [
     "lca",
     "decompose_move",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Traversal trait mixins
+# ---------------------------------------------------------------------------
+
+class TraversableEffect(Effect):
+    """Effect annotated with a VM pipeline trigger phase."""
+
+    trigger_phase: ResolutionPhase = ResolutionPhase.UPDATE
+
+
+class HasAvailability(BaseModelPlus):
+    """Predicate-based runtime availability checks for traversable objects."""
+
+    availability: list[Predicate] = Field(default_factory=list)
+
+    def available(
+        self,
+        ns: StringMap | None = None,
+        *,
+        ctx=None,
+        rand: Random | None = None,
+    ) -> bool:
+        """Return ``True`` when every availability predicate is satisfied."""
+        if not self.availability:
+            return True
+        if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            ns = ctx.get_ns(self)
+        if ns is None:
+            ns = {}
+        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        return all(predicate.satisfied_by(ns, rand=resolved_rand) for predicate in self.availability)
+
+    def available_for(
+        self,
+        other: object,
+        *,
+        ctx,
+        rand: Random | None = None,
+    ) -> bool:
+        """Evaluate this entity's availability against ``other``'s namespace."""
+        if not self.availability:
+            return True
+        ns = ctx.get_ns(other) if ctx is not None and hasattr(ctx, "get_ns") else {}
+        if ns is None:
+            ns = {}
+        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        return all(predicate.satisfied_by(ns, rand=resolved_rand) for predicate in self.availability)
+
+
+class HasEffects(BaseModelPlus):
+    """Phase-aware runtime effects for traversable objects."""
+
+    effects: list[TraversableEffect | Effect] = Field(default_factory=list)
+
+    def _effects_for(self, phase: ResolutionPhase) -> list[TraversableEffect]:
+        """Return effects eligible for the requested VM phase."""
+        matching: list[TraversableEffect] = []
+        for effect in self.effects:
+            if isinstance(effect, TraversableEffect):
+                if effect.trigger_phase == phase:
+                    matching.append(effect)
+                continue
+            if phase == ResolutionPhase.UPDATE:
+                matching.append(TraversableEffect(expr=effect.expr))
+        return matching
+
+    def _sync_locals(self, ns: StringMap) -> None:
+        """Write updated namespace values back to ``self.locals`` when present."""
+        local_store = getattr(self, "locals", None)
+        if not isinstance(local_store, MutableMapping):
+            return
+        for key in list(local_store.keys()):
+            if key in ns and local_store[key] != ns[key]:
+                local_store[key] = ns[key]
+
+    def apply_effects(
+        self,
+        phase: ResolutionPhase | StringMap = ResolutionPhase.UPDATE,
+        *,
+        ns: StringMap | None = None,
+        ctx=None,
+        rand: Random | None = None,
+    ) -> StringMap:
+        """Apply effects for ``phase`` to this object's namespace.
+
+        For backward compatibility, passing a namespace as the first positional
+        argument is treated as ``ns`` with ``phase=UPDATE``.
+        """
+        resolved_phase = phase
+        resolved_ns = ns
+        if not isinstance(phase, ResolutionPhase):
+            if ns is not None:
+                raise TypeError("ns cannot be passed twice to apply_effects")
+            resolved_phase = ResolutionPhase.UPDATE
+            resolved_ns = phase
+
+        matching = self._effects_for(resolved_phase)
+        if resolved_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            resolved_ns = ctx.get_ns(self)
+        if resolved_ns is None:
+            resolved_ns = {}
+        if not isinstance(resolved_ns, MutableMapping):
+            resolved_ns = dict(resolved_ns)
+        if not matching:
+            return resolved_ns
+
+        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        for effect in matching:
+            effect.apply(resolved_ns, rand=resolved_rand)
+        self._sync_locals(resolved_ns)
+        return resolved_ns
+
+    def apply_effects_to(
+        self,
+        other: object,
+        phase: ResolutionPhase = ResolutionPhase.UPDATE,
+        *,
+        ctx,
+        rand: Random | None = None,
+    ) -> StringMap:
+        """Apply effects for ``phase`` to another object's namespace."""
+        matching = self._effects_for(phase)
+        target_ns = ctx.get_ns(other) if ctx is not None and hasattr(ctx, "get_ns") else {}
+        if target_ns is None:
+            target_ns = {}
+        if not isinstance(target_ns, MutableMapping):
+            target_ns = dict(target_ns)
+        if not matching:
+            return target_ns
+
+        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        for effect in matching:
+            effect.apply(target_ns, rand=resolved_rand)
+        return target_ns
 
 
 # ---------------------------------------------------------------------------
@@ -539,9 +684,10 @@ class TraversableEdge(Edge):
         successor = self.successor
         if successor is None:
             return False
+        rand = getattr(ctx, "random", None) if ctx is not None else None
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(successor)
-        return successor.available(ns=ns)
+        return successor.available(ns=ns, ctx=ctx, rand=rand)
 
     def get_return_edge(self) -> AnonymousEdge:
         """Construct the return edge from this call edge.
@@ -640,9 +786,10 @@ class AnonymousEdge:
         """Availability check delegated to successor node availability."""
         if self.successor is None:
             return False
+        rand = getattr(ctx, "random", None) if ctx is not None else None
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(self.successor)
-        return self.successor.available(ns=ns)
+        return self.successor.available(ns=ns, ctx=ctx, rand=rand)
 
 
 # ---------------------------------------------------------------------------
