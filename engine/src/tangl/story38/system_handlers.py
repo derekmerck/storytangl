@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tangl.core38 import Selector
+from tangl.core38 import Priority, Record, Selector
 from tangl.vm38 import Dependency
 
 from .dispatch import on_journal
@@ -77,20 +77,54 @@ def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
     return []
 
 
-@on_journal
-def render_block(*, caller, ctx, **_kw):
-    """Render block content and available choices into story38 fragments."""
+def _merge_fragment_batches(*batches: Any) -> list[Record]:
+    merged: list[Record] = []
+    for batch in batches:
+        if batch is None:
+            continue
+        if isinstance(batch, Record):
+            merged.append(batch)
+            continue
+        if isinstance(batch, list):
+            merged.extend(batch)
+            continue
+        merged.extend(list(batch))
+    return merged
+
+
+@on_journal(priority=Priority.EARLY)
+def render_block_content(*, caller, ctx, **_kw):
+    """Render block narrative text into content fragments."""
     if not isinstance(caller, Block):
         return None
 
-    fragments: list[Any] = []
     rendered_content = _render_block_content(caller, ctx=ctx)
     if rendered_content:
-        fragments.append(ContentFragment(content=rendered_content, source_id=caller.uid))
+        return ContentFragment(content=rendered_content, source_id=caller.uid)
+    return None
 
+
+@on_journal(priority=Priority.NORMAL)
+def render_block_media(*, caller, ctx, **_kw):
+    """Render block media payloads into media fragments."""
+    if not isinstance(caller, Block):
+        return None
+
+    fragments: list[MediaFragment] = []
     for media_item in caller.media:
         payload = media_item if isinstance(media_item, dict) else {"value": media_item}
         fragments.append(MediaFragment(source_id=caller.uid, payload=payload))
+
+    return fragments or None
+
+
+@on_journal(priority=Priority.LATE)
+def render_block_choices(*, caller, ctx, **_kw):
+    """Render block outbound actions into choice fragments."""
+    if not isinstance(caller, Block):
+        return None
+
+    fragments: list[ChoiceFragment] = []
 
     for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
         available = edge.available(ctx=ctx)
@@ -109,4 +143,22 @@ def render_block(*, caller, ctx, **_kw):
             )
         )
 
+    return fragments or None
+
+
+def render_block(*, caller, ctx, **_kw):
+    """Compatibility facade for block journal rendering.
+
+    This wrapper preserves direct-call behavior while journal rendering is split
+    into composable handlers (`render_block_content`, `render_block_media`,
+    `render_block_choices`) registered through dispatch.
+    """
+    if not isinstance(caller, Block):
+        return None
+
+    fragments = _merge_fragment_batches(
+        render_block_content(caller=caller, ctx=ctx),
+        render_block_media(caller=caller, ctx=ctx),
+        render_block_choices(caller=caller, ctx=ctx),
+    )
     return fragments or None

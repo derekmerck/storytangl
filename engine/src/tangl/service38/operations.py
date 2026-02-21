@@ -66,7 +66,7 @@ _OPERATION_ENDPOINTS: dict[ServiceOperation38, str] = {
     ServiceOperation38.WORLD_UNLOAD: "WorldController.unload_world",
 
     ServiceOperation38.SYSTEM_INFO: "SystemController.get_system_info",
-    ServiceOperation38.SYSTEM_RESET: "SystemController.reload_system",
+    ServiceOperation38.SYSTEM_RESET: "SystemController.reset_system",
 }
 
 

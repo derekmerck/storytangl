@@ -57,13 +57,21 @@ class WorldCompiler:
         script_metadata.setdefault("title", default_title)
 
         if runtime_version == "38":
+            domain_facet, assets_facet, resources_facet = self._build_world38_facets(bundle)
             story38_bundle = self.story38_compiler.compile(
                 script_data,
                 source_map=decode_result.source_map,
                 codec_state=decode_result.codec_state,
                 codec_id=codec_id,
             )
-            world38 = World38(label=bundle.manifest.story_label(story_key), bundle=story38_bundle)
+            world38 = World38(
+                label=bundle.manifest.story_label(story_key),
+                bundle=story38_bundle,
+                domain=domain_facet,
+                templates=story38_bundle.template_registry,
+                assets=assets_facet,
+                resources=resources_facet,
+            )
             return world38
 
         script_manager = self.script_compiler.compile(script_data)
@@ -107,15 +115,27 @@ class WorldCompiler:
 
         base_metadata = bundle.manifest.metadata.copy()
 
-        domain_manager = DomainManager()
-        domain_module = self._get_domain_module(bundle)
-        if domain_module:
-            self.domain_compiler.load_into(domain_module, domain_manager)
+        domain_manager: DomainManager | None = None
+        resource_manager = None
+        world38_domain_facet = None
+        world38_assets_facet = None
+        world38_resources_facet = None
+        if runtime_version == "38":
+            (
+                world38_domain_facet,
+                world38_assets_facet,
+                world38_resources_facet,
+            ) = self._build_world38_facets(bundle)
+        else:
+            domain_manager = DomainManager()
+            domain_module = self._get_domain_module(bundle)
+            if domain_module:
+                self.domain_compiler.load_into(domain_module, domain_manager)
 
-        resource_manager = self.media_compiler.index(
-            bundle.media_dir,
-            organization_hints=bundle.manifest.media_organization,
-        )
+            resource_manager = self.media_compiler.index(
+                bundle.media_dir,
+                organization_hints=bundle.manifest.media_organization,
+            )
 
         worlds: dict[str, World | World38] = {}
         for story_key in bundle.manifest.story_keys():
@@ -146,6 +166,10 @@ class WorldCompiler:
                 worlds[story_key] = World38(
                     label=bundle.manifest.story_label(story_key),
                     bundle=story38_bundle,
+                    domain=world38_domain_facet,
+                    templates=story38_bundle.template_registry,
+                    assets=world38_assets_facet,
+                    resources=world38_resources_facet,
                 )
                 continue
 
@@ -168,6 +192,25 @@ class WorldCompiler:
             worlds[story_key] = world
 
         return worlds
+
+    def _build_world38_facets(
+        self,
+        bundle: WorldBundle,
+    ) -> tuple[DomainManager | None, AssetManager, Any]:
+        domain_facet: DomainManager | None = None
+        domain_module = self._get_domain_module(bundle)
+        if domain_module:
+            domain_facet = DomainManager()
+            self.domain_compiler.load_into(domain_module, domain_facet)
+
+        assets_facet = AssetManager()
+        self.asset_compiler.setup_defaults(assets_facet)
+
+        resources_facet = self.media_compiler.index(
+            bundle.media_dir,
+            organization_hints=bundle.manifest.media_organization,
+        )
+        return domain_facet, assets_facet, resources_facet
 
     def _decode_story_data(
         self,

@@ -166,14 +166,14 @@ class TestDoPrereqs:
 
 
 class TestDoJournal:
-    """do_journal uses last_result aggregation (pipe)."""
+    """do_journal merges all handler contributions in execution order."""
 
     def test_no_handlers_returns_none(self, null_ctx) -> None:
         g = Graph()
         node = _node(g, label="n")
         assert do_journal(node, ctx=null_ctx) is None
 
-    def test_last_handler_wins(self, null_ctx) -> None:
+    def test_multiple_handlers_merge_results(self, null_ctx) -> None:
         first = Record(label="first")
         second = Record(label="second")
         on_journal(lambda *, caller, ctx, **kw: first)
@@ -181,7 +181,8 @@ class TestDoJournal:
         g = Graph()
         node = _node(g, label="n")
         result = do_journal(node, ctx=null_ctx)
-        assert result is second
+        assert isinstance(result, list)
+        assert result == [first, second]
 
     def test_invalid_journal_payload_raises(self, null_ctx) -> None:
         on_journal(lambda *, caller, ctx, **kw: "second")

@@ -17,9 +17,14 @@ class StoryGraph38(Graph):
     initial_cursor_ids: list[UUID] = Field(default_factory=list)
     locals: dict[str, Any] = Field(default_factory=dict)
     factory: TemplateRegistry | None = Field(default=None, exclude=True)
+    script_manager: Any | None = Field(default=None, exclude=True)
     world: Any | None = Field(default=None, exclude=True)
     template_by_entity_id: dict[UUID, UUID] = Field(default_factory=dict, exclude=True)
     template_lineage_by_entity_id: dict[UUID, list[UUID]] = Field(default_factory=dict, exclude=True)
+
+    def get_story_locals(self) -> dict[str, Any]:
+        """Return story-level locals exposed to runtime render/provision paths."""
+        return dict(self.locals)
 
     def get_authorities(self) -> list[object]:
         """Return application/world authority registries when available."""
@@ -33,11 +38,18 @@ class StoryGraph38(Graph):
 
     def get_template_scope_groups(self, caller) -> list[list[object]]:
         """Return template groups ordered from closest template scope outward."""
+        caller_uid = getattr(caller, "uid", None)
+        lineage = self.template_lineage_by_entity_id.get(caller_uid, [])
+
+        get_groups = getattr(self.script_manager, "get_template_scope_groups", None)
+        if callable(get_groups):
+            groups = get_groups(caller=caller, graph=self, lineage_ids=lineage)
+            if groups:
+                return [list(group) for group in groups]
+
         if self.factory is None:
             return []
 
-        caller_uid = getattr(caller, "uid", None)
-        lineage = self.template_lineage_by_entity_id.get(caller_uid, [])
         groups: list[list[object]] = []
         seen_ids: set[UUID] = set()
 

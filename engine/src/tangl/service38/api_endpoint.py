@@ -27,6 +27,14 @@ class WritebackMode(str, Enum):
     NEVER = "never"
 
 
+class ResourceBinding(str, Enum):
+    """Hydration bindings supported by service38 orchestrator."""
+
+    USER = "user"
+    LEDGER = "ledger"
+    FRAME = "frame"
+
+
 class EndpointPolicy(BaseModel):
     """Persistence policy attached to service endpoints."""
 
@@ -62,6 +70,7 @@ class ApiEndpoint38(LegacyApiEndpoint):
 
     writeback_mode: WritebackMode = WritebackMode.AUTO
     persist_paths: tuple[str, ...] = Field(default_factory=tuple)
+    binds: tuple[ResourceBinding, ...] | None = None
 
     @classmethod
     def annotate(
@@ -75,10 +84,19 @@ class ApiEndpoint38(LegacyApiEndpoint):
         postprocessors: list | None = None,
         writeback_mode: WritebackMode = WritebackMode.AUTO,
         persist_paths: tuple[str, ...] | None = None,
+        binds: tuple[ResourceBinding | str, ...] | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorator that records service38 policy metadata on endpoint methods."""
 
         persist_paths = tuple(persist_paths or ())
+        normalized_binds: tuple[ResourceBinding, ...] | None
+        if binds is None:
+            normalized_binds = None
+        else:
+            normalized_binds = tuple(
+                binding if isinstance(binding, ResourceBinding) else ResourceBinding(str(binding).strip().lower())
+                for binding in binds
+            )
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             endpoint = cls(
@@ -92,6 +110,7 @@ class ApiEndpoint38(LegacyApiEndpoint):
                 postprocessors=postprocessors,
                 writeback_mode=writeback_mode,
                 persist_paths=persist_paths,
+                binds=normalized_binds,
             )
 
             @functools.wraps(func)
@@ -112,6 +131,7 @@ __all__ = [
     "MethodType",
     "PostprocessResult",
     "PreprocessResult",
+    "ResourceBinding",
     "ResponseType",
     "WritebackMode",
 ]
