@@ -1,4 +1,4 @@
-"""Interactive StoryTangl CLI wired through the service orchestrator."""
+"""Interactive StoryTangl CLI wired through the service38 gateway."""
 
 from __future__ import annotations
 
@@ -9,24 +9,18 @@ import cmd2
 
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import Orchestrator
-from tangl.service.controllers import (
-    RuntimeController as RuntimeServiceController,
-    SystemController as SystemServiceController,
-    UserController as UserServiceController,
-    WorldController as WorldServiceController,
-)
 from tangl.service38 import ServiceGateway38, ServiceOperation38, build_service_gateway38
 from tangl.service38.operations import endpoint_for_operation
 
 
 class StoryTanglCLI(cmd2.Cmd):
-    """Cmd2 shell that delegates all operations to the orchestrator."""
+    """Cmd2 shell that delegates operations to service38."""
 
     prompt = "⅁$ "
 
     def __init__(
         self,
-        orchestrator: Orchestrator,
+        orchestrator: Orchestrator | None = None,
         *,
         service_gateway: ServiceGateway38 | None = None,
         render_profile: str = "cli_ascii",
@@ -41,7 +35,12 @@ class StoryTanglCLI(cmd2.Cmd):
 
         self.orchestrator = orchestrator
         self.service_gateway = service_gateway
-        self.persistence = orchestrator.persistence
+        if service_gateway is not None:
+            self.persistence = service_gateway.persistence
+        elif orchestrator is not None:
+            self.persistence = orchestrator.persistence
+        else:
+            self.persistence = None
         self.render_profile = render_profile
         self.user_id = user_id
         self.ledger_id = ledger_id
@@ -96,6 +95,9 @@ class StoryTanglCLI(cmd2.Cmd):
                 **kwargs,
             )
 
+        if self.orchestrator is None:
+            raise RuntimeError("No orchestrator or service gateway configured")
+
         endpoint = endpoint_for_operation(operation)
         return self.orchestrator.execute(endpoint, **kwargs)
 
@@ -113,6 +115,8 @@ class StoryTanglCLI(cmd2.Cmd):
                 render_profile=self.render_profile,
                 **kwargs,
             )
+        if self.orchestrator is None:
+            raise RuntimeError("No orchestrator or service gateway configured")
         return self.orchestrator.execute(endpoint, **kwargs)
 
     def remove_resources(self, identifiers: Iterable[UUID]) -> None:
@@ -131,16 +135,8 @@ def create_cli_app() -> StoryTanglCLI:
     """Instantiate the CLI, orchestrator, and persistence plumbing."""
 
     persistence = PersistenceManagerFactory.create_persistence_manager()
-    orchestrator = Orchestrator(persistence)
-    for controller in (
-        RuntimeServiceController,
-        UserServiceController,
-        SystemServiceController,
-        WorldServiceController,
-    ):
-        orchestrator.register_controller(controller)
     service_gateway = build_service_gateway38(persistence, default_render_profile="cli_ascii")
-    return StoryTanglCLI(orchestrator=orchestrator, service_gateway=service_gateway)
+    return StoryTanglCLI(orchestrator=None, service_gateway=service_gateway)
 
 
 __all__ = ["StoryTanglCLI", "create_cli_app"]

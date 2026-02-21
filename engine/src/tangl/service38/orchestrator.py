@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import inspect
-from typing import Any, Iterable, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
+from typing import Any, Iterable, Mapping, MutableMapping, TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ from .api_endpoint import (
     MethodType,
     PostprocessResult,
     PreprocessResult,
+    ResourceBinding,
     ResponseType,
     WritebackMode,
 )
@@ -65,6 +66,7 @@ class _EndpointBinding:
     controller: Any
     endpoint: LegacyApiEndpoint
     policy: EndpointPolicy
+    hydration_bindings: tuple[ResourceBinding, ...]
 
 
 class Orchestrator38:
@@ -85,6 +87,7 @@ class Orchestrator38:
                 controller=instance,
                 endpoint=endpoint,
                 policy=EndpointPolicy.from_endpoint(endpoint),
+                hydration_bindings=self._resolve_hydration_bindings(endpoint),
             )
 
     def set_endpoint_policy(
@@ -125,7 +128,12 @@ class Orchestrator38:
         policy_override = exec_options.as_policy() if exec_options is not None else None
         policy = binding.policy.merged(policy_override)
 
-        resolved_params = self._hydrate_resources(endpoint, user_id, params)
+        resolved_params = self._hydrate_resources(
+            endpoint,
+            binding.hydration_bindings,
+            user_id,
+            params,
+        )
 
         try:
             result = self._invoke_endpoint(binding.controller, endpoint, resolved_params)
@@ -170,6 +178,7 @@ class Orchestrator38:
     def _hydrate_resources(
         self,
         endpoint: LegacyApiEndpoint,
+        hydration_bindings: tuple[ResourceBinding, ...],
         user_id: UUID | None,
         params: MutableMapping[str, Any],
     ) -> dict[str, Any]:
@@ -179,41 +188,64 @@ class Orchestrator38:
         explicit_ledger_id = provided.get("ledger_id")
         computed_ledger_id: UUID | None = explicit_ledger_id
         hydrated_ledger: Any | None = resolved.get("ledger") if "ledger" in resolved else None
+        user_required = self._is_binding_required(endpoint, ResourceBinding.USER)
+        ledger_required = self._is_binding_required(endpoint, ResourceBinding.LEDGER)
+        frame_required = self._is_binding_required(endpoint, ResourceBinding.FRAME)
 
-        hints = {k: v for k, v in endpoint.type_hints().items() if k != "return"}
-
-        for name, annotation in hints.items():
-            if name in resolved:
-                continue
-
-            if self._is_user_type(annotation):
-                if user_id is None:
+        if ResourceBinding.USER in hydration_bindings and "user" not in resolved:
+            if user_id is None:
+                if user_required:
                     raise ValueError("user_id is required to hydrate user parameter")
-                resolved[name] = self._get_or_load_user(user_id)
-                continue
+            else:
+                resolved["user"] = self._get_or_load_user(user_id)
 
-            if self._is_ledger_type(annotation):
-                ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
-                if ledger_id is None:
+        if ResourceBinding.LEDGER in hydration_bindings and "ledger" not in resolved:
+            ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
+            if ledger_id is None:
+                try:
                     ledger_id = self._infer_ledger_id(user_id)
                     computed_ledger_id = ledger_id
+                except ValueError:
+                    if ledger_required:
+                        raise
+                    ledger_id = None
+            if ledger_id is not None:
                 ledger = self._get_or_load_ledger(ledger_id)
                 hydrated_ledger = ledger
-                resolved[name] = ledger
-                continue
+                resolved["ledger"] = ledger
 
-            if self._is_frame_type(annotation):
-                ledger = hydrated_ledger
-                if ledger is None:
-                    ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
-                    if ledger_id is None:
+        if ResourceBinding.FRAME in hydration_bindings and "frame" not in resolved:
+            ledger = hydrated_ledger or resolved.get("ledger")
+            if ledger is None:
+                ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
+                if ledger_id is None:
+                    try:
                         ledger_id = self._infer_ledger_id(user_id)
                         computed_ledger_id = ledger_id
+                    except ValueError:
+                        if frame_required:
+                            raise
+                        ledger_id = None
+                if ledger_id is not None:
                     ledger = self._get_or_load_ledger(ledger_id)
                     hydrated_ledger = ledger
-                resolved[name] = ledger.get_frame()
+            if ledger is not None:
+                resolved["frame"] = ledger.get_frame()
 
         return resolved
+
+    @staticmethod
+    def _is_binding_required(endpoint: LegacyApiEndpoint, binding: ResourceBinding) -> bool:
+        param_name = {
+            ResourceBinding.USER: "user",
+            ResourceBinding.LEDGER: "ledger",
+            ResourceBinding.FRAME: "frame",
+        }[binding]
+
+        parameter = inspect.signature(endpoint.func).parameters.get(param_name)
+        if parameter is None:
+            return False
+        return parameter.default is inspect._empty
 
     def _invoke_endpoint(
         self,
@@ -528,30 +560,30 @@ class Orchestrator38:
             key = payload.get("uid") or payload.get("ledger_uid")
         return key
 
-    def _is_user_type(self, annotation: Any) -> bool:
-        resolved = self._resolve_annotation(annotation)
-        name = getattr(resolved, "__name__", "")
-        return name.endswith("User")
+    @staticmethod
+    def _resolve_hydration_bindings(endpoint: LegacyApiEndpoint) -> tuple[ResourceBinding, ...]:
+        raw_binds = getattr(endpoint, "binds", None)
+        if raw_binds is not None:
+            return tuple(
+                binding
+                if isinstance(binding, ResourceBinding)
+                else ResourceBinding(str(binding).strip().lower())
+                for binding in raw_binds
+            )
 
-    def _is_ledger_type(self, annotation: Any) -> bool:
-        resolved = self._resolve_annotation(annotation)
-        name = getattr(resolved, "__name__", "")
-        return name.endswith("Ledger")
-
-    def _is_frame_type(self, annotation: Any) -> bool:
-        resolved = self._resolve_annotation(annotation)
-        name = getattr(resolved, "__name__", "")
-        return name.endswith("Frame")
-
-    def _resolve_annotation(self, annotation: Any) -> Any:
-        origin = get_origin(annotation)
-        if origin is None:
-            return annotation
-        if origin is Union:
-            args = [arg for arg in get_args(annotation) if arg is not type(None)]
-            if len(args) == 1:
-                return self._resolve_annotation(args[0])
-        return annotation
+        # Backward-compatible fallback for legacy endpoints that do not
+        # provide service38 binding metadata.
+        signature = inspect.signature(endpoint.func)
+        param_names = {name for name in signature.parameters if name != "self"}
+        inferred: list[ResourceBinding] = []
+        for param_name, binding in (
+            ("user", ResourceBinding.USER),
+            ("ledger", ResourceBinding.LEDGER),
+            ("frame", ResourceBinding.FRAME),
+        ):
+            if param_name in param_names:
+                inferred.append(binding)
+        return tuple(inferred)
 
 
 __all__ = [

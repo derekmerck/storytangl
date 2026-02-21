@@ -7,19 +7,19 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_gateway38, get_user_locks38
+from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38
 from tangl.service.response.info_response import UserInfo
 from tangl.service.response.info_response.user_info import UserSecret
-from tangl.service38 import ServiceGateway38, ServiceOperation38
+from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
 from tangl.type_hints import UniqueLabel
-from tangl.utils.hash_secret import key_for_secret, uuid_for_key
+from tangl.utils.hash_secret import key_for_secret
 
 
 router = APIRouter(tags=["User"])
 
 
 def _call(
-    gateway: ServiceGateway38,
+    adapter: GatewayRestAdapter38,
     operation: ServiceOperation38,
     /,
     *,
@@ -27,7 +27,7 @@ def _call(
     render_profile: str = "raw",
     **params: Any,
 ) -> Any:
-    return gateway.execute(
+    return adapter.execute_operation(
         operation,
         user_id=user_id,
         render_profile=render_profile,
@@ -37,15 +37,15 @@ def _call(
 
 @router.get("/info")
 async def get_user_info(
-    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserInfo:
     """Return profile information for the authenticated user."""
 
-    user_id = uuid_for_key(api_key)
+    user_id = adapter.resolve_user_id(api_key)
     return _call(
-        gateway,
+        adapter,
         ServiceOperation38.USER_INFO,
         user_id=user_id,
         render_profile=render_profile,
@@ -54,14 +54,14 @@ async def get_user_info(
 
 @router.post("/create")
 async def create_user(
-    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Create a user and return the secret metadata for clients."""
 
     user = _call(
-        gateway,
+        adapter,
         ServiceOperation38.USER_CREATE,
         render_profile=render_profile,
         secret=secret,
@@ -75,7 +75,7 @@ async def create_user(
     if user_id is None:
         raise HTTPException(status_code=500, detail="Failed to create user")
     api_info = _call(
-        gateway,
+        adapter,
         ServiceOperation38.USER_KEY,
         render_profile=render_profile,
         secret=secret,
@@ -93,7 +93,7 @@ async def set_user_world():
 
 @router.put("/secret")
 async def update_user_secret(
-    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     user_locks = Depends(get_user_locks38),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     secret: str = Query(example=settings.client.secret, default=None),
@@ -101,10 +101,10 @@ async def update_user_secret(
 ):
     """Update the secret for the authenticated user and surface the new API key."""
 
-    user_id = uuid_for_key(api_key)
+    user_id = adapter.resolve_user_id(api_key)
     async with user_locks[user_id]:
         info = _call(
-            gateway,
+            adapter,
             ServiceOperation38.USER_UPDATE,
             user_id=user_id,
             render_profile=render_profile,
@@ -119,20 +119,20 @@ async def update_user_secret(
 
 @router.delete("/drop")
 async def drop_user(
-    gateway: ServiceGateway38 = Depends(get_service_gateway38),
+    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Remove the authenticated user and purge persisted resources."""
 
-    user_id = uuid_for_key(api_key)
+    user_id = adapter.resolve_user_id(api_key)
     identifiers = _call(
-        gateway,
+        adapter,
         ServiceOperation38.USER_DROP,
         user_id=user_id,
         render_profile=render_profile,
     )
-    persistence = gateway.persistence
+    persistence = adapter.persistence
     if persistence is not None and isinstance(identifiers, Iterable):
         for identifier in identifiers:
             if not isinstance(identifier, UUID):
@@ -141,5 +141,3 @@ async def drop_user(
                 persistence.remove(identifier)
             except KeyError:
                 continue
-
-

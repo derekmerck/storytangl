@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tangl.core38 import Graph
+from tangl.core38.ctx import CoreCtx
 from tangl.vm38.ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
 from tangl.vm38.runtime.frame import PhaseCtx
 from tangl.vm38.traversable import TraversableNode
@@ -17,6 +18,22 @@ def test_phase_ctx_satisfies_vm_protocols() -> None:
     assert isinstance(ctx, VmDispatchCtx)
     assert isinstance(ctx, VmResolverCtx)
     assert isinstance(ctx, VmPhaseCtx)
+    assert isinstance(ctx, CoreCtx)
+
+
+def test_phase_ctx_exposes_core_meta_surface() -> None:
+    graph = Graph()
+    node = TraversableNode(label="n")
+    graph.add(node)
+    ctx = PhaseCtx(
+        graph=graph,
+        cursor_id=node.uid,
+        correlation_id="corr-1",
+        meta={"k": "v"},
+    )
+
+    assert ctx.correlation_id == "corr-1"
+    assert ctx.get_meta() == {"k": "v"}
 
 
 def test_protocol_exports_are_importable_from_vm38_package() -> None:

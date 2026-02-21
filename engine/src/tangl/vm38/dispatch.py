@@ -177,8 +177,26 @@ def do_update(caller, *, ctx, **kwargs) -> None:
 
 
 def do_journal(caller, *, ctx, **kwargs):
-    result = CallReceipt.last_result(*_run_task("render_journal", caller=caller, ctx=ctx, **kwargs))
-    return _assert_journal_result(result)
+    receipts = _run_task("render_journal", caller=caller, ctx=ctx, **kwargs)
+    results = CallReceipt.gather_results(*receipts)
+    if not results:
+        return None
+
+    merged: list[Record] = []
+    for value in results:
+        normalized = _assert_journal_result(value)
+        if normalized is None:
+            continue
+        if isinstance(normalized, Record):
+            merged.append(normalized)
+            continue
+        merged.extend(normalized)
+
+    if not merged:
+        return None
+    if len(merged) == 1:
+        return merged[0]
+    return merged
 
 
 def do_finalize(caller, *, ctx, **kwargs):

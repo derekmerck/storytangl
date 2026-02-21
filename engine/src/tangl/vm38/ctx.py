@@ -6,7 +6,7 @@ from random import Random
 from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 from uuid import UUID
 
-from tangl.core38.ctx import DispatchCtx
+from tangl.core38.ctx import CoreCtx, DispatchCtx
 
 
 @runtime_checkable
@@ -15,11 +15,12 @@ class VmDispatchCtx(DispatchCtx, Protocol):
 
 
 @runtime_checkable
-class VmResolverCtx(VmDispatchCtx, Protocol):
+class VmResolverCtx(VmDispatchCtx, CoreCtx, Protocol):
     """Context contract required by vm38 provision resolver."""
 
     def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
     def get_template_scope_groups(self) -> Iterable[Iterable[Any]]: ...
+    # Legacy aliases retained as compatibility bridges.
     def get_entity_groups(self) -> Iterable[Iterable[Any]]: ...
     def get_template_groups(self) -> Iterable[Iterable[Any]]: ...
 

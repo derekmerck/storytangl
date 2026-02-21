@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import logging
+import warnings
 from typing import Any, Iterable, Optional, TypeAlias, Union, Self
 from uuid import UUID
 
@@ -61,6 +62,12 @@ class Resolver:
             return getter()
         getter = getattr(ctx, "get_entity_groups", None)
         if callable(getter):
+            warnings.warn(
+                "Resolver context uses legacy get_entity_groups(); "
+                "prefer get_location_entity_groups().",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return getter()
         raise TypeError(
             "Resolver context must provide get_location_entity_groups() or get_entity_groups()"
@@ -73,6 +80,12 @@ class Resolver:
             return getter()
         getter = getattr(ctx, "get_template_groups", None)
         if callable(getter):
+            warnings.warn(
+                "Resolver context uses legacy get_template_groups(); "
+                "prefer get_template_scope_groups().",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return getter()
         raise TypeError(
             "Resolver context must provide get_template_scope_groups() or get_template_groups()"

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 @with_default_category("World")
 class WorldController(CommandSet):
-    """World inspection commands powered by the orchestrator."""
+    """World inspection commands powered by service38."""
 
     _cmd: StoryTanglCLI
 

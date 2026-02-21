@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .controllers import DEFAULT_CONTROLLERS
 from .gateway import ServiceGateway38
 from .orchestrator import Orchestrator38
 
@@ -18,14 +19,7 @@ DEFAULT_ENDPOINT_POLICIES: dict[str, dict[str, tuple[str, ...]]] = {
 def register_default_controllers(orchestrator: Orchestrator38) -> None:
     """Register the standard controller set for service38."""
 
-    from tangl.service.controllers import RuntimeController, SystemController, UserController, WorldController
-
-    for controller in (
-        RuntimeController,
-        UserController,
-        SystemController,
-        WorldController,
-    ):
+    for controller in DEFAULT_CONTROLLERS:
         orchestrator.register_controller(controller)
 
 

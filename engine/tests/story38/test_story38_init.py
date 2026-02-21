@@ -6,6 +6,7 @@ dependency prelinking expectations, and runtime/loader guardrails.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,7 +19,7 @@ from tangl.story38 import InitMode, World38
 from tangl.story38.concepts import Actor, Location, Role, Setting
 from tangl.story38.fabula import GraphInitializationError, StoryCompiler38
 from tangl.story38.episode import Action, Block, Scene
-from tangl.core38 import BehaviorRegistry, DispatchLayer, Selector
+from tangl.core38 import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
 from tangl.story38.dispatch import story_dispatch
 from tangl.vm38 import Ledger
 
@@ -86,6 +87,30 @@ def test_minimal_mode_materializes_entry_and_ancestor_only() -> None:
     assert location_nodes == []
     assert graph.initial_cursor_id == block_nodes[0].uid
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
+
+
+def test_hybrid_mode_materializes_containers_plus_entry_chain() -> None:
+    script = _base_script()
+    script["scenes"]["epilogue"] = {
+        "blocks": {
+            "after": {"content": "After"},
+        }
+    }
+    world = World38.from_script_data(script_data=script)
+    result = world.create_story("run_hybrid", init_mode=InitMode.HYBRID)
+
+    graph = result.graph
+    scene_nodes = list(Selector(has_kind=Scene).filter(graph.values()))
+    block_nodes = list(Selector(has_kind=Block).filter(graph.values()))
+    actor_nodes = list(Selector(has_kind=Actor).filter(graph.values()))
+    location_nodes = list(Selector(has_kind=Location).filter(graph.values()))
+
+    assert {node.label for node in scene_nodes} == {"intro", "epilogue"}
+    assert {node.label for node in block_nodes} == {"start"}
+    assert actor_nodes == []
+    assert location_nodes == []
+    assert graph.initial_cursor_id == block_nodes[0].uid
+    assert any("HYBRID init left action destination unresolved" in warning for warning in result.report.warnings)
 
 
 def test_full_mode_materializes_all_and_wires_dependencies() -> None:
@@ -232,6 +257,26 @@ def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
 def test_loader_compiler_runtime_38_path(tmp_path: Path) -> None:
     world_root = tmp_path / "loader_world"
     world_root.mkdir()
+    media_dir = world_root / "media"
+    media_dir.mkdir()
+    (media_dir / "cover.svg").write_text(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"></svg>",
+        encoding="utf-8",
+    )
+    (world_root / "domain").mkdir()
+    package_dir = world_root / "loader_world"
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "domain.py").write_text(
+        """
+from tangl.core.entity import Entity
+
+
+class DomainCharacter(Entity):
+    ...
+""".strip(),
+        encoding="utf-8",
+    )
 
     (world_root / "world.yaml").write_text(
         """
@@ -260,6 +305,11 @@ scenes:
     compiled = WorldCompiler().compile(bundle, runtime_version="38")
 
     assert isinstance(compiled, World38)
+    assert compiled.domain is not None
+    assert compiled.assets is not None
+    assert compiled.resources is not None
+    assert compiled.templates is compiled.bundle.template_registry
+    assert "DomainCharacter" in compiled.domain.class_registry
     result = compiled.create_story("loader_story", init_mode=InitMode.MINIMAL)
     assert result.graph.initial_cursor_id is not None
     assert result.codec_id in {"near_native", "near_native_yaml"}
@@ -332,6 +382,54 @@ def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
     ]
     group_heads = [getattr(group[0], "uid", None) for group in groups if group]
     assert group_heads[: len(lineage)] == lineage
+
+
+def test_world_template_lookup_facade_finds_templates() -> None:
+    world = World38.from_script_data(script_data=_base_script())
+
+    start_template = world.find_template("intro.start")
+    assert start_template is not None
+    assert start_template.get_label() == "intro.start"
+
+    block_templates = world.find_templates(Selector(has_payload_kind=Block))
+    assert block_templates
+    assert any(template.get_label() == "intro.start" for template in block_templates)
+
+
+def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
+    @dataclass(slots=True)
+    class _TemplateScopeFacet:
+        extra_template_registry: TemplateRegistry
+
+        def get_template_scope_groups(self, *, caller=None, graph=None):
+            return [self.extra_template_registry.values()]
+
+    base_world = World38.from_script_data(script_data=_base_script())
+    extra_registry = TemplateRegistry(label="world_extra_templates")
+    extra_template = EntityTemplate(
+        label="world.extra.guest",
+        payload=Actor(label="guest", name="Guest Actor"),
+        registry=extra_registry,
+    )
+    _ = extra_template
+
+    world = World38(
+        label=base_world.label,
+        bundle=base_world.bundle,
+        templates=_TemplateScopeFacet(extra_template_registry=extra_registry),
+    )
+    result = world.create_story("scope_world_story", init_mode=InitMode.FULLY_SPECIFIED)
+    cursor = result.graph.get(result.graph.initial_cursor_id)
+    assert cursor is not None
+
+    groups = result.graph.get_template_scope_groups(cursor)
+    labels = {
+        item.get_label()
+        for group in groups
+        for item in group
+        if hasattr(item, "get_label")
+    }
+    assert "world.extra.guest" in labels
 
 
 def test_story38_source_has_no_legacy_core_vm_imports() -> None:
