@@ -25,6 +25,7 @@ from typing import (
     runtime_checkable,
     Mapping,
     Type,
+    Optional,
 )
 from enum import IntEnum, Enum
 from collections import ChainMap
@@ -383,13 +384,13 @@ class BehaviorRegistry(Registry[Behavior]):
     @classmethod
     def chain_execute_all(
         cls,
-        *registries,
-        call_args=None,
-        call_kwargs=None,
-        ctx=None,
-        task=None,
-        selector: Selector = None,
-        inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None,
+        *registries: BehaviorRegistry,
+        call_args: Optional[tuple[Any, ...]] = None,
+        call_kwargs: Optional[dict[str, Any]] = None,
+        ctx: Optional[RuntimeCtx] = None,
+        task: Optional[Tag] = None,
+        selector: Optional[Selector] = None,
+        inline_behaviors: Optional[Iterable[Behavior | Callable[..., Any]]] = None,
     ) -> Iterator[CallReceipt]:
         """Execute behaviors across multiple registries plus context-provided sources.
 
@@ -439,13 +440,13 @@ class BehaviorRegistry(Registry[Behavior]):
     @classmethod
     def chain_execute(
         cls,
-        *registries,
-        call_args=None,
-        call_kwargs=None,
-        ctx=None,
-        task=None,
-        selector: Selector = None,
-        inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None,
+        *registries: BehaviorRegistry,
+        call_args: Optional[tuple[Any, ...]] = None,
+        call_kwargs: Optional[dict[str, Any]] = None,
+        ctx: Optional[RuntimeCtx] = None,
+        task: Optional[Tag] = None,
+        selector: Optional[Selector] = None,
+        inline_behaviors: Optional[Iterable[Behavior | Callable[..., Any]]] = None,
     ) -> Iterator[CallReceipt]:
         """Backwards-compatible alias for :meth:`chain_execute_all`."""
         return cls.chain_execute_all(

@@ -198,8 +198,6 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
     cursor is a container, descent takes priority.  We rely on registration
     order (container handler registered first) for this.
     """
-    from .resolution_phase import ResolutionPhase
-
     for edge in caller.edges_out():
         if not isinstance(edge, TraversableEdge):
             continue
@@ -223,14 +221,6 @@ def apply_runtime_effects(*, caller, ctx, **kw):
     """Apply UPDATE-phase runtime effects attached to the current node."""
     if hasattr(caller, "apply_effects"):
         caller.apply_effects(phase=ResolutionPhase.UPDATE, ctx=ctx)
-    return None
-
-
-@on_finalize
-def apply_final_runtime_effects(*, caller, ctx, **kw):
-    """Apply FINALIZE-phase runtime effects attached to the current node."""
-    if hasattr(caller, "apply_effects"):
-        caller.apply_effects(phase=ResolutionPhase.FINALIZE, ctx=ctx)
     return None
 
 
@@ -276,6 +266,14 @@ def mark_visited(*, caller, ctx, **kw):
 # FINALIZE — finalize-phase runtime hooks
 # ---------------------------------------------------------------------------
 
+@on_finalize
+def apply_final_runtime_effects(*, caller, ctx, **kw):
+    """Apply FINALIZE-phase runtime effects attached to the current node."""
+    if hasattr(caller, "apply_effects"):
+        caller.apply_effects(phase=ResolutionPhase.FINALIZE, ctx=ctx)
+    return None
+
+
 # Post-MVP: event-sourcing integration may also register a handler here that:
 # 1. Collects mutations from the watched graph
 # 2. Builds a Patch record
@@ -299,8 +297,6 @@ def follow_triggered_postreqs(*, caller, ctx, **kw):
     Useful for narrative pacing: "You enter the tavern" (JOURNAL) → auto-advance
     to "You approach the bar" (POSTREQS redirect) → THEN the player gets choices.
     """
-    from .resolution_phase import ResolutionPhase
-
     for edge in caller.edges_out():
         if not isinstance(edge, TraversableEdge):
             continue

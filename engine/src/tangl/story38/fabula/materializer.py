@@ -53,11 +53,11 @@ class _PrelinkCtx:
             return None
         return self.graph.get(self.cursor_id)
 
-    def get_authorities(self):
+    def get_authorities(self) -> list[object]:
         return []
 
     # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self):
+    def get_registries(self) -> list[object]:
         return self.get_authorities()
 
     def get_inline_behaviors(self):

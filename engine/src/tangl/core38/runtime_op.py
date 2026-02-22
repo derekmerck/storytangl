@@ -35,7 +35,7 @@ class RuntimeOp(BaseModel):
     - eval(ns, *, rand=None) -> Any: Evaluate expression, return result
     - exec(ns, *, rand=None) -> StringMap: Execute statement, return mutated namespace
     - satisfied_by(ns, *, rand=None) -> bool: Evaluate as boolean condition
-    - all_satisfied_by(*exprs, ns) -> bool: Evaluate all conditions are true
+    - all_satisfied_by(*exprs, ns, rand=None) -> bool: Evaluate all conditions are true
     - apply(ns, *, rand=None) -> StringMap: Execute and return namespace (alias for exec)
     - apply_all(*exprs, ns) -> StringMap: Execute all exprs and return mutated namespace
 
@@ -65,7 +65,12 @@ class RuntimeOp(BaseModel):
             ns = {}
         globs: dict[str, Any] = {"__builtins__": safe_builtins}
         if extra_globals:
-            globs.update(extra_globals)
+            sanitized_globals = {
+                key: value
+                for key, value in extra_globals.items()
+                if key != "__builtins__"
+            }
+            globs.update(sanitized_globals)
         return eval(s, globs, ns)
 
     @classmethod
@@ -80,7 +85,12 @@ class RuntimeOp(BaseModel):
             ns = {}
         globs: dict[str, Any] = {"__builtins__": safe_builtins}
         if extra_globals:
-            globs.update(extra_globals)
+            sanitized_globals = {
+                key: value
+                for key, value in extra_globals.items()
+                if key != "__builtins__"
+            }
+            globs.update(sanitized_globals)
         exec(s, globs, ns)
         return ns
 
@@ -99,9 +109,15 @@ class RuntimeOp(BaseModel):
         return bool(self.eval(ns, rand=rand))
 
     @classmethod
-    def all_satisfied_by(cls, *exprs: str, ns: StringMap = None) -> Any:
+    def all_satisfied_by(
+        cls,
+        *exprs: str,
+        ns: StringMap = None,
+        rand: Random | None = None,
+    ) -> bool:
         """Return ``True`` when all expressions evaluate truthy in the same namespace."""
-        return all([bool(cls._eval_expr(e, ns)) for e in exprs])
+        extra = {"rand": rand} if rand is not None else None
+        return all(bool(cls._eval_expr(e, ns, extra_globals=extra)) for e in exprs)
 
     def apply(self, ns: StringMap = None, *, rand: Random | None = None) -> StringMap:
         """Alias of :meth:`exec` for effect-oriented call sites."""

@@ -300,6 +300,23 @@ class TestTraversableNodeContainer:
         node.apply_effects(ResolutionPhase.FINALIZE, ns=ns)
         assert ns["counter"] == 20
 
+    def test_apply_effects_accepts_int_phase_values(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="n",
+            effects=[TraversableEffect(expr="counter = counter + 1")],
+        )
+        ns = {"counter": 1}
+        node.apply_effects(ResolutionPhase.UPDATE.value, ns=ns)
+        assert ns["counter"] == 2
+
+    def test_apply_effects_rejects_non_phase_non_mapping_positional(self) -> None:
+        g = Graph()
+        node = _node(g, label="n", effects=[TraversableEffect(expr="counter = 1")])
+        with pytest.raises(TypeError, match="phase must be ResolutionPhase"):
+            node.apply_effects("not-a-phase")
+
     def test_apply_effects_to_targets_other_namespace(self) -> None:
         g = Graph()
         provider = _node(
@@ -336,6 +353,24 @@ class TestTraversableNodeContainer:
         rng = Random(42)
 
         assert node.available(ns={}, rand=rng) is True
+
+    def test_available_uses_ctx_get_random_when_present(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="n",
+            availability=[Predicate(expr="rand.random() < 0.9")],
+        )
+        ctx = SimpleNamespace(get_ns=lambda _: {}, get_random=lambda: Random(42))
+        assert node.available(ctx=ctx) is True
+
+    def test_apply_effects_uses_ctx_get_random_when_present(self) -> None:
+        g = Graph()
+        node = _node(g, label="n", effects=[TraversableEffect(expr="coin = rand.random() < 0.9")])
+        ns: dict[str, object] = {}
+        ctx = SimpleNamespace(get_ns=lambda _: ns, get_random=lambda: Random(42))
+        node.apply_effects(ctx=ctx)
+        assert ns["coin"] is True
 
 
 # ============================================================================

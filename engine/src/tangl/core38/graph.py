@@ -90,9 +90,8 @@ class Graph(Registry[GraphItem]):
 
         See Also
         --------
-        :meth:`tangl.vm38.runtime.frame.Frame.get_registries`
-            Assembles the full registry list for ``chain_execute``:
-            ``[vm_dispatch] + graph.get_authorities()``.
+        :meth:`tangl.vm38.runtime.frame.PhaseCtx.get_authorities`
+            Supplies graph/world authority registries to VM dispatch expansion.
         :class:`tangl.story38.story_graph.StoryGraph38`
             Reference override — returns story and world authority registries.
 
@@ -101,7 +100,7 @@ class Graph(Registry[GraphItem]):
         The assembly order matters: ``vm_dispatch`` is always first (SYSTEM
         layer), then authorities returned here (APPLICATION and AUTHOR layers)
         in declaration order.  Lower dispatch layers (LOCAL, INLINE) are added
-        by ``Frame.get_registries`` separately.
+        by ``PhaseCtx.get_authorities`` and inline behavior expansion separately.
         """
         return []
 

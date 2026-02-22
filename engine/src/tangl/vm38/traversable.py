@@ -66,6 +66,18 @@ __all__ = [
 # Traversal trait mixins
 # ---------------------------------------------------------------------------
 
+def _resolve_rand(*, rand: Random | None, ctx: Any = None) -> Random | None:
+    """Resolve RNG from explicit arg first, then context helpers."""
+    if rand is not None:
+        return rand
+    if ctx is None:
+        return None
+    get_random = getattr(ctx, "get_random", None)
+    if callable(get_random):
+        return get_random()
+    return getattr(ctx, "random", None)
+
+
 class TraversableEffect(Effect):
     """Effect annotated with a VM pipeline trigger phase."""
 
@@ -81,7 +93,7 @@ class HasAvailability(BaseModelPlus):
         self,
         ns: StringMap | None = None,
         *,
-        ctx=None,
+        ctx: Any = None,
         rand: Random | None = None,
     ) -> bool:
         """Return ``True`` when every availability predicate is satisfied."""
@@ -91,14 +103,14 @@ class HasAvailability(BaseModelPlus):
             ns = ctx.get_ns(self)
         if ns is None:
             ns = {}
-        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        resolved_rand = _resolve_rand(rand=rand, ctx=ctx)
         return all(predicate.satisfied_by(ns, rand=resolved_rand) for predicate in self.availability)
 
     def available_for(
         self,
         other: object,
         *,
-        ctx,
+        ctx: Any,
         rand: Random | None = None,
     ) -> bool:
         """Evaluate this entity's availability against ``other``'s namespace."""
@@ -107,7 +119,7 @@ class HasAvailability(BaseModelPlus):
         ns = ctx.get_ns(other) if ctx is not None and hasattr(ctx, "get_ns") else {}
         if ns is None:
             ns = {}
-        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        resolved_rand = _resolve_rand(rand=rand, ctx=ctx)
         return all(predicate.satisfied_by(ns, rand=resolved_rand) for predicate in self.availability)
 
 
@@ -139,10 +151,10 @@ class HasEffects(BaseModelPlus):
 
     def apply_effects(
         self,
-        phase: ResolutionPhase | StringMap = ResolutionPhase.UPDATE,
+        phase: ResolutionPhase | int | StringMap = ResolutionPhase.UPDATE,
         *,
         ns: StringMap | None = None,
-        ctx=None,
+        ctx: Any = None,
         rand: Random | None = None,
     ) -> StringMap:
         """Apply effects for ``phase`` to this object's namespace.
@@ -150,13 +162,22 @@ class HasEffects(BaseModelPlus):
         For backward compatibility, passing a namespace as the first positional
         argument is treated as ``ns`` with ``phase=UPDATE``.
         """
-        resolved_phase = phase
+        resolved_phase: ResolutionPhase
         resolved_ns = ns
-        if not isinstance(phase, ResolutionPhase):
+        if isinstance(phase, ResolutionPhase):
+            resolved_phase = phase
+        elif isinstance(phase, Mapping):
             if ns is not None:
                 raise TypeError("ns cannot be passed twice to apply_effects")
             resolved_phase = ResolutionPhase.UPDATE
             resolved_ns = phase
+        else:
+            try:
+                resolved_phase = ResolutionPhase(phase)
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    "phase must be ResolutionPhase, a phase value, or a namespace mapping",
+                ) from exc
 
         matching = self._effects_for(resolved_phase)
         if resolved_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
@@ -168,7 +189,7 @@ class HasEffects(BaseModelPlus):
         if not matching:
             return resolved_ns
 
-        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        resolved_rand = _resolve_rand(rand=rand, ctx=ctx)
         for effect in matching:
             effect.apply(resolved_ns, rand=resolved_rand)
         self._sync_locals(resolved_ns)
@@ -179,7 +200,7 @@ class HasEffects(BaseModelPlus):
         other: object,
         phase: ResolutionPhase = ResolutionPhase.UPDATE,
         *,
-        ctx,
+        ctx: Any,
         rand: Random | None = None,
     ) -> StringMap:
         """Apply effects for ``phase`` to another object's namespace."""
@@ -192,7 +213,7 @@ class HasEffects(BaseModelPlus):
         if not matching:
             return target_ns
 
-        resolved_rand = rand if rand is not None else getattr(ctx, "random", None)
+        resolved_rand = _resolve_rand(rand=rand, ctx=ctx)
         for effect in matching:
             effect.apply(target_ns, rand=resolved_rand)
         return target_ns
@@ -684,7 +705,7 @@ class TraversableEdge(Edge):
         successor = self.successor
         if successor is None:
             return False
-        rand = getattr(ctx, "random", None) if ctx is not None else None
+        rand = _resolve_rand(rand=None, ctx=ctx)
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(successor)
         return successor.available(ns=ns, ctx=ctx, rand=rand)
@@ -786,7 +807,7 @@ class AnonymousEdge:
         """Availability check delegated to successor node availability."""
         if self.successor is None:
             return False
-        rand = getattr(ctx, "random", None) if ctx is not None else None
+        rand = _resolve_rand(rand=None, ctx=ctx)
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(self.successor)
         return self.successor.available(ns=ns, ctx=ctx, rand=rand)

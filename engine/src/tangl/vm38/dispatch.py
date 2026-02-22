@@ -64,7 +64,7 @@ automatically alongside any registries provided by the dispatch context.
 # Hook generation helpers
 # ---------------------------------------------------------------------------
 
-def _validate_dispatch_ctx(ctx) -> None:
+def _validate_dispatch_ctx(ctx: Any) -> None:
     """Raise ``TypeError`` when ctx lacks dispatch protocol methods."""
     has_authorities = callable(getattr(ctx, "get_authorities", None)) or callable(
         getattr(ctx, "get_registries", None)

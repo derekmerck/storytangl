@@ -529,7 +529,7 @@ bookmarks and why Graph doesn't have traversal algorithms.
 
 `Graph.get_authorities()` is the dispatch bootstrapping extension point.  Application-layer
 graph subclasses override it to expose their behavior registries (story, world, mechanics)
-to the VM's ``Frame.get_registries()`` without any type coupling between core and higher
+to the VM's ``PhaseCtx.get_authorities()`` without any type coupling between core and higher
 layers.  The no-op default on bare ``Graph`` is correct — core itself has no policy
 registries to contribute.  This hook exists precisely *because* you cannot use dispatch
 to assemble the dispatch chain: authorities must be discoverable before any behavior fires.
@@ -544,7 +544,7 @@ a hook *does* — it only ensures the hook *fires* at the right time.
 ### Progressive Protocols
 
 Rather than a monolithic context type, `_ctx` is duck-typed with progressive expectations
-by layer. Core dispatch expects `get_registries()` and `get_inline_behaviors()`. VM
+by layer. Core dispatch expects `get_authorities()` and `get_inline_behaviors()`. VM
 extends with graph access, template data, and receipt management. Story extends further
 with actor registries and world-level asset managers. Each layer documents its Protocol;
 the runtime context satisfies all layers it passes through.
