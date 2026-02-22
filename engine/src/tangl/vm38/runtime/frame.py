@@ -72,7 +72,6 @@ from tangl.core38 import (
 from tangl.utils.hashing import hashing_func
 from ..ctx import VmPhaseCtx
 from ..dispatch import (
-    dispatch as vm_dispatch,
     do_finalize,
     do_gather_ns,
     do_journal,
@@ -108,7 +107,7 @@ class PhaseCtx:
     Why
     ---
     Every ``do_*`` call in the pipeline requires a context that satisfies the
-    ``BehaviorRegistry.chain_execute`` protocol: ``get_registries()`` and
+    ``BehaviorRegistry.chain_execute_all`` protocol: ``get_authorities()`` and
     ``get_inline_behaviors()``.  ``PhaseCtx`` provides these, plus VM-specific
     accessors for the cursor, graph, namespace, and random state.
 
@@ -134,7 +133,8 @@ class PhaseCtx:
 
     API
     ---
-    - ``get_registries()`` — registries for ``chain_execute``.
+    - ``get_authorities()`` — authority registries for dispatch expansion.
+    - ``get_registries()`` — compatibility alias for ``get_authorities()``.
     - ``get_inline_behaviors()`` — inline behaviors (empty for now).
     - ``get_ns(node)`` — cached scoped namespace from ancestor chain.
     - ``get_random()`` — deterministic RNG for this frame.
@@ -163,20 +163,19 @@ class PhaseCtx:
 
     # -- Dispatch protocol --------------------------------------------------
 
-    def get_registries(self) -> list[BehaviorRegistry]:
-        """Registries to include in ``chain_execute``.
-
-        Always includes the module-level ``vm_dispatch`` registry. If the
-        graph exposes a ``get_authorities()`` hook, those registries are
-        appended in declaration order.
-        """
-        registries: list[BehaviorRegistry] = [vm_dispatch]
+    def get_authorities(self) -> list[BehaviorRegistry]:
+        """Authority registries contributed by the graph/runtime environment."""
+        registries: list[BehaviorRegistry] = []
         get_authorities = getattr(self.graph, "get_authorities", None)
         if callable(get_authorities):
             for registry in get_authorities() or ():
                 if isinstance(registry, BehaviorRegistry) and registry not in registries:
                     registries.append(registry)
         return registries
+
+    # Backwards-compatible alias retained during v38 migration.
+    def get_registries(self) -> list[BehaviorRegistry]:
+        return self.get_authorities()
 
     def get_inline_behaviors(self) -> list[Callable | Behavior]:
         return self.inline_behaviors

@@ -11,9 +11,12 @@ The runtime-op family is intentionally small and serializable:
 Notes
 -----
 Execution uses ``safe_builtins`` rather than full Python builtins.
+
+Pass ``rand=Random(...)`` to inject a deterministic RNG into expression globals.
 """
 
 from __future__ import annotations
+from random import Random
 from typing import Any
 
 from pydantic import BaseModel
@@ -29,11 +32,11 @@ class RuntimeOp(BaseModel):
     Use Query/Predicate/Effect subclasses for semantic clarity in domain code.
 
     RuntimeOp provides:
-    - eval(ns) -> Any: Evaluate expression, return result
-    - exec(ns) -> StringMap: Execute statement, return mutated namespace
-    - satisfied_by(ns) -> bool: Evaluate as boolean condition
-    - all_satisfied_by(*exprs, ns) -> bool: Evaluate all conditions are true
-    - apply(ns) -> StringMap: Execute and return namespace (alias for exec)
+    - eval(ns, *, rand=None) -> Any: Evaluate expression, return result
+    - exec(ns, *, rand=None) -> StringMap: Execute statement, return mutated namespace
+    - satisfied_by(ns, *, rand=None) -> bool: Evaluate as boolean condition
+    - all_satisfied_by(*exprs, ns, rand=None) -> bool: Evaluate all conditions are true
+    - apply(ns, *, rand=None) -> StringMap: Execute and return namespace (alias for exec)
     - apply_all(*exprs, ns) -> StringMap: Execute all exprs and return mutated namespace
 
     Example:
@@ -51,38 +54,74 @@ class RuntimeOp(BaseModel):
     expr: str
 
     @classmethod
-    def _eval_expr(cls, s: str, ns: StringMap = None) -> Any:
+    def _eval_expr(
+        cls,
+        s: str,
+        ns: StringMap = None,
+        *,
+        extra_globals: dict[str, Any] | None = None,
+    ) -> Any:
         if ns is None:
             ns = {}
-        return eval(s, {"__builtins__": safe_builtins}, ns)
+        globs: dict[str, Any] = {"__builtins__": safe_builtins}
+        if extra_globals:
+            sanitized_globals = {
+                key: value
+                for key, value in extra_globals.items()
+                if key != "__builtins__"
+            }
+            globs.update(sanitized_globals)
+        return eval(s, globs, ns)
 
     @classmethod
-    def _exec_expr(cls, s: str, ns: StringMap = None) -> StringMap:
+    def _exec_expr(
+        cls,
+        s: str,
+        ns: StringMap = None,
+        *,
+        extra_globals: dict[str, Any] | None = None,
+    ) -> StringMap:
         if ns is None:
             ns = {}
-        exec(s, {"__builtins__": safe_builtins}, ns)
+        globs: dict[str, Any] = {"__builtins__": safe_builtins}
+        if extra_globals:
+            sanitized_globals = {
+                key: value
+                for key, value in extra_globals.items()
+                if key != "__builtins__"
+            }
+            globs.update(sanitized_globals)
+        exec(s, globs, ns)
         return ns
 
-    def eval(self, ns: StringMap = None) -> Any:
+    def eval(self, ns: StringMap = None, *, rand: Random | None = None) -> Any:
         """Evaluate this expression and return the result."""
-        return self._eval_expr(self.expr, ns)
+        extra = {"rand": rand} if rand is not None else None
+        return self._eval_expr(self.expr, ns, extra_globals=extra)
 
-    def exec(self, ns: StringMap = None) -> StringMap:
+    def exec(self, ns: StringMap = None, *, rand: Random | None = None) -> StringMap:
         """Execute this statement and return the mutated namespace."""
-        return self._exec_expr(self.expr, ns)
+        extra = {"rand": rand} if rand is not None else None
+        return self._exec_expr(self.expr, ns, extra_globals=extra)
 
-    def satisfied_by(self, ns: StringMap = None) -> bool:
+    def satisfied_by(self, ns: StringMap = None, *, rand: Random | None = None) -> bool:
         """Evaluate this expression as a truthy/falsey guard."""
-        return bool(self.eval(ns))
+        return bool(self.eval(ns, rand=rand))
 
     @classmethod
-    def all_satisfied_by(cls, *exprs: str, ns: StringMap = None) -> Any:
+    def all_satisfied_by(
+        cls,
+        *exprs: str,
+        ns: StringMap = None,
+        rand: Random | None = None,
+    ) -> bool:
         """Return ``True`` when all expressions evaluate truthy in the same namespace."""
-        return all([bool(cls._eval_expr(e, ns)) for e in exprs])
+        extra = {"rand": rand} if rand is not None else None
+        return all(bool(cls._eval_expr(e, ns, extra_globals=extra)) for e in exprs)
 
-    def apply(self, ns: StringMap = None) -> StringMap:
+    def apply(self, ns: StringMap = None, *, rand: Random | None = None) -> StringMap:
         """Alias of :meth:`exec` for effect-oriented call sites."""
-        return self._exec_expr(self.expr, ns)
+        return self.exec(ns, rand=rand)
 
     @classmethod
     def apply_all(cls, *exprs: str, ns: StringMap = None) -> StringMap:
@@ -117,8 +156,8 @@ class Query(RuntimeOp):
         TypeError: Query cannot mutate state via exec()
     """
 
-    def __call__(self, ns: StringMap = None) -> Any:
-        return self.eval(ns)
+    def __call__(self, ns: StringMap = None, *, rand: Random | None = None) -> Any:
+        return self.eval(ns, rand=rand)
 
     @classmethod
     def _exec_expr(cls, *_, **__) -> Any:
@@ -148,8 +187,8 @@ class Predicate(RuntimeOp):
         TypeError: Predicate cannot mutate state via exec()
     """
 
-    def __call__(self, ns: StringMap = None) -> bool:
-        return self.satisfied_by(ns)
+    def __call__(self, ns: StringMap = None, *, rand: Random | None = None) -> bool:
+        return self.satisfied_by(ns, rand=rand)
 
     @classmethod
     def _exec_expr(cls, *_, **__) -> Any:
@@ -178,8 +217,8 @@ class Effect(RuntimeOp):
         TypeError: Effect cannot be evaluated for a value
     """
 
-    def __call__(self, ns: StringMap = None) -> Any:
-        return self.apply(ns)
+    def __call__(self, ns: StringMap = None, *, rand: Random | None = None) -> Any:
+        return self.apply(ns, rand=rand)
 
     @classmethod
     def _eval_expr(cls, *_, **__) -> Any:
