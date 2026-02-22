@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from tangl.core38 import Node
 from typing import Any
 
 from tangl.vm38 import TraversableNode, on_get_ns
 
 
-class Actor(TraversableNode):
+class Actor(Node):
     """Minimal actor concept node for story38."""
 
     name: str = ""

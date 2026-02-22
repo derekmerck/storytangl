@@ -59,7 +59,7 @@ from .entity import Entity
 from .selector import Selector
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 ET = TypeVar('ET', bound=Entity)
 

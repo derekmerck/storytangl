@@ -1,7 +1,7 @@
-# tangl.core — Design Notes
+# tangl.core38 — Design Notes
 
-> Architectural intent, design decisions, and rationale for the core subpackage
-> of the StoryTangl narrative engine (v3.7/v3.8 framework).
+> Architectural intent, design decisions, and rationale for the core38 subpackage
+> of the StoryTangl narrative engine (v3.8 framework).
 
 ---
 
@@ -52,18 +52,19 @@ Higher layers express logic as compositions of these primitives, not parallel ve
 ## Core Module Map
 
 ```
-tangl.core
+tangl.core38
 ├── Lifecycle      → bases.py      (existence, frozen vs mutable, identity, uniqueness)
 ├── Shape          → entity.py     (Entity: canonical concrete composition)
 │                  → registry.py   (Registry, RegistryAware, EntityGroup, HierarchicalGroup)
 │                  → graph.py      (Graph, Node, Edge, Subgraph, HierarchicalNode)
 │                  → singleton.py  (Singleton, InstanceInheritance)
-│                  → token.py      (Token, TokenFactory)
+│                  → token.py      (Token[X] — wrapper class factory)
 │                  → record.py     (Record, OrderedRegistry)
 │                  → template.py   (EntityTemplate, Snapshot, TemplateGroup, TemplateRegistry)
-├── Behavior       → behavior.py   (Behavior, CallReceipt, BehaviorRegistry)
+├── Behavior       → behavior.py   (Behavior, CallReceipt, BehaviorRegistry, AggregationMode)
 │                  → dispatch.py   (on_*/do_* hook pairs, global dispatch registry)
 ├── Selection      → selector.py   (Selector: pure query predicate)
+├── Runtime Ops    → runtime_op.py (RuntimeOp, Query, Predicate, Effect)
 └── Context        → ctx.py        (resolve_ctx, using_ctx, ambient ContextVar)
 ```
 
@@ -74,6 +75,10 @@ not itself define:
 
 - Requirements, satisfaction, provisioning, scope visibility (VM)
 - Traversal, cursor, steps, epochs, ledgers (VM)
+- Availability predicates and phased effects on traversable nodes (VM — see
+  `vm38.traversable.HasAvailability`, `HasEffects`, `TraversableEffect`)
+- Token provisioning and singleton catalog discovery (VM — see
+  `vm38.provision.TokenProvisioner`)
 - Narrative semantics or syntax (Story)
 - Persistence policies, transactions, access control (Service)
 
@@ -87,16 +92,21 @@ The foundation of the entire system. Five orthogonal trait mixins that compose v
 standard Python MRO to produce the identity, comparison, serialization, ordering, and
 state behavior of every object in the graph:
 
-| Trait           | Concern         | `__eq__`         | Hashable? |
-|-----------------|-----------------|------------------|-----------|
-| `HasIdentity`   | Who am I?       | `eq_by_id` (uid) | No*       |
-| `Unstructurable` | What am I?     | `eq_by_value`    | No        |
-| `HasContent`    | What do I hold? | `eq_by_content`  | No        |
-| `HasOrder`      | When was I?     | (none)           | No        |
-| `HasState`      | Runtime scratch | (none)           | No        |
+| Trait            | Concern         | `__eq__`         | Hashable? |
+|------------------|-----------------|------------------|-----------|
+| `HasIdentity`    | Who am I?       | `eq_by_id` (uid) | No*       |
+| `Unstructurable` | What am I?      | `eq_by_value`    | No        |
+| `HasContent`     | What do I hold? | `eq_by_content`  | No        |
+| `HasOrder`       | When was I?     | (none)           | No        |
+| `HasState`       | Runtime scratch | (none)           | No        |
 
 *HasIdentity overrides `__eq__`, so Pydantic sets `__hash__ = None`. Singletons and
 Records restore `__hash__` explicitly.
+
+**Availability predicates and executable effects are NOT in this table.** They require
+`ResolutionPhase` vocabulary from the VM layer. `HasAvailability`, `HasEffects`, and
+`TraversableEffect` live in `vm38.traversable` as VM-layer traits that happen to wrap
+core `Predicate` and `Effect` primitives. See `VM_DESIGN.md — Traversal Traits`.
 
 **Key design decisions:**
 
@@ -125,7 +135,9 @@ the identifier set.
 **`HasState.locals` is invisible to identity.** The `locals` dict is a mutable
 scratchpad for runtime working memory. It is not used for identity, content hashing,
 or equality by any trait — it exists purely for runtime state that higher layers
-manage.
+manage. The VM's `HasEffects._sync_locals()` is responsible for writing effect
+mutations back to `locals` after they run — this is the node's concern, not
+`RuntimeOp`'s.
 
 **Seq ordering is monotonic across runs.** `HasOrder._seq` is seeded from
 `time.time_ns()` and auto-increments. This ensures monotonicity within and across
@@ -151,9 +163,10 @@ both `ctx=` and `_ctx=` in the same call).
 
 **Ctx is duck-typed.** The `_ctx` parameter accepts `Any`. The dispatch contract is
 progressive by layer: core expects `get_registries()` and `get_inline_behaviors()`;
-VM extends with graph, template data, and `get_receipts()`; Story extends further.
-Each layer should define a Protocol for what it minimally expects. The legacy
-`core.ctx.Ctx` frozen dataclass is a placeholder/stub.
+VM extends with graph access, template data, and `get_receipts()`; Story extends further
+with actor registries and world-level asset managers. Each layer should define a Protocol
+for what it minimally expects. The legacy `core.ctx.Ctx` frozen dataclass is a
+placeholder/stub.
 
 **Deferred imports are intentional.** Entity's dispatch/ctx imports are deferred to
 break circular dependencies. Entity is a low-level concept; dispatch and ctx are
@@ -172,9 +185,16 @@ they query.
 
 **Callable detection is general.** v37 checked for `has_`/`is_` prefixes explicitly.
 v38 checks `callable(attrib_value)` — any callable attribute on the entity is invoked
-with the criterion value. Convention is still `has_*`/`is_*` but it's not enforced. This
-enables patterns like `Selector(caller_kind=Entity).matches(behavior)` where
-`Behavior.caller_kind(kind)` is transparently invoked.
+with the criterion value as sole argument. Convention is still `has_*`/`is_*` but it is
+not enforced. This enables patterns like `Selector(caller_kind=Entity).matches(behavior)`
+where `Behavior.caller_kind(kind)` is transparently invoked.
+
+**The single-argument callable convention is the system-wide matching contract.**
+Methods intended for selector matching — whether on entities, singletons, or tokens —
+should accept a single argument that may be a scalar, set, or tuple, handling spreading
+internally if needed (see `HasIdentity.has_tags` for the canonical pattern). This
+convention applies equally to `Selector.matches()` and to `TokenProvisioner`'s singleton
+matching: the same method signature works in both contexts.
 
 **`Any` is a wildcard; `None` is not.** `Selector(label=Any)` skips the label check.
 `Selector(label=None)` matches entities where `entity.label == None`. This distinction
@@ -200,13 +220,13 @@ duplicate. The guard was removed because the number of add-paths was reduced, ma
 double-add much less likely. Dispatch hooks provide interception if dedup is needed at
 a higher layer.
 
-**`__setitem__` intentionally raises.** `reg[uid] = entity` raises KeyError, directing
+**`__setitem__` intentionally raises.** `reg[uid] = entity` raises `KeyError`, directing
 users to `add()`. This ensures dispatch hooks fire on all additions.
 
 **`bind_registry` is a pointer, not a copy.** Named to emphasize pointer semantics —
 Pydantic would occasionally copy during validation, and the name `set_registry` was
 misleading. `bind_registry(None)` unbinds (used by `Registry.remove()`).
-`bind_registry(registry)` on an already-bound item raises ValueError to prevent
+`bind_registry(registry)` on an already-bound item raises `ValueError` to prevent
 accidental dual-ownership.
 
 **`_validate_linkable` uses identity, not equality.** The check is `item.registry is self`,
@@ -220,6 +240,14 @@ equivalent is the `first_result` aggregator.
 **Hierarchical reparenting.** `HierarchicalGroup.add_member()` removes the item from its
 old parent first, then adds to the new parent. Cache invalidation via
 `_invalidate_parent_attr()` clears the `@cached_property` stored in `__dict__`.
+
+**Back-pointer aliasing is a layering pattern.** `RegistryAware` provides `item.registry`
+as the canonical back-pointer to the owning registry. Higher layers alias this to domain-
+meaningful names: `GraphItem.graph` aliases `item.registry`; `StoryItem.story` aliases
+`item.registry` for story-graph items. This extends upward: `registry.factory` is a
+back-pointer from a graph to its owning factory/world, so `item.registry.factory` gives
+any item access to its world, aliased as `StoryGraph.world` at the story layer. The
+pattern provides ergonomic navigation without special machinery.
 
 
 ### Graph (`graph.py`)
@@ -243,44 +271,53 @@ edges are created before their targets exist.
 **Three access patterns for edge endpoints:**
 1. `edge.predecessor` — property, dereferences through `graph.get()`
 2. `edge.set_predecessor(node, _ctx)` — explicit ctx for dispatch hook firing
-3. `edge.predecessor = node` — property setter, uses ambient ctx only
+3. `edge.predecessor_id` — raw UUID for serialization and identity comparison
 
-**Typed find helpers inject `has_kind` narrowing.** `find_nodes()` calls
-`selector.with_criteria(has_kind=Node)`. Because `with_criteria` only narrows, you can
-further restrict to `SubclassNode` but can't widen back to `GraphItem`.
+**`get_authorities()` is the dispatch bootstrapping extension point.** Application-layer
+graph subclasses override this to expose domain-specific behavior registries to the VM's
+`Frame.get_registries()`. The no-op default on a bare `Graph` is correct — core has no
+policy registries to contribute.
 
-**`_do_link` / `_do_unlink` are bridge methods.** They delegate to
-`dispatch.do_link`/`do_unlink`. Both Edge mutations and Subgraph membership changes
-fire through these bridge methods, providing a uniform hook surface for graph structural
-changes.
-
-**HierarchicalNode is pure MRO composition.** `HierarchicalNode(HierarchicalGroup, Node)`
-adds no fields or methods. It exists so a node can participate in both parent-child
-hierarchy and edge navigation simultaneously.
+This hook exists because dispatch bootstrapping cannot use dispatch to assemble itself:
+the authority chain must be discoverable before any behavior fires. A duck-typed method
+on the graph is the right primitive — `Frame.get_registries()` checks
+`getattr(graph, "get_authorities", None)` and calls it if present, without type-coupling
+to any application graph class. `StoryGraph38` overrides it to return `[story_dispatch,
+*world.get_authorities()]`. Future `WorldGraph`, `MechanicsGraph`, etc. follow the same
+pattern.
 
 
 ### Singleton (`singleton.py`)
 
-Label-unique, immutable concept-level entities with per-class instance registries.
+Frozen, content-addressed referents that serve as canonical type definitions for Token
+instances.
 
-**Per-class registry isolation.** `__init_subclass__` creates a fresh `Registry()` for each
-subclass. `Singleton._instances` and `MySingleton._instances` are separate — the same
-label can exist in different class hierarchies without collision.
+**Singletons enforce uniqueness by label.** Two `Singleton` instances with the same
+`label` are the same object — the constructor raises `ValueError` on a collision.
+`get_instance(label)` retrieves the canonical instance; `has_instance(label)` tests
+without raising.
 
-**Identity is `(class, label)`.** `id_hash()` is keyed by class and label, not class and
-uid. Two singletons with the same class and label would have the same id_hash — but
-uniqueness is enforced by the model validator so this can't happen at runtime.
+**`_instances` is a per-class Registry.** Each Singleton subclass maintains its own
+`_instances` class-variable registry. Querying instances uses the same
+`registry.find_all(selector=s)` mechanics as any other registry — including the callable
+attribute convention from `Selector.matches()`. This is how `TokenProvisioner` discovers
+matching singleton candidates without any special matching machinery.
 
-**Frozen and hashable.** Singletons are `ConfigDict(frozen=True)` and restore
-`__hash__` as `hash((self.__class__, self.label))`. This enables set membership and dict
-key usage — essential since singletons represent concept-level types (weapon types, NPC
-archetypes, demographic categories) that frequently appear in lookup tables.
+**`json_schema_extra={"instance_var": True}` marks per-token state.** Fields with this
+annotation belong to individual token instances rather than the shared type definition.
+`Token._instance_vars(singleton_cls)` discovers these fields by inspecting
+`model_fields`, and they are materialized as real Pydantic fields on the dynamic wrapper
+class. The same annotation drives `TokenProvisioner._partition()`, which splits
+requirement parameters into type-level selector criteria (used to filter singletons) and
+token locals (passed through to the minted token).
 
-**Reference-only serialization.** `unstructure()` returns just `{kind: cls, label: str}`.
-`structure()` looks up the existing instance. Singletons must be created before they can
-be deserialized — they are live objects, not data.
+**`load_instances_from_yaml()` is the authoring entry point.** World asset managers
+call this during initialization to populate singleton registries from authored YAML
+catalogs. The YAML file contains only content fields — the singleton class provides the
+schema. Classes typically fire `load_defaults()` at module import time to ensure the
+catalog is populated before any provisioning can occur.
 
-**InstanceInheritance copies fields at creation time only.** `inherit_from` copies all
+**`InstanceInheritance` copies fields at creation time only.** `inherit_from` copies all
 non-identity, non-private fields from the referent. Subsequent mutations to the parent do
 not propagate. This is creation-order dependent — the referent must exist before the
 inheritor is created.
@@ -316,14 +353,45 @@ label="Glamdring")` makes the distinction explicit.
   Token, not the singleton. This means `def greet(self): return f"I am {self.name}"`
   uses the Token's `name` instance_var, not the singleton's.
 
-**`has_kind` delegates to wrapped type.** `token.has_kind(SwordType)` returns True, making
-Tokens transparently findable by their wrapped singleton type via Selector queries. This
-is the mechanism that lets `graph.find_nodes(Selector(has_kind=SwordType))` find tokens.
+**`has_kind` delegates to wrapped type.** `token.has_kind(SwordType)` returns True,
+making Tokens transparently findable by their wrapped singleton type via Selector
+queries. This is the mechanism that lets `graph.find_nodes(Selector(has_kind=SwordType))`
+find tokens.
 
-**TokenFactory is a provisioner adapter.** It wraps the canonical
-`Token[X](token_from=label)` syntax in the Builder protocol so provisioners can treat
-Token creation uniformly with template materialization. Each factory wraps a single
-singleton type. The concept of "builders" may eventually migrate to `vm.provision`.
+**`TokenFactory` was removed from core.** The provisioner adapter that wrapped
+`Token[X](token_from=label)` for builder-like flows has been replaced by
+`vm38.provision.TokenProvisioner`, which integrates singleton catalog discovery into the
+standard `gather_offers` pipeline. Token itself has no provisioning responsibility — it
+only knows how to create wrapper classes and materialize instances. See
+`VM_DESIGN.md — Token Provisioning`.
+
+
+### RuntimeOp (`runtime_op.py`)
+
+Serializable, sandboxed expression wrappers for authored runtime logic.
+
+**The runtime-op family is intentionally small.** `RuntimeOp` stores an expression
+string and provides `eval`/`exec` helpers sandboxed to `safe_builtins`. `Predicate` is
+read-only boolean evaluation (guards, availability checks). `Effect` is write-oriented
+namespace mutation. `Query` is read-only value computation.
+
+**`rand` is the only injected global at this layer.** `RuntimeOp._eval_expr` and
+`_exec_expr` accept `extra_globals: dict | None` as a seam for higher-layer injection.
+Public instance methods (`eval`, `exec`, `satisfied_by`, `apply`) expose only
+`rand: Random | None`, which is the lowest-layer injectable. Story-layer code passes
+additional helpers (e.g., `bind_effect_helpers`) through `extra_globals` without
+subclassing.
+
+**RuntimeOp knows nothing about nodes.** It operates purely on namespace dicts. Writing
+effect mutations back to a node's `locals` is the responsibility of `HasEffects._sync_locals()`
+in the VM layer, not of `Effect.apply()`. This keeps RuntimeOp portable and testable
+without any graph context.
+
+**Effects and predicates are not phased.** `ResolutionPhase` is VM vocabulary.
+`RuntimeOp` has no trigger timing — it is simply a serializable expression. Phase
+annotation (`TraversableEffect.trigger_phase`) lives on the VM-layer wrapper class in
+`vm38.traversable`, following the same wrapper-inheritance pattern as `TraversableEdge`
+wrapping `Edge`.
 
 
 ### Record & OrderedRegistry (`record.py`)
@@ -331,72 +399,29 @@ singleton type. The concept of "builders" may eventually migrate to `vm.provisio
 Immutable, content-addressed, ordered facts and their append-only container.
 
 **Record has three identity layers:** uid (Entity), content (HasContent), seq (HasOrder).
-Records are identified primarily by content and ordered by seq. They are frozen
-(`ConfigDict(frozen=True)`) and allow extra fields (`extra="allow"`) so higher layers can
-define specific Record subclasses while the base is a generic container.
+Records are identified primarily by content and ordered by seq.
 
-**`origin_id` is a backreference, not a binding.** It optionally points to the entity that
-produced this record but is NOT a registry-aware reference. Use `origin(registry)` to
-dereference — the record doesn't know which registry contains its origin.
+**OrderedRegistry is append-only.** `add()` is permitted; `remove()` raises. This
+enforces the event-sourcing invariant that facts, once recorded, are never retracted
+(they may be superseded by later facts, but the history is preserved).
 
-**OrderedRegistry is sort_key-generic.** The core design insight: you almost never want
-"records 47 through 93" — you want "records from *this landmark* to *that landmark*."
-`get_slice(start_key, stop_key, selector, sort_key)` works with any comparable key, not
-just seq values. Half-open intervals (includes start, excludes stop), composable with
-Selector for orthogonal filtering.
-
-**Bookmarks are NOT in core.** v37's StreamRegistry conflated storage with streaming
-semantics (push, markers, sections, seq-specific slicing). v38 pushes bookmarks, typed
-markers, batch push, dict ingestion, and channel conventions to higher layers. These all
-reduce to `get_slice` calls with resolved key values and Selector criteria.
-
-**Append-only invariant.** `remove()` raises `NotImplementedError`. Records represent
-committed facts — you can append corrections but never erase history. This is fundamental
-to the event-sourced audit trail.
+**Slice semantics are sort-key-generic.** `get_slice(after=marker)` works against any
+`sort_key` — seq for Records, but potentially domain-specific keys for other
+OrderedRegistry users. The registry does not hardcode seq as the ordering mechanism.
 
 
 ### Template (`template.py`)
 
-The selectability bridge between authored content and live entities.
+Prototypes for node creation — authored once, materialized many times.
 
-**The three operations:**
-```
-Script ──compile──▶ Template ──materialize──▶ Live Entity
-(dict)              (record)                   (entity)
-  ▲                    │
-  └────decompile───────┘
-```
+**Template is a payload wrapper, not a prototype.** The template itself stores creation
+metadata and a `payload: Entity` (the prototype). Materialization clones the payload
+and applies overrides. This separates "what kind of thing to create" from "how to create it."
 
-- compile/decompile is the **authoring loop** — lossless for author-facing content,
-  lossy for framework noise (uids, seq, caches).
-- structure/unstructure is the **persistence loop** — lossless for everything.
-- materialize is the **one-way runtime entry** — stamps out a new live entity from
-  the payload template.
-
-**Payload separation.** v37 flattened template data onto the template itself. v38 cleanly
-separates: the `payload` field holds an actual Entity instance. The template wrapper
-provides matching, scoping, and compile/decompile; the payload provides entity content.
-`materialize()` calls `payload.evolve(**updates)` — a copy with optional overrides.
-
-**Dual-axis matching.** Templates expose two independent matching axes:
-- `has_template_kind(EntityTemplate)` — "is this a template?"
-- `has_payload_kind(Scene)` — "does this template create a Scene?"
-- `has_kind(...)` — matches either axis (convenience)
-
-This distinction is critical for provisioning: "find me templates that produce Scenes
-within scope X" queries `has_payload_kind=Scene` while scope checks use tags/path from
-the template wrapper.
-
-**Templates encode structural rules.** A template doesn't just store content — through
-TemplateGroup hierarchy and scope metadata, templates define the grammar of what entities
-can appear in what positions. The compile step validates this grammar; materialize
-enforces it at runtime.
-
-**TemplateGroup compiles depth-first.** `EntityTemplate.compile()` returns a single
-template; `TemplateGroup.compile()` returns an iterator of templates (depth-first
-flattened tree). `TemplateRegistry.compile()` handles both by checking
-`isinstance(result, Iterator)`. The generator trick (`yield from` + return value) passes
-child uids back to the parent without auxiliary data structures.
+**TemplateRegistry is the world's script.** The full ordered set of templates available
+during a story session. Provisioners receive it in scoped chunks (closest template scope
+first, global scope last) so inner-scope templates shadow outer-scope templates when
+multiple match a requirement.
 
 **Snapshot is a degenerate template.** It reuses template machinery for persistence:
 "recreate this exact entity" with `preserve_uid=True`. It's not part of the authoring
@@ -429,6 +454,7 @@ are sorted by `sort_key = (dispatch_layer, priority, wants_exact_kind, seq)`.
 - LOCAL — inline behaviors, per-operation overrides
 
 **Seven hook pairs:**
+
 | Hook | Trigger | Aggregation |
 |------|---------|-------------|
 | `on_init` / `do_init` | Entity construction | `gather_results` |
@@ -439,15 +465,20 @@ are sorted by `sort_key = (dispatch_layer, priority, wants_exact_kind, seq)`.
 | `on_link` / `do_link` | Graph structural link | `gather_results` |
 | `on_unlink` / `do_unlink` | Graph structural unlink | `gather_results` |
 
-**CallReceipt aggregation modes.** Receipts support multiple aggregation strategies:
-`gather_results` (collect all), `merge_results` (ChainMap dicts or concat lists),
-`first_result` (early exit), `last_result` (pipe/composite), `all_true` (validation gate).
-Last-writer-wins for `merge_results` on conflicting dict keys.
+**`AggregationMode` is serializable dispatch vocabulary.** The enum names the fold
+strategies that `do_*` functions apply to receipt lists. It lives in `behavior.py`
+alongside `CallReceipt` because the intent is for `_make_do_hook(task, agg_mode)` in
+the VM's dispatch factory to read the mode and wire the correct fold — eliminating
+the near-identical boilerplate currently copy-pasted across `vm38/dispatch.py`'s
+`do_*` function bodies. The `CallReceipt.aggregate(mode, *receipts)` adapter is the
+bridge. See `VM_DESIGN.md — Dispatch Hook Factory`.
 
 **`caller_kind` filtering.** Behaviors can declare `wants_caller_kind` to restrict which
 entity types trigger them. The Selector invokes `behavior.caller_kind(type(caller))`
 transparently — the Selector doesn't know anything about Behavior internals.
 
+
+---
 
 ## Cross-Cutting Design Decisions
 
@@ -490,6 +521,24 @@ criteria (`has_kind`), in creation helpers (`add_node(kind=X)`), and in template
 Python class reference (even though at the core level it IS a class reference — higher
 layers may use string-based kind resolution through the service layer).
 
+### Wrapper Inheritance as a Layering Pattern
+
+Domain concepts are introduced at the layer where they belong, wrapping core primitives
+rather than modifying them. The chain is consistent throughout:
+
+| Layer | Wraps | Adds |
+|-------|-------|------|
+| `core38.Edge` | — | topology endpoints |
+| `vm38.TraversableEdge` | `Edge` | `trigger_phase`, `entry_phase`, `return_phase` |
+| `story38.Choice` | `TraversableEdge` | narrative presentation metadata |
+| `core38.Effect` | — | serializable expression |
+| `vm38.TraversableEffect` | `Effect` | `trigger_phase` for pipeline timing |
+| `story38.StoryEffect` | `TraversableEffect` | narrative context helpers |
+
+This pattern keeps each layer's additions local, prevents upward imports, and gives
+authors a consistent inheritance ladder to extend.
+
+---
 
 ## v37 → v38 Key Migration Summary
 
@@ -504,12 +553,16 @@ layers may use string-based kind resolution through the service layer).
 | Template payload | Flattened fields | Separate `payload: Entity` | Clean separation of wrapper and content |
 | Ordered slicing | Seq-specific markers | Sort-key-generic `get_slice` | Composable with arbitrary orderings |
 | Token reference | `label` (overloaded) | `token_from` (separate) | Distinct identity vs. reference |
+| Token provisioner | `TokenFactory` in core | `TokenProvisioner` in vm38 | Provisioning is context-aware; core is timeless |
+| Availability/Effects | `HasAvailability`, `HasEffects` in core | `HasAvailability`, `HasEffects`, `TraversableEffect` in vm38 | Phase vocabulary belongs at VM layer |
 | Behavior API | `add_behavior` / `dispatch` | `register` / `execute_all` | Clearer verbs; ctx-aware chaining |
 | Dispatch layers | `HandlerPriority` / `HandlerLayer` | `Priority` / `DispatchLayer` | Simplified naming |
 | Duplicate guard | Registry.add raises | Silent overwrite | Fewer add-paths reduce double-add risk |
 | Label sanitization | Silent transformation | Stored as-given | Avoids invisible renaming confusion |
 | `Selectable` mixin | Inverse matching | Removed | Selection is Selector's job; templates handle scoping |
 
+
+---
 
 ## Architectural Principles
 
@@ -545,9 +598,9 @@ a hook *does* — it only ensures the hook *fires* at the right time.
 
 Rather than a monolithic context type, `_ctx` is duck-typed with progressive expectations
 by layer. Core dispatch expects `get_authorities()` and `get_inline_behaviors()`. VM
-extends with graph access, template data, and receipt management. Story extends further
-with actor registries and world-level asset managers. Each layer documents its Protocol;
-the runtime context satisfies all layers it passes through.
+extends with graph access, namespace caching, and seeded randomness. Story extends further
+with actor registries and world-level asset managers. Each layer defines a Protocol for
+what it minimally expects; the runtime context satisfies all layers it passes through.
 
 ### Timelessness
 
@@ -559,6 +612,6 @@ context.
 
 ---
 
-*This document should be updated as each subpackage is documented. Companion design
-notes for `tangl.vm`, `tangl.story`, and `tangl.service` will follow the same pattern
-of capturing architectural intent, component design rationale, and cross-cutting decisions.*
+*Companion design notes for `tangl.vm38`, `tangl.story38`, and `tangl.service` follow
+the same pattern of capturing architectural intent, component design rationale, and
+cross-cutting decisions. See `VM_DESIGN.md` for the VM layer.*

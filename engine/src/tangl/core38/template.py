@@ -31,6 +31,7 @@ from .registry import Registry, HierarchicalGroup, RegistryAware
 from .record import Record
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 ET = TypeVar("ET", bound=Entity)
 

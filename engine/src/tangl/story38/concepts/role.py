@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tangl.vm38 import Dependency
+from .actor import Actor
 from typing import Any, Mapping
 
 from tangl.core38 import Selector
@@ -8,7 +10,7 @@ from tangl.vm38 import Dependency, on_get_ns
 from ..dispatch import on_gather_ns
 
 
-class Role(Dependency):
+class Role(Dependency[Actor]):
     """Role dependency edge (source node -> actor provider)."""
 
     @staticmethod
