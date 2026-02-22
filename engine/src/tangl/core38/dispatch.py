@@ -21,7 +21,7 @@ Context contract
 Dispatch chaining is driven by the runtime context protocol used by
 :class:`tangl.core38.behavior.BehaviorRegistry`:
 
-- ``ctx.get_registries()`` contributes extra registries by layer.
+- ``ctx.get_authorities()`` contributes extra registries by layer.
 - ``ctx.get_inline_behaviors()`` contributes one-off callables.
 
 Callers normally pass ``_ctx`` to hook-aware APIs (for example ``Entity(..., _ctx=ctx)``,
@@ -42,7 +42,8 @@ Example:
     >>> item = Entity(
     ...     label="bar",
     ...     _ctx=SimpleNamespace(
-    ...         get_registries=lambda: [],
+    ...         get_authorities=lambda: [],
+    ...         get_registries=lambda: [],  # compatibility alias
     ...         get_inline_behaviors=lambda: [],
     ...     ),
     ... )  # calls global dispatch by default
@@ -53,7 +54,8 @@ Example:
     >>> item = Entity(
     ...     label="bar",
     ...     _ctx=SimpleNamespace(
-    ...         get_registries=lambda: [q],
+    ...         get_authorities=lambda: [q],
+    ...         get_registries=lambda: [q],  # compatibility alias
     ...         get_inline_behaviors=lambda: [],
     ...     ),
     ... )

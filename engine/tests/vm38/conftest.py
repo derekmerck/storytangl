@@ -81,10 +81,11 @@ def clean_vm_dispatch():
 def null_ctx() -> SimpleNamespace:
     """Minimal context satisfying the dispatch protocol.
 
-    Has ``get_registries()`` and ``get_inline_behaviors()`` — enough for
+    Has ``get_authorities()`` and ``get_inline_behaviors()`` — enough for
     ``do_*`` functions to run without error when no handlers are registered.
     """
     return SimpleNamespace(
+        get_authorities=lambda: [],
         get_registries=lambda: [],
         get_inline_behaviors=lambda: [],
     )
@@ -97,6 +98,7 @@ def ctx_with_vm_dispatch() -> SimpleNamespace:
     Use when you need system handlers to fire through ``do_*`` functions.
     """
     return SimpleNamespace(
+        get_authorities=lambda: [vm_dispatch],
         get_registries=lambda: [vm_dispatch],
         get_inline_behaviors=lambda: [],
     )
@@ -108,6 +110,7 @@ def ctx_factory():
 
     def _make(registries=None, inline=None):
         return SimpleNamespace(
+            get_authorities=lambda: list(registries or []),
             get_registries=lambda: list(registries or []),
             get_inline_behaviors=lambda: list(inline or []),
         )

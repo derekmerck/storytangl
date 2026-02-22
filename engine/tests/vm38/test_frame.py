@@ -16,7 +16,6 @@ import pytest
 
 from tangl.core38 import BehaviorRegistry, DispatchLayer, Graph, OrderedRegistry, Record
 from tangl.vm38.dispatch import (
-    dispatch as vm_dispatch,
     on_journal,
     on_prereqs,
     on_postreqs,
@@ -69,13 +68,12 @@ def _simple_graph(*labels: str) -> tuple[Graph, list[TraversableNode]]:
 
 
 class TestPhaseCtx:
-    def test_registries_include_vm_dispatch(self) -> None:
+    def test_authorities_default_empty_for_plain_graph(self) -> None:
         g = Graph()
         a = _node(g, label="a")
         ctx = PhaseCtx(graph=g, cursor_id=a.uid)
-        registries = ctx.get_registries()
-        # Should include at least the module-level vm_dispatch
-        assert vm_dispatch in registries
+        authorities = ctx.get_authorities()
+        assert authorities == []
 
     def test_ns_caching(self) -> None:
         g = Graph()
@@ -104,7 +102,7 @@ class TestPhaseCtx:
         ctx = PhaseCtx(graph=g, cursor_id=a.uid, step=9)
         assert ctx.step == 9
 
-    def test_registries_include_graph_authorities_when_available(self) -> None:
+    def test_authorities_include_graph_authorities_when_available(self) -> None:
         authority = BehaviorRegistry(
             label="story.auth",
             default_dispatch_layer=DispatchLayer.APPLICATION,
@@ -117,9 +115,8 @@ class TestPhaseCtx:
         g = AuthorityGraph()
         a = _node(g, label="a")
         ctx = PhaseCtx(graph=g, cursor_id=a.uid)
-        registries = ctx.get_registries()
-        assert vm_dispatch in registries
-        assert authority in registries
+        authorities = ctx.get_authorities()
+        assert authority in authorities
 
     def test_location_groups_include_immediate_neighbors_at_distance_zero(self) -> None:
         g = Graph()

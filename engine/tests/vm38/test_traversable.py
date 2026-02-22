@@ -10,17 +10,20 @@ Organized by concept:
 from __future__ import annotations
 
 import doctest
+from random import Random
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
 import tangl.vm38.traversable as traversable_module
 from tangl.core38 import Graph
-from tangl.core38.runtime_op import Effect, Predicate
+from tangl.core38.runtime_op import Predicate
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.traversable import (
     AnonymousEdge,
     AnyTraversableEdge,
+    TraversableEffect,
     TraversableEdge,
     TraversableNode,
     assert_traversal_contracts,
@@ -268,10 +271,106 @@ class TestTraversableNodeContainer:
 
     def test_apply_effects_mutates_namespace(self) -> None:
         g = Graph()
-        node = _node(g, label="gate", effects=[Effect(expr="counter = counter + 1")])
+        node = _node(g, label="gate", effects=[TraversableEffect(expr="counter = counter + 1")])
         ns = {"counter": 1}
-        node.apply_effects(ns)
+        node.apply_effects(ns=ns)
         assert ns["counter"] == 2
+
+    def test_apply_final_effects_fires_at_finalize_phase(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="n",
+            effects=[
+                TraversableEffect(
+                    expr="counter = counter + 1",
+                    trigger_phase=ResolutionPhase.UPDATE,
+                ),
+                TraversableEffect(
+                    expr="counter = counter * 10",
+                    trigger_phase=ResolutionPhase.FINALIZE,
+                ),
+            ],
+        )
+        ns = {"counter": 1}
+
+        node.apply_effects(ResolutionPhase.UPDATE, ns=ns)
+        assert ns["counter"] == 2
+
+        node.apply_effects(ResolutionPhase.FINALIZE, ns=ns)
+        assert ns["counter"] == 20
+
+    def test_apply_effects_accepts_int_phase_values(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="n",
+            effects=[TraversableEffect(expr="counter = counter + 1")],
+        )
+        ns = {"counter": 1}
+        node.apply_effects(ResolutionPhase.UPDATE.value, ns=ns)
+        assert ns["counter"] == 2
+
+    def test_apply_effects_rejects_non_phase_non_mapping_positional(self) -> None:
+        g = Graph()
+        node = _node(g, label="n", effects=[TraversableEffect(expr="counter = 1")])
+        with pytest.raises(TypeError, match="phase must be ResolutionPhase"):
+            node.apply_effects("not-a-phase")
+
+    def test_apply_effects_to_targets_other_namespace(self) -> None:
+        g = Graph()
+        provider = _node(
+            g,
+            label="provider",
+            effects=[TraversableEffect(expr="gold = gold - 5")],
+        )
+        host_ns = {"gold": 20}
+        ctx = SimpleNamespace(get_ns=lambda _: host_ns, random=None)
+
+        provider.apply_effects_to(object(), ctx=ctx)
+        assert host_ns["gold"] == 15
+
+    def test_available_for_uses_other_namespace(self) -> None:
+        g = Graph()
+        req = _node(
+            g,
+            label="req",
+            availability=[Predicate(expr="level >= 5")],
+        )
+        ctx_pass = SimpleNamespace(get_ns=lambda _: {"level": 6}, random=None)
+        ctx_fail = SimpleNamespace(get_ns=lambda _: {"level": 3}, random=None)
+
+        assert req.available_for(object(), ctx=ctx_pass) is True
+        assert req.available_for(object(), ctx=ctx_fail) is False
+
+    def test_rand_injected_into_predicate(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="n",
+            availability=[Predicate(expr="rand.random() < 0.9")],
+        )
+        rng = Random(42)
+
+        assert node.available(ns={}, rand=rng) is True
+
+    def test_available_uses_ctx_get_random_when_present(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="n",
+            availability=[Predicate(expr="rand.random() < 0.9")],
+        )
+        ctx = SimpleNamespace(get_ns=lambda _: {}, get_random=lambda: Random(42))
+        assert node.available(ctx=ctx) is True
+
+    def test_apply_effects_uses_ctx_get_random_when_present(self) -> None:
+        g = Graph()
+        node = _node(g, label="n", effects=[TraversableEffect(expr="coin = rand.random() < 0.9")])
+        ns: dict[str, object] = {}
+        ctx = SimpleNamespace(get_ns=lambda _: ns, get_random=lambda: Random(42))
+        node.apply_effects(ctx=ctx)
+        assert ns["coin"] is True
 
 
 # ============================================================================

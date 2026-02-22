@@ -527,10 +527,12 @@ Higher layers provide policy (which registries are active, what scope rules appl
 bookmarks map to key values). This separation is why OrderedRegistry doesn't have
 bookmarks and why Graph doesn't have traversal algorithms.
 
-The optional `Graph.get_authorities()` hook is a provisional convenience for this boundary.
-Its intended role is to expose application/story-owned registries when present, while keeping
-core itself policy-free. If higher layers converge on a better authority protocol, this hook
-can move out of core without changing core dispatch mechanics.
+`Graph.get_authorities()` is the dispatch bootstrapping extension point.  Application-layer
+graph subclasses override it to expose their behavior registries (story, world, mechanics)
+to the VM's ``PhaseCtx.get_authorities()`` without any type coupling between core and higher
+layers.  The no-op default on bare ``Graph`` is correct — core itself has no policy
+registries to contribute.  This hook exists precisely *because* you cannot use dispatch
+to assemble the dispatch chain: authorities must be discoverable before any behavior fires.
 
 ### Hook Points, Not Hook Logic
 
@@ -542,7 +544,7 @@ a hook *does* — it only ensures the hook *fires* at the right time.
 ### Progressive Protocols
 
 Rather than a monolithic context type, `_ctx` is duck-typed with progressive expectations
-by layer. Core dispatch expects `get_registries()` and `get_inline_behaviors()`. VM
+by layer. Core dispatch expects `get_authorities()` and `get_inline_behaviors()`. VM
 extends with graph access, template data, and receipt management. Story extends further
 with actor registries and world-level asset managers. Each layer documents its Protocol;
 the runtime context satisfies all layers it passes through.

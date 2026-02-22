@@ -68,15 +68,39 @@ class Graph(Registry[GraphItem]):
     """
 
     def get_authorities(self) -> list[object]:
-        """Return optional application-level behavior registries.
+        """Return application-level behavior registries for dispatch bootstrapping.
+
+        Extension hook — override in application-layer graph subclasses to
+        expose domain-specific registries to the VM dispatch chain.
+
+        The no-op default is correct for a bare ``Graph``.  Application graphs
+        override this to return their registries:
+
+        - :class:`~tangl.story38.StoryGraph38` returns ``[story_dispatch]``
+          and cascades to ``world.get_authorities()`` when a world is attached.
+        - Future ``WorldGraph``, ``MechanicsGraph``, etc. follow the same pattern.
+
+        Why a hook on Graph, not a Protocol
+        ------------------------------------
+        Dispatch bootstrapping cannot use dispatch to assemble itself — the
+        authority chain must be discoverable before any hook fires.  A duck-typed
+        method on the graph is the right primitive: the VM layer checks
+        ``getattr(graph, "get_authorities", None)`` and calls it if present,
+        without type-coupling to any application graph class.
+
+        See Also
+        --------
+        :meth:`tangl.vm38.runtime.frame.PhaseCtx.get_authorities`
+            Supplies graph/world authority registries to VM dispatch expansion.
+        :class:`tangl.story38.story_graph.StoryGraph38`
+            Reference override — returns story and world authority registries.
 
         Notes
         -----
-        This hook is intentionally minimal and provisional. Authorities are
-        primarily an application/story concern (for example a story graph may
-        return story/world registries). Core exposes this no-op hook so runtime
-        layers can discover authorities via protocol (`if hook exists`) without
-        type-coupling to higher-order graph types.
+        The assembly order matters: ``vm_dispatch`` is always first (SYSTEM
+        layer), then authorities returned here (APPLICATION and AUTHOR layers)
+        in declaration order.  Lower dispatch layers (LOCAL, INLINE) are added
+        by ``PhaseCtx.get_authorities`` and inline behavior expansion separately.
         """
         return []
 

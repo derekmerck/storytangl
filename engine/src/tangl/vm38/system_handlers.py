@@ -32,7 +32,7 @@ Handler Inventory
 - (no default — story layer provides content rendering)
 
 **finalize_step** (FINALIZE):
-- (no default for MVP — replay/patch generation is post-MVP)
+- ``apply_final_runtime_effects`` — apply node/runtime finalize effects
 
 **get_postreqs** (POSTREQS):
 - ``follow_triggered_postreqs`` — first available edge with trigger_phase=POSTREQS
@@ -76,6 +76,7 @@ from .dispatch import (
     on_finalize,
     on_postreqs,
 )
+from .resolution_phase import ResolutionPhase
 from .traversable import TraversableNode, TraversableEdge, AnonymousEdge
 
 if TYPE_CHECKING:
@@ -197,8 +198,6 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
     cursor is a container, descent takes priority.  We rely on registration
     order (container handler registered first) for this.
     """
-    from .resolution_phase import ResolutionPhase
-
     for edge in caller.edges_out():
         if not isinstance(edge, TraversableEdge):
             continue
@@ -219,17 +218,9 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
 
 @on_update
 def apply_runtime_effects(*, caller, ctx, **kw):
-    """Apply runtime effects attached to the current node.
-
-    Judgment call
-    -------------
-    Effects mutate the node's scoped namespace during UPDATE. This keeps
-    mutation semantics local to traversal concerns without introducing a
-    separate runtime effect registry in vm38.
-    """
+    """Apply UPDATE-phase runtime effects attached to the current node."""
     if hasattr(caller, "apply_effects"):
-        ns = ctx.get_ns(caller) if ctx is not None and hasattr(ctx, "get_ns") else {}
-        caller.apply_effects(ns=ns)
+        caller.apply_effects(phase=ResolutionPhase.UPDATE, ctx=ctx)
     return None
 
 
@@ -272,15 +263,23 @@ def mark_visited(*, caller, ctx, **kw):
 
 
 # ---------------------------------------------------------------------------
-# FINALIZE — commit step record (no default for MVP)
+# FINALIZE — finalize-phase runtime hooks
 # ---------------------------------------------------------------------------
 
-# Post-MVP: event-sourcing integration would register a handler here that:
+@on_finalize
+def apply_final_runtime_effects(*, caller, ctx, **kw):
+    """Apply FINALIZE-phase runtime effects attached to the current node."""
+    if hasattr(caller, "apply_effects"):
+        caller.apply_effects(phase=ResolutionPhase.FINALIZE, ctx=ctx)
+    return None
+
+
+# Post-MVP: event-sourcing integration may also register a handler here that:
 # 1. Collects mutations from the watched graph
 # 2. Builds a Patch record
 # 3. Appends it to the output stream
 #
-# For MVP, the frame appends fragments directly.  No patch mechanism.
+# For MVP, the frame appends fragments directly. No patch mechanism yet.
 
 
 # ---------------------------------------------------------------------------
@@ -298,8 +297,6 @@ def follow_triggered_postreqs(*, caller, ctx, **kw):
     Useful for narrative pacing: "You enter the tavern" (JOURNAL) → auto-advance
     to "You approach the bar" (POSTREQS redirect) → THEN the player gets choices.
     """
-    from .resolution_phase import ResolutionPhase
-
     for edge in caller.edges_out():
         if not isinstance(edge, TraversableEdge):
             continue
