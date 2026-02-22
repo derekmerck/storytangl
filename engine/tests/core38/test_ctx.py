@@ -14,10 +14,11 @@ def test_ctx_implements_dispatch_and_core_protocols() -> None:
     assert isinstance(ctx, CoreCtx)
 
 
-def test_get_registries_merges_dispatch_and_explicit_registries_without_duplicates() -> None:
+def test_get_authorities_merges_dispatch_and_explicit_registries_without_duplicates() -> None:
     a = object()
     b = object()
     ctx = Ctx(dispatch=[a, b], registries=(b,))
+    assert ctx.get_authorities() == [b, a]
     assert ctx.get_registries() == [b, a]
 
 

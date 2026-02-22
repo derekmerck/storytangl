@@ -47,7 +47,18 @@ class TestBehaviorRegistryChainExecute:
         receipts = list(registry.execute_all(task="t"))
         assert [receipt.result for receipt in receipts] == ["ok"]
 
-    def test_chain_execute_extends_ctx_registries(self) -> None:
+    def test_chain_execute_extends_ctx_authorities(self) -> None:
+        order: list[str] = []
+        base = BehaviorRegistry(default_dispatch_layer=DispatchLayer.GLOBAL)
+        app = BehaviorRegistry(default_dispatch_layer=DispatchLayer.APPLICATION)
+        base.register(task="x", func=lambda *, ctx=None: order.append("base"))
+        app.register(task="x", func=lambda *, ctx=None: order.append("app"))
+
+        ctx = SimpleNamespace(get_authorities=lambda: [app], get_inline_behaviors=lambda: [])
+        CallReceipt.gather_results(*base.chain_execute(base, task="x", ctx=ctx))
+        assert order == ["base", "app"]
+
+    def test_chain_execute_supports_legacy_ctx_registries_alias(self) -> None:
         order: list[str] = []
         base = BehaviorRegistry(default_dispatch_layer=DispatchLayer.GLOBAL)
         app = BehaviorRegistry(default_dispatch_layer=DispatchLayer.APPLICATION)
@@ -64,7 +75,7 @@ class TestBehaviorRegistryChainExecute:
         base.register(task="x", func=lambda *, ctx=None: layers.append(DispatchLayer.GLOBAL))
 
         ctx = SimpleNamespace(
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [lambda *, ctx=None: layers.append(DispatchLayer.LOCAL)],
         )
         CallReceipt.gather_results(*base.chain_execute(base, task="x", ctx=ctx))
@@ -75,14 +86,14 @@ class TestBehaviorRegistryChainExecute:
         reg = BehaviorRegistry()
         reg.register(task="x", func=lambda *, ctx=None: calls.__setitem__("n", calls["n"] + 1))
 
-        ctx = SimpleNamespace(get_registries=lambda: [reg], get_inline_behaviors=lambda: [])
+        ctx = SimpleNamespace(get_authorities=lambda: [reg], get_inline_behaviors=lambda: [])
         CallReceipt.gather_results(*BehaviorRegistry.chain_execute(reg, reg, ctx=ctx, task="x"))
         assert calls["n"] == 1
 
-    def test_chain_execute_accepts_ctx_without_optional_methods(self) -> None:
+    def test_chain_execute_accepts_ctx_without_inline_method(self) -> None:
         registry = BehaviorRegistry()
         registry.register(task="x", func=lambda *, ctx=None: "ok")
-        ctx = SimpleNamespace(get_registries=lambda: [])
+        ctx = SimpleNamespace(get_authorities=lambda: [])
         receipts = list(BehaviorRegistry.chain_execute(registry, ctx=ctx, task="x"))
         assert receipts[0].result == "ok"
 

@@ -37,8 +37,6 @@ from collections.abc import Iterable as IterableABC
 from typing import Any, Callable, Iterable, Optional, TYPE_CHECKING
 
 from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record
-from .ctx import VmDispatchCtx
-
 if TYPE_CHECKING:
     from .provision import Requirement, ProvisionOffer
     from .traversable import TraversableNode, TraversableEdge, AnyTraversableEdge
@@ -66,16 +64,18 @@ automatically alongside any registries provided by the dispatch context.
 # Hook generation helpers
 # ---------------------------------------------------------------------------
 
-def _assemble_registries(ctx) -> list[BehaviorRegistry]:
-    """Collect registries from ctx and ensure vm_dispatch is included."""
-    if not isinstance(ctx, VmDispatchCtx):
+def _validate_dispatch_ctx(ctx) -> None:
+    """Raise ``TypeError`` when ctx lacks dispatch protocol methods."""
+    has_authorities = callable(getattr(ctx, "get_authorities", None)) or callable(
+        getattr(ctx, "get_registries", None)
+    )
+    has_inline = callable(getattr(ctx, "get_inline_behaviors", None))
+    if not has_authorities or not has_inline:
         raise TypeError(
-            "Dispatch context must provide get_registries() and get_inline_behaviors()"
+            "Dispatch context must provide get_authorities()/get_registries() "
+            "and get_inline_behaviors()"
         )
-    registries = list((ctx.get_registries() if ctx else None) or [])
-    if dispatch not in registries:
-        registries.append(dispatch)
-    return registries
+    return None
 
 
 def _make_on_hook(task: str) -> Callable:
@@ -93,9 +93,8 @@ def _make_on_hook(task: str) -> Callable:
 
 
 def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
-    registries = _assemble_registries(ctx)
-    receipts = BehaviorRegistry.chain_execute(
-        *registries,
+    _validate_dispatch_ctx(ctx)
+    receipts = dispatch.execute_all(
         task=task,
         call_kwargs={"caller": caller, **kwargs},
         ctx=ctx,
@@ -382,7 +381,7 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
     cause infinite recursion through the cache.  Use priority ordering
     (EARLY/LATE) if a handler needs access to other namespace contributions.
     """
-    registries = _assemble_registries(ctx)
+    _validate_dispatch_ctx(ctx)
 
     # Walk from node to root: [node, parent, grandparent, ..., root]
     ancestors = list(node.ancestors) if hasattr(node, "ancestors") else [node]
@@ -390,8 +389,7 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
     # Fire handlers at each ancestor level, collect per-level dicts
     layers: list[dict[str, Any]] = []
     for ancestor in ancestors:
-        receipts = BehaviorRegistry.chain_execute(
-            *registries,
+        receipts = dispatch.execute_all(
             task="gather_ns",
             call_kwargs={"caller": ancestor},
             ctx=ctx,
@@ -431,9 +429,8 @@ def do_resolve(requirement: Requirement, *, offers: Iterable[ProvisionOffer], ct
     - handler returns ``None`` to keep existing offers unchanged
     - handler returns ``Iterable[ProvisionOffer]`` to contribute overrides
     """
-    registries = _assemble_registries(ctx)
-    receipts = BehaviorRegistry.chain_execute(
-        *registries,
+    _validate_dispatch_ctx(ctx)
+    receipts = dispatch.execute_all(
         task="resolve_req",
         call_kwargs={"caller": requirement, "offers": offers},
         ctx=ctx,

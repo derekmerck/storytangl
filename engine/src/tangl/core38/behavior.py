@@ -71,6 +71,8 @@ class RuntimeCtx(DispatchCtx, Protocol):
     layers may expose additional fields and helper methods.
     """
 
+    def get_authorities(self) -> Iterable[BehaviorRegistry]: ...
+    # Backwards-compatible alias retained during v38 migration.
     def get_registries(self) -> Iterable[BehaviorRegistry]: ...
     def get_inline_behaviors(self) -> Iterable[Behavior | Callable[..., Any]]: ...
 
@@ -336,7 +338,7 @@ class BehaviorRegistry(Registry[Behavior]):
         Yields:
             CallReceipt for each executed behavior in sort order
         """
-        return self.chain_execute(
+        return self.chain_execute_all(
             self,
             call_args=call_args,
             call_kwargs=call_kwargs,
@@ -366,19 +368,35 @@ class BehaviorRegistry(Registry[Behavior]):
         return registry
 
     @classmethod
-    def chain_execute(cls, *registries,
-                      call_args = None,
-                      call_kwargs = None,
-                      ctx = None, task = None,
-                      selector: Selector = None,
-                      inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None
-                      ) -> Iterator[CallReceipt]:
+    def _ctx_authorities(cls, ctx: Any) -> Iterable[BehaviorRegistry]:
+        """Yield registry authorities provided by ctx (new API, then compatibility alias)."""
+        get_authorities = getattr(ctx, "get_authorities", None)
+        if callable(get_authorities):
+            return get_authorities() or ()
+
+        get_registries = getattr(ctx, "get_registries", None)
+        if callable(get_registries):
+            return get_registries() or ()
+
+        return ()
+
+    @classmethod
+    def chain_execute_all(
+        cls,
+        *registries,
+        call_args=None,
+        call_kwargs=None,
+        ctx=None,
+        task=None,
+        selector: Selector = None,
+        inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None,
+    ) -> Iterator[CallReceipt]:
         """Execute behaviors across multiple registries plus context-provided sources.
 
         Registry sources are assembled in this order:
 
         1. Explicit ``registries`` arguments.
-        2. ``ctx.get_registries()`` when available.
+        2. ``ctx.get_authorities()`` when available.
         3. Inline callables from ``ctx.get_inline_behaviors()`` and ``inline_behaviors``.
 
         Registries are deduplicated by object identity, then behaviors are filtered and
@@ -388,9 +406,7 @@ class BehaviorRegistry(Registry[Behavior]):
         assembled_registries = list(registries)
 
         if ctx is not None:
-            get_registries = getattr(ctx, "get_registries", None)
-            if callable(get_registries):
-                assembled_registries.extend(get_registries() or ())
+            assembled_registries.extend(cls._ctx_authorities(ctx))
 
             get_inline_behaviors = getattr(ctx, "get_inline_behaviors", None)
             if callable(get_inline_behaviors):
@@ -419,3 +435,25 @@ class BehaviorRegistry(Registry[Behavior]):
             sort_key=lambda v: v.sort_key,
         )
         return cls._get_receipts(behaviors, call_args=call_args, call_kwargs=call_kwargs, ctx=ctx)
+
+    @classmethod
+    def chain_execute(
+        cls,
+        *registries,
+        call_args=None,
+        call_kwargs=None,
+        ctx=None,
+        task=None,
+        selector: Selector = None,
+        inline_behaviors: Iterable[Behavior | Callable[..., Any]] = None,
+    ) -> Iterator[CallReceipt]:
+        """Backwards-compatible alias for :meth:`chain_execute_all`."""
+        return cls.chain_execute_all(
+            *registries,
+            call_args=call_args,
+            call_kwargs=call_kwargs,
+            ctx=ctx,
+            task=task,
+            selector=selector,
+            inline_behaviors=inline_behaviors,
+        )
