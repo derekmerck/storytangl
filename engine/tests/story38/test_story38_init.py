@@ -1,7 +1,7 @@
 """Story38 initialization integration tests.
 
-Covers compiler output, MINIMAL/FULLY_SPECIFIED initialization behavior,
-dependency prelinking expectations, and runtime/loader guardrails.
+Covers compiler output, LAZY/EAGER initialization behavior, dependency
+prelinking expectations, and runtime/loader guardrails.
 """
 
 from __future__ import annotations
@@ -71,9 +71,9 @@ def test_compiler_emits_template_registry_and_entry_ids() -> None:
     assert bundle.template_registry.find_one(Selector(label="intro.start")) is not None
 
 
-def test_minimal_mode_materializes_entry_and_ancestor_only() -> None:
+def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
     world = World38.from_script_data(script_data=_base_script())
-    result = world.create_story("run_min", init_mode=InitMode.MINIMAL)
+    result = world.create_story("run_lazy", init_mode=InitMode.LAZY)
 
     graph = result.graph
     scene_nodes = list(Selector(has_kind=Scene).filter(graph.values()))
@@ -89,33 +89,9 @@ def test_minimal_mode_materializes_entry_and_ancestor_only() -> None:
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
 
 
-def test_hybrid_mode_materializes_containers_plus_entry_chain() -> None:
-    script = _base_script()
-    script["scenes"]["epilogue"] = {
-        "blocks": {
-            "after": {"content": "After"},
-        }
-    }
-    world = World38.from_script_data(script_data=script)
-    result = world.create_story("run_hybrid", init_mode=InitMode.HYBRID)
-
-    graph = result.graph
-    scene_nodes = list(Selector(has_kind=Scene).filter(graph.values()))
-    block_nodes = list(Selector(has_kind=Block).filter(graph.values()))
-    actor_nodes = list(Selector(has_kind=Actor).filter(graph.values()))
-    location_nodes = list(Selector(has_kind=Location).filter(graph.values()))
-
-    assert {node.label for node in scene_nodes} == {"intro", "epilogue"}
-    assert {node.label for node in block_nodes} == {"start"}
-    assert actor_nodes == []
-    assert location_nodes == []
-    assert graph.initial_cursor_id == block_nodes[0].uid
-    assert any("HYBRID init left action destination unresolved" in warning for warning in result.report.warnings)
-
-
-def test_full_mode_materializes_all_and_wires_dependencies() -> None:
+def test_eager_mode_materializes_all_and_wires_dependencies() -> None:
     world = World38.from_script_data(script_data=_base_script())
-    result = world.create_story("run_full", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("run_eager", init_mode=InitMode.EAGER)
 
     graph = result.graph
     assert len(result.report.unresolved_hard) == 0
@@ -131,7 +107,7 @@ def test_full_mode_materializes_all_and_wires_dependencies() -> None:
     assert settings[0].satisfied
 
 
-def test_full_mode_missing_hard_dependency_raises() -> None:
+def test_eager_mode_missing_hard_dependency_raises() -> None:
     script = _base_script()
     script["scenes"]["intro"]["blocks"]["start"]["roles"] = [
         {"label": "host", "actor_ref": "missing", "hard": True}
@@ -139,24 +115,24 @@ def test_full_mode_missing_hard_dependency_raises() -> None:
 
     world = World38.from_script_data(script_data=script)
     with pytest.raises(GraphInitializationError):
-        world.create_story("run_fail", init_mode=InitMode.FULLY_SPECIFIED)
+        world.create_story("run_fail", init_mode=InitMode.EAGER)
 
 
-def test_full_mode_missing_soft_dependency_is_reported() -> None:
+def test_eager_mode_missing_soft_dependency_is_reported() -> None:
     script = _base_script()
     script["scenes"]["intro"]["blocks"]["start"]["roles"] = [
         {"label": "optional_host", "actor_ref": "missing", "hard": False}
     ]
 
     world = World38.from_script_data(script_data=script)
-    result = world.create_story("run_soft", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("run_soft", init_mode=InitMode.EAGER)
 
     assert len(result.report.unresolved_hard) == 0
     assert len(result.report.unresolved_soft) == 1
     assert result.report.unresolved_soft[0].label == "optional_host"
 
 
-def test_full_mode_prelink_selection_is_deterministic() -> None:
+def test_eager_mode_prelink_selection_is_deterministic() -> None:
     script = _base_script()
     script["actors"] = {
         "alice": {"name": "Alice"},
@@ -165,10 +141,10 @@ def test_full_mode_prelink_selection_is_deterministic() -> None:
     script["scenes"]["intro"]["blocks"]["start"]["roles"] = [{"label": "companion"}]
 
     world_a = World38.from_script_data(script_data=script)
-    result_a = world_a.create_story("run_det_a", init_mode=InitMode.FULLY_SPECIFIED)
+    result_a = world_a.create_story("run_det_a", init_mode=InitMode.EAGER)
 
     world_b = World38.from_script_data(script_data=script)
-    result_b = world_b.create_story("run_det_b", init_mode=InitMode.FULLY_SPECIFIED)
+    result_b = world_b.create_story("run_det_b", init_mode=InitMode.EAGER)
 
     role_a = next(Selector(has_kind=Role).filter(result_a.graph.values()))
     role_b = next(Selector(has_kind=Role).filter(result_b.graph.values()))
@@ -193,7 +169,7 @@ def test_static_cyoa_traversal_needs_no_runtime_provisioning() -> None:
     }
 
     world = World38.from_script_data(script_data=script)
-    result = world.create_story("linear_full", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("linear_eager", init_mode=InitMode.EAGER)
 
     assert result.report.unresolved_hard == []
     ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
@@ -223,7 +199,7 @@ def test_action_payload_is_materialized_from_script() -> None:
     }
 
     world = World38.from_script_data(script_data=script)
-    result = world.create_story("payload_story", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("payload_story", init_mode=InitMode.EAGER)
     start = result.graph.get(result.graph.initial_cursor_id)
     assert isinstance(start, Block)
     action = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
@@ -246,7 +222,7 @@ def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
     }
 
     world = World38.from_script_data(script_data=script)
-    result = world.create_story("payload_alias_story", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("payload_alias_story", init_mode=InitMode.EAGER)
     start = result.graph.get(result.graph.initial_cursor_id)
     assert isinstance(start, Block)
     action = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
@@ -310,7 +286,7 @@ scenes:
     assert compiled.resources is not None
     assert compiled.templates is compiled.bundle.template_registry
     assert "DomainCharacter" in compiled.domain.class_registry
-    result = compiled.create_story("loader_story", init_mode=InitMode.MINIMAL)
+    result = compiled.create_story("loader_story", init_mode=InitMode.LAZY)
     assert result.graph.initial_cursor_id is not None
     assert result.codec_id in {"near_native", "near_native_yaml"}
     assert "__source_files__" in result.source_map
@@ -326,7 +302,7 @@ def test_runtime_controller_create_story38_with_world_param() -> None:
         user=user,
         world_id=world.label,
         world=world,
-        init_mode=InitMode.FULLY_SPECIFIED.value,
+        init_mode=InitMode.EAGER.value,
         story_label="svc_story",
     )
 
@@ -338,7 +314,7 @@ def test_runtime_controller_create_story38_with_world_param() -> None:
 
 def test_story_graph_authorities_include_story_and_world_authorities() -> None:
     world = World38.from_script_data(script_data=_base_script())
-    result = world.create_story("auth_story", init_mode=InitMode.MINIMAL)
+    result = world.create_story("auth_story", init_mode=InitMode.LAZY)
 
     world_authority = BehaviorRegistry(
         label="world.auth",
@@ -353,7 +329,7 @@ def test_story_graph_authorities_include_story_and_world_authorities() -> None:
 
 def test_story_graph_template_lineage_is_nearest_first() -> None:
     world = World38.from_script_data(script_data=_base_script())
-    result = world.create_story("scope_lineage_story", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("scope_lineage_story", init_mode=InitMode.EAGER)
 
     graph = result.graph
     cursor = graph.get(graph.initial_cursor_id)
@@ -366,7 +342,7 @@ def test_story_graph_template_lineage_is_nearest_first() -> None:
 
 def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
     world = World38.from_script_data(script_data=_base_script())
-    result = world.create_story("scope_groups_story", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("scope_groups_story", init_mode=InitMode.EAGER)
 
     graph = result.graph
     cursor = graph.get(graph.initial_cursor_id)
@@ -418,7 +394,7 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
         bundle=base_world.bundle,
         templates=_TemplateScopeFacet(extra_template_registry=extra_registry),
     )
-    result = world.create_story("scope_world_story", init_mode=InitMode.FULLY_SPECIFIED)
+    result = world.create_story("scope_world_story", init_mode=InitMode.EAGER)
     cursor = result.graph.get(result.graph.initial_cursor_id)
     assert cursor is not None
 

@@ -9,9 +9,8 @@ from uuid import UUID
 class InitMode(str, Enum):
     """Graph initialization modes for story38."""
 
-    MINIMAL = "minimal"
-    HYBRID = "hybrid"
-    FULLY_SPECIFIED = "fully_specified"
+    LAZY = "lazy"
+    EAGER = "eager"
 
 
 @runtime_checkable

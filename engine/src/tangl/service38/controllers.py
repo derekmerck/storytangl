@@ -1,9 +1,4 @@
-"""Service38-native controller wrappers over legacy controller logic.
-
-This module is an explicit transition layer: service38 owns endpoint metadata
-(``ApiEndpoint38`` + explicit ``binds``), while implementation bodies still
-delegate to legacy controller methods.
-"""
+"""Service38-native controller surfaces with explicit binding metadata."""
 
 from __future__ import annotations
 
@@ -14,10 +9,10 @@ from uuid import UUID
 from tangl.core import BaseFragment
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.service.api_endpoint import HasApiEndpoints
 from tangl.service.controllers.runtime_controller import RuntimeController as LegacyRuntimeController
 from tangl.service.controllers.system_controller import SystemController as LegacySystemController
 from tangl.service.controllers.user_controller import ApiKeyInfo
-from tangl.service.controllers.user_controller import UserController as LegacyUserController
 from tangl.service.controllers.world_controller import WorldController as LegacyWorldController
 from tangl.service.controllers.world_controller import _dereference_world_id
 from tangl.service.response import RuntimeInfo, StoryInfo
@@ -30,6 +25,7 @@ from tangl.vm.ledger import Ledger
 from tangl.vm38.runtime.ledger import Ledger as Ledger38
 
 from .api_endpoint import AccessLevel, ApiEndpoint38, MethodType, ResourceBinding, ResponseType
+from tangl.utils.hash_secret import key_for_secret
 
 
 class RuntimeController(LegacyRuntimeController):
@@ -199,45 +195,77 @@ class RuntimeController(LegacyRuntimeController):
         )
 
 
-class UserController(LegacyUserController):
-    """Service38 user controller surface with explicit binding metadata."""
+class UserController(HasApiEndpoints):
+    """Service38 user controller with explicit v38-native user semantics."""
 
     @ApiEndpoint38.annotate(
         access_level=AccessLevel.USER,
+        method_type=MethodType.CREATE,
+        response_type=ResponseType.RUNTIME,
         binds=(),
     )
     def create_user(self, **kwargs: Hash) -> RuntimeInfo:
-        return super().create_user(**kwargs)
+        secret = kwargs.pop("secret", None)
+        user = User(**kwargs)
+        if isinstance(secret, str) and secret:
+            user.set_secret(secret)
+        return RuntimeInfo.ok(message="User created", user=user, user_id=str(user.uid))
 
     @ApiEndpoint38.annotate(
         access_level=AccessLevel.USER,
+        method_type=MethodType.UPDATE,
+        response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.USER,),
     )
     def update_user(self, user: User, **kwargs: Hash) -> RuntimeInfo:
-        return super().update_user(user=user, **kwargs)
+        secret = kwargs.pop("secret", None)
+        api_key: str | None = None
+        if isinstance(secret, str) and secret:
+            user.set_secret(secret)
+            api_key = key_for_secret(secret)
+
+        if "last_played_dt" in kwargs:
+            user.last_played_dt = kwargs["last_played_dt"]
+        if "privileged" in kwargs:
+            user.privileged = bool(kwargs["privileged"])
+
+        details: dict[str, Any] = {"user_id": str(user.uid)}
+        if api_key is not None:
+            details["api_key"] = api_key
+        return RuntimeInfo.ok(message="User updated", **details)
 
     @ApiEndpoint38.annotate(
         access_level=AccessLevel.USER,
+        method_type=MethodType.READ,
+        response_type=ResponseType.INFO,
         binds=(ResourceBinding.USER,),
     )
     def get_user_info(self, user: User, **kwargs: Hash) -> UserInfo:
-        return super().get_user_info(user=user, **kwargs)
+        return UserInfo.from_user(user, **kwargs)
 
     @ApiEndpoint38.annotate(
         access_level=AccessLevel.USER,
+        method_type=MethodType.DELETE,
+        response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.USER,),
     )
     def drop_user(self, user: User, **kwargs: Hash) -> RuntimeInfo:
-        return super().drop_user(user=user, **kwargs)
+        dropped_ledger_id = user.current_ledger_id
+        user.current_ledger_id = None
+        details: dict[str, Any] = {"user_id": str(user.uid)}
+        if dropped_ledger_id is not None:
+            details["dropped_ledger_id"] = str(dropped_ledger_id)
+        return RuntimeInfo.ok(message="User dropped", **details)
 
     @ApiEndpoint38.annotate(
         access_level=AccessLevel.PUBLIC,
+        method_type=MethodType.READ,
         group="system",
         response_type=ResponseType.INFO,
         binds=(),
     )
     def get_key_for_secret(self, secret: str, **kwargs: Hash) -> ApiKeyInfo:
-        return super().get_key_for_secret(secret=secret, **kwargs)
+        return ApiKeyInfo(secret=secret)
 
 
 class WorldController(LegacyWorldController):

@@ -82,7 +82,7 @@ def test_story38_rest_envelope_flow(
 
     create = client.post(
         "story/story38/create",
-        params={"world_id": world_label, "init_mode": "FULLY_SPECIFIED"},
+        params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
     assert create.status_code == 200

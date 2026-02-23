@@ -140,19 +140,10 @@ class StoryMaterializer38:
         if not entry_templates:
             raise ValueError("No entry templates resolved for story initialization")
 
-        if init_mode is InitMode.MINIMAL:
+        if init_mode is InitMode.LAZY:
             for templ in entry_templates:
                 self._materialize_with_ancestors(templ=templ, state=state)
-        elif init_mode is InitMode.HYBRID:
-            # Provisional behavior: materialize containers plus entry chain.
-            # Final production semantics are deferred until container provisioning
-            # rules for unresolved scene/block links are finalized.
-            for templ in sorted(bundle.template_registry.values(), key=self._template_depth):
-                if self._is_container_template(templ):
-                    self._materialize_with_ancestors(templ=templ, state=state)
-            for templ in entry_templates:
-                self._materialize_with_ancestors(templ=templ, state=state)
-        elif init_mode is InitMode.FULLY_SPECIFIED:
+        elif init_mode is InitMode.EAGER:
             for templ in sorted(bundle.template_registry.values(), key=self._template_depth):
                 self._materialize_with_ancestors(templ=templ, state=state)
         else:
@@ -161,7 +152,7 @@ class StoryMaterializer38:
         self._finalize_scene_contracts(state=state)
         self._wire_materialized_nodes(state=state)
 
-        if init_mode is InitMode.FULLY_SPECIFIED:
+        if init_mode is InitMode.EAGER:
             self._prelink_all_dependencies(state=state)
             assert_traversal_contracts(state.graph)
             if state.report.unresolved_hard:
@@ -198,17 +189,6 @@ class StoryMaterializer38:
         seq = getattr(templ, "seq", 0)
         label = templ.get_label() if hasattr(templ, "get_label") else ""
         return depth, seq, label
-
-    @staticmethod
-    def _is_container_template(templ: Any) -> bool:
-        payload = getattr(templ, "payload", None)
-        if isinstance(payload, Scene):
-            return True
-
-        members = getattr(templ, "members", None)
-        if callable(members):
-            return any(True for _ in members())
-        return False
 
     def _resolve_entry_templates(self, bundle: StoryTemplateBundle) -> list[Any]:
         templates = []
@@ -388,7 +368,7 @@ class StoryMaterializer38:
                         predecessor_id=action.uid,
                         requirement=requirement,
                     )
-                    if state.report.mode in {InitMode.MINIMAL, InitMode.HYBRID}:
+                    if state.report.mode is InitMode.LAZY:
                         state.report.warnings.append(
                             f"{state.report.mode.value.upper()} init left action destination unresolved; "
                             f"action={action.get_label()!r}, expected={qualified_ref!r}"

@@ -38,7 +38,7 @@ class World38:
         self,
         story_label: str,
         *,
-        init_mode: InitMode = InitMode.FULLY_SPECIFIED,
+        init_mode: InitMode = InitMode.EAGER,
     ) -> StoryInitResult:
         materializer = StoryMaterializer38()
         return materializer.create_story(
