@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -20,12 +21,45 @@ from tangl.service.response.info_response import SystemInfo, UserInfo, WorldInfo
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.type_hints import Hash, Identifier, UnstructuredData
+from tangl.utils.hash_secret import key_for_secret
 from tangl.vm.frame import Frame
 from tangl.vm.ledger import Ledger
 from tangl.vm38.runtime.ledger import Ledger as Ledger38
 
 from .api_endpoint import AccessLevel, ApiEndpoint38, MethodType, ResourceBinding, ResponseType
-from tangl.utils.hash_secret import key_for_secret
+
+
+_TRUE_STRINGS = {"1", "true", "t", "yes", "y", "on"}
+_FALSE_STRINGS = {"0", "false", "f", "no", "n", "off", ""}
+
+
+def _parse_bool_flag(value: Any, *, field_name: str) -> bool:
+    """Parse a permissive bool flag from API payloads without truthy-string traps."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in _TRUE_STRINGS:
+            return True
+        if normalized in _FALSE_STRINGS:
+            return False
+    raise ValueError(f"{field_name} must be a boolean-like value")
+
+
+def _parse_datetime_field(value: Any, *, field_name: str) -> datetime | None:
+    """Parse datetime payloads consistently with user model expectations."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO datetime string") from exc
+    raise ValueError(f"{field_name} must be a datetime or ISO datetime string")
 
 
 class RuntimeController(LegacyRuntimeController):
@@ -225,9 +259,15 @@ class UserController(HasApiEndpoints):
             api_key = key_for_secret(secret)
 
         if "last_played_dt" in kwargs:
-            user.last_played_dt = kwargs["last_played_dt"]
+            user.last_played_dt = _parse_datetime_field(
+                kwargs["last_played_dt"],
+                field_name="last_played_dt",
+            )
         if "privileged" in kwargs:
-            user.privileged = bool(kwargs["privileged"])
+            user.privileged = _parse_bool_flag(
+                kwargs["privileged"],
+                field_name="privileged",
+            )
 
         details: dict[str, Any] = {"user_id": str(user.uid)}
         if api_key is not None:

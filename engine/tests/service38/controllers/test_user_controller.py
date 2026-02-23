@@ -23,6 +23,7 @@ are not re-testing the legacy logic but the service38 dispatch plumbing.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -229,6 +230,61 @@ class TestMutatingUserEndpoints:
         )
         assert isinstance(result, RuntimeInfo)
         assert result.status == "ok"
+
+    def test_update_user_parses_false_string_without_privilege_escalation(
+        self,
+        orchestrator: Orchestrator38,
+        existing_user: User,
+    ) -> None:
+        existing_user.privileged = True
+        result = orchestrator.execute(
+            "UserController.update_user",
+            user_id=existing_user.uid,
+            privileged="false",
+        )
+        assert isinstance(result, RuntimeInfo)
+        assert result.status == "ok"
+        assert existing_user.privileged is False
+
+    def test_update_user_parses_last_played_dt_iso_string(
+        self,
+        orchestrator: Orchestrator38,
+        existing_user: User,
+    ) -> None:
+        iso_dt = "2026-02-23T12:34:56"
+        result = orchestrator.execute(
+            "UserController.update_user",
+            user_id=existing_user.uid,
+            last_played_dt=iso_dt,
+        )
+        assert isinstance(result, RuntimeInfo)
+        assert result.status == "ok"
+        assert isinstance(existing_user.last_played_dt, datetime)
+        assert existing_user.last_played_dt == datetime.fromisoformat(iso_dt)
+
+    def test_update_user_rejects_invalid_privileged_value(
+        self,
+        orchestrator: Orchestrator38,
+        existing_user: User,
+    ) -> None:
+        with pytest.raises(ValueError, match="privileged"):
+            orchestrator.execute(
+                "UserController.update_user",
+                user_id=existing_user.uid,
+                privileged="definitely",
+            )
+
+    def test_update_user_rejects_invalid_last_played_dt(
+        self,
+        orchestrator: Orchestrator38,
+        existing_user: User,
+    ) -> None:
+        with pytest.raises(ValueError, match="last_played_dt"):
+            orchestrator.execute(
+                "UserController.update_user",
+                user_id=existing_user.uid,
+                last_played_dt="not-a-datetime",
+            )
 
     def test_drop_user_hydrates_and_unlinks_stories(
         self,
