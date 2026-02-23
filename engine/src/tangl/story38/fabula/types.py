@@ -9,9 +9,8 @@ from uuid import UUID
 class InitMode(str, Enum):
     """Graph initialization modes for story38."""
 
-    MINIMAL = "minimal"
-    HYBRID = "hybrid"
-    FULLY_SPECIFIED = "fully_specified"
+    LAZY = "lazy"
+    EAGER = "eager"
 
 
 @runtime_checkable
@@ -68,12 +67,12 @@ class InitReport:
 
 
 class GraphInitializationError(RuntimeError):
-    """Raised when fully specified initialization cannot satisfy hard requirements."""
+    """Raised when EAGER initialization cannot satisfy hard requirements."""
 
     def __init__(self, report: InitReport):
         self.report = report
         super().__init__(
-            "Fully specified initialization failed: "
+            "EAGER initialization failed: "
             f"{len(report.unresolved_hard)} unresolved hard dependencies"
         )
 

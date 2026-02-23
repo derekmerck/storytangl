@@ -236,7 +236,27 @@ class PhaseCtx:
 
         uid = node.uid
         if uid not in self._ns_cache:
-            self._ns_cache[uid] = do_gather_ns(node, ctx=self)
+            ns = do_gather_ns(node, ctx=self)
+
+            # Temporary bridge: graph/world locals are layered here until scoped
+            # dispatch support for world/graph-level gather_ns providers lands.
+            # Keep this blunt and visible so we remember to remove it.
+            base_maps = list(ns.maps) if isinstance(ns, ChainMap) else [dict(ns)]
+            tail_layers: list[dict[str, Any]] = []
+
+            graph_locals = getattr(self.graph, "locals", None) or {}
+            if graph_locals:
+                tail_layers.append(dict(graph_locals))
+
+            world = getattr(self.graph, "world", None)
+            world_locals = getattr(world, "locals", None) if world is not None else None
+            if world_locals:
+                tail_layers.append(dict(world_locals))
+
+            if tail_layers:
+                ns = ChainMap(*base_maps, *tail_layers)
+
+            self._ns_cache[uid] = ns
 
         return self._ns_cache[uid]
 

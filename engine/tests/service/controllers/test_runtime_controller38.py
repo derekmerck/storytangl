@@ -38,7 +38,7 @@ def test_runtime_controller38_flow_create_info_update_resolve_drop() -> None:
         user=user,
         world_id=world.label,
         world=world,
-        init_mode=InitMode.FULLY_SPECIFIED.value,
+        init_mode=InitMode.EAGER.value,
         story_label="svc38_story",
     )
     assert created.status == "ok"
@@ -91,7 +91,7 @@ def test_runtime_controller38_update_default_since_step_returns_full_history() -
         user=user,
         world_id=world.label,
         world=world,
-        init_mode=InitMode.FULLY_SPECIFIED.value,
+        init_mode=InitMode.EAGER.value,
         story_label="svc38_story_default_update",
     )
     ledger = created.details.get("ledger") if created.details else None
@@ -120,7 +120,7 @@ def test_runtime_controller38_resolve_choice_accepts_choice_payload(monkeypatch)
         user=user,
         world_id=world.label,
         world=world,
-        init_mode=InitMode.FULLY_SPECIFIED.value,
+        init_mode=InitMode.EAGER.value,
         story_label="svc38_story_payload",
     )
     ledger = created.details.get("ledger") if created.details else None
@@ -155,7 +155,7 @@ def test_runtime_controller38_envelope_includes_blocker_diagnostics_metadata() -
         user=user,
         world_id=world.label,
         world=world,
-        init_mode=InitMode.FULLY_SPECIFIED.value,
+        init_mode=InitMode.EAGER.value,
         story_label="svc38_story_blockers",
     )
     ledger = created.details.get("ledger") if created.details else None

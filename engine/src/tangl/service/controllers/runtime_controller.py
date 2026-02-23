@@ -434,8 +434,11 @@ class RuntimeController(HasApiEndpoints):
             world = registry.get_world(world_id, runtime_version="38")
 
         story_label = kwargs.get("story_label") or f"story_{user.uid}"
-        mode_raw = kwargs.get("init_mode") or kwargs.get("mode") or InitMode.FULLY_SPECIFIED.value
-        mode = InitMode(mode_raw)
+        mode_raw = kwargs.get("init_mode") or kwargs.get("mode") or InitMode.EAGER.value
+        if isinstance(mode_raw, str):
+            mode = InitMode(mode_raw.lower())
+        else:
+            mode = InitMode(mode_raw)
         init_result = world.create_story(story_label, init_mode=mode)
         story_graph = init_result.graph
 

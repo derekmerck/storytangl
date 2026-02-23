@@ -29,20 +29,33 @@ def _render_block_content(block: Block, *, ctx) -> str:
         return content
 
 
+def _hard_unresolved_dependencies(*, edge: Action) -> list[Dependency]:
+    """Return unresolved hard dependencies on an action successor."""
+    successor = edge.successor
+    if successor is None:
+        return []
+
+    unresolved = successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
+    return [
+        dep
+        for dep in unresolved
+        if bool(getattr(dep.requirement, "hard_requirement", False))
+    ]
+
+
 def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     """Return a coarse reason for unavailable choices."""
     if edge.successor is None:
         return "missing_successor"
 
-    if edge.available(ctx=ctx):
-        return None
-
-    successor = edge.successor
-    deps = successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
-    if next(deps, None) is not None:
+    # Hard unresolved dependencies block choice availability regardless of guard predicates.
+    if _hard_unresolved_dependencies(edge=edge):
         return "missing_dependency"
 
-    return "guard_failed_or_unavailable"
+    if not edge.available(ctx=ctx):
+        return "guard_failed_or_unavailable"
+
+    return None
 
 
 def _dependency_blocker(dep: Dependency) -> dict[str, Any]:
@@ -63,11 +76,7 @@ def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
     if edge.successor is None:
         return [{"type": "edge", "reason": "missing_successor"}]
 
-    successor = edge.successor
-    blockers = [
-        _dependency_blocker(dep)
-        for dep in successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
-    ]
+    blockers = [_dependency_blocker(dep) for dep in _hard_unresolved_dependencies(edge=edge)]
     if blockers:
         return blockers
 
@@ -127,16 +136,15 @@ def render_block_choices(*, caller, ctx, **_kw):
     fragments: list[ChoiceFragment] = []
 
     for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
-        available = edge.available(ctx=ctx)
+        reason = _choice_unavailable_reason(edge=edge, ctx=ctx)
+        available = reason is None
         blockers = [] if available else _choice_blockers(edge=edge, ctx=ctx)
         fragments.append(
             ChoiceFragment(
                 edge_id=edge.uid,
                 text=edge.text or edge.get_label(),
                 available=available,
-                unavailable_reason=(
-                    None if available else _choice_unavailable_reason(edge=edge, ctx=ctx)
-                ),
+                unavailable_reason=(None if available else reason),
                 blockers=blockers or None,
                 accepts=(dict(edge.accepts) if isinstance(edge.accepts, dict) else None),
                 ui_hints=(dict(edge.ui_hints) if isinstance(edge.ui_hints, dict) else None),

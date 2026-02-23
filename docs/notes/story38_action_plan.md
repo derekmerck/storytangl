@@ -6,9 +6,9 @@ Status: In Progress (updated 2026-02-21)
 
 - Until container provisioning rules for unresolved scene/block links are finalized,
   treat story38 runtime support as:
-- `FULLY_SPECIFIED` stories, or
+- `EAGER` stories, or
 - effectively flat/minimally-scoped stories that do not depend on deferred container creation.
-- `HYBRID` remains an exploratory implementation path and is deferred for production semantics.
+- `LAZY` stories where unresolved dependencies are expected to resolve at runtime.
 
 ## Decision Locks
 
@@ -136,10 +136,9 @@ Tests:
 
 ### Phase 6 - Materialization Modes + Provisioning Semantics
 
-- [x] Keep `MINIMAL` and `FULLY_SPECIFIED`.
-- [x] Reintroduce `HYBRID` semantics as: instantiate containers/groups, defer resident members.
-- [ ] Finalize production semantics for `HYBRID` (depends on container provisioning rules).
-- [ ] Define container provisioning rules for unresolved scene/block links.
+- [x] Keep `LAZY` and `EAGER`.
+- [x] Remove `HYBRID` mode from story38 initialization.
+- [ ] Define container provisioning rules for unresolved scene/block links in `LAZY`.
 - [x] Document resolver behavior for update/clone policy offers (deferred execution, rank/filter first, strict fallback).
 
 Target code:
@@ -148,7 +147,7 @@ Target code:
 - `engine/src/tangl/vm38/provision/`
 
 Tests:
-- [x] Add/extend `engine/tests/story38/test_story38_init.py` for hybrid behavior
+- [x] Add/extend `engine/tests/story38/test_story38_init.py` for `LAZY`/`EAGER` behavior
 - [x] Extend `engine/tests/vm38/test_resolver.py` for clone/update offer orchestration
 
 ## Testing Plan (Per Phase)

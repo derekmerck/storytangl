@@ -266,7 +266,7 @@ async def create_story38(
     story_label: str | None = Query(None, description="Optional story label"),
     init_mode: str | None = Query(
         None,
-        description="Initialization mode: MINIMAL or FULLY_SPECIFIED",
+        description="Initialization mode: LAZY or EAGER",
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),

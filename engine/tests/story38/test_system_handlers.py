@@ -81,6 +81,24 @@ def test_render_block_choice_unavailable_reason_missing_dependency() -> None:
     assert choice.blockers[0]["resolution_meta"] == {"alternatives": []}
 
 
+def test_render_block_choice_hard_dependency_blocks_even_when_guard_is_true() -> None:
+    graph = Graph()
+    start = Block(label="start")
+    reachable = Block(label="reachable")
+    graph.add(start)
+    graph.add(reachable)
+    graph.add(Action(predecessor_id=start.uid, successor_id=reachable.uid, text="Open"))
+    requirement = Requirement(has_label="key", hard_requirement=True)
+    requirement.resolution_reason = "no_offers"
+    graph.add(Dependency(predecessor_id=reachable.uid, requirement=requirement))
+
+    fragments = render_block(caller=start, ctx=_ctx_with_ns())
+    assert fragments is not None
+    choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
+    assert choice.available is False
+    assert choice.unavailable_reason == "missing_dependency"
+
+
 def test_render_block_choice_unavailable_reason_guard_failed() -> None:
     graph = Graph()
     start = Block(label="start")
@@ -175,3 +193,19 @@ def test_dispatch_journal_allows_custom_handler_injection() -> None:
     contents = [fragment.content for fragment in fragments if isinstance(fragment, ContentFragment)]
     assert "overlay" in contents
     assert "Hello Joe" in contents
+
+
+def test_render_block_content_includes_graph_locals_from_phase_ctx_tail_layer() -> None:
+    graph = StoryGraph38(locals={"gold": 10})
+    start = Block(label="start", content="Gold: {gold}")
+    graph.add(start)
+    graph.initial_cursor_id = start.uid
+    ctx = PhaseCtx(graph=graph, cursor_id=start.uid)
+
+    fragments = do_journal(start, ctx=ctx)
+    if isinstance(fragments, ContentFragment):
+        content = fragments
+    else:
+        assert isinstance(fragments, list)
+        content = next(fragment for fragment in fragments if isinstance(fragment, ContentFragment))
+    assert content.content == "Gold: 10"
