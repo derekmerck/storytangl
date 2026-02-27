@@ -46,6 +46,7 @@ from .resolution_phase import ResolutionPhase
 # - frontier planning
 from .provision import (
     Affordance,
+    Blocker,
     Dependency,
     FallbackProvisioner,
     FindProvisioner,
@@ -58,6 +59,7 @@ from .provision import (
     Resolver,
     TemplateProvisioner,
     UpdateCloneProvisioner,
+    ViabilityResult,
     CloneProvisioner,
 )
 
@@ -110,6 +112,7 @@ from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
 __all__ = [
     "Affordance",
     "AnonymousEdge",
+    "Blocker",
     "Dependency",
     "FallbackProvisioner",
     "FindProvisioner",
@@ -126,6 +129,7 @@ __all__ = [
     "Resolver",
     "TemplateProvisioner",
     "UpdateCloneProvisioner",
+    "ViabilityResult",
     "CloneProvisioner",
     "TraversableEdge",
     "TraversableNode",

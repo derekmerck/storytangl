@@ -26,11 +26,13 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core38 import Selector
+from tangl.core38 import EntityTemplate, Selector, TemplateRegistry
 from tangl.story38 import InitMode, World38
 from tangl.story38.episode import Action, Block
 from tangl.story38.fragments import ChoiceFragment, ContentFragment
+from tangl.story38.story_graph import StoryGraph38
 from tangl.vm38 import Ledger
+from tangl.vm38 import Dependency, Requirement
 from tangl.vm38.dispatch import do_journal
 
 import tangl.story38  # noqa: F401 – ensure story38 journal/phase handlers are registered
@@ -328,6 +330,48 @@ class TestMultiScene:
         action = _get_single_action(ledger)
         ledger.resolve_choice(action.uid)
         assert ledger.cursor.label == "mouth"
+
+
+# ---------------------------------------------------------------------------
+# Selection-time provisioning
+# ---------------------------------------------------------------------------
+
+class TestSelectionTimeProvisioning:
+    def test_unresolved_but_viable_choice_provisions_then_traverses(self) -> None:
+        graph = StoryGraph38(label="selection_time")
+        start = Block(label="start", content="Start")
+        graph.add(start)
+        action = Action(predecessor_id=start.uid, text="Go end")
+        graph.add(action)
+        destination_req = Requirement(
+            has_kind=Block,
+            has_identifier="end",
+            authored_path="end",
+            is_qualified=False,
+            hard_requirement=True,
+        )
+        dep = Dependency(
+            registry=graph,
+            predecessor_id=action.uid,
+            label="destination",
+            requirement=destination_req,
+        )
+
+        templates = TemplateRegistry(label="selection_time_templates")
+        EntityTemplate(
+            label="end",
+            payload=Block(label="end", content="Done"),
+            registry=templates,
+        )
+        graph.factory = templates
+        graph.initial_cursor_id = start.uid
+
+        ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
+        ledger.resolve_choice(action.uid)
+
+        assert ledger.cursor.label == "end"
+        assert dep.satisfied is True
+        assert dep.provider is ledger.cursor
 
 
 # ---------------------------------------------------------------------------

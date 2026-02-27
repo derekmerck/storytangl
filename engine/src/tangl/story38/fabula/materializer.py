@@ -320,9 +320,12 @@ class StoryMaterializer38:
         state: _MaterializationState,
     ) -> None:
         for index, spec in enumerate(specs):
+            authored_successor_ref = self._coerce_str(spec.get("authored_successor_ref"))
             successor_ref = self._coerce_str(
                 spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
             )
+            if successor_ref is None:
+                successor_ref = self._coerce_str(spec.get("successor_ref"))
             if not successor_ref:
                 msg = (
                     f"Block '{node.get_label()}' action[{index}] is missing successor "
@@ -359,6 +362,8 @@ class StoryMaterializer38:
                     requirement = Requirement(
                         has_kind=TraversableNode,
                         has_identifier=qualified_ref,
+                        authored_path=authored_successor_ref or successor_ref,
+                        is_qualified=self._is_qualified_path(authored_successor_ref or successor_ref),
                         provision_policy=ProvisionPolicy.ANY,
                         hard_requirement=True,
                     )
@@ -398,6 +403,8 @@ class StoryMaterializer38:
             }
             if identifier is not None:
                 requirement_kwargs["has_identifier"] = identifier
+                requirement_kwargs["authored_path"] = identifier
+                requirement_kwargs["is_qualified"] = self._is_qualified_path(identifier)
 
             requirement = Requirement(**requirement_kwargs)
             dep = dependency_kind(
@@ -490,3 +497,7 @@ class StoryMaterializer38:
         if parent_label:
             return f"{parent_label}.{successor_ref}"
         return successor_ref
+
+    @staticmethod
+    def _is_qualified_path(path: str | None) -> bool:
+        return isinstance(path, str) and "." in path

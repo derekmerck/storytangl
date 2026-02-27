@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 from pydantic import ConfigDict, SkipValidation
 
 from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, Priority, TokenFactory
+from ..traversable import TraversableNode
+
+from .scope import admitted, build_plan, resolve_target_path, scope_distance
 
 if TYPE_CHECKING:
     from .requirement import Requirement, Affordance
@@ -47,6 +50,8 @@ class ProvisionOffer(Record):
     priority: int = Priority.NORMAL
     distance_from_caller: int = 999
     specificity: int = 0
+    scope_distance: int = 0
+    build_plan: list[str] | None = None
     candidate: Any = None
 
     def sort_key(self):
@@ -73,6 +78,13 @@ def _next_provision_uid(*, _ctx: Any = None) -> UUID:
             if hasattr(rng, "getrandbits"):
                 return UUID(int=rng.getrandbits(128), version=4)
     return uuid4()
+
+
+def _template_hash_value(template: EntityTemplate) -> str:
+    content_hash = template.content_hash()
+    if isinstance(content_hash, bytes):
+        return content_hash.hex()
+    return str(content_hash)
 
 
 @dataclass
@@ -111,18 +123,68 @@ class TemplateProvisioner:
 
     templates: SkipValidation[Iterable[EntityTemplate]]  # world's template registry
     distance: int = 0
+    request_ctx: str = ""
+    graph: Any | None = None
+    story_materialize: Callable[[EntityTemplate, Any], Entity] | None = None
+
+    @staticmethod
+    def _selector_identifier(requirement: "Requirement") -> str | None:
+        extra = requirement.__pydantic_extra__ or {}
+        value = extra.get("has_identifier")
+        return str(value) if isinstance(value, str) and value else None
+
+    @staticmethod
+    def _is_episode_requirement(requirement: "Requirement") -> bool:
+        extra = requirement.__pydantic_extra__ or {}
+        kind = extra.get("has_kind")
+        return isinstance(kind, type) and issubclass(kind, TraversableNode)
+
+    def _materialize_template(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+        if callable(self.story_materialize):
+            provider = self.story_materialize(template, _ctx)
+        else:
+            provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+        provider.templ_hash = _template_hash_value(template)
+        return provider
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
+        identifier = self._selector_identifier(requirement)
+
+        is_episode_requirement = self._is_episode_requirement(requirement)
         candidates = requirement.filter(self.templates)
         for c in candidates:
+            candidate_identifier = identifier or c.payload.get_label()
+            target_ctx = resolve_target_path(
+                identifier=candidate_identifier,
+                request_ctx=self.request_ctx,
+                authored_path=requirement.authored_path,
+                is_qualified=requirement.is_qualified,
+            )
+            if target_ctx is None:
+                continue
+
+            if not admitted(c.admission_scope, target_ctx):
+                continue
+
+            distance = scope_distance(c.admission_scope, target_ctx)
+            chain = None
+            if is_episode_requirement:
+                if requirement.is_qualified:
+                    chain = build_plan(target_ctx, self.graph)
+                elif distance > 0:
+                    continue
+
             yield ProvisionOffer(
                 origin_id = "TemplateProvisioner",
                 policy = ProvisionPolicy.CREATE,
                 priority = Priority.NORMAL,
                 distance_from_caller=self.distance,
+                scope_distance=distance,
+                build_plan=chain,
                 candidate=c,
-                callback = lambda *_, _c=c, **kwargs: _c.materialize(
-                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx"))
+                callback = lambda *_, _c=c, **kwargs: self._materialize_template(
+                    _c,
+                    _ctx=kwargs.get("_ctx"),
                 ),
             )
 
@@ -138,14 +200,21 @@ class InlineTemplateProvisioner:
             return [ProvisionOffer(
                 origin_id=requirement.fallback_templ.get_label(),
                 policy=ProvisionPolicy.CREATE,
-                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: _t.materialize(
-                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx"))
+                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: cls._materialize_inline(
+                    _t,
+                    _ctx=kwargs.get("_ctx"),
                 ),
                 priority=Priority.LATE,
                 distance_from_caller=0,
                 candidate=requirement.fallback_templ,
             )]
         return []
+
+    @staticmethod
+    def _materialize_inline(template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+        provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+        provider.templ_hash = _template_hash_value(template)
+        return provider
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
 

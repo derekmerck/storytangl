@@ -85,6 +85,9 @@ class TestEntityCreation:
     def test_uid_is_unique(self) -> None:
         assert Entity().uid != Entity().uid
 
+    def test_templ_hash_defaults_to_none(self) -> None:
+        assert Entity().templ_hash is None
+
 
 class TestEntitySerialization:
     """Entity structuring and persistence-shape behavior."""

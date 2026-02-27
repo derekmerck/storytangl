@@ -76,16 +76,20 @@ def policy_tier(policy: Any) -> int:
     return 9
 
 
-def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int]:
+def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int]:
     """Deterministic offer sort key.
 
     Order:
     1) policy tier
-    2) distance from caller
-    3) specificity (higher first)
-    4) explicit offer priority
-    5) creation sequence
+    2) scope distance
+    3) distance from caller
+    4) specificity (higher first)
+    5) explicit offer priority
+    6) creation sequence
     """
+    scope = getattr(offer, "scope_distance", 0)
+    if not isinstance(scope, int):
+        scope = 0
     distance = getattr(offer, "distance_from_caller", 999)
     if not isinstance(distance, int):
         distance = 999
@@ -99,7 +103,7 @@ def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int]:
     if not isinstance(seq, int):
         seq = 0
 
-    return policy_tier(offer.policy), distance, -specificity, priority, seq
+    return policy_tier(offer.policy), scope, distance, -specificity, priority, seq
 
 
 def annotate_offer_specificity(requirement: Selector, offer: Any) -> Any:
@@ -123,6 +127,8 @@ def summarize_offer(offer: Any) -> dict[str, Any]:
     return {
         "origin_id": str(getattr(offer, "origin_id", "")) or None,
         "policy": str(getattr(offer, "policy", None)),
+        "scope_distance": getattr(offer, "scope_distance", None),
+        "build_plan": getattr(offer, "build_plan", None),
         "distance_from_caller": getattr(offer, "distance_from_caller", None),
         "specificity": getattr(offer, "specificity", None),
         "priority": getattr(offer, "priority", None),

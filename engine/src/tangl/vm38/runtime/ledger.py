@@ -16,7 +16,7 @@ from tangl.core38 import Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
 from tangl.vm38.traversable import TraversableEdge, TraversableNode
 
-from .frame import Frame, StepTrace
+from .frame import Frame, PhaseCtx, StepTrace
 from ..fragments import Fragment
 from ..replay import CheckpointRecord, RollbackRecord, StepRecord, get_replay_engine
 from ..replay.contracts import ReplayDelta
@@ -173,11 +173,55 @@ class Ledger(Entity):
             )
         )
 
+    @staticmethod
+    def _selection_destination_dependency(edge: TraversableEdge):
+        from tangl.vm38 import Dependency
+
+        graph = getattr(edge, "graph", None)
+        if graph is None:
+            return None
+
+        deps = graph.find_edges(
+            Selector(
+                has_kind=Dependency,
+                predecessor=edge,
+                label="destination",
+                satisfied=False,
+            )
+        )
+        for dep in deps:
+            return dep
+        deps = graph.find_edges(
+            Selector(has_kind=Dependency, predecessor=edge, satisfied=False)
+        )
+        return next(deps, None)
+
+    def _provision_selected_destination(self, edge: TraversableEdge) -> None:
+        if edge.successor is not None:
+            return
+
+        dep = self._selection_destination_dependency(edge)
+        if dep is None:
+            return
+
+        from tangl.vm38 import Resolver
+
+        ctx = PhaseCtx(
+            graph=self.graph,
+            cursor_id=self.cursor_id,
+            step=max(self.cursor_steps, 0),
+        )
+        resolved = Resolver.from_ctx(ctx).resolve_dependency(dep, force=False, _ctx=ctx)
+        if resolved and dep.successor is not None and edge.successor is None:
+            edge.set_successor(dep.successor, _ctx=ctx)
+
     def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
         """Resolve a player choice and sync frame results into ledger state."""
         edge = self.graph.get(edge_id)
         if edge is None:
             raise ValueError(f"Choice edge not found: {edge_id}")
+
+        self._provision_selected_destination(edge)
 
         frame = self.get_frame()
         if hasattr(frame, "step_observer"):

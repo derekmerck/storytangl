@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core38 import BehaviorRegistry, DispatchLayer, Graph
+from tangl.core38 import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core38.runtime_op import Predicate
 from tangl.story38 import StoryGraph38
 from tangl.story38.fragments import ChoiceFragment, ContentFragment, MediaFragment
@@ -56,6 +56,27 @@ def test_render_block_choice_unavailable_reason_missing_successor() -> None:
     assert choice.available is False
     assert choice.unavailable_reason == "missing_successor"
     assert choice.blockers == [{"type": "edge", "reason": "missing_successor"}]
+
+
+def test_render_block_choice_missing_successor_uses_preview_blockers_when_dependency_exists() -> None:
+    graph = StoryGraph38()
+    start = Block(label="start")
+    graph.add(start)
+    action = Action(predecessor_id=start.uid, text="Broken")
+    graph.add(action)
+    requirement = Requirement(has_identifier="missing", hard_requirement=True)
+    graph.add(Dependency(predecessor_id=action.uid, label="destination", requirement=requirement))
+    # No templates available for resolution.
+    graph.factory = TemplateRegistry(label="empty")
+
+    ctx = PhaseCtx(graph=graph, cursor_id=start.uid)
+    fragments = render_block(caller=start, ctx=ctx)
+    assert fragments is not None
+    choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
+    assert choice.available is False
+    assert choice.unavailable_reason == "missing_successor"
+    assert choice.blockers is not None
+    assert choice.blockers[0]["type"] == "provision"
 
 
 def test_render_block_choice_unavailable_reason_missing_dependency() -> None:

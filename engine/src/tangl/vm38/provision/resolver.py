@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import logging
 import warnings
-from typing import Any, Iterable, Optional, TypeAlias, Union, Self
+from typing import Any, Iterable, Iterator, Optional, TypeAlias, Union, Self
 from uuid import UUID
 
 from tangl.core38 import (
@@ -15,6 +15,10 @@ from tangl.core38 import (
     Selector,
 )
 from ..dispatch import on_provision
+from ..ctx import VmResolverCtx
+from ..traversable import TraversableNode
+from .matching import annotate_offer_specificity, summarize_offer
+from .preview import Blocker, ViabilityResult
 from .provisioner import (
     ProvisionOffer,
     FindProvisioner,
@@ -23,10 +27,11 @@ from .provisioner import (
     FallbackProvisioner,
     UpdateCloneProvisioner,
     ProvisionPolicy,
+    _next_provision_uid,
+    _template_hash_value,
 )
-from .matching import annotate_offer_specificity, summarize_offer
 from .requirement import Requirement, PT, Dependency, Affordance
-from ..ctx import VmResolverCtx
+from .scope import admitted, build_plan, prefix_paths, resolve_target_path, scope_distance, split_path
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
@@ -98,6 +103,86 @@ class Resolver:
             template_scope_groups=cls._ctx_template_scope_groups(ctx),
         )
 
+    @staticmethod
+    def _selector_identifier(requirement: Requirement) -> str | None:
+        extra = requirement.__pydantic_extra__ or {}
+        value = extra.get("has_identifier")
+        if isinstance(value, str) and value:
+            return value
+        return None
+
+    @staticmethod
+    def _is_episode_requirement(requirement: Requirement) -> bool:
+        extra = requirement.__pydantic_extra__ or {}
+        kind = extra.get("has_kind")
+        return isinstance(kind, type) and issubclass(kind, TraversableNode)
+
+    @staticmethod
+    def _request_ctx_path(_ctx: Any) -> str:
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is None:
+            return ""
+
+        cursor = getattr(_ctx, "cursor", None)
+        if cursor is None:
+            graph = getattr(_ctx, "graph", None)
+            cursor_id = getattr(_ctx, "cursor_id", None)
+            if graph is not None and cursor_id is not None and hasattr(graph, "get"):
+                cursor = graph.get(cursor_id)
+
+        if cursor is None:
+            return ""
+        path = getattr(cursor, "path", None)
+        if isinstance(path, str) and path:
+            return path
+        label = getattr(cursor, "label", None)
+        if isinstance(label, str):
+            return label
+        return ""
+
+    @staticmethod
+    def _story_materialize_hook(_ctx: Any) -> Any:
+        hook = getattr(_ctx, "story_materialize", None)
+        if callable(hook):
+            return hook
+
+        meta = getattr(_ctx, "meta", None)
+        if isinstance(meta, dict):
+            meta_hook = meta.get("story_materialize")
+            if callable(meta_hook):
+                return meta_hook
+        return None
+
+    def _resolve_target_path_for_requirement(self, requirement: Requirement, *, _ctx: Any = None) -> str | None:
+        return resolve_target_path(
+            identifier=self._selector_identifier(requirement),
+            request_ctx=self._request_ctx_path(_ctx),
+            authored_path=requirement.authored_path,
+            is_qualified=requirement.is_qualified,
+        )
+
+    @staticmethod
+    def _iter_template_values(group: Any) -> Iterator[EntityTemplate]:
+        if isinstance(group, EntityTemplate):
+            yield group
+            members = getattr(group, "members", None)
+            if callable(members):
+                for member in members():
+                    if isinstance(member, EntityTemplate):
+                        yield member
+            return
+        try:
+            values = iter(group)
+        except TypeError:
+            return
+        for value in values:
+            if isinstance(value, EntityTemplate):
+                yield value
+
+    def _iter_templates(self) -> Iterator[EntityTemplate]:
+        for group in self.template_scope_groups:
+            yield from self._iter_template_values(group)
+
     def gather_offers(
         self,
         requirement: Requirement[PT],
@@ -107,6 +192,9 @@ class Resolver:
         _ctx=None,
     ) -> list[ProvisionOffer]:
         offers: list[ProvisionOffer] = list(preferred_offers or [])
+        request_ctx = self._request_ctx_path(_ctx)
+        graph = getattr(_ctx, "graph", None)
+        story_materialize = self._story_materialize_hook(_ctx)
 
         # If there are more than 20 groups, the distance-based priorities will slip
         # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
@@ -115,7 +203,15 @@ class Resolver:
             offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
 
         for i, template_group in enumerate(self.template_scope_groups):
-            offers.extend(TemplateProvisioner(templates=template_group, distance=i).get_dependency_offers(requirement))
+            offers.extend(
+                TemplateProvisioner(
+                    templates=template_group,
+                    distance=i,
+                    request_ctx=request_ctx,
+                    graph=graph,
+                    story_materialize=story_materialize,
+                ).get_dependency_offers(requirement)
+            )
 
         offers.extend(InlineTemplateProvisioner.get_dependency_offers(requirement))
         offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
@@ -161,7 +257,15 @@ class Resolver:
             return
 
         seen_ids: set[UUID] = set()
-        for affordance in frontier.edges_out(Selector(has_kind=Affordance)):
+        if hasattr(frontier, "edges_out"):
+            affordances = frontier.edges_out(Selector(has_kind=Affordance))
+        else:
+            graph = getattr(frontier, "graph", None)
+            if graph is None:
+                return
+            affordances = graph.find_edges(Selector(has_kind=Affordance, predecessor=frontier))
+
+        for affordance in affordances:
             provider = affordance.successor
             if provider is None:
                 # Backward compatibility for stale serialized affordances.
@@ -206,16 +310,14 @@ class Resolver:
             )
         return offers
 
-    def resolve_requirement(
+    def _resolve_requirement_offer(
         self,
         requirement: Requirement[PT],
         *,
         force: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
-    ) -> Optional[PT]:
-        # updates requirement in place, returns provider to allow linking at dependency level
-
+    ) -> tuple[Optional[PT], Optional[ProvisionOffer], list[ProvisionOffer]]:
         offers = self.gather_offers(
             requirement,
             force=force,
@@ -235,32 +337,373 @@ class Resolver:
             requirement.resolution_meta = requirement.resolution_meta or {
                 "alternatives": [],
             }
-            return None
+            return None, None, offers
         else:
             requirement.unsatisfiable = False
 
-        if len(offers) == 1:
-            # Unambiguous offer available
-            requirement.unambiguously_resolved = True
-        else:
-            requirement.unambiguously_resolved = False
+        requirement.unambiguously_resolved = len(offers) == 1
 
-        selected_offer = offers[0]
-        requirement.selected_offer_policy = selected_offer.policy
-        requirement.resolution_reason = "resolved"
-        requirement.resolution_meta = {
-            "selected": summarize_offer(selected_offer),
-            "alternatives": [summarize_offer(offer) for offer in offers[:5]],
-        }
+        for selected_offer in offers:
+            requirement.selected_offer_policy = selected_offer.policy
+            requirement.resolution_reason = "resolved"
+            requirement.resolution_meta = {
+                "selected": summarize_offer(selected_offer),
+                "alternatives": [summarize_offer(offer) for offer in offers[:5]],
+            }
 
-        # todo: should we return the selected offer and let caller invoke it later
-        #       and/or stash it somewhere for audit?
-        provider = selected_offer.callback(_ctx=_ctx)
-        if provider is None:
-            requirement.unsatisfiable = True
-            requirement.resolution_reason = "provider_none"
-            return None
+            provider = selected_offer.callback(_ctx=_ctx)
+            if provider is not None:
+                return provider, selected_offer, offers
+
+        requirement.unsatisfiable = True
+        requirement.selected_offer_policy = None
+        requirement.resolution_reason = "provider_none"
+        return None, None, offers
+
+    def resolve_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        force: bool = False,
+        preferred_offers: Iterable[ProvisionOffer] = (),
+        _ctx=None,
+    ) -> Optional[PT]:
+        provider, _, _ = self._resolve_requirement_offer(
+            requirement=requirement,
+            force=force,
+            preferred_offers=preferred_offers,
+            _ctx=_ctx,
+        )
         return provider
+
+    @staticmethod
+    def _matches_identifier(candidate: Any, identifier: str) -> bool:
+        has_identifier = getattr(candidate, "has_identifier", None)
+        if callable(has_identifier):
+            try:
+                return bool(has_identifier(identifier))
+            except Exception:
+                return False
+        return getattr(candidate, "label", None) == identifier
+
+    def _find_existing_path_node(self, graph: Any, path: str) -> Any | None:
+        segments = split_path(path)
+        if not segments:
+            return None
+
+        current = None
+        for index, segment in enumerate(segments):
+            if index == 0:
+                current = self._find_top_level_node(graph, segment)
+            else:
+                current = self._find_child_node(current, segment)
+            if current is None:
+                return None
+        return current
+
+    def _find_top_level_node(self, graph: Any, segment: str) -> Any | None:
+        values = getattr(graph, "values", None)
+        if not callable(values):
+            return None
+        for candidate in values():
+            if getattr(candidate, "parent", None) is not None:
+                continue
+            if self._matches_identifier(candidate, segment):
+                return candidate
+        return None
+
+    def _find_child_node(self, parent: Any, segment: str) -> Any | None:
+        if parent is None:
+            return None
+
+        children = getattr(parent, "children", None)
+        if callable(children):
+            for candidate in children():
+                if self._matches_identifier(candidate, segment):
+                    return candidate
+            return None
+
+        members = getattr(parent, "members", None)
+        if callable(members):
+            for candidate in members():
+                if self._matches_identifier(candidate, segment):
+                    return candidate
+            return None
+        return None
+
+    def _find_structural_template(self, *, identifier: str, target_ctx: str) -> EntityTemplate | None:
+        best: tuple[int, int, EntityTemplate] | None = None
+        for group in self.template_scope_groups:
+            for template in self._iter_template_values(group):
+                if not template.has_identifier(identifier):
+                    continue
+                if not template.has_payload_kind(TraversableNode):
+                    continue
+                if not admitted(template.admission_scope, target_ctx):
+                    continue
+                key = (
+                    scope_distance(template.admission_scope, target_ctx),
+                    int(getattr(template, "seq", 0)),
+                )
+                if best is None or key < (best[0], best[1]):
+                    best = (key[0], key[1], template)
+        if best is None:
+            return None
+        return best[2]
+
+    def _chain_paths_resolvable(
+        self,
+        *,
+        build_segments: list[str],
+        target_ctx: str,
+        graph: Any,
+    ) -> bool:
+        if not build_segments:
+            return True
+        if graph is None:
+            return False
+
+        target_prefix_paths = prefix_paths(target_ctx)[:-1]
+        prefix_segments = split_path(target_ctx)[:-1]
+        if not prefix_segments:
+            return False
+
+        segment_index = 0
+        plan_index = 0
+        while segment_index < len(prefix_segments) and plan_index < len(build_segments):
+            if prefix_segments[segment_index] == build_segments[plan_index]:
+                segment_path = target_prefix_paths[segment_index]
+                if self._find_existing_path_node(graph, segment_path) is None:
+                    template = self._find_structural_template(
+                        identifier=segment_path,
+                        target_ctx=target_ctx,
+                    )
+                    if template is None:
+                        return False
+                plan_index += 1
+            segment_index += 1
+        return plan_index == len(build_segments)
+
+    def _execute_build_chain(
+        self,
+        *,
+        requirement: Requirement,
+        offer: ProvisionOffer,
+        graph: Any,
+        _ctx: Any = None,
+    ) -> Any | None:
+        build_segments = list(offer.build_plan or [])
+        if not build_segments:
+            target_path = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            if not target_path:
+                return None
+            parent_path_parts = split_path(target_path)[:-1]
+            if not parent_path_parts:
+                return None
+            return self._find_existing_path_node(graph, ".".join(parent_path_parts))
+
+        target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+        if target_ctx is None:
+            raise ValueError("Cannot execute structural chain without a target path")
+
+        if not self._chain_paths_resolvable(
+            build_segments=build_segments,
+            target_ctx=target_ctx,
+            graph=graph,
+        ):
+            raise ValueError("structural build chain is not resolvable")
+
+        segments = split_path(target_ctx)
+        parent_segments = segments[:-1]
+        if not parent_segments:
+            return None
+
+        current: Any | None = None
+        for index, segment in enumerate(parent_segments):
+            if index == 0:
+                existing = self._find_top_level_node(graph, segment)
+            else:
+                existing = self._find_child_node(current, segment)
+
+            if existing is not None:
+                current = existing
+                continue
+
+            segment_path = ".".join(segments[: index + 1])
+            template = self._find_structural_template(identifier=segment_path, target_ctx=target_ctx)
+            if template is None:
+                raise ValueError(f"Missing structural template for segment {segment_path!r}")
+
+            created = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+            created.templ_hash = _template_hash_value(template)
+            if not isinstance(created, RegistryAware):
+                raise TypeError("Structural template materialization must yield RegistryAware nodes")
+
+            if created.registry is not graph:
+                graph.add(created, _ctx=_ctx)
+            if current is not None and hasattr(current, "add_child"):
+                current.add_child(created)
+            current = created
+
+        return current
+
+    @staticmethod
+    def _bind_dependency_provider(
+        *,
+        dependency: Dependency,
+        provider: PT,
+        parent: Any | None = None,
+        _ctx: Any = None,
+    ) -> bool:
+        if not isinstance(provider, RegistryAware):
+            raise TypeError("Dependency providers must be RegistryAware")
+
+        created = provider.registry is not dependency.registry
+        if created:
+            dependency.registry.add(provider, _ctx=_ctx)
+            if parent is not None and hasattr(parent, "add_child"):
+                if getattr(provider, "parent", None) is not parent:
+                    parent.add_child(provider)
+
+        dependency.set_provider(provider, _ctx=_ctx)
+        return True
+
+    def preview_requirement(
+        self,
+        requirement: Requirement,
+        *,
+        force: bool = False,
+        preferred_offers: Iterable[ProvisionOffer] = (),
+        max_depth: int = 8,
+        _ctx: Any = None,
+    ) -> ViabilityResult:
+        # depth/visited are reserved for future recursive chain variants.
+        _ = max_depth
+        offers = self.gather_offers(
+            requirement,
+            force=force,
+            preferred_offers=preferred_offers,
+            _ctx=_ctx,
+        )
+
+        graph = getattr(_ctx, "graph", None)
+        for offer in offers:
+            chain = list(offer.build_plan or [])
+            target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            if chain and (
+                target_ctx is None
+                or not self._chain_paths_resolvable(
+                    build_segments=chain,
+                    target_ctx=target_ctx,
+                    graph=graph,
+                )
+            ):
+                continue
+            return ViabilityResult(
+                viable=True,
+                chain=chain,
+                scope_distance=int(getattr(offer, "scope_distance", 0) or 0),
+                blockers=[],
+            )
+
+        blockers = self._diagnose_blockers(requirement=requirement, _ctx=_ctx)
+        return ViabilityResult(viable=False, chain=[], scope_distance=0, blockers=blockers)
+
+    def _diagnose_blockers(self, *, requirement: Requirement, _ctx: Any = None) -> list[Blocker]:
+        identifier = self._selector_identifier(requirement)
+        target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+
+        templates = list(self._iter_templates())
+        identity_candidates = [template for template in templates if requirement.matches(template)]
+
+        if not identity_candidates:
+            kind = (requirement.__pydantic_extra__ or {}).get("has_kind")
+            if isinstance(kind, type):
+                kind_candidates = [template for template in templates if template.has_kind(kind)]
+                if kind_candidates:
+                    return [
+                        Blocker(
+                            reason="name_mismatch",
+                            context={
+                                "identifier": identifier,
+                                "target_ctx": target_ctx,
+                            },
+                        )
+                    ]
+            return [
+                Blocker(
+                    reason="no_template",
+                    context={
+                        "identifier": identifier,
+                        "target_ctx": target_ctx,
+                    },
+                )
+            ]
+
+        admitted_candidates = [
+            template
+            for template in identity_candidates
+            if admitted(template.admission_scope, target_ctx)
+        ]
+        if not admitted_candidates:
+            return [
+                Blocker(
+                    reason="scope_rejected",
+                    context={
+                        "identifier": identifier,
+                        "target_ctx": target_ctx,
+                        "scopes": [template.admission_scope for template in identity_candidates],
+                    },
+                )
+            ]
+
+        if self._is_episode_requirement(requirement):
+            distances = [scope_distance(template.admission_scope, target_ctx) for template in admitted_candidates]
+            if not requirement.is_qualified and distances and min(distances) > 0:
+                return [
+                    Blocker(
+                        reason="scope_rejected",
+                        context={
+                            "identifier": identifier,
+                            "target_ctx": target_ctx,
+                            "distances": distances,
+                            "policy": "unqualified_episode_requires_distance_0",
+                        },
+                    )
+                ]
+
+            graph = getattr(_ctx, "graph", None)
+            if requirement.is_qualified and target_ctx:
+                unresolved: list[list[str]] = []
+                for template in admitted_candidates:
+                    chain = build_plan(target_ctx, graph)
+                    if not self._chain_paths_resolvable(
+                        build_segments=chain,
+                        target_ctx=target_ctx,
+                        graph=graph,
+                    ):
+                        unresolved.append(chain)
+                if unresolved:
+                    return [
+                        Blocker(
+                            reason="chain_unresolvable",
+                            context={
+                                "identifier": identifier,
+                                "target_ctx": target_ctx,
+                                "chains": unresolved,
+                            },
+                        )
+                    ]
+
+        return [
+            Blocker(
+                reason="no_template",
+                context={
+                    "identifier": identifier,
+                    "target_ctx": target_ctx,
+                },
+            )
+        ]
 
     def resolve_dependency(self, dependency: Dependency[PT], *, force: bool = False, _ctx=None) -> bool:
         preferred_offers = self._linked_affordance_offers(
@@ -268,47 +711,69 @@ class Resolver:
             frontier=dependency.predecessor,
         )
 
-        provider = self.resolve_requirement(
+        provider, selected_offer, _offers = self._resolve_requirement_offer(
             requirement=dependency.requirement,
             force=force,
             preferred_offers=preferred_offers,
             _ctx=_ctx,
         )
-        if provider is not None:
-            if force and dependency.requirement.selected_offer_policy is ProvisionPolicy.FORCE:
-                # Judgment call: force fallback is an emergency "shape only" provider.
-                # We bypass requirement predicate validation here intentionally.
-                if not isinstance(provider, RegistryAware):
-                    raise TypeError(
-                        "Force fallback provider must be RegistryAware for dependency linkage"
-                    )
-                if provider.registry is not dependency.registry:
-                    dependency.registry.add(provider, _ctx=_ctx)
-                dependency.requirement.provider_id = provider.uid
-                dependency.requirement.resolved_step = (
-                    getattr(_ctx, "step", None)
-                    if isinstance(getattr(_ctx, "step", None), int)
-                    else None
+        if provider is None:
+            return False
+
+        if selected_offer is None:
+            dependency.requirement.resolution_reason = "provider_none"
+            return False
+
+        if force and dependency.requirement.selected_offer_policy is ProvisionPolicy.FORCE:
+            # Judgment call: force fallback is an emergency "shape only" provider.
+            # We bypass requirement predicate validation here intentionally.
+            if not isinstance(provider, RegistryAware):
+                raise TypeError(
+                    "Force fallback provider must be RegistryAware for dependency linkage"
                 )
-                cursor_id = getattr(_ctx, "cursor_id", None)
-                if cursor_id is None:
-                    cursor = getattr(_ctx, "cursor", None)
-                    cursor_id = getattr(cursor, "uid", None)
-                dependency.requirement.resolved_cursor_id = (
-                    cursor_id if isinstance(cursor_id, UUID) else None
-                )
-                dependency.requirement.resolution_reason = "forced_fallback_resolved"
-                Edge.set_successor(dependency, provider, _ctx=_ctx)
-                return True
-            try:
-                dependency.set_provider(provider, _ctx=_ctx)
-            except ValueError:
-                dependency.requirement.resolution_reason = "provider_rejected"
-                return False
-            if dependency.requirement.resolution_reason is None:
-                dependency.requirement.resolution_reason = "resolved"
+            if provider.registry is not dependency.registry:
+                dependency.registry.add(provider, _ctx=_ctx)
+            dependency.requirement.provider_id = provider.uid
+            dependency.requirement.resolved_step = (
+                getattr(_ctx, "step", None)
+                if isinstance(getattr(_ctx, "step", None), int)
+                else None
+            )
+            cursor_id = getattr(_ctx, "cursor_id", None)
+            if cursor_id is None:
+                cursor = getattr(_ctx, "cursor", None)
+                cursor_id = getattr(cursor, "uid", None)
+            dependency.requirement.resolved_cursor_id = (
+                cursor_id if isinstance(cursor_id, UUID) else None
+            )
+            dependency.requirement.resolution_reason = "forced_fallback_resolved"
+            Edge.set_successor(dependency, provider, _ctx=_ctx)
             return True
-        return False
+
+        parent = None
+        try:
+            parent = self._execute_build_chain(
+                requirement=dependency.requirement,
+                offer=selected_offer,
+                graph=dependency.registry,
+                _ctx=_ctx,
+            )
+            self._bind_dependency_provider(
+                dependency=dependency,
+                provider=provider,
+                parent=parent,
+                _ctx=_ctx,
+            )
+        except ValueError:
+            dependency.requirement.resolution_reason = "provider_rejected"
+            return False
+        except (TypeError, RuntimeError):
+            dependency.requirement.resolution_reason = "provider_rejected"
+            return False
+
+        if dependency.requirement.resolution_reason is None:
+            dependency.requirement.resolution_reason = "resolved"
+        return True
 
     def resolve_frontier_node(self, node: Node, *, force: bool = False, _ctx=None) -> bool:
         # Note this is not unsatisfied deps, it's anyone without a provider
@@ -323,8 +788,6 @@ class Resolver:
             return False
 
         # Containers must have a reachable sink from their source.
-        from ..traversable import TraversableNode
-
         if isinstance(node, TraversableNode) and node.is_container:
             source = node.source
             sink = node.sink
@@ -337,6 +800,7 @@ class Resolver:
                 return False
 
         return True
+
 
 # Register the resolution process with dispatch so it will be invoked from the phase bus
 @on_provision

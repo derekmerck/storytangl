@@ -50,6 +50,10 @@ class TestEntityTemplateCreation:
         templ = EntityTemplate(payload=Scene(label="scene-a"))
         assert templ.get_label() == "from-scene-a"
 
+    def test_admission_scope_defaults_to_none(self) -> None:
+        templ = EntityTemplate(payload=Scene(label="scene-a"))
+        assert templ.admission_scope is None
+
 
 class TestEntityTemplateMatching:
     def test_has_kind_matches_template_type(self) -> None:
@@ -155,7 +159,13 @@ class TestEntityTemplateCompileDecompileSerialization:
 
     def test_content_hash_from_payload(self) -> None:
         templ = EntityTemplate(payload=Scene(label="scene-a"))
-        assert templ.get_hashable_content() == templ.payload.unstructure()
+        assert templ.get_hashable_content()["payload"] == templ.payload.unstructure()
+        assert templ.get_hashable_content()["admission_scope"] is None
+
+    def test_content_hash_includes_admission_scope(self) -> None:
+        plain = EntityTemplate(payload=Scene(label="scene-a"), admission_scope=None)
+        scoped = EntityTemplate(payload=Scene(label="scene-a"), admission_scope="castle.*")
+        assert plain.content_hash() != scoped.content_hash()
 
 
 class TestSnapshot:

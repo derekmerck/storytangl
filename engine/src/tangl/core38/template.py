@@ -100,6 +100,8 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
 
     payload: ET = Field(..., exclude=True)
     # Excluded from pydantic model_dump; unstructure/structure handles payload explicitly.
+    admission_scope: str | None = None
+    # Optional target-context scope gate for provisioning admission.
 
     def get_label(self):
         """Return template label, falling back to a payload-derived label."""
@@ -107,7 +109,10 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
 
     def get_hashable_content(self):
         """Use payload constructor-form data as template content identity."""
-        return self.payload.unstructure()
+        return {
+            "payload": self.payload.unstructure(),
+            "admission_scope": self.admission_scope,
+        }
 
     @classmethod
     def from_entity(cls, entity: Entity):

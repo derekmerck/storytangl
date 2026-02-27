@@ -55,6 +55,9 @@ class Entity(Unstructurable, HasIdentity):
         Ambient context helpers for hook propagation.
     """
 
+    templ_hash: str | None = None
+    """Optional provenance hash of the template used to materialize this entity."""
+
     def __init__(self, _ctx: Any = None, **kwargs: Any) -> None:
         """Construct the entity and optionally run ``on_init`` dispatch hooks."""
         super().__init__(**kwargs)
