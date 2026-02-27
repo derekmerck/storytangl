@@ -16,5 +16,5 @@ Documentation is divided into sections:
 
    api/index
    mechanics/index
-   designer/index
+   design/index
    contrib/index

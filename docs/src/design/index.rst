@@ -4,7 +4,9 @@ Design Plans
 .. toctree::
    :maxdepth: 4
 
-   story/story_philosophy
+   glossary
+
+   story/philosophy
 
    core/CONTENT_ADDRESSABLE
    core/DEREF_DESIGN
