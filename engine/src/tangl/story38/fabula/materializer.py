@@ -321,15 +321,15 @@ class StoryMaterializer38:
     ) -> None:
         for index, spec in enumerate(specs):
             authored_successor_ref = self._coerce_str(spec.get("authored_successor_ref"))
-            successor_ref = self._coerce_str(
-                spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
-            )
+            successor_ref = self._coerce_str(spec.get("successor_ref"))
             if successor_ref is None:
-                successor_ref = self._coerce_str(spec.get("successor_ref"))
+                successor_ref = self._coerce_str(
+                    spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
+                )
             if not successor_ref:
                 msg = (
                     f"Block '{node.get_label()}' action[{index}] is missing successor "
-                    "(expected one of: successor, target_ref, target_node)"
+                    "(expected one of: successor, successor_ref, target_ref, target_node)"
                 )
                 raise ValueError(msg)
             activation = self._coerce_str(spec.get("trigger") or spec.get("activation"))
@@ -489,7 +489,7 @@ class StoryMaterializer38:
     def _qualify_successor_ref(*, successor_ref: str | None, source: TraversableNode) -> str | None:
         if not successor_ref:
             return None
-        if "." in successor_ref:
+        if StoryMaterializer38._is_qualified_path(successor_ref):
             return successor_ref
 
         parent = source.parent

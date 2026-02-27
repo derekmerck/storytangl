@@ -7,7 +7,7 @@ the graph, cursor position and history, return stack, and accumulated output.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Optional, Self
 from uuid import UUID
 
 from pydantic import Field
@@ -20,6 +20,9 @@ from .frame import Frame, PhaseCtx, StepTrace
 from ..fragments import Fragment
 from ..replay import CheckpointRecord, RollbackRecord, StepRecord, get_replay_engine
 from ..replay.contracts import ReplayDelta
+
+if TYPE_CHECKING:
+    from tangl.vm38 import Dependency
 
 
 __all__ = ["Ledger"]
@@ -174,7 +177,7 @@ class Ledger(Entity):
         )
 
     @staticmethod
-    def _selection_destination_dependency(edge: TraversableEdge):
+    def _selection_destination_dependency(edge: TraversableEdge) -> Optional["Dependency"]:
         from tangl.vm38 import Dependency
 
         graph = getattr(edge, "graph", None)
@@ -189,7 +192,8 @@ class Ledger(Entity):
                 satisfied=False,
             )
         )
-        for dep in deps:
+        dep = next(deps, None)
+        if dep is not None:
             return dep
         deps = graph.find_edges(
             Selector(has_kind=Dependency, predecessor=edge, satisfied=False)

@@ -229,15 +229,26 @@ class StoryCompiler38:
         normalized: list[dict[str, Any]] = []
         for spec in specs:
             payload = dict(spec)
-            authored = payload.get("successor_ref")
-            if authored is None:
-                authored = payload.get("successor") or payload.get("target_ref") or payload.get("target_node")
-            if isinstance(authored, str) and authored:
-                payload["authored_successor_ref"] = authored
-                if "." in authored:
-                    payload["successor_ref"] = authored
+            authored = payload.get("authored_successor_ref")
+            if not (isinstance(authored, str) and authored):
+                authored = payload.get("successor_ref")
+                if authored is None:
+                    authored = (
+                        payload.get("successor")
+                        or payload.get("target_ref")
+                        or payload.get("target_node")
+                    )
+                if isinstance(authored, str) and authored:
+                    payload["authored_successor_ref"] = authored
+
+            canonical = payload.get("successor_ref")
+            if not (isinstance(canonical, str) and canonical):
+                canonical = authored
+            if isinstance(canonical, str) and canonical:
+                if "." in canonical:
+                    payload["successor_ref"] = canonical
                 else:
-                    payload["successor_ref"] = f"{scene_label}.{authored}"
+                    payload["successor_ref"] = f"{scene_label}.{canonical}"
             normalized.append(payload)
         return normalized
 

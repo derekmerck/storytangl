@@ -74,6 +74,9 @@ def _admitted_single(expanded_scope: str, ctx_parts: list[str]) -> bool:
     if len(ctx_parts) <= len(prefix):
         return False
 
+    # Intentionally compare only the prefix segment-by-segment: len(ctx_parts) >
+    # len(prefix) above guarantees extra ctx_parts are valid trailing depth, so
+    # zip(prefix, ctx_parts) with fnmatch checks only required prefix positions.
     for expected, actual in zip(prefix, ctx_parts):
         if not fnmatch(actual, expected):
             return False
@@ -213,7 +216,7 @@ def _matches_segment(candidate: Any, segment: str) -> bool:
     if callable(has_identifier):
         try:
             return bool(has_identifier(segment))
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             return False
 
     label = getattr(candidate, "label", None)

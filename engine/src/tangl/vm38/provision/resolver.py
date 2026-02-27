@@ -382,7 +382,7 @@ class Resolver:
         if callable(has_identifier):
             try:
                 return bool(has_identifier(identifier))
-            except Exception:
+            except (TypeError, ValueError, AttributeError):
                 return False
         return getattr(candidate, "label", None) == identifier
 
@@ -675,7 +675,7 @@ class Resolver:
             graph = getattr(_ctx, "graph", None)
             if requirement.is_qualified and target_ctx:
                 unresolved: list[list[str]] = []
-                for template in admitted_candidates:
+                for _template in admitted_candidates:
                     chain = build_plan(target_ctx, graph)
                     if not self._chain_paths_resolvable(
                         build_segments=chain,
@@ -764,10 +764,7 @@ class Resolver:
                 parent=parent,
                 _ctx=_ctx,
             )
-        except ValueError:
-            dependency.requirement.resolution_reason = "provider_rejected"
-            return False
-        except (TypeError, RuntimeError):
+        except (ValueError, TypeError, RuntimeError):
             dependency.requirement.resolution_reason = "provider_rejected"
             return False
 
