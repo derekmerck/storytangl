@@ -66,6 +66,20 @@ class TestRequirementPolicy:
         )
         assert req.provision_policy == ProvisionPolicy.EXISTING
 
+    def test_authored_path_defaults(self) -> None:
+        req = Requirement(has_identifier="foo")
+        assert req.authored_path is None
+        assert req.is_qualified is False
+
+    def test_authored_path_metadata_round_trip(self) -> None:
+        req = Requirement(
+            has_identifier="scene2.block",
+            authored_path="block",
+            is_qualified=False,
+        )
+        assert req.authored_path == "block"
+        assert req.is_qualified is False
+
 
 # ============================================================================
 # HasRequirement

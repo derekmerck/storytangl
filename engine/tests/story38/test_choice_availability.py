@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core38 import Graph, Selector
+from tangl.core38 import EntityTemplate, Graph, Selector, TemplateRegistry
 from tangl.core38.runtime_op import Predicate
 from tangl.story38.concepts import Actor, Location, Role, Setting
 from tangl.story38.episode import Action, Block, Scene
@@ -197,6 +197,40 @@ class TestMissingSuccessor:
         assert fragments and fragments[0].available is False
         assert fragments[0].unavailable_reason == "missing_successor"
         assert fragments[0].blockers == [{"type": "edge", "reason": "missing_successor"}]
+
+    def test_unresolved_successor_is_available_when_preview_is_viable(self) -> None:
+        graph = StoryGraph38(label="preview_story")
+        start = Block(label="start")
+        graph.add(start)
+        action = Action(predecessor_id=start.uid, text="Provisioned")
+        graph.add(action)
+        graph.add(
+            Dependency(
+                predecessor_id=action.uid,
+                label="destination",
+                requirement=Requirement(
+                    has_kind=Block,
+                    has_identifier="end",
+                    authored_path="end",
+                    is_qualified=False,
+                    hard_requirement=True,
+                ),
+            )
+        )
+
+        templates = TemplateRegistry(label="preview_templates")
+        EntityTemplate(
+            label="end",
+            payload=Block(label="end"),
+            registry=templates,
+        )
+        graph.factory = templates
+
+        ctx = _full_ctx(graph, start)
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].available is True
+        assert fragments[0].unavailable_reason is None
 
 
 # ---------------------------------------------------------------------------

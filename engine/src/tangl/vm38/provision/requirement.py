@@ -57,6 +57,10 @@ class Requirement(Selector, Generic[PT]):
     # a requirement can satisfy itself if it carries an inline template
     # a cloner could take such an offer and combine it with an existing source
 
+    # Authoring-path metadata used by qualified/unqualified policy forks.
+    authored_path: str | None = None
+    is_qualified: bool = False
+
     # Optional two-part formula for late synthesized UPDATE/CLONE offers.
     # These are typed fields (not selector extras), so they do not participate
     # in provider matching criteria.

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from tangl.core38 import Priority, Record, Selector
-from tangl.vm38 import Dependency
+from tangl.vm38 import Dependency, Resolver
 
 from .dispatch import on_journal
 from .episode import Action, Block
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
+
+logger = logging.getLogger(__name__)
 
 
 class _SafeFormatDict(dict):
@@ -43,9 +46,49 @@ def _hard_unresolved_dependencies(*, edge: Action) -> list[Dependency]:
     ]
 
 
+def _destination_dependency(*, edge: Action) -> Dependency | None:
+    """Return destination dependency edge when successor is unresolved."""
+    graph = getattr(edge, "graph", None)
+    if graph is None:
+        return None
+    deps = list(graph.find_edges(Selector(has_kind=Dependency, predecessor=edge)))
+    for dep in deps:
+        if dep.get_label() == "destination":
+            return dep
+    return deps[0] if deps else None
+
+
+def _preview_destination_viability(*, edge: Action, ctx):
+    dep = _destination_dependency(edge=edge)
+    if dep is None or dep.requirement.satisfied:
+        return None
+    try:
+        resolver = Resolver.from_ctx(ctx)
+    except (TypeError, ValueError, LookupError) as exc:
+        logger.debug("Resolver preview unavailable for edge=%s", edge, exc_info=exc)
+        return None
+    return resolver.preview_requirement(dep.requirement, _ctx=ctx)
+
+
+def _preview_blockers(preview) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    for blocker in getattr(preview, "blockers", []) or []:
+        blockers.append(
+            {
+                "type": "provision",
+                "reason": blocker.reason,
+                "context": dict(blocker.context or {}),
+            }
+        )
+    return blockers
+
+
 def _choice_unavailable_reason(*, edge: Action, ctx) -> str | None:
     """Return a coarse reason for unavailable choices."""
     if edge.successor is None:
+        preview = _preview_destination_viability(edge=edge, ctx=ctx)
+        if preview is not None and preview.viable:
+            return None
         return "missing_successor"
 
     # Hard unresolved dependencies block choice availability regardless of guard predicates.
@@ -74,6 +117,13 @@ def _dependency_blocker(dep: Dependency) -> dict[str, Any]:
 def _choice_blockers(*, edge: Action, ctx) -> list[dict[str, Any]]:
     """Return structured blocker diagnostics for an unavailable choice edge."""
     if edge.successor is None:
+        preview = _preview_destination_viability(edge=edge, ctx=ctx)
+        if preview is not None:
+            if preview.viable:
+                return []
+            preview_blockers = _preview_blockers(preview)
+            if preview_blockers:
+                return preview_blockers
         return [{"type": "edge", "reason": "missing_successor"}]
 
     blockers = [_dependency_blocker(dep) for dep in _hard_unresolved_dependencies(edge=edge)]

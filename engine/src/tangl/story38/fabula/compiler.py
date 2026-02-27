@@ -89,6 +89,18 @@ class StoryCompiler38:
             blocks = self._normalize_mapping(scene_data.get("blocks"))
             for block_label, block_data in blocks:
                 qualified_label = f"{scene_label}.{block_label}"
+                actions = self._canonicalize_action_specs(
+                    self._normalize_list(block_data.get("actions")),
+                    scene_label=scene_label,
+                )
+                continues = self._canonicalize_action_specs(
+                    self._normalize_list(block_data.get("continues")),
+                    scene_label=scene_label,
+                )
+                redirects = self._canonicalize_action_specs(
+                    self._normalize_list(block_data.get("redirects")),
+                    scene_label=scene_label,
+                )
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
                         block_data.get("obj_cls") or block_data.get("block_cls"),
@@ -97,9 +109,9 @@ class StoryCompiler38:
                     payload={
                         **block_data,
                         "label": block_data.get("label") or block_label,
-                        "actions": self._normalize_list(block_data.get("actions")),
-                        "continues": self._normalize_list(block_data.get("continues")),
-                        "redirects": self._normalize_list(block_data.get("redirects")),
+                        "actions": actions,
+                        "continues": continues,
+                        "redirects": redirects,
                         "roles": self._normalize_list(block_data.get("roles")),
                         "settings": self._normalize_list(block_data.get("settings")),
                         "media": self._normalize_list(block_data.get("media")),
@@ -207,6 +219,38 @@ class StoryCompiler38:
             else:
                 out.append(dict(getattr(item, "model_dump", lambda **_: {})()))
         return out
+
+    @staticmethod
+    def _canonicalize_action_specs(
+        specs: list[dict[str, Any]],
+        *,
+        scene_label: str,
+    ) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for spec in specs:
+            payload = dict(spec)
+            authored = payload.get("authored_successor_ref")
+            if not (isinstance(authored, str) and authored):
+                authored = payload.get("successor_ref")
+                if authored is None:
+                    authored = (
+                        payload.get("successor")
+                        or payload.get("target_ref")
+                        or payload.get("target_node")
+                    )
+                if isinstance(authored, str) and authored:
+                    payload["authored_successor_ref"] = authored
+
+            canonical = payload.get("successor_ref")
+            if not (isinstance(canonical, str) and canonical):
+                canonical = authored
+            if isinstance(canonical, str) and canonical:
+                if "." in canonical:
+                    payload["successor_ref"] = canonical
+                else:
+                    payload["successor_ref"] = f"{scene_label}.{canonical}"
+            normalized.append(payload)
+        return normalized
 
     @staticmethod
     def _resolve_entry_template_ids(
