@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from tangl.vm38 import TraversableNode, on_get_ns
+from tangl.core38 import contribute_ns
+from tangl.vm38 import TraversableNode
 
 
 class Location(TraversableNode):
@@ -10,17 +11,10 @@ class Location(TraversableNode):
 
     name: str = ""
 
-    @on_get_ns
-    def on_get_ns(self, ctx) -> dict[str, Any]:
-        """Publish location attributes for namespace composition.
-
-        Temporary bridge: ``on_get_ns`` remains transitional until scoped-dispatch
-        returns as a first-class mechanism.
-        """
-        payload: dict[str, Any] = {
+    @contribute_ns
+    def provide_location_symbols(self) -> dict[str, Any]:
+        """Publish location attributes for namespace composition."""
+        return {
             "label": self.get_label(),
             "name": self.name or self.get_label(),
         }
-        if hasattr(self, "locals") and self.locals:
-            payload.update(dict(self.locals))
-        return payload

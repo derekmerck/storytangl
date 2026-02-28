@@ -4,9 +4,10 @@ from __future__ import annotations
 from typing import Any, Self
 
 from .bases import HasIdentity, Unstructurable
+from .namespace import HasNamespace
 
 
-class Entity(Unstructurable, HasIdentity):
+class Entity(Unstructurable, HasIdentity, HasNamespace):
     """Canonical concrete core entity composed from identity + constructor-form traits.
 
     Why
@@ -19,8 +20,9 @@ class Entity(Unstructurable, HasIdentity):
 
     Notes
     -----
-    Inheritance order is ``(Unstructurable, HasIdentity)``, so ``__eq__`` compares
-    by value via :meth:`Unstructurable.eq_by_value`.
+    Inheritance order is ``(Unstructurable, HasNamespace, HasIdentity)``.
+    ``HasNamespace`` adds namespace contribution behavior, while ``__eq__`` still
+    compares by value via :meth:`Unstructurable.eq_by_value`.
 
     - Two entities with the same ``uid`` but different constructor-form values are
       not equal under ``==``.

@@ -96,7 +96,6 @@ from .fragments import Fragment
 # - phase bus hooks
 from .dispatch import (
     on_finalize,
-    on_get_ns,
     on_gather_ns,
     on_journal,
     on_postreqs,
@@ -141,7 +140,6 @@ __all__ = [
     "is_self_loop",
     "assert_traversal_contracts",
     "on_finalize",
-    "on_get_ns",
     "on_gather_ns",
     "on_journal",
     "on_postreqs",

@@ -33,6 +33,7 @@ from tangl.vm38.traversable import (
     TraversableEdge,
     TraversableNode,
 )
+from tangl.vm38 import Dependency, Requirement
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -59,6 +60,7 @@ def register_system_handlers(clean_vm_dispatch):
     """
     # Re-register each handler explicitly
     from tangl.vm38.dispatch import on_gather_ns, on_validate, on_prereqs, on_update, on_postreqs
+    on_gather_ns(sh.contribute_runtime_baseline)
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)
     on_validate(sh.validate_successor_exists)
@@ -104,6 +106,66 @@ class TestContributeLocals:
         node.locals = {"mood": "happy"}
         ns = do_gather_ns(node, ctx=ctx)
         assert ns["mood"] == "happy"
+
+
+class TestContributeRuntimeBaseline:
+    def test_cursor_and_graph_present_without_ctx_symbol(self) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+        baseline_ctx = SimpleNamespace(
+            graph=g,
+            cursor=node,
+            get_registries=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+        ns = do_gather_ns(node, ctx=baseline_ctx)
+        assert ns["cursor"] is node
+        assert ns["graph"] is g
+        assert "ctx" not in ns
+
+    def test_satisfied_deps_include_ancestor_scopes(self, ctx) -> None:
+        g = Graph()
+        scene = _node(g, label="scene")
+        block = _node(g, label="block")
+        provider = _node(g, label="guide")
+        scene.add_child(block)
+
+        dep = Dependency(
+            predecessor_id=scene.uid,
+            label="companion",
+            requirement=Requirement(has_kind=TraversableNode),
+        )
+        g.add(dep)
+        dep.set_provider(provider)
+
+        ns = do_gather_ns(block, ctx=ctx)
+        assert ns["companion"] is provider
+
+    def test_nearer_satisfied_deps_override_ancestor_scopes(self, ctx) -> None:
+        g = Graph()
+        scene = _node(g, label="scene")
+        block = _node(g, label="block")
+        parent_provider = _node(g, label="parent_guide")
+        child_provider = _node(g, label="child_guide")
+        scene.add_child(block)
+
+        parent_dep = Dependency(
+            predecessor_id=scene.uid,
+            label="companion",
+            requirement=Requirement(has_kind=TraversableNode),
+        )
+        child_dep = Dependency(
+            predecessor_id=block.uid,
+            label="companion",
+            requirement=Requirement(has_kind=TraversableNode),
+        )
+        g.add(parent_dep)
+        g.add(child_dep)
+        parent_dep.set_provider(parent_provider)
+        child_dep.set_provider(child_provider)
+
+        ns = do_gather_ns(block, ctx=ctx)
+        assert ns["companion"] is child_provider
 
 
 # ============================================================================

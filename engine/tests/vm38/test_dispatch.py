@@ -3,7 +3,7 @@
 Organized by concept:
 - Hook registration: on_* decorators
 - Hook execution: do_* functions with aggregation
-- Namespace gathering: do_gather_ns ancestor walk and ChainMap scoping
+- Namespace gathering: two-phase ``do_gather_ns`` behavior
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ from tangl.vm38.dispatch import (
     do_update,
     do_validate,
     on_finalize,
-    on_get_ns,
     on_gather_ns,
     on_journal,
     on_postreqs,
@@ -33,6 +32,8 @@ from tangl.vm38.dispatch import (
     on_update,
     on_validate,
 )
+import tangl.vm38 as vm38_api
+import tangl.vm38.dispatch as vm38_dispatch_api
 from tangl.vm38.traversable import AnonymousEdge, TraversableNode
 
 
@@ -79,30 +80,35 @@ class TestHookRegistration:
     def test_all_phase_hooks_register_to_correct_tasks(self) -> None:
         """Each on_* hook maps to its expected task name."""
         pairs = [
-            (on_validate,  "validate_edge"),
+            (on_validate, "validate_edge"),
             (on_provision, "provision_node"),
-            (on_prereqs,   "get_prereqs"),
-            (on_update,    "apply_update"),
-            (on_journal,   "render_journal"),
-            (on_finalize,  "finalize_step"),
-            (on_postreqs,  "get_postreqs"),
+            (on_prereqs, "get_prereqs"),
+            (on_update, "apply_update"),
+            (on_journal, "render_journal"),
+            (on_finalize, "finalize_step"),
+            (on_postreqs, "get_postreqs"),
             (on_gather_ns, "gather_ns"),
-            (on_get_ns,    "gather_ns"),
         ]
         for on_hook, expected_task in pairs:
             on_hook(lambda *, caller, ctx, **kw: None)
-            # Just verify no exception — task mapping is correct
             assert list(vm_dispatch.find_all(Selector(task=expected_task)))
 
-    def test_on_get_ns_marks_instance_methods_without_global_registration(self) -> None:
-        class _NodeWithNs(TraversableNode):
-            @on_get_ns
-            def provide_locals(self, ctx):
-                return {"ok": True}
+    def test_on_gather_ns_uses_explicit_caller_kind_fields(self) -> None:
+        @on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
+        def _typed(*, caller, ctx, **kw):
+            return {"ok": True}
 
-        _ = _NodeWithNs
-        behaviors = list(vm_dispatch.find_all(Selector(task="gather_ns")))
-        assert behaviors == []
+        behavior = list(vm_dispatch.find_all(Selector(task="gather_ns")))[0]
+        assert behavior.wants_caller_kind is TraversableNode
+        assert behavior.wants_exact_kind is False
+
+    def test_on_gather_ns_rejects_has_kind_kwarg(self) -> None:
+        with pytest.raises(TypeError, match="wants_caller_kind"):
+            on_gather_ns(lambda *, caller, ctx, **kw: None, has_kind=TraversableNode)
+
+    def test_on_get_ns_not_exposed_in_vm38_api(self) -> None:
+        assert not hasattr(vm38_dispatch_api, "on_get_ns")
+        assert not hasattr(vm38_api, "on_get_ns")
 
 
 # ============================================================================
@@ -114,10 +120,8 @@ class TestDoValidate:
     """do_validate uses all_true aggregation."""
 
     def test_no_handlers_returns_true(self, null_ctx) -> None:
-        """No validators registered → vacuously true."""
         g = Graph()
         edge = _node(g, label="e")
-        # all_true with no receipts returns True (vacuous truth)
         result = do_validate(edge, ctx=null_ctx)
         assert result is True
 
@@ -220,42 +224,29 @@ class TestDoUpdate:
 
 
 # ============================================================================
-# Namespace gathering — ancestor walk
+# Namespace gathering — two-phase contract
 # ============================================================================
 
 
 class TestDoGatherNs:
-    """do_gather_ns walks the ancestor chain and builds a scoped ChainMap."""
+    """``do_gather_ns`` composes local ``get_ns`` + immediate dispatch."""
 
-    def test_empty_ns_with_no_handlers(self, null_ctx) -> None:
+    def test_nonempty_base_ns_with_no_handlers(self, null_ctx) -> None:
         g = Graph()
         node = _node(g, label="n")
         ns = do_gather_ns(node, ctx=null_ctx)
         assert isinstance(ns, ChainMap)
-        assert len(ns) == 0
+        assert ns["self"] is node
+        assert ns["n"] is node
 
-    def test_node_locals_contributed(self, null_ctx) -> None:
-        """Handler contributing locals maps through namespace."""
-        @on_gather_ns
-        def add_locals(*, caller, ctx, **kw):
-            if hasattr(caller, "locals") and caller.locals:
-                return dict(caller.locals)
-            return None
-
+    def test_locals_come_from_entity_get_ns(self, null_ctx) -> None:
         g = Graph()
         node = _node(g, label="n")
         node.locals = {"mood": "angry"}
         ns = do_gather_ns(node, ctx=null_ctx)
         assert ns["mood"] == "angry"
 
-    def test_closer_scope_overrides(self, null_ctx) -> None:
-        """Child locals override parent locals in the ChainMap."""
-        @on_gather_ns
-        def add_locals(*, caller, ctx, **kw):
-            if hasattr(caller, "locals") and caller.locals:
-                return dict(caller.locals)
-            return None
-
+    def test_closer_scope_overrides_ancestor_scope(self, null_ctx) -> None:
         g = Graph()
         parent = _node(g, label="scene")
         child = _node(g, label="block")
@@ -268,53 +259,56 @@ class TestDoGatherNs:
         assert ns["shared"] == "child"
         assert ns["color"] == "red"
 
-    def test_rootless_node_still_works(self, null_ctx) -> None:
-        """A node with no parent gets its own namespace."""
+    def test_dispatch_fires_only_for_immediate_caller(self, null_ctx) -> None:
         @on_gather_ns
-        def add_locals(*, caller, ctx, **kw):
-            if hasattr(caller, "locals") and caller.locals:
-                return dict(caller.locals)
-            return None
+        def dispatch_marker(*, caller, ctx, **kw):
+            return {"dispatch_for": caller.get_label()}
 
         g = Graph()
-        node = _node(g, label="orphan")
-        node.locals = {"key": "val"}
-        ns = do_gather_ns(node, ctx=null_ctx)
-        assert ns["key"] == "val"
+        parent = _node(g, label="scene")
+        child = _node(g, label="block")
+        parent.add_child(child)
 
-    def test_on_get_ns_alias_registers_global_contributors(self, null_ctx) -> None:
-        @on_get_ns
-        def add_flag(*, caller, ctx, **kw):
-            return {"via_alias": caller.get_label()}
+        ns = do_gather_ns(child, ctx=null_ctx)
+        assert ns["dispatch_for"] == "block"
+
+    def test_wants_caller_kind_filters_dispatch_handlers(self, null_ctx) -> None:
+        @on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
+        def include_node(*, caller, ctx, **kw):
+            return {"typed": caller.get_label()}
+
+        @on_gather_ns(wants_caller_kind=Graph, wants_exact_kind=False)
+        def exclude_graph(*, caller, ctx, **kw):
+            return {"graph_handler": True}
 
         g = Graph()
         node = _node(g, label="n")
         ns = do_gather_ns(node, ctx=null_ctx)
-        assert ns["via_alias"] == "n"
+        assert ns["typed"] == "n"
+        assert "graph_handler" not in ns
 
-    def test_on_get_ns_marked_method_contributes_namespace(self, null_ctx) -> None:
-        class _MethodNode(TraversableNode):
-            @on_get_ns
-            def provide_locals(self, ctx):
-                return {"from_method": self.get_label()}
+    def test_self_binding_includes_label_and_path_aliases(self, null_ctx) -> None:
+        g = Graph()
+        parent = _node(g, label="scene")
+        child = _node(g, label="block")
+        parent.add_child(child)
+
+        ns = do_gather_ns(child, ctx=null_ctx)
+        assert ns["self"] is child
+        assert ns["block"] is child
+        assert ns[child.path] is child
+
+    def test_nested_roles_and_settings_deep_merge(self, null_ctx) -> None:
+        @on_gather_ns
+        def add_roles(*, caller, ctx, **kw):
+            return {"roles": {"alpha": "a"}}
+
+        @on_gather_ns
+        def add_settings(*, caller, ctx, **kw):
+            return {"settings": {"castle": "c"}, "roles": {"beta": "b"}}
 
         g = Graph()
-        node = _MethodNode(label="method-node")
-        g.add(node)
-
+        node = _node(g, label="n")
         ns = do_gather_ns(node, ctx=null_ctx)
-        assert ns["from_method"] == "method-node"
-
-    def test_on_get_ns_marked_method_accepts_caller_and_ctx(self, null_ctx) -> None:
-        class _MethodNode(TraversableNode):
-            @on_get_ns
-            def provide_locals(self, caller, ctx):
-                return {"same_caller": caller.uid == self.uid, "has_ctx": ctx is not None}
-
-        g = Graph()
-        node = _MethodNode(label="method-node")
-        g.add(node)
-
-        ns = do_gather_ns(node, ctx=null_ctx)
-        assert ns["same_caller"] is True
-        assert ns["has_ctx"] is True
+        assert ns["roles"] == {"alpha": "a", "beta": "b"}
+        assert ns["settings"] == {"castle": "c"}

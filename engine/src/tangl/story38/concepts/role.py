@@ -1,51 +1,46 @@
 from __future__ import annotations
 
-from tangl.vm38 import Dependency
-from .actor import Actor
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from tangl.core38 import Selector
-from tangl.vm38 import Dependency, on_get_ns
+from tangl.vm38 import Dependency
 
 from ..dispatch import on_gather_ns
+from .actor import Actor
 
 
 class Role(Dependency[Actor]):
     """Role dependency edge (source node -> actor provider)."""
 
     @staticmethod
-    def _invoke_provider_ns(provider: Any, *, ctx: Any = None) -> dict[str, Any]:
-        provider_hook = getattr(provider, "on_get_ns", None)
-        if not callable(provider_hook):
+    def _invoke_provider_ns(provider: Any) -> dict[str, Any]:
+        get_ns = getattr(provider, "get_ns", None)
+        if not callable(get_ns):
             return {}
 
-        value = provider_hook(ctx)
+        value = get_ns()
         if value is None:
             return {}
         if not isinstance(value, Mapping):
             raise TypeError(
-                f"{type(provider).__name__}.on_get_ns must return Mapping | None"
+                f"{type(provider).__name__}.get_ns must return Mapping | None",
             )
-        return dict(value)
 
-    @on_get_ns
-    def on_get_ns(self, ctx) -> dict[str, Any]:
-        """Publish role/provider symbols for namespace composition.
+        payload = dict(value)
+        return {key: item for key, item in payload.items() if item is not provider}
 
-        Temporary bridge: ``on_get_ns`` remains transitional until scoped-dispatch
-        returns as a first-class mechanism.
-        """
+    def provide_role_symbols(self) -> dict[str, Any]:
+        """Publish role/provider symbols for namespace composition."""
         provider = self.provider
         label = self.get_label()
         if provider is None or not label:
             return {}
 
         payload: dict[str, Any] = {label: provider}
-
-        provider_ns = self._invoke_provider_ns(provider, ctx=ctx)
+        provider_ns = self._invoke_provider_ns(provider)
         for key, value in provider_ns.items():
             payload[f"{label}_{key}"] = value
-
         return payload
 
 
@@ -59,17 +54,20 @@ def contribute_roles(*, caller, ctx, **_kw):
     if not hasattr(caller, "edges_out"):
         return None
 
+    scope_nodes = list(caller.ancestors) if hasattr(caller, "ancestors") else [caller]
+
     contributions: dict[str, Any] = {}
     roles: dict[str, Any] = {}
-    role_edges = sorted(caller.edges_out(Selector(has_kind=Role)), key=_role_sort_key)
-    for role in role_edges:
-        role_payload = role.on_get_ns(ctx)
-        if role_payload:
-            contributions.update(role_payload)
-        provider = role.provider
-        label = role.get_label()
-        if provider is not None and label:
-            roles[label] = provider
+    for scope in reversed(scope_nodes):
+        role_edges = sorted(scope.edges_out(Selector(has_kind=Role)), key=_role_sort_key)
+        for role in role_edges:
+            role_payload = role.provide_role_symbols()
+            if role_payload:
+                contributions.update(role_payload)
+            provider = role.provider
+            label = role.get_label()
+            if provider is not None and label:
+                roles[label] = provider
 
     if roles:
         contributions["roles"] = roles

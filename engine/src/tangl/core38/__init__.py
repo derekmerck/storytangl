@@ -76,6 +76,7 @@ from .singleton import Singleton
 from .record import Record, OrderedRegistry
 from .graph import GraphItem, Graph, Subgraph, Edge, Node, HierarchicalNode
 from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRegistry, AggregationMode
+from .namespace import HasNamespace, contribute_ns
 
 # Requires:
 # - behaviors

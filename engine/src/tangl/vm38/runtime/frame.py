@@ -120,10 +120,11 @@ class PhaseCtx:
 
     Namespace
     ---------
-    ``get_ns(node)`` delegates to ``do_gather_ns`` which walks the ancestor
-    chain and fires namespace handlers at each level.  Results are cached per
-    node UID for the lifetime of this context — the namespace is stable within
-    a single pipeline pass.
+    ``get_ns(node)`` delegates to ``do_gather_ns`` which composes namespace
+    data in two phases: caller/ancestor ``get_ns()`` maps, then immediate-
+    caller dispatch contributors. Results are cached per node UID for the
+    lifetime of this context — the namespace is stable within a single
+    pipeline pass.
 
     The cache is keyed by node UID, so different nodes (cursor vs. frontier
     nodes during PLANNING, different ancestors during condition evaluation)
@@ -136,7 +137,7 @@ class PhaseCtx:
     - ``get_authorities()`` — authority registries for dispatch expansion.
     - ``get_registries()`` — compatibility alias for ``get_authorities()``.
     - ``get_inline_behaviors()`` — inline behaviors (empty for now).
-    - ``get_ns(node)`` — cached scoped namespace from ancestor chain.
+    - ``get_ns(node)`` — cached scoped namespace from local + dispatch contributors.
     - ``get_random()`` — deterministic RNG for this frame.
     - ``cursor`` — the current node (resolved from ``cursor_id``).
 
@@ -160,6 +161,7 @@ class PhaseCtx:
     incoming_payload: Any = None
 
     _ns_cache: dict[UUID, ChainMap[str, Any]] = field(default_factory=dict)
+    _ns_inflight: set[UUID] = field(default_factory=set)
 
     # -- Dispatch protocol --------------------------------------------------
 
@@ -210,9 +212,8 @@ class PhaseCtx:
     def get_ns(self, node: Node = None) -> ChainMap[str, Any]:
         """Build or retrieve the cached scoped namespace for a node.
 
-        Delegates to ``do_gather_ns`` on cache miss, which walks the ancestor
-        chain and fires all ``gather_ns`` handlers at each level.  The result
-        is cached per node UID for the lifetime of this context.
+        Delegates to ``do_gather_ns`` on cache miss. The result is cached per
+        node UID for the lifetime of this context.
 
         Parameters
         ----------
@@ -236,27 +237,15 @@ class PhaseCtx:
 
         uid = node.uid
         if uid not in self._ns_cache:
-            ns = do_gather_ns(node, ctx=self)
-
-            # Temporary bridge: graph/world locals are layered here until scoped
-            # dispatch support for world/graph-level gather_ns providers lands.
-            # Keep this blunt and visible so we remember to remove it.
-            base_maps = list(ns.maps) if isinstance(ns, ChainMap) else [dict(ns)]
-            tail_layers: list[dict[str, Any]] = []
-
-            graph_locals = getattr(self.graph, "locals", None) or {}
-            if graph_locals:
-                tail_layers.append(dict(graph_locals))
-
-            world = getattr(self.graph, "world", None)
-            world_locals = getattr(world, "locals", None) if world is not None else None
-            if world_locals:
-                tail_layers.append(dict(world_locals))
-
-            if tail_layers:
-                ns = ChainMap(*base_maps, *tail_layers)
-
-            self._ns_cache[uid] = ns
+            if uid in self._ns_inflight:
+                raise RuntimeError(
+                    f"Recursive namespace build detected for node uid={uid}",
+                )
+            self._ns_inflight.add(uid)
+            try:
+                self._ns_cache[uid] = do_gather_ns(node, ctx=self)
+            finally:
+                self._ns_inflight.discard(uid)
 
         return self._ns_cache[uid]
 

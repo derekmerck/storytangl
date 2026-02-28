@@ -201,7 +201,7 @@ requirement resolution.
 
 | Decorator | Invocation | Purpose |
 |-----------|------------|---------|
-| `on_gather_ns` / `on_get_ns` | `do_gather_ns` | Namespace assembly from ancestor chain |
+| `on_gather_ns` | `do_gather_ns` | Namespace assembly from caller/ancestor `get_ns()` + immediate dispatch |
 | `on_resolve` | `do_resolve` | Offer override/filter during provisioning |
 
 **`do_resolve` is a filter hook, not an addition hook.** Handlers return `None` to leave
@@ -238,11 +238,13 @@ dispatch to assemble itself, so it uses `getattr(graph, "get_authorities", None)
 than a hook call.
 
 **Namespace is cached per-node per-context.** `get_ns(node)` delegates to
-`do_gather_ns` on cache miss, caches the result by node UID. Different nodes during the
-same pipeline pass (cursor, frontier nodes during PLANNING, ancestors during condition
+`do_gather_ns` on cache miss, caches the result by node UID. `do_gather_ns` uses a
+two-phase model: (1) caller + ancestors contribute via `get_ns()`, (2) immediate-caller
+dispatch contributors add runtime/context layers. Different nodes during the same
+pipeline pass (cursor, frontier nodes during PLANNING, ancestors during condition
 evaluation) each get their own cached namespace. The cache dies with the PhaseCtx, so
-UPDATE mutations are visible in the *next* pipeline pass via a fresh PhaseCtx — they
-do not retroactively affect cached namespaces within the current pass.
+UPDATE mutations are visible in the *next* pipeline pass via a fresh PhaseCtx — they do
+not retroactively affect cached namespaces within the current pass.
 
 **Namespace handlers must not call `get_ns` for the node they're building.** That
 would cause infinite recursion. Use handler priority ordering instead — a handler that

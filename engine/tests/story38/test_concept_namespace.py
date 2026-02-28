@@ -123,7 +123,7 @@ def test_role_provider_hook_type_errors_are_not_swallowed() -> None:
     graph, scene, block = _build_scene_with_block()
 
     class ExplodingActor(Actor):
-        def on_get_ns(self, ctx) -> dict[str, object]:
+        def get_ns(self):
             raise TypeError("provider boom")
 
     actor = ExplodingActor(label="guard", name="Joe")
@@ -145,7 +145,7 @@ def test_setting_provider_hook_requires_mapping_or_none() -> None:
     graph, scene, block = _build_scene_with_block()
 
     class BadLocation(Location):
-        def on_get_ns(self, ctx) -> list[str]:
+        def get_ns(self) -> list[str]:
             return ["bad"]
 
     location = BadLocation(label="castle", name="Castle")
@@ -159,5 +159,5 @@ def test_setting_provider_hook_requires_mapping_or_none() -> None:
     setting.set_provider(location)
 
     ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
-    with pytest.raises(TypeError, match="on_get_ns must return Mapping \\| None"):
+    with pytest.raises(TypeError, match="get_ns must return Mapping \\| None"):
         ctx.get_ns(block)

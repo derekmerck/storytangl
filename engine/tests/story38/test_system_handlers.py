@@ -216,8 +216,9 @@ def test_dispatch_journal_allows_custom_handler_injection() -> None:
     assert "Hello Joe" in contents
 
 
-def test_render_block_content_includes_graph_locals_from_phase_ctx_tail_layer() -> None:
+def test_render_block_content_includes_graph_locals_from_gather_ns() -> None:
     graph = StoryGraph38(locals={"gold": 10})
+    graph.world = SimpleNamespace(locals={"gold": 3})
     start = Block(label="start", content="Gold: {gold}")
     graph.add(start)
     graph.initial_cursor_id = start.uid

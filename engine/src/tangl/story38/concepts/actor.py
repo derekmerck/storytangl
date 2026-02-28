@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from tangl.core38 import Node
 from typing import Any
 
-from tangl.vm38 import TraversableNode, on_get_ns
+from tangl.core38 import Node, contribute_ns
 
 
 class Actor(Node):
@@ -11,13 +10,9 @@ class Actor(Node):
 
     name: str = ""
 
-    @on_get_ns
-    def on_get_ns(self, ctx) -> dict[str, Any]:
-        """Publish actor attributes for namespace composition.
-
-        Temporary bridge: ``on_get_ns`` remains transitional until scoped-dispatch
-        returns as a first-class mechanism.
-        """
+    @contribute_ns
+    def provide_actor_symbols(self) -> dict[str, Any]:
+        """Publish actor attributes for namespace composition."""
         payload: dict[str, Any] = {
             "label": self.get_label(),
             "name": self.name or self.get_label(),

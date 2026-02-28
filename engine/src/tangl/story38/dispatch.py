@@ -17,6 +17,10 @@ def on_journal(func=None, **kwargs):
 
 def on_gather_ns(func=None, **kwargs):
     """Register a story-level namespace contributor."""
+    if "has_kind" in kwargs:
+        raise TypeError(
+            "on_gather_ns no longer accepts 'has_kind'; use 'wants_caller_kind'",
+        )
     if func is None:
         return lambda f: story_dispatch.register(func=f, task="gather_ns", **kwargs)
     return story_dispatch.register(func=func, task="gather_ns", **kwargs)
