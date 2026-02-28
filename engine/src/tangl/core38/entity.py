@@ -4,9 +4,10 @@ from __future__ import annotations
 from typing import Any, Self
 
 from .bases import HasIdentity, Unstructurable
+from .namespace import HasNamespace
 
 
-class Entity(Unstructurable, HasIdentity):
+class Entity(Unstructurable, HasIdentity, HasNamespace):
     """Canonical concrete core entity composed from identity + constructor-form traits.
 
     Why

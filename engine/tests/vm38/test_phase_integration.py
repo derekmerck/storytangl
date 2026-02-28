@@ -89,6 +89,7 @@ def _register_system_handlers():
         on_gather_ns, on_validate as _ov, on_prereqs as _op,
         on_update as _ou, on_postreqs as _ops,
     )
+    on_gather_ns(sh.contribute_runtime_baseline)
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)
     _ov(sh.validate_successor_exists)

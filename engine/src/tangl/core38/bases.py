@@ -542,4 +542,7 @@ class HasState(BaseModelPlus):
         {'hp': 100}
     """
 
-    locals: StringMap = Field(default_factory=dict)
+    locals: StringMap = Field(
+        default_factory=dict,
+        json_schema_extra={"contribute_ns": True},
+    )

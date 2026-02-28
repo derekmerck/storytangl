@@ -6,11 +6,32 @@ from typing import Any
 from tangl.core38 import Priority, Record, Selector
 from tangl.vm38 import Dependency, Resolver
 
-from .dispatch import on_journal
+from .dispatch import on_gather_ns, on_journal
 from .episode import Action, Block
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 
 logger = logging.getLogger(__name__)
+
+
+@on_gather_ns
+def gather_story_graph_locals(*, caller, ctx, **_kw):
+    """Inject story-graph locals for current runtime scope."""
+    graph = getattr(caller, "graph", None)
+    locals_ = getattr(graph, "locals", None) if graph is not None else None
+    if isinstance(locals_, dict) and locals_:
+        return dict(locals_)
+    return None
+
+
+@on_gather_ns
+def gather_story_world_locals(*, caller, ctx, **_kw):
+    """Inject world locals when present on attached world."""
+    graph = getattr(caller, "graph", None)
+    world = getattr(graph, "world", None) if graph is not None else None
+    locals_ = getattr(world, "locals", None) if world is not None else None
+    if isinstance(locals_, dict) and locals_:
+        return dict(locals_)
+    return None
 
 
 class _SafeFormatDict(dict):

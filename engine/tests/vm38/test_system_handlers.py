@@ -59,6 +59,7 @@ def register_system_handlers(clean_vm_dispatch):
     """
     # Re-register each handler explicitly
     from tangl.vm38.dispatch import on_gather_ns, on_validate, on_prereqs, on_update, on_postreqs
+    on_gather_ns(sh.contribute_runtime_baseline)
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)
     on_validate(sh.validate_successor_exists)
@@ -104,6 +105,22 @@ class TestContributeLocals:
         node.locals = {"mood": "happy"}
         ns = do_gather_ns(node, ctx=ctx)
         assert ns["mood"] == "happy"
+
+
+class TestContributeRuntimeBaseline:
+    def test_cursor_and_graph_present_without_ctx_symbol(self) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+        baseline_ctx = SimpleNamespace(
+            graph=g,
+            cursor=node,
+            get_registries=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+        ns = do_gather_ns(node, ctx=baseline_ctx)
+        assert ns["cursor"] is node
+        assert ns["graph"] is g
+        assert "ctx" not in ns
 
 
 # ============================================================================

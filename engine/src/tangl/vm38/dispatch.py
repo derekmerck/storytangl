@@ -14,9 +14,8 @@ helper keyed by task name and aggregation mode.
 The ``on_resolve`` / ``do_resolve`` hook is separate because it has a different call
 signature (takes ``requirement`` + ``offers``, not ``caller``).
 
-The ``on_gather_ns`` / ``on_get_ns`` / ``do_gather_ns`` hook family is separate
-because it walks the ancestor chain (scoped dispatch semantic) rather than
-firing once at the cursor.
+The ``on_gather_ns`` / ``do_gather_ns`` hook family is separate because it
+composes per-entity namespace maps with dispatch contributions.
 
 See Also
 --------
@@ -30,13 +29,12 @@ See Also
 
 from __future__ import annotations
 
-import inspect
 import logging
 from collections import ChainMap
-from collections.abc import Iterable as IterableABC
-from typing import Any, Callable, Iterable, Optional, TYPE_CHECKING
+from collections.abc import Iterable as IterableABC, Mapping
+from typing import Any, Callable, Iterable, TYPE_CHECKING
 
-from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record
+from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record, Selector
 if TYPE_CHECKING:
     from .provision import Requirement, ProvisionOffer
     from .traversable import TraversableNode, TraversableEdge, AnyTraversableEdge
@@ -98,6 +96,7 @@ def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
         task=task,
         call_kwargs={"caller": caller, **kwargs},
         ctx=ctx,
+        selector=Selector(caller_kind=type(caller)),
     )
     return list(receipts)
 
@@ -209,205 +208,89 @@ def do_postreqs(caller, *, ctx, **kwargs):
 
 
 # ---------------------------------------------------------------------------
-# Namespace gathering hook — scoped dispatch semantic
+# Namespace gathering hook — two-phase semantic
 # ---------------------------------------------------------------------------
 
-on_gather_ns = _make_on_hook("gather_ns")
-"""Register a namespace contributor.
+def on_gather_ns(func=None, **kwargs):
+    """Register a namespace contributor for the ``gather_ns`` task.
 
-Namespace handlers receive ``caller=<ancestor_node>`` and return a dict of
-symbols to contribute.  They are fired once per ancestor in the hierarchy
-walk (from node to root), so a handler registered for a specific caller kind
-only fires when an ancestor of that kind is encountered.
-
-Examples::
-
-    @on_gather_ns
-    def contribute_locals(*, caller, ctx, **kw):
-        if hasattr(caller, 'locals') and caller.locals:
-            return caller.locals
-
-    @on_gather_ns
-    def contribute_satisfied_deps(*, caller, ctx, **kw):
-        from tangl.vm38.provision import Dependency, Affordance
-        from tangl.core38 import Selector
-        reqs = caller.edges_out(Selector(has_kind=(Dependency, Affordance)))
-        return {r.get_label(): r.successor for r in reqs if r.satisfied}
-"""
-
-_CALLER_NS_METHOD_ATTR = "_vm38_on_get_ns_method"
-
-
-def _mark_caller_ns_method(func: Callable[..., Any]) -> Callable[..., Any]:
-    setattr(func, _CALLER_NS_METHOD_ATTR, True)
-    return func
-
-
-def _looks_like_instance_method(func: Callable[..., Any]) -> bool:
-    """Detect ``self``-style methods declared on caller classes."""
-    try:
-        params = list(inspect.signature(func).parameters.values())
-    except (TypeError, ValueError):
-        return False
-    if not params:
-        return False
-    first = params[0]
-    if first.kind not in (
-        inspect.Parameter.POSITIONAL_ONLY,
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-    ):
-        return False
-    return first.name in {"self", "this"}
-
-
-def on_get_ns(func=None, **kwargs):
-    """Register a namespace hook or mark an instance method namespace provider.
-
-    Temporary compatibility surface:
-    ``on_get_ns`` is a bridge for legacy-style namespace extension while scoped
-    dispatch is being reintroduced in v38. Prefer ``on_gather_ns`` for new
-    global handlers and treat method-mode ``@on_get_ns`` as transitional.
-
-    Usage modes:
-    - ``@on_get_ns`` or ``@on_get_ns(priority=...)`` on module-level functions:
-      registers a normal ``gather_ns`` handler.
-    - ``@on_get_ns`` on instance methods (``self`` first arg):
-      marks the method for per-caller invocation during ``do_gather_ns``.
+    Use ``has_kind=Type`` to apply subclass-based caller filtering.
     """
+    has_kind = kwargs.pop("has_kind", None)
+    if has_kind is not None:
+        kwargs.setdefault("wants_caller_kind", has_kind)
+        kwargs.setdefault("wants_exact_kind", False)
 
     if func is None:
-        return lambda f: on_get_ns(f, **kwargs)
-    if _looks_like_instance_method(func):
-        return _mark_caller_ns_method(func)
-    return on_gather_ns(func=func, **kwargs)
+        return lambda f: dispatch.register(func=f, task="gather_ns", **kwargs)
+    return dispatch.register(func=func, task="gather_ns", **kwargs)
 
 
-def _invoke_caller_ns_provider(provider: Callable[..., Any], *, caller: Any, ctx: Any) -> Any:
-    """Invoke a caller-bound namespace provider with flexible signatures."""
-    try:
-        signature = inspect.signature(provider)
-    except (TypeError, ValueError):
-        return provider()
-
-    params = signature.parameters
-    kwargs: dict[str, Any] = {}
-    if "caller" in params:
-        kwargs["caller"] = caller
-    if "ctx" in params:
-        kwargs["ctx"] = ctx
-
-    if kwargs:
-        return provider(**kwargs)
-
-    positional = [
-        param
-        for param in params.values()
-        if param.kind in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        )
-    ]
-    if len(positional) == 0:
-        return provider()
-    if len(positional) == 1:
-        return provider(ctx)
-    return provider(caller, ctx)
+def _coerce_ns_layers(value: Any, *, source: str) -> list[Mapping[str, Any]]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return []
+        if all(isinstance(item, Mapping) for item in value):
+            return [item for item in value if item]
+        raise TypeError(f"{source} must return mappings only, got {type(value)!r}")
+    if isinstance(value, ChainMap):
+        return [layer for layer in value.maps if layer]
+    if isinstance(value, Mapping):
+        return [value] if value else []
+    raise TypeError(f"{source} must return Mapping | ChainMap | None, got {type(value)!r}")
 
 
-def _gather_caller_ns(caller: Any, *, ctx: Any) -> dict[str, Any]:
-    """Collect namespace contributions from caller-bound provider methods."""
-    contributions: dict[str, Any] = {}
-    seen_names: set[str] = set()
-
-    method_names: list[str] = []
-    for cls in type(caller).__mro__:
-        for name, raw in cls.__dict__.items():
-            if name in seen_names:
-                continue
-            if callable(raw) and getattr(raw, _CALLER_NS_METHOD_ATTR, False):
-                seen_names.add(name)
-                method_names.append(name)
-
-    if "on_get_ns" not in seen_names and callable(
-        getattr(caller, "on_get_ns", None)
-    ):
-        method_names.append("on_get_ns")
-
-    for name in method_names:
-        provider = getattr(caller, name, None)
-        if not callable(provider):
-            continue
-        result = _invoke_caller_ns_provider(provider, caller=caller, ctx=ctx)
-        if result is None:
-            continue
-        if isinstance(result, dict):
-            contributions.update(result)
-            continue
-        contributions.update(dict(result))
-
-    return contributions
+def _merge_nested_layers(
+    layers: list[Mapping[str, Any]],
+    *,
+    nested_keys: tuple[str, ...] = ("roles", "settings"),
+) -> dict[str, dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for nested_key in nested_keys:
+        combined: dict[str, Any] = {}
+        for layer in reversed(layers):
+            nested = layer.get(nested_key)
+            if isinstance(nested, Mapping):
+                combined.update(dict(nested))
+        if combined:
+            merged[nested_key] = combined
+    return merged
 
 
 def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
-    """Build a scoped namespace by walking the ancestor chain.
+    """Build a scoped namespace in two phases.
 
-    Walks ``node.ancestors`` (which includes ``node`` itself) from node to
-    root.  At each ancestor, fires all ``gather_ns`` handlers with
-    ``caller=ancestor``.  Results are merged into a :class:`ChainMap` where
-    closer scope (node) overrides more distant scope (root).
-
-    This implements the *scoped dispatch* semantic from legacy: the same
-    handlers fire at each level of the hierarchy, receiving different callers.
-    A handler that contributes ``.locals`` fires once per ancestor that has
-    locals; a handler that contributes satisfied deps fires once per ancestor
-    that has deps.
-
-    Parameters
-    ----------
-    node
-        The node to build namespace for (usually the cursor).
-    ctx
-        Dispatch context providing registries.
-
-    Returns
-    -------
-    ChainMap[str, Any]
-        Namespace with closest scope first.  Use ``dict(result)`` for a
-        flat dict if ChainMap semantics aren't needed.
-
-    Notes
-    -----
-    Handlers must NOT call ``ctx.get_ns()`` for the same node — that would
-    cause infinite recursion through the cache.  Use priority ordering
-    (EARLY/LATE) if a handler needs access to other namespace contributions.
+    Phase 1: collect ``get_ns()`` from caller and its ancestor chain.
+    Phase 2: execute immediate-caller ``gather_ns`` dispatch handlers.
     """
     _validate_dispatch_ctx(ctx)
 
-    # Walk from node to root: [node, parent, grandparent, ..., root]
     ancestors = list(node.ancestors) if hasattr(node, "ancestors") else [node]
+    layers: list[Mapping[str, Any]] = []
 
-    # Fire handlers at each ancestor level, collect per-level dicts
-    layers: list[dict[str, Any]] = []
     for ancestor in ancestors:
-        receipts = dispatch.execute_all(
-            task="gather_ns",
-            call_kwargs={"caller": ancestor},
-            ctx=ctx,
+        get_ns = getattr(ancestor, "get_ns", None)
+        if not callable(get_ns):
+            continue
+        layers.extend(
+            _coerce_ns_layers(get_ns(), source=f"{type(ancestor).__name__}.get_ns"),
         )
-        layer_result = CallReceipt.merge_results(*receipts)
-        layer: dict[str, Any] = {}
-        if layer_result:
-            layer = layer_result if isinstance(layer_result, dict) else dict(layer_result)
 
-        caller_layer = _gather_caller_ns(ancestor, ctx=ctx)
-        if caller_layer:
-            layer.update(caller_layer)
+    receipts = dispatch.execute_all(
+        task="gather_ns",
+        call_kwargs={"caller": node},
+        ctx=ctx,
+        selector=Selector(caller_kind=type(node)),
+    )
+    dispatch_result = CallReceipt.merge_results(*receipts)
+    layers.extend(_coerce_ns_layers(dispatch_result, source="gather_ns handler"))
 
-        if layer:
-            layers.append(layer)
+    nested_overlay = _merge_nested_layers(layers)
+    if nested_overlay:
+        layers = [nested_overlay, *layers]
 
-    # ChainMap: first map wins on lookup → closest scope overrides
-    # ancestors list is [node, parent, ..., root], which is already closest-first
     return ChainMap(*layers) if layers else ChainMap()
 
 
@@ -471,6 +354,6 @@ __all__ = [
     "on_finalize", "do_finalize",
     "on_postreqs", "do_postreqs",
     # helper decos and invocation
-    "on_gather_ns", "on_get_ns", "do_gather_ns",
+    "on_gather_ns", "do_gather_ns",
     "on_resolve", "do_resolve",
 ]
