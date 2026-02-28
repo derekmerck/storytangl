@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from tangl.core38 import Node, contribute_ns
 from typing import Any
+
+from tangl.core38 import Node, contribute_ns
 
 
 class Actor(Node):

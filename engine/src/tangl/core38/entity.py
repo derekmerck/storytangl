@@ -20,8 +20,9 @@ class Entity(Unstructurable, HasIdentity, HasNamespace):
 
     Notes
     -----
-    Inheritance order is ``(Unstructurable, HasIdentity)``, so ``__eq__`` compares
-    by value via :meth:`Unstructurable.eq_by_value`.
+    Inheritance order is ``(Unstructurable, HasNamespace, HasIdentity)``.
+    ``HasNamespace`` adds namespace contribution behavior, while ``__eq__`` still
+    compares by value via :meth:`Unstructurable.eq_by_value`.
 
     - Two entities with the same ``uid`` but different constructor-form values are
       not equal under ``==``.

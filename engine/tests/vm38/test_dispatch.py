@@ -93,14 +93,18 @@ class TestHookRegistration:
             on_hook(lambda *, caller, ctx, **kw: None)
             assert list(vm_dispatch.find_all(Selector(task=expected_task)))
 
-    def test_on_gather_ns_maps_has_kind_to_caller_filter(self) -> None:
-        @on_gather_ns(has_kind=TraversableNode)
+    def test_on_gather_ns_uses_explicit_caller_kind_fields(self) -> None:
+        @on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
         def _typed(*, caller, ctx, **kw):
             return {"ok": True}
 
         behavior = list(vm_dispatch.find_all(Selector(task="gather_ns")))[0]
         assert behavior.wants_caller_kind is TraversableNode
         assert behavior.wants_exact_kind is False
+
+    def test_on_gather_ns_rejects_has_kind_kwarg(self) -> None:
+        with pytest.raises(TypeError, match="wants_caller_kind"):
+            on_gather_ns(lambda *, caller, ctx, **kw: None, has_kind=TraversableNode)
 
     def test_on_get_ns_not_exposed_in_vm38_api(self) -> None:
         assert not hasattr(vm38_dispatch_api, "on_get_ns")
@@ -268,12 +272,12 @@ class TestDoGatherNs:
         ns = do_gather_ns(child, ctx=null_ctx)
         assert ns["dispatch_for"] == "block"
 
-    def test_has_kind_filters_dispatch_handlers(self, null_ctx) -> None:
-        @on_gather_ns(has_kind=TraversableNode)
+    def test_wants_caller_kind_filters_dispatch_handlers(self, null_ctx) -> None:
+        @on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
         def include_node(*, caller, ctx, **kw):
             return {"typed": caller.get_label()}
 
-        @on_gather_ns(has_kind=Graph)
+        @on_gather_ns(wants_caller_kind=Graph, wants_exact_kind=False)
         def exclude_graph(*, caller, ctx, **kw):
             return {"graph_handler": True}
 

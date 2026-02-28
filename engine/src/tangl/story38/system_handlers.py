@@ -23,9 +23,13 @@ def gather_story_graph_locals(*, caller, ctx, **_kw):
     return None
 
 
-@on_gather_ns
+@on_gather_ns(priority=Priority.EARLY)
 def gather_story_world_locals(*, caller, ctx, **_kw):
-    """Inject world locals when present on attached world."""
+    """Inject world locals when present on attached world.
+
+    World locals intentionally run before story-graph locals so graph values
+    can override world defaults when keys overlap.
+    """
     graph = getattr(caller, "graph", None)
     world = getattr(graph, "world", None) if graph is not None else None
     locals_ = getattr(world, "locals", None) if world is not None else None

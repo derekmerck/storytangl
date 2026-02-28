@@ -33,6 +33,7 @@ from tangl.vm38.traversable import (
     TraversableEdge,
     TraversableNode,
 )
+from tangl.vm38 import Dependency, Requirement
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -121,6 +122,50 @@ class TestContributeRuntimeBaseline:
         assert ns["cursor"] is node
         assert ns["graph"] is g
         assert "ctx" not in ns
+
+    def test_satisfied_deps_include_ancestor_scopes(self, ctx) -> None:
+        g = Graph()
+        scene = _node(g, label="scene")
+        block = _node(g, label="block")
+        provider = _node(g, label="guide")
+        scene.add_child(block)
+
+        dep = Dependency(
+            predecessor_id=scene.uid,
+            label="companion",
+            requirement=Requirement(has_kind=TraversableNode),
+        )
+        g.add(dep)
+        dep.set_provider(provider)
+
+        ns = do_gather_ns(block, ctx=ctx)
+        assert ns["companion"] is provider
+
+    def test_nearer_satisfied_deps_override_ancestor_scopes(self, ctx) -> None:
+        g = Graph()
+        scene = _node(g, label="scene")
+        block = _node(g, label="block")
+        parent_provider = _node(g, label="parent_guide")
+        child_provider = _node(g, label="child_guide")
+        scene.add_child(block)
+
+        parent_dep = Dependency(
+            predecessor_id=scene.uid,
+            label="companion",
+            requirement=Requirement(has_kind=TraversableNode),
+        )
+        child_dep = Dependency(
+            predecessor_id=block.uid,
+            label="companion",
+            requirement=Requirement(has_kind=TraversableNode),
+        )
+        g.add(parent_dep)
+        g.add(child_dep)
+        parent_dep.set_provider(parent_provider)
+        child_dep.set_provider(child_provider)
+
+        ns = do_gather_ns(block, ctx=ctx)
+        assert ns["companion"] is child_provider
 
 
 # ============================================================================

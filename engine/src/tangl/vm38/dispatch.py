@@ -214,12 +214,13 @@ def do_postreqs(caller, *, ctx, **kwargs):
 def on_gather_ns(func=None, **kwargs):
     """Register a namespace contributor for the ``gather_ns`` task.
 
-    Use ``has_kind=Type`` to apply subclass-based caller filtering.
+    Use ``wants_caller_kind=Type`` to filter by caller type and
+    ``wants_exact_kind=False`` to allow subclass matches.
     """
-    has_kind = kwargs.pop("has_kind", None)
-    if has_kind is not None:
-        kwargs.setdefault("wants_caller_kind", has_kind)
-        kwargs.setdefault("wants_exact_kind", False)
+    if "has_kind" in kwargs:
+        raise TypeError(
+            "on_gather_ns no longer accepts 'has_kind'; use 'wants_caller_kind'",
+        )
 
     if func is None:
         return lambda f: dispatch.register(func=f, task="gather_ns", **kwargs)

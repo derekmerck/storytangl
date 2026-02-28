@@ -90,7 +90,11 @@ logger = logging.getLogger(__name__)
 # Namespace contributors
 # ---------------------------------------------------------------------------
 
-@on_gather_ns(has_kind=TraversableNode, priority=Priority.FIRST)
+@on_gather_ns(
+    wants_caller_kind=TraversableNode,
+    wants_exact_kind=False,
+    priority=Priority.FIRST,
+)
 def contribute_runtime_baseline(*, caller, ctx, **kw):
     """Inject context baseline symbols for runtime expressions."""
     graph = getattr(ctx, "graph", None)
@@ -103,7 +107,7 @@ def contribute_runtime_baseline(*, caller, ctx, **kw):
     return result or None
 
 
-@on_gather_ns(has_kind=TraversableNode)
+@on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
 def contribute_locals(*, caller, ctx, **kw):
     """Inject ``caller.locals`` into the namespace.
 
@@ -119,12 +123,15 @@ def contribute_locals(*, caller, ctx, **kw):
     return None
 
 
-@on_gather_ns(has_kind=TraversableNode)
+@on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
 def contribute_satisfied_deps(*, caller, ctx, **kw):
     """Inject satisfied dependency/affordance providers as named symbols.
 
-    For each satisfied ``Dependency`` or ``Affordance`` edge originating from
-    ``caller``, contributes ``edge.label → edge.successor`` (the provider).
+    Walks caller scope from far to near (ancestors -> caller) and, for each
+    satisfied ``Dependency`` or ``Affordance`` edge, contributes
+    ``edge.label → edge.successor`` (the provider).
+
+    Nearer scopes overwrite farther scopes for duplicate labels.
 
     This makes provisioned resources available by name in the namespace.
     For example, a scene with a satisfied ``"companion"`` dependency makes
@@ -134,17 +141,19 @@ def contribute_satisfied_deps(*, caller, ctx, **kw):
     from .provision import Dependency, Affordance
 
     result = {}
-    for edge in caller.edges_out(Selector(has_kind=Dependency)):
-        if edge.satisfied and edge.successor is not None:
-            label = edge.get_label()
-            if label:
-                result[label] = edge.successor
+    scope_nodes = list(caller.ancestors) if hasattr(caller, "ancestors") else [caller]
+    for scope in reversed(scope_nodes):
+        for edge in scope.edges_out(Selector(has_kind=Dependency)):
+            if edge.satisfied and edge.successor is not None:
+                label = edge.get_label()
+                if label:
+                    result[label] = edge.successor
 
-    for edge in caller.edges_out(Selector(has_kind=Affordance)):
-        if edge.satisfied and edge.successor is not None:
-            label = edge.get_label()
-            if label:
-                result[label] = edge.successor
+        for edge in scope.edges_out(Selector(has_kind=Affordance)):
+            if edge.satisfied and edge.successor is not None:
+                label = edge.get_label()
+                if label:
+                    result[label] = edge.successor
 
     return result if result else None
 
