@@ -45,8 +45,34 @@ class Requirement(Selector, Generic[PT]):
     resolution_reason: Optional[str] = None
     resolution_meta: Optional[dict[str, Any]] = None
 
+    def _matches_identifier(self, entity: PT) -> bool:
+        extra = self.__pydantic_extra__ or {}
+        identifier = extra.get("has_identifier")
+        if not isinstance(identifier, str) or not identifier:
+            return True
+
+        has_identifier = getattr(entity, "has_identifier", None)
+        if callable(has_identifier):
+            try:
+                if bool(has_identifier(identifier)):
+                    return True
+            except (TypeError, ValueError, AttributeError):
+                pass
+
+        if "." in identifier:
+            path = getattr(entity, "path", None)
+            if isinstance(path, str) and path == identifier:
+                return True
+
+        return False
+
     def satisfied_by(self, entity: PT) -> bool:
-        return self.matches(entity)
+        if not self._matches_identifier(entity):
+            return False
+
+        criteria = dict(self.__pydantic_extra__ or {})
+        criteria.pop("has_identifier", None)
+        return Selector(predicate=self.predicate, **criteria).matches(entity)
 
     def _validate_satisfied_by(self, entity: PT) -> bool:
         if not self.satisfied_by(entity):

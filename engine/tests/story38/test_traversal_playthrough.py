@@ -435,6 +435,64 @@ class TestLazyCrossSceneProvisioning:
         )
         assert nested_scene2 is None
 
+    def test_qualified_scene_block_successor_provisions_and_binds_entry(self) -> None:
+        script = {
+            "label": "lazy_cross_scene_qualified_world",
+            "metadata": {
+                "title": "Lazy Cross Scene Qualified",
+                "author": "Tests",
+                "start_at": "scene1.start",
+            },
+            "scenes": {
+                "scene1": {
+                    "blocks": {
+                        "start": {
+                            "content": "Start",
+                            "actions": [{"text": "Go", "successor": "scene2.entry"}],
+                        }
+                    }
+                },
+                "scene2": {
+                    "blocks": {
+                        "entry": {"content": "Entry"},
+                    }
+                },
+            },
+        }
+
+        world = World38.from_script_data(script_data=script)
+        result = world.create_story("lazy_cross_scene_qualified_story", init_mode=InitMode.LAZY)
+        ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+        action = _get_single_action(ledger)
+        ledger.resolve_choice(action.uid)
+
+        assert ledger.cursor.label == "entry"
+
+        scene2 = next(
+            (
+                node
+                for node in ledger.graph.values()
+                if isinstance(node, Scene) and node.label == "scene2"
+            ),
+            None,
+        )
+        assert scene2 is not None
+
+        entry_block = next(
+            (
+                node
+                for node in ledger.graph.values()
+                if isinstance(node, Block)
+                and node.label == "entry"
+                and getattr(node.parent, "uid", None) == scene2.uid
+            ),
+            None,
+        )
+        assert entry_block is not None
+        assert scene2.source_id == entry_block.uid
+        assert scene2.sink_id == entry_block.uid
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------

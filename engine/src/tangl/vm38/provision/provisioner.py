@@ -9,7 +9,13 @@ from pydantic import ConfigDict, SkipValidation
 from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, Priority, TokenFactory
 from ..traversable import TraversableNode
 
-from .scope import admitted, build_plan, resolve_target_path, scope_distance
+from .scope import (
+    admitted,
+    build_plan,
+    leaf_identifier,
+    scope_distance,
+    target_context_candidates,
+)
 
 if TYPE_CHECKING:
     from .requirement import Requirement, Affordance
@@ -52,6 +58,7 @@ class ProvisionOffer(Record):
     specificity: int = 0
     scope_distance: int = 0
     build_plan: list[str] | None = None
+    target_ctx: str | None = None
     candidate: Any = None
 
     def sort_key(self):
@@ -94,7 +101,7 @@ class FindProvisioner:
     distance: int = 0
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
-        candidates = requirement.filter(self.values)
+        candidates = (value for value in self.values if requirement.satisfied_by(value))
         for c in candidates:
             yield ProvisionOffer(
                 origin_id = "FindProvisioner",
@@ -140,6 +147,29 @@ class TemplateProvisioner:
         kind = extra.get("has_kind")
         return isinstance(kind, type) and issubclass(kind, TraversableNode)
 
+    @staticmethod
+    def _matches_non_identifier_criteria(requirement: "Requirement", candidate: Any) -> bool:
+        criteria = dict(requirement.__pydantic_extra__ or {})
+        criteria.pop("has_identifier", None)
+        selector = Selector(predicate=requirement.predicate, **criteria)
+        return selector.matches(candidate)
+
+    @classmethod
+    def _matches_template_identity(
+        cls,
+        requirement: "Requirement",
+        candidate: EntityTemplate,
+    ) -> bool:
+        identifier = cls._selector_identifier(requirement)
+        if identifier is None:
+            return True
+        if candidate.has_identifier(identifier):
+            return True
+        leaf = leaf_identifier(identifier)
+        if leaf is None:
+            return False
+        return candidate.has_identifier(leaf)
+
     def _materialize_template(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
         if callable(self.materialize_node):
             return self.materialize_node(
@@ -159,43 +189,46 @@ class TemplateProvisioner:
         identifier = self._selector_identifier(requirement)
 
         is_episode_requirement = self._is_episode_requirement(requirement)
-        candidates = requirement.filter(self.templates)
-        for c in candidates:
+        for c in self.templates:
+            if not self._matches_non_identifier_criteria(requirement, c):
+                continue
+            if not self._matches_template_identity(requirement, c):
+                continue
+
             candidate_identifier = identifier or c.payload.get_label()
-            target_ctx = resolve_target_path(
+            target_contexts = target_context_candidates(
                 identifier=candidate_identifier,
                 request_ctx=self.request_ctx,
                 authored_path=requirement.authored_path,
                 is_qualified=requirement.is_qualified,
                 is_absolute=requirement.is_absolute,
             )
-            if target_ctx is None:
-                continue
-
-            if not admitted(c.admission_scope, target_ctx):
-                continue
-
-            distance = scope_distance(c.admission_scope, target_ctx)
-            chain = None
-            if is_episode_requirement:
-                if requirement.is_qualified:
-                    chain = build_plan(target_ctx, self.graph)
-                elif distance > 0:
+            for target_ctx in target_contexts:
+                if not admitted(c.admission_scope, target_ctx):
                     continue
 
-            yield ProvisionOffer(
-                origin_id = "TemplateProvisioner",
-                policy = ProvisionPolicy.CREATE,
-                priority = Priority.NORMAL,
-                distance_from_caller=self.distance,
-                scope_distance=distance,
-                build_plan=chain,
-                candidate=c,
-                callback=lambda *_, _c=c, **kwargs: self._materialize_template(
-                    _c,
-                    _ctx=kwargs.get("_ctx"),
-                ),
-            )
+                distance = scope_distance(c.admission_scope, target_ctx)
+                chain = None
+                if is_episode_requirement:
+                    if requirement.is_qualified:
+                        chain = build_plan(target_ctx, self.graph)
+                    elif distance > 0:
+                        continue
+
+                yield ProvisionOffer(
+                    origin_id = "TemplateProvisioner",
+                    policy = ProvisionPolicy.CREATE,
+                    priority = Priority.NORMAL,
+                    distance_from_caller=self.distance,
+                    scope_distance=distance,
+                    build_plan=chain,
+                    target_ctx=target_ctx,
+                    candidate=c,
+                    callback=lambda *_, _c=c, **kwargs: self._materialize_template(
+                        _c,
+                        _ctx=kwargs.get("_ctx"),
+                    ),
+                )
 
     # Not sure what affordance providers look like in template form?
 

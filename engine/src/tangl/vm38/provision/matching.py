@@ -129,6 +129,7 @@ def summarize_offer(offer: Any) -> dict[str, Any]:
         "policy": str(getattr(offer, "policy", None)),
         "scope_distance": getattr(offer, "scope_distance", None),
         "build_plan": getattr(offer, "build_plan", None),
+        "target_ctx": getattr(offer, "target_ctx", None),
         "distance_from_caller": getattr(offer, "distance_from_caller", None),
         "specificity": getattr(offer, "specificity", None),
         "priority": getattr(offer, "priority", None),

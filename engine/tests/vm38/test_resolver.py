@@ -111,6 +111,22 @@ class TestFindProvisioner:
         far_offer = list(far.get_dependency_offers(req))[0]
         assert near_offer.sort_key() < far_offer.sort_key()
 
+    def test_dotted_identifier_matches_existing_entity_path(self) -> None:
+        graph = Graph()
+        scene = TraversableNode(label="scene2", registry=graph)
+        entry = TraversableNode(label="entry", registry=graph)
+        scene.add_child(entry)
+
+        prov = FindProvisioner(values=[entry])
+        req = Requirement(
+            has_kind=TraversableNode,
+            has_identifier="scene2.entry",
+        )
+        offers = list(prov.get_dependency_offers(req))
+
+        assert len(offers) == 1
+        assert offers[0].callback() is entry
+
 
 # ============================================================================
 # Resolver — orchestrated resolution

@@ -33,7 +33,15 @@ from .provisioner import (
     _template_hash_value,
 )
 from .requirement import Requirement, PT, Dependency, Affordance
-from .scope import admitted, build_plan, prefix_paths, resolve_target_path, scope_distance, split_path
+from .scope import (
+    admitted,
+    build_plan,
+    prefix_paths,
+    resolve_target_path,
+    scope_distance,
+    split_path,
+    target_context_candidates,
+)
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
@@ -575,8 +583,12 @@ class Resolver:
         _ctx: Any = None,
     ) -> Any | None:
         build_segments = list(offer.build_plan or [])
+        offer_target_ctx = getattr(offer, "target_ctx", None)
         if not build_segments:
-            target_path = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            target_path = offer_target_ctx or self._resolve_target_path_for_requirement(
+                requirement,
+                _ctx=_ctx,
+            )
             if not target_path:
                 return None
             parent_path_parts = split_path(target_path)[:-1]
@@ -584,7 +596,10 @@ class Resolver:
                 return None
             return self._find_existing_path_node(graph, ".".join(parent_path_parts))
 
-        target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+        target_ctx = offer_target_ctx or self._resolve_target_path_for_requirement(
+            requirement,
+            _ctx=_ctx,
+        )
         if target_ctx is None:
             raise ValueError("Cannot execute structural chain without a target path")
 
@@ -672,7 +687,10 @@ class Resolver:
         graph = getattr(_ctx, "graph", None)
         for offer in offers:
             chain = list(offer.build_plan or [])
-            target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            target_ctx = getattr(offer, "target_ctx", None) or self._resolve_target_path_for_requirement(
+                requirement,
+                _ctx=_ctx,
+            )
             if chain and (
                 target_ctx is None
                 or not self._chain_paths_resolvable(
@@ -694,10 +712,26 @@ class Resolver:
 
     def _diagnose_blockers(self, *, requirement: Requirement, _ctx: Any = None) -> list[Blocker]:
         identifier = self._selector_identifier(requirement)
-        target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+        request_ctx = self._request_ctx_path(_ctx)
+        target_ctxs = target_context_candidates(
+            identifier=identifier,
+            request_ctx=request_ctx,
+            authored_path=requirement.authored_path,
+            is_qualified=requirement.is_qualified,
+            is_absolute=requirement.is_absolute,
+        )
+        if not target_ctxs:
+            target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            if target_ctx is not None:
+                target_ctxs = [target_ctx]
 
         templates = list(self._iter_templates())
-        identity_candidates = [template for template in templates if requirement.matches(template)]
+        identity_candidates = [
+            template
+            for template in templates
+            if TemplateProvisioner._matches_non_identifier_criteria(requirement, template)
+            and TemplateProvisioner._matches_template_identity(requirement, template)
+        ]
 
         if not identity_candidates:
             kind = (requirement.__pydantic_extra__ or {}).get("has_kind")
@@ -709,7 +743,7 @@ class Resolver:
                             reason="name_mismatch",
                             context={
                                 "identifier": identifier,
-                                "target_ctx": target_ctx,
+                                "target_ctx": target_ctxs[0] if target_ctxs else None,
                             },
                         )
                     ]
@@ -718,14 +752,15 @@ class Resolver:
                     reason="no_template",
                     context={
                         "identifier": identifier,
-                        "target_ctx": target_ctx,
+                        "target_ctx": target_ctxs[0] if target_ctxs else None,
                     },
                 )
             ]
 
         admitted_candidates = [
-            template
+            (template, target_ctx)
             for template in identity_candidates
+            for target_ctx in target_ctxs
             if admitted(template.admission_scope, target_ctx)
         ]
         if not admitted_candidates:
@@ -734,21 +769,26 @@ class Resolver:
                     reason="scope_rejected",
                     context={
                         "identifier": identifier,
-                        "target_ctx": target_ctx,
+                        "target_ctx": target_ctxs[0] if target_ctxs else None,
+                        "target_ctx_candidates": list(target_ctxs),
                         "scopes": [template.admission_scope for template in identity_candidates],
                     },
                 )
             ]
 
         if self._is_episode_requirement(requirement):
-            distances = [scope_distance(template.admission_scope, target_ctx) for template in admitted_candidates]
+            distances = [
+                scope_distance(template.admission_scope, target_ctx)
+                for template, target_ctx in admitted_candidates
+            ]
             if not requirement.is_qualified and distances and min(distances) > 0:
                 return [
                     Blocker(
                         reason="scope_rejected",
                         context={
                             "identifier": identifier,
-                            "target_ctx": target_ctx,
+                            "target_ctx": target_ctxs[0] if target_ctxs else None,
+                            "target_ctx_candidates": list(target_ctxs),
                             "distances": distances,
                             "policy": "unqualified_episode_requires_distance_0",
                         },
@@ -756,23 +796,24 @@ class Resolver:
                 ]
 
             graph = getattr(_ctx, "graph", None)
-            if requirement.is_qualified and target_ctx:
-                unresolved: list[list[str]] = []
-                for _template in admitted_candidates:
+            if requirement.is_qualified and target_ctxs:
+                unresolved: list[dict[str, Any]] = []
+                for _template, target_ctx in admitted_candidates:
                     chain = build_plan(target_ctx, graph)
                     if not self._chain_paths_resolvable(
                         build_segments=chain,
                         target_ctx=target_ctx,
                         graph=graph,
                     ):
-                        unresolved.append(chain)
-                if unresolved:
+                        unresolved.append({"target_ctx": target_ctx, "chain": chain})
+                if unresolved and len(unresolved) == len(admitted_candidates):
                     return [
                         Blocker(
                             reason="chain_unresolvable",
                             context={
                                 "identifier": identifier,
-                                "target_ctx": target_ctx,
+                                "target_ctx": target_ctxs[0] if target_ctxs else None,
+                                "target_ctx_candidates": list(target_ctxs),
                                 "chains": unresolved,
                             },
                         )
@@ -783,7 +824,8 @@ class Resolver:
                 reason="no_template",
                 context={
                     "identifier": identifier,
-                    "target_ctx": target_ctx,
+                    "target_ctx": target_ctxs[0] if target_ctxs else None,
+                    "target_ctx_candidates": list(target_ctxs),
                 },
             )
         ]
