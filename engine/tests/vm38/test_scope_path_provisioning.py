@@ -20,7 +20,9 @@ from tangl.vm38.provision import (
     TemplateProvisioner,
     admitted,
     build_plan,
+    resolve_target_path,
     scope_distance,
+    target_context_candidates,
 )
 from tangl.vm38.traversable import TraversableNode
 from tangl.vm38 import Dependency
@@ -75,8 +77,43 @@ class TestBuildPlan:
         assert build_plan("castle.morning.gatehouse", graph) == ["castle", "morning"]
 
 
+class TestResolveTargetPath:
+    def test_absolute_single_segment_identifier_is_not_reanchored(self) -> None:
+        resolved = resolve_target_path(
+            identifier="scene2",
+            request_ctx="scene1.block1",
+            is_absolute=True,
+        )
+        assert resolved == "scene2"
+
+
+class TestTargetContextCandidates:
+    def test_relative_bare_generates_ancestor_candidates(self) -> None:
+        assert target_context_candidates(
+            identifier="entry",
+            request_ctx="scene1.block1",
+        ) == [
+            "scene1.block1.entry",
+            "scene1.entry",
+            "entry",
+        ]
+
+    def test_dotted_identifier_keeps_single_candidate(self) -> None:
+        assert target_context_candidates(
+            identifier="scene2.entry",
+            request_ctx="scene1.block1",
+        ) == ["scene2.entry"]
+
+    def test_absolute_single_segment_keeps_single_candidate(self) -> None:
+        assert target_context_candidates(
+            identifier="scene2",
+            request_ctx="scene1.block1",
+            is_absolute=True,
+        ) == ["scene2"]
+
+
 class TestTemplateProvisionerScopePolicy:
-    def test_unqualified_episode_rejects_distance_gt_zero(self) -> None:
+    def test_unqualified_episode_prefers_zero_distance_candidate(self) -> None:
         template = EntityTemplate(
             label="castle.morning.gatehouse",
             payload=TraversableNode(label="gatehouse"),
@@ -94,7 +131,9 @@ class TestTemplateProvisionerScopePolicy:
             graph=Graph(),
         )
         offers = list(provisioner.get_dependency_offers(req))
-        assert offers == []
+        assert len(offers) == 1
+        assert offers[0].scope_distance == 0
+        assert offers[0].target_ctx == "castle.gatehouse"
 
     def test_qualified_episode_emits_build_plan_and_scope_distance(self) -> None:
         template = EntityTemplate(
@@ -136,6 +175,55 @@ class TestTemplateProvisionerScopePolicy:
             graph=Graph(),
         )
         assert list(provisioner.get_dependency_offers(req)) == []
+
+    def test_qualified_path_uses_target_ctx_for_scope_filtering(self) -> None:
+        template_scene1 = EntityTemplate(
+            label="scene1.entry",
+            payload=TraversableNode(label="entry"),
+            admission_scope="scene1.*",
+        )
+        template_scene2 = EntityTemplate(
+            label="scene2.entry",
+            payload=TraversableNode(label="entry"),
+            admission_scope="scene2.*",
+        )
+        req = Requirement(
+            has_kind=TraversableNode,
+            has_identifier="scene2.entry",
+            authored_path="scene2.entry",
+            is_qualified=True,
+        )
+        provisioner = TemplateProvisioner(
+            templates=[template_scene1, template_scene2],
+            request_ctx="scene1.start",
+            graph=Graph(),
+        )
+
+        offers = list(provisioner.get_dependency_offers(req))
+        assert len(offers) == 1
+        assert offers[0].target_ctx == "scene2.entry"
+        assert offers[0].build_plan == ["scene2"]
+
+    def test_qualified_identifier_does_not_fallback_to_leaf_template_identity(self) -> None:
+        template = EntityTemplate(
+            label="entry",
+            payload=TraversableNode(label="entry"),
+            admission_scope="scene2.*",
+        )
+        req = Requirement(
+            has_kind=TraversableNode,
+            has_identifier="scene2.entry",
+            authored_path="scene2.entry",
+            is_qualified=True,
+        )
+        provisioner = TemplateProvisioner(
+            templates=[template],
+            request_ctx="scene1.start",
+            graph=Graph(),
+        )
+
+        offers = list(provisioner.get_dependency_offers(req))
+        assert offers == []
 
 
 class TestOfferSortKey:

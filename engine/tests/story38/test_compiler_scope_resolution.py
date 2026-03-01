@@ -308,3 +308,94 @@ class TestScriptManager38Standalone:
         labels = {r.get_label() for r in results}
         assert "scene_a.block_1" in labels
         assert "scene_a" not in labels
+
+
+# ---------------------------------------------------------------------------
+# Compiler canonical successor policy
+# ---------------------------------------------------------------------------
+
+class TestCompilerCanonicalSuccessorPolicy:
+    """Part A canonicalization behavior for action successor refs."""
+
+    @staticmethod
+    def _first_action_spec(script: dict, *, block_id: str) -> dict:
+        bundle = StoryCompiler38().compile(script)
+        block_templ = bundle.template_registry.find_one(Selector(label=block_id))
+        assert block_templ is not None
+        payload = block_templ.payload
+        assert isinstance(payload, Block)
+        assert payload.actions
+        return payload.actions[0]
+
+    def test_bare_root_scene_successor_remains_bare_and_marks_absolute(self) -> None:
+        script = {
+            "label": "compiler_root_scene_ref",
+            "metadata": {
+                "title": "Compiler Root Scene Ref",
+                "author": "Tests",
+                "start_at": "scene1.block1",
+            },
+            "scenes": {
+                "scene1": {
+                    "blocks": {
+                        "block1": {
+                            "content": "Start",
+                            "actions": [{"text": "Next", "successor": "scene2"}],
+                        }
+                    }
+                },
+                "scene2": {
+                    "blocks": {
+                        "block2": {"content": "Target"},
+                    }
+                },
+            },
+        }
+        action_spec = self._first_action_spec(script, block_id="scene1.block1")
+
+        assert action_spec["authored_successor_ref"] == "scene2"
+        assert action_spec["successor_ref"] == "scene2"
+        assert action_spec["successor_is_absolute"] is True
+
+    def test_bare_local_successor_reanchors_to_scene_and_marks_relative(self) -> None:
+        script = {
+            "label": "compiler_local_ref",
+            "metadata": {
+                "title": "Compiler Local Ref",
+                "author": "Tests",
+                "start_at": "scene1.block1",
+            },
+            "scenes": {
+                "scene1": {
+                    "blocks": {
+                        "block1": {
+                            "content": "Start",
+                            "actions": [{"text": "Next", "successor": "block2"}],
+                        },
+                        "block2": {"content": "Target"},
+                    }
+                },
+            },
+        }
+        action_spec = self._first_action_spec(script, block_id="scene1.block1")
+
+        assert action_spec["authored_successor_ref"] == "block2"
+        assert action_spec["successor_ref"] == "scene1.block2"
+        assert action_spec["successor_is_absolute"] is False
+
+    def test_duplicate_root_scene_labels_fail_compile(self) -> None:
+        script = {
+            "label": "compiler_duplicate_scenes",
+            "metadata": {
+                "title": "Compiler Duplicate Scenes",
+                "author": "Tests",
+                "start_at": "scene1.block1",
+            },
+            "scenes": [
+                {"label": "scene1", "blocks": {"block1": {"content": "A"}}},
+                {"label": "scene1", "blocks": {"block2": {"content": "B"}}},
+            ],
+        }
+
+        with pytest.raises(ValueError, match="Duplicate root scene labels"):
+            StoryCompiler38().compile(script)

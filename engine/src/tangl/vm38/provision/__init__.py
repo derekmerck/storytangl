@@ -5,10 +5,12 @@ from .scope import (
     build_plan,
     context_prefix,
     is_qualified_path,
+    leaf_identifier,
     levenshtein_components,
     resolve_target_path,
     scope_distance,
     scope_prefix,
+    target_context_candidates,
 )
 from .provisioner import (
     ProvisionPolicy,

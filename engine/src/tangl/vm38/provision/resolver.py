@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import StrEnum
 import logging
 import warnings
 from typing import Any, Iterable, Iterator, Optional, TypeAlias, Union, Self
@@ -6,6 +7,7 @@ from uuid import UUID
 
 from tangl.core38 import (
     Edge,
+    Entity,
     EntityGroup,
     EntityTemplate,
     Priority,
@@ -31,12 +33,26 @@ from .provisioner import (
     _template_hash_value,
 )
 from .requirement import Requirement, PT, Dependency, Affordance
-from .scope import admitted, build_plan, prefix_paths, resolve_target_path, scope_distance, split_path
+from .scope import (
+    admitted,
+    build_plan,
+    prefix_paths,
+    resolve_target_path,
+    scope_distance,
+    split_path,
+    target_context_candidates,
+)
 
 # Not necessarily a hierarchical template group, just an iterator of
 # templates at the same scope-distance
 TemplateGroup: TypeAlias = Union[EntityGroup, EntityTemplate]
 logger = logging.getLogger(__name__)
+
+
+class _MaterializeRole(StrEnum):
+    INIT = "init"
+    PROVISION_INTERMEDIATE = "provision_intermediate"
+    PROVISION_LEAF = "provision_leaf"
 
 
 @dataclass
@@ -153,13 +169,94 @@ class Resolver:
                 return meta_hook
         return None
 
+    @staticmethod
+    def _materialize_node(
+        template: EntityTemplate,
+        *,
+        _ctx: Any = None,
+        role: _MaterializeRole | str = _MaterializeRole.PROVISION_LEAF,
+        story_materialize: Any = None,
+    ) -> Entity:
+        if isinstance(role, str):
+            role = _MaterializeRole(role)
+        if role in (_MaterializeRole.INIT, _MaterializeRole.PROVISION_INTERMEDIATE):
+            provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+        elif role is _MaterializeRole.PROVISION_LEAF:
+            if callable(story_materialize):
+                provider = story_materialize(template, _ctx)
+            else:
+                provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+        else:
+            raise ValueError(f"Unsupported materialization role: {role!r}")
+
+        if not isinstance(provider, Entity):
+            raise TypeError(
+                "Template materialization must yield Entity-compatible providers"
+            )
+        provider.templ_hash = _template_hash_value(template)
+        return provider
+
+    @staticmethod
+    def _attach_child(parent: Any, child: Any) -> None:
+        if parent is None or not hasattr(parent, "add_child"):
+            return
+        parent.add_child(child)
+        finalize = getattr(parent, "finalize_container_contract", None)
+        if callable(finalize):
+            finalize()
+
     def _resolve_target_path_for_requirement(self, requirement: Requirement, *, _ctx: Any = None) -> str | None:
         return resolve_target_path(
             identifier=self._selector_identifier(requirement),
             request_ctx=self._request_ctx_path(_ctx),
             authored_path=requirement.authored_path,
             is_qualified=requirement.is_qualified,
+            is_absolute=requirement.is_absolute,
         )
+
+    def _template_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        request_ctx = self._request_ctx_path(_ctx)
+        graph = getattr(_ctx, "graph", None)
+        story_materialize = self._story_materialize_hook(_ctx)
+
+        offers: list[ProvisionOffer] = []
+        for i, template_group in enumerate(self.template_scope_groups):
+            offers.extend(
+                TemplateProvisioner(
+                    templates=template_group,
+                    distance=i,
+                    request_ctx=request_ctx,
+                    graph=graph,
+                    story_materialize=story_materialize,
+                    materialize_node=self._materialize_node,
+                ).get_dependency_offers(requirement)
+            )
+        return offers
+
+    def inspect_template_dependency_offers(
+        self,
+        requirement: Requirement[PT],
+        *,
+        force: bool = False,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        """Return template-only dependency offers using resolver matching semantics."""
+        offers = self._template_offers_for_requirement(requirement, _ctx=_ctx)
+        offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
+
+        def _allowed(offer: ProvisionOffer) -> bool:
+            if offer.policy & ProvisionPolicy.FORCE:
+                return force
+            return bool(offer.policy & requirement.provision_policy)
+
+        offers = [offer for offer in offers if _allowed(offer)]
+        offers.sort(key=lambda v: v.sort_key())
+        return offers
 
     @staticmethod
     def _iter_template_values(group: Any) -> Iterator[EntityTemplate]:
@@ -192,9 +289,6 @@ class Resolver:
         _ctx=None,
     ) -> list[ProvisionOffer]:
         offers: list[ProvisionOffer] = list(preferred_offers or [])
-        request_ctx = self._request_ctx_path(_ctx)
-        graph = getattr(_ctx, "graph", None)
-        story_materialize = self._story_materialize_hook(_ctx)
 
         # If there are more than 20 groups, the distance-based priorities will slip
         # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
@@ -202,18 +296,14 @@ class Resolver:
         for i, entity_group in enumerate(self.location_entity_groups):
             offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
 
-        for i, template_group in enumerate(self.template_scope_groups):
-            offers.extend(
-                TemplateProvisioner(
-                    templates=template_group,
-                    distance=i,
-                    request_ctx=request_ctx,
-                    graph=graph,
-                    story_materialize=story_materialize,
-                ).get_dependency_offers(requirement)
-            )
+        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
 
-        offers.extend(InlineTemplateProvisioner.get_dependency_offers(requirement))
+        offers.extend(
+            InlineTemplateProvisioner(
+                materialize_node=self._materialize_node,
+                story_materialize=self._story_materialize_hook(_ctx),
+            ).iter_dependency_offers(requirement)
+        )
         offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
 
         _ctx = resolve_ctx(_ctx)
@@ -493,8 +583,12 @@ class Resolver:
         _ctx: Any = None,
     ) -> Any | None:
         build_segments = list(offer.build_plan or [])
+        offer_target_ctx = getattr(offer, "target_ctx", None)
         if not build_segments:
-            target_path = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            target_path = offer_target_ctx or self._resolve_target_path_for_requirement(
+                requirement,
+                _ctx=_ctx,
+            )
             if not target_path:
                 return None
             parent_path_parts = split_path(target_path)[:-1]
@@ -502,7 +596,10 @@ class Resolver:
                 return None
             return self._find_existing_path_node(graph, ".".join(parent_path_parts))
 
-        target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+        target_ctx = offer_target_ctx or self._resolve_target_path_for_requirement(
+            requirement,
+            _ctx=_ctx,
+        )
         if target_ctx is None:
             raise ValueError("Cannot execute structural chain without a target path")
 
@@ -534,15 +631,17 @@ class Resolver:
             if template is None:
                 raise ValueError(f"Missing structural template for segment {segment_path!r}")
 
-            created = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-            created.templ_hash = _template_hash_value(template)
+            created = self._materialize_node(
+                template,
+                _ctx=_ctx,
+                role=_MaterializeRole.PROVISION_INTERMEDIATE,
+            )
             if not isinstance(created, RegistryAware):
                 raise TypeError("Structural template materialization must yield RegistryAware nodes")
 
             if created.registry is not graph:
                 graph.add(created, _ctx=_ctx)
-            if current is not None and hasattr(current, "add_child"):
-                current.add_child(created)
+            self._attach_child(current, created)
             current = created
 
         return current
@@ -561,9 +660,8 @@ class Resolver:
         created = provider.registry is not dependency.registry
         if created:
             dependency.registry.add(provider, _ctx=_ctx)
-            if parent is not None and hasattr(parent, "add_child"):
-                if getattr(provider, "parent", None) is not parent:
-                    parent.add_child(provider)
+            if getattr(provider, "parent", None) is not parent:
+                Resolver._attach_child(parent, provider)
 
         dependency.set_provider(provider, _ctx=_ctx)
         return True
@@ -589,7 +687,10 @@ class Resolver:
         graph = getattr(_ctx, "graph", None)
         for offer in offers:
             chain = list(offer.build_plan or [])
-            target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            target_ctx = getattr(offer, "target_ctx", None) or self._resolve_target_path_for_requirement(
+                requirement,
+                _ctx=_ctx,
+            )
             if chain and (
                 target_ctx is None
                 or not self._chain_paths_resolvable(
@@ -611,10 +712,26 @@ class Resolver:
 
     def _diagnose_blockers(self, *, requirement: Requirement, _ctx: Any = None) -> list[Blocker]:
         identifier = self._selector_identifier(requirement)
-        target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+        request_ctx = self._request_ctx_path(_ctx)
+        target_ctxs = target_context_candidates(
+            identifier=identifier,
+            request_ctx=request_ctx,
+            authored_path=requirement.authored_path,
+            is_qualified=requirement.is_qualified,
+            is_absolute=requirement.is_absolute,
+        )
+        if not target_ctxs:
+            target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+            if target_ctx is not None:
+                target_ctxs = [target_ctx]
 
         templates = list(self._iter_templates())
-        identity_candidates = [template for template in templates if requirement.matches(template)]
+        identity_candidates = [
+            template
+            for template in templates
+            if TemplateProvisioner._matches_non_identifier_criteria(requirement, template)
+            and TemplateProvisioner._matches_template_identity(requirement, template)
+        ]
 
         if not identity_candidates:
             kind = (requirement.__pydantic_extra__ or {}).get("has_kind")
@@ -626,7 +743,7 @@ class Resolver:
                             reason="name_mismatch",
                             context={
                                 "identifier": identifier,
-                                "target_ctx": target_ctx,
+                                "target_ctx": target_ctxs[0] if target_ctxs else None,
                             },
                         )
                     ]
@@ -635,14 +752,15 @@ class Resolver:
                     reason="no_template",
                     context={
                         "identifier": identifier,
-                        "target_ctx": target_ctx,
+                        "target_ctx": target_ctxs[0] if target_ctxs else None,
                     },
                 )
             ]
 
         admitted_candidates = [
-            template
+            (template, target_ctx)
             for template in identity_candidates
+            for target_ctx in target_ctxs
             if admitted(template.admission_scope, target_ctx)
         ]
         if not admitted_candidates:
@@ -651,21 +769,26 @@ class Resolver:
                     reason="scope_rejected",
                     context={
                         "identifier": identifier,
-                        "target_ctx": target_ctx,
+                        "target_ctx": target_ctxs[0] if target_ctxs else None,
+                        "target_ctx_candidates": list(target_ctxs),
                         "scopes": [template.admission_scope for template in identity_candidates],
                     },
                 )
             ]
 
         if self._is_episode_requirement(requirement):
-            distances = [scope_distance(template.admission_scope, target_ctx) for template in admitted_candidates]
+            distances = [
+                scope_distance(template.admission_scope, target_ctx)
+                for template, target_ctx in admitted_candidates
+            ]
             if not requirement.is_qualified and distances and min(distances) > 0:
                 return [
                     Blocker(
                         reason="scope_rejected",
                         context={
                             "identifier": identifier,
-                            "target_ctx": target_ctx,
+                            "target_ctx": target_ctxs[0] if target_ctxs else None,
+                            "target_ctx_candidates": list(target_ctxs),
                             "distances": distances,
                             "policy": "unqualified_episode_requires_distance_0",
                         },
@@ -673,23 +796,24 @@ class Resolver:
                 ]
 
             graph = getattr(_ctx, "graph", None)
-            if requirement.is_qualified and target_ctx:
-                unresolved: list[list[str]] = []
-                for _template in admitted_candidates:
+            if requirement.is_qualified and target_ctxs:
+                unresolved: list[dict[str, Any]] = []
+                for _template, target_ctx in admitted_candidates:
                     chain = build_plan(target_ctx, graph)
                     if not self._chain_paths_resolvable(
                         build_segments=chain,
                         target_ctx=target_ctx,
                         graph=graph,
                     ):
-                        unresolved.append(chain)
-                if unresolved:
+                        unresolved.append({"target_ctx": target_ctx, "chain": chain})
+                if unresolved and len(unresolved) == len(admitted_candidates):
                     return [
                         Blocker(
                             reason="chain_unresolvable",
                             context={
                                 "identifier": identifier,
-                                "target_ctx": target_ctx,
+                                "target_ctx": target_ctxs[0] if target_ctxs else None,
+                                "target_ctx_candidates": list(target_ctxs),
                                 "chains": unresolved,
                             },
                         )
@@ -700,7 +824,8 @@ class Resolver:
                 reason="no_template",
                 context={
                     "identifier": identifier,
-                    "target_ctx": target_ctx,
+                    "target_ctx": target_ctxs[0] if target_ctxs else None,
+                    "target_ctx_candidates": list(target_ctxs),
                 },
             )
         ]

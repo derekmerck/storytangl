@@ -23,6 +23,8 @@ from .types import (
     GraphInitializationError,
     InitMode,
     InitReport,
+    ResolutionError,
+    ResolutionFailureReason,
     StoryInitResult,
     UnresolvedDependency,
 )
@@ -217,7 +219,11 @@ class StoryMaterializer38:
         if templ.uid in state.template_to_entity:
             return state.template_to_entity[templ.uid]
 
-        entity = templ.materialize()
+        entity = Resolver._materialize_node(
+            templ,
+            _ctx=state,
+            role="init",
+        )
         if not isinstance(entity, GraphItem):
             return None
 
@@ -240,9 +246,18 @@ class StoryMaterializer38:
             parent_entity = state.template_to_entity.get(parent_templ.uid)
             if isinstance(parent_entity, TraversableNode) and isinstance(entity, GraphItem):
                 if hasattr(parent_entity, "add_child"):
-                    parent_entity.add_child(entity)
+                    self._attach_child(parent_entity, entity)
 
         return entity
+
+    @staticmethod
+    def _attach_child(parent: Any, child: Any) -> None:
+        if parent is None or not hasattr(parent, "add_child"):
+            return
+        parent.add_child(child)
+        finalize = getattr(parent, "finalize_container_contract", None)
+        if callable(finalize):
+            finalize()
 
     @staticmethod
     def _template_lineage_ids(templ: Any) -> list[UUID]:
@@ -322,6 +337,7 @@ class StoryMaterializer38:
         for index, spec in enumerate(specs):
             authored_successor_ref = self._coerce_str(spec.get("authored_successor_ref"))
             successor_ref = self._coerce_str(spec.get("successor_ref"))
+            successor_is_absolute = bool(spec.get("successor_is_absolute", False))
             if successor_ref is None:
                 successor_ref = self._coerce_str(
                     spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
@@ -353,31 +369,41 @@ class StoryMaterializer38:
                 trigger_phase=trigger_phase,
             )
 
-            qualified_ref = self._qualify_successor_ref(successor_ref=successor_ref, source=node)
-            if qualified_ref:
-                target = state.id_to_entity.get(qualified_ref) or state.id_to_entity.get(successor_ref)
-                if isinstance(target, TraversableNode):
-                    action.set_successor(target)
-                else:
-                    requirement = Requirement(
-                        has_kind=TraversableNode,
-                        has_identifier=qualified_ref,
-                        authored_path=authored_successor_ref or successor_ref,
-                        is_qualified=self._is_qualified_path(authored_successor_ref or successor_ref),
-                        provision_policy=ProvisionPolicy.ANY,
-                        hard_requirement=True,
-                    )
-                    Dependency(
-                        registry=state.graph,
-                        label="destination",
-                        predecessor_id=action.uid,
-                        requirement=requirement,
-                    )
-                    if state.report.mode is InitMode.LAZY:
-                        state.report.warnings.append(
-                            f"{state.report.mode.value.upper()} init left action destination unresolved; "
-                            f"action={action.get_label()!r}, expected={qualified_ref!r}"
-                        )
+            target = state.id_to_entity.get(successor_ref)
+            if isinstance(target, TraversableNode):
+                action.set_successor(target)
+                continue
+
+            requirement = Requirement(
+                has_kind=TraversableNode,
+                has_identifier=successor_ref,
+                authored_path=authored_successor_ref or successor_ref,
+                is_qualified=self._is_qualified_path(authored_successor_ref or successor_ref),
+                is_absolute=successor_is_absolute,
+                provision_policy=ProvisionPolicy.ANY,
+                hard_requirement=True,
+            )
+            if state.report.mode is InitMode.LAZY:
+                self._validate_lazy_destination(
+                    state=state,
+                    source=node,
+                    action=action,
+                    authored_ref=authored_successor_ref or successor_ref,
+                    canonical_ref=successor_ref,
+                    requirement=requirement,
+                )
+
+            Dependency(
+                registry=state.graph,
+                label="destination",
+                predecessor_id=action.uid,
+                requirement=requirement,
+            )
+            if state.report.mode is InitMode.LAZY:
+                state.report.warnings.append(
+                    f"{state.report.mode.value.upper()} init left action destination unresolved; "
+                    f"action={action.get_label()!r}, expected={successor_ref!r}"
+                )
 
     def _wire_dependencies_for_specs(
         self,
@@ -485,8 +511,106 @@ class StoryMaterializer38:
         value = extra.get("has_identifier")
         return str(value) if value is not None else None
 
+    def _validate_lazy_destination(
+        self,
+        *,
+        state: _MaterializationState,
+        source: TraversableNode,
+        action: Action,
+        authored_ref: str | None,
+        canonical_ref: str,
+        requirement: Requirement,
+    ) -> None:
+        ctx = _PrelinkCtx(
+            graph=state.graph,
+            template_registry=state.bundle.template_registry,
+            cursor_id=source.uid,
+        )
+        resolver = Resolver.from_ctx(ctx)
+        offers = resolver.inspect_template_dependency_offers(requirement, _ctx=ctx)
+        candidates = self._unique_template_candidates(offers)
+        if len(candidates) == 1:
+            return
+
+        reason = (
+            ResolutionFailureReason.NO_TEMPLATE
+            if len(candidates) == 0
+            else ResolutionFailureReason.AMBIGUOUS_TEMPLATE
+        )
+        raise ResolutionError(
+            source_node_id=source.uid,
+            source_node_label=source.get_label(),
+            action_id=action.uid,
+            action_label=action.get_label(),
+            authored_ref=authored_ref,
+            canonical_ref=canonical_ref,
+            reason=reason,
+            selector=self._serialize_selector(requirement),
+            world_id=self._world_id(state),
+            bundle_id=self._bundle_id(state),
+        )
+
+    @staticmethod
+    def _unique_template_candidates(offers: list[Any]) -> list[Any]:
+        candidates: list[Any] = []
+        seen: set[UUID] = set()
+        for offer in offers:
+            candidate = getattr(offer, "candidate", None)
+            candidate_uid = getattr(candidate, "uid", None)
+            if not isinstance(candidate_uid, UUID):
+                continue
+            if candidate_uid in seen:
+                continue
+            seen.add(candidate_uid)
+            candidates.append(candidate)
+        return candidates
+
+    @staticmethod
+    def _serialize_selector(requirement: Requirement) -> dict[str, Any]:
+        selector: dict[str, Any] = {}
+        extra = requirement.__pydantic_extra__ or {}
+
+        has_kind = extra.get("has_kind")
+        if isinstance(has_kind, type):
+            selector["has_kind"] = f"{has_kind.__module__}.{has_kind.__name__}"
+        elif has_kind is not None:
+            selector["has_kind"] = str(has_kind)
+
+        has_identifier = extra.get("has_identifier")
+        if has_identifier is not None:
+            selector["has_identifier"] = str(has_identifier)
+
+        has_tags = extra.get("has_tags")
+        if isinstance(has_tags, (set, tuple, list)):
+            selector["has_tags"] = [str(tag) for tag in has_tags]
+        elif has_tags is not None:
+            selector["has_tags"] = str(has_tags)
+
+        selector["authored_path"] = requirement.authored_path
+        selector["is_qualified"] = requirement.is_qualified
+        selector["is_absolute"] = requirement.is_absolute
+        selector["provision_policy"] = requirement.provision_policy.name
+        return selector
+
+    @staticmethod
+    def _world_id(state: _MaterializationState) -> str | None:
+        world = getattr(state.graph, "world", None)
+        label = getattr(world, "label", None)
+        if isinstance(label, str) and label:
+            return label
+        return None
+
+    @staticmethod
+    def _bundle_id(state: _MaterializationState) -> str | None:
+        label = getattr(state.bundle.template_registry, "label", None)
+        if isinstance(label, str) and label:
+            return label
+        return None
+
     @staticmethod
     def _qualify_successor_ref(*, successor_ref: str | None, source: TraversableNode) -> str | None:
+        # Legacy helper retained while other non-action callers migrate.
+        # Compiler canonicalization is authoritative for action destinations.
         if not successor_ref:
             return None
         if StoryMaterializer38._is_qualified_path(successor_ref):

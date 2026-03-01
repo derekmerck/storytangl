@@ -121,29 +121,70 @@ def is_qualified_path(path: str | None) -> bool:
     return isinstance(path, str) and "." in path
 
 
+def leaf_identifier(identifier: str | None) -> str | None:
+    parts = split_path(identifier)
+    if not parts:
+        return None
+    return parts[-1]
+
+
+def target_context_candidates(
+    *,
+    identifier: str | None,
+    request_ctx: str | None,
+    authored_path: str | None = None,
+    is_qualified: bool = False,
+    is_absolute: bool = False,
+) -> list[str]:
+    # authored_path/is_qualified are kept in the signature for call-site symmetry
+    # with resolve_target_path and future policy forks.
+    _ = authored_path
+    _ = is_qualified
+
+    if not isinstance(identifier, str) or not identifier:
+        return []
+
+    if "." in identifier:
+        return [identifier]
+
+    if is_absolute:
+        return [identifier]
+
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    request_parts = split_path(request_ctx)
+    for index in range(len(request_parts), 0, -1):
+        prefix = ".".join(request_parts[:index])
+        candidate = f"{prefix}.{identifier}"
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        candidates.append(candidate)
+
+    if identifier not in seen:
+        candidates.append(identifier)
+    return candidates
+
+
 def resolve_target_path(
     *,
     identifier: str | None,
     request_ctx: str | None,
     authored_path: str | None = None,
     is_qualified: bool = False,
+    is_absolute: bool = False,
 ) -> str | None:
-    if not isinstance(identifier, str) or not identifier:
+    candidates = target_context_candidates(
+        identifier=identifier,
+        request_ctx=request_ctx,
+        authored_path=authored_path,
+        is_qualified=is_qualified,
+        is_absolute=is_absolute,
+    )
+    if not candidates:
         return None
-
-    if "." in identifier:
-        return identifier
-
-    if is_qualified and authored_path:
-        # Backward-compatibility fallback when callers mark qualified without
-        # providing a canonical identifier at compile time.
-        if request_ctx:
-            return f"{request_ctx}.{identifier}"
-        return identifier
-
-    if request_ctx:
-        return f"{request_ctx}.{identifier}"
-    return identifier
+    return candidates[0]
 
 
 def build_plan(target_ctx: str | None, graph: Any) -> list[str]:

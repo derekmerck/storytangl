@@ -17,7 +17,12 @@ from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.user.user import User
 from tangl.story38 import InitMode, World38
 from tangl.story38.concepts import Actor, Location, Role, Setting
-from tangl.story38.fabula import GraphInitializationError, StoryCompiler38
+from tangl.story38.fabula import (
+    GraphInitializationError,
+    ResolutionError,
+    ResolutionFailureReason,
+    StoryCompiler38,
+)
 from tangl.story38.episode import Action, Block, Scene
 from tangl.core38 import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
 from tangl.story38.dispatch import story_dispatch
@@ -87,6 +92,93 @@ def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
     assert location_nodes == []
     assert graph.initial_cursor_id == block_nodes[0].uid
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
+
+
+def test_lazy_mode_missing_canonical_destination_raises_resolution_error() -> None:
+    script = {
+        "label": "lazy_missing_destination",
+        "metadata": {
+            "title": "Missing Destination",
+            "author": "Tests",
+            "start_at": "intro.start",
+        },
+        "scenes": {
+            "intro": {
+                "blocks": {
+                    "start": {
+                        "content": "Start",
+                        "actions": [{"text": "Go", "successor": "missing"}],
+                    },
+                }
+            },
+        },
+    }
+
+    world = World38.from_script_data(script_data=script)
+    with pytest.raises(ResolutionError) as exc_info:
+        world.create_story("lazy_missing_story", init_mode=InitMode.LAZY)
+
+    error = exc_info.value
+    assert error.reason is ResolutionFailureReason.NO_TEMPLATE
+    assert error.authored_ref == "missing"
+    assert error.canonical_ref == "intro.missing"
+    assert error.source_node_label == "start"
+    assert error.selector["has_identifier"] == "intro.missing"
+    assert error.world_id == world.label
+    assert error.bundle_id == world.bundle.template_registry.label
+
+
+def test_lazy_mode_ambiguous_destination_raises_resolution_error() -> None:
+    @dataclass(slots=True)
+    class _AmbiguousTemplates:
+        extra: TemplateRegistry
+
+        def get_template_scope_groups(self, *, caller=None, graph=None):
+            return [list(self.extra.values())]
+
+    script = {
+        "label": "lazy_ambiguous_destination",
+        "metadata": {
+            "title": "Ambiguous Destination",
+            "author": "Tests",
+            "start_at": "scene1.start",
+        },
+        "scenes": {
+            "scene1": {
+                "blocks": {
+                    "start": {
+                        "content": "Start",
+                        "actions": [{"text": "Go", "successor": "scene2"}],
+                    },
+                }
+            },
+            "scene2": {
+                "blocks": {
+                    "entry": {"content": "Entry"},
+                }
+            },
+        },
+    }
+    extra_templates = TemplateRegistry(label="extra_scope")
+    EntityTemplate(
+        label="scene2",
+        payload=Block(label="scene2_shadow", content="Shadow"),
+        registry=extra_templates,
+    )
+
+    world = World38.from_script_data(
+        script_data=script,
+        templates=_AmbiguousTemplates(extra=extra_templates),
+    )
+    with pytest.raises(ResolutionError) as exc_info:
+        world.create_story("lazy_ambiguous_story", init_mode=InitMode.LAZY)
+
+    error = exc_info.value
+    assert error.reason is ResolutionFailureReason.AMBIGUOUS_TEMPLATE
+    assert error.authored_ref == "scene2"
+    assert error.canonical_ref == "scene2"
+    assert error.source_node_label == "start"
+    assert error.selector["has_identifier"] == "scene2"
 
 
 def test_eager_mode_materializes_all_and_wires_dependencies() -> None:
@@ -338,6 +430,25 @@ def test_story_graph_template_lineage_is_nearest_first() -> None:
     lineage = graph.template_lineage_by_entity_id.get(cursor.uid, [])
     assert lineage
     assert lineage[0] == graph.template_by_entity_id[cursor.uid]
+
+
+def test_scene_finalize_container_contract_is_idempotent() -> None:
+    world = World38.from_script_data(script_data=_base_script())
+    result = world.create_story("scene_finalize_idempotent", init_mode=InitMode.EAGER)
+    graph = result.graph
+
+    scene = next(Selector(has_kind=Scene, label="intro").filter(graph.values()), None)
+    assert scene is not None
+    original_source = scene.source_id
+    original_sink = scene.sink_id
+    assert original_source is not None
+    assert original_sink is not None
+
+    scene.finalize_container_contract()
+    scene.finalize_container_contract()
+
+    assert scene.source_id == original_source
+    assert scene.sink_id == original_sink
 
 
 def test_story_graph_template_scope_groups_follow_lineage_order() -> None:

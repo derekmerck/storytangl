@@ -9,7 +9,13 @@ from pydantic import ConfigDict, SkipValidation
 from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, Priority, TokenFactory
 from ..traversable import TraversableNode
 
-from .scope import admitted, build_plan, resolve_target_path, scope_distance
+from .scope import (
+    admitted,
+    build_plan,
+    leaf_identifier,
+    scope_distance,
+    target_context_candidates,
+)
 
 if TYPE_CHECKING:
     from .requirement import Requirement, Affordance
@@ -52,6 +58,7 @@ class ProvisionOffer(Record):
     specificity: int = 0
     scope_distance: int = 0
     build_plan: list[str] | None = None
+    target_ctx: str | None = None
     candidate: Any = None
 
     def sort_key(self):
@@ -94,7 +101,7 @@ class FindProvisioner:
     distance: int = 0
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
-        candidates = requirement.filter(self.values)
+        candidates = (value for value in self.values if requirement.satisfied_by(value))
         for c in candidates:
             yield ProvisionOffer(
                 origin_id = "FindProvisioner",
@@ -126,6 +133,7 @@ class TemplateProvisioner:
     request_ctx: str = ""
     graph: Any | None = None
     story_materialize: Callable[[EntityTemplate, Any], Entity] | None = None
+    materialize_node: Callable[..., Entity] | None = None
 
     @staticmethod
     def _selector_identifier(requirement: "Requirement") -> str | None:
@@ -139,7 +147,42 @@ class TemplateProvisioner:
         kind = extra.get("has_kind")
         return isinstance(kind, type) and issubclass(kind, TraversableNode)
 
+    @staticmethod
+    def _matches_non_identifier_criteria(requirement: "Requirement", candidate: Any) -> bool:
+        criteria = dict(requirement.__pydantic_extra__ or {})
+        criteria.pop("has_identifier", None)
+        selector = Selector(predicate=requirement.predicate, **criteria)
+        return selector.matches(candidate)
+
+    @classmethod
+    def _matches_template_identity(
+        cls,
+        requirement: "Requirement",
+        candidate: EntityTemplate,
+    ) -> bool:
+        identifier = cls._selector_identifier(requirement)
+        if identifier is None:
+            return True
+        if candidate.has_identifier(identifier):
+            return True
+        # Explicit dotted identifiers are treated as strict identity requests:
+        # no leaf fallback, so authored absolute/qualified paths cannot silently
+        # collapse to shared leaf-only template labels.
+        if "." in identifier:
+            return False
+        leaf = leaf_identifier(identifier)
+        if leaf is None:
+            return False
+        return candidate.has_identifier(leaf)
+
     def _materialize_template(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+        if callable(self.materialize_node):
+            return self.materialize_node(
+                template,
+                _ctx=_ctx,
+                role="provision_leaf",
+                story_materialize=self.story_materialize,
+            )
         if callable(self.story_materialize):
             provider = self.story_materialize(template, _ctx)
         else:
@@ -151,56 +194,63 @@ class TemplateProvisioner:
         identifier = self._selector_identifier(requirement)
 
         is_episode_requirement = self._is_episode_requirement(requirement)
-        candidates = requirement.filter(self.templates)
-        for c in candidates:
+        for c in self.templates:
+            if not self._matches_non_identifier_criteria(requirement, c):
+                continue
+            if not self._matches_template_identity(requirement, c):
+                continue
+
             candidate_identifier = identifier or c.payload.get_label()
-            target_ctx = resolve_target_path(
+            target_contexts = target_context_candidates(
                 identifier=candidate_identifier,
                 request_ctx=self.request_ctx,
                 authored_path=requirement.authored_path,
                 is_qualified=requirement.is_qualified,
+                is_absolute=requirement.is_absolute,
             )
-            if target_ctx is None:
-                continue
-
-            if not admitted(c.admission_scope, target_ctx):
-                continue
-
-            distance = scope_distance(c.admission_scope, target_ctx)
-            chain = None
-            if is_episode_requirement:
-                if requirement.is_qualified:
-                    chain = build_plan(target_ctx, self.graph)
-                elif distance > 0:
+            for target_ctx in target_contexts:
+                if not admitted(c.admission_scope, target_ctx):
                     continue
 
-            yield ProvisionOffer(
-                origin_id = "TemplateProvisioner",
-                policy = ProvisionPolicy.CREATE,
-                priority = Priority.NORMAL,
-                distance_from_caller=self.distance,
-                scope_distance=distance,
-                build_plan=chain,
-                candidate=c,
-                callback = lambda *_, _c=c, **kwargs: self._materialize_template(
-                    _c,
-                    _ctx=kwargs.get("_ctx"),
-                ),
-            )
+                distance = scope_distance(c.admission_scope, target_ctx)
+                chain = None
+                if is_episode_requirement:
+                    if requirement.is_qualified:
+                        chain = build_plan(target_ctx, self.graph)
+                    elif distance > 0:
+                        continue
+
+                yield ProvisionOffer(
+                    origin_id = "TemplateProvisioner",
+                    policy = ProvisionPolicy.CREATE,
+                    priority = Priority.NORMAL,
+                    distance_from_caller=self.distance,
+                    scope_distance=distance,
+                    build_plan=chain,
+                    target_ctx=target_ctx,
+                    candidate=c,
+                    callback=lambda *_, _c=c, **kwargs: self._materialize_template(
+                        _c,
+                        _ctx=kwargs.get("_ctx"),
+                    ),
+                )
 
     # Not sure what affordance providers look like in template form?
 
 
+@dataclass
 class InlineTemplateProvisioner:
     """Offer inline requirement templates as normal CREATE candidates."""
 
-    @classmethod
-    def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
+    materialize_node: Callable[..., Entity] | None = None
+    story_materialize: Callable[[EntityTemplate, Any], Entity] | None = None
+
+    def iter_dependency_offers(self, requirement: Requirement) -> Iterable[ProvisionOffer]:
         if requirement.fallback_templ is not None:
             return [ProvisionOffer(
                 origin_id=requirement.fallback_templ.get_label(),
                 policy=ProvisionPolicy.CREATE,
-                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: cls._materialize_inline(
+                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: self._materialize_inline(
                     _t,
                     _ctx=kwargs.get("_ctx"),
                 ),
@@ -210,11 +260,22 @@ class InlineTemplateProvisioner:
             )]
         return []
 
-    @staticmethod
-    def _materialize_inline(template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+    def _materialize_inline(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+        if callable(self.materialize_node):
+            return self.materialize_node(
+                template,
+                _ctx=_ctx,
+                role="provision_leaf",
+                story_materialize=self.story_materialize,
+            )
         provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
         provider.templ_hash = _template_hash_value(template)
         return provider
+
+    @classmethod
+    def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
+        # Compatibility shim retained for existing classmethod call-sites.
+        return cls().iter_dependency_offers(requirement)
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
 
@@ -417,10 +478,13 @@ class UpdateCloneProvisioner:
     ) -> Any:
         if not hasattr(reference, "evolve"):
             raise TypeError(f"{type(reference).__name__} is not cloneable (missing evolve)")
-        return reference.evolve(
+        clone = reference.evolve(
             uid=_next_provision_uid(_ctx=_ctx),
             **dict(updates),
         )
+        if hasattr(clone, "templ_hash") and hasattr(reference, "templ_hash"):
+            clone.templ_hash = getattr(reference, "templ_hash", None)
+        return clone
 
     @classmethod
     def _make_offer(

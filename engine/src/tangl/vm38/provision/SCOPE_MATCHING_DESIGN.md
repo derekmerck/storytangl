@@ -1,8 +1,8 @@
 # Scope Matching & Structural Provisioning Design
 
-**Status:** Design reference (v2)
+**Status:** Design reference (v3, Phase C implemented)
 **Scope:** vm38/provision, core38/template, story38 prereq handlers
-**Date:** 2026-02-26
+**Date:** 2026-03-01
 
 ---
 
@@ -23,7 +23,8 @@ request.
 - For **qualified** requirements (author wrote `castle.guard` or
   `morning.gatehouse`), the requirement path determines the target context.
 - For **unqualified** requirements (author wrote `guard` or `gatehouse`),
-  the caller's current position supplies the target context.
+  the caller's current position supplies a **candidate context set**
+  (caller path, ancestor paths, then root fallback).
 
 Scope answers one question: "Is this target context a valid home for an
 instance of this template?" The matching algorithm is the same for concepts
@@ -39,41 +40,47 @@ Every provisioning request has two contexts that must be named separately:
   (e.g. `village.tavern`).
 
 - **Target context** (`target_ctx`): Where the provisioned instance would
-  live. Derived from the requirement path if qualified, or from the request
-  context if unqualified.
+  live for one candidate offer. Qualified refs usually yield one target
+  context; unqualified refs can yield multiple target contexts.
 
 Scope is always evaluated against `target_ctx`, never directly against
-`request_ctx`. The caller influences the target context only when the
+`request_ctx`. The caller influences target context generation only when the
 requirement doesn't specify one.
 
 ## Path Resolution
 
-Requirements may be fully qualified (`castle.gatehouse`), relative
-(`morning.gatehouse` from a caller in `castle`), or bare (`guard`).
-Before matching, the requirement is resolved to determine the target
-context:
+Requirements may be fully qualified (`castle.gatehouse`) or bare
+(`guard`). For matching, runtime generates target-context candidates:
 
 ```
-resolve(req_path, request_ctx):
-    qualifier, name = split_last(req_path)
-    if qualifier is not None:
-        if is_relative(qualifier):
-            return request_ctx + "." + req_path   # relative
-        return req_path                            # absolute
-    return request_ctx + "." + name                # bare → caller-anchored
+target_context_candidates(identifier, request_ctx, is_absolute=False):
+    if dotted(identifier):
+        return [identifier]  # already authoritative
+    if is_absolute:
+        return [identifier]  # compiler-marked absolute bare ref
+    candidates = []
+    for each prefix in request_ctx from deepest to shallowest:
+        candidates.append(prefix + "." + identifier)
+    candidates.append(identifier)  # root fallback
+    return unique(candidates)
 ```
 
-**Bare names always resolve under the caller.** Resolution is fully
-deterministic from the authored expression and the cursor position —
-no graph or registry lookups at runtime. If a bare `scene2` should
-mean `world.scene2`, the script compiler expands it to a qualified
-path at compile time. This keeps runtime resolution stateless and
-pushes convenience inference into the codec where it belongs.
+The compiler remains authoritative for authored intent:
 
-The original authored form is preserved alongside the resolved form.
+- `authored_successor_ref` is preserved.
+- canonical `successor_ref` is emitted.
+- `successor_is_absolute` marks bare refs that must not be re-anchored.
+
+Runtime does not infer identity; it only expands candidate placement contexts
+for unqualified, non-absolute bare identifiers.
+
+`resolve_target_path(...)` is now a compatibility wrapper that returns the
+first candidate from `target_context_candidates(...)`.
+
+The original authored form is preserved alongside canonical metadata.
 A requirement is **qualified** when the original authored path contains
 at least one explicit segment beyond the bare name. This distinction
-drives the episode policy fork (below).
+still drives the episode policy fork (below).
 
 ## Three Separate Computations
 
@@ -224,7 +231,7 @@ The admission check and distance metric are identical for both. The
 | Distance | Concept | Episode (qualified req) | Episode (unqualified req) |
 |----------|---------|------------------------|--------------------------|
 | 0        | ✓ offer | ✓ offer, no build      | ✓ offer, no build        |
-| 1+       | ✓ offer, penalized | ✓ offer if chain buildable | ✗ no offer |
+| 1+       | ✓ offer, penalized | ✓ offer if chain buildable | ✗ no offer (unless another candidate has d=0) |
 | not admitted | ✗ no offer | ✗ no offer | ✗ no offer |
 
 **Concepts:** Scope is a relevance filter. An admitted concept at any
@@ -236,13 +243,14 @@ template to use, not where the instance lives structurally.
 **Episodes, qualified:** The requirement path determines the full
 structural chain. Each missing segment in the chain is a container to
 build. The build plan is derived from prefix alignment, not from the
-distance metric. The offer carries the plan; the callback executes it.
+distance metric. The offer carries the plan; resolver execution applies it
+before dependency binding.
 
 **Episodes, unqualified:** The requirement doesn't specify enough path
-to determine what to build. The caller's position supplies the target
-context for admission, but if that doesn't produce a distance-0 match,
-the template is not offered. The system does not infer containers from
-the template's scope — that would be the engine guessing structural
+to determine what to build. Runtime evaluates candidate target contexts
+derived from caller ancestry. The template is offered only when at least
+one candidate yields distance 0. The system does not infer containers
+from template scope alone — that would be the engine guessing structural
 intent the author didn't express.
 
 ### Qualified vs Unqualified
@@ -260,7 +268,7 @@ Only qualified episode requirements can trigger structural chain building.
 
 ## Reference Case Table
 
-Target context is shown as the resolved absolute path. "Qualified" refers
+Target context is shown as the selected candidate path. "Qualified" refers
 to whether the original authored requirement (before resolution) contained
 explicit path segments.
 
@@ -284,6 +292,12 @@ explicit path segments.
 | 16 | episode | `village.gatehouse` | `castle.*` on **gatehouse** | any | yes | `village.gatehouse` | ✗ | `village.gatehouse` not admitted by `castle.*` |
 | 17 | episode | `castle.morning.gatehouse` | `castle.*` on **gatehouse** | any | yes | `castle.morning.gatehouse` | ✓ d=1 + build | Admitted (`castle.*` permissive); build `morning` |
 
+Additional Phase C case (candidate-context behavior):
+
+| # | Kind | Req (authored) | Scope on tmpl | Caller | Qualified? | Candidate target ctxs | Match? | Reason |
+|---|------|---------------|--------------|--------|------------|-----------------------|--------|--------|
+| 18 | episode | `gatehouse` | `castle.*` on **gatehouse** | `castle.keep` | no | `castle.keep.gatehouse`, `castle.gatehouse`, `gatehouse` | ✓ d=0 | Ancestor candidate `castle.gatehouse` admitted at distance 0 |
+
 ## Implementation: Selector Integration
 
 `Requirement` extends `Selector` in v38. Scope matching integrates as
@@ -302,6 +316,7 @@ class ProvisionOffer(Record):
     # new
     scope_distance: int = 0
     build_plan: list[str] | None = None   # segment labels to create, in order
+    target_ctx: str | None = None
 ```
 
 The offer sort key incorporates scope distance:
@@ -322,43 +337,38 @@ def offer_sort_key(offer):
 generation. Offers that fail admission are not emitted. Offers for
 unqualified episode requirements at distance > 0 are not emitted.
 Qualified episode offers populate `build_plan` via prefix alignment.
+Each emitted offer carries its own `target_ctx`.
+
+Identity matching is two-stage in Phase C:
+
+1. Match non-identifier selector criteria.
+2. Match identifier by exact candidate identifier first.
+3. For bare identifiers only, allow leaf identifier fallback.
+
+For explicit dotted identifiers, fallback is intentionally disabled so
+qualified/absolute authored paths do not collapse to leaf-only template labels.
+
+Runtime binding also supports dotted identifier checks against `entity.path`
+in `Requirement.satisfied_by(...)` to preserve absolute path semantics once
+providers are materialized.
 
 ## Implementation: Build Plan Execution
 
 For MVP, the build plan is a list of segment labels representing
-containers to create, outermost first. The offer callback executes
-them serially:
+containers to create, outermost first. In Phase C execution moved out of
+offer callbacks and into resolver orchestration:
 
 ```python
-def make_chain_callback(build_plan, leaf_template, root):
-    def callback(*_, _ctx=None, **__):
-        parent = root
-        for segment in build_plan:
-            existing = parent.find_member(segment)
-            if existing is not None:
-                parent = existing
-                continue
-            tmpl = find_structural_template(segment, parent, _ctx)
-            node = tmpl.materialize(uid=_next_provision_uid(_ctx=_ctx))
-            _ctx.graph.add(node)
-            parent.add_member(node)
-            parent = node
-        # Create the leaf
-        leaf = leaf_template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        _ctx.graph.add(leaf)
-        parent.add_member(leaf)
-        return leaf
-    return callback
+resolve_dependency(...):
+    offer = select_offer(...)
+    provider = offer.callback(_ctx=_ctx)  # detached leaf node
+    parent = execute_build_chain(offer.build_plan, offer.target_ctx)
+    bind_dependency_provider(parent=parent, provider=provider)
 ```
 
-**Deferred improvement:** Rather than building the full chain in the
-offer callback, create only the target node and let the traversal
-entry-chain machinery (prereq redirect / `enter()` descent) provision
-each container on the fly as the cursor descends. This leverages the
-existing LCA → target traversal walk and means each container is
-provisioned with its own full pipeline pass (requirements, namespace,
-journal, etc.). The serial callback is correct for MVP; the
-traversal-driven approach is the eventual design target.
+`offer.target_ctx` is authoritative during execution/preview/diagnostics.
+Resolver only falls back to `resolve_target_path(...)` when an offer lacks
+an explicit `target_ctx` (legacy compatibility).
 
 ### Materialization Tiers
 
@@ -383,14 +393,16 @@ The offer callback is pure — it returns a detached node without
 mutating the graph. The executor handles side effects in a fixed
 linear sequence:
 
-1. `node = callback()` — create detached node
-2. `graph.add(node)` — insert into graph
-3. `dependency.set_provider(node)` — bind to the requesting edge
+1. `provider = callback()` — create detached provider
+2. `parent = _execute_build_chain(...)` — ensure/locate parent container
+3. if provider is new to graph: `graph.add(provider)`
+4. if parent exists and provider has no parent: `parent.add_child(provider)`
+   (`add_child` path finalizes container contract on the parent container)
+5. `dependency.set_provider(provider)` — bind to requesting edge
 
 No staging, no rollback, no transactional semantics. If `set_provider`
-fails after a successful `graph.add`, the offer should not have been
-selected — `provider_rejected` is a bug/failure sentinel, not a
-recovery path.
+fails after graph insertion/attachment, `provider_rejected` is a
+bug/failure sentinel, not a recovery path.
 
 ### Container Entry Discovery
 

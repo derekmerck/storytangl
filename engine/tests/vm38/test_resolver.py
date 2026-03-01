@@ -39,6 +39,19 @@ from tangl.vm38.provision import (
 from tangl.vm38.traversable import TraversableNode
 
 
+class FinalizableContainer(TraversableNode):
+    finalize_calls: int = 0
+
+    def finalize_container_contract(self) -> None:
+        self.finalize_calls += 1
+        children = list(self.children())
+        if children:
+            if self.source_id is None:
+                self.source_id = children[0].uid
+            if self.sink_id is None:
+                self.sink_id = children[-1].uid
+
+
 def _node(graph: Graph, **kwargs) -> TraversableNode:
     node = TraversableNode(**kwargs)
     graph.add(node)
@@ -98,6 +111,22 @@ class TestFindProvisioner:
         far_offer = list(far.get_dependency_offers(req))[0]
         assert near_offer.sort_key() < far_offer.sort_key()
 
+    def test_dotted_identifier_matches_existing_entity_path(self) -> None:
+        graph = Graph()
+        scene = TraversableNode(label="scene2", registry=graph)
+        entry = TraversableNode(label="entry", registry=graph)
+        scene.add_child(entry)
+
+        prov = FindProvisioner(values=[entry])
+        req = Requirement(
+            has_kind=TraversableNode,
+            has_identifier="scene2.entry",
+        )
+        offers = list(prov.get_dependency_offers(req))
+
+        assert len(offers) == 1
+        assert offers[0].callback() is entry
+
 
 # ============================================================================
 # Resolver — orchestrated resolution
@@ -105,6 +134,44 @@ class TestFindProvisioner:
 
 
 class TestResolverOfferGathering:
+    def test_materialize_node_role_policy_uses_hook_only_for_leaf(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
+        hook_calls: list[str] = []
+
+        def hook(templ: EntityTemplate, _ctx=None):
+            hook_calls.append(templ.get_label())
+            return templ.materialize()
+
+        leaf = Resolver._materialize_node(
+            template,
+            role="provision_leaf",
+            story_materialize=hook,
+        )
+        init = Resolver._materialize_node(
+            template,
+            role="init",
+            story_materialize=hook,
+        )
+        intermediate = Resolver._materialize_node(
+            template,
+            role="provision_intermediate",
+            story_materialize=hook,
+        )
+
+        assert hook_calls == [template.get_label()]
+        assert leaf.templ_hash == template.content_hash().hex()
+        assert init.templ_hash == template.content_hash().hex()
+        assert intermediate.templ_hash == template.content_hash().hex()
+
+    def test_materialize_node_uid_falls_back_without_rng_context(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
+        provider = Resolver._materialize_node(
+            template,
+            _ctx=SimpleNamespace(),
+            role="init",
+        )
+        assert isinstance(provider.uid, UUID)
+
     def test_template_create_offer_uses_ctx_rng_for_uid(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
         resolver = Resolver(location_entity_groups=[], template_scope_groups=[[template]])
@@ -251,6 +318,25 @@ class TestResolverOfferGathering:
         assert clone.label == "patched"
         assert source.label == "source"
         assert req.selected_offer_policy == ProvisionPolicy.CLONE
+
+    def test_clone_offer_inherits_reference_templ_hash(self) -> None:
+        source = Entity(label="source")
+        source.templ_hash = "refhash123"
+        template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
+        resolver = Resolver(
+            location_entity_groups=[[source]],
+            template_scope_groups=[[template]],
+        )
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.CLONE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        clone = resolver.resolve_requirement(req)
+        assert clone is not None
+        assert clone.templ_hash == "refhash123"
 
     def test_clone_offer_uid_is_deterministic_for_same_seed(self) -> None:
         def _resolve(seed: int) -> tuple[Entity, Entity]:
@@ -536,6 +622,60 @@ class TestResolverDependencyResolution:
         assert dep.requirement.selected_offer_policy == ProvisionPolicy.FORCE
         assert dep.requirement.resolved_step == 11
         assert dep.requirement.resolved_cursor_id == node.uid
+
+    def test_attachment_finalization_runs_for_scene_like_containers(self) -> None:
+        g = Graph()
+        cursor = _node(g, label="entry")
+        dep = _dependency(
+            g,
+            requirement=Requirement(
+                has_kind=TraversableNode,
+                has_identifier="root.child.leaf",
+                authored_path="root.child.leaf",
+                is_qualified=True,
+            ),
+            predecessor_id=cursor.uid,
+        )
+
+        root_template = EntityTemplate(
+            label="root",
+            payload=FinalizableContainer(label="root"),
+        )
+        child_template = EntityTemplate(
+            label="root.child",
+            payload=FinalizableContainer(label="child"),
+        )
+        leaf_template = EntityTemplate(
+            label="root.child.leaf",
+            payload=TraversableNode(label="root.child.leaf"),
+        )
+
+        resolver = Resolver(
+            location_entity_groups=[[cursor]],
+            template_scope_groups=[[leaf_template, root_template, child_template]],
+        )
+        ctx = SimpleNamespace(
+            graph=g,
+            cursor=cursor,
+            cursor_id=cursor.uid,
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: [],
+        )
+
+        assert resolver.resolve_dependency(dep, _ctx=ctx) is True
+        root = next((node for node in g.values() if isinstance(node, FinalizableContainer) and node.label == "root"), None)
+        child = next((node for node in g.values() if isinstance(node, FinalizableContainer) and node.label == "child"), None)
+        leaf = dep.provider
+
+        assert root is not None
+        assert child is not None
+        assert leaf is not None
+        assert root.finalize_calls >= 1
+        assert child.finalize_calls >= 1
+        assert root.source_id == child.uid
+        assert root.sink_id == child.uid
+        assert child.source_id == leaf.uid
+        assert child.sink_id == leaf.uid
 
 
 class TestResolverFrontierNode:

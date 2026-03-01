@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from importlib import import_module
 from typing import Any
@@ -67,6 +68,8 @@ class StoryCompiler38:
         )
 
         scenes = self._normalize_mapping(data.get("scenes"))
+        self._validate_unique_root_scene_labels(scenes)
+        root_scene_labels = {scene_label for scene_label, _ in scenes}
         for scene_label, scene_data in scenes:
             scene_payload = self._build_payload(
                 kind=self._resolve_kind(scene_data.get("obj_cls"), fallback=Scene),
@@ -92,14 +95,17 @@ class StoryCompiler38:
                 actions = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("actions")),
                     scene_label=scene_label,
+                    root_scene_labels=root_scene_labels,
                 )
                 continues = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("continues")),
                     scene_label=scene_label,
+                    root_scene_labels=root_scene_labels,
                 )
                 redirects = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("redirects")),
                     scene_label=scene_label,
+                    root_scene_labels=root_scene_labels,
                 )
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
@@ -225,7 +231,13 @@ class StoryCompiler38:
         specs: list[dict[str, Any]],
         *,
         scene_label: str,
+        root_scene_labels: set[str],
     ) -> list[dict[str, Any]]:
+        """Return canonical action specs for one scene.
+
+        Part A policy: when a bare successor token collides with a root scene
+        label, it is treated as an absolute scene destination by design.
+        """
         normalized: list[dict[str, Any]] = []
         for spec in specs:
             payload = dict(spec)
@@ -247,10 +259,27 @@ class StoryCompiler38:
             if isinstance(canonical, str) and canonical:
                 if "." in canonical:
                     payload["successor_ref"] = canonical
+                    payload["successor_is_absolute"] = False
+                elif canonical in root_scene_labels:
+                    payload["successor_ref"] = canonical
+                    payload["successor_is_absolute"] = True
                 else:
                     payload["successor_ref"] = f"{scene_label}.{canonical}"
+                    payload["successor_is_absolute"] = False
             normalized.append(payload)
         return normalized
+
+    @staticmethod
+    def _validate_unique_root_scene_labels(scenes: list[tuple[str, dict[str, Any]]]) -> None:
+        labels = [label for label, _ in scenes]
+        duplicates = sorted(
+            label
+            for label, count in Counter(labels).items()
+            if count > 1
+        )
+        if duplicates:
+            joined = ", ".join(duplicates)
+            raise ValueError(f"Duplicate root scene labels declared: {joined}")
 
     @staticmethod
     def _resolve_entry_template_ids(
