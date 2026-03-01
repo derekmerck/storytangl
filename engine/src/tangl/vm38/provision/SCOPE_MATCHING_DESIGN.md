@@ -342,7 +342,11 @@ Each emitted offer carries its own `target_ctx`.
 Identity matching is two-stage in Phase C:
 
 1. Match non-identifier selector criteria.
-2. Match identifier by exact candidate identifier or leaf identifier fallback.
+2. Match identifier by exact candidate identifier first.
+3. For bare identifiers only, allow leaf identifier fallback.
+
+For explicit dotted identifiers, fallback is intentionally disabled so
+qualified/absolute authored paths do not collapse to leaf-only template labels.
 
 Runtime binding also supports dotted identifier checks against `entity.path`
 in `Requirement.satisfied_by(...)` to preserve absolute path semantics once

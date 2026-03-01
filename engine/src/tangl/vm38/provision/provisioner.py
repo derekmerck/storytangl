@@ -165,6 +165,11 @@ class TemplateProvisioner:
             return True
         if candidate.has_identifier(identifier):
             return True
+        # Explicit dotted identifiers are treated as strict identity requests:
+        # no leaf fallback, so authored absolute/qualified paths cannot silently
+        # collapse to shared leaf-only template labels.
+        if "." in identifier:
+            return False
         leaf = leaf_identifier(identifier)
         if leaf is None:
             return False

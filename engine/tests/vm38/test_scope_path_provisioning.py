@@ -204,6 +204,27 @@ class TestTemplateProvisionerScopePolicy:
         assert offers[0].target_ctx == "scene2.entry"
         assert offers[0].build_plan == ["scene2"]
 
+    def test_qualified_identifier_does_not_fallback_to_leaf_template_identity(self) -> None:
+        template = EntityTemplate(
+            label="entry",
+            payload=TraversableNode(label="entry"),
+            admission_scope="scene2.*",
+        )
+        req = Requirement(
+            has_kind=TraversableNode,
+            has_identifier="scene2.entry",
+            authored_path="scene2.entry",
+            is_qualified=True,
+        )
+        provisioner = TemplateProvisioner(
+            templates=[template],
+            request_ctx="scene1.start",
+            graph=Graph(),
+        )
+
+        offers = list(provisioner.get_dependency_offers(req))
+        assert offers == []
+
 
 class TestOfferSortKey:
     def test_scope_distance_beats_caller_distance(self) -> None:
