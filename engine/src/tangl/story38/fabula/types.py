@@ -77,6 +77,47 @@ class GraphInitializationError(RuntimeError):
         )
 
 
+class ResolutionFailureReason(str, Enum):
+    """Typed failure reasons for LAZY destination wiring checks."""
+
+    NO_TEMPLATE = "no_template"
+    AMBIGUOUS_TEMPLATE = "ambiguous_template"
+
+
+class ResolutionError(RuntimeError):
+    """Raised when LAZY destination wiring cannot resolve canonical targets."""
+
+    def __init__(
+        self,
+        *,
+        source_node_id: UUID | None,
+        source_node_label: str | None,
+        action_id: UUID | None,
+        action_label: str | None,
+        authored_ref: str | None,
+        canonical_ref: str | None,
+        reason: ResolutionFailureReason,
+        selector: dict[str, Any],
+        world_id: str | None = None,
+        bundle_id: str | None = None,
+    ) -> None:
+        self.source_node_id = source_node_id
+        self.source_node_label = source_node_label
+        self.action_id = action_id
+        self.action_label = action_label
+        self.authored_ref = authored_ref
+        self.canonical_ref = canonical_ref
+        self.reason = reason
+        self.selector = selector
+        self.world_id = world_id
+        self.bundle_id = bundle_id
+        super().__init__(
+            f"LAZY destination resolution failed ({reason.value}): "
+            f"action={action_label or action_id}, source={source_node_label or source_node_id}, "
+            f"authored_ref={authored_ref!r}, canonical_ref={canonical_ref!r}"
+        )
+
+
 @dataclass(slots=True)
 class StoryInitResult:
     """Result of creating a story graph from a story38 world."""

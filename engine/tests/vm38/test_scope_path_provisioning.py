@@ -20,6 +20,7 @@ from tangl.vm38.provision import (
     TemplateProvisioner,
     admitted,
     build_plan,
+    resolve_target_path,
     scope_distance,
 )
 from tangl.vm38.traversable import TraversableNode
@@ -73,6 +74,16 @@ class TestBuildPlan:
     def test_build_plan_returns_missing_prefix_chain_in_order(self) -> None:
         graph = Graph()
         assert build_plan("castle.morning.gatehouse", graph) == ["castle", "morning"]
+
+
+class TestResolveTargetPath:
+    def test_absolute_single_segment_identifier_is_not_reanchored(self) -> None:
+        resolved = resolve_target_path(
+            identifier="scene2",
+            request_ctx="scene1.block1",
+            is_absolute=True,
+        )
+        assert resolved == "scene2"
 
 
 class TestTemplateProvisionerScopePolicy:

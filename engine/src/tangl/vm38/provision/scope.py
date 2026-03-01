@@ -127,11 +127,15 @@ def resolve_target_path(
     request_ctx: str | None,
     authored_path: str | None = None,
     is_qualified: bool = False,
+    is_absolute: bool = False,
 ) -> str | None:
     if not isinstance(identifier, str) or not identifier:
         return None
 
     if "." in identifier:
+        return identifier
+
+    if is_absolute:
         return identifier
 
     if is_qualified and authored_path:

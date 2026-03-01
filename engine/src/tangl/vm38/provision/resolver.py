@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import StrEnum
 import logging
 import warnings
 from typing import Any, Iterable, Iterator, Optional, TypeAlias, Union, Self
@@ -6,6 +7,7 @@ from uuid import UUID
 
 from tangl.core38 import (
     Edge,
+    Entity,
     EntityGroup,
     EntityTemplate,
     Priority,
@@ -37,6 +39,12 @@ from .scope import admitted, build_plan, prefix_paths, resolve_target_path, scop
 # templates at the same scope-distance
 TemplateGroup: TypeAlias = Union[EntityGroup, EntityTemplate]
 logger = logging.getLogger(__name__)
+
+
+class _MaterializeRole(StrEnum):
+    INIT = "init"
+    PROVISION_INTERMEDIATE = "provision_intermediate"
+    PROVISION_LEAF = "provision_leaf"
 
 
 @dataclass
@@ -153,13 +161,94 @@ class Resolver:
                 return meta_hook
         return None
 
+    @staticmethod
+    def _materialize_node(
+        template: EntityTemplate,
+        *,
+        _ctx: Any = None,
+        role: _MaterializeRole | str = _MaterializeRole.PROVISION_LEAF,
+        story_materialize: Any = None,
+    ) -> Entity:
+        if isinstance(role, str):
+            role = _MaterializeRole(role)
+        if role in (_MaterializeRole.INIT, _MaterializeRole.PROVISION_INTERMEDIATE):
+            provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+        elif role is _MaterializeRole.PROVISION_LEAF:
+            if callable(story_materialize):
+                provider = story_materialize(template, _ctx)
+            else:
+                provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+        else:
+            raise ValueError(f"Unsupported materialization role: {role!r}")
+
+        if not isinstance(provider, Entity):
+            raise TypeError(
+                "Template materialization must yield Entity-compatible providers"
+            )
+        provider.templ_hash = _template_hash_value(template)
+        return provider
+
+    @staticmethod
+    def _attach_child(parent: Any, child: Any) -> None:
+        if parent is None or not hasattr(parent, "add_child"):
+            return
+        parent.add_child(child)
+        finalize = getattr(parent, "finalize_container_contract", None)
+        if callable(finalize):
+            finalize()
+
     def _resolve_target_path_for_requirement(self, requirement: Requirement, *, _ctx: Any = None) -> str | None:
         return resolve_target_path(
             identifier=self._selector_identifier(requirement),
             request_ctx=self._request_ctx_path(_ctx),
             authored_path=requirement.authored_path,
             is_qualified=requirement.is_qualified,
+            is_absolute=requirement.is_absolute,
         )
+
+    def _template_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        request_ctx = self._request_ctx_path(_ctx)
+        graph = getattr(_ctx, "graph", None)
+        story_materialize = self._story_materialize_hook(_ctx)
+
+        offers: list[ProvisionOffer] = []
+        for i, template_group in enumerate(self.template_scope_groups):
+            offers.extend(
+                TemplateProvisioner(
+                    templates=template_group,
+                    distance=i,
+                    request_ctx=request_ctx,
+                    graph=graph,
+                    story_materialize=story_materialize,
+                    materialize_node=self._materialize_node,
+                ).get_dependency_offers(requirement)
+            )
+        return offers
+
+    def inspect_template_dependency_offers(
+        self,
+        requirement: Requirement[PT],
+        *,
+        force: bool = False,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        """Return template-only dependency offers using resolver matching semantics."""
+        offers = self._template_offers_for_requirement(requirement, _ctx=_ctx)
+        offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
+
+        def _allowed(offer: ProvisionOffer) -> bool:
+            if offer.policy & ProvisionPolicy.FORCE:
+                return force
+            return bool(offer.policy & requirement.provision_policy)
+
+        offers = [offer for offer in offers if _allowed(offer)]
+        offers.sort(key=lambda v: v.sort_key())
+        return offers
 
     @staticmethod
     def _iter_template_values(group: Any) -> Iterator[EntityTemplate]:
@@ -192,9 +281,6 @@ class Resolver:
         _ctx=None,
     ) -> list[ProvisionOffer]:
         offers: list[ProvisionOffer] = list(preferred_offers or [])
-        request_ctx = self._request_ctx_path(_ctx)
-        graph = getattr(_ctx, "graph", None)
-        story_materialize = self._story_materialize_hook(_ctx)
 
         # If there are more than 20 groups, the distance-based priorities will slip
         # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
@@ -202,18 +288,14 @@ class Resolver:
         for i, entity_group in enumerate(self.location_entity_groups):
             offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
 
-        for i, template_group in enumerate(self.template_scope_groups):
-            offers.extend(
-                TemplateProvisioner(
-                    templates=template_group,
-                    distance=i,
-                    request_ctx=request_ctx,
-                    graph=graph,
-                    story_materialize=story_materialize,
-                ).get_dependency_offers(requirement)
-            )
+        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
 
-        offers.extend(InlineTemplateProvisioner.get_dependency_offers(requirement))
+        offers.extend(
+            InlineTemplateProvisioner(
+                materialize_node=self._materialize_node,
+                story_materialize=self._story_materialize_hook(_ctx),
+            ).iter_dependency_offers(requirement)
+        )
         offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
 
         _ctx = resolve_ctx(_ctx)
@@ -534,15 +616,17 @@ class Resolver:
             if template is None:
                 raise ValueError(f"Missing structural template for segment {segment_path!r}")
 
-            created = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-            created.templ_hash = _template_hash_value(template)
+            created = self._materialize_node(
+                template,
+                _ctx=_ctx,
+                role=_MaterializeRole.PROVISION_INTERMEDIATE,
+            )
             if not isinstance(created, RegistryAware):
                 raise TypeError("Structural template materialization must yield RegistryAware nodes")
 
             if created.registry is not graph:
                 graph.add(created, _ctx=_ctx)
-            if current is not None and hasattr(current, "add_child"):
-                current.add_child(created)
+            self._attach_child(current, created)
             current = created
 
         return current
@@ -561,9 +645,8 @@ class Resolver:
         created = provider.registry is not dependency.registry
         if created:
             dependency.registry.add(provider, _ctx=_ctx)
-            if parent is not None and hasattr(parent, "add_child"):
-                if getattr(provider, "parent", None) is not parent:
-                    parent.add_child(provider)
+            if getattr(provider, "parent", None) is not parent:
+                Resolver._attach_child(parent, provider)
 
         dependency.set_provider(provider, _ctx=_ctx)
         return True

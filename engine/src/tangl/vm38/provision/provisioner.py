@@ -126,6 +126,7 @@ class TemplateProvisioner:
     request_ctx: str = ""
     graph: Any | None = None
     story_materialize: Callable[[EntityTemplate, Any], Entity] | None = None
+    materialize_node: Callable[..., Entity] | None = None
 
     @staticmethod
     def _selector_identifier(requirement: "Requirement") -> str | None:
@@ -140,6 +141,13 @@ class TemplateProvisioner:
         return isinstance(kind, type) and issubclass(kind, TraversableNode)
 
     def _materialize_template(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+        if callable(self.materialize_node):
+            return self.materialize_node(
+                template,
+                _ctx=_ctx,
+                role="provision_leaf",
+                story_materialize=self.story_materialize,
+            )
         if callable(self.story_materialize):
             provider = self.story_materialize(template, _ctx)
         else:
@@ -159,6 +167,7 @@ class TemplateProvisioner:
                 request_ctx=self.request_ctx,
                 authored_path=requirement.authored_path,
                 is_qualified=requirement.is_qualified,
+                is_absolute=requirement.is_absolute,
             )
             if target_ctx is None:
                 continue
@@ -182,7 +191,7 @@ class TemplateProvisioner:
                 scope_distance=distance,
                 build_plan=chain,
                 candidate=c,
-                callback = lambda *_, _c=c, **kwargs: self._materialize_template(
+                callback=lambda *_, _c=c, **kwargs: self._materialize_template(
                     _c,
                     _ctx=kwargs.get("_ctx"),
                 ),
@@ -191,16 +200,19 @@ class TemplateProvisioner:
     # Not sure what affordance providers look like in template form?
 
 
+@dataclass
 class InlineTemplateProvisioner:
     """Offer inline requirement templates as normal CREATE candidates."""
 
-    @classmethod
-    def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
+    materialize_node: Callable[..., Entity] | None = None
+    story_materialize: Callable[[EntityTemplate, Any], Entity] | None = None
+
+    def iter_dependency_offers(self, requirement: Requirement) -> Iterable[ProvisionOffer]:
         if requirement.fallback_templ is not None:
             return [ProvisionOffer(
                 origin_id=requirement.fallback_templ.get_label(),
                 policy=ProvisionPolicy.CREATE,
-                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: cls._materialize_inline(
+                callback=lambda *_, _t=requirement.fallback_templ, **kwargs: self._materialize_inline(
                     _t,
                     _ctx=kwargs.get("_ctx"),
                 ),
@@ -210,11 +222,22 @@ class InlineTemplateProvisioner:
             )]
         return []
 
-    @staticmethod
-    def _materialize_inline(template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+    def _materialize_inline(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
+        if callable(self.materialize_node):
+            return self.materialize_node(
+                template,
+                _ctx=_ctx,
+                role="provision_leaf",
+                story_materialize=self.story_materialize,
+            )
         provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
         provider.templ_hash = _template_hash_value(template)
         return provider
+
+    @classmethod
+    def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
+        # Compatibility shim retained for existing classmethod call-sites.
+        return cls().iter_dependency_offers(requirement)
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
 
@@ -417,10 +440,13 @@ class UpdateCloneProvisioner:
     ) -> Any:
         if not hasattr(reference, "evolve"):
             raise TypeError(f"{type(reference).__name__} is not cloneable (missing evolve)")
-        return reference.evolve(
+        clone = reference.evolve(
             uid=_next_provision_uid(_ctx=_ctx),
             **dict(updates),
         )
+        if hasattr(clone, "templ_hash") and hasattr(reference, "templ_hash"):
+            clone.templ_hash = getattr(reference, "templ_hash", None)
+        return clone
 
     @classmethod
     def _make_offer(
