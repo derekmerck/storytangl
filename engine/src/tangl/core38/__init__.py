@@ -84,7 +84,7 @@ from .namespace import HasNamespace, contribute_ns
 # - building
 # - dispatch hooks
 from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
-from .token import Token, TokenFactory  # Delegated reference builder
+from .token import Token, TokenCatalog, TokenFactory  # Delegated reference builder
 from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
 
 from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx

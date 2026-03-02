@@ -53,6 +53,7 @@ See Also
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from collections import ChainMap
 from dataclasses import dataclass, field
 from random import Random
@@ -68,12 +69,14 @@ from tangl.core38 import (
     OrderedRegistry,
     Record,
     Selector,
+    TemplateRegistry,
 )
 from tangl.utils.hashing import hashing_func
 from ..ctx import VmPhaseCtx
 from ..dispatch import (
     do_finalize,
     do_gather_ns,
+    do_get_template_scope_groups,
     do_journal,
     do_postreqs,
     do_prereqs,
@@ -188,6 +191,11 @@ class PhaseCtx:
     def get_meta(self) -> Mapping[str, Any]:
         return dict(self.meta or {})
 
+    @contextmanager
+    def with_subdispatch(self):
+        """Isolate nested dispatch calls from the parent phase invocation."""
+        yield self
+
     @property
     def selected_edge(self) -> Any | None:
         """Alias for incoming edge during this pipeline pass."""
@@ -292,28 +300,22 @@ class PhaseCtx:
         add_group(self.graph.values())
         return groups or [list(self.graph.values())]
 
-    def get_template_scope_groups(self) -> list[Iterable]:
-        """Template pools ordered by authoring/template scope distance."""
-        get_groups = getattr(self.graph, "get_template_scope_groups", None)
-        if callable(get_groups):
-            groups = list(get_groups(self.cursor) or [])
-            if groups:
-                return groups
+    def get_template_scope_groups(self) -> list[TemplateRegistry]:
+        """Template registries available for scoped provisioning."""
+        groups = do_get_template_scope_groups(self.cursor, ctx=self)
+        if groups:
+            return groups
 
         factory = getattr(self.graph, "factory", None)
-        if factory is None:
-            return []
-
-        if hasattr(factory, "values"):
-            return [factory.values()]
-
-        return [factory]
+        if isinstance(factory, TemplateRegistry):
+            return [factory]
+        return []
 
     # Backwards-compatible aliases for existing resolver contexts.
     def get_entity_groups(self) -> list[Iterable]:
         return self.get_location_entity_groups()
 
-    def get_template_groups(self) -> list[Iterable]:
+    def get_template_groups(self) -> list[TemplateRegistry]:
         return self.get_template_scope_groups()
 
 

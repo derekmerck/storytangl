@@ -7,6 +7,7 @@ from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 from uuid import UUID
 
 from tangl.core38.ctx import CoreCtx, DispatchCtx
+from tangl.core38 import TemplateRegistry
 
 
 @runtime_checkable
@@ -19,10 +20,10 @@ class VmResolverCtx(VmDispatchCtx, CoreCtx, Protocol):
     """Context contract required by vm38 provision resolver."""
 
     def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
-    def get_template_scope_groups(self) -> Iterable[Iterable[Any]]: ...
+    def get_template_scope_groups(self) -> Iterable[TemplateRegistry]: ...
     # Legacy aliases retained as compatibility bridges.
     def get_entity_groups(self) -> Iterable[Iterable[Any]]: ...
-    def get_template_groups(self) -> Iterable[Iterable[Any]]: ...
+    def get_template_groups(self) -> Iterable[TemplateRegistry]: ...
 
 
 @runtime_checkable

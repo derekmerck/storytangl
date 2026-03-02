@@ -44,3 +44,13 @@ def test_protocol_exports_are_importable_from_vm38_package() -> None:
     assert _VmDispatchCtx is VmDispatchCtx
     assert _VmResolverCtx is VmResolverCtx
     assert _VmPhaseCtx is VmPhaseCtx
+
+
+def test_phase_ctx_exposes_with_subdispatch_context_manager() -> None:
+    graph = Graph()
+    node = TraversableNode(label="n")
+    graph.add(node)
+    ctx = PhaseCtx(graph=graph, cursor_id=node.uid)
+
+    with ctx.with_subdispatch() as nested:
+        assert nested is ctx

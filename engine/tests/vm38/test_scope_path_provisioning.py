@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core38 import EntityTemplate, Graph
+from tangl.core38 import EntityTemplate, Graph, TemplateRegistry
 from tangl.vm38.provision import (
     ProvisionOffer,
     ProvisionPolicy,
@@ -38,6 +38,13 @@ def _ctx(*, graph: Graph, cursor: TraversableNode) -> SimpleNamespace:
         get_registries=lambda: [],
         get_inline_behaviors=lambda: [],
     )
+
+
+def _template_registry(*templates: EntityTemplate) -> TemplateRegistry:
+    registry = TemplateRegistry(label="scope_test_templates")
+    for template in templates:
+        registry.add(template)
+    return registry
 
 
 class TestScopeAdmission:
@@ -126,7 +133,7 @@ class TestTemplateProvisionerScopePolicy:
             is_qualified=False,
         )
         provisioner = TemplateProvisioner(
-            templates=[template],
+            registries=[_template_registry(template)],
             request_ctx="castle.morning",
             graph=Graph(),
         )
@@ -148,7 +155,7 @@ class TestTemplateProvisionerScopePolicy:
             is_qualified=True,
         )
         provisioner = TemplateProvisioner(
-            templates=[template],
+            registries=[_template_registry(template)],
             request_ctx="village.square",
             graph=Graph(),
         )
@@ -170,7 +177,7 @@ class TestTemplateProvisionerScopePolicy:
             is_qualified=False,
         )
         provisioner = TemplateProvisioner(
-            templates=[template],
+            registries=[_template_registry(template)],
             request_ctx="village",
             graph=Graph(),
         )
@@ -194,7 +201,7 @@ class TestTemplateProvisionerScopePolicy:
             is_qualified=True,
         )
         provisioner = TemplateProvisioner(
-            templates=[template_scene1, template_scene2],
+            registries=[_template_registry(template_scene1, template_scene2)],
             request_ctx="scene1.start",
             graph=Graph(),
         )
@@ -217,7 +224,7 @@ class TestTemplateProvisionerScopePolicy:
             is_qualified=True,
         )
         provisioner = TemplateProvisioner(
-            templates=[template],
+            registries=[_template_registry(template)],
             request_ctx="scene1.start",
             graph=Graph(),
         )
@@ -282,7 +289,7 @@ class TestResolverPreviewAndExecution:
             authored_path="castle.gatehouse",
             is_qualified=True,
         )
-        resolver = Resolver(template_scope_groups=[[leaf, castle]])
+        resolver = Resolver(template_scope_groups=[_template_registry(leaf, castle)])
         before = len(graph)
         preview = resolver.preview_requirement(req, _ctx=_ctx(graph=graph, cursor=cursor))
         assert preview.viable is True
@@ -303,7 +310,7 @@ class TestResolverPreviewAndExecution:
             authored_path="castle.gatehouse",
             is_qualified=True,
         )
-        resolver = Resolver(template_scope_groups=[[leaf]])
+        resolver = Resolver(template_scope_groups=[_template_registry(leaf)])
         preview = resolver.preview_requirement(req, _ctx=_ctx(graph=graph, cursor=cursor))
         assert preview.viable is False
         assert preview.blockers
@@ -321,7 +328,7 @@ class TestResolverPreviewAndExecution:
             label="crafted",
             payload=TraversableNode(label="crafted"),
         )
-        resolver = Resolver(template_scope_groups=[[template]])
+        resolver = Resolver(template_scope_groups=[_template_registry(template)])
         ctx = _ctx(graph=graph, cursor=source)
 
         assert resolver.resolve_dependency(dep, _ctx=ctx) is True

@@ -89,6 +89,29 @@ class TestEntityTemplateMatching:
         ids = templ.get_identifiers()
         assert "templ" in ids and "scene-a" in ids
 
+    def test_admitted_to_matches_scope_prefix(self) -> None:
+        templ = EntityTemplate(payload=Scene(label="scene-a"), admission_scope="castle.*")
+        assert templ.admitted_to("castle.guard")
+        assert not templ.admitted_to("village.square")
+
+    def test_selector_can_filter_with_admitted_to(self) -> None:
+        reg = TemplateRegistry()
+        castle = EntityTemplate(
+            label="castle.scene",
+            payload=Scene(label="scene-a"),
+            admission_scope="castle.*",
+        )
+        village = EntityTemplate(
+            label="village.scene",
+            payload=Scene(label="scene-b"),
+            admission_scope="village.*",
+        )
+        reg.add(castle)
+        reg.add(village)
+
+        matches = list(reg.find_all(Selector(admitted_to="castle.guard")))
+        assert matches == [castle]
+
     def test_selector_finds_by_payload_kind(self) -> None:
         reg = TemplateRegistry()
         scene = EntityTemplate(payload=Scene(label="scene-a"))

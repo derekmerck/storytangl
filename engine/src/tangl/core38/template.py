@@ -21,6 +21,8 @@ from __future__ import annotations
 from typing import Optional, Iterator, TypeVar, Generic, Type, Self, Any
 from uuid import uuid4
 import logging
+from fnmatch import fnmatch
+import re
 
 from pydantic import Field
 
@@ -36,6 +38,64 @@ logger.setLevel(logging.WARNING)
 ET = TypeVar("ET", bound=Entity)
 
 NONGENERIC_FIELDS = {'uid', 'seq'}  # discarded when decompiling to script
+_BRACE_RE = re.compile(r"\{([^{}]+)\}")
+
+
+def _expand_scope_braces(pattern: str) -> list[str]:
+    match = _BRACE_RE.search(pattern)
+    if match is None:
+        return [pattern]
+
+    prefix = pattern[: match.start()]
+    suffix = pattern[match.end() :]
+    options = [opt.strip() for opt in match.group(1).split(",")]
+
+    expanded: list[str] = []
+    for option in options:
+        for tail in _expand_scope_braces(suffix):
+            expanded.append(f"{prefix}{option}{tail}")
+    return expanded
+
+
+def _split_scope_path(path: str | None) -> list[str]:
+    if not isinstance(path, str) or not path:
+        return []
+    return [segment for segment in path.split(".") if segment]
+
+
+def _scope_admitted_single(expanded_scope: str, ctx_parts: list[str]) -> bool:
+    scope_parts = _split_scope_path(expanded_scope)
+    if not scope_parts:
+        return True
+
+    if scope_parts[-1] in ("*", "**"):
+        prefix = scope_parts[:-1]
+    else:
+        prefix = scope_parts
+
+    if len(ctx_parts) <= len(prefix):
+        return False
+
+    for expected, actual in zip(prefix, ctx_parts):
+        if not fnmatch(actual, expected):
+            return False
+    return True
+
+
+def _scope_admitted(template_scope: str | None, target_ctx: str | None) -> bool:
+    if template_scope in (None, "", "*"):
+        return True
+    if not isinstance(target_ctx, str) or not target_ctx:
+        return False
+
+    ctx_parts = _split_scope_path(target_ctx)
+    if not ctx_parts:
+        return False
+
+    for expanded in _expand_scope_braces(template_scope):
+        if _scope_admitted_single(expanded, ctx_parts):
+            return True
+    return False
 
 
 class EntityTemplate(RegistryAware, Record, Generic[ET]):
@@ -154,6 +214,10 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
     def get_identifiers(self) -> set[Identifier]:
         """Return combined identifier set from template and payload."""
         return super().get_identifiers().union(self.payload.get_identifiers())
+
+    def admitted_to(self, target_ctx: str | None) -> bool:
+        """Return whether this template admits provisioning at ``target_ctx``."""
+        return _scope_admitted(self.admission_scope, target_ctx)
 
     # create copies
     def materialize(self, preserve_uid: bool = False, **updates) -> ET:

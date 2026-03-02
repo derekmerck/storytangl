@@ -12,6 +12,7 @@ from tangl.vm38 import (
     Resolver,
     TraversableNode,
     assert_traversal_contracts,
+    do_get_template_scope_groups,
 )
 
 from ..concepts import Actor, Location, Role, Setting
@@ -56,6 +57,9 @@ class _PrelinkCtx:
         return self.graph.get(self.cursor_id)
 
     def get_authorities(self) -> list[object]:
+        getter = getattr(self.graph, "get_authorities", None)
+        if callable(getter):
+            return list(getter() or [])
         return []
 
     # Backwards-compatible alias retained during v38 migration.
@@ -99,11 +103,12 @@ class _PrelinkCtx:
         return groups or [list(self.graph.values())]
 
     def get_template_scope_groups(self):
-        if hasattr(self.graph, "get_template_scope_groups"):
-            groups = self.graph.get_template_scope_groups(self.cursor)
-            if groups:
-                return groups
-        return [self.template_registry.values()]
+        cursor = self.cursor
+        if cursor is not None:
+            registries = do_get_template_scope_groups(cursor, ctx=self)
+            if registries:
+                return registries
+        return [self.template_registry]
 
     # Legacy aliases retained for compatibility with old resolver contexts.
     def get_entity_groups(self):

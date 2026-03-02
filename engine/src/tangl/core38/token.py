@@ -21,14 +21,18 @@ from dataclasses import dataclass
 import re
 import sys
 import logging
+import itertools
 from types import MethodType
-from typing import Any, ClassVar, Generic, Self, Type, TypeVar
+from typing import Any, ClassVar, Generic, Iterator, Self, Type, TypeVar
 from copy import deepcopy
 
 import pydantic
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
+from tangl.type_hints import Identifier
+
 from .graph import Node
+from .selector import Selector
 from .singleton import Singleton
 
 logger = logging.getLogger(__name__)
@@ -150,6 +154,17 @@ class Token(Node, Generic[WST]):
             return False
         return super().has_kind(kind) or self.reference_singleton.has_kind(kind)
 
+    def has_identifier(self, identifier: Identifier) -> bool:
+        """Match token identity against both local and referent identifiers."""
+        if super().has_identifier(identifier):
+            return True
+        if identifier == self.token_from:
+            return True
+        try:
+            return self.reference_singleton.has_identifier(identifier)
+        except Exception:
+            return False
+
     def __repr__(self) -> str:
         return self.wrapped_cls.__repr__(self)
 
@@ -231,6 +246,76 @@ class Token(Node, Generic[WST]):
             # Sometimes we want to use a type var
             wrapped_cls = wrapped_cls.__bound__
         return cls._create_wrapper_cls(wrapped_cls)
+
+
+@dataclass
+class TokenCatalog(Generic[WST]):
+    """Provisioner-facing adapter over one singleton instance registry."""
+
+    wst: Type[WST]
+
+    def has_kind(self, kind: Type[Node]) -> bool:
+        return self.wst.has_kind(kind)
+
+    def find_all(
+        self,
+        selector: Selector | None = None,
+        sort_key = None,
+    ) -> Iterator[WST]:
+        return self.wst._instances.find_all(selector=selector, sort_key=sort_key)
+
+    @classmethod
+    def chain_find_all(
+        cls,
+        *catalogs: "TokenCatalog[WST]",
+        selector: Selector | None = None,
+        sort_key = None,
+    ) -> Iterator[WST]:
+        values = itertools.chain.from_iterable(
+            catalog.wst._instances.values() for catalog in catalogs
+        )
+        if selector is not None:
+            values = selector.filter(values)
+        if sort_key is None:
+            yield from values
+            return
+        yield from sorted(values, key=sort_key)
+
+    @classmethod
+    def _materialize_one(
+        cls,
+        wrapped_cls: Type[WST],
+        instance: WST,
+        *,
+        uid = None,
+        label: str | None = None,
+        **token_locals: Any,
+    ) -> Token[WST]:
+        data: dict[str, Any] = {
+            "token_from": instance.get_label(),
+            **token_locals,
+        }
+        if uid is not None:
+            data["uid"] = uid
+        if label is not None:
+            data["label"] = label
+        return Token[wrapped_cls](**data)
+
+    def materialize_one(
+        self,
+        instance: WST,
+        *,
+        uid = None,
+        label: str | None = None,
+        **token_locals: Any,
+    ) -> Token[WST]:
+        return self._materialize_one(
+            self.wst,
+            instance,
+            uid=uid,
+            label=label,
+            **token_locals,
+        )
 
 
 @dataclass

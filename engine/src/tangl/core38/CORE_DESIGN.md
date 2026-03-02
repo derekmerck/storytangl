@@ -358,12 +358,12 @@ making Tokens transparently findable by their wrapped singleton type via Selecto
 queries. This is the mechanism that lets `graph.find_nodes(Selector(has_kind=SwordType))`
 find tokens.
 
-**`TokenFactory` was removed from core.** The provisioner adapter that wrapped
-`Token[X](token_from=label)` for builder-like flows has been replaced by
-`vm38.provision.TokenProvisioner`, which integrates singleton catalog discovery into the
-standard `gather_offers` pipeline. Token itself has no provisioning responsibility — it
-only knows how to create wrapper classes and materialize instances. See
-`VM_DESIGN.md — Token Provisioning`.
+**Core exposes token adapters; VM owns provisioning policy.** `TokenFactory` and
+`TokenCatalog` in core are thin adapters around token materialization and singleton
+instance lookup. `vm38.provision.TokenProvisioner` consumes these adapters inside the
+offer pipeline and applies runtime policy (`ProvisionPolicy`, ranking, resolution).
+Token itself remains provisioning-agnostic; it only defines wrapper semantics and
+instance behavior.
 
 
 ### RuntimeOp (`runtime_op.py`)
