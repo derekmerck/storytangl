@@ -64,6 +64,7 @@ class ProvisionOffer(Record):
     priority: int = Priority.NORMAL
     distance_from_caller: int = 999
     specificity: int = 0
+    exact_kind_match: bool = False
     scope_distance: int = 0
     build_plan: list[str] | None = None
     target_ctx: str | None = None
@@ -193,19 +194,18 @@ class TemplateProvisioner:
         return candidate.has_identifier(leaf)
 
     def _materialize_template(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
-        if callable(self.materialize_node):
-            return self.materialize_node(
-                template,
-                _ctx=_ctx,
-                role="provision_leaf",
-                story_materialize=self.story_materialize,
+        if not callable(self.materialize_node):
+            raise RuntimeError(
+                "TemplateProvisioner requires materialize_node for consistent "
+                "story materialization semantics; instantiate through Resolver "
+                "or inject materialize_node explicitly."
             )
-        if callable(self.story_materialize):
-            provider = self.story_materialize(template, _ctx)
-        else:
-            provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        provider.templ_hash = _template_hash_value(template)
-        return provider
+        return self.materialize_node(
+            template,
+            _ctx=_ctx,
+            role="provision_leaf",
+            story_materialize=self.story_materialize,
+        )
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
         identifier = self._selector_identifier(requirement)
@@ -293,21 +293,26 @@ class InlineTemplateProvisioner:
         return []
 
     def _materialize_inline(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
-        if callable(self.materialize_node):
-            return self.materialize_node(
-                template,
-                _ctx=_ctx,
-                role="provision_leaf",
-                story_materialize=self.story_materialize,
+        if not callable(self.materialize_node):
+            raise RuntimeError(
+                "InlineTemplateProvisioner requires materialize_node for consistent "
+                "story materialization semantics; instantiate through Resolver "
+                "or inject materialize_node explicitly."
             )
-        provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        provider.templ_hash = _template_hash_value(template)
-        return provider
+        return self.materialize_node(
+            template,
+            _ctx=_ctx,
+            role="provision_leaf",
+            story_materialize=self.story_materialize,
+        )
 
     @classmethod
     def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
-        # Compatibility shim retained for existing classmethod call-sites.
-        return cls().iter_dependency_offers(requirement)
+        raise NotImplementedError(
+            "InlineTemplateProvisioner.get_dependency_offers() classmethod shim "
+            "was removed; use Resolver.gather_offers() or "
+            "InlineTemplateProvisioner(...).iter_dependency_offers(requirement)."
+        )
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
 
@@ -379,6 +384,9 @@ class TokenProvisioner:
     @staticmethod
     def _selector(requirement: "Requirement") -> Selector:
         criteria = dict(requirement.__pydantic_extra__ or {})
+        # ``label`` is used as the desired token-node label at materialization time.
+        # Do not apply it to singleton candidate filtering.
+        criteria.pop("label", None)
         return Selector(predicate=requirement.predicate, **criteria)
 
     @staticmethod
@@ -395,24 +403,37 @@ class TokenProvisioner:
         if not catalogs:
             return
 
+        catalogs_by_type = {catalog.wst: catalog for catalog in catalogs}
+
+        def _catalog_for_instance(instance: Any) -> TokenCatalog | None:
+            instance_type = type(instance)
+            exact = catalogs_by_type.get(instance_type)
+            if exact is not None:
+                return exact
+            # Fallback for mixed catalog hierarchies: nearest ancestor catalog.
+            for ancestor in instance_type.__mro__[1:]:
+                catalog = catalogs_by_type.get(ancestor)
+                if catalog is not None:
+                    return catalog
+            return None
+
         for instance in TokenCatalog.chain_find_all(*catalogs, selector=selector):
-            for catalog in catalogs:
-                if not isinstance(instance, catalog.wst):
-                    continue
-                origin = f"TokenProvisioner:{catalog.wst.__name__}:{instance.get_label()}"
-                yield ProvisionOffer(
-                    origin_id=origin,
-                    policy=ProvisionPolicy.CREATE | ProvisionPolicy.TOKEN,
-                    priority=Priority.EARLY,
-                    scope_distance=0,
-                    candidate=instance,
-                    callback=lambda *_, _catalog=catalog, _inst=instance, _label=label, **kwargs: _catalog.materialize_one(
-                        _inst,
-                        uid=_next_provision_uid(_ctx=kwargs.get("_ctx")),
-                        label=_label,
-                    ),
-                )
-                break
+            catalog = _catalog_for_instance(instance)
+            if catalog is None:
+                continue
+            origin = f"TokenProvisioner:{catalog.wst.__name__}:{instance.get_label()}"
+            yield ProvisionOffer(
+                origin_id=origin,
+                policy=ProvisionPolicy.CREATE | ProvisionPolicy.TOKEN,
+                priority=Priority.EARLY,
+                scope_distance=0,
+                candidate=instance,
+                callback=lambda *_, _catalog=catalog, _inst=instance, _label=label, **kwargs: _catalog.materialize_one(
+                    _inst,
+                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx")),
+                    label=_label,
+                ),
+            )
 
     def get_affordance_offers(self, node: Node) -> Iterable[ProvisionOffer]:
         _ = node

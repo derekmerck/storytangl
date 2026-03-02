@@ -208,6 +208,16 @@ class TestTokenKindMatching:
         assert token.has_identifier("Glamdring")
         assert token.has_identifier("sword")
 
+    def test_has_identifier_propagates_unexpected_referent_errors(self) -> None:
+        class BrokenIdType(Singleton):
+            def has_identifier(self, identifier):  # pragma: no cover - exercised through Token
+                raise RuntimeError("broken identifier logic")
+
+        BrokenIdType(label="broken")
+        token = Token[BrokenIdType](token_from="broken", label="broken_token")
+        with pytest.raises(RuntimeError, match="broken identifier logic"):
+            token.has_identifier("not_local_match")
+
     def test_graph_find_by_wrapped_type(self) -> None:
         WeaponType(label="sword", damage="1d6")
         graph = Graph()

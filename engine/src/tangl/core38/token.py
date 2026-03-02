@@ -155,14 +155,20 @@ class Token(Node, Generic[WST]):
         return super().has_kind(kind) or self.reference_singleton.has_kind(kind)
 
     def has_identifier(self, identifier: Identifier) -> bool:
-        """Match token identity against both local and referent identifiers."""
+        """Match token identity against both local and referent identifiers.
+
+        Suppresses only referent lookup/availability failures from
+        ``self.reference_singleton.has_identifier(identifier)``:
+        ``ValueError`` (missing singleton instance) and ``AttributeError``.
+        Other errors propagate so identifier implementation bugs remain visible.
+        """
         if super().has_identifier(identifier):
             return True
         if identifier == self.token_from:
             return True
         try:
             return self.reference_singleton.has_identifier(identifier)
-        except Exception:
+        except (ValueError, AttributeError):
             return False
 
     def __repr__(self) -> str:

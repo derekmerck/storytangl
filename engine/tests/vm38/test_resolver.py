@@ -37,6 +37,7 @@ from tangl.vm38.provision import (
     ProvisionPolicy,
     Requirement,
     Resolver,
+    TemplateProvisioner,
     FallbackProvisioner,
     ProvisionOffer,
 )
@@ -217,12 +218,41 @@ class TestResolverOfferGathering:
             fallback_templ=template,
             provision_policy=ProvisionPolicy.CREATE,
         )
-        offer = list(InlineTemplateProvisioner.get_dependency_offers(req))[0]
+        offer = list(
+            InlineTemplateProvisioner(
+                materialize_node=Resolver._materialize_node,
+            ).iter_dependency_offers(req)
+        )[0]
 
         seed = 71
         provider = offer.callback(_ctx=_ctx_with_seed(seed))
 
         assert provider.uid == UUID(int=Random(seed).getrandbits(128), version=4)
+
+    def test_inline_template_classmethod_shim_raises(self) -> None:
+        req = Requirement(
+            has_identifier="inline",
+            fallback_templ=EntityTemplate(payload={"kind": Entity, "label": "inline"}),
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+        with pytest.raises(NotImplementedError, match="classmethod shim was removed"):
+            list(InlineTemplateProvisioner.get_dependency_offers(req))
+
+    def test_template_provisioner_materialize_requires_materialize_node(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
+        req = Requirement(
+            has_identifier="crafted",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+        provisioner = TemplateProvisioner(
+            registries=[_template_registry(template)],
+            request_ctx="",
+            graph=Graph(),
+            materialize_node=None,
+        )
+        offer = list(provisioner.get_dependency_offers(req))[0]
+        with pytest.raises(RuntimeError, match="requires materialize_node"):
+            offer.callback()
 
     def test_token_catalog_offer_creates_token_provider(self) -> None:
         class GearType(Singleton):
@@ -242,6 +272,50 @@ class TestResolverOfferGathering:
         assert provider.token_from == "torch"
         assert req.selected_offer_policy is not None
         assert bool(req.selected_offer_policy & ProvisionPolicy.TOKEN)
+
+    def test_token_offer_uses_requirement_label_for_materialized_token_only(self) -> None:
+        class GearType(Singleton):
+            pass
+
+        GearType(label="torch")
+        catalog = TokenCatalog(wst=GearType)
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=GearType,
+            has_identifier="torch",
+            label="inventory_torch",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+
+        provider = resolver.resolve_requirement(req, _ctx=_ctx_with_token_catalogs(catalog))
+        assert isinstance(provider, Token)
+        assert provider.token_from == "torch"
+        assert provider.label == "inventory_torch"
+
+    def test_token_offer_uses_exact_catalog_for_subclass_instance(self) -> None:
+        class ItemType(Singleton):
+            pass
+
+        class ArmorType(ItemType):
+            pass
+
+        ArmorType(label="chainmail")
+        base_catalog = TokenCatalog(wst=ItemType)
+        armor_catalog = TokenCatalog(wst=ArmorType)
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=ItemType,
+            has_identifier="chainmail",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+
+        provider = resolver.resolve_requirement(
+            req,
+            _ctx=_ctx_with_token_catalogs(base_catalog, armor_catalog),
+        )
+        assert isinstance(provider, Token)
+        assert provider.token_from == "chainmail"
+        assert provider.__class__.wrapped_cls is ArmorType
 
     def test_existing_offer_beats_token_create_offer(self) -> None:
         class GearType(Singleton):
@@ -315,7 +389,11 @@ class TestResolverOfferGathering:
     def test_inline_template_provisioner_offers_create(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "castle"})
         req = Requirement(has_identifier="castle", fallback_templ=template)
-        offers = list(InlineTemplateProvisioner.get_dependency_offers(req))
+        offers = list(
+            InlineTemplateProvisioner(
+                materialize_node=Resolver._materialize_node,
+            ).iter_dependency_offers(req)
+        )
         assert len(offers) == 1
         assert offers[0].policy == ProvisionPolicy.CREATE
 
@@ -338,6 +416,24 @@ class TestResolverOfferGathering:
         offers = resolver.gather_offers(req)
         assert offers
         assert offers[0].candidate is plain
+        assert offers[0].exact_kind_match is True
+        assert any(offer.exact_kind_match is False for offer in offers[1:])
+
+    def test_exact_kind_match_sorts_ahead_of_specificity(self) -> None:
+        exact = ProvisionOffer(
+            policy=ProvisionPolicy.EXISTING,
+            callback=lambda: None,
+            exact_kind_match=True,
+            specificity=0,
+        )
+        inexact = ProvisionOffer(
+            policy=ProvisionPolicy.EXISTING,
+            callback=lambda: None,
+            exact_kind_match=False,
+            specificity=10_000,
+        )
+        ordered = sorted([inexact, exact], key=lambda offer: offer.sort_key())
+        assert ordered[0] is exact
 
     def test_update_clone_declines_without_two_part_formula(self) -> None:
         source = Entity(label="source")

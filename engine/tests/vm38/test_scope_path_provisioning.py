@@ -24,6 +24,7 @@ from tangl.vm38.provision import (
     scope_distance,
     target_context_candidates,
 )
+from tangl.vm38.provision.scope import MAX_SCOPE_BRACE_EXPANSIONS
 from tangl.vm38.traversable import TraversableNode
 from tangl.vm38 import Dependency
 
@@ -59,6 +60,16 @@ class TestScopeAdmission:
         assert admitted("scene{2,10}.*", "scene2.entry")
         assert admitted("scene{2,10}.*", "scene10.entry")
         assert not admitted("scene{2,10}.*", "scene3.entry")
+
+    def test_non_wildcard_scope_requires_leaf_segment(self) -> None:
+        assert admitted("a.b", "a.b") is False
+        assert admitted("a.b", "a.b.c") is True
+
+    def test_brace_expansion_limit_fails_closed(self) -> None:
+        depth = 1
+        while (1 << depth) <= MAX_SCOPE_BRACE_EXPANSIONS:
+            depth += 1
+        assert admitted(("{a,b}" * depth) + ".*", ("a" * depth) + ".entry") is False
 
 
 class TestScopeDistance:

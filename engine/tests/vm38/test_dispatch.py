@@ -290,6 +290,18 @@ class TestDiscoveryHooks:
             do_get_token_catalogs(node, requirement=None, ctx=null_ctx)
 
     def test_discovery_uses_subdispatch_context_when_available(self) -> None:
+        seen_ctx = {"value": None}
+
+        class _SubCtx:
+            def __init__(self, parent) -> None:
+                self.parent = parent
+
+            def get_authorities(self):
+                return []
+
+            def get_inline_behaviors(self):
+                return []
+
         class _Ctx:
             def __init__(self) -> None:
                 self.entered = False
@@ -305,14 +317,16 @@ class TestDiscoveryHooks:
                 @contextmanager
                 def _cm():
                     self.entered = True
+                    subctx = _SubCtx(self)
                     try:
-                        yield self
+                        yield subctx
                     finally:
                         self.exited = True
                 return _cm()
 
         @on_get_template_scope_groups
         def _noop(*, caller, ctx, **kw):
+            seen_ctx["value"] = ctx
             return []
 
         g = Graph()
@@ -321,6 +335,8 @@ class TestDiscoveryHooks:
         assert do_get_template_scope_groups(node, ctx=ctx) == []
         assert ctx.entered is True
         assert ctx.exited is True
+        assert seen_ctx["value"] is not None
+        assert seen_ctx["value"] is not ctx
 
 
 # ============================================================================

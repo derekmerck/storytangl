@@ -36,7 +36,6 @@ from .provisioner import (
 )
 from .requirement import Requirement, PT, Dependency, Affordance
 from .scope import (
-    admitted,
     build_plan,
     prefix_paths,
     resolve_target_path,
@@ -527,7 +526,7 @@ class Resolver:
                 continue
             if not template.has_payload_kind(TraversableNode):
                 continue
-            if not admitted(template.admission_scope, target_ctx):
+            if not template.admitted_to(target_ctx):
                 continue
             key = (
                 scope_distance(template.admission_scope, target_ctx),
@@ -759,7 +758,7 @@ class Resolver:
             (template, target_ctx)
             for template in identity_candidates
             for target_ctx in target_ctxs
-            if admitted(template.admission_scope, target_ctx)
+            if template.admitted_to(target_ctx)
         ]
         if not admitted_candidates:
             return [

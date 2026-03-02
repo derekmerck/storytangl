@@ -387,11 +387,11 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
 def do_get_template_scope_groups(caller, *, ctx) -> list["TemplateRegistry"]:
     """Execute template-scope discovery handlers and return merged registries."""
     _validate_dispatch_ctx(ctx)
-    with _subdispatch_context(ctx):
+    with _subdispatch_context(ctx) as subctx:
         receipts = dispatch.execute_all(
             task="get_template_scope_groups",
             call_kwargs={"caller": caller},
-            ctx=ctx,
+            ctx=subctx,
             selector=Selector(caller_kind=type(caller)),
         )
         merged = CallReceipt.merge_results(*receipts)
@@ -411,11 +411,11 @@ def do_get_token_catalogs(
     _validate_dispatch_ctx(ctx)
 
     selector = Selector(caller_kind=type(caller)) if caller is not None else None
-    with _subdispatch_context(ctx):
+    with _subdispatch_context(ctx) as subctx:
         receipts = dispatch.execute_all(
             task="get_token_catalogs",
             call_kwargs={"caller": caller, "requirement": requirement},
-            ctx=ctx,
+            ctx=subctx,
             selector=selector,
         )
         merged = CallReceipt.merge_results(*receipts)

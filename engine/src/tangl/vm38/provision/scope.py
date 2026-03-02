@@ -6,22 +6,42 @@ from typing import Any
 
 
 _BRACE_RE = re.compile(r"\{([^{}]+)\}")
+MAX_SCOPE_BRACE_EXPANSIONS = 256
 
 
-def _expand_braces(pattern: str) -> list[str]:
-    match = _BRACE_RE.search(pattern)
-    if match is None:
-        return [pattern]
+class _ScopeExpansionLimitError(ValueError):
+    """Raised when scope brace expansion exceeds configured limit."""
 
-    prefix = pattern[: match.start()]
-    suffix = pattern[match.end() :]
-    options = [opt.strip() for opt in match.group(1).split(",")]
 
-    expanded: list[str] = []
-    for option in options:
-        for tail in _expand_braces(suffix):
-            expanded.append(f"{prefix}{option}{tail}")
-    return expanded
+def _expand_braces(
+    pattern: str,
+    *,
+    max_expansions: int = MAX_SCOPE_BRACE_EXPANSIONS,
+) -> list[str]:
+    remaining = max_expansions
+
+    def _expand(value: str) -> list[str]:
+        nonlocal remaining
+        match = _BRACE_RE.search(value)
+        if match is None:
+            if remaining <= 0:
+                raise _ScopeExpansionLimitError(
+                    "scope brace expansion exceeds maximum allowed combinations"
+                )
+            remaining -= 1
+            return [value]
+
+        prefix = value[: match.start()]
+        suffix = value[match.end() :]
+        options = [opt.strip() for opt in match.group(1).split(",")]
+
+        expanded: list[str] = []
+        for option in options:
+            for tail in _expand(suffix):
+                expanded.append(f"{prefix}{option}{tail}")
+        return expanded
+
+    return _expand(pattern)
 
 
 def split_path(path: str | None) -> list[str]:
@@ -54,13 +74,25 @@ def admitted(template_scope: str | None, target_ctx: str | None) -> bool:
     if not ctx_parts:
         return False
 
-    for expanded in _expand_braces(template_scope):
+    try:
+        expanded_scopes = _expand_braces(template_scope)
+    except _ScopeExpansionLimitError:
+        # Fail closed for pathological expansion inputs.
+        return False
+
+    for expanded in expanded_scopes:
         if _admitted_single(expanded, ctx_parts):
             return True
     return False
 
 
 def _admitted_single(expanded_scope: str, ctx_parts: list[str]) -> bool:
+    """Match scope prefix against a placement context with an implicit leaf.
+
+    ``template_scope`` describes where a template may be placed, not the final
+    full path itself. The context therefore must include one additional trailing
+    segment: ``a.b`` admits ``a.b.c`` but not ``a.b``.
+    """
     scope_parts = split_path(expanded_scope)
     if not scope_parts:
         return True

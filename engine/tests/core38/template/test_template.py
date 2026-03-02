@@ -9,7 +9,13 @@ from pydantic import ValidationError
 
 from tangl.core38.entity import Entity
 from tangl.core38.selector import Selector
-from tangl.core38.template import EntityTemplate, Snapshot, TemplateGroup, TemplateRegistry
+from tangl.core38.template import (
+    MAX_SCOPE_BRACE_EXPANSIONS,
+    EntityTemplate,
+    Snapshot,
+    TemplateGroup,
+    TemplateRegistry,
+)
 
 from ..conftest import Block, Scene, SpecialScene
 
@@ -93,6 +99,22 @@ class TestEntityTemplateMatching:
         templ = EntityTemplate(payload=Scene(label="scene-a"), admission_scope="castle.*")
         assert templ.admitted_to("castle.guard")
         assert not templ.admitted_to("village.square")
+
+    def test_admitted_to_non_wildcard_scope_requires_leaf_segment(self) -> None:
+        templ = EntityTemplate(payload=Scene(label="scene-a"), admission_scope="a.b")
+        assert templ.admitted_to("a.b") is False
+        assert templ.admitted_to("a.b.c") is True
+
+    def test_admitted_to_rejects_over_expansive_brace_scope(self) -> None:
+        depth = 1
+        while (1 << depth) <= MAX_SCOPE_BRACE_EXPANSIONS:
+            depth += 1
+
+        templ = EntityTemplate(
+            payload=Scene(label="scene-a"),
+            admission_scope=("{a,b}" * depth) + ".*",
+        )
+        assert templ.admitted_to(("a" * depth) + ".guard") is False
 
     def test_selector_can_filter_with_admitted_to(self) -> None:
         reg = TemplateRegistry()
