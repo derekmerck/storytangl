@@ -22,8 +22,9 @@ import re
 import sys
 import logging
 import itertools
+from uuid import UUID
 from types import MethodType
-from typing import Any, ClassVar, Generic, Iterator, Self, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterator, Self, Type, TypeVar
 from copy import deepcopy
 
 import pydantic
@@ -266,7 +267,7 @@ class TokenCatalog(Generic[WST]):
     def find_all(
         self,
         selector: Selector | None = None,
-        sort_key = None,
+        sort_key: Callable[[WST], Any] | None = None,
     ) -> Iterator[WST]:
         return self.wst._instances.find_all(selector=selector, sort_key=sort_key)
 
@@ -275,7 +276,7 @@ class TokenCatalog(Generic[WST]):
         cls,
         *catalogs: "TokenCatalog[WST]",
         selector: Selector | None = None,
-        sort_key = None,
+        sort_key: Callable[[WST], Any] | None = None,
     ) -> Iterator[WST]:
         values = itertools.chain.from_iterable(
             catalog.wst._instances.values() for catalog in catalogs
@@ -293,7 +294,7 @@ class TokenCatalog(Generic[WST]):
         wrapped_cls: Type[WST],
         instance: WST,
         *,
-        uid = None,
+        uid: UUID | None = None,
         label: str | None = None,
         **token_locals: Any,
     ) -> Token[WST]:
@@ -311,7 +312,7 @@ class TokenCatalog(Generic[WST]):
         self,
         instance: WST,
         *,
-        uid = None,
+        uid: UUID | None = None,
         label: str | None = None,
         **token_locals: Any,
     ) -> Token[WST]:

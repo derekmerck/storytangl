@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from tangl.core38 import Selector
+
+logger = logging.getLogger(__name__)
 
 
 def _selector_criteria(selector: Selector) -> dict[str, Any]:
@@ -152,16 +155,27 @@ def annotate_offer_specificity(requirement: Selector, offer: Any) -> Any:
                     "exact_kind_match": exact_kind_match,
                 }
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "offer.model_copy failed while annotating specificity; "
+                "origin_id=%s specificity=%s exact_kind_match=%s",
+                getattr(offer, "origin_id", None),
+                specificity,
+                exact_kind_match,
+                exc_info=exc,
+            )
     if hasattr(offer, "specificity"):
         try:
             offer.specificity = specificity
             if hasattr(offer, "exact_kind_match"):
                 offer.exact_kind_match = exact_kind_match
             return offer
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "in-place offer specificity annotation failed; origin_id=%s",
+                getattr(offer, "origin_id", None),
+                exc_info=exc,
+            )
     return offer
 
 
