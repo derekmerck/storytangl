@@ -17,6 +17,7 @@ from .provisioner import (
     ProvisionOffer,
     Provisioner,
     TemplateProvisioner,
+    TokenProvisioner,
     InlineTemplateProvisioner,
     FindProvisioner,
     FallbackProvisioner,

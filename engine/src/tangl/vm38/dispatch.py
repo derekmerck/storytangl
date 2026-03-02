@@ -30,12 +30,15 @@ See Also
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from collections import ChainMap
 from collections.abc import Iterable as IterableABC, Mapping
 from typing import Any, Callable, Iterable, TYPE_CHECKING
 
 from tangl.core38 import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record, Selector
 if TYPE_CHECKING:
+    from tangl.core38 import TemplateRegistry
+    from tangl.core38.token import TokenCatalog
     from .provision import Requirement, ProvisionOffer
     from .traversable import TraversableNode, TraversableEdge, AnyTraversableEdge
 
@@ -99,6 +102,13 @@ def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
         selector=Selector(caller_kind=type(caller)),
     )
     return list(receipts)
+
+
+def _subdispatch_context(ctx: Any):
+    with_subdispatch = getattr(ctx, "with_subdispatch", None)
+    if callable(with_subdispatch):
+        return with_subdispatch()
+    return nullcontext(ctx)
 
 
 def _assert_redirect_result(value, *, task: str):
@@ -227,6 +237,20 @@ def on_gather_ns(func=None, **kwargs):
     return dispatch.register(func=func, task="gather_ns", **kwargs)
 
 
+def on_get_template_scope_groups(func=None, **kwargs):
+    """Register a template-scope discovery contributor."""
+    if func is None:
+        return lambda f: dispatch.register(func=f, task="get_template_scope_groups", **kwargs)
+    return dispatch.register(func=func, task="get_template_scope_groups", **kwargs)
+
+
+def on_get_token_catalogs(func=None, **kwargs):
+    """Register a token-catalog discovery contributor."""
+    if func is None:
+        return lambda f: dispatch.register(func=f, task="get_token_catalogs", **kwargs)
+    return dispatch.register(func=func, task="get_token_catalogs", **kwargs)
+
+
 def _coerce_ns_layers(value: Any, *, source: str) -> list[Mapping[str, Any]]:
     if value is None:
         return []
@@ -241,6 +265,71 @@ def _coerce_ns_layers(value: Any, *, source: str) -> list[Mapping[str, Any]]:
     if isinstance(value, Mapping):
         return [value] if value else []
     raise TypeError(f"{source} must return Mapping | ChainMap | None, got {type(value)!r}")
+
+
+def _coerce_template_registries(value: Any, *, source: str) -> list["TemplateRegistry"]:
+    from tangl.core38 import TemplateRegistry as _TemplateRegistry
+
+    if value is None:
+        return []
+
+    if isinstance(value, _TemplateRegistry):
+        raw = [value]
+    elif isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
+        raise TypeError(
+            f"{source} must return TemplateRegistry | Iterable[TemplateRegistry] | None, got {type(value)!r}"
+        )
+    else:
+        raw = list(value)
+
+    registries: list[_TemplateRegistry] = []
+    seen_registry_ids: set[int] = set()
+    for item in raw:
+        if item is None:
+            continue
+        if not isinstance(item, _TemplateRegistry):
+            raise TypeError(
+                "get_template_scope_groups handlers must return TemplateRegistry entries only"
+            )
+        item_id = id(item)
+        if item_id in seen_registry_ids:
+            continue
+        seen_registry_ids.add(item_id)
+        registries.append(item)
+    return registries
+
+
+def _coerce_token_catalogs(value: Any, *, source: str) -> list["TokenCatalog"]:
+    from tangl.core38.token import TokenCatalog as _TokenCatalog
+
+    if value is None:
+        return []
+
+    if isinstance(value, _TokenCatalog):
+        raw = [value]
+    elif isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
+        raise TypeError(
+            f"{source} must return TokenCatalog | Iterable[TokenCatalog] | None, got {type(value)!r}"
+        )
+    else:
+        raw = list(value)
+
+    catalogs: list[_TokenCatalog] = []
+    seen_wrapped: set[int] = set()
+    for item in raw:
+        if item is None:
+            continue
+        if not isinstance(item, _TokenCatalog):
+            raise TypeError(
+                "get_token_catalogs handlers must return TokenCatalog entries only"
+            )
+        wrapped_cls = getattr(item, "wst", None)
+        wrapped_id = id(wrapped_cls)
+        if wrapped_id in seen_wrapped:
+            continue
+        seen_wrapped.add(wrapped_id)
+        catalogs.append(item)
+    return catalogs
 
 
 def _merge_nested_layers(
@@ -293,6 +382,44 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
         layers = [nested_overlay, *layers]
 
     return ChainMap(*layers) if layers else ChainMap()
+
+
+def do_get_template_scope_groups(caller, *, ctx) -> list["TemplateRegistry"]:
+    """Execute template-scope discovery handlers and return merged registries."""
+    _validate_dispatch_ctx(ctx)
+    with _subdispatch_context(ctx) as subctx:
+        receipts = dispatch.execute_all(
+            task="get_template_scope_groups",
+            call_kwargs={"caller": caller},
+            ctx=subctx,
+            selector=Selector(caller_kind=type(caller)),
+        )
+        merged = CallReceipt.merge_results(*receipts)
+    return _coerce_template_registries(
+        merged,
+        source="get_template_scope_groups handler",
+    )
+
+
+def do_get_token_catalogs(
+    caller,
+    *,
+    requirement: "Requirement" | None = None,
+    ctx,
+) -> list["TokenCatalog"]:
+    """Execute token-catalog discovery handlers and return deduped catalogs."""
+    _validate_dispatch_ctx(ctx)
+
+    selector = Selector(caller_kind=type(caller)) if caller is not None else None
+    with _subdispatch_context(ctx) as subctx:
+        receipts = dispatch.execute_all(
+            task="get_token_catalogs",
+            call_kwargs={"caller": caller, "requirement": requirement},
+            ctx=subctx,
+            selector=selector,
+        )
+        merged = CallReceipt.merge_results(*receipts)
+    return _coerce_token_catalogs(merged, source="get_token_catalogs handler")
 
 
 # ---------------------------------------------------------------------------
@@ -356,5 +483,7 @@ __all__ = [
     "on_postreqs", "do_postreqs",
     # helper decos and invocation
     "on_gather_ns", "do_gather_ns",
+    "on_get_template_scope_groups", "do_get_template_scope_groups",
+    "on_get_token_catalogs", "do_get_token_catalogs",
     "on_resolve", "do_resolve",
 ]

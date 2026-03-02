@@ -14,8 +14,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import BehaviorRegistry, DispatchLayer, Graph, OrderedRegistry, Record
+from tangl.core38 import (
+    BehaviorRegistry,
+    DispatchLayer,
+    Graph,
+    OrderedRegistry,
+    Record,
+    TemplateRegistry,
+)
 from tangl.vm38.dispatch import (
+    on_get_template_scope_groups,
     on_journal,
     on_prereqs,
     on_postreqs,
@@ -133,6 +141,29 @@ class TestPhaseCtx:
         assert a.uid in near_ids
         assert b.uid in near_ids
         assert c.uid in near_ids
+
+    def test_with_subdispatch_context_manager_yields_ctx(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid)
+        with ctx.with_subdispatch() as nested:
+            assert nested is ctx
+
+    def test_template_scope_groups_resolve_via_dispatch(self) -> None:
+        class GuardGraph(Graph):
+            def get_template_scope_groups(self, caller):  # pragma: no cover - should never run
+                raise AssertionError("legacy graph template scope lookup should not be called")
+
+        marker = TemplateRegistry(label="marker")
+
+        @on_get_template_scope_groups
+        def provide(*, caller, ctx, **kw):
+            return [marker]
+
+        g = GuardGraph()
+        a = _node(g, label="a")
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid)
+        assert ctx.get_template_scope_groups() == [marker]
 
 
 class TestFrameRandomDeterminism:

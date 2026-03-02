@@ -21,6 +21,8 @@ from __future__ import annotations
 from typing import Optional, Iterator, TypeVar, Generic, Type, Self, Any
 from uuid import uuid4
 import logging
+from fnmatch import fnmatch
+import re
 
 from pydantic import Field
 
@@ -36,6 +38,96 @@ logger.setLevel(logging.WARNING)
 ET = TypeVar("ET", bound=Entity)
 
 NONGENERIC_FIELDS = {'uid', 'seq'}  # discarded when decompiling to script
+_BRACE_RE = re.compile(r"\{([^{}]+)\}")
+MAX_SCOPE_BRACE_EXPANSIONS = 256
+
+
+class _ScopeExpansionLimitError(ValueError):
+    """Raised when admission-scope brace expansion exceeds configured limit."""
+
+
+def _expand_scope_braces(
+    pattern: str,
+    *,
+    max_expansions: int = MAX_SCOPE_BRACE_EXPANSIONS,
+) -> list[str]:
+    remaining = max_expansions
+
+    def _expand(value: str) -> list[str]:
+        nonlocal remaining
+        match = _BRACE_RE.search(value)
+        if match is None:
+            if remaining <= 0:
+                raise _ScopeExpansionLimitError(
+                    "admission_scope brace expansion exceeds maximum allowed combinations"
+                )
+            remaining -= 1
+            return [value]
+
+        prefix = value[: match.start()]
+        suffix = value[match.end() :]
+        options = [opt.strip() for opt in match.group(1).split(",")]
+
+        expanded: list[str] = []
+        for option in options:
+            for tail in _expand(suffix):
+                expanded.append(f"{prefix}{option}{tail}")
+        return expanded
+
+    return _expand(pattern)
+
+
+def _split_scope_path(path: str | None) -> list[str]:
+    if not isinstance(path, str) or not path:
+        return []
+    return [segment for segment in path.split(".") if segment]
+
+
+def _scope_admitted_single(expanded_scope: str, ctx_parts: list[str]) -> bool:
+    """Match scope prefix against a placement context with an implicit leaf.
+
+    ``admission_scope`` is interpreted as a prefix over container/context segments.
+    The target context must include one additional trailing segment (the placement
+    leaf), so a scope like ``a.b`` admits ``a.b.c`` but not ``a.b``.
+    """
+    scope_parts = _split_scope_path(expanded_scope)
+    if not scope_parts:
+        return True
+
+    if scope_parts[-1] in ("*", "**"):
+        prefix = scope_parts[:-1]
+    else:
+        prefix = scope_parts
+
+    if len(ctx_parts) <= len(prefix):
+        return False
+
+    for expected, actual in zip(prefix, ctx_parts):
+        if not fnmatch(actual, expected):
+            return False
+    return True
+
+
+def _scope_admitted(template_scope: str | None, target_ctx: str | None) -> bool:
+    if template_scope in (None, "", "*"):
+        return True
+    if not isinstance(target_ctx, str) or not target_ctx:
+        return False
+
+    ctx_parts = _split_scope_path(target_ctx)
+    if not ctx_parts:
+        return False
+
+    try:
+        expanded_scopes = _expand_scope_braces(template_scope)
+    except _ScopeExpansionLimitError:
+        # Fail closed for pathological expansion inputs.
+        return False
+
+    for expanded in expanded_scopes:
+        if _scope_admitted_single(expanded, ctx_parts):
+            return True
+    return False
 
 
 class EntityTemplate(RegistryAware, Record, Generic[ET]):
@@ -154,6 +246,10 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
     def get_identifiers(self) -> set[Identifier]:
         """Return combined identifier set from template and payload."""
         return super().get_identifiers().union(self.payload.get_identifiers())
+
+    def admitted_to(self, target_ctx: str | None) -> bool:
+        """Return whether this template admits provisioning at ``target_ctx``."""
+        return _scope_admitted(self.admission_scope, target_ctx)
 
     # create copies
     def materialize(self, preserve_uid: bool = False, **updates) -> ET:

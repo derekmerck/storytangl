@@ -6,11 +6,19 @@ from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, SkipValidation
 
-from tangl.core38 import Entity, Record, EntityTemplate, Node, Selector, Priority, TokenFactory
+from tangl.core38 import (
+    Entity,
+    Record,
+    EntityTemplate,
+    Node,
+    Selector,
+    Priority,
+    TemplateRegistry,
+    TokenCatalog,
+)
 from ..traversable import TraversableNode
 
 from .scope import (
-    admitted,
     build_plan,
     leaf_identifier,
     scope_distance,
@@ -56,6 +64,7 @@ class ProvisionOffer(Record):
     priority: int = Priority.NORMAL
     distance_from_caller: int = 999
     specificity: int = 0
+    exact_kind_match: bool = False
     scope_distance: int = 0
     build_plan: list[str] | None = None
     target_ctx: str | None = None
@@ -128,8 +137,7 @@ class FindProvisioner:
 @dataclass
 class TemplateProvisioner:
 
-    templates: SkipValidation[Iterable[EntityTemplate]]  # world's template registry
-    distance: int = 0
+    registries: SkipValidation[Iterable[TemplateRegistry]] = ()
     request_ctx: str = ""
     graph: Any | None = None
     story_materialize: Callable[[EntityTemplate, Any], Entity] | None = None
@@ -154,6 +162,16 @@ class TemplateProvisioner:
         selector = Selector(predicate=requirement.predicate, **criteria)
         return selector.matches(candidate)
 
+    @staticmethod
+    def _selector_without_identifier(requirement: "Requirement") -> Selector:
+        criteria = dict(requirement.__pydantic_extra__ or {})
+        criteria.pop("has_identifier", None)
+        return Selector(predicate=requirement.predicate, **criteria)
+
+    @staticmethod
+    def _matches_scope(candidate: EntityTemplate, target_ctx: str) -> bool:
+        return Selector(admitted_to=target_ctx).matches(candidate)
+
     @classmethod
     def _matches_template_identity(
         cls,
@@ -176,60 +194,74 @@ class TemplateProvisioner:
         return candidate.has_identifier(leaf)
 
     def _materialize_template(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
-        if callable(self.materialize_node):
-            return self.materialize_node(
-                template,
-                _ctx=_ctx,
-                role="provision_leaf",
-                story_materialize=self.story_materialize,
+        if not callable(self.materialize_node):
+            raise RuntimeError(
+                "TemplateProvisioner requires materialize_node for consistent "
+                "story materialization semantics; instantiate through Resolver "
+                "or inject materialize_node explicitly."
             )
-        if callable(self.story_materialize):
-            provider = self.story_materialize(template, _ctx)
-        else:
-            provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        provider.templ_hash = _template_hash_value(template)
-        return provider
+        return self.materialize_node(
+            template,
+            _ctx=_ctx,
+            role="provision_leaf",
+            story_materialize=self.story_materialize,
+        )
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
         identifier = self._selector_identifier(requirement)
-
         is_episode_requirement = self._is_episode_requirement(requirement)
-        for c in self.templates:
-            if not self._matches_non_identifier_criteria(requirement, c):
-                continue
-            if not self._matches_template_identity(requirement, c):
-                continue
+        selector = self._selector_without_identifier(requirement)
+        registries = [registry for registry in self.registries if isinstance(registry, TemplateRegistry)]
+        if not registries:
+            return
 
-            candidate_identifier = identifier or c.payload.get_label()
+        seen_pairs: set[tuple[UUID, str]] = set()
+
+        if isinstance(identifier, str) and identifier:
             target_contexts = target_context_candidates(
-                identifier=candidate_identifier,
+                identifier=identifier,
                 request_ctx=self.request_ctx,
                 authored_path=requirement.authored_path,
                 is_qualified=requirement.is_qualified,
                 is_absolute=requirement.is_absolute,
             )
-            for target_ctx in target_contexts:
-                if not admitted(c.admission_scope, target_ctx):
+        else:
+            target_contexts = [self.request_ctx or ""]
+
+        for target_ctx in target_contexts:
+            ranked_candidates = TemplateRegistry.chain_find_all(
+                *registries,
+                selector=selector,
+                sort_key=lambda template: scope_distance(template.admission_scope, target_ctx),
+            )
+            for candidate in ranked_candidates:
+                if not self._matches_template_identity(requirement, candidate):
+                    continue
+                if not self._matches_scope(candidate, target_ctx):
                     continue
 
-                distance = scope_distance(c.admission_scope, target_ctx)
+                distance = scope_distance(candidate.admission_scope, target_ctx)
+                if is_episode_requirement and (not requirement.is_qualified) and distance > 0:
+                    continue
+
+                pair = (candidate.uid, target_ctx)
+                if pair in seen_pairs:
+                    continue
+                seen_pairs.add(pair)
+
                 chain = None
-                if is_episode_requirement:
-                    if requirement.is_qualified:
-                        chain = build_plan(target_ctx, self.graph)
-                    elif distance > 0:
-                        continue
+                if is_episode_requirement and requirement.is_qualified:
+                    chain = build_plan(target_ctx, self.graph)
 
                 yield ProvisionOffer(
-                    origin_id = "TemplateProvisioner",
-                    policy = ProvisionPolicy.CREATE,
-                    priority = Priority.NORMAL,
-                    distance_from_caller=self.distance,
+                    origin_id="TemplateProvisioner",
+                    policy=ProvisionPolicy.CREATE,
+                    priority=Priority.NORMAL,
                     scope_distance=distance,
                     build_plan=chain,
                     target_ctx=target_ctx,
-                    candidate=c,
-                    callback=lambda *_, _c=c, **kwargs: self._materialize_template(
+                    candidate=candidate,
+                    callback=lambda *_, _c=candidate, **kwargs: self._materialize_template(
                         _c,
                         _ctx=kwargs.get("_ctx"),
                     ),
@@ -261,21 +293,26 @@ class InlineTemplateProvisioner:
         return []
 
     def _materialize_inline(self, template: EntityTemplate, *, _ctx: Any = None) -> Entity:
-        if callable(self.materialize_node):
-            return self.materialize_node(
-                template,
-                _ctx=_ctx,
-                role="provision_leaf",
-                story_materialize=self.story_materialize,
+        if not callable(self.materialize_node):
+            raise RuntimeError(
+                "InlineTemplateProvisioner requires materialize_node for consistent "
+                "story materialization semantics; instantiate through Resolver "
+                "or inject materialize_node explicitly."
             )
-        provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        provider.templ_hash = _template_hash_value(template)
-        return provider
+        return self.materialize_node(
+            template,
+            _ctx=_ctx,
+            role="provision_leaf",
+            story_materialize=self.story_materialize,
+        )
 
     @classmethod
     def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
-        # Compatibility shim retained for existing classmethod call-sites.
-        return cls().iter_dependency_offers(requirement)
+        raise NotImplementedError(
+            "InlineTemplateProvisioner.get_dependency_offers() classmethod shim "
+            "was removed; use Resolver.gather_offers() or "
+            "InlineTemplateProvisioner(...).iter_dependency_offers(requirement)."
+        )
 
     # Can't have a fallback affordance, that's just a structure that's in scope?
 
@@ -338,21 +375,69 @@ class FallbackProvisioner:
         )]
 
 
+@dataclass
 class TokenProvisioner:
-    # todo: This doesn't work yet b/c token factory doesn't present attribs that can be filtered by req
+    """Offer CREATE token providers from singleton token catalogs."""
 
-    token_factories: Iterable[TokenFactory]  # has all token types for this provisioner
+    catalogs: SkipValidation[Iterable[TokenCatalog]] = ()
+
+    @staticmethod
+    def _selector(requirement: "Requirement") -> Selector:
+        criteria = dict(requirement.__pydantic_extra__ or {})
+        # ``label`` is used as the desired token-node label at materialization time.
+        # Do not apply it to singleton candidate filtering.
+        criteria.pop("label", None)
+        return Selector(predicate=requirement.predicate, **criteria)
+
+    @staticmethod
+    def _explicit_label(requirement: "Requirement") -> str | None:
+        value = (requirement.__pydantic_extra__ or {}).get("label")
+        if isinstance(value, str) and value:
+            return value
+        return None
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterable[ProvisionOffer]:
+        selector = self._selector(requirement)
+        label = self._explicit_label(requirement)
+        catalogs = [catalog for catalog in self.catalogs if isinstance(catalog, TokenCatalog)]
+        if not catalogs:
+            return
 
-        candidates = requirement.filter(self.token_factories)
-        for c in candidates:
+        catalogs_by_type = {catalog.wst: catalog for catalog in catalogs}
+
+        def _catalog_for_instance(instance: Any) -> TokenCatalog | None:
+            instance_type = type(instance)
+            exact = catalogs_by_type.get(instance_type)
+            if exact is not None:
+                return exact
+            # Fallback for mixed catalog hierarchies: nearest ancestor catalog.
+            for ancestor in instance_type.__mro__[1:]:
+                catalog = catalogs_by_type.get(ancestor)
+                if catalog is not None:
+                    return catalog
+            return None
+
+        for instance in TokenCatalog.chain_find_all(*catalogs, selector=selector):
+            catalog = _catalog_for_instance(instance)
+            if catalog is None:
+                continue
+            origin = f"TokenProvisioner:{catalog.wst.__name__}:{instance.get_label()}"
             yield ProvisionOffer(
-                origin_id = f"{c.get_label()}:{requirement.token_from}",
-                policy = ProvisionPolicy.CREATE | ProvisionPolicy.TOKEN,
-                callback = c.materialize(requirement.token_from),
-                priority=Priority.EARLY  # tokens are considered to be cheaper than full nodes when available
+                origin_id=origin,
+                policy=ProvisionPolicy.CREATE | ProvisionPolicy.TOKEN,
+                priority=Priority.EARLY,
+                scope_distance=0,
+                candidate=instance,
+                callback=lambda *_, _catalog=catalog, _inst=instance, _label=label, **kwargs: _catalog.materialize_one(
+                    _inst,
+                    uid=_next_provision_uid(_ctx=kwargs.get("_ctx")),
+                    label=_label,
+                ),
             )
+
+    def get_affordance_offers(self, node: Node) -> Iterable[ProvisionOffer]:
+        _ = node
+        return []
 
 
 class UpdateCloneProvisioner:
@@ -561,6 +646,7 @@ class UpdateCloneProvisioner:
             offer
             for offer in offers
             if (offer.policy & ProvisionPolicy.CREATE)
+            and not (offer.policy & ProvisionPolicy.TOKEN)
             and cls._offer_matches_selector(offer, template_selector)
         ]
 

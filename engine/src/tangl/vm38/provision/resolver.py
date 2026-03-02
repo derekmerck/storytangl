@@ -12,11 +12,12 @@ from tangl.core38 import (
     EntityTemplate,
     Priority,
     RegistryAware,
+    TemplateRegistry,
     resolve_ctx,
     Node,
     Selector,
 )
-from ..dispatch import on_provision
+from ..dispatch import do_get_token_catalogs, on_provision
 from ..ctx import VmResolverCtx
 from ..traversable import TraversableNode
 from .matching import annotate_offer_specificity, summarize_offer
@@ -25,6 +26,7 @@ from .provisioner import (
     ProvisionOffer,
     FindProvisioner,
     TemplateProvisioner,
+    TokenProvisioner,
     InlineTemplateProvisioner,
     FallbackProvisioner,
     UpdateCloneProvisioner,
@@ -34,7 +36,6 @@ from .provisioner import (
 )
 from .requirement import Requirement, PT, Dependency, Affordance
 from .scope import (
-    admitted,
     build_plan,
     prefix_paths,
     resolve_target_path,
@@ -43,9 +44,6 @@ from .scope import (
     target_context_candidates,
 )
 
-# Not necessarily a hierarchical template group, just an iterator of
-# templates at the same scope-distance
-TemplateGroup: TypeAlias = Union[EntityGroup, EntityTemplate]
 logger = logging.getLogger(__name__)
 
 
@@ -65,10 +63,10 @@ class Resolver:
     # it and provides a working default with a single group, single distance.
 
     location_entity_groups: Iterable[Iterable[Any]] = ()
-    template_scope_groups: Iterable[TemplateGroup] = ()
+    template_scope_groups: Iterable[TemplateRegistry] = ()
     # Legacy aliases kept for backward compatibility.
     entity_groups: Iterable[Iterable[Any]] = ()
-    template_groups: Iterable[TemplateGroup] = ()
+    template_groups: Iterable[TemplateRegistry] = ()
 
     def __post_init__(self) -> None:
         if not self.location_entity_groups and self.entity_groups:
@@ -95,7 +93,7 @@ class Resolver:
         )
 
     @staticmethod
-    def _ctx_template_scope_groups(ctx) -> Iterable[TemplateGroup]:
+    def _ctx_template_scope_groups(ctx) -> Iterable[TemplateRegistry]:
         getter = getattr(ctx, "get_template_scope_groups", None)
         if callable(getter):
             return getter()
@@ -224,19 +222,34 @@ class Resolver:
         graph = getattr(_ctx, "graph", None)
         story_materialize = self._story_materialize_hook(_ctx)
 
-        offers: list[ProvisionOffer] = []
-        for i, template_group in enumerate(self.template_scope_groups):
-            offers.extend(
-                TemplateProvisioner(
-                    templates=template_group,
-                    distance=i,
-                    request_ctx=request_ctx,
-                    graph=graph,
-                    story_materialize=story_materialize,
-                    materialize_node=self._materialize_node,
-                ).get_dependency_offers(requirement)
-            )
-        return offers
+        provisioner = TemplateProvisioner(
+            registries=self.template_scope_groups,
+            request_ctx=request_ctx,
+            graph=graph,
+            story_materialize=story_materialize,
+            materialize_node=self._materialize_node,
+        )
+        return list(provisioner.get_dependency_offers(requirement))
+
+    def _token_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is None:
+            return []
+
+        caller = getattr(_ctx, "cursor", None)
+        catalogs = do_get_token_catalogs(
+            caller,
+            requirement=requirement,
+            ctx=_ctx,
+        )
+        if not catalogs:
+            return []
+        return list(TokenProvisioner(catalogs=catalogs).get_dependency_offers(requirement))
 
     def inspect_template_dependency_offers(
         self,
@@ -258,27 +271,11 @@ class Resolver:
         offers.sort(key=lambda v: v.sort_key())
         return offers
 
-    @staticmethod
-    def _iter_template_values(group: Any) -> Iterator[EntityTemplate]:
-        if isinstance(group, EntityTemplate):
-            yield group
-            members = getattr(group, "members", None)
-            if callable(members):
-                for member in members():
-                    if isinstance(member, EntityTemplate):
-                        yield member
-            return
-        try:
-            values = iter(group)
-        except TypeError:
-            return
-        for value in values:
-            if isinstance(value, EntityTemplate):
-                yield value
-
     def _iter_templates(self) -> Iterator[EntityTemplate]:
-        for group in self.template_scope_groups:
-            yield from self._iter_template_values(group)
+        for registry in self.template_scope_groups:
+            if not isinstance(registry, TemplateRegistry):
+                continue
+            yield from registry.values()
 
     def gather_offers(
         self,
@@ -297,6 +294,7 @@ class Resolver:
             offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
 
         offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(self._token_offers_for_requirement(requirement, _ctx=_ctx))
 
         offers.extend(
             InlineTemplateProvisioner(
@@ -523,20 +521,19 @@ class Resolver:
 
     def _find_structural_template(self, *, identifier: str, target_ctx: str) -> EntityTemplate | None:
         best: tuple[int, int, EntityTemplate] | None = None
-        for group in self.template_scope_groups:
-            for template in self._iter_template_values(group):
-                if not template.has_identifier(identifier):
-                    continue
-                if not template.has_payload_kind(TraversableNode):
-                    continue
-                if not admitted(template.admission_scope, target_ctx):
-                    continue
-                key = (
-                    scope_distance(template.admission_scope, target_ctx),
-                    int(getattr(template, "seq", 0)),
-                )
-                if best is None or key < (best[0], best[1]):
-                    best = (key[0], key[1], template)
+        for template in self._iter_templates():
+            if not template.has_identifier(identifier):
+                continue
+            if not template.has_payload_kind(TraversableNode):
+                continue
+            if not template.admitted_to(target_ctx):
+                continue
+            key = (
+                scope_distance(template.admission_scope, target_ctx),
+                int(getattr(template, "seq", 0)),
+            )
+            if best is None or key < (best[0], best[1]):
+                best = (key[0], key[1], template)
         if best is None:
             return None
         return best[2]
@@ -761,7 +758,7 @@ class Resolver:
             (template, target_ctx)
             for template in identity_candidates
             for target_ctx in target_ctxs
-            if admitted(template.admission_scope, target_ctx)
+            if template.admitted_to(target_ctx)
         ]
         if not admitted_candidates:
             return [

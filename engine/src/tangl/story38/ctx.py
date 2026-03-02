@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
+from tangl.core38 import TemplateRegistry
 from tangl.vm38.ctx import VmResolverCtx
 
 
@@ -18,7 +19,7 @@ class StoryRuntimeCtx(VmResolverCtx, Protocol):
 
     def get_story_locals(self) -> Mapping[str, Any]: ...
     def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
-    def get_template_scope_groups(self) -> Iterable[Iterable[Any]]: ...
+    def get_template_scope_groups(self) -> Iterable[TemplateRegistry]: ...
 
 
 __all__ = ["StoryRuntimeCtx"]

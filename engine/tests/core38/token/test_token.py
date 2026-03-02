@@ -12,7 +12,7 @@ from tangl.core38.entity import Entity
 from tangl.core38.graph import Graph, GraphItem, HierarchicalNode, Node
 from tangl.core38.selector import Selector
 from tangl.core38.singleton import Singleton
-from tangl.core38.token import Token, TokenFactory
+from tangl.core38.token import Token, TokenCatalog, TokenFactory
 
 from ..conftest import ArmorType, NPCType, WeaponType
 
@@ -197,6 +197,27 @@ class TestTokenKindMatching:
         token = Token[WeaponType](token_from="sword", label="Glamdring")
         assert token.has_kind((WeaponType, ArmorType))
 
+    def test_has_identifier_matches_referent_label(self) -> None:
+        WeaponType(label="sword", damage="1d6")
+        token = Token[WeaponType](token_from="sword", label="Glamdring")
+        assert token.has_identifier("sword")
+
+    def test_has_identifier_matches_token_label_and_referent_label(self) -> None:
+        WeaponType(label="sword", damage="1d6")
+        token = Token[WeaponType](token_from="sword", label="Glamdring")
+        assert token.has_identifier("Glamdring")
+        assert token.has_identifier("sword")
+
+    def test_has_identifier_propagates_unexpected_referent_errors(self) -> None:
+        class BrokenIdType(Singleton):
+            def has_identifier(self, identifier):  # pragma: no cover - exercised through Token
+                raise RuntimeError("broken identifier logic")
+
+        BrokenIdType(label="broken")
+        token = Token[BrokenIdType](token_from="broken", label="broken_token")
+        with pytest.raises(RuntimeError, match="broken identifier logic"):
+            token.has_identifier("not_local_match")
+
     def test_graph_find_by_wrapped_type(self) -> None:
         WeaponType(label="sword", damage="1d6")
         graph = Graph()
@@ -274,3 +295,30 @@ class TestTokenFactory:
 
     def test_factory_is_dataclass(self) -> None:
         assert is_dataclass(TokenFactory)
+
+
+class TestTokenCatalog:
+    def test_find_all_uses_singleton_registry(self) -> None:
+        WeaponType(label="sword", damage="1d6")
+        WeaponType(label="dagger", damage="1d4")
+        catalog = TokenCatalog[WeaponType](wst=WeaponType)
+
+        found = list(catalog.find_all(Selector(has_identifier="sword")))
+        assert len(found) == 1
+        assert found[0].label == "sword"
+
+    def test_materialize_one_uses_instance_label_as_token_from(self) -> None:
+        base = WeaponType(label="sword", damage="1d6")
+        catalog = TokenCatalog[WeaponType](wst=WeaponType)
+
+        token = catalog.materialize_one(base)
+        assert token.token_from == "sword"
+        assert token.label is None
+
+    def test_materialize_one_accepts_label_override(self) -> None:
+        base = WeaponType(label="sword", damage="1d6")
+        catalog = TokenCatalog[WeaponType](wst=WeaponType)
+
+        token = catalog.materialize_one(base, label="Glamdring")
+        assert token.token_from == "sword"
+        assert token.label == "Glamdring"

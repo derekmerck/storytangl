@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from tangl.core38 import Selector
+
+logger = logging.getLogger(__name__)
 
 
 def _selector_criteria(selector: Selector) -> dict[str, Any]:
@@ -44,6 +47,30 @@ def _exact_bonus(name: str, target: Any, candidate: Any) -> int:
     return 0
 
 
+def _exact_kind_match(selector: Selector, candidate: Any) -> bool:
+    if candidate is None:
+        return False
+    target = _selector_criteria(selector).get("has_kind")
+    if not isinstance(target, type):
+        return False
+    if type(candidate) is target:
+        return True
+
+    # Token wrappers expose the referenced singleton type via ``wrapped_cls``.
+    wrapped_cls = getattr(type(candidate), "wrapped_cls", None)
+    if isinstance(wrapped_cls, type) and wrapped_cls is target:
+        return True
+
+    # EntityTemplate candidates should rank exact when payload kind is exact.
+    candidate_dict = getattr(candidate, "__dict__", None)
+    if isinstance(candidate_dict, dict):
+        payload = candidate_dict.get("payload")
+        if payload is not None and type(payload) is target:
+            return True
+
+    return False
+
+
 def score_selector_specificity(selector: Selector, candidate: Any = None) -> int:
     """Compute a CSS-like specificity score for selector/candidate matching."""
     score = 0
@@ -76,16 +103,17 @@ def policy_tier(policy: Any) -> int:
     return 9
 
 
-def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int]:
+def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int, int]:
     """Deterministic offer sort key.
 
     Order:
     1) policy tier
     2) scope distance
     3) distance from caller
-    4) specificity (higher first)
-    5) explicit offer priority
-    6) creation sequence
+    4) exact kind match (exact first)
+    5) specificity (higher first)
+    6) explicit offer priority
+    7) creation sequence
     """
     scope = getattr(offer, "scope_distance", 0)
     if not isinstance(scope, int):
@@ -96,6 +124,7 @@ def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int]:
     specificity = getattr(offer, "specificity", 0)
     if not isinstance(specificity, int):
         specificity = 0
+    exact_kind_match = bool(getattr(offer, "exact_kind_match", False))
     priority = getattr(offer, "priority", 0)
     if not isinstance(priority, int):
         priority = 0
@@ -103,23 +132,50 @@ def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int]:
     if not isinstance(seq, int):
         seq = 0
 
-    return policy_tier(offer.policy), scope, distance, -specificity, priority, seq
+    return (
+        policy_tier(offer.policy),
+        scope,
+        distance,
+        0 if exact_kind_match else 1,
+        -specificity,
+        priority,
+        seq,
+    )
 
 
 def annotate_offer_specificity(requirement: Selector, offer: Any) -> Any:
     candidate = getattr(offer, "candidate", None)
     specificity = score_requirement_specificity(requirement, candidate=candidate)
+    exact_kind_match = _exact_kind_match(requirement, candidate)
     if hasattr(offer, "model_copy"):
         try:
-            return offer.model_copy(update={"specificity": specificity})
-        except Exception:
-            pass
+            return offer.model_copy(
+                update={
+                    "specificity": specificity,
+                    "exact_kind_match": exact_kind_match,
+                }
+            )
+        except Exception as exc:
+            logger.debug(
+                "offer.model_copy failed while annotating specificity; "
+                "origin_id=%s specificity=%s exact_kind_match=%s",
+                getattr(offer, "origin_id", None),
+                specificity,
+                exact_kind_match,
+                exc_info=exc,
+            )
     if hasattr(offer, "specificity"):
         try:
             offer.specificity = specificity
+            if hasattr(offer, "exact_kind_match"):
+                offer.exact_kind_match = exact_kind_match
             return offer
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "in-place offer specificity annotation failed; origin_id=%s",
+                getattr(offer, "origin_id", None),
+                exc_info=exc,
+            )
     return offer
 
 
@@ -131,6 +187,7 @@ def summarize_offer(offer: Any) -> dict[str, Any]:
         "build_plan": getattr(offer, "build_plan", None),
         "target_ctx": getattr(offer, "target_ctx", None),
         "distance_from_caller": getattr(offer, "distance_from_caller", None),
+        "exact_kind_match": getattr(offer, "exact_kind_match", None),
         "specificity": getattr(offer, "specificity", None),
         "priority": getattr(offer, "priority", None),
     }

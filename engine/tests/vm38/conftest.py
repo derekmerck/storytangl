@@ -61,15 +61,21 @@ class SimpleFragment(Record):
 
 @pytest.fixture(autouse=True)
 def clean_vm_dispatch():
-    """Clear the module-level vm_dispatch registry around each test.
+    """Isolate vm_dispatch mutations while preserving pre-registered handlers.
 
-    System handlers register at import time.  Tests that import
-    ``tangl.vm38.system_handlers`` will populate the registry; this
-    fixture ensures that side-effect is cleaned up.
+    Some non-vm38 modules (for example story runtime handlers) register vm hooks
+    at import time during test collection. vm38 tests should run against a clean
+    registry, but must not permanently remove those baseline registrations for
+    subsequent modules in the same pytest session.
     """
+    baseline_behaviors = list(vm_dispatch.values())
     vm_dispatch.clear()
-    yield
-    vm_dispatch.clear()
+    try:
+        yield
+    finally:
+        vm_dispatch.clear()
+        for behavior in baseline_behaviors:
+            vm_dispatch.add(behavior)
 
 
 # ============================================================================

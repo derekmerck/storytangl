@@ -202,6 +202,8 @@ requirement resolution.
 | Decorator | Invocation | Purpose |
 |-----------|------------|---------|
 | `on_gather_ns` | `do_gather_ns` | Namespace assembly from caller/ancestor `get_ns()` + immediate dispatch |
+| `on_get_template_scope_groups` | `do_get_template_scope_groups` | Discover template search-space groups in dispatch order |
+| `on_get_token_catalogs` | `do_get_token_catalogs` | Discover token catalogs in dispatch order (deduped by wrapped type) |
 | `on_resolve` | `do_resolve` | Offer override/filter during provisioning |
 
 **`do_resolve` is a filter hook, not an addition hook.** Handlers return `None` to leave
@@ -209,6 +211,11 @@ existing offers unchanged, or `Iterable[ProvisionOffer]` to replace them. Provis
 (Find, Template, Token) contribute offers *before* `do_resolve` fires in
 `Resolver.gather_offers`. `do_resolve` is for late filtering, scoring adjustments, and
 story-layer offer manipulation — not for generating new offer sources.
+
+**Nested discovery uses a subdispatch boundary.** Discovery helpers (`do_get_template_scope_groups`
+and `do_get_token_catalogs`) run inside `ctx.with_subdispatch()` when available. In vm38
+today this is a no-op seam, but it establishes the stable contract for future receipt
+buffer isolation in nested dispatch calls.
 
 **Aggregation modes match phase semantics.** PREREQS and POSTREQS use `first_result`
 (first redirect wins, subsequent handlers skipped). VALIDATE uses `all_true` (all
@@ -236,6 +243,11 @@ order. This means story_dispatch, world dispatch, and any author-layer registrie
 participate automatically — no context configuration required. The assembly cannot use
 dispatch to assemble itself, so it uses `getattr(graph, "get_authorities", None)` rather
 than a hook call.
+
+**Template scope discovery is dispatch-first.** `PhaseCtx.get_template_scope_groups()`
+calls `do_get_template_scope_groups(caller=cursor, ctx=self)` and uses that merged result
+when available. The graph factory fallback remains as a compatibility path when no
+contributors are registered.
 
 **Namespace is cached per-node per-context.** `get_ns(node)` delegates to
 `do_gather_ns` on cache miss, caches the result by node UID. `do_gather_ns` uses a
@@ -331,8 +343,8 @@ fundamental resolution strategies:
 | Provisioner | Source | Policy | Distance |
 |-------------|--------|--------|----------|
 | `FindProvisioner` | entity_groups from graph | EXISTING | location distance |
-| `TemplateProvisioner` | template_groups from world | CREATE | scope distance |
-| `TokenProvisioner` | singleton catalogs from authorities | CREATE | 0 |
+| `TemplateProvisioner` | `do_get_template_scope_groups` discovery | CREATE | scope distance |
+| `TokenProvisioner` | `do_get_token_catalogs` discovery | CREATE | 0 |
 
 **Provisioners are not registered — they are called.** `Resolver.gather_offers` calls
 each provisioner directly before `do_resolve` fires. This is intentional: provisioners
@@ -348,46 +360,22 @@ naturally rank higher in offer selection.
 #### TokenProvisioner
 
 `TokenProvisioner` integrates singleton catalog discovery into the standard offer
-pipeline. It is stateless — it discovers which singleton types are available by polling
-authorities at offer-generation time:
+pipeline. It is a thin source/filter/offer loop:
 
 ```python
-# Conceptual implementation
-@classmethod
-def get_dependency_offers(cls, requirement, *, ctx=None) -> Iterator[ProvisionOffer]:
-    tokenizable = cls._collect_tokenizable(ctx)   # poll get_tokenizable() from authorities
-    if requirement.kind not in tokenizable:
-        return
-    selector, token_locals = cls._partition(requirement, requirement.kind)
-    for instance in requirement.kind._instances.find_all(selector=selector):
-        yield TokenOffer(singleton=instance, token_locals=token_locals)
+# Resolver-side discovery
+catalogs = do_get_token_catalogs(caller, requirement=requirement, ctx=ctx)
+offers = TokenProvisioner(catalogs=catalogs).get_dependency_offers(requirement)
 ```
 
-**Requirement parameter partitioning.** Not all requirement params are type-level
-filter criteria. Parameters matching `instance_var=True` fields on the singleton class
-are *pass-through* — they do not filter singleton instances, they get assigned into the
-minted token's locals. `_partition(requirement, singleton_cls)` splits on this:
+Each catalog wraps one singleton type (`TokenCatalog.wst`) and delegates matching to the
+singleton `_instances` registry (`catalog.find_all(selector=...)`). For each match,
+TokenProvisioner yields a `CREATE | TOKEN` offer whose callback mints
+`Token[wst](token_from=instance.label, ...)`.
 
-- `instance_var` field → `token_locals`, not passed to Selector
-- callable attribute on singleton → Selector criterion (callable convention)
-- type-level field → Selector criterion (equality check)
-
-This means `Requirement(kind=WearableType, has_coverage=BodyPart.TOP,
-material="dragon leather")` correctly filters on coverage (a method on `WearableType`)
-while passing `material` through to the token's locals without filtering — because
-`material` is an instance_var field.
-
-**Same callable convention as `Selector.matches`.** Singleton methods intended for
-token requirement matching follow the same single-argument convention as selector
-criteria: `has_coverage(region_or_set)`, `has_tags(tag_or_set)`. A method written to
-be Selector-compatible is automatically TokenProvisioner-compatible. This is the
-system-wide matching contract — authors learn it once.
-
-**Authority polling replaces explicit registration.** `_collect_tokenizable(ctx)` walks
-`ctx.get_registries()` and calls `registry.get_tokenizable()` on any registry that
-exposes it. World asset managers implement `get_tokenizable()` and appear in the
-authority chain via `StoryGraph38.get_authorities()`. No explicit registration step
-required at world init.
+Token creation is always treated as synthetic provisioning. Existing token entities on
+the graph are still discovered by `FindProvisioner` like any other entity. Update/clone
+composition excludes TOKEN offers by policy.
 
 #### Offer Selection
 
@@ -433,13 +421,14 @@ registration step at the vm level.
 | Manager | Authority hook | VM consumer |
 |---------|---------------|-------------|
 | `DomainManager` | registers handlers directly | fires through normal dispatch |
-| `ScriptManager` | (not an authority) | provides template groups to Resolver |
-| `AssetManager` | `get_tokenizable()` | `TokenProvisioner._collect_tokenizable` |
+| Story/World discovery handlers | `on_get_template_scope_groups` | Template search-space discovery |
+| World asset/domain providers | `on_get_token_catalogs` (often adapting provider APIs) | Token catalog discovery |
 | `MediaManager` | `on_provision_media` or similar | future provision hook |
 
-`ScriptManager` is the exception — templates are not in the authority chain because they
-are handed to `Resolver` as concrete `TemplateProvisioner(templates=...)` groups, not
-discovered through dispatch. Dispatch is for behaviors; template groups are data.
+Template scope groups and token catalogs are both discovered through dispatch tasks, so
+the VM stays ignorant of world/facet plumbing details. World internals can keep facet
+organization (`templates`, `assets`, etc.); contributors translate that into dispatch
+results.
 
 
 ### System Handlers (`system_handlers.py`)
@@ -536,20 +525,19 @@ edge type with narrative-specific fields subclasses `Choice`, not `TraversableEd
 The vm machinery sees `TraversableEdge` (via `isinstance` or duck-type) and behaves
 correctly.
 
-### Singleton Catalog Discovery: Lazy, Not Eager
+### Catalog Discovery: Dispatch-Native, Not VM-Wired
 
-`TokenProvisioner` polls `get_tokenizable()` at offer-generation time, not at
-initialization. This means:
+Resolver performs catalog/scope discovery by dispatching:
 
-- World asset managers don't need to register with any vm-level service at init
-- Token provisioning works correctly when the world is attached after vm initialization
-- The catalog is always current (no stale pre-assembled list)
-- Adding a new tokenizable type to an AssetManager requires no change to the provisioner
+- `do_get_template_scope_groups(caller, ctx=ctx)`
+- `do_get_token_catalogs(caller, requirement=req, ctx=ctx)`
 
-The cost is that `_collect_tokenizable` walks all registries on every token-relevant
-provision call. For the scale of a narrative engine (dozens of singleton types, not
-millions), this is negligible. If it becomes a bottleneck, a per-context cache keyed on
-`id(ctx)` is the straightforward optimization.
+Contributors decide where data comes from (story lineage maps, world facets, mod systems,
+procedural generators). The VM contract is only "dispatch task in, normalized result out."
+
+This keeps provisioning extensible without adding VM-specific integration points for each
+new search space. It also centralizes merge/validation rules (flattening, token catalog
+dedupe by wrapped type) in one place.
 
 ### Availability vs. Existence
 
@@ -572,7 +560,8 @@ and passes the annotated list to the renderer. The renderer decides presentation
 | Effect lists | `entry_effects` / `final_effects` (two fields) | `effects: list[TraversableEffect]` + `trigger_phase` | Single list, phase declared on the effect |
 | Availability/Effects location | `core.bases.HasAvailability`, `HasEffects` | `vm38.traversable.HasAvailability`, `HasEffects` | Phase vocabulary is VM, not core |
 | Token provisioning | `TokenFactory` in core38 | `TokenProvisioner` in vm38 | Provisioning is context-aware; core is timeless |
-| Catalog discovery | Explicit factory registration | `get_tokenizable()` via authority polling | Self-registering through existing authority chain |
+| Template discovery | Graph/facet call-chain wiring | `do_get_template_scope_groups` dispatch task | VM no longer knows world internals |
+| Catalog discovery | Explicit wiring / polling APIs | `do_get_token_catalogs` dispatch task | Unified discovery contract across search spaces |
 | System handlers | Self-registering mixins via `@on_update` on class body | Module-level `@on_update` with `hasattr` duck-type | No import side effects on dispatch registry |
 | Phase dispatch | Manual aggregation per `do_*` function | `AggregationMode` table driving factory (planned) | Eliminate copy-paste; aggregation mode is data |
 | Provisioner registration | Implicit (attached to context) | Explicit call in `gather_offers` | Clear source of truth for what generates offers |

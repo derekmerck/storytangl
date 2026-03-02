@@ -34,6 +34,7 @@ from tangl.story38.episode import Block, Scene
 from tangl.story38.fabula import StoryCompiler38, StoryMaterializer38
 from tangl.story38.fabula.script_manager38 import ScriptManager38
 from tangl.story38.story_graph import StoryGraph38
+from tangl.vm38.runtime.frame import PhaseCtx
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +238,60 @@ class TestWorldScopeProviderIntegration:
             for item in group
         }
         assert "world.extra.npc" in all_labels
+
+    def test_world_extra_templates_appear_in_phase_ctx_dispatch_scope(self) -> None:
+        @dataclass(slots=True)
+        class _FakeFacet:
+            extra: TemplateRegistry
+
+            def get_template_scope_groups(self, *, caller=None, graph=None):
+                return [list(self.extra.values())]
+
+        base_world = World38.from_script_data(script_data=_multi_scene_script())
+        extra_reg = TemplateRegistry(label="extra")
+        _ = EntityTemplate(
+            label="world.extra.npc",
+            payload=Actor(label="npc", name="NPC"),
+            registry=extra_reg,
+        )
+
+        world = World38(
+            label=base_world.label,
+            bundle=base_world.bundle,
+            templates=_FakeFacet(extra=extra_reg),
+        )
+        result = world.create_story("world_scope_story_ctx", init_mode=InitMode.EAGER)
+        cursor = result.graph.get(result.graph.initial_cursor_id)
+        assert cursor is not None
+
+        ctx = PhaseCtx(graph=result.graph, cursor_id=cursor.uid)
+        registries = ctx.get_template_scope_groups()
+        all_labels = {
+            getattr(item, "label", None)
+            for registry in registries
+            for item in registry.values()
+        }
+        assert "world.extra.npc" in all_labels
+
+    def test_phase_ctx_scope_groups_do_not_call_graph_scope_method(self, monkeypatch) -> None:
+        world, result = _world_and_graph()
+        _ = world
+        graph = result.graph
+        cursor = graph.get(graph.initial_cursor_id)
+        assert cursor is not None
+
+        def _legacy_lookup(_self, _caller):
+            raise AssertionError("legacy graph scope lookup should not be called")
+
+        monkeypatch.setattr(
+            type(graph),
+            "get_template_scope_groups",
+            _legacy_lookup,
+        )
+
+        ctx = PhaseCtx(graph=graph, cursor_id=cursor.uid)
+        groups = ctx.get_template_scope_groups()
+        assert groups
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,10 @@ from tangl.core38 import (
     Registry,
     RegistryAware,
     Selector,
+    Singleton,
+    TemplateRegistry,
+    Token,
+    TokenCatalog,
 )
 from tangl.vm38.provision import (
     Affordance,
@@ -33,6 +37,7 @@ from tangl.vm38.provision import (
     ProvisionPolicy,
     Requirement,
     Resolver,
+    TemplateProvisioner,
     FallbackProvisioner,
     ProvisionOffer,
 )
@@ -71,6 +76,28 @@ def _ctx_with_seed(seed: int) -> SimpleNamespace:
         get_inline_behaviors=lambda: [],
         get_random=lambda: rng,
     )
+
+
+def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> SimpleNamespace:
+    registry = BehaviorRegistry(label="token_catalog_registry")
+
+    def _catalogs(*, caller, requirement, ctx, **kw):
+        return list(catalogs)
+    registry.register(func=_catalogs, task="get_token_catalogs")
+
+    return SimpleNamespace(
+        cursor=None,
+        get_authorities=lambda: [registry],
+        get_registries=lambda: [registry],
+        get_inline_behaviors=lambda: [],
+    )
+
+
+def _template_registry(*templates: EntityTemplate) -> TemplateRegistry:
+    registry = TemplateRegistry(label="resolver_test_templates")
+    for template in templates:
+        registry.add(template)
+    return registry
 
 
 # ============================================================================
@@ -174,7 +201,7 @@ class TestResolverOfferGathering:
 
     def test_template_create_offer_uses_ctx_rng_for_uid(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
-        resolver = Resolver(location_entity_groups=[], template_scope_groups=[[template]])
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[_template_registry(template)])
         req = Requirement(has_identifier="crafted", provision_policy=ProvisionPolicy.CREATE)
 
         seed = 1729
@@ -191,12 +218,139 @@ class TestResolverOfferGathering:
             fallback_templ=template,
             provision_policy=ProvisionPolicy.CREATE,
         )
-        offer = list(InlineTemplateProvisioner.get_dependency_offers(req))[0]
+        offer = list(
+            InlineTemplateProvisioner(
+                materialize_node=Resolver._materialize_node,
+            ).iter_dependency_offers(req)
+        )[0]
 
         seed = 71
         provider = offer.callback(_ctx=_ctx_with_seed(seed))
 
         assert provider.uid == UUID(int=Random(seed).getrandbits(128), version=4)
+
+    def test_inline_template_classmethod_shim_raises(self) -> None:
+        req = Requirement(
+            has_identifier="inline",
+            fallback_templ=EntityTemplate(payload={"kind": Entity, "label": "inline"}),
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+        with pytest.raises(NotImplementedError, match="classmethod shim was removed"):
+            list(InlineTemplateProvisioner.get_dependency_offers(req))
+
+    def test_template_provisioner_materialize_requires_materialize_node(self) -> None:
+        template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
+        req = Requirement(
+            has_identifier="crafted",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+        provisioner = TemplateProvisioner(
+            registries=[_template_registry(template)],
+            request_ctx="",
+            graph=Graph(),
+            materialize_node=None,
+        )
+        offer = list(provisioner.get_dependency_offers(req))[0]
+        with pytest.raises(RuntimeError, match="requires materialize_node"):
+            offer.callback()
+
+    def test_token_catalog_offer_creates_token_provider(self) -> None:
+        class GearType(Singleton):
+            pass
+
+        GearType(label="torch")
+        catalog = TokenCatalog(wst=GearType)
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=GearType,
+            has_identifier="torch",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+
+        provider = resolver.resolve_requirement(req, _ctx=_ctx_with_token_catalogs(catalog))
+        assert isinstance(provider, Token)
+        assert provider.token_from == "torch"
+        assert req.selected_offer_policy is not None
+        assert bool(req.selected_offer_policy & ProvisionPolicy.TOKEN)
+
+    def test_token_offer_uses_requirement_label_for_materialized_token_only(self) -> None:
+        class GearType(Singleton):
+            pass
+
+        GearType(label="torch")
+        catalog = TokenCatalog(wst=GearType)
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=GearType,
+            has_identifier="torch",
+            label="inventory_torch",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+
+        provider = resolver.resolve_requirement(req, _ctx=_ctx_with_token_catalogs(catalog))
+        assert isinstance(provider, Token)
+        assert provider.token_from == "torch"
+        assert provider.label == "inventory_torch"
+
+    def test_token_offer_uses_exact_catalog_for_subclass_instance(self) -> None:
+        class ItemType(Singleton):
+            pass
+
+        class ArmorType(ItemType):
+            pass
+
+        ArmorType(label="chainmail")
+        base_catalog = TokenCatalog(wst=ItemType)
+        armor_catalog = TokenCatalog(wst=ArmorType)
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=ItemType,
+            has_identifier="chainmail",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+
+        provider = resolver.resolve_requirement(
+            req,
+            _ctx=_ctx_with_token_catalogs(base_catalog, armor_catalog),
+        )
+        assert isinstance(provider, Token)
+        assert provider.token_from == "chainmail"
+        assert provider.__class__.wrapped_cls is ArmorType
+
+    def test_existing_offer_beats_token_create_offer(self) -> None:
+        class GearType(Singleton):
+            pass
+
+        GearType(label="torch")
+        existing = Token[GearType](token_from="torch", label="existing")
+        catalog = TokenCatalog(wst=GearType)
+        resolver = Resolver(location_entity_groups=[[existing]], template_scope_groups=[])
+        req = Requirement(
+            has_kind=GearType,
+            has_identifier="torch",
+        )
+
+        provider = resolver.resolve_requirement(req, _ctx=_ctx_with_token_catalogs(catalog))
+        assert provider is existing
+        assert req.selected_offer_policy == ProvisionPolicy.EXISTING
+
+    def test_update_clone_ignores_token_create_offers(self) -> None:
+        class PatchType(Singleton):
+            pass
+
+        PatchType(label="patched")
+        source = Entity(label="source")
+        catalog = TokenCatalog(wst=PatchType)
+        resolver = Resolver(location_entity_groups=[[source]], template_scope_groups=[])
+        req = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.UPDATE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        offers = resolver.gather_offers(req, _ctx=_ctx_with_token_catalogs(catalog))
+        assert offers == []
 
     def test_gathers_from_entity_groups(self) -> None:
         e = Entity(label="sword")
@@ -235,7 +389,11 @@ class TestResolverOfferGathering:
     def test_inline_template_provisioner_offers_create(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "castle"})
         req = Requirement(has_identifier="castle", fallback_templ=template)
-        offers = list(InlineTemplateProvisioner.get_dependency_offers(req))
+        offers = list(
+            InlineTemplateProvisioner(
+                materialize_node=Resolver._materialize_node,
+            ).iter_dependency_offers(req)
+        )
         assert len(offers) == 1
         assert offers[0].policy == ProvisionPolicy.CREATE
 
@@ -258,13 +416,31 @@ class TestResolverOfferGathering:
         offers = resolver.gather_offers(req)
         assert offers
         assert offers[0].candidate is plain
+        assert offers[0].exact_kind_match is True
+        assert any(offer.exact_kind_match is False for offer in offers[1:])
+
+    def test_exact_kind_match_sorts_ahead_of_specificity(self) -> None:
+        exact = ProvisionOffer(
+            policy=ProvisionPolicy.EXISTING,
+            callback=lambda: None,
+            exact_kind_match=True,
+            specificity=0,
+        )
+        inexact = ProvisionOffer(
+            policy=ProvisionPolicy.EXISTING,
+            callback=lambda: None,
+            exact_kind_match=False,
+            specificity=10_000,
+        )
+        ordered = sorted([inexact, exact], key=lambda offer: offer.sort_key())
+        assert ordered[0] is exact
 
     def test_update_clone_declines_without_two_part_formula(self) -> None:
         source = Entity(label="source")
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
         resolver = Resolver(
             location_entity_groups=[[source]],
-            template_scope_groups=[[template]],
+            template_scope_groups=[_template_registry(template)],
         )
         req = Requirement(
             has_kind=Entity,
@@ -278,7 +454,7 @@ class TestResolverOfferGathering:
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
         resolver = Resolver(
             location_entity_groups=[[source]],
-            template_scope_groups=[[template]],
+            template_scope_groups=[_template_registry(template)],
         )
         req = Requirement(
             has_kind=Entity,
@@ -302,7 +478,7 @@ class TestResolverOfferGathering:
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
         resolver = Resolver(
             location_entity_groups=[[source]],
-            template_scope_groups=[[template]],
+            template_scope_groups=[_template_registry(template)],
         )
         req = Requirement(
             has_kind=Entity,
@@ -325,7 +501,7 @@ class TestResolverOfferGathering:
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
         resolver = Resolver(
             location_entity_groups=[[source]],
-            template_scope_groups=[[template]],
+            template_scope_groups=[_template_registry(template)],
         )
         req = Requirement(
             has_kind=Entity,
@@ -344,7 +520,7 @@ class TestResolverOfferGathering:
             template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
             resolver = Resolver(
                 location_entity_groups=[[source]],
-                template_scope_groups=[[template]],
+                template_scope_groups=[_template_registry(template)],
             )
             req = Requirement(
                 has_kind=Entity,
@@ -438,7 +614,7 @@ class TestResolverOfferGathering:
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
         resolver = Resolver(
             location_entity_groups=[[source]],
-            template_scope_groups=[[template]],
+            template_scope_groups=[_template_registry(template)],
         )
         req = Requirement(
             has_kind=Entity,
@@ -505,13 +681,15 @@ class TestResolverRequirementResolution:
         ctx = SimpleNamespace(
             get_location_entity_groups=lambda: [[provider]],
             get_entity_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy entity groups called")),
-            get_template_scope_groups=lambda: [[template]],
+            get_template_scope_groups=lambda: [_template_registry(template)],
             get_template_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy template groups called")),
         )
 
         resolver = Resolver.from_ctx(ctx)
         assert list(resolver.location_entity_groups)[0][0] is provider
-        assert list(resolver.template_scope_groups)[0][0] is template
+        registry = list(resolver.template_scope_groups)[0]
+        assert isinstance(registry, TemplateRegistry)
+        assert registry.find_one(Selector(has_identifier="templ")) is template
 
     def test_from_ctx_legacy_entity_groups_warns(self) -> None:
         provider = Entity(label="provider")
@@ -527,7 +705,7 @@ class TestResolverRequirementResolution:
         template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
         ctx = SimpleNamespace(
             get_location_entity_groups=lambda: [],
-            get_template_groups=lambda: [[template]],
+            get_template_groups=lambda: [_template_registry(template)],
         )
         with pytest.deprecated_call(match="get_template_groups"):
             resolver = Resolver.from_ctx(ctx)
@@ -652,7 +830,7 @@ class TestResolverDependencyResolution:
 
         resolver = Resolver(
             location_entity_groups=[[cursor]],
-            template_scope_groups=[[leaf_template, root_template, child_template]],
+            template_scope_groups=[_template_registry(leaf_template, root_template, child_template)],
         )
         ctx = SimpleNamespace(
             graph=g,

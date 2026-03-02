@@ -27,7 +27,7 @@ from typing import Callable, Iterator
 
 import pytest
 
-from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware
+from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware, TemplateRegistry
 from tangl.vm38.dispatch import (
     dispatch as vm_dispatch,
     do_provision,
@@ -65,6 +65,13 @@ def _ctx() -> SimpleNamespace:
         get_registries=lambda: [],
         get_inline_behaviors=lambda: [],
     )
+
+
+def _template_registry(*templates: EntityTemplate) -> TemplateRegistry:
+    registry = TemplateRegistry(label="provision_pipeline_templates")
+    for template in templates:
+        registry.add(template)
+    return registry
 
 
 @contextmanager
@@ -381,7 +388,7 @@ class TestPolicyEnforcement:
 
     def test_create_policy_only_uses_template_provisioners(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "new_thing"})
-        resolver = Resolver(entity_groups=[], template_scope_groups=[[template]])
+        resolver = Resolver(entity_groups=[], template_scope_groups=[_template_registry(template)])
         req = Requirement(
             has_identifier="new_thing",
             provision_policy=ProvisionPolicy.CREATE,
@@ -406,7 +413,11 @@ class TestPolicyEnforcement:
             fallback_templ=template,
             provision_policy=ProvisionPolicy.CREATE,
         )
-        offers = list(InlineTemplateProvisioner.get_dependency_offers(req))
+        offers = list(
+            InlineTemplateProvisioner(
+                materialize_node=Resolver._materialize_node,
+            ).iter_dependency_offers(req)
+        )
         assert any(o.policy == ProvisionPolicy.CREATE for o in offers)
 
 
