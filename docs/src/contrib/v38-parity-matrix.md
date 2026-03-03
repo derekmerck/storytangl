@@ -1,8 +1,8 @@
 # V38 Parity Matrix (Phase 1)
 
 ## Status
-- Date: 2026-03-02
-- Phase: 1 (inventory and classification; service38 C-track isolation + ACL + vm38 user namespace bridge implemented)
+- Date: 2026-03-03
+- Phase: 1 (inventory/classification complete; parity execution snapshot refreshed against active v38 suites)
 - Scope lock: `engine/tests/core`, `engine/tests/vm`, `engine/tests/story`, `engine/tests/service`
 - Explicitly out of first-pass classification scope: `engine/tests/integration`, `engine/tests/loaders`, `engine/tests/ir` (tracked as secondary references only)
 
@@ -11,24 +11,24 @@ This matrix classifies each in-scope legacy test module exactly once and maps it
 - `PORT_*`: move test intent into v38 behavior/contracts.
 - `RETIRE_*`: remove from parity gate because behavior is gone, moved, or irrelevant.
 
-This document is analysis-only and does not execute cutover work.
+This document tracks both mapping decisions and current parity execution status for mapped `PORT_*` targets.
 
 ## Inventory Snapshot
-- Total in-scope legacy modules: `125`
+- Total in-scope legacy modules: `128`
 - By feature area:
   - `core`: 15
   - `vm`: 41
   - `story`: 56
-  - `service`: 13
+  - `service`: 16
 - By disposition:
-  - `PORT_DIRECT`: 13
+  - `PORT_DIRECT`: 16
   - `PORT_ADAPT`: 72
   - `RETIRE_REMOVED`: 24
   - `RETIRE_MOVED`: 12
   - `RETIRE_IRRELEVANT`: 4
 - By risk level:
-  - `low`: 19
-  - `medium`: 55
+  - `low`: 20
+  - `medium`: 57
   - `high`: 51
 
 ## Disposition Legend
@@ -39,25 +39,43 @@ This document is analysis-only and does not execute cutover work.
 - `RETIRE_IRRELEVANT`: no meaningful mapping to v38 architecture.
 
 ## Target Resolution Status (PORT rows)
-- `PORT_*` rows: `85`
+- `PORT_*` rows: `88`
 - Missing `target_v38_test_path`: `0`
-- Unique target modules: `33`
-  - Existing targets: `21`
-  - Planned targets: `12`
+- Unique target modules: `36`
+  - Existing targets: `36`
+  - Planned targets: `0`
 
 Planned target modules referenced by `PORT_*` rows:
-- `engine/tests/service38/controllers/test_runtime_controller.py`
-- `engine/tests/service38/controllers/test_user_controller.py`
-- `engine/tests/service38/response/test_exports.py`
-- `engine/tests/service38/test_api_endpoint.py`
-- `engine/tests/service38/test_orchestrator.py`
-- `engine/tests/story38/test_choice_availability.py`
-- `engine/tests/story38/test_compiler_scope_resolution.py`
-- `engine/tests/story38/test_journal_order.py`
-- `engine/tests/story38/test_traversal_playthrough.py`
-- `engine/tests/vm38/test_call_stack.py`
-- `engine/tests/vm38/test_phase_integration.py`
-- `engine/tests/vm38/test_provision_pipeline.py`
+- None.
+
+## Current Port Coverage Snapshot (2026-03-03)
+- `PORT_*` rows with existing target tests: `88 / 88` (`100.0%`)
+- By feature area:
+  - `core`: `13 / 13`
+  - `vm`: `30 / 30`
+  - `story`: `33 / 33`
+  - `service`: `12 / 12`
+- Remaining `PORT_*` gaps:
+  - None.
+- Validation run:
+  - Command: `poetry run pytest -q engine/tests/core38 engine/tests/vm38 engine/tests/story38 engine/tests/service38`
+  - Result: `909 passed, 11 warnings`
+
+## Legacy vs V38 Surface Audit (2026-03-03)
+- Scope-completeness check:
+  - In-scope legacy test modules discovered under scope lock: `128`
+  - Matrix rows: `128` (unique legacy paths: `128`)
+  - Missing rows: `0`; duplicate rows: `0`
+- Surface comparison snapshot (package/module level, implementation-facing):
+  - `core` modules: `36` → `core38` modules: `15` (name-overlap modules: `8`)
+  - `vm` modules: `40` → `vm38` modules: `25` (name-overlap modules: `11`)
+  - `story` modules: `38` → `story38` modules: `23` (name-overlap modules: `12`)
+  - `service` modules: `25` → `service38` modules: `14` (name-overlap modules: `6`)
+- Interpretation:
+  - Lower direct module-name overlap is expected from v38 consolidation/refactoring (trait split, phase-driven VM runtime, service gateway/adapter model).
+  - Parity remains test-intent based; non-overlap modules are represented through `PORT_ADAPT`/`RETIRE_*` dispositions rather than 1:1 module renames.
+- Audit delta found during this pass:
+  - Added previously missing in-scope service rows (all `PORT_DIRECT`): `test_auth38.py`, `test_operations38.py`, `test_rest_adapter38.py`.
 
 ## Classification Matrix
 | legacy_test_path | feature_area | disposition | target_v38_test_path | v38_feature_anchor | rationale | risk_level | status |
@@ -72,7 +90,7 @@ Planned target modules referenced by `PORT_*` rows:
 | engine/tests/core/graph/test_graph.py | core | PORT_ADAPT | engine/tests/core38/graph/test_graph.py | tangl.core38.graph.Graph | Graph topology behavior persists in v38 with consolidated graph item types and updated endpoint naming. | low | mapped |
 | engine/tests/core/graph/test_node.py | core | PORT_ADAPT | engine/tests/core38/graph/test_graph.py | tangl.core38.graph.Graph | Graph topology behavior persists in v38 with consolidated graph item types and updated endpoint naming. | low | mapped |
 | engine/tests/core/graph/test_token_37.py | core | PORT_ADAPT | engine/tests/core38/token/test_token.py | tangl.core38.token.Token | Graph token behavior is still needed but should follow the v38 token wrapper model instead of v37 token-node conventions. | medium | mapped |
-| engine/tests/core/record/test_content_addressable.py | core | RETIRE_REMOVED |  | tangl.core38.record.Record.hashable_content | v38 no longer carries a standalone ContentAddressable model and folds content hashing semantics into core38 record/entity traits. | low | mapped |
+| engine/tests/core/record/test_content_addressable.py | core | RETIRE_REMOVED |  | tangl.core38.record.Record.get_hashable_content | v38 no longer carries a standalone ContentAddressable model and folds content hashing semantics into core38 record/entity traits. | low | mapped |
 | engine/tests/core/record/test_record_stream.py | core | PORT_ADAPT | engine/tests/core38/record/test_record.py | tangl.core38.record.OrderedRegistry | Record stream behaviors continue via core38 ordered registry with different naming and slice/query helpers. | low | mapped |
 | engine/tests/core/registry/test_registry.py | core | PORT_DIRECT | engine/tests/core38/registry/test_registry.py | tangl.core38.registry.Registry | Registry CRUD and selection semantics remain first-class in core38 with directly comparable contracts. | low | mapped |
 | engine/tests/core/registry/test_selection.py | core | PORT_ADAPT | engine/tests/core38/selector/test_selector.py | tangl.core38.selector.Selector.matches | Selection remains in scope but moved to explicit Selector-driven matching rather than legacy inline matcher assumptions. | low | mapped |
@@ -86,10 +104,13 @@ Planned target modules referenced by `PORT_*` rows:
 | engine/tests/service/response/test_native_response.py | service | RETIRE_REMOVED |  | tangl.service38.gateway.ServiceGateway38.execute | Legacy native response/info model contracts are superseded by service38 gateway operation and runtime-envelope contracts. | high | mapped |
 | engine/tests/service/response/test_runtime38_response.py | service | PORT_DIRECT | engine/tests/service/response/test_runtime38_response.py | tangl.service.response.RuntimeEnvelope38 | RuntimeEnvelope38 is already v38-specific and should remain as direct transport contract coverage. | low | mapped |
 | engine/tests/service/test_api_endpoints.py | service | PORT_ADAPT | engine/tests/service38/test_api_endpoint.py | tangl.service38.api_endpoint.ApiEndpoint38.annotate | Endpoint annotation metadata remains required but should validate service38 policy-aware endpoint wrappers. | medium | mapped |
+| engine/tests/service/test_auth38.py | service | PORT_DIRECT | engine/tests/service/test_auth38.py | tangl.service38.auth.user_id_by_key | API-key auth resolution and access-level mapping are already v38-specific and should remain direct parity coverage. | medium | mapped |
+| engine/tests/service/test_operations38.py | service | PORT_DIRECT | engine/tests/service/test_operations38.py | tangl.service38.operations.endpoint_for_operation | Operation-to-endpoint routing and bootstrap registration are already encoded as service38 contracts and should stay directly gated. | low | mapped |
 | engine/tests/service/test_orchestrator.py | service | PORT_ADAPT | engine/tests/service38/test_orchestrator.py | tangl.service38.orchestrator.Orchestrator38.execute | Orchestrator behavior remains core but should be validated against service38 hydration, policy, and writeback semantics. | high | mapped |
 | engine/tests/service/test_orchestrator38.py | service | PORT_DIRECT | engine/tests/service/test_orchestrator38.py | tangl.service38.orchestrator.Orchestrator38 | This suite already targets service38 orchestrator behavior and should stay as direct parity evidence. | low | mapped |
 | engine/tests/service/test_orchestrator_basic.py | service | PORT_ADAPT | engine/tests/service38/test_orchestrator.py | tangl.service38.orchestrator.Orchestrator38.execute | Orchestrator behavior remains core but should be validated against service38 hydration, policy, and writeback semantics. | high | mapped |
 | engine/tests/service/test_response_contract.py | service | RETIRE_REMOVED |  | tangl.service38.gateway.ServiceGateway38.execute | Legacy native response/info model contracts are superseded by service38 gateway operation and runtime-envelope contracts. | high | mapped |
+| engine/tests/service/test_rest_adapter38.py | service | PORT_DIRECT | engine/tests/service/test_rest_adapter38.py | tangl.service38.rest_adapter.GatewayRestAdapter38.execute_operation | Transport adapter request/auth forwarding is already service38-native behavior and should remain direct parity coverage. | medium | mapped |
 | engine/tests/story/asset/test_asset_bag.py | story | RETIRE_MOVED |  | tangl.story38.fabula.StoryMaterializer38 | Legacy story-level asset workflows are demoted from in-scope v38 parity and moved outside the core refactor gate. | medium | mapped |
 | engine/tests/story/asset/test_asset_manager2.py | story | RETIRE_MOVED |  | tangl.story38.fabula.StoryMaterializer38 | Legacy story-level asset workflows are demoted from in-scope v38 parity and moved outside the core refactor gate. | medium | mapped |
 | engine/tests/story/asset/test_asset_wallet.py | story | RETIRE_MOVED |  | tangl.story38.fabula.StoryMaterializer38 | Legacy story-level asset workflows are demoted from in-scope v38 parity and moved outside the core refactor gate. | medium | mapped |
@@ -171,9 +192,9 @@ Planned target modules referenced by `PORT_*` rows:
 | engine/tests/vm/provision/test_template_provisioner_delegation.py | vm | PORT_ADAPT | engine/tests/vm38/test_resolver.py | tangl.vm38.provision.TemplateProvisioner | Template-based provisioning still exists but is now exercised through vm38 resolver/template scope APIs. | high | mapped |
 | engine/tests/vm/provision/test_template_provisioner_scope.py | vm | PORT_ADAPT | engine/tests/vm38/test_resolver.py | tangl.vm38.provision.TemplateProvisioner | Template-based provisioning still exists but is now exercised through vm38 resolver/template scope APIs. | high | mapped |
 | engine/tests/vm/provision/test_token_provisioner.py | vm | RETIRE_REMOVED |  | tangl.vm38.provision.InlineTemplateProvisioner | Dedicated token provisioner paths were removed and replaced by generic resolver/template provisioners in vm38. | medium | mapped |
-| engine/tests/vm/test_call_return_integration.py | vm | PORT_ADAPT | engine/tests/vm38/test_call_stack.py | tangl.vm38.runtime.ledger.push_call | Call/return stack behavior remains required but should be ported to vm38 frame+ledger stack semantics. | high | mapped |
-| engine/tests/vm/test_call_stack.py | vm | PORT_ADAPT | engine/tests/vm38/test_call_stack.py | tangl.vm38.runtime.ledger.push_call | Call/return stack behavior remains required but should be ported to vm38 frame+ledger stack semantics. | high | mapped |
-| engine/tests/vm/test_call_stack_persistence.py | vm | PORT_ADAPT | engine/tests/vm38/test_call_stack.py | tangl.vm38.runtime.ledger.push_call | Call/return stack behavior remains required but should be ported to vm38 frame+ledger stack semantics. | high | mapped |
+| engine/tests/vm/test_call_return_integration.py | vm | PORT_ADAPT | engine/tests/vm38/test_call_stack.py | tangl.vm38.runtime.ledger.Ledger.push_call | Call/return stack behavior remains required but should be ported to vm38 frame+ledger stack semantics. | high | mapped |
+| engine/tests/vm/test_call_stack.py | vm | PORT_ADAPT | engine/tests/vm38/test_call_stack.py | tangl.vm38.runtime.ledger.Ledger.push_call | Call/return stack behavior remains required but should be ported to vm38 frame+ledger stack semantics. | high | mapped |
+| engine/tests/vm/test_call_stack_persistence.py | vm | PORT_ADAPT | engine/tests/vm38/test_call_stack.py | tangl.vm38.runtime.ledger.Ledger.push_call | Call/return stack behavior remains required but should be ported to vm38 frame+ledger stack semantics. | high | mapped |
 | engine/tests/vm/test_context.py | vm | PORT_ADAPT | engine/tests/vm38/test_frame.py | tangl.vm38.runtime.frame.PhaseCtx.get_ns | Legacy VM context responsibilities were refactored into vm38 PhaseCtx and should be asserted against the new accessors. | medium | mapped |
 | engine/tests/vm/test_context_journal_state.py | vm | PORT_ADAPT | engine/tests/vm38/test_system_handlers.py | tangl.vm38.runtime.frame.Frame.follow_edge | Journal-time state expectations remain valid but should be tested through vm38 phase sequencing and system handlers. | medium | mapped |
 | engine/tests/vm/test_cost_model.py | vm | RETIRE_IRRELEVANT |  | tangl.vm38.provision.ProvisionPolicy | Legacy cost model heuristics are not part of vm38 MVP provisioning policy semantics. | medium | mapped |
@@ -186,4 +207,4 @@ Planned target modules referenced by `PORT_*` rows:
 | engine/tests/vm/test_ns.py | vm | PORT_ADAPT | engine/tests/vm38/test_system_handlers.py | tangl.vm38.dispatch.do_gather_ns | Namespace assembly remains required but now flows through vm38 gather_ns dispatch and PhaseCtx caching. | medium | mapped |
 | engine/tests/vm/test_stack_event_sourcing.py | vm | RETIRE_REMOVED |  | tangl.vm38.replay.DiffReplayEngine | Legacy stack event-sourcing infrastructure is deprecated by vm38 in favor of simpler diff patches and step records. | high | mapped |
 | engine/tests/vm/test_traversal_utilities.py | vm | PORT_DIRECT | engine/tests/vm38/test_traversal.py | tangl.vm38.traversal.steps_since_last_visit | Traversal utility behavior is directly represented by vm38 traversal query functions. | low | mapped |
-| engine/tests/vm/test_update_markers.py | vm | RETIRE_REMOVED |  | tangl.vm38.runtime.ledger.get_journal | Marker-channel update slicing was replaced by step-based fragment retrieval in vm38 output streams. | medium | mapped |
+| engine/tests/vm/test_update_markers.py | vm | RETIRE_REMOVED |  | tangl.vm38.runtime.ledger.Ledger.get_journal | Marker-channel update slicing was replaced by step-based fragment retrieval in vm38 output streams. | medium | mapped |
