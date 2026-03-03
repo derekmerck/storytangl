@@ -20,6 +20,7 @@ class GatewayRequest38:
     operation: ServiceOperation38
     params: Mapping[str, Any] = field(default_factory=dict)
     user_id: UUID | None = None
+    user_auth: UserAuthInfo | None = None
     render_profile: str | None = None
 
 
@@ -61,6 +62,7 @@ class GatewayRestAdapter38:
         return self.gateway.execute(
             request.operation,
             user_id=request.user_id,
+            user_auth=request.user_auth,
             render_profile=request.render_profile or self.default_render_profile,
             **dict(request.params),
         )
@@ -71,6 +73,7 @@ class GatewayRestAdapter38:
         /,
         *,
         user_id: UUID | None = None,
+        user_auth: UserAuthInfo | None = None,
         render_profile: str | None = None,
         **params: Any,
     ) -> Any:
@@ -79,6 +82,7 @@ class GatewayRestAdapter38:
         return self.gateway.execute(
             operation,
             user_id=user_id,
+            user_auth=user_auth,
             render_profile=render_profile or self.default_render_profile,
             **params,
         )
@@ -94,10 +98,11 @@ class GatewayRestAdapter38:
     ) -> Any:
         """Resolve ``api_key`` then execute user-scoped operation."""
 
-        user_id = self.resolve_user_id(api_key)
+        user_auth = self.resolve_user_auth(api_key)
         return self.execute_operation(
             operation,
-            user_id=user_id,
+            user_id=user_auth.user_id,
+            user_auth=user_auth,
             render_profile=render_profile,
             **params,
         )

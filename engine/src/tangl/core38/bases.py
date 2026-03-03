@@ -205,6 +205,20 @@ class BaseModelPlus(BaseModel):
         """Set field values on frozen instances directly, bypassing validation."""
         self.__dict__[attrib_name] = value
 
+    @classmethod
+    def __fqn__(cls) -> str:
+        return f"{cls.__module__}.{cls.__name__}"
+
+    @classmethod
+    def dereference_cls_name(cls, name: str) -> Type[Self] | None:
+        """Resolve a class name/fqn against ``cls`` and its subclass tree."""
+        if name == cls.__qualname__ or name == cls.__fqn__():
+            return cls
+        for sub_cls in cls.__subclasses__():
+            if resolved := sub_cls.dereference_cls_name(name):
+                return resolved
+        return None
+
 
 def is_identifier(meth: Callable[..., Any]) -> Callable[..., Any]:
     """Mark a method as an identifier producer.

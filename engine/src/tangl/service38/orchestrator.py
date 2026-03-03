@@ -10,9 +10,11 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from tangl.core import BaseFragment
-from tangl.service.exceptions import ServiceError
+from tangl.service.api_endpoint import AccessLevel
+from tangl.service.exceptions import AccessDeniedError, AuthMismatchError, ServiceError
 
 from .api_endpoint import (
+    ApiEndpoint38,
     EndpointPolicy,
     LegacyApiEndpoint,
     MethodType,
@@ -31,6 +33,7 @@ from .response import (
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
     from tangl.service.api_endpoint import HasApiEndpoints
+    from .auth import UserAuthInfo
 
 
 @dataclass
@@ -114,6 +117,7 @@ class Orchestrator38:
         endpoint_name: str,
         *,
         user_id: UUID | None = None,
+        user_auth: "UserAuthInfo | None" = None,
         exec_options: ExecuteOptions | None = None,
         **params: Any,
     ) -> NativeResponse:
@@ -133,6 +137,13 @@ class Orchestrator38:
             binding.hydration_bindings,
             user_id,
             params,
+        )
+        self._enforce_access(
+            endpoint=endpoint,
+            endpoint_name=endpoint_name,
+            user_id=user_id,
+            user_auth=user_auth,
+            resolved_params=resolved_params,
         )
 
         try:
@@ -156,6 +167,10 @@ class Orchestrator38:
             return result
 
         except ServiceError as exc:
+            if isinstance(exc, AccessDeniedError):
+                self._resource_cache.clear()
+                raise
+
             ledger = resolved_params.get("ledger")
             cursor_id = getattr(ledger, "cursor_id", None)
             step = getattr(ledger, "step", None)
@@ -166,6 +181,51 @@ class Orchestrator38:
                 cursor_id=cursor_id,
                 step=step,
             )
+
+    def _enforce_access(
+        self,
+        *,
+        endpoint: LegacyApiEndpoint,
+        endpoint_name: str,
+        user_id: UUID | None,
+        user_auth: "UserAuthInfo | None",
+        resolved_params: Mapping[str, Any],
+    ) -> None:
+        if not isinstance(endpoint, ApiEndpoint38):
+            return
+
+        required_level = getattr(endpoint, "access_level", AccessLevel.RESTRICTED) or AccessLevel.RESTRICTED
+        caller_level = self._resolve_caller_access_level(
+            user_id=user_id,
+            user_auth=user_auth,
+            resolved_params=resolved_params,
+        )
+        if caller_level < required_level:
+            raise AccessDeniedError(
+                f"Access denied for endpoint '{endpoint_name}' "
+                f"(required={required_level.name}, actual={caller_level.name})"
+            )
+
+    def _resolve_caller_access_level(
+        self,
+        *,
+        user_id: UUID | None,
+        user_auth: "UserAuthInfo | None",
+        resolved_params: Mapping[str, Any],
+    ) -> AccessLevel:
+        if user_auth is not None:
+            if user_id is not None and user_auth.user_id != user_id:
+                raise AuthMismatchError(
+                    f"user_id {user_id} does not match authenticated user {user_auth.user_id}"
+                )
+            return user_auth.access_level
+
+        hydrated_user = self._resolve_hydrated_user(resolved_params=resolved_params, user_id=user_id)
+        if hydrated_user is None:
+            return AccessLevel.PUBLIC
+        if bool(getattr(hydrated_user, "privileged", False)):
+            return AccessLevel.RESTRICTED
+        return AccessLevel.USER
 
     @staticmethod
     def _should_write_back(method_type: MethodType, mode: WritebackMode) -> bool:
@@ -188,6 +248,7 @@ class Orchestrator38:
         explicit_ledger_id = provided.get("ledger_id")
         computed_ledger_id: UUID | None = explicit_ledger_id
         hydrated_ledger: Any | None = resolved.get("ledger") if "ledger" in resolved else None
+        hydrated_user: Any | None = resolved.get("user") if "user" in resolved else None
         user_required = self._is_binding_required(endpoint, ResourceBinding.USER)
         ledger_required = self._is_binding_required(endpoint, ResourceBinding.LEDGER)
         frame_required = self._is_binding_required(endpoint, ResourceBinding.FRAME)
@@ -197,7 +258,8 @@ class Orchestrator38:
                 if user_required:
                     raise ValueError("user_id is required to hydrate user parameter")
             else:
-                resolved["user"] = self._get_or_load_user(user_id)
+                hydrated_user = self._get_or_load_user(user_id)
+                resolved["user"] = hydrated_user
 
         if ResourceBinding.LEDGER in hydration_bindings and "ledger" not in resolved:
             ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
@@ -213,6 +275,12 @@ class Orchestrator38:
                 ledger = self._get_or_load_ledger(ledger_id)
                 hydrated_ledger = ledger
                 resolved["ledger"] = ledger
+                hydrated_user = hydrated_user or self._resolve_hydrated_user(
+                    resolved_params=resolved,
+                    user_id=user_id,
+                )
+                if hydrated_user is not None:
+                    self._attach_runtime_user(ledger, hydrated_user)
 
         if ResourceBinding.FRAME in hydration_bindings and "frame" not in resolved:
             ledger = hydrated_ledger or resolved.get("ledger")
@@ -230,9 +298,43 @@ class Orchestrator38:
                     ledger = self._get_or_load_ledger(ledger_id)
                     hydrated_ledger = ledger
             if ledger is not None:
+                hydrated_user = hydrated_user or self._resolve_hydrated_user(
+                    resolved_params=resolved,
+                    user_id=user_id,
+                )
+                if hydrated_user is not None:
+                    self._attach_runtime_user(ledger, hydrated_user)
                 resolved["frame"] = ledger.get_frame()
 
         return resolved
+
+    def _resolve_hydrated_user(
+        self,
+        *,
+        resolved_params: Mapping[str, Any],
+        user_id: UUID | None,
+    ) -> Any | None:
+        user = resolved_params.get("user")
+        if user is not None:
+            return user
+        if user_id is None:
+            return None
+        entry = self._resource_cache.get(user_id)
+        if entry is not None:
+            return entry.resource
+        try:
+            return self._get_or_load_user(user_id)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _attach_runtime_user(ledger: Any, user: Any) -> None:
+        if hasattr(ledger, "user"):
+            setattr(ledger, "user", user)
+
+        user_uid = getattr(user, "uid", None)
+        if user_uid is not None and hasattr(ledger, "user_id"):
+            setattr(ledger, "user_id", user_uid)
 
     @staticmethod
     def _is_binding_required(endpoint: LegacyApiEndpoint, binding: ResourceBinding) -> bool:

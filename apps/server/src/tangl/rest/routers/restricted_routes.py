@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from fastapi import Depends, Header, HTTPException, Path, Query
 
-from tangl.service.response.info_response import RuntimeInfo
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38, resolve_user_id38
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
+from tangl.rest.dependencies import get_orchestrator, get_user_locks
+from tangl.rest.dependencies38 import get_service_adapter38, resolve_user_auth38
+from tangl.service import Orchestrator
+from tangl.service.response import RuntimeInfo
+from tangl.service38 import GatewayRestAdapter38
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -14,84 +16,78 @@ from .system_router import router as system_router
 from .world_router import router as world_router
 
 
-def _call(
-    adapter: GatewayRestAdapter38,
-    operation: ServiceOperation38,
+def _call_legacy(
+    orchestrator: Orchestrator,
+    endpoint_name: str,
     /,
     *,
     user_id=None,
-    render_profile: str = "raw",
     **params,
 ):
-    return adapter.execute_operation(
-        operation,
-        user_id=user_id,
-        render_profile=render_profile,
-        **params,
-    )
+    kwargs = dict(params)
+    if user_id is not None:
+        kwargs["user_id"] = user_id
+    return orchestrator.execute(endpoint_name, **kwargs)
 
 
 @story_router.put("/go", tags=["Restricted"])
 async def goto_story_block(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks = Depends(get_user_locks38),
+    user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     block_id: UniqueLabel = Query(example="scene_1/block_1"),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
-    """Jump the active frame to ``block_id``."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
-    async with user_locks[user_id]:
-        return _call(
-            adapter,
-            ServiceOperation38.STORY_JUMP,
-            user_id=user_id,
-            render_profile=render_profile,
+    """Jump the active frame to ``block_id`` via the legacy orchestrator path."""
+    _ = render_profile
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    async with user_locks[user_auth.user_id]:
+        return _call_legacy(
+            orchestrator,
+            "RuntimeController.jump_to_node",
+            user_id=user_auth.user_id,
             node_id=block_id,
         )
 
 
 @story_router.get("/info", tags=["Restricted"])
 async def inspect_story_node(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> RuntimeInfo:
     """Return diagnostic story information for the active user."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
-    return _call(
-        adapter,
-        ServiceOperation38.STORY_STATUS,
-        user_id=user_id,
-        render_profile=render_profile,
+    _ = render_profile
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    return _call_legacy(
+        orchestrator,
+        "RuntimeController.get_story_info",
+        user_id=user_auth.user_id,
     )
 
 
 @story_router.post("/check", tags=["Restricted"])
 async def check_expression() -> RuntimeInfo:
     """Expression inspection is not yet supported."""
-
     raise HTTPException(status_code=501, detail="Expression inspection is not available")
 
 
 @story_router.post("/apply", tags=["Restricted"])
 async def apply_effect() -> RuntimeInfo:
     """Direct state mutation is not supported in the orchestrated REST API."""
-
     raise HTTPException(status_code=501, detail="Direct story mutation is not available")
 
 
 @system_router.put("/reset", tags=["Restricted"])
 async def reset_system():
     """System resets are not wired through the orchestrator yet."""
-
     raise HTTPException(status_code=501, detail="System reset is not available")
 
 
 @world_router.get("/{world_id}/scenes", tags=["Restricted"])
 async def get_scene_list(world_id: UniqueLabel = Path()):
     """Scene listing is not yet exposed through the orchestrated REST API."""
-
+    _ = world_id
     raise HTTPException(status_code=501, detail="Scene listings are not available")

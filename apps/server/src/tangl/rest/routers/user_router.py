@@ -7,10 +7,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38, resolve_user_id38
+from tangl.rest.dependencies38 import (
+    get_service_adapter38,
+    get_user_locks38,
+    resolve_user_auth38,
+)
+from tangl.service.exceptions import AccessDeniedError
 from tangl.service.response.info_response import UserInfo
 from tangl.service.response.info_response.user_info import UserSecret
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
+from tangl.service38 import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -24,15 +29,20 @@ def _call(
     /,
     *,
     user_id: UUID | None = None,
+    user_auth: UserAuthInfo | None = None,
     render_profile: str = "raw",
     **params: Any,
 ) -> Any:
-    return adapter.execute_operation(
-        operation,
-        user_id=user_id,
-        render_profile=render_profile,
-        **params,
-    )
+    try:
+        return adapter.execute_operation(
+            operation,
+            user_id=user_id,
+            user_auth=user_auth,
+            render_profile=render_profile,
+            **params,
+        )
+    except AccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/info")
@@ -43,11 +53,12 @@ async def get_user_info(
 ) -> UserInfo:
     """Return profile information for the authenticated user."""
 
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     return _call(
         adapter,
         ServiceOperation38.USER_INFO,
-        user_id=user_id,
+        user_id=user_auth.user_id,
+        user_auth=user_auth,
         render_profile=render_profile,
     )
 
@@ -101,12 +112,13 @@ async def update_user_secret(
 ):
     """Update the secret for the authenticated user and surface the new API key."""
 
-    user_id = resolve_user_id38(api_key, adapter=adapter)
-    async with user_locks[user_id]:
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    async with user_locks[user_auth.user_id]:
         info = _call(
             adapter,
             ServiceOperation38.USER_UPDATE,
-            user_id=user_id,
+            user_id=user_auth.user_id,
+            user_auth=user_auth,
             render_profile=render_profile,
             secret=secret,
         )
@@ -114,7 +126,11 @@ async def update_user_secret(
     secret_value = getattr(info, "secret", secret)
     if api_key_value is None:
         api_key_value = key_for_secret(secret_value)
-    return UserSecret(user_secret=secret_value, api_key=api_key_value, user_id=user_id)
+    return UserSecret(
+        user_secret=secret_value,
+        api_key=api_key_value,
+        user_id=user_auth.user_id,
+    )
 
 
 @router.delete("/drop")
@@ -125,11 +141,12 @@ async def drop_user(
 ):
     """Remove the authenticated user and purge persisted resources."""
 
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     identifiers = _call(
         adapter,
         ServiceOperation38.USER_DROP,
-        user_id=user_id,
+        user_id=user_auth.user_id,
+        user_auth=user_auth,
         render_profile=render_profile,
     )
     persistence = adapter.persistence

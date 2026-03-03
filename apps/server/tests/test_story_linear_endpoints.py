@@ -50,6 +50,10 @@ def _fragment_contains(fragments: list[dict[str, object]], text: str) -> bool:
     return any(text in str(fragment.get("content", "")) for fragment in fragments)
 
 
+def _fragment_has_html_content(fragments: list[dict[str, object]]) -> bool:
+    return any("<p>" in str(fragment.get("content", "")) for fragment in fragments)
+
+
 def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str, str]]) -> None:
     client, headers = linear_story_client
 
@@ -93,3 +97,45 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     fragments_three = payload_three["fragments"]
     assert _fragment_contains(fragments_three, "You arrive at the village.")
     assert payload_three["choices"] == []
+
+
+def test_linear_story_update_supports_html_render_profile(
+    linear_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = linear_story_client
+
+    create = client.post("story/story/create", params={"world_id": "the_path"}, headers=headers)
+    assert create.status_code == 200
+
+    update = client.get(
+        "story/update",
+        params={"render_profile": "html"},
+        headers=headers,
+    )
+    assert update.status_code == 200
+    payload = update.json()
+    assert _fragment_has_html_content(payload["fragments"])
+
+
+def test_linear_story_do_supports_html_render_profile(
+    linear_story_client: tuple[TestClient, dict[str, str]],
+) -> None:
+    client, headers = linear_story_client
+
+    create = client.post("story/story/create", params={"world_id": "the_path"}, headers=headers)
+    assert create.status_code == 200
+
+    update = client.get("story/update", headers=headers)
+    assert update.status_code == 200
+    first_choice = update.json()["choices"][0].get("uid")
+    assert first_choice is not None
+
+    resolve = client.post(
+        "story/do",
+        params={"render_profile": "html"},
+        json={"uid": first_choice},
+        headers=headers,
+    )
+    assert resolve.status_code == 200
+    payload = resolve.json()
+    assert _fragment_has_html_content(payload["fragments"])

@@ -10,7 +10,6 @@ from .orchestrator import Orchestrator38
 
 
 DEFAULT_ENDPOINT_POLICIES: dict[str, dict[str, tuple[str, ...]]] = {
-    "RuntimeController.create_story": {"persist_paths": ("details.ledger",)},
     "RuntimeController.create_story38": {"persist_paths": ("details.ledger",)},
     "UserController.create_user": {"persist_paths": ("details.user",)},
 }

@@ -108,6 +108,7 @@ class TestUserControllerBindingMetadata:
         """create_user needs no pre-loaded resources — it creates one."""
         ep = self._ep("create_user")
         assert ep.binds == ()
+        assert ep.access_level == AccessLevel.PUBLIC
 
     def test_update_user_binds_user(self) -> None:
         ep = self._ep("update_user")
@@ -246,6 +247,21 @@ class TestMutatingUserEndpoints:
         assert result.status == "ok"
         assert existing_user.privileged is False
 
+    def test_update_user_cannot_escalate_privilege_for_non_privileged_user(
+        self,
+        orchestrator: Orchestrator38,
+        existing_user: User,
+    ) -> None:
+        existing_user.privileged = False
+        result = orchestrator.execute(
+            "UserController.update_user",
+            user_id=existing_user.uid,
+            privileged="true",
+        )
+        assert isinstance(result, RuntimeInfo)
+        assert result.status == "ok"
+        assert existing_user.privileged is False
+
     def test_update_user_parses_last_played_dt_iso_string(
         self,
         orchestrator: Orchestrator38,
@@ -346,14 +362,14 @@ class TestUserControllerGatewayRouting:
         user = (result.details or {}).get("user")
         assert user is not None
 
-    def test_gateway_module_binding_is_service38_controllers(
+    def test_gateway_module_binding_is_service38_user_controller(
         self,
         orchestrator: Orchestrator38,
     ) -> None:
         """service38 bootstrap wires the service38 UserController, not the legacy one."""
         endpoint_name = endpoint_for_operation(ServiceOperation38.USER_CREATE)
         binding = orchestrator._endpoints[endpoint_name]
-        assert binding.endpoint.func.__module__ == "tangl.service38.controllers"
+        assert binding.endpoint.func.__module__ == "tangl.service38.user.user_controller"
 
 
 # ---------------------------------------------------------------------------

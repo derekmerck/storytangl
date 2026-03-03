@@ -9,7 +9,9 @@ from tangl.config import settings
 from tangl.core38 import Selector
 from tangl.rest.app import app
 from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
+from tangl.rest.dependencies38 import get_service_gateway38
 from tangl.service.user.user import User
+from tangl.service38.api_endpoint import AccessLevel
 from tangl.story38.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 from tangl.vm38.runtime.ledger import Ledger as Ledger38
@@ -142,3 +144,27 @@ def test_story38_rest_envelope_flow(
     dropped = drop.json()
     assert dropped.get("status") == "ok"
     assert dropped.get("dropped_ledger_id")
+
+
+def test_story38_status_returns_403_when_endpoint_is_restricted_for_non_privileged_user(
+    story38_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, headers, world_label = story38_client
+    create = client.post(
+        "story/story38/create",
+        params={"world_id": world_label, "init_mode": "EAGER"},
+        headers=headers,
+    )
+    assert create.status_code == 200
+
+    gateway = get_service_gateway38()
+    binding = gateway.orchestrator._endpoints["RuntimeController.get_story_info38"]
+    previous_level = binding.endpoint.access_level
+    binding.endpoint.access_level = AccessLevel.RESTRICTED
+    try:
+        response = client.get("story/story38/status", headers=headers)
+        assert response.status_code == 403
+        detail = response.json().get("detail", "")
+        assert "Access denied" in detail
+    finally:
+        binding.endpoint.access_level = previous_level

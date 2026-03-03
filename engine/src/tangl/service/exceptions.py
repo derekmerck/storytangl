@@ -30,6 +30,12 @@ class AccessDeniedError(ServiceError):
     code = "ACCESS_DENIED"
 
 
+class AuthMismatchError(ServiceError):
+    """Provided user context conflicts with authenticated identity."""
+
+    code = "AUTH_MISMATCH"
+
+
 class ValidationError(ServiceError):
     """Input validation failed for the request."""
 
