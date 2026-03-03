@@ -135,6 +135,27 @@ def _call_legacy(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
+def _apply_legacy_render_profile(
+    adapter: GatewayRestAdapter38,
+    endpoint_name: str,
+    payload: Any,
+    *,
+    render_profile: str,
+    user_id: UUID | None,
+) -> Any:
+    """Apply service38 outbound rendering hooks to legacy payloads."""
+
+    if render_profile.strip().lower() == "raw":
+        return payload
+
+    return adapter.gateway.hooks.run_outbound(
+        payload,
+        operation=f"endpoint:{endpoint_name}",
+        render_profile=render_profile,
+        user_id=user_id,
+    )
+
+
 def _runtime_info_payload(
     result: Any,
     *,
@@ -227,7 +248,6 @@ async def get_story_update(
     ),
 ) -> dict[str, Any]:
     """Return journal fragments for legacy story sessions."""
-    _ = render_profile
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     fragments = _call_legacy(
         orchestrator,
@@ -239,6 +259,13 @@ async def get_story_update(
         end_marker=end_marker,
     )
     serialized_fragments = _serialize(fragments)
+    serialized_fragments = _apply_legacy_render_profile(
+        adapter,
+        "RuntimeController.get_journal_entries",
+        serialized_fragments,
+        render_profile=render_profile,
+        user_id=user_auth.user_id,
+    )
     return {
         "fragments": serialized_fragments,
         "choices": _extract_choices_from_fragments(serialized_fragments),
@@ -257,7 +284,6 @@ async def do_story_action(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Resolve a player choice and return resulting legacy journal fragments."""
-    _ = render_profile
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     try:
         choice_id = request.resolve_choice_id()
@@ -282,7 +308,14 @@ async def do_story_action(
     payload = _serialize(status)
     if not isinstance(payload, dict):
         payload = {"status": payload}
-    payload["fragments"] = _serialize(fragments)
+    serialized_fragments = _serialize(fragments)
+    payload["fragments"] = _apply_legacy_render_profile(
+        adapter,
+        "RuntimeController.get_journal_entries",
+        serialized_fragments,
+        render_profile=render_profile,
+        user_id=user_auth.user_id,
+    )
     return payload
 
 
