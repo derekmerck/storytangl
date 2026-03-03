@@ -25,6 +25,7 @@ class _StubGateway:
         operation: ServiceOperation38,
         *,
         user_id: UUID | None = None,
+        user_auth: UserAuthInfo | None = None,
         render_profile: str = "raw",
         **params: Any,
     ) -> dict[str, Any]:
@@ -32,6 +33,7 @@ class _StubGateway:
             {
                 "operation": operation,
                 "user_id": user_id,
+                "user_auth": user_auth,
                 "render_profile": render_profile,
                 "params": dict(params),
             }
@@ -45,13 +47,13 @@ def test_gateway_rest_adapter38_execute_operation_uses_default_render_profile() 
     user_id = uuid4()
 
     adapter.execute_operation(
-        ServiceOperation38.STORY_STATUS,
+        ServiceOperation38.STORY38_STATUS,
         user_id=user_id,
         include_debug=True,
     )
 
     call = gateway.calls[-1]
-    assert call["operation"] == ServiceOperation38.STORY_STATUS
+    assert call["operation"] == ServiceOperation38.STORY38_STATUS
     assert call["user_id"] == user_id
     assert call["render_profile"] == "cli_ascii"
     assert call["params"] == {"include_debug": True}
@@ -64,7 +66,7 @@ def test_gateway_rest_adapter38_execute_request_overrides_profile() -> None:
 
     adapter.execute_request(
         GatewayRequest38(
-            operation=ServiceOperation38.STORY_UPDATE,
+            operation=ServiceOperation38.STORY38_UPDATE,
             user_id=user_id,
             render_profile="html",
             params={"limit": 5},
@@ -72,7 +74,7 @@ def test_gateway_rest_adapter38_execute_request_overrides_profile() -> None:
     )
 
     call = gateway.calls[-1]
-    assert call["operation"] == ServiceOperation38.STORY_UPDATE
+    assert call["operation"] == ServiceOperation38.STORY38_UPDATE
     assert call["user_id"] == user_id
     assert call["render_profile"] == "html"
     assert call["params"] == {"limit": 5}
@@ -98,3 +100,5 @@ def test_gateway_rest_adapter38_execute_authenticated_uses_auth_resolver() -> No
     assert resolved_keys == ["demo-key"]
     assert call["operation"] == ServiceOperation38.USER_INFO
     assert call["user_id"] == expected_user_id
+    assert call["user_auth"] is not None
+    assert call["user_auth"].user_id == expected_user_id

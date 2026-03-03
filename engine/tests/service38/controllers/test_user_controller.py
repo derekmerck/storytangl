@@ -108,6 +108,7 @@ class TestUserControllerBindingMetadata:
         """create_user needs no pre-loaded resources — it creates one."""
         ep = self._ep("create_user")
         assert ep.binds == ()
+        assert ep.access_level == AccessLevel.PUBLIC
 
     def test_update_user_binds_user(self) -> None:
         ep = self._ep("update_user")
@@ -346,14 +347,14 @@ class TestUserControllerGatewayRouting:
         user = (result.details or {}).get("user")
         assert user is not None
 
-    def test_gateway_module_binding_is_service38_controllers(
+    def test_gateway_module_binding_is_service38_user_controller(
         self,
         orchestrator: Orchestrator38,
     ) -> None:
         """service38 bootstrap wires the service38 UserController, not the legacy one."""
         endpoint_name = endpoint_for_operation(ServiceOperation38.USER_CREATE)
         binding = orchestrator._endpoints[endpoint_name]
-        assert binding.endpoint.func.__module__ == "tangl.service38.controllers"
+        assert binding.endpoint.func.__module__ == "tangl.service38.user.user_controller"
 
 
 # ---------------------------------------------------------------------------

@@ -7,10 +7,17 @@ import pytest
 
 from tangl.core import Graph, StreamRegistry
 from tangl.core38 import Graph as Graph38
-from tangl.service import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
+from tangl.service import AccessLevel, ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
+from tangl.service.exceptions import AccessDeniedError
 from tangl.service.response import RuntimeInfo as LegacyRuntimeInfo
 from tangl.service.user.user import User
-from tangl.service38 import ApiEndpoint38, Orchestrator38, ServiceOperation38, WritebackMode
+from tangl.service38 import (
+    ApiEndpoint38,
+    Orchestrator38,
+    ServiceOperation38,
+    UserAuthInfo,
+    WritebackMode,
+)
 from tangl.service38.gateway import ServiceGateway38
 from tangl.service38.hooks import GatewayHooks, HookPhase
 from tangl.service38.response import InfoModel, RuntimeInfo
@@ -366,6 +373,40 @@ def test_orchestrator38_round_trip_ledger_writeback_remains_hydratable() -> None
     assert second.details.get("had_runtime_user") is False
 
 
+def test_orchestrator38_reattaches_runtime_user_when_user_is_hydrated() -> None:
+    class _LedgerController(HasApiEndpoints):
+        @ApiEndpoint.annotate(response_type=ResponseType.RUNTIME, method_type=MethodType.READ)
+        def inspect(self, ledger: Ledger38) -> RuntimeInfo:
+            return RuntimeInfo.ok(
+                has_runtime_user=ledger.user is not None,
+                user_id=str(ledger.user_id) if ledger.user_id else None,
+            )
+
+    graph = Graph38()
+    start = graph.add_node(label="start")
+    user = User(label="rt-player")
+    ledger = Ledger38(graph=graph, cursor_id=start.uid)
+    ledger.user_id = user.uid
+
+    persistence = RoundTripPersistence()
+    persistence[user.uid] = user
+    persistence[ledger.uid] = ledger.unstructure()
+
+    orchestrator = Orchestrator38(persistence)
+    orchestrator.register_controller(_LedgerController)
+
+    result = orchestrator.execute(
+        "_LedgerController.inspect",
+        user_id=user.uid,
+        ledger_id=ledger.uid,
+    )
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.details is not None
+    assert result.details.get("has_runtime_user") is True
+    assert result.details.get("user_id") == str(user.uid)
+
+
 def test_orchestrator38_hydrates_user_by_param_name_not_type_suffix(
     fake_persistence: FakePersistence,
 ) -> None:
@@ -401,6 +442,7 @@ def test_orchestrator38_explicit_binds_override_signature_inference(
 
     class _AccountController(HasApiEndpoints):
         @ApiEndpoint38.annotate(
+            access_level=AccessLevel.USER,
             response_type=ResponseType.INFO,
             method_type=MethodType.READ,
             binds=(),
@@ -416,3 +458,115 @@ def test_orchestrator38_explicit_binds_override_signature_inference(
 
     with pytest.raises(TypeError, match="argument binding failed"):
         orchestrator.execute("_AccountController.who", user_id=user_id)
+
+
+def test_orchestrator38_public_endpoint_allows_anonymous_calls() -> None:
+    class _AccessController(HasApiEndpoints):
+        @ApiEndpoint38.annotate(
+            access_level=AccessLevel.PUBLIC,
+            method_type=MethodType.READ,
+            response_type=ResponseType.RUNTIME,
+            binds=(),
+        )
+        def public_status(self) -> RuntimeInfo:
+            return RuntimeInfo.ok(message="public")
+
+    orchestrator = Orchestrator38(persistence_manager={})
+    orchestrator.register_controller(_AccessController)
+
+    result = orchestrator.execute("_AccessController.public_status")
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.message == "public"
+
+
+def test_orchestrator38_user_endpoint_denies_when_no_user_context() -> None:
+    class _AccessController(HasApiEndpoints):
+        @ApiEndpoint38.annotate(
+            access_level=AccessLevel.USER,
+            method_type=MethodType.READ,
+            response_type=ResponseType.RUNTIME,
+            binds=(),
+        )
+        def user_status(self) -> RuntimeInfo:
+            return RuntimeInfo.ok(message="user")
+
+    orchestrator = Orchestrator38(persistence_manager={})
+    orchestrator.register_controller(_AccessController)
+
+    with pytest.raises(AccessDeniedError, match="Access denied"):
+        orchestrator.execute("_AccessController.user_status")
+
+
+def test_orchestrator38_restricted_endpoint_denies_non_privileged_user() -> None:
+    class _AccessController(HasApiEndpoints):
+        @ApiEndpoint38.annotate(
+            access_level=AccessLevel.RESTRICTED,
+            method_type=MethodType.READ,
+            response_type=ResponseType.RUNTIME,
+            binds=(),
+        )
+        def restricted_status(self) -> RuntimeInfo:
+            return RuntimeInfo.ok(message="restricted")
+
+    user = User(label="normal-user", privileged=False)
+    persistence = {user.uid: user}
+
+    orchestrator = Orchestrator38(persistence_manager=persistence)
+    orchestrator.register_controller(_AccessController)
+
+    with pytest.raises(AccessDeniedError, match="Access denied"):
+        orchestrator.execute("_AccessController.restricted_status", user_id=user.uid)
+
+
+def test_orchestrator38_restricted_endpoint_allows_privileged_user() -> None:
+    class _AccessController(HasApiEndpoints):
+        @ApiEndpoint38.annotate(
+            access_level=AccessLevel.RESTRICTED,
+            method_type=MethodType.READ,
+            response_type=ResponseType.RUNTIME,
+            binds=(),
+        )
+        def restricted_status(self) -> RuntimeInfo:
+            return RuntimeInfo.ok(message="restricted")
+
+    user = User(label="admin-user", privileged=True)
+    persistence = {user.uid: user}
+
+    orchestrator = Orchestrator38(persistence_manager=persistence)
+    orchestrator.register_controller(_AccessController)
+
+    result = orchestrator.execute("_AccessController.restricted_status", user_id=user.uid)
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"
+    assert result.message == "restricted"
+
+
+def test_orchestrator38_user_auth_context_is_authoritative() -> None:
+    class _AccessController(HasApiEndpoints):
+        @ApiEndpoint38.annotate(
+            access_level=AccessLevel.RESTRICTED,
+            method_type=MethodType.READ,
+            response_type=ResponseType.RUNTIME,
+            binds=(),
+        )
+        def restricted_status(self) -> RuntimeInfo:
+            return RuntimeInfo.ok(message="restricted")
+
+    user = User(label="normal-user", privileged=False)
+    persistence = {user.uid: user}
+
+    orchestrator = Orchestrator38(persistence_manager=persistence)
+    orchestrator.register_controller(_AccessController)
+
+    auth = UserAuthInfo(user_id=user.uid, access_level=AccessLevel.RESTRICTED)
+    result = orchestrator.execute(
+        "_AccessController.restricted_status",
+        user_id=user.uid,
+        user_auth=auth,
+    )
+
+    assert isinstance(result, RuntimeInfo)
+    assert result.status == "ok"

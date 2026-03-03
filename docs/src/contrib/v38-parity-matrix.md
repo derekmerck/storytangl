@@ -1,8 +1,8 @@
 # V38 Parity Matrix (Phase 1)
 
 ## Status
-- Date: 2026-02-19
-- Phase: 1 (inventory and classification only)
+- Date: 2026-03-02
+- Phase: 1 (inventory and classification; service38 C-track isolation + ACL + vm38 user namespace bridge implemented)
 - Scope lock: `engine/tests/core`, `engine/tests/vm`, `engine/tests/story`, `engine/tests/service`
 - Explicitly out of first-pass classification scope: `engine/tests/integration`, `engine/tests/loaders`, `engine/tests/ir` (tracked as secondary references only)
 

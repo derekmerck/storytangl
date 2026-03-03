@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 from uuid import UUID
 
 from .api_endpoint import WritebackMode
 from .hooks import GatewayHooks
 from .operations import ServiceOperation38, endpoint_for_operation, operation_for_endpoint
 from .orchestrator import ExecuteOptions, Orchestrator38
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .auth import UserAuthInfo
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ class ServiceGateway38:
         operation: ServiceOperation38 | str,
         *,
         user_id: UUID | None = None,
+        user_auth: "UserAuthInfo | None" = None,
         render_profile: str | Iterable[str] | None = None,
         writeback_mode: WritebackMode | None = None,
         persist_paths: tuple[str, ...] | None = None,
@@ -68,6 +72,7 @@ class ServiceGateway38:
         result = self.orchestrator.execute(
             endpoint_name,
             user_id=user_id,
+            user_auth=user_auth,
             exec_options=ExecuteOptions(
                 writeback_mode=writeback_mode,
                 persist_paths=persist_paths,
@@ -87,6 +92,7 @@ class ServiceGateway38:
         endpoint_name: str,
         *,
         user_id: UUID | None = None,
+        user_auth: "UserAuthInfo | None" = None,
         render_profile: str | Iterable[str] | None = None,
         writeback_mode: WritebackMode | None = None,
         persist_paths: tuple[str, ...] | None = None,
@@ -109,6 +115,7 @@ class ServiceGateway38:
             result = self.orchestrator.execute(
                 endpoint_name,
                 user_id=user_id,
+                user_auth=user_auth,
                 exec_options=ExecuteOptions(
                     writeback_mode=writeback_mode,
                     persist_paths=persist_paths,
@@ -125,6 +132,7 @@ class ServiceGateway38:
         return self.execute(
             operation,
             user_id=user_id,
+            user_auth=user_auth,
             render_profile=render_profile,
             writeback_mode=writeback_mode,
             persist_paths=persist_paths,

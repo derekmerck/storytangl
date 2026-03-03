@@ -144,12 +144,18 @@ class Ledger(Entity):
 
     def get_frame(self) -> Frame:
         """Create an ephemeral frame for the next pipeline execution."""
+        frame_meta: dict[str, Any] = {}
+        if self.user is not None:
+            frame_meta["user"] = self.user
+        if self.user_id is not None:
+            frame_meta["user_id"] = self.user_id
         return Frame(
             self.graph,
             self.cursor,
             self.output_stream,
             self._call_stack(),
             step_base=self.cursor_steps,
+            meta=frame_meta,
         )
 
     def _record_step(self, trace: StepTrace) -> None:
@@ -288,23 +294,28 @@ class Ledger(Entity):
     @classmethod
     def structure(cls, data: UnstructuredData) -> Self:
         """Reconstruct a ledger from serialized data."""
+        def _coerce_uuid(value: UUID | str) -> UUID:
+            if isinstance(value, UUID):
+                return value
+            return UUID(str(value))
+
         graph = Graph.structure(data["graph"])
         output_stream = OrderedRegistry.structure(data.get("output_stream", {}))
 
         return cls(
-            uid=UUID(data["uid"]),
+            uid=_coerce_uuid(data["uid"]),
             label=data.get("label", ""),
             graph=graph,
             output_stream=output_stream,
-            cursor_id=UUID(data["cursor_id"]),
-            cursor_history=[UUID(uid) for uid in data.get("cursor_history", [])],
+            cursor_id=_coerce_uuid(data["cursor_id"]),
+            cursor_history=[_coerce_uuid(uid) for uid in data.get("cursor_history", [])],
             cursor_steps=data.get("cursor_steps", -1),
             choice_steps=data.get("choice_steps", -1),
             reentrant_steps=data.get("reentrant_steps", -1),
-            call_stack_ids=[UUID(uid) for uid in data.get("call_stack_ids", [])],
+            call_stack_ids=[_coerce_uuid(uid) for uid in data.get("call_stack_ids", [])],
             last_redirect=data.get("last_redirect"),
             redirect_trace=list(data.get("redirect_trace", [])),
-            user_id=UUID(data["user_id"]) if data.get("user_id") else None,
+            user_id=_coerce_uuid(data["user_id"]) if data.get("user_id") else None,
             replay_algorithm_id=data.get("replay_algorithm_id", "diff_v1"),
             checkpoint_cadence=data.get("checkpoint_cadence", 1),
         )

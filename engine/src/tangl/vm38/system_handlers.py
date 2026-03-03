@@ -64,6 +64,7 @@ See Also
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from tangl.core38 import Node, Priority, Selector
@@ -156,6 +157,37 @@ def contribute_satisfied_deps(*, caller, ctx, **kw):
                     result[label] = edge.successor
 
     return result if result else None
+
+
+@on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
+def contribute_runtime_user_context(*, caller, ctx, **kw):
+    """Inject runtime user symbols from frame metadata when available."""
+    _ = (caller, kw)
+    get_meta = getattr(ctx, "get_meta", None)
+    if not callable(get_meta):
+        return None
+
+    meta = get_meta() or {}
+    if not isinstance(meta, Mapping):
+        return None
+
+    user = meta.get("user")
+    user_id = meta.get("user_id")
+    user_ns = None
+    get_user_ns = getattr(user, "get_ns", None)
+    if callable(get_user_ns):
+        user_ns = get_user_ns()
+        if not isinstance(user_ns, Mapping):
+            user_ns = None
+
+    result: dict[str, object] = {}
+    if user is not None:
+        result["user"] = user
+    if user_id is not None:
+        result["user_id"] = user_id
+    if user_ns:
+        result.update(dict(user_ns))
+    return result or None
 
 
 # ---------------------------------------------------------------------------

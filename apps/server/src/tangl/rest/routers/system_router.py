@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from tangl.config import settings
 from tangl.rest.dependencies38 import get_service_adapter38
+from tangl.service.exceptions import AccessDeniedError
 from tangl.service.response.info_response.user_info import UserSecret
 from tangl.service.response.info_response import SystemInfo
 from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
@@ -23,11 +24,14 @@ def _call(
     render_profile: str = "raw",
     **params: Any,
 ) -> Any:
-    return adapter.execute_operation(
-        operation,
-        render_profile=render_profile,
-        **params,
-    )
+    try:
+        return adapter.execute_operation(
+            operation,
+            render_profile=render_profile,
+            **params,
+        )
+    except AccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 def _serialize(value: Any) -> Any:

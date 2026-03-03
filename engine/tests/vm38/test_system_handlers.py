@@ -63,6 +63,7 @@ def register_system_handlers(clean_vm_dispatch):
     on_gather_ns(sh.contribute_runtime_baseline)
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)
+    on_gather_ns(sh.contribute_runtime_user_context)
     on_validate(sh.validate_successor_exists)
     on_prereqs(sh.descend_into_container)
     on_prereqs(sh.follow_triggered_prereqs)
@@ -166,6 +167,54 @@ class TestContributeRuntimeBaseline:
 
         ns = do_gather_ns(block, ctx=ctx)
         assert ns["companion"] is child_provider
+
+
+class TestContributeRuntimeUserContext:
+    def test_reads_user_and_user_id_from_ctx_meta(self) -> None:
+        user = SimpleNamespace(uid="user-1", get_ns=lambda: {"rank": "captain"})
+        runtime_ctx = SimpleNamespace(get_meta=lambda: {"user": user, "user_id": user.uid})
+
+        result = sh.contribute_runtime_user_context(caller=None, ctx=runtime_ctx)
+
+        assert result is not None
+        assert result["user"] is user
+        assert result["user_id"] == "user-1"
+        assert result["rank"] == "captain"
+
+    def test_gather_ns_includes_user_symbols(self) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+        user = SimpleNamespace(uid="user-2", get_ns=lambda: {"achievements": 3})
+        runtime_ctx = SimpleNamespace(
+            graph=g,
+            cursor=node,
+            get_meta=lambda: {"user": user, "user_id": user.uid},
+            get_registries=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+
+        ns = do_gather_ns(node, ctx=runtime_ctx)
+
+        assert ns["user"] is user
+        assert ns["user_id"] == "user-2"
+        assert ns["achievements"] == 3
+
+    def test_gather_ns_handles_user_without_get_ns(self) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+        user = SimpleNamespace(uid="user-3")
+        runtime_ctx = SimpleNamespace(
+            graph=g,
+            cursor=node,
+            get_meta=lambda: {"user": user, "user_id": user.uid},
+            get_registries=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+
+        ns = do_gather_ns(node, ctx=runtime_ctx)
+
+        assert ns["user"] is user
+        assert ns["user_id"] == "user-3"
 
 
 # ============================================================================

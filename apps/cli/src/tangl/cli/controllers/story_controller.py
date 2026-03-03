@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from cmd2 import CommandSet, with_argparser, with_default_category
-from tangl.service38 import ServiceOperation38
-from tangl.service38.operations import endpoint_for_operation
 
 
 if TYPE_CHECKING:
@@ -126,11 +124,11 @@ class StoryController(CommandSet):
 
         return choices
 
-    def _call_service(self, operation: ServiceOperation38, **params: Any) -> Any:
-        call_operation = getattr(self._cmd, "call_operation", None)
-        if callable(call_operation):
-            return call_operation(operation, **params)
-        return self._cmd.call_endpoint(endpoint_for_operation(operation), **params)
+    def _call_legacy(self, endpoint: str, **params: Any) -> Any:
+        call_legacy = getattr(self._cmd, "call_legacy_endpoint", None)
+        if callable(call_legacy):
+            return call_legacy(endpoint, **params)
+        return self._cmd.call_endpoint(endpoint, **params)
 
     # ------------------------------------------------------------------
     # commands
@@ -149,7 +147,7 @@ class StoryController(CommandSet):
         if args.label:
             kwargs["story_label"] = args.label
 
-        result = self._call_service(ServiceOperation38.STORY_CREATE, **kwargs)
+        result = self._call_legacy("RuntimeController.create_story", **kwargs)
         if getattr(result, "status", None) == "error":
             self._cmd.perror(result.message or "Failed to create story")
             return
@@ -158,6 +156,9 @@ class StoryController(CommandSet):
         ledger_obj = details.get("ledger")
         ledger_id_value = details.get("ledger_id")
         ledger_id = UUID(ledger_id_value) if ledger_id_value is not None else None
+
+        if ledger_obj is not None and getattr(self._cmd, "persistence", None) is not None:
+            self._cmd.persistence.save(ledger_obj)
 
         if ledger_id is not None:
             self._cmd.set_ledger(ledger_id)
@@ -170,8 +171,8 @@ class StoryController(CommandSet):
         if ledger_id is not None:
             self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
 
-        fragments = self._call_service(
-            ServiceOperation38.STORY_UPDATE,
+        fragments = self._call_legacy(
+            "RuntimeController.get_journal_entries",
             limit=10,
         )
         self._current_story_update = list(fragments)
@@ -204,8 +205,8 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        fragments = self._call_service(
-            ServiceOperation38.STORY_UPDATE,
+        fragments = self._call_legacy(
+            "RuntimeController.get_journal_entries",
             limit=10,
         )
         self._current_story_update = list(fragments)
@@ -233,12 +234,12 @@ class StoryController(CommandSet):
             return
 
         choice = active_choices[index - 1]
-        self._call_service(
-            ServiceOperation38.STORY_DO,
+        self._call_legacy(
+            "RuntimeController.resolve_choice",
             choice_id=choice.uid,
         )
-        fragments = self._call_service(
-            ServiceOperation38.STORY_UPDATE,
+        fragments = self._call_legacy(
+            "RuntimeController.get_journal_entries",
             limit=10,
         )
         self._current_story_update = list(fragments)
@@ -259,8 +260,8 @@ class StoryController(CommandSet):
             return
 
         try:
-            result = self._call_service(
-                ServiceOperation38.STORY_DROP,
+            result = self._call_legacy(
+                "RuntimeController.drop_story",
                 archive=bool(args.archive),
             )
         except ValueError as exc:
@@ -305,7 +306,7 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        info = self._call_service(ServiceOperation38.STORY_STATUS)
+        info = self._call_legacy("RuntimeController.get_story_info")
         if hasattr(info, "model_dump"):
             payload = info.model_dump()
         elif isinstance(info, dict):

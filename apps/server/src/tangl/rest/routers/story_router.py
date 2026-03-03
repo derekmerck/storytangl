@@ -7,8 +7,15 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38, get_user_locks38, resolve_user_id38
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
+from tangl.rest.dependencies import get_orchestrator, get_user_locks
+from tangl.rest.dependencies38 import (
+    get_service_adapter38,
+    get_user_locks38,
+    resolve_user_auth38,
+)
+from tangl.service import Orchestrator
+from tangl.service.exceptions import AccessDeniedError
+from tangl.service38 import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
 from tangl.service38.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -34,7 +41,6 @@ router = APIRouter(tags=["Story"])
 
 def _serialize(value: Any) -> Any:
     """Best-effort JSON encoding for fragments and response payloads."""
-
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, set):
@@ -74,7 +80,6 @@ def _extract_choices_from_fragments(fragments: list[Any]) -> list[dict[str, Any]
         return result
 
     choices: list[dict[str, Any]] = []
-
     for fragment in fragments:
         fragment_data = fragment if isinstance(fragment, dict) else _serialize(fragment)
         fragment_type = fragment_data.get("fragment_type")
@@ -89,39 +94,57 @@ def _extract_choices_from_fragments(fragments: list[Any]) -> list[dict[str, Any]
     return choices
 
 
-def _call(
+def _call_service38(
     adapter: GatewayRestAdapter38,
     operation: ServiceOperation38,
     /,
     *,
     render_profile: str = "raw",
     user_id: UUID | None = None,
+    user_auth: UserAuthInfo | None = None,
     **params: Any,
 ) -> Any:
-    return adapter.execute_operation(
-        operation,
-        user_id=user_id,
-        render_profile=render_profile,
-        **params,
-    )
+    try:
+        return adapter.execute_operation(
+            operation,
+            user_id=user_id,
+            user_auth=user_auth,
+            render_profile=render_profile,
+            **params,
+        )
+    except AccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+def _call_legacy(
+    orchestrator: Orchestrator,
+    endpoint_name: str,
+    /,
+    *,
+    user_id: UUID | None = None,
+    **params: Any,
+) -> Any:
+    kwargs = dict(params)
+    if user_id is not None:
+        kwargs["user_id"] = user_id
+    return orchestrator.execute(endpoint_name, **kwargs)
 
 
 def _runtime_info_payload(
-    result: RuntimeInfo,
+    result: Any,
     *,
     flatten_details: bool = False,
 ) -> dict[str, Any]:
-    """Serialize RuntimeInfo into a JSON-safe payload."""
-
-    details = dict(result.details or {})
+    """Serialize RuntimeInfo-like payloads into JSON-safe mappings."""
+    details = dict(getattr(result, "details", None) or {})
     details.pop("ledger", None)
 
     payload: dict[str, Any] = {
-        "status": result.status,
-        "code": result.code,
-        "message": result.message,
-        "cursor_id": result.cursor_id,
-        "step": result.step,
+        "status": getattr(result, "status", None),
+        "code": getattr(result, "code", None),
+        "message": getattr(result, "message", None),
+        "cursor_id": getattr(result, "cursor_id", None),
+        "step": getattr(result, "step", None),
     }
     payload = {k: v for k, v in payload.items() if v is not None}
 
@@ -134,11 +157,8 @@ def _runtime_info_payload(
     return _serialize(payload)
 
 
-def _extract_story38_envelope(
-    result: RuntimeInfo,
-) -> dict[str, Any]:
+def _extract_story38_envelope(result: RuntimeInfo) -> dict[str, Any]:
     """Return the vm38 envelope payload from RuntimeInfo."""
-
     details = dict(result.details or {})
     details.pop("ledger", None)
 
@@ -153,30 +173,35 @@ async def create_story(
     world_id: str = Query(..., description="World template to instantiate"),
     story_label: str | None = Query(None, description="Optional story label"),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: str = Header(..., alias="X-API-Key"),
 ):
-    """Create a new story instance for the authenticated user."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    """Create a new story instance for the authenticated user (legacy path)."""
+    _ = render_profile  # retained for API compatibility; legacy orchestrator is transport-agnostic
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     kwargs: dict[str, Any] = {"world_id": world_id}
     if story_label:
         kwargs["story_label"] = story_label
-    result = _call(
-        adapter,
-        ServiceOperation38.STORY_CREATE,
-        user_id=user_id,
-        render_profile=render_profile,
+    result = _call_legacy(
+        orchestrator,
+        "RuntimeController.create_story",
+        user_id=user_auth.user_id,
         **kwargs,
     )
-    if isinstance(result, RuntimeInfo):
+    details = getattr(result, "details", None) or {}
+    ledger = details.get("ledger") if isinstance(details, dict) else None
+    if ledger is not None and getattr(orchestrator, "persistence", None) is not None:
+        orchestrator.persistence.save(ledger)
+
+    if hasattr(result, "status") and hasattr(result, "details"):
         return _runtime_info_payload(result, flatten_details=True)
     return _serialize(result)
 
 
-# todo: maybe "journal" since update is used as a phase?
 @router.get("/update")
 async def get_story_update(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
@@ -196,20 +221,18 @@ async def get_story_update(
         description="Exclusive end marker for a marker range.",
     ),
 ) -> dict[str, Any]:
-    """Return journal fragments (including atomic blocks with embedded choices)."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
-    fragments = _call(
-        adapter,
-        ServiceOperation38.STORY_UPDATE,
-        user_id=user_id,
-        render_profile=render_profile,
+    """Return journal fragments for legacy story sessions."""
+    _ = render_profile
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    fragments = _call_legacy(
+        orchestrator,
+        "RuntimeController.get_journal_entries",
+        user_id=user_auth.user_id,
         limit=limit,
         marker=marker,
         start_marker=start_marker,
         end_marker=end_marker,
     )
-    # todo: just pass on a list of loose fragments here.
     serialized_fragments = _serialize(fragments)
     return {
         "fragments": serialized_fragments,
@@ -220,36 +243,34 @@ async def get_story_update(
 @router.post("/do")
 async def do_story_action(
     request: ChoiceRequest = Body(...),
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks = Depends(get_user_locks38),
+    user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
-    """Resolve a player choice and return the resulting journal fragments."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    """Resolve a player choice and return resulting legacy journal fragments."""
+    _ = render_profile
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     try:
         choice_id = request.resolve_choice_id()
     except ValueError as exc:  # pragma: no cover - FastAPI handles validation
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    async with user_locks[user_id]:
-        status = _call(
-            adapter,
-            ServiceOperation38.STORY_DO,
-            user_id=user_id,
-            render_profile=render_profile,
+    async with user_locks[user_auth.user_id]:
+        status = _call_legacy(
+            orchestrator,
+            "RuntimeController.resolve_choice",
+            user_id=user_auth.user_id,
             choice_id=choice_id,
             choice_payload=request.payload,
         )
-
-        fragments = _call(
-            adapter,
-            ServiceOperation38.STORY_UPDATE,
-            user_id=user_id,
-            render_profile=render_profile,
+        fragments = _call_legacy(
+            orchestrator,
+            "RuntimeController.get_journal_entries",
+            user_id=user_auth.user_id,
             limit=0,
         )
 
@@ -273,18 +294,18 @@ async def create_story38(
     api_key: str = Header(..., alias="X-API-Key"),
 ) -> dict[str, Any]:
     """Create a vm38/story38 session and return the initial envelope."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     kwargs: dict[str, Any] = {"world_id": world_id}
     if story_label:
         kwargs["story_label"] = story_label
     if init_mode:
         kwargs["init_mode"] = init_mode
 
-    result = _call(
+    result = _call_service38(
         adapter,
         ServiceOperation38.STORY38_CREATE,
-        user_id=user_id,
+        user_id=user_auth.user_id,
+        user_auth=user_auth,
         render_profile=render_profile,
         **kwargs,
     )
@@ -311,12 +332,12 @@ async def get_story_update38(
     limit: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
     """Return vm38 envelope with ordered fragments."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
-    result = _call(
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    result = _call_service38(
         adapter,
         ServiceOperation38.STORY38_UPDATE,
-        user_id=user_id,
+        user_id=user_auth.user_id,
+        user_auth=user_auth,
         render_profile=render_profile,
         limit=limit,
         **({"since_step": since_step} if since_step is not None else {}),
@@ -338,18 +359,18 @@ async def do_story_action38(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict[str, Any]:
     """Resolve a choice and return the vm38 envelope."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     try:
         choice_id = request.resolve_choice_id()
     except ValueError as exc:  # pragma: no cover - FastAPI handles validation
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    async with user_locks[user_id]:
-        result = _call(
+    async with user_locks[user_auth.user_id]:
+        result = _call_service38(
             adapter,
             ServiceOperation38.STORY38_DO,
-            user_id=user_id,
+            user_id=user_auth.user_id,
+            user_auth=user_auth,
             render_profile=render_profile,
             choice_id=choice_id,
             choice_payload=request.payload,
@@ -369,12 +390,12 @@ async def get_story_status38(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict[str, Any]:
     """Return vm38 runtime status details."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
-    result = _call(
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    result = _call_service38(
         adapter,
         ServiceOperation38.STORY38_STATUS,
-        user_id=user_id,
+        user_id=user_auth.user_id,
+        user_auth=user_auth,
         render_profile=render_profile,
     )
     if isinstance(result, RuntimeInfo):
@@ -384,52 +405,52 @@ async def get_story_status38(
 
 @router.get("/status")
 async def get_story_status(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
-    """Return a lightweight summary of the current story state."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    """Return a lightweight summary of the current story state (legacy path)."""
+    _ = render_profile
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     return _serialize(
-        _call(
-            adapter,
-            ServiceOperation38.STORY_STATUS,
-            user_id=user_id,
-            render_profile=render_profile,
+        _call_legacy(
+            orchestrator,
+            "RuntimeController.get_story_info",
+            user_id=user_auth.user_id,
         )
     )
 
 
 @router.delete("/drop")
 async def reset_story(
+    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks=Depends(get_user_locks38),
+    user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
     archive: bool = Query(default=False, description="Retain the ledger if true."),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
-    """End the user's active story and optionally archive the ledger."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    """End the user's active story and optionally archive the ledger (legacy path)."""
+    _ = render_profile
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
 
     try:
-        async with user_locks[user_id]:
-            result = _call(
-                adapter,
-                ServiceOperation38.STORY_DROP,
-                user_id=user_id,
-                render_profile=render_profile,
+        async with user_locks[user_auth.user_id]:
+            result = _call_legacy(
+                orchestrator,
+                "RuntimeController.drop_story",
+                user_id=user_auth.user_id,
                 archive=archive,
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if isinstance(result, RuntimeInfo):
+    if hasattr(result, "model_dump"):
         payload = result.model_dump(mode="python", exclude_none=True)
         if isinstance(payload.get("details"), dict):
             details_payload = payload.pop("details")
@@ -452,14 +473,14 @@ async def reset_story38(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict[str, Any]:
     """End the active vm38 story and optionally archive the ledger."""
-
-    user_id = resolve_user_id38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth38(api_key, adapter=adapter)
     try:
-        async with user_locks[user_id]:
-            result = _call(
+        async with user_locks[user_auth.user_id]:
+            result = _call_service38(
                 adapter,
                 ServiceOperation38.STORY38_DROP,
-                user_id=user_id,
+                user_id=user_auth.user_id,
+                user_auth=user_auth,
                 render_profile=render_profile,
                 archive=archive,
             )
