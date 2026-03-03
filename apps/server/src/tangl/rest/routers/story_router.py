@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from tangl.config import settings
@@ -441,8 +441,8 @@ async def get_story_status38(
     return _serialize(result)
 
 
-@router.get("/status")
-async def get_story_status(
+@router.get("/info")
+async def get_story_info(
     orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
@@ -459,6 +459,29 @@ async def get_story_status(
             "RuntimeController.get_story_info",
             user_id=user_auth.user_id,
         )
+    )
+
+
+@router.get("/status")
+async def get_story_status_alias(
+    response: Response,
+    orchestrator: Orchestrator = Depends(get_orchestrator),
+    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    api_key: UniqueLabel = Header(
+        ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
+    ),
+    render_profile: str = Query(default="raw", description="Response rendering profile."),
+):
+    """Deprecated alias for :route:`GET /story/info`."""
+    response.headers["Deprecation"] = "true"
+    response.headers["Warning"] = '299 - "Deprecated endpoint: use /story/info"'
+    response.headers["X-Deprecated-Endpoint"] = "/story/status"
+    response.headers["X-Replacement-Endpoint"] = "/story/info"
+    return await get_story_info(
+        orchestrator=orchestrator,
+        adapter=adapter,
+        api_key=api_key,
+        render_profile=render_profile,
     )
 
 

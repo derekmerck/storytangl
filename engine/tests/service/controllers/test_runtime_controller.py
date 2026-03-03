@@ -9,6 +9,8 @@ import pytest
 import yaml
 
 from tangl.core import StreamRegistry
+from tangl.core38 import Graph as Graph38
+from tangl.core38 import Selector as Selector38
 from tangl.journal.content import ContentFragment
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.exceptions import InvalidOperationError
@@ -21,6 +23,10 @@ from tangl.story.fabula.domain_manager import DomainManager
 from tangl.story.fabula.script_manager import ScriptManager
 from tangl.story.fabula.world import World
 from tangl.vm import ChoiceEdge, Frame, Ledger, ResolutionPhase
+from tangl.vm38.replay import CausalityTransitionRecord
+from tangl.vm38.runtime.causality import CausalityMode
+from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.vm38.traversable import TraversableNode
 
 
 
@@ -63,6 +69,13 @@ def user_with_ledger(ledger: Ledger) -> User:
     user = User(uid=uuid4())
     user.current_ledger_id = ledger.uid
     return user
+
+
+@pytest.fixture()
+def ledger38() -> Ledger38:
+    graph = Graph38(label="demo38")
+    start = TraversableNode(label="start", registry=graph)
+    return Ledger38.from_graph(graph=graph, entry_id=start.uid)
 
 
 def _register_journal_handler(frame: Frame) -> None:
@@ -306,6 +319,66 @@ def test_get_story_info_reports_metadata(runtime_controller: RuntimeController, 
     assert info.journal_size == 0
     assert info.title == ledger.graph.label
     assert info.cursor_label == "start"
+
+
+def test_get_node_info_marks_legacy_ledger_dirty(
+    runtime_controller: RuntimeController,
+    ledger: Ledger,
+) -> None:
+    result = runtime_controller.get_node_info(ledger=ledger, node_id=ledger.cursor_id)
+    assert result.status == "ok"
+    assert ledger.is_dirty is True
+    assert result.details is not None
+    assert result.details["node_id"] == str(ledger.cursor_id)
+
+
+def test_check_expr_marks_legacy_ledger_dirty_and_returns_result(
+    runtime_controller: RuntimeController,
+    ledger: Ledger,
+) -> None:
+    result = runtime_controller.check_expr(ledger=ledger, expr="1 + 1")
+    assert result.status == "ok"
+    assert ledger.is_dirty is True
+    assert result.details is not None
+    assert result.details["result"] == 2
+
+
+def test_apply_effect_marks_legacy_ledger_dirty(
+    runtime_controller: RuntimeController,
+    ledger: Ledger,
+) -> None:
+    result = runtime_controller.apply_effect(ledger=ledger, expr="score = 42")
+    assert result.status == "ok"
+    assert ledger.is_dirty is True
+    assert result.details is not None
+    assert result.details["result"] is True
+
+
+def test_get_node_info_marks_vm38_soft_dirty(
+    runtime_controller: RuntimeController,
+    ledger38: Ledger38,
+) -> None:
+    result = runtime_controller.get_node_info(ledger=ledger38, node_id=ledger38.cursor_id)
+    assert result.status == "ok"
+    assert ledger38.causality_mode == CausalityMode.SOFT_DIRTY
+    transitions = list(Selector38(has_kind=CausalityTransitionRecord).filter(ledger38.output_stream))
+    assert len(transitions) == 1
+    assert transitions[0].reason == "debug_get_node_info"
+
+
+def test_vm38_check_and_apply_soft_dirty_transition_records_once(
+    runtime_controller: RuntimeController,
+    ledger38: Ledger38,
+) -> None:
+    check = runtime_controller.check_expr(ledger=ledger38, expr="1 + 1")
+    apply = runtime_controller.apply_effect(ledger=ledger38, expr="debug_counter = 1")
+
+    assert check.status == "ok"
+    assert apply.status == "ok"
+    assert ledger38.causality_mode == CausalityMode.SOFT_DIRTY
+    transitions = list(Selector38(has_kind=CausalityTransitionRecord).filter(ledger38.output_stream))
+    assert len(transitions) == 1
+    assert transitions[0].to_mode == CausalityMode.SOFT_DIRTY.value
 
 @pytest.mark.skip(reason="changed behavior, endpoint is gone")
 def test_get_available_choices_returns_choice_info_models(

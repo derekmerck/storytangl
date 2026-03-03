@@ -20,7 +20,7 @@ from .provisioner import (
     TokenProvisioner,
     InlineTemplateProvisioner,
     FindProvisioner,
-    FallbackProvisioner,
+    StubProvisioner,
     UpdateCloneProvisioner,
     CloneProvisioner,
 )

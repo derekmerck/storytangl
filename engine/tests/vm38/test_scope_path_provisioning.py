@@ -364,7 +364,14 @@ class TestResolverPreviewAndExecution:
         )
 
         class _Resolver(Resolver):
-            def _resolve_requirement_offer(self, requirement, *, force=False, preferred_offers=(), _ctx=None):
+            def _resolve_requirement_offer(
+                self,
+                requirement,
+                *,
+                allow_stubs=False,
+                preferred_offers=(),
+                _ctx=None,
+            ):
                 requirement.selected_offer_policy = ProvisionPolicy.CREATE
                 requirement.resolution_reason = "resolved"
                 requirement.resolution_meta = {"selected": {"origin_id": "bad"}}

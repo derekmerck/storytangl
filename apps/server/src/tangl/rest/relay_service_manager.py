@@ -99,7 +99,7 @@ class RelayServiceManager(ServiceManagerAbc):
 
     @dev_endpoint
     def apply_story_expr(self, obj_id: UUID, expr: str ) -> RuntimeInfo:
-        result = self.relay_put("story", "apply", expr = expr)
+        result = self.relay_post("story", "apply", expr = expr)
         return RuntimeInfo(**result.json())
 
 

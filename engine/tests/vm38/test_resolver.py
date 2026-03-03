@@ -1,7 +1,7 @@
 """Contract tests for ``tangl.vm38.provision.resolver``.
 
 Organized by concept:
-- Offer gathering: FindProvisioner, TemplateProvisioner, FallbackProvisioner
+- Offer gathering: FindProvisioner, TemplateProvisioner, StubProvisioner
 - Requirement resolution: single vs ambiguous offers
 - Dependency resolution: provider linking
 - Frontier resolution: full node satisfaction check
@@ -38,7 +38,7 @@ from tangl.vm38.provision import (
     Requirement,
     Resolver,
     TemplateProvisioner,
-    FallbackProvisioner,
+    StubProvisioner,
     ProvisionOffer,
 )
 from tangl.vm38.traversable import TraversableNode
@@ -359,30 +359,41 @@ class TestResolverOfferGathering:
         offers = resolver.gather_offers(req)
         assert len(offers) >= 1
 
-    def test_empty_groups_yield_force_fallback_only_when_forced(self) -> None:
+    def test_empty_groups_yield_stub_offer_only_when_stubs_allowed(self) -> None:
         resolver = Resolver(entity_groups=[], template_groups=[])
         req = Requirement.from_identifier("missing")
-        offers = resolver.gather_offers(req, force=True)
-        assert any(o.policy == ProvisionPolicy.FORCE for o in offers)
+        offers = resolver.gather_offers(req, allow_stubs=True)
+        assert any(o.policy == ProvisionPolicy.STUB for o in offers)
 
-        no_force_offers = resolver.gather_offers(req, force=False)
-        assert no_force_offers == []
+        no_stub_offers = resolver.gather_offers(req, allow_stubs=False)
+        assert no_stub_offers == []
 
-    def test_force_fallback_not_selected_when_non_force_offer_exists(self) -> None:
+    def test_hard_dirty_context_auto_allows_stub_offers(self) -> None:
+        resolver = Resolver(entity_groups=[], template_groups=[])
+        req = Requirement.from_identifier("missing")
+        ctx = SimpleNamespace(
+            causality_mode="hard_dirty",
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: [],
+        )
+        offers = resolver.gather_offers(req, allow_stubs=False, _ctx=ctx)
+        assert any(offer.policy == ProvisionPolicy.STUB for offer in offers)
+
+    def test_stub_offer_not_selected_when_non_stub_offer_exists(self) -> None:
         sword = Entity(label="sword")
         resolver = Resolver(entity_groups=[[sword]], template_groups=[])
         req = Requirement.from_identifier("sword")
-        offers = resolver.gather_offers(req, force=True)
+        offers = resolver.gather_offers(req, allow_stubs=True)
         assert len(offers) == 1
-        assert all(o.policy != ProvisionPolicy.FORCE for o in offers)
+        assert all(o.policy != ProvisionPolicy.STUB for o in offers)
 
-    def test_force_fallback_synthesizes_kind_and_identifier(self) -> None:
+    def test_stub_offer_synthesizes_kind_and_identifier(self) -> None:
         class Person(Entity):
             pass
 
         resolver = Resolver(entity_groups=[], template_groups=[])
         req = Requirement(has_kind=Person, has_identifier="joe")
-        provider = resolver.resolve_requirement(req, force=True)
+        provider = resolver.resolve_requirement(req, allow_stubs=True)
         assert isinstance(provider, Person)
         assert provider.label == "joe"
 
@@ -639,16 +650,16 @@ class TestResolverRequirementResolution:
         resolver = Resolver(entity_groups=[])
         req = Requirement(has_identifier="missing", provision_policy=ProvisionPolicy.EXISTING)
         provider = resolver.resolve_requirement(req)
-        # EXISTING-only policy filters out FORCE fallbacks
+        # EXISTING-only policy filters out STUB offers.
         assert provider is None
         assert req.unsatisfiable is True
         assert req.resolution_reason == "no_offers"
 
-    def test_force_with_existing_offer_prefers_existing(self) -> None:
+    def test_allow_stubs_with_existing_offer_prefers_existing(self) -> None:
         sword = Entity(label="sword")
         resolver = Resolver(entity_groups=[[sword]])
         req = Requirement.from_identifier("sword")
-        provider = resolver.resolve_requirement(req, force=True)
+        provider = resolver.resolve_requirement(req, allow_stubs=True)
         assert provider is sword
         assert req.selected_offer_policy == ProvisionPolicy.EXISTING
 
@@ -770,7 +781,7 @@ class TestResolverDependencyResolution:
         assert success is True
         assert dep.provider is bob
 
-    def test_force_fallback_bypasses_requirement_validation(self) -> None:
+    def test_stub_offer_bypasses_requirement_validation(self) -> None:
         class Person(RegistryAware):
             pass
 
@@ -792,14 +803,81 @@ class TestResolverDependencyResolution:
             get_registries=lambda: [],
             get_inline_behaviors=lambda: [],
         )
-        success = resolver.resolve_dependency(dep, force=True, _ctx=ctx)
+        success = resolver.resolve_dependency(dep, allow_stubs=True, _ctx=ctx)
         assert success is True
         assert dep.provider is not None
         assert isinstance(dep.provider, Person)
         assert dep.satisfied
-        assert dep.requirement.selected_offer_policy == ProvisionPolicy.FORCE
+        assert dep.requirement.selected_offer_policy == ProvisionPolicy.STUB
         assert dep.requirement.resolved_step == 11
         assert dep.requirement.resolved_cursor_id == node.uid
+
+    def test_stub_offer_requires_allow_stubs_or_hard_dirty(self) -> None:
+        class Person(RegistryAware):
+            pass
+
+        g = Graph()
+        node = _node(g, label="room")
+        dep = _dependency(
+            g,
+            requirement=Requirement(has_kind=Person, has_identifier="joe"),
+            predecessor_id=node.uid,
+        )
+
+        provider = Person(label="joe")
+        selected_offer = ProvisionOffer(
+            origin_id="stub-test",
+            policy=ProvisionPolicy.STUB,
+            callback=lambda *_, **__: provider,
+        )
+
+        class _Resolver(Resolver):
+            def _resolve_requirement_offer(  # noqa: D401 - test seam override
+                self,
+                requirement,
+                *,
+                allow_stubs=False,
+                preferred_offers=(),
+                _ctx=None,
+            ):
+                requirement.selected_offer_policy = ProvisionPolicy.STUB
+                requirement.resolution_reason = "resolved"
+                requirement.resolution_meta = {"selected": {"origin_id": "stub-test"}}
+                return provider, selected_offer, [selected_offer]
+
+        resolver = _Resolver(entity_groups=[], template_groups=[])
+        with pytest.raises(AssertionError, match="STUB offer selected"):
+            resolver.resolve_dependency(dep, allow_stubs=False)
+
+    def test_stub_offer_escalates_hard_dirty_callback(self) -> None:
+        class Person(RegistryAware):
+            pass
+
+        g = Graph()
+        node = _node(g, label="room")
+        dep = _dependency(
+            g,
+            requirement=Requirement(has_kind=Person, has_identifier="joe"),
+            predecessor_id=node.uid,
+        )
+
+        transitions: list[tuple[str, str | None]] = []
+
+        def _escalate(reason: str, step_id: str | None = None) -> bool:
+            transitions.append((reason, step_id))
+            return True
+
+        ctx = SimpleNamespace(
+            step=11,
+            cursor_id=node.uid,
+            get_registries=lambda: [],
+            get_inline_behaviors=lambda: [],
+            escalate_to_hard_dirty=_escalate,
+        )
+        resolver = Resolver(entity_groups=[], template_groups=[])
+        assert resolver.resolve_dependency(dep, allow_stubs=True, _ctx=ctx) is True
+        assert transitions == [("stub_link_accepted", str(dep.uid))]
+        assert dep.requirement.resolution_reason == "stub_link_resolved"
 
     def test_attachment_finalization_runs_for_scene_like_containers(self) -> None:
         g = Graph()

@@ -464,7 +464,7 @@ class StoryMaterializer38:
             )
             resolver = Resolver.from_ctx(ctx)
             was_satisfied = dep.satisfied
-            resolved = resolver.resolve_dependency(dep, force=False)
+            resolved = resolver.resolve_dependency(dep, allow_stubs=False)
 
             if resolved and dep.satisfied:
                 if not was_satisfied:

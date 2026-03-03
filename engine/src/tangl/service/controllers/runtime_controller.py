@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+import logging
+from typing import Any, Mapping
 from uuid import UUID
 
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 from tangl.core import BaseFragment, StreamRegistry
 from tangl.journal.media import MediaFragment
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.core38.runtime_op import RuntimeOp
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,
@@ -24,6 +26,10 @@ from tangl.vm.frame import ChoiceEdge, Frame
 from tangl.vm.ledger import Ledger
 from tangl.service.user.user import User
 from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.vm38.runtime.frame import PhaseCtx as PhaseCtx38
+
+
+logger = logging.getLogger(__name__)
 
 
 class RuntimeController(HasApiEndpoints):
@@ -255,6 +261,116 @@ class RuntimeController(HasApiEndpoints):
             metadata=merged_metadata,
         )
 
+    @staticmethod
+    def _resolve_graph_node(graph: Any, node_id: UUID | str | None) -> Any | None:
+        """Resolve a node by UUID or identifier/label from a graph-like registry."""
+        if graph is None or node_id is None:
+            return None
+
+        get_node = getattr(graph, "get", None)
+        if isinstance(node_id, UUID) and callable(get_node):
+            return get_node(node_id)
+
+        if not isinstance(node_id, str):
+            return None
+
+        find_one = getattr(graph, "find_one", None)
+        if callable(find_one):
+            try:
+                return find_one(alias=node_id)
+            except Exception:
+                pass
+
+        values = getattr(graph, "values", None)
+        if not callable(values):
+            return None
+
+        for candidate in values():
+            if getattr(candidate, "label", None) == node_id:
+                return candidate
+            has_identifier = getattr(candidate, "has_identifier", None)
+            if callable(has_identifier):
+                try:
+                    if has_identifier(node_id):
+                        return candidate
+                except Exception:
+                    continue
+        return None
+
+    def _mark_debug_soft_dirty(
+        self,
+        *,
+        ledger: Any,
+        reason: str,
+        step_id: str | None = None,
+        node: Any | None = None,
+    ) -> None:
+        """Flag debug causality drift, preferring vm38 soft-dirty transitions."""
+        if isinstance(ledger, Ledger38):
+            ledger.mark_soft_dirty(reason, step_id=step_id)
+            return
+
+        mark_dirty = getattr(ledger, "mark_dirty", None)
+        if callable(mark_dirty):
+            mark_dirty(reason)
+
+        if node is not None:
+            node_mark_dirty = getattr(node, "mark_dirty", None)
+            if callable(node_mark_dirty):
+                node_mark_dirty(reason)
+            elif hasattr(node, "tags"):
+                node.tags = set(node.tags) | {"dirty"}
+
+    @staticmethod
+    def _debug_namespace_for_node(ledger: Any, node: Any) -> Mapping[str, Any]:
+        """Gather a debug/eval namespace using the runtime's frame context."""
+        if isinstance(ledger, Ledger38):
+            ctx = PhaseCtx38(
+                graph=ledger.graph,
+                cursor_id=ledger.cursor_id,
+                step=max(ledger.cursor_steps, 0),
+                causality_mode=ledger.causality_mode,
+                mark_soft_dirty_callback=ledger.mark_soft_dirty,
+                escalate_to_hard_dirty_callback=ledger.escalate_to_hard_dirty,
+            )
+            return ctx.get_ns(node)
+
+        frame = ledger.get_frame()
+        context = getattr(frame, "context", None)
+        get_ns = getattr(context, "get_ns", None)
+        if callable(get_ns):
+            return get_ns(node)
+        return {}
+
+    @staticmethod
+    def _sanitize_debug_value(value: Any) -> Any:
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, set):
+            return [RuntimeController._sanitize_debug_value(item) for item in sorted(value, key=str)]
+        if isinstance(value, type):
+            return value.__name__
+        if callable(value):
+            return repr(value)
+        if isinstance(value, list):
+            return [RuntimeController._sanitize_debug_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [RuntimeController._sanitize_debug_value(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: RuntimeController._sanitize_debug_value(item)
+                for key, item in value.items()
+            }
+        return value
+
+    @staticmethod
+    def _serialize_debug_node(node: Any) -> dict[str, Any]:
+        if hasattr(node, "model_dump"):
+            return RuntimeController._sanitize_debug_value(node.model_dump(mode="python"))
+        if hasattr(node, "unstructure"):
+            return RuntimeController._sanitize_debug_value(node.unstructure())
+        return {"repr": RuntimeController._sanitize_debug_value(repr(node))}
+
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         response_type=ResponseType.RUNTIME,
@@ -352,9 +468,45 @@ class RuntimeController(HasApiEndpoints):
     def jump_to_node(self, ledger: Ledger, node_id: UUID) -> RuntimeInfo:
         """Teleport the ledger cursor to ``node_id`` for debugging purposes."""
 
-        destination = ledger.graph.get(node_id)
+        destination = self._resolve_graph_node(ledger.graph, node_id)
         if destination is None:
             raise ValueError(f"Node {node_id} not found in graph")
+
+        self._mark_debug_soft_dirty(
+            ledger=ledger,
+            reason="debug_jump_to_node",
+            step_id=str(node_id),
+            node=destination,
+        )
+
+        if isinstance(ledger, Ledger38):
+            frame = ledger.get_frame()
+            frame.goto_node(
+                destination,
+                allow_stubs=ledger.causality_mode.value == "hard_dirty",
+            )
+
+            prev_id = ledger.cursor_history[-1] if ledger.cursor_history else None
+            for traced_node_id in frame.cursor_trace:
+                if prev_id is not None and traced_node_id == prev_id:
+                    ledger.reentrant_steps += 1
+                prev_id = traced_node_id
+
+            ledger.cursor_id = frame.cursor.uid
+            ledger.cursor_steps += frame.cursor_steps
+            ledger.cursor_history.extend(frame.cursor_trace)
+            ledger.call_stack_ids = [edge.uid for edge in frame.return_stack]
+            ledger.last_redirect = frame.last_redirect
+            ledger.redirect_trace = list(frame.redirect_trace)
+            ledger.save_snapshot(cadence=ledger.checkpoint_cadence)
+
+            return RuntimeInfo.ok(
+                cursor_id=ledger.cursor_id,
+                step=ledger.step,
+                message="Jumped",
+                dirty=True,
+                causality_mode=ledger.causality_mode.value,
+            )
 
         if not destination.has_tags("dirty"):
             destination.tags = set(destination.tags) | {"dirty"}
@@ -371,6 +523,136 @@ class RuntimeController(HasApiEndpoints):
             step=ledger.step,
             message="Jumped",
             dirty=True,
+        )
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.RESTRICTED,
+        method_type=MethodType.UPDATE,
+        response_type=ResponseType.RUNTIME,
+    )
+    def get_node_info(
+        self,
+        ledger: Ledger,
+        node_id: UUID | str | None = None,
+    ) -> RuntimeInfo:
+        """Inspect a graph node in the active story for debug tooling."""
+        resolved_node_id = node_id or getattr(ledger, "cursor_id", None)
+        node = self._resolve_graph_node(ledger.graph, resolved_node_id)
+        if node is None:
+            raise ValueError(f"Node {resolved_node_id} not found in graph")
+
+        self._mark_debug_soft_dirty(
+            ledger=ledger,
+            reason="debug_get_node_info",
+            step_id=str(getattr(node, "uid", resolved_node_id)),
+            node=node,
+        )
+
+        return RuntimeInfo.ok(
+            cursor_id=getattr(ledger, "cursor_id", None),
+            step=getattr(ledger, "step", None),
+            message="Node info",
+            node_id=str(getattr(node, "uid", resolved_node_id)),
+            node=self._serialize_debug_node(node),
+        )
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.RESTRICTED,
+        method_type=MethodType.UPDATE,
+        response_type=ResponseType.RUNTIME,
+    )
+    def check_expr(
+        self,
+        ledger: Ledger,
+        expr: str,
+        node_id: UUID | str | None = None,
+    ) -> RuntimeInfo:
+        """Evaluate a debug expression against the active runtime namespace."""
+        resolved_node_id = node_id or getattr(ledger, "cursor_id", None)
+        node = self._resolve_graph_node(ledger.graph, resolved_node_id)
+        if node is None:
+            raise ValueError(f"Node {resolved_node_id} not found in graph")
+
+        self._mark_debug_soft_dirty(
+            ledger=ledger,
+            reason="debug_check_expr",
+            step_id=str(getattr(node, "uid", resolved_node_id)),
+            node=node,
+        )
+        namespace = self._debug_namespace_for_node(ledger, node)
+
+        try:
+            result = RuntimeOp(expr=expr).eval(namespace)
+        except Exception as exc:
+            logger.warning("Debug check_expr failed: %s", exc)
+            return RuntimeInfo.error(
+                code="debug_check_failed",
+                message=str(exc),
+                cursor_id=getattr(ledger, "cursor_id", None),
+                step=getattr(ledger, "step", None),
+                expr=expr,
+                node_id=str(getattr(node, "uid", resolved_node_id)),
+            )
+
+        return RuntimeInfo.ok(
+            cursor_id=getattr(ledger, "cursor_id", None),
+            step=getattr(ledger, "step", None),
+            message="Expression evaluated",
+            expr=expr,
+            result=self._sanitize_debug_value(result),
+            node_id=str(getattr(node, "uid", resolved_node_id)),
+            node=self._serialize_debug_node(node),
+        )
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.RESTRICTED,
+        method_type=MethodType.UPDATE,
+        response_type=ResponseType.RUNTIME,
+    )
+    def apply_effect(
+        self,
+        ledger: Ledger,
+        expr: str,
+        node_id: UUID | str | None = None,
+    ) -> RuntimeInfo:
+        """Execute a debug effect expression against the active runtime namespace."""
+        resolved_node_id = node_id or getattr(ledger, "cursor_id", None)
+        node = self._resolve_graph_node(ledger.graph, resolved_node_id)
+        if node is None:
+            raise ValueError(f"Node {resolved_node_id} not found in graph")
+
+        self._mark_debug_soft_dirty(
+            ledger=ledger,
+            reason="debug_apply_effect",
+            step_id=str(getattr(node, "uid", resolved_node_id)),
+            node=node,
+        )
+        namespace = self._debug_namespace_for_node(ledger, node)
+
+        try:
+            RuntimeOp(expr=expr).apply(namespace)
+            sync_locals = getattr(node, "_sync_locals", None)
+            if callable(sync_locals):
+                sync_locals(namespace)
+        except Exception as exc:
+            logger.warning("Debug apply_effect failed: %s", exc)
+            return RuntimeInfo.error(
+                code="debug_apply_failed",
+                message=str(exc),
+                cursor_id=getattr(ledger, "cursor_id", None),
+                step=getattr(ledger, "step", None),
+                expr=expr,
+                node_id=str(getattr(node, "uid", resolved_node_id)),
+            )
+
+        return RuntimeInfo.ok(
+            cursor_id=getattr(ledger, "cursor_id", None),
+            step=getattr(ledger, "step", None),
+            message="Expression applied",
+            expr=expr,
+            result=True,
+            node_id=str(getattr(node, "uid", resolved_node_id)),
+            node=self._serialize_debug_node(node),
         )
 
     @ApiEndpoint.annotate(

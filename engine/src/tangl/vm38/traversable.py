@@ -78,6 +78,25 @@ def _resolve_rand(*, rand: Random | None, ctx: Any = None) -> Random | None:
     return getattr(ctx, "random", None)
 
 
+def _ctx_is_hard_dirty(ctx: Any = None) -> bool:
+    """Return True when context indicates causality fidelity is broken."""
+    if ctx is None:
+        return False
+    mode = getattr(ctx, "causality_mode", None)
+    if mode is None:
+        meta = getattr(ctx, "meta", None)
+        if isinstance(meta, Mapping):
+            mode = meta.get("causality_mode")
+    if mode is None:
+        return False
+    try:
+        from .runtime.causality import CausalityMode
+
+        return mode == CausalityMode.HARD_DIRTY
+    except Exception:
+        return str(mode) == "hard_dirty"
+
+
 class TraversableEffect(Effect):
     """Effect annotated with a VM pipeline trigger phase."""
 
@@ -97,6 +116,8 @@ class HasAvailability(BaseModelPlus):
         rand: Random | None = None,
     ) -> bool:
         """Return ``True`` when every availability predicate is satisfied."""
+        if _ctx_is_hard_dirty(ctx):
+            return True
         if not self.availability:
             return True
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
@@ -114,6 +135,8 @@ class HasAvailability(BaseModelPlus):
         rand: Random | None = None,
     ) -> bool:
         """Evaluate this entity's availability against ``other``'s namespace."""
+        if _ctx_is_hard_dirty(ctx):
+            return True
         if not self.availability:
             return True
         ns = ctx.get_ns(other) if ctx is not None and hasattr(ctx, "get_ns") else {}

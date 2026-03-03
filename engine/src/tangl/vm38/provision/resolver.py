@@ -28,7 +28,7 @@ from .provisioner import (
     TemplateProvisioner,
     TokenProvisioner,
     InlineTemplateProvisioner,
-    FallbackProvisioner,
+    StubProvisioner,
     UpdateCloneProvisioner,
     ProvisionPolicy,
     _next_provision_uid,
@@ -168,6 +168,31 @@ class Resolver:
         return None
 
     @staticmethod
+    def _ctx_causality_mode(_ctx: Any) -> Any | None:
+        mode = getattr(_ctx, "causality_mode", None)
+        if mode is not None:
+            return mode
+
+        meta = getattr(_ctx, "meta", None)
+        if isinstance(meta, dict) and "causality_mode" in meta:
+            return meta["causality_mode"]
+        return None
+
+    @classmethod
+    def _stubs_allowed(cls, *, allow_stubs: bool, _ctx: Any = None) -> bool:
+        if allow_stubs:
+            return True
+        mode = cls._ctx_causality_mode(_ctx)
+        if mode is None:
+            return False
+        try:
+            from tangl.vm38.runtime import CausalityMode
+
+            return mode == CausalityMode.HARD_DIRTY
+        except Exception:
+            return str(mode) == "hard_dirty"
+
+    @staticmethod
     def _materialize_node(
         template: EntityTemplate,
         *,
@@ -255,16 +280,17 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        force: bool = False,
+        allow_stubs: bool = False,
         _ctx: Any = None,
     ) -> list[ProvisionOffer]:
         """Return template-only dependency offers using resolver matching semantics."""
         offers = self._template_offers_for_requirement(requirement, _ctx=_ctx)
         offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
+        stubs_allowed = self._stubs_allowed(allow_stubs=allow_stubs, _ctx=_ctx)
 
         def _allowed(offer: ProvisionOffer) -> bool:
-            if offer.policy & ProvisionPolicy.FORCE:
-                return force
+            if offer.policy & ProvisionPolicy.STUB:
+                return stubs_allowed
             return bool(offer.policy & requirement.provision_policy)
 
         offers = [offer for offer in offers if _allowed(offer)]
@@ -281,7 +307,7 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        force: bool = False,
+        allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> list[ProvisionOffer]:
@@ -318,18 +344,19 @@ class Resolver:
                     offers = resolved_offers
 
         offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
+        stubs_allowed = self._stubs_allowed(allow_stubs=allow_stubs, _ctx=_ctx)
 
         def _allowed(offer: ProvisionOffer) -> bool:
-            if offer.policy & ProvisionPolicy.FORCE:
-                return force
+            if offer.policy & ProvisionPolicy.STUB:
+                return stubs_allowed
             return bool(offer.policy & requirement.provision_policy)
 
         offers = [offer for offer in offers if _allowed(offer)]
 
-        # Judgment call: synthetic fallback is an emergency path only.
-        # It is offered only when force=True and no other provider yielded a valid offer.
-        if force and not offers:
-            offers.extend(FallbackProvisioner.get_dependency_offers(requirement))
+        # Debug/preview behavior: stubs keep traversal alive when authored
+        # dependencies are unsatisfied or impossible from the current state.
+        if stubs_allowed and not offers:
+            offers.extend(StubProvisioner.get_dependency_offers(requirement))
 
         offers.sort(key=lambda v: v.sort_key())
         return offers
@@ -402,13 +429,13 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        force: bool = False,
+        allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> tuple[Optional[PT], Optional[ProvisionOffer], list[ProvisionOffer]]:
         offers = self.gather_offers(
             requirement,
-            force=force,
+            allow_stubs=allow_stubs,
             preferred_offers=preferred_offers,
             _ctx=_ctx,
         )
@@ -452,13 +479,13 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        force: bool = False,
+        allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> Optional[PT]:
         provider, _, _ = self._resolve_requirement_offer(
             requirement=requirement,
-            force=force,
+            allow_stubs=allow_stubs,
             preferred_offers=preferred_offers,
             _ctx=_ctx,
         )
@@ -667,7 +694,7 @@ class Resolver:
         self,
         requirement: Requirement,
         *,
-        force: bool = False,
+        allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
         max_depth: int = 8,
         _ctx: Any = None,
@@ -676,7 +703,7 @@ class Resolver:
         _ = max_depth
         offers = self.gather_offers(
             requirement,
-            force=force,
+            allow_stubs=allow_stubs,
             preferred_offers=preferred_offers,
             _ctx=_ctx,
         )
@@ -827,7 +854,13 @@ class Resolver:
             )
         ]
 
-    def resolve_dependency(self, dependency: Dependency[PT], *, force: bool = False, _ctx=None) -> bool:
+    def resolve_dependency(
+        self,
+        dependency: Dependency[PT],
+        *,
+        allow_stubs: bool = False,
+        _ctx=None,
+    ) -> bool:
         preferred_offers = self._linked_affordance_offers(
             requirement=dependency.requirement,
             frontier=dependency.predecessor,
@@ -835,7 +868,7 @@ class Resolver:
 
         provider, selected_offer, _offers = self._resolve_requirement_offer(
             requirement=dependency.requirement,
-            force=force,
+            allow_stubs=allow_stubs,
             preferred_offers=preferred_offers,
             _ctx=_ctx,
         )
@@ -846,12 +879,17 @@ class Resolver:
             dependency.requirement.resolution_reason = "provider_none"
             return False
 
-        if force and dependency.requirement.selected_offer_policy is ProvisionPolicy.FORCE:
-            # Judgment call: force fallback is an emergency "shape only" provider.
-            # We bypass requirement predicate validation here intentionally.
+        if selected_offer.policy & ProvisionPolicy.STUB:
+            stubs_allowed = self._stubs_allowed(allow_stubs=allow_stubs, _ctx=_ctx)
+            if not stubs_allowed:
+                raise AssertionError(
+                    "Invariant violation: STUB offer selected while stubs are not allowed"
+                )
+            # Debug/preview mode: STUB linking intentionally bypasses requirement
+            # predicate fidelity to keep traversal running under illegal traversal.
             if not isinstance(provider, RegistryAware):
                 raise TypeError(
-                    "Force fallback provider must be RegistryAware for dependency linkage"
+                    "STUB provider must be RegistryAware for dependency linkage"
                 )
             if provider.registry is not dependency.registry:
                 dependency.registry.add(provider, _ctx=_ctx)
@@ -868,7 +906,10 @@ class Resolver:
             dependency.requirement.resolved_cursor_id = (
                 cursor_id if isinstance(cursor_id, UUID) else None
             )
-            dependency.requirement.resolution_reason = "forced_fallback_resolved"
+            dependency.requirement.resolution_reason = "stub_link_resolved"
+            escalate = getattr(_ctx, "escalate_to_hard_dirty", None)
+            if callable(escalate):
+                escalate("stub_link_accepted", step_id=str(dependency.uid))
             Edge.set_successor(dependency, provider, _ctx=_ctx)
             return True
 
@@ -894,12 +935,18 @@ class Resolver:
             dependency.requirement.resolution_reason = "resolved"
         return True
 
-    def resolve_frontier_node(self, node: Node, *, force: bool = False, _ctx=None) -> bool:
+    def resolve_frontier_node(
+        self,
+        node: Node,
+        *,
+        allow_stubs: bool = False,
+        _ctx=None,
+    ) -> bool:
         # Note this is not unsatisfied deps, it's anyone without a provider
         # satisfied could mean not a hard req
         open_deps = node.edges_out(Selector(has_kind=Dependency, provider=None))
         for dep in open_deps:
-            self.resolve_dependency(dep, force=force, _ctx=_ctx)
+            self.resolve_dependency(dep, allow_stubs=allow_stubs, _ctx=_ctx)
 
         # Find unsat blockers with no provider and a hard-requirement
         unsatisfied_deps = node.edges_out(Selector(has_kind=Dependency, satisfied=False))
@@ -923,5 +970,9 @@ class Resolver:
 
 # Register the resolution process with dispatch so it will be invoked from the phase bus
 @on_provision
-def provision_node(caller: Node, *, ctx, force: bool = False):
-    Resolver.from_ctx(ctx).resolve_frontier_node(node=caller, force=force, _ctx=ctx)
+def provision_node(caller: Node, *, ctx, allow_stubs: bool = False):
+    Resolver.from_ctx(ctx).resolve_frontier_node(
+        node=caller,
+        allow_stubs=allow_stubs,
+        _ctx=ctx,
+    )

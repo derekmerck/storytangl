@@ -385,9 +385,22 @@ The first (highest-priority) allowed offer wins and its `callback()` is invoked 
 materialize the provider.
 
 `ProvisionPolicy` flags encode the selection contract: `EXISTING` (find an existing
-entity), `CREATE` (clone/mint a new one), `FORCE` (emergency fallback, only when
-`force=True`), `TOKEN` (specifically a singleton token). Requirements can restrict which
-policies are acceptable.
+entity), `CREATE` (clone/mint a new one), `STUB` (debug/preview fallback, only when
+stubs are allowed), `TOKEN` (specifically a singleton token). Requirements can restrict
+which policies are acceptable.
+
+#### Causality Modes (Debug/Preview Traversal)
+
+Runtime context carries a monotonic causality mode:
+
+- `CLEAN` — normal authored traversal assumptions hold.
+- `SOFT_DIRTY` — debug inspection/mutation occurred, but authored availability still runs.
+- `HARD_DIRTY` — causal chain is broken; availability becomes permissive and STUB linking
+  is allowed automatically.
+
+`SOFT_DIRTY` is set by explicit debug actions (`jump`, `inspect`, `check`, `apply`).
+`HARD_DIRTY` is set on first accepted `STUB` dependency link. Transitions are append-only
+audit records in the ledger output stream via `CausalityTransitionRecord`.
 
 
 ### Authority Chain and Back-Pointer Aliasing

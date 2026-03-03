@@ -269,6 +269,40 @@ class TestTraversableNodeContainer:
         assert node.available(ns={"has_key": True, "level": 3}) is True
         assert node.available(ns={"has_key": True, "level": 1}) is False
 
+    def test_soft_dirty_context_still_enforces_availability(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="gate",
+            availability=[Predicate(expr="has_key"), Predicate(expr="level > 2")],
+        )
+        ctx = SimpleNamespace(causality_mode="soft_dirty")
+        assert node.available(ns={"has_key": True, "level": 1}, ctx=ctx) is False
+
+    def test_hard_dirty_context_short_circuits_availability(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="gate",
+            availability=[Predicate(expr="has_key"), Predicate(expr="level > 2")],
+        )
+        ctx = SimpleNamespace(causality_mode="hard_dirty")
+        assert node.available(ns={"has_key": False, "level": 0}, ctx=ctx) is True
+
+    def test_hard_dirty_context_short_circuits_available_for(self) -> None:
+        g = Graph()
+        node = _node(
+            g,
+            label="gate",
+            availability=[Predicate(expr="has_key"), Predicate(expr="level > 2")],
+        )
+        other = _node(g, label="other")
+        ctx = SimpleNamespace(
+            causality_mode="hard_dirty",
+            get_ns=lambda _item: {"has_key": False, "level": 0},
+        )
+        assert node.available_for(other, ctx=ctx) is True
+
     def test_apply_effects_mutates_namespace(self) -> None:
         g = Graph()
         node = _node(g, label="gate", effects=[TraversableEffect(expr="counter = counter + 1")])

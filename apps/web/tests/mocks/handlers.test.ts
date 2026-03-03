@@ -35,8 +35,8 @@ describe('MSW Handlers', () => {
     expect(response.data[0]).toHaveProperty('key')
   })
 
-  it('returns status entries on /story/status', async () => {
-    const response = await axios.get('/story/status')
+  it('returns status entries on /story/info', async () => {
+    const response = await axios.get('/story/info')
     expect(Array.isArray(response.data)).toBe(true)
     expect(response.data[0]).toHaveProperty('key')
     expect(response.data[0]).toHaveProperty('value')

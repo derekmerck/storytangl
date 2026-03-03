@@ -7,6 +7,7 @@ the graph, cursor position and history, return stack, and accumulated output.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Optional, Self
 from uuid import UUID
 
@@ -16,9 +17,16 @@ from tangl.core38 import Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
 from tangl.vm38.traversable import TraversableEdge, TraversableNode
 
+from .causality import CausalityMode
 from .frame import Frame, PhaseCtx, StepTrace
 from ..fragments import Fragment
-from ..replay import CheckpointRecord, RollbackRecord, StepRecord, get_replay_engine
+from ..replay import (
+    CausalityTransitionRecord,
+    CheckpointRecord,
+    RollbackRecord,
+    StepRecord,
+    get_replay_engine,
+)
 from ..replay.contracts import ReplayDelta
 
 if TYPE_CHECKING:
@@ -26,6 +34,8 @@ if TYPE_CHECKING:
 
 
 __all__ = ["Ledger"]
+
+logger = logging.getLogger(__name__)
 
 
 class Ledger(Entity):
@@ -39,6 +49,9 @@ class Ledger(Entity):
 
     replay_algorithm_id: str = "diff_v1"
     checkpoint_cadence: int = 1
+    causality_mode: CausalityMode = CausalityMode.CLEAN
+    causality_break_reason: str | None = None
+    causality_break_step_id: str | None = None
 
     @property
     def cursor(self) -> TraversableNode:
@@ -123,6 +136,9 @@ class Ledger(Entity):
         self.call_stack_ids = []
         self.last_redirect = None
         self.redirect_trace = []
+        self.causality_mode = CausalityMode.CLEAN
+        self.causality_break_reason = None
+        self.causality_break_step_id = None
 
     def initialize_entry(self) -> None:
         """Finalize entry initialization and persist initial checkpoint."""
@@ -149,6 +165,7 @@ class Ledger(Entity):
             frame_meta["user"] = self.user
         if self.user_id is not None:
             frame_meta["user_id"] = self.user_id
+        frame_meta["causality_mode"] = self.causality_mode.value
         return Frame(
             self.graph,
             self.cursor,
@@ -156,7 +173,69 @@ class Ledger(Entity):
             self._call_stack(),
             step_base=self.cursor_steps,
             meta=frame_meta,
+            causality_mode=self.causality_mode,
+            mark_soft_dirty_callback=self.mark_soft_dirty,
+            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
         )
+
+    def _record_causality_transition(
+        self,
+        *,
+        from_mode: CausalityMode,
+        to_mode: CausalityMode,
+        reason: str,
+        step_id: str | None = None,
+    ) -> None:
+        step = max(self.cursor_steps, 0)
+        self.output_stream.append(
+            CausalityTransitionRecord(
+                step=step,
+                from_mode=from_mode.value,
+                to_mode=to_mode.value,
+                reason=reason,
+                step_id=step_id,
+                cursor_id=self.cursor_id,
+            )
+        )
+        logger.warning(
+            "Causality transition %s -> %s at step=%s cursor_id=%s reason=%s step_id=%s",
+            from_mode.value,
+            to_mode.value,
+            step,
+            self.cursor_id,
+            reason,
+            step_id,
+        )
+
+    def mark_soft_dirty(self, reason: str, step_id: str | None = None) -> bool:
+        """Transition from CLEAN to SOFT_DIRTY and audit the change once."""
+        if self.causality_mode is not CausalityMode.CLEAN:
+            return False
+        previous = self.causality_mode
+        self.causality_mode = CausalityMode.SOFT_DIRTY
+        self._record_causality_transition(
+            from_mode=previous,
+            to_mode=self.causality_mode,
+            reason=reason,
+            step_id=step_id,
+        )
+        return True
+
+    def escalate_to_hard_dirty(self, reason: str, step_id: str | None = None) -> bool:
+        """Escalate to HARD_DIRTY once; never downgrade within this session."""
+        if self.causality_mode is CausalityMode.HARD_DIRTY:
+            return False
+        previous = self.causality_mode
+        self.causality_mode = CausalityMode.HARD_DIRTY
+        self.causality_break_reason = reason
+        self.causality_break_step_id = step_id
+        self._record_causality_transition(
+            from_mode=previous,
+            to_mode=self.causality_mode,
+            reason=reason,
+            step_id=step_id,
+        )
+        return True
 
     def _record_step(self, trace: StepTrace) -> None:
         """Build and append replay records for one traced frame hop."""
@@ -220,8 +299,15 @@ class Ledger(Entity):
             graph=self.graph,
             cursor_id=self.cursor_id,
             step=max(self.cursor_steps, 0),
+            causality_mode=self.causality_mode,
+            mark_soft_dirty_callback=self.mark_soft_dirty,
+            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
         )
-        resolved = Resolver.from_ctx(ctx).resolve_dependency(dep, force=False, _ctx=ctx)
+        resolved = Resolver.from_ctx(ctx).resolve_dependency(
+            dep,
+            allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
+            _ctx=ctx,
+        )
         if resolved and dep.successor is not None and edge.successor is None:
             edge.set_successor(dep.successor, _ctx=ctx)
 
@@ -284,6 +370,9 @@ class Ledger(Entity):
             "call_stack_ids": [str(uid) for uid in self.call_stack_ids],
             "last_redirect": self.last_redirect,
             "redirect_trace": self.redirect_trace,
+            "causality_mode": self.causality_mode.value,
+            "causality_break_reason": self.causality_break_reason,
+            "causality_break_step_id": self.causality_break_step_id,
             "user_id": str(self.user_id) if self.user_id else None,
             "replay_algorithm_id": self.replay_algorithm_id,
             "checkpoint_cadence": self.checkpoint_cadence,
@@ -328,6 +417,9 @@ class Ledger(Entity):
             call_stack_ids=[_coerce_uuid(uid) for uid in data.get("call_stack_ids", [])],
             last_redirect=data.get("last_redirect"),
             redirect_trace=list(data.get("redirect_trace", [])),
+            causality_mode=CausalityMode(data.get("causality_mode", CausalityMode.CLEAN.value)),
+            causality_break_reason=data.get("causality_break_reason"),
+            causality_break_step_id=data.get("causality_break_step_id"),
             user_id=_coerce_uuid(data["user_id"]) if data.get("user_id") else None,
             replay_algorithm_id=data.get("replay_algorithm_id", "diff_v1"),
             checkpoint_cadence=data.get("checkpoint_cadence", 1),

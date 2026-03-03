@@ -90,7 +90,7 @@ def policy_tier(policy: Any) -> int:
     """Return policy sort tier (lower is preferred)."""
     from .provisioner import ProvisionPolicy
 
-    if policy & ProvisionPolicy.FORCE:
+    if policy & ProvisionPolicy.STUB:
         return 9
     if policy & ProvisionPolicy.EXISTING:
         return 1

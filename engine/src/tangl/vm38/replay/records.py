@@ -47,3 +47,13 @@ class RollbackRecord(Record):
     truncated_step_count: int
     reason: str | None = None
 
+
+class CausalityTransitionRecord(Record):
+    """Monotonic causality mode transitions for debug/preview auditing."""
+
+    step: int
+    from_mode: str
+    to_mode: str
+    reason: str
+    step_id: str | None = None
+    cursor_id: UUID | None = None

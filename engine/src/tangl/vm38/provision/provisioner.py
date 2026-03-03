@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 class ProvisionPolicy(Flag):
     # For offers only
-    FORCE = auto()  # forces highest priority and always allowed
+    STUB = auto()  # debug/preview linkage that suspends requirement fidelity
     TOKEN = auto()  # indicate offer is for a token
 
     # Offer may include ONE of these, req may include multiple
@@ -44,7 +44,7 @@ class ProvisionPolicy(Flag):
     ANY = EXISTING | UPDATE | CREATE
 
     def __int__(self):
-        # should be monotonic, force is lowest
+        # should be monotonic, stub is lowest
         # (create | token) should probably be cheaper than create alone?
         return self.value
 
@@ -317,8 +317,8 @@ class InlineTemplateProvisioner:
     # Can't have a fallback affordance, that's just a structure that's in scope?
 
 
-class FallbackProvisioner:
-    """Force-only emergency provider that synthesizes minimal matching entities."""
+class StubProvisioner:
+    """Debug-only provider that synthesizes minimal matching entities."""
 
     HIGH_COST_PRIORITY = Priority.LAST + 10_000
 
@@ -367,8 +367,8 @@ class FallbackProvisioner:
     @classmethod
     def get_dependency_offers(cls, requirement: Requirement) -> Iterable[ProvisionOffer]:
         return [ProvisionOffer(
-            origin_id="FallbackProvisioner",
-            policy=ProvisionPolicy.FORCE,
+            origin_id="StubProvisioner",
+            policy=ProvisionPolicy.STUB,
             priority=cls.HIGH_COST_PRIORITY,
             distance_from_caller=999_999,
             callback=lambda *_, _req=requirement, **__: cls._synthesize_entity(_req),

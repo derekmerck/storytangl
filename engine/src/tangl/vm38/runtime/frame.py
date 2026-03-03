@@ -91,6 +91,7 @@ from ..traversable import (
     TraversableEdge,
     TraversableNode,
 )
+from .causality import CausalityMode
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,9 @@ class PhaseCtx:
     correlation_id: UUID | str | None = None
     logger: Any | None = None
     meta: Mapping[str, Any] | None = field(default_factory=dict)
+    causality_mode: CausalityMode = CausalityMode.CLEAN
+    mark_soft_dirty_callback: Callable[[str, str | None], bool] | None = None
+    escalate_to_hard_dirty_callback: Callable[[str, str | None], bool] | None = None
 
     random: Random = field(default_factory=Random)
     inline_behaviors: list[Callable | Behavior] = field(default_factory=list)
@@ -190,6 +194,24 @@ class PhaseCtx:
 
     def get_meta(self) -> Mapping[str, Any]:
         return dict(self.meta or {})
+
+    def mark_soft_dirty(self, reason: str, *, step_id: str | None = None) -> bool:
+        callback = self.mark_soft_dirty_callback
+        if not callable(callback):
+            return False
+        changed = callback(reason, step_id)
+        if changed:
+            self.causality_mode = CausalityMode.SOFT_DIRTY
+        return changed
+
+    def escalate_to_hard_dirty(self, reason: str, *, step_id: str | None = None) -> bool:
+        callback = self.escalate_to_hard_dirty_callback
+        if not callable(callback):
+            return False
+        changed = callback(reason, step_id)
+        if changed:
+            self.causality_mode = CausalityMode.HARD_DIRTY
+        return changed
 
     @contextmanager
     def with_subdispatch(self):
@@ -375,7 +397,7 @@ class Frame:
     ---
     - ``follow_edge(edge)`` — move cursor, run pipeline, return redirect or None.
     - ``resolve_choice(edge)`` — loop ``follow_edge`` until terminal.
-    - ``goto_node(node)`` — force-provision and jump (skip validation).
+    - ``goto_node(node)`` — optional stub-provision and jump (skip validation).
 
     Notes
     -----
@@ -439,6 +461,9 @@ class Frame:
     correlation_id: UUID | str | None = None
     logger: Any | None = None
     meta: Mapping[str, Any] | None = field(default_factory=dict)
+    causality_mode: CausalityMode = CausalityMode.CLEAN
+    mark_soft_dirty_callback: Callable[[str, str | None], bool] | None = None
+    escalate_to_hard_dirty_callback: Callable[[str, str | None], bool] | None = None
 
     _random: Random = field(default_factory=Random)
     selected_edge: AnyTraversableEdge | None = None
@@ -476,6 +501,9 @@ class Frame:
             correlation_id=self.correlation_id,
             logger=self.logger,
             meta=dict(self.meta or {}),
+            causality_mode=self.causality_mode,
+            mark_soft_dirty_callback=self.mark_soft_dirty_callback,
+            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty_callback,
             random=self._random,
             incoming_edge=incoming_edge,
             incoming_payload=incoming_payload,
@@ -623,6 +651,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.PREREQS
             prereq_result = do_prereqs(self.cursor, ctx=ctx)
             if prereq_result is not None:
+                self.causality_mode = ctx.causality_mode
                 self._record_redirect(phase=ResolutionPhase.PREREQS, edge=prereq_result)
                 self._capture_step_trace(
                     edge=edge,
@@ -676,6 +705,7 @@ class Frame:
             ctx.current_phase = ResolutionPhase.POSTREQS
             postreq_result = do_postreqs(self.cursor, ctx=ctx)
             if postreq_result is not None:
+                self.causality_mode = ctx.causality_mode
                 self._record_redirect(phase=ResolutionPhase.POSTREQS, edge=postreq_result)
                 self._capture_step_trace(
                     edge=edge,
@@ -685,6 +715,7 @@ class Frame:
                 )
                 return postreq_result
 
+        self.causality_mode = ctx.causality_mode
         self._capture_step_trace(
             edge=edge,
             entry_phase=entry_phase,
@@ -763,23 +794,24 @@ class Frame:
 
     # -- Direct jump --------------------------------------------------------
 
-    def goto_node(self, node: TraversableNode, *, force: bool = False):
+    def goto_node(self, node: TraversableNode, *, allow_stubs: bool = False):
         """Jump directly to a node, skipping validation.
 
         Used for initialization (placing cursor at the entry point) and for
-        forced teleportation.  Provisions the target (optionally with force)
+        forced teleportation.  Provisions the target (optionally allowing stubs)
         and then follows an anonymous edge starting at PLANNING.
 
         Parameters
         ----------
         node
             The target node.
-        force
-            If True, force-resolve any unmet requirements.
+        allow_stubs
+            If True, allow resolver STUB offers for unmet requirements.
         """
-        if force:
+        if allow_stubs:
             ctx = self._make_ctx()
-            do_provision(node, ctx=ctx, force=True)
+            do_provision(node, ctx=ctx, allow_stubs=True)
+            self.causality_mode = ctx.causality_mode
 
         edge = AnonymousEdge(
             predecessor=self.cursor,

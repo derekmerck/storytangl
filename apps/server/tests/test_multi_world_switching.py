@@ -89,6 +89,65 @@ def test_drop_story_with_invalid_api_key_returns_401(
     assert "invalid api key" in response.json()["detail"].lower()
 
 
+def test_story_status_alias_sets_deprecation_headers(
+    multi_world_client: tuple[TestClient, dict[str, str], UUID]
+) -> None:
+    client, headers, _ = multi_world_client
+
+    create_resp = client.post(
+        "story/story/create",
+        params={"world_id": "the_crossroads"},
+        headers=headers,
+    )
+    assert create_resp.status_code == 200
+
+    response = client.get("story/status", headers=headers)
+    assert response.status_code == 200
+    assert response.headers.get("Deprecation") == "true"
+    assert "/story/info" in response.headers.get("Warning", "")
+
+
+def test_story_debug_endpoints_are_wired(
+    multi_world_client: tuple[TestClient, dict[str, str], UUID]
+) -> None:
+    client, headers, _ = multi_world_client
+
+    create_resp = client.post(
+        "story/story/create",
+        params={"world_id": "the_crossroads"},
+        headers=headers,
+    )
+    assert create_resp.status_code == 200
+
+    inspect_resp = client.get("story/inspect", headers=headers)
+    assert inspect_resp.status_code == 200
+    assert inspect_resp.json().get("status") == "ok"
+
+    check_resp = client.post(
+        "story/check",
+        headers=headers,
+        json={"expr": "1 + 1"},
+    )
+    assert check_resp.status_code == 200
+    assert check_resp.json().get("status") == "ok"
+
+    apply_resp = client.post(
+        "story/apply",
+        headers=headers,
+        json={"expr": "debug_counter = 7"},
+    )
+    assert apply_resp.status_code == 200
+    assert apply_resp.json().get("status") == "ok"
+
+    apply_alias_resp = client.put(
+        "story/apply",
+        headers=headers,
+        json={"expr": "debug_counter = 8"},
+    )
+    assert apply_alias_resp.status_code == 200
+    assert apply_alias_resp.json().get("status") == "ok"
+
+
 def test_drop_story_archive_preserves_ledger(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:
@@ -172,7 +231,7 @@ def test_multi_world_switching_flow(
     assert choices_one == extract_choices_from_fragments(fragments_one)
     assert len(choices_one) >= 2
 
-    status_before = client.get("story/status", headers=headers)
+    status_before = client.get("story/info", headers=headers)
     assert status_before.status_code == 200
     step_before = status_before.json()["step"]
 
@@ -181,7 +240,7 @@ def test_multi_world_switching_flow(
     choose_resp = client.post("story/do", json={"uid": first_choice}, headers=headers)
     assert choose_resp.status_code == 200
 
-    status_after = client.get("story/status", headers=headers)
+    status_after = client.get("story/info", headers=headers)
     assert status_after.status_code == 200
     assert status_after.json()["step"] > step_before
 

@@ -67,7 +67,7 @@ describe('StoryStatus', () => {
 
   it('handles empty status array', async () => {
     server.use(
-      http.get(`${DEFAULT_API_URL}/story/status`, () => HttpResponse.json([])),
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json([])),
     )
 
     const wrapper = mountStatus()
@@ -77,7 +77,7 @@ describe('StoryStatus', () => {
   })
 
   it('handles API error gracefully', async () => {
-    server.use(http.get(`${DEFAULT_API_URL}/story/status`, () => HttpResponse.error()))
+    server.use(http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.error()))
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 

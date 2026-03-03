@@ -15,9 +15,10 @@ import pytest
 
 from tangl.core38 import Graph, Selector, Snapshot
 from tangl.vm38.dispatch import on_prereqs
-from tangl.vm38.replay import RollbackRecord, StepRecord
+from tangl.vm38.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
 from tangl.vm38.resolution_phase import ResolutionPhase
 from tangl.vm38.runtime.frame import Frame
+from tangl.vm38.runtime.causality import CausalityMode
 from tangl.vm38.runtime.ledger import Ledger
 from tangl.vm38.traversal import get_visit_count
 from tangl.vm38.traversable import (
@@ -112,6 +113,52 @@ class TestLedgerCursor:
         assert ledger.choice_steps == 0
         assert ledger.reentrant_steps == 0
         assert ledger.cursor_history == [a.uid]
+
+
+class TestLedgerCausality:
+    def test_mark_soft_dirty_records_single_transition(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+
+        assert ledger.mark_soft_dirty("debug_check_expr", step_id="node-1") is True
+        assert ledger.mark_soft_dirty("debug_check_expr", step_id="node-1") is False
+        assert ledger.causality_mode == CausalityMode.SOFT_DIRTY
+
+        transitions = list(Selector(has_kind=CausalityTransitionRecord).filter(ledger.output_stream))
+        assert len(transitions) == 1
+        transition = transitions[0]
+        assert transition.from_mode == CausalityMode.CLEAN.value
+        assert transition.to_mode == CausalityMode.SOFT_DIRTY.value
+        assert transition.reason == "debug_check_expr"
+        assert transition.step_id == "node-1"
+
+    def test_escalate_to_hard_dirty_is_monotonic_and_recorded_once(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+
+        assert ledger.mark_soft_dirty("debug_get_node_info") is True
+        assert ledger.escalate_to_hard_dirty("stub_link_accepted", step_id="dep-1") is True
+        assert ledger.escalate_to_hard_dirty("stub_link_accepted", step_id="dep-2") is False
+        assert ledger.causality_mode == CausalityMode.HARD_DIRTY
+        assert ledger.causality_break_reason == "stub_link_accepted"
+        assert ledger.causality_break_step_id == "dep-1"
+
+        transitions = list(Selector(has_kind=CausalityTransitionRecord).filter(ledger.output_stream))
+        assert len(transitions) == 2
+        assert transitions[-1].from_mode == CausalityMode.SOFT_DIRTY.value
+        assert transitions[-1].to_mode == CausalityMode.HARD_DIRTY.value
+        assert transitions[-1].reason == "stub_link_accepted"
+        assert transitions[-1].step_id == "dep-1"
+
+    def test_causality_fields_roundtrip_through_structure(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        ledger.mark_soft_dirty("debug_check_expr", step_id="n1")
+        ledger.escalate_to_hard_dirty("stub_link_accepted", step_id="dep-5")
+
+        payload = ledger.unstructure()
+        restored = Ledger.structure(payload)
+
+        assert restored.causality_mode == CausalityMode.HARD_DIRTY
+        assert restored.causality_break_reason == "stub_link_accepted"
+        assert restored.causality_break_step_id == "dep-5"
 
 
 # ============================================================================
