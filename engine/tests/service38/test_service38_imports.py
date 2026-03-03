@@ -8,21 +8,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2] / "src" / "tangl"
 
-IMPLEMENTATION_MODULES = (
-    ROOT / "story38" / "story_controller.py",
-    ROOT / "story38" / "fabula" / "world_controller.py",
-    ROOT / "service38" / "user" / "user_controller.py",
-    ROOT / "service38" / "system_controller.py",
-)
+
+def _module_name_for_path(path: Path) -> str:
+    relative = path.relative_to(ROOT).with_suffix("")
+    return f"tangl.{'.'.join(relative.parts)}"
+
+
+def _discover_implementation_modules() -> tuple[Path, ...]:
+    modules: list[Path] = []
+    for package_root in (ROOT / "story38", ROOT / "service38"):
+        for path in package_root.rglob("*_controller.py"):
+            modules.append(path)
+    return tuple(sorted(modules))
+
+
+IMPLEMENTATION_MODULES = _discover_implementation_modules()
 
 BARREL_MODULE = ROOT / "service38" / "controllers.py"
 
-BARREL_ALLOWED_IMPORTS = {
-    "tangl.story38.story_controller",
-    "tangl.story38.fabula.world_controller",
-    "tangl.service38.user.user_controller",
-    "tangl.service38.system_controller",
-}
+BARREL_ALLOWED_IMPORTS = {_module_name_for_path(path) for path in IMPLEMENTATION_MODULES}
 
 
 def _import_modules(path: Path) -> list[str]:

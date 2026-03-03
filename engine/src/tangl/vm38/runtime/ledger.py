@@ -299,8 +299,21 @@ class Ledger(Entity):
                 return value
             return UUID(str(value))
 
-        graph = Graph.structure(data["graph"])
-        output_stream = OrderedRegistry.structure(data.get("output_stream", {}))
+        def _coerce_kind_refs(value: Any) -> Any:
+            if isinstance(value, dict):
+                normalized: dict[str, Any] = {}
+                for key, item in value.items():
+                    if key == "kind" and isinstance(item, str):
+                        normalized[key] = Entity.dereference_cls_name(item) or item
+                    else:
+                        normalized[key] = _coerce_kind_refs(item)
+                return normalized
+            if isinstance(value, list):
+                return [_coerce_kind_refs(item) for item in value]
+            return value
+
+        graph = Graph.structure(_coerce_kind_refs(data["graph"]))
+        output_stream = OrderedRegistry.structure(_coerce_kind_refs(data.get("output_stream", {})))
 
         return cls(
             uid=_coerce_uuid(data["uid"]),

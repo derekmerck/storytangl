@@ -32,7 +32,11 @@ class SystemController(HasApiEndpoints):
         _ = (args, kwargs)
         try:
             num_worlds = len(WorldRegistry().list_worlds())
-        except Exception:  # pragma: no cover - defensive import boundary
+        except Exception as exc:  # pragma: no cover - defensive import boundary
+            logger.exception(
+                "Failed to enumerate worlds from WorldRegistry.list_worlds(): %s",
+                exc,
+            )
             num_worlds = 0
 
         info = SystemInfo(
@@ -55,7 +59,10 @@ class SystemController(HasApiEndpoints):
     @staticmethod
     def reset_system(*args: Any, hard: bool = False, **kwargs: Any) -> RuntimeInfo:
         _ = (args, hard, kwargs)
-        raise NotImplementedError
+        return RuntimeInfo.error(
+            code="NOT_IMPLEMENTED",
+            message="System reset is not implemented in service38",
+        )
 
 
 __all__ = ["SystemController"]

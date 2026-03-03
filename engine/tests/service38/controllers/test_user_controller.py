@@ -247,6 +247,21 @@ class TestMutatingUserEndpoints:
         assert result.status == "ok"
         assert existing_user.privileged is False
 
+    def test_update_user_cannot_escalate_privilege_for_non_privileged_user(
+        self,
+        orchestrator: Orchestrator38,
+        existing_user: User,
+    ) -> None:
+        existing_user.privileged = False
+        result = orchestrator.execute(
+            "UserController.update_user",
+            user_id=existing_user.uid,
+            privileged="true",
+        )
+        assert isinstance(result, RuntimeInfo)
+        assert result.status == "ok"
+        assert existing_user.privileged is False
+
     def test_update_user_parses_last_played_dt_iso_string(
         self,
         orchestrator: Orchestrator38,

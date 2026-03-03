@@ -7,7 +7,6 @@ from typing import Any
 
 import yaml
 
-from tangl.core import BaseFragment
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.service.api_endpoint import HasApiEndpoints
@@ -57,7 +56,7 @@ class WorldController(HasApiEndpoints):
         group="system",
         binds=(),
     )
-    def list_worlds(self) -> list[BaseFragment]:
+    def list_worlds(self) -> list[WorldList]:
         registry = WorldRegistry()
         worlds = registry.list_worlds()
 
@@ -74,7 +73,7 @@ class WorldController(HasApiEndpoints):
                     }
                 )
 
-        fragments: list[BaseFragment] = []
+        fragments: list[WorldList] = []
         for world in worlds:
             content = OrderedTupleDict(
                 {
@@ -94,9 +93,12 @@ class WorldController(HasApiEndpoints):
     )
     def get_world_info(self, world: World38, **kwargs: Any) -> WorldInfo:
         metadata = dict(world.metadata or {})
+        metadata.pop("label", None)
+        info_kwargs = dict(kwargs)
+        info_kwargs.pop("label", None)
         metadata.setdefault("title", world.label)
         metadata.setdefault("author", "Unknown")
-        return WorldInfo(label=world.label, **metadata, **kwargs)
+        return WorldInfo(label=world.label, **metadata, **info_kwargs)
 
     @ApiEndpoint38.annotate(
         preprocessors=[_dereference_world_id],
@@ -156,7 +158,13 @@ class WorldController(HasApiEndpoints):
         binds=(),
     )
     def unload_world(self, world: World38) -> RuntimeInfo:
-        _MANUAL_WORLDS38.pop(world.label, None)
+        removed = _MANUAL_WORLDS38.pop(world.label, None)
+        if removed is None:
+            return RuntimeInfo.error(
+                code="WORLD_NOT_MANUAL",
+                message="No manual world to unload",
+                world_label=world.label,
+            )
         return RuntimeInfo.ok(message="World unloaded", world_label=world.label)
 
 

@@ -385,8 +385,6 @@ class Unstructurable(BaseModelPlus):
     def structure(cls, data: UnstructuredData) -> Self:
         data = dict(data)
         cls_ = data.pop('kind', cls)
-        if isinstance(cls_, str):
-            cls_ = cls.dereference_cls_name(cls_) or cls_
         if not isclass(cls_):
             raise TypeError(f"Expected {cls_} to be a class")
         return cls_(**data)

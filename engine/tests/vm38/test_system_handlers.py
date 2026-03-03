@@ -216,6 +216,27 @@ class TestContributeRuntimeUserContext:
         assert ns["user"] is user
         assert ns["user_id"] == "user-3"
 
+    def test_gather_ns_does_not_allow_user_ns_to_override_reserved_symbols(self) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+        user = SimpleNamespace(
+            uid="user-4",
+            get_ns=lambda: {"user": "spoofed", "user_id": "spoofed", "rank": "gm"},
+        )
+        runtime_ctx = SimpleNamespace(
+            graph=g,
+            cursor=node,
+            get_meta=lambda: {"user": user, "user_id": user.uid},
+            get_registries=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+
+        ns = do_gather_ns(node, ctx=runtime_ctx)
+
+        assert ns["user"] is user
+        assert ns["user_id"] == "user-4"
+        assert ns["rank"] == "gm"
+
 
 # ============================================================================
 # Validate: validate_successor_exists

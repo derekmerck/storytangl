@@ -114,6 +114,8 @@ def _call_service38(
         )
     except AccessDeniedError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _call_legacy(
@@ -127,7 +129,10 @@ def _call_legacy(
     kwargs = dict(params)
     if user_id is not None:
         kwargs["user_id"] = user_id
-    return orchestrator.execute(endpoint_name, **kwargs)
+    try:
+        return orchestrator.execute(endpoint_name, **kwargs)
+    except AccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 def _runtime_info_payload(

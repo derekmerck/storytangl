@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import computed_field
-
 from tangl.service.api_endpoint import HasApiEndpoints
 from tangl.service.response.info_response import UserInfo
 from tangl.service.user.user import User
@@ -56,12 +54,7 @@ def _parse_datetime_field(value: Any, *, field_name: str) -> datetime | None:
 class ApiKeyInfo(InfoModel):
     """Encoded API key metadata returned after user updates."""
 
-    secret: str
-
-    @computed_field  # type: ignore[misc]
-    @property
-    def api_key(self) -> str:
-        return key_for_secret(self.secret)
+    api_key: str
 
 
 class UserController(HasApiEndpoints):
@@ -99,10 +92,13 @@ class UserController(HasApiEndpoints):
                 field_name="last_played_dt",
             )
         if "privileged" in kwargs:
-            user.privileged = _parse_bool_flag(
+            # USER-level callers must not be able to self-escalate privileges.
+            next_privileged = _parse_bool_flag(
                 kwargs["privileged"],
                 field_name="privileged",
             )
+            if bool(getattr(user, "privileged", False)):
+                user.privileged = next_privileged
 
         details: dict[str, Any] = {"user_id": str(user.uid)}
         if api_key is not None:
@@ -142,7 +138,7 @@ class UserController(HasApiEndpoints):
     )
     def get_key_for_secret(self, secret: str, **kwargs: Hash) -> ApiKeyInfo:
         _ = kwargs
-        return ApiKeyInfo(secret=secret)
+        return ApiKeyInfo(api_key=key_for_secret(secret))
 
 
 __all__ = ["ApiKeyInfo", "UserController"]

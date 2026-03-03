@@ -186,7 +186,8 @@ def contribute_runtime_user_context(*, caller, ctx, **kw):
     if user_id is not None:
         result["user_id"] = user_id
     if user_ns:
-        result.update(dict(user_ns))
+        reserved = {"user", "user_id"}
+        result.update({key: value for key, value in user_ns.items() if key not in reserved})
     return result or None
 
 
