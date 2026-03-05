@@ -698,6 +698,13 @@ class TraversableEdge(Edge):
     stack and, on completion, follows ``get_return_edge()`` back to
     ``predecessor`` starting at this phase."""
 
+    predicate: str | None = None
+    """Legacy compatibility guard key for namespace-driven edge gating.
+
+    When present, ``available()`` requires ``ns[predicate]`` to be truthy
+    before successor availability is considered.
+    """
+
     @property
     def predecessor(self) -> Optional[TraversableNode]:
         """Type-narrowed predecessor."""
@@ -729,9 +736,22 @@ class TraversableEdge(Edge):
         if successor is None:
             return False
         rand = _resolve_rand(rand=None, ctx=ctx)
-        if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
-            ns = ctx.get_ns(successor)
-        return successor.available(ns=ns, ctx=ctx, rand=rand)
+        successor_ns = ns
+        if successor_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            successor_ns = ctx.get_ns(successor)
+
+        if self.predicate:
+            predicate_ns = ns
+            if predicate_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+                predicate_basis = self.predecessor or successor
+                predicate_ns = ctx.get_ns(predicate_basis)
+            resolved_ns = predicate_ns or {}
+            if not bool(resolved_ns.get(self.predicate)):
+                return False
+
+        if not hasattr(successor, "available"):
+            return True
+        return successor.available(ns=successor_ns, ctx=ctx, rand=rand)
 
     def get_return_edge(self) -> AnonymousEdge:
         """Construct the return edge from this call edge.
@@ -833,6 +853,8 @@ class AnonymousEdge:
         rand = _resolve_rand(rand=None, ctx=ctx)
         if ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             ns = ctx.get_ns(self.successor)
+        if not hasattr(self.successor, "available"):
+            return True
         return self.successor.available(ns=ns, ctx=ctx, rand=rand)
 
 

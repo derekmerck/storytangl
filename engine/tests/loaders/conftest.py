@@ -2,13 +2,18 @@ from pathlib import Path
 
 import pytest
 
-from tangl.story.fabula import World
+from tangl.story38 import World38
+
 
 @pytest.fixture(autouse=True)
-def clear_world():
-    World.clear_instances()
+def clear_world_instances() -> None:
+    clear_instances = getattr(World38, "clear_instances", None)
+    if callable(clear_instances):
+        clear_instances()
     yield
-    World.clear_instances()
+    if callable(clear_instances):
+        clear_instances()
+
 
 @pytest.fixture
 def media_mvp_path(resources_dir) -> Path:

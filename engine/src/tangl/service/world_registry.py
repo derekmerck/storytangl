@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from tangl.config import get_world_dirs
-from tangl.story.fabula import World
 from tangl.story38.fabula import World38
 
 from tangl.loaders import UniqueLabel, WorldBundle, WorldCompiler
+
+if TYPE_CHECKING:
+    from tangl.story.fabula import World
 
 logger = logging.getLogger(__name__)
 

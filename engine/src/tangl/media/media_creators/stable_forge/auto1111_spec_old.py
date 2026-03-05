@@ -9,7 +9,7 @@ import yaml
 import webuiapi
 
 from tangl.compilers.story_script import BaseScriptItem
-from tangl.core.entity import Node
+from tangl.core import Node
 from tangl.media import MediaResourceInventoryTag as MediaRIT
 from .forge_utils import basic_info, dims_given_max, DEFAULT_MAX_DIM
 from .stable_spec import StableSpec

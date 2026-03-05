@@ -5,13 +5,22 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from tangl.core38 import CallReceipt as CallReceipt38, Selector as Selector38
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
-from tangl.vm import is_first_visit
+from tangl.vm import (
+    ResolutionPhase as P,
+    is_first_visit,
+    on_gather_ns,
+    on_journal,
+    on_prereqs,
+    on_provision,
+    on_update,
+)
 from tangl.vm.dispatch import vm_dispatch
 from tangl.core import CallReceipt
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.story.dispatch import on_gather_content
-from tangl.vm.resolution_phase import ResolutionPhase as P
+from tangl.vm38.dispatch import dispatch as vm38_dispatch
 
 from .has_game import HasGame
 
@@ -23,8 +32,56 @@ logger = logging.getLogger(__name__)
 # todo: should probably register these on story dispatch instead of vm
 
 
+def _ctx_frame(ctx: Any) -> Any | None:
+    """Return legacy frame from context when available."""
+    return getattr(ctx, "_frame", None)
+
+
+def _ctx_cursor_history(ctx: Any) -> list[Any] | None:
+    """Resolve cursor-history-like data from legacy frame when present."""
+    frame = _ctx_frame(ctx)
+    history = getattr(frame, "cursor_history", None) if frame is not None else None
+    return history if isinstance(history, list) else None
+
+
+def _ctx_selected_payload(ctx: Any) -> Any:
+    """Extract selected payload from vm38/legacy context + frame bridges."""
+    payload = getattr(ctx, "selected_payload", None)
+    if payload is not None:
+        return payload
+
+    payload = getattr(ctx, "incoming_payload", None)
+    if payload is not None:
+        return payload
+
+    frame = _ctx_frame(ctx)
+    if frame is not None:
+        selected_edge = getattr(frame, "selected_edge", None)
+        if selected_edge is not None:
+            payload = getattr(selected_edge, "payload", None)
+            if payload is not None:
+                return payload
+
+    selected_edge = getattr(ctx, "selected_edge", None)
+    if selected_edge is not None:
+        return getattr(selected_edge, "payload", None)
+
+    incoming_edge = getattr(ctx, "incoming_edge", None)
+    if incoming_edge is not None:
+        return getattr(incoming_edge, "payload", None)
+
+    return None
+
+
 @vm_dispatch.register(task=P.PREREQS, caller=HasGame)
-def setup_game_on_first_visit(cursor: HasGame, *, ctx: Context, **kwargs: Any):
+@on_prereqs(wants_caller_kind=HasGame, wants_exact_kind=False)
+def setup_game_on_first_visit(
+    cursor: HasGame | None = None,
+    *,
+    caller: HasGame | None = None,
+    ctx: Context,
+    **kwargs: Any,
+):
     """
     Initialize the embedded game when the block is first visited.
 
@@ -39,12 +96,17 @@ def setup_game_on_first_visit(cursor: HasGame, *, ctx: Context, **kwargs: Any):
         This handler never redirects traversal.
     """
 
+    cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):
         return None
 
-    frame = ctx._frame
-
-    if not is_first_visit(cursor.uid, frame.cursor_history):
+    cursor_history = _ctx_cursor_history(ctx)
+    if cursor_history is not None:
+        if not is_first_visit(cursor.uid, cursor_history):
+            return None
+    elif cursor.game.phase == GamePhase.READY:
+        # vm38 contexts do not expose frame history directly; phase is enough
+        # to prevent repeated setup in steady-state traversal.
         return None
 
     logger.debug("First visit to %s; initializing game", cursor.get_label())
@@ -57,7 +119,14 @@ def setup_game_on_first_visit(cursor: HasGame, *, ctx: Context, **kwargs: Any):
 
 
 @vm_dispatch.register(task=P.PLANNING, caller=HasGame)
-def provision_game_moves(cursor: HasGame, *, ctx: Context, **kwargs: Any):
+@on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
+def provision_game_moves(
+    cursor: HasGame | None = None,
+    *,
+    caller: HasGame | None = None,
+    ctx: Context,
+    **kwargs: Any,
+):
     """
     Provision self-loop :class:`~tangl.story.episode.action.Action` choices for moves.
 
@@ -73,8 +142,9 @@ def provision_game_moves(cursor: HasGame, *, ctx: Context, **kwargs: Any):
         accepting player input.
     """
 
-    from tangl.story.episode.action import Action
+    from tangl.story import Action
 
+    cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):
         return []
 
@@ -101,11 +171,23 @@ def provision_game_moves(cursor: HasGame, *, ctx: Context, **kwargs: Any):
         )
 
     logger.debug("Provisioned %s move actions at %s", len(actions), cursor.get_label())
+    # vm38 PLANNING handlers are side-effect-only: returning non-None results
+    # causes do_provision() to raise. Keep list-return behavior for direct calls
+    # used by legacy-style tests/helpers.
+    if getattr(ctx, "current_phase", None) == P.PLANNING and hasattr(ctx, "incoming_edge"):
+        return None
     return actions
 
 
 @vm_dispatch.register(task=P.UPDATE, caller=HasGame)
-def process_game_move(cursor: HasGame, *, ctx: Context, **kwargs: Any):
+@on_update(wants_caller_kind=HasGame, wants_exact_kind=False)
+def process_game_move(
+    cursor: HasGame | None = None,
+    *,
+    caller: HasGame | None = None,
+    ctx: Context,
+    **kwargs: Any,
+):
     """
     Apply the player's selected move through the game handler.
 
@@ -120,17 +202,16 @@ def process_game_move(cursor: HasGame, *, ctx: Context, **kwargs: Any):
         Updates occur in-place on ``cursor.game``; no redirect is produced.
     """
 
+    cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):
         return None
 
-    frame = ctx._frame
-    selected_edge = getattr(frame, "selected_edge", None)
-
-    if selected_edge is None or not getattr(selected_edge, "payload", None):
+    payload = _ctx_selected_payload(ctx)
+    if not isinstance(payload, dict):
         logger.debug("No selected move payload at %s", cursor.get_label())
         return None
 
-    move = selected_edge.payload.get("move")
+    move = payload.get("move")
 
     if move is None:
         logger.warning("Selected edge missing move payload at %s", cursor.get_label())
@@ -160,13 +241,30 @@ def process_game_move(cursor: HasGame, *, ctx: Context, **kwargs: Any):
 
     # Context namespaces cache values per cursor; refresh so POSTREQ predicates
     # read the updated game_* flags from :func:`inject_game_context`.
-    ctx._frame._invalidate_context()
+    frame = _ctx_frame(ctx)
+    if frame is not None and hasattr(frame, "_invalidate_context"):
+        frame._invalidate_context()
+    # vm38 caches namespaces per follow-edge hop; clear after UPDATE so
+    # POSTREQS sees fresh game_* flags in the same pipeline pass.
+    ns_cache = getattr(ctx, "_ns_cache", None)
+    if isinstance(ns_cache, dict):
+        ns_cache.clear()
+    ns_inflight = getattr(ctx, "_ns_inflight", None)
+    if isinstance(ns_inflight, set):
+        ns_inflight.clear()
 
     return None
 
 
 @vm_dispatch.register(task=P.JOURNAL, caller=HasGame)
-def generate_game_journal(cursor: HasGame, *, ctx: Context, **kwargs: Any):
+@on_journal(wants_caller_kind=HasGame, wants_exact_kind=False)
+def generate_game_journal(
+    cursor: HasGame | None = None,
+    *,
+    caller: HasGame | None = None,
+    ctx: Context,
+    **kwargs: Any,
+):
     """
     Build journal fragments summarizing the last round.
 
@@ -184,6 +282,7 @@ def generate_game_journal(cursor: HasGame, *, ctx: Context, **kwargs: Any):
 
     from tangl.journal.content import ContentFragment
 
+    cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):
         return []
 
@@ -220,7 +319,14 @@ def generate_game_journal(cursor: HasGame, *, ctx: Context, **kwargs: Any):
 
 
 @vm_dispatch.register(task="get_ns", caller=HasGame)
-def inject_game_context(cursor: HasGame, *, ctx: Context, **kwargs: Any) -> dict[str, Any]:
+@on_gather_ns(wants_caller_kind=HasGame, wants_exact_kind=False)
+def inject_game_context(
+    cursor: HasGame | None = None,
+    *,
+    caller: HasGame | None = None,
+    ctx: Context,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """
     Expose game state to the VM predicate namespace.
 
@@ -235,6 +341,7 @@ def inject_game_context(cursor: HasGame, *, ctx: Context, **kwargs: Any) -> dict
         Namespace entries prefixed with ``game_`` for predicate access.
     """
 
+    cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):
         return {}
 
@@ -266,7 +373,15 @@ def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
     if game is None:
         return None
 
-    with ctx._fresh_call_receipts():
+    fresh_call_receipts = getattr(ctx, "_fresh_call_receipts", None)
+    if callable(fresh_call_receipts):
+        with fresh_call_receipts():
+            game_receipts = vm_dispatch.dispatch(
+                caller=game,
+                task="generate_journal",
+                ctx=ctx,
+            )
+    else:
         game_receipts = vm_dispatch.dispatch(
             caller=game,
             task="generate_journal",
@@ -275,4 +390,18 @@ def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
 
     content = CallReceipt.first_result(*game_receipts)
 
-    return content if content else None
+    if content:
+        return content
+
+    # vm38 fallback: custom game journal handlers may register on the vm38
+    # phase bus during migration away from legacy vm_dispatch tasks.
+    vm38_receipts = list(
+        vm38_dispatch.execute_all(
+            task="generate_journal",
+            call_kwargs={"caller": game},
+            ctx=ctx,
+            selector=Selector38(caller_kind=type(game)),
+        )
+    )
+    vm38_content = CallReceipt38.first_result(*vm38_receipts)
+    return vm38_content if vm38_content else None

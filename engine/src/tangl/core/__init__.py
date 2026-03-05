@@ -1,77 +1,70 @@
-"""
-.. currentmodule:: tangl.core
+"""Legacy compatibility shim that re-exports ``tangl.core38``."""
 
-Foundational abstractions for self-realizing narrative graphs. These classes
-define the *vocabulary* (nouns) and *capabilities* (verbs) for higher-level
-story resolution.
+import os
 
-Conceptual layers
------------------
+import tangl.core38 as _core38
 
-1. :ref:`Identity and Collection<core-identity>`
+from tangl.core38 import *  # noqa: F401,F403
+from tangl.core38.bases import HasContent
+from tangl.core38 import BehaviorRegistry
 
-   - :class:`ContentAddressable` standardizes content-based identifiers for records.
-   - :class:`Entity` provides a universal base for all managed objects.
-   - :class:`Registry` organizes entities with robust search and chaining.
-   - :class:`Singleton` shared entities that are discoverable by a unique label.
+from tangl.core.entity import Entity as _LegacyEntity
+from tangl.core.graph import Edge as _LegacyEdge
+from tangl.core.graph import Graph as _LegacyGraph
+from tangl.core.graph import GraphItem as _LegacyGraphItem
+from tangl.core.graph.node import Node as _LegacyNode
+from tangl.core.graph.subgraph import Subgraph as _LegacySubgraph
+from tangl.core.record.base_fragment import BaseFragment as _LegacyBaseFragment
+from tangl.core.record.record import Record as _LegacyRecord
+from tangl.core.record.snapshot import Snapshot as _LegacySnapshot
+from tangl.core.record.stream_registry import StreamRegistry as _LegacyStreamRegistry
+from tangl.core.registry import Registry as _LegacyRegistry
 
-2. :ref:`Graph Topology<core-topology>`
 
-   - :class:`Graph`, and :class:`GraphItems<GraphItem>` like :class:`Node`,
-     :class:`Edge`, :class:`Subgraph` describe linked structures and hierarchy.
+_V38_VALUES = {"1", "true", "yes", "on", "v38", "new"}
+_LEGACY_VALUES = {"0", "false", "no", "off", "legacy", "old"}
 
-3. :ref:`Runtime Artifacts<core-artifacts>`
 
-   - :class:`Record` captures immutable events, fragments, and notes.
-   - :class:`StreamRegistry` sequences records with bookmarks and channels.
-   - :class:`Snapshot` wraps a copy of an entity for record keeping and rematerialization.
-   - :class:`Fragment<BaseFragment>` is a record type that encodes narrative/UI output.
+def _pick(symbol: str, legacy_value, v38_value, *, default: str = "legacy"):
+    raw_value = os.getenv(
+        f"TANGL_SHIM_CORE_{symbol}",
+        os.getenv("TANGL_SHIM_CORE_DEFAULT", default),
+    )
+    selected = str(raw_value).strip().lower()
+    if selected in _LEGACY_VALUES:
+        return legacy_value
+    if selected in _V38_VALUES:
+        return v38_value
+    raise ValueError(
+        f"Invalid shim value '{raw_value}' for TANGL_SHIM_CORE_{symbol}. "
+        f"Use one of {sorted(_LEGACY_VALUES | _V38_VALUES)}."
+    )
 
-4. :ref:`Behaviors<core-behaviors>`
 
-   - :class:`Behavior` wraps callable behaviors, returning a :class:`CallReceipt` record.
-   - :class:`BehaviorRegistry` executes handlers in ordered pipelines.
+__all__ = getattr(
+    _core38,
+    "__all__",
+    [name for name in dir(_core38) if not name.startswith("_")],
+)
 
-4. :ref:`Dispatch<core-global-dispatch>`
+# Legacy compatibility aliases for import-surface blast-radius testing.
+Entity = _pick("ENTITY", _LegacyEntity, _core38.Entity)
+Registry = _pick("REGISTRY", _LegacyRegistry, _core38.Registry)
+GraphItem = _pick("GRAPHITEM", _LegacyGraphItem, _core38.GraphItem)
+Graph = _pick("GRAPH", _LegacyGraph, _core38.Graph)
+Edge = _pick("EDGE", _LegacyEdge, _core38.Edge)
+Subgraph = _pick("SUBGRAPH", _LegacySubgraph, _core38.Subgraph)
+Record = _pick("RECORD", _LegacyRecord, _core38.Record)
+Snapshot = _pick("SNAPSHOT", _LegacySnapshot, _core38.Snapshot)
+Node = _pick("NODE", _LegacyNode, _core38.Node)
+BaseFragment = _LegacyBaseFragment
+ContentAddressable = HasContent
+LayeredDispatch = BehaviorRegistry
+StreamRegistry = _LegacyStreamRegistry
 
-   - `core_dispatch` provides global hooks for identity and topology
-
-Design intent
--------------
-`tangl.core` isolates minimal abstractions so that story engines can reason about
-identity, relationships, and events *without presupposing narrative content*.
-"""
-
-# Base classes for all objects and collections
-from tangl.core.record.content_addressable import ContentAddressable
-from .entity import Entity
-from .registry import Registry
-
-# Sequential data artifacts
-from .record import Record, StreamRegistry, Snapshot, BaseFragment
-
-# Globally reusable objects
-from .singleton import Singleton
-
-# Topology and membership related extensions
-from .graph import GraphItem, Node, Edge, Subgraph, Graph
-
-# Function dispatch, chaining, auditing
-from .behavior import CallReceipt, Behavior, BehaviorRegistry, LayeredDispatch
-
-from .dispatch import core_dispatch
-
-__all__ = [
-    # Identity & collections
-    "ContentAddressable", "Entity", "Registry",
-    # Singleton
-    "Singleton",
-    # Graph topology
-    "GraphItem", "Node", "Edge", "Subgraph", "Graph",
-    # Records/streams
-    "Record", "StreamRegistry", "Snapshot", "BaseFragment",
-    # Behaviors
-    "CallReceipt", "Behavior", "BehaviorRegistry", "LayeredDispatch",
-    # Core-dispatch
-    "core_dispatch"
+__all__ += [
+    "BaseFragment",
+    "ContentAddressable",
+    "LayeredDispatch",
+    "StreamRegistry",
 ]

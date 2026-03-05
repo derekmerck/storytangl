@@ -10,9 +10,13 @@ from tangl.service.controllers.runtime_controller import RuntimeController
 
 
 def test_system_media_dereference_to_sys_url(tmp_path: Path) -> None:
-    path = tmp_path / "logo.png"
-    path.write_bytes(b"fake image bytes")
-    rit = MediaRIT(path=path, data_type=MediaDataType.IMAGE, label="logo.png")
+    path = tmp_path / "logo.svg"
+    path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
+        '<circle cx="16" cy="16" r="14" fill="red"/></svg>',
+        encoding="utf-8",
+    )
+    rit = MediaRIT(path=path, data_type=MediaDataType.IMAGE, label="logo.svg")
 
     fragment = MediaFragment(
         content=rit,
@@ -28,6 +32,6 @@ def test_system_media_dereference_to_sys_url(tmp_path: Path) -> None:
     result = controller._dereference_media(fragment, world_id="ignored")
 
     assert result["url"].startswith("/media/sys/")
-    assert result["url"].endswith("logo.png")
+    assert result["url"].endswith("logo.svg")
     assert result["fragment_type"] == "media"
     assert result["media_role"] == "ui_logo"

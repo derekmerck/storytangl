@@ -1,10 +1,10 @@
 # V38 Parity Matrix (Phase 1)
 
 ## Status
-- Date: 2026-03-03
-- Phase: 1 (inventory/classification complete; parity execution snapshot refreshed against active v38 suites)
+- Date: 2026-03-04
+- Phase: 1 + secondary-scope execution recipe validated (non-retiring blast run green, including full-v38 toggle lane)
 - Scope lock: `engine/tests/core`, `engine/tests/vm`, `engine/tests/story`, `engine/tests/service`
-- Explicitly out of first-pass classification scope: `engine/tests/integration`, `engine/tests/loaders`, `engine/tests/ir` (tracked as secondary references only)
+- Explicitly out of first-pass classification scope: `engine/tests/integration`, `engine/tests/loaders`, `engine/tests/ir` (now tracked as secondary execution scope)
 
 ## Purpose
 This matrix classifies each in-scope legacy test module exactly once and maps it to either:
@@ -12,6 +12,140 @@ This matrix classifies each in-scope legacy test module exactly once and maps it
 - `RETIRE_*`: remove from parity gate because behavior is gone, moved, or irrelevant.
 
 This document tracks both mapping decisions and current parity execution status for mapped `PORT_*` targets.
+
+## Phase 1.5 Execution Recipe (Validated)
+This experiment is now the active migration recipe:
+1. Normalize non-retiring imports to top-level surfaces (`tangl.core`, `tangl.vm`, `tangl.story`, `tangl.service`) so blast radius is measurable.
+2. Add/keep thin compatibility bridges only where needed (selector/caller aliasing, record-like acceptance, type aliases).
+3. Pin explicit legacy semantics only where behavior is still intentionally legacy (for example `LegacyStoryGraph` in selected tests).
+4. Convert eager legacy imports in loader/service entrypoints to lazy imports so v38 flows do not pull legacy internals by accident.
+5. Re-run the non-retiring blast gate and only keep bridges still required by passing behavior.
+
+## Secondary Scope Bridge Matrix (Integration/Loaders/IR)
+| concern | temporary bridge (now) | end-state target | test policy |
+|---|---|---|---|
+| Deep import drift bypassing shims | Replace deep imports with top-level package imports in non-retiring modules/tests | Remove legacy package shims entirely; import `core38`/`vm38`/`story38`/`service38` directly | Keep tests if they validate externally observable behavior |
+| Legacy story-graph semantics still required by some tests | Use `LegacyStoryGraph` explicitly in tests that still require legacy runtime behavior | Port those tests to v38 semantics or retire if no external behavior is covered | Retire tests that only assert legacy graph internals |
+| Legacy matcher syntax (`matches(**criteria)` / filter helpers) | Translate to selector-first matching where low-risk (`Selector(...).matches(entity)`) | Remove compatibility aliases once callsites are migrated | Keep only behavior-focused assertions, not matcher implementation details |
+| Loader/service eager legacy imports | Convert to lazy imports in runtime37-only paths | Remove runtime37 code paths when fully retired | Keep loader tests that validate world discovery/compile outputs |
+| Legacy-internal assertions in secondary suites | Explicitly classify as retirement candidates | Drop from parity gate unless tied to missing public behavior | If no external consumer-facing gap exists, retire |
+
+## Secondary Scope Test Retirement Policy
+- Keep tests that validate observable contracts: API outputs, journal/choice behavior, loader/compiler outputs, replay/provision invariants.
+- Retire tests that only inspect legacy internal classes, private fields, or historical execution mechanics with no v38 contract value.
+- Keep or reintroduce a retired test only when it demonstrates a legitimately missing feature relied on by another non-retiring area.
+- For media while v37/v38 mechanics are in transition, keep only stable contracts (resource indexing and RIT/URL dereference shape); retire legacy phase-runner/media-dependency internal assertions.
+
+## Secondary Scope File Matrix (Integration/Loaders/IR, 2026-03-04 pass 2)
+| path | disposition | rationale | status |
+|---|---|---|---|
+| `engine/tests/integration/test_choice_availability_e2e.py` | `RETIRE_LEGACY_INTERNAL` | Hard-coupled to `LegacyStoryGraph` + legacy phase runner internals; no longer a v38 contract gate. | retired (module skipped) |
+| `engine/tests/integration/test_media_e2e.py` | `RETIRE_LEGACY_INTERNAL` | Depends on legacy v37 phase-runner/media-dependency mechanics that are not vm38 contract assertions. | retired (module skipped) |
+| `engine/tests/integration/test_service_layer.py` | `PORT_ADAPT` | Integration smoke flow now runs through `create_story38`/`resolve_choice38`/`get_story_update38` on service-layer orchestrator wiring. | ported to runtime38 |
+| `engine/tests/integration/test_system_media_e2e.py` | `KEEP_DIRECT` | Validates system-media URL dereference contract; runtime-version agnostic. | kept |
+| `engine/tests/loaders/test_world_loader.py::test_compile_anthology_shares_domain_and_media` | `RETIRE_LEGACY_INTERNAL` | Asserts runtime37-only world internals (`domain_manager`/`resource_manager`) with no added v38 signal. | retired (test skipped) |
+| `engine/tests/loaders/test_world_loader.py::test_loader_creates_runtime38_world_with_media_registry` | `PORT_ADAPT` | Same intent as legacy media-registry smoke test, now asserted against runtime38 world facets (`resources`, `bundle`). | ported to runtime38 |
+| `engine/tests/loaders/test_world_loader.py::test_compiler_adds_bundle_root_for_domain_imports` | `PORT_ADAPT` | Preserves domain import-path contract while asserting runtime38 world domain facet wiring. | ported to runtime38 |
+| `engine/tests/loaders/test_round_tripping.py` | `RETIRE_LEGACY_INTERNAL` | Relied on legacy ScriptManager template-shape assumptions that do not map 1:1 to story38 template bundle/runtime representation. | retired (module skipped) |
+| `engine/tests/loaders/test_world_bundle.py` | `KEEP_DIRECT` | Bundle manifest/path normalization contract is runtime-neutral and still required. | kept |
+| `engine/tests/loaders/test_world_manifest.py` | `KEEP_DIRECT` | Manifest schema/normalization contract is runtime-neutral and still required. | kept |
+| `engine/tests/ir/test_base_script_item_selectable.py::test_selectable_mro_uses_entity_matches` | `RETIRE_LEGACY_INTERNAL` | Explicitly checks legacy `Entity.matches` MRO mechanics; not a v38 external behavior contract. | retired (test skipped) |
+| `engine/tests/ir/* (remaining)` | `KEEP_ADAPT` | IR serialization/template-shorthand/path contracts remain relevant to loader/story38 ingest behavior. | kept |
+
+## Deferred Track: Media Planning (2026-03-04)
+- Status: deferred by design for a dedicated follow-up track.
+- Why deferred: loader/codec and IR ingestion are still evolving, and legacy media planning internals are not a stable parity target.
+- Diagnostic policy now: keep skip-based diagnostics on legacy-coupled media integration tests (`engine/tests/integration/test_media_e2e.py`) while preserving stable system-media contracts (`engine/tests/integration/test_system_media_e2e.py`).
+- Exit criteria for this deferred track:
+  - vm38-native media planning/provision hook for media dependencies,
+  - parity coverage for world-vs-system media resolution behavior,
+  - service-layer dereference contract coverage for media URLs/content.
+
+## Non-Retiring Blast Snapshot (2026-03-04)
+- Validation run:
+  - Command: `poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story`
+  - Result: `1639 passed, 46 skipped, 10 xfailed`
+- Full-v38 toggle validation run (updated):
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1636 passed, 52 skipped, 10 xfailed`
+- Additional bridge reductions validated in this run:
+  - `engine/tests/persistence/test_ledger_persistence.py` exercises `tangl.vm38.Ledger` + `CheckpointRecord` directly.
+  - `tangl.core.record.base_fragment.BaseFragment` now derives from `tangl.core38.Record` while keeping alias/serialization compatibility (`fragment_type`, `content`, `has_channel`).
+
+## Vocabulary Migration Snapshot (2026-03-04 pass 3)
+- `obj_cls -> kind` migration is now mechanically adopted in non-retiring mechanics/media callsites via compat wrappers (`kind` first, fallback to `obj_cls` where needed for mixed lanes).
+- Persistence structuring now accepts `kind` (preferred) and legacy `obj_cls`, and emits both keys for cross-lane compatibility.
+- Coverage added: `engine/tests/persistence/test_structuring_handler.py` validates `kind`/`obj_cls` dual support.
+- Focused validation run:
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests/mechanics/games/test_has_game.py engine/tests/mechanics/games/test_game_handlers.py engine/tests/mechanics/games/test_rps_integration.py engine/tests/media/test_system_media_integration.py engine/tests/persistence/test_structuring_handler.py`
+  - Result: `25 passed, 2 skipped`
+
+## Remaining Shim Work (Primary)
+- `core.factory` remains active in IR authoring models:
+  - `engine/src/tangl/ir/core_ir/base_script_model.py` still subclasses legacy `HierarchicalTemplate`.
+  - This is the largest remaining conceptual bridge until IR/template authoring migrates to `core38.template`/`TemplateRegistry`.
+- Legacy matcher semantics still appear in retired/legacy-coupled tests:
+  - `engine/tests/ir/test_base_script_item_selectable.py` continues to assert `matches(...)` internals (already classified retirement candidate).
+- `core.domain` retirement status is on track:
+  - no active non-retiring imports from `tangl.core.domain`;
+  - `tangl.story.fabula.domain_manager` remains the intentional world-specific class/dispatch registry seam.
+
+## Shim Switchboard (2026-03-04)
+- Added env-driven symbol switches to compatibility shims:
+  - `tangl.core`:
+    - package default: `TANGL_SHIM_CORE_DEFAULT`
+    - per symbol: `TANGL_SHIM_CORE_ENTITY|REGISTRY|GRAPHITEM|GRAPH|EDGE|SUBGRAPH|RECORD|SNAPSHOT|NODE`
+  - `tangl.vm`:
+    - package default: `TANGL_SHIM_VM_DEFAULT`
+    - per symbol: `TANGL_SHIM_VM_BUILDRECEIPT|CHOICEEDGE|CONTEXT|FRAME|LEDGER|PLANNINGRECEIPT|RESOLUTIONPHASE`
+  - `tangl.story`:
+    - package default: `TANGL_SHIM_STORY_DEFAULT`
+    - per symbol: `TANGL_SHIM_STORY_ACTION|BLOCK|SCENE|STORYGRAPH`
+- Value semantics:
+  - legacy: `legacy/old/0/false/off`
+  - v38: `v38/new/1/true/on`
+- Default behavior is unchanged (non-retiring blast remains green with no env overrides).
+- First canary cut:
+  - Command: `TANGL_SHIM_STORY_BLOCK=v38 poetry run pytest ... --maxfail=20`
+  - Result: `10 failed, 1629 passed, 46 skipped, 10 xfailed`
+  - Signal: expected mixed-runtime breakage in mechanics/media paths that combine legacy story graph/runtime with a v38 block type.
+
+### Switchboard Deep-Dive (2026-03-04)
+- Toggle matrix against the same non-retiring gate:
+  - `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=legacy TANGL_SHIM_STORY_DEFAULT=legacy`
+    - Result: `23 failed, 1616 passed, 46 skipped, 10 xfailed`
+    - Fail clusters: `ir` (`6`), `loaders` (`2`), `story38` (`15`)
+  - `TANGL_SHIM_CORE_DEFAULT=legacy TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=legacy`
+    - Result: `35 failed, 1604 passed, 46 skipped, 10 xfailed`
+    - Fail clusters: `mechanics/games` (`33`), `media` (`2`)
+  - `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=legacy TANGL_SHIM_STORY_DEFAULT=v38`
+    - Result: `34 failed, 1605 passed, 46 skipped, 10 xfailed`
+    - Fail clusters: core-only set + mixed story/runtime mechanics/media (`11`)
+  - `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38`
+    - Result: `58 failed, 1581 passed, 46 skipped, 10 xfailed`
+
+- First-cause signatures:
+  - Core-v38 only:
+    - Legacy type anchoring in template/fabula stack:
+      - `tangl.core.factory.template` validates `obj_cls` against legacy `tangl.core.entity.Entity`.
+      - `tangl.story.fabula.domain_manager` registers only subclasses of legacy `Entity`.
+    - Strict selector typing in legacy `Selectable.matches(selector=...)` rejects core38 graph items.
+  - VM-v38 only:
+    - Constructor/shape drift:
+      - `Frame(graph=..., cursor_id=...)` (legacy) vs vm38 expects `Frame(graph=..., cursor=...)`.
+      - `Ledger(..., records=StreamRegistry())` (legacy) vs vm38 expects core38-shaped graph/output stream.
+  - Core+Story mixed with legacy VM:
+    - Mixed-runtime dispatch drift (legacy VM planning/journal phases with v38 story/core call sites) causes handler non-selection and empty/None journal/update outputs.
+
+- Classification outcome for current failing set:
+  - `MECHANICAL_ADAPT` (majority):
+    - Update call sites/helpers to vm38 constructor and payload vocabulary.
+    - Replace legacy hard imports (`tangl.core.entity`, `tangl.core.graph.*`) in bridging layers with shim-safe imports.
+    - Relax/translate legacy selector typing to accept core38 entities or translate to `core38.Selector`.
+  - `REQUIRED_BRIDGE_FIX`:
+    - Domain class/module loading in runtime38 paths must accept classes deriving from shimmed/v38 entity types.
+  - `RETIRE_CANDIDATE`:
+    - Any remaining assertions that require exact legacy `obj_cls` export strings or legacy internal MRO shape (not observable in v38 contracts).
 
 ## Inventory Snapshot
 - Total in-scope legacy modules: `128`

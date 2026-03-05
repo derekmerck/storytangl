@@ -2,9 +2,10 @@ from collections.abc import Mapping
 
 import pytest
 
-from tangl.core import Graph
+from tangl.core38 import Graph
 # from tangl.core.domain.affiliate import SingletonDomain
-from tangl.vm.ledger import Ledger
+from tangl.vm38 import Ledger
+from tangl.vm38.replay import CheckpointRecord
 
 
 def _load_ledger(payload):
@@ -24,7 +25,7 @@ def _load_ledger(payload):
 def test_ledger_roundtrip_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="test_node")
-    ledger = Ledger(graph=graph, cursor_id=node.uid, step=42)
+    ledger = Ledger(graph=graph, cursor_id=node.uid, cursor_steps=42)
     # ledger.domains.append(SingletonDomain(label="demo_domain"))
     ledger.push_snapshot()
 
@@ -43,7 +44,7 @@ def test_ledger_roundtrip_all_backends(manager):
 def test_event_sourced_rebuild_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="event_node")
-    ledger = Ledger(graph=graph, cursor_id=node.uid, event_sourced=True)
+    ledger = Ledger(graph=graph, cursor_id=node.uid)
     ledger.push_snapshot()
 
     manager.save(ledger)
@@ -51,5 +52,5 @@ def test_event_sourced_rebuild_all_backends(manager):
     retrieved = manager.get(ledger.uid)
     restored = _load_ledger(retrieved)
 
-    assert restored.event_sourced is True
+    assert restored.records.last(is_instance=CheckpointRecord) is not None
     assert restored.graph.find_one(label="event_node") is not None

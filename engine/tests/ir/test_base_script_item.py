@@ -1,15 +1,16 @@
 """Tests for :mod:`tangl.ir.core_ir.base_script_model`."""
 
 from tangl.core import Record, Node
+from tangl.core.record.record import Record as LegacyRecord
 from tangl.ir.core_ir import BaseScriptItem
 
 # todo: merge w template tests, nothing script-ish
 
 
 def test_base_script_item_is_record() -> None:
-    """``BaseScriptItem`` should inherit :class:`~tangl.core.Record`."""
+    """``BaseScriptItem`` should remain record-compatible across shim modes."""
 
-    assert issubclass(BaseScriptItem, Record)
+    assert issubclass(BaseScriptItem, (Record, LegacyRecord))
 
 
 def test_base_script_item_defaults_and_extras() -> None:

@@ -16,8 +16,7 @@ from enum import auto, Flag
 
 from pydantic import Field
 
-from tangl.core.entity import Entity
-from tangl.core.graph import Node, Graph
+from tangl.core import Entity, Graph, Node
 # from tangl.core import Renderable, on_render
 # from tangl.story.story_node import StoryNode
 from tangl.lang.helpers import oxford_join
@@ -99,6 +98,5 @@ class Ornamentation(Node):
 
     def __bool__(self):
         return len(self.collection) > 0
-
 
 

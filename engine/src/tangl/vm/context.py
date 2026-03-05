@@ -128,7 +128,13 @@ class Context:
 
     def __post_init__(self):
         # Set initial hash on frozen object
-        object.__setattr__(self, "initial_state_hash", hashing_func(self.graph._state_hash()))
+        if hasattr(self.graph, "_state_hash"):
+            state_hash = self.graph._state_hash()
+        elif hasattr(self.graph, "value_hash"):
+            state_hash = self.graph.value_hash()
+        else:
+            state_hash = hashing_func(repr(self.graph))
+        object.__setattr__(self, "initial_state_hash", hashing_func(state_hash))
 
     @functools.cached_property
     def rand(self):

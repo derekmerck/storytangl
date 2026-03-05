@@ -11,6 +11,14 @@ if TYPE_CHECKING:
     from tangl.core import Graph, Node
 
 
+def _add_node_compat(graph: Graph, *, kind: type, label: str | None, **kwargs: Any):
+    """Prefer v38 ``kind`` vocabulary while tolerating legacy ``obj_cls`` APIs."""
+    try:
+        return graph.add_node(kind=kind, label=label, **kwargs)
+    except TypeError:
+        return graph.add_node(obj_cls=kind, label=label, **kwargs)
+
+
 class HasGame:
     """
     Mixin for story nodes that embed a game instance and handler.
@@ -115,10 +123,9 @@ class HasGame:
             The created node instance.
         """
 
-        from tangl.vm import ChoiceEdge
-        from tangl.vm.resolution_phase import ResolutionPhase as P
+        from tangl.vm import ChoiceEdge, ResolutionPhase as P
 
-        node = graph.add_node(obj_cls=cls, label=label, **kwargs)
+        node = _add_node_compat(graph, kind=cls, label=label, **kwargs)
 
         if game_class is not None:
             object.__setattr__(node, "_game_class", game_class)

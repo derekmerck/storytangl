@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Optional, Iterator, TypeVar, Generic, Type, Self, Any
 from uuid import uuid4
 import logging
+from copy import deepcopy
 from fnmatch import fnmatch
 import re
 
@@ -498,3 +499,14 @@ class Snapshot(EntityTemplate):
         if not preserve_uid:
             raise TypeError("Snapshot does not support preserve_uid != True")
         return super().materialize(preserve_uid=True)
+
+    @classmethod
+    def from_item(cls, item: Entity) -> Snapshot:
+        """Legacy constructor alias for snapshotting an existing entity."""
+        return cls.from_entity(item)
+
+    def restore_item(self, verify: bool = False) -> ET:
+        """Legacy restore alias returning a materialized copy."""
+        # `verify` is kept for API compatibility; v38 snapshot content is immutable.
+        _ = verify
+        return deepcopy(self.payload)

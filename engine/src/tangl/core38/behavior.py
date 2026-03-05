@@ -179,6 +179,11 @@ class CallReceipt(Record):
         return all([bool(r) for r in cls.iter_results(*receipts)])
 
     @classmethod
+    def all_truthy(cls, *receipts: Self):
+        """Legacy alias for :meth:`all_true`."""
+        return cls.all_true(*receipts)
+
+    @classmethod
     def merge_results(cls, *receipts: Self) -> list[Any] | Mapping[Any, Any]:
         """Merge homogeneous results (lists/dicts) or return gathered mixed results."""
         results = cls.gather_results(*receipts)
@@ -232,10 +237,10 @@ class Behavior(RegistryAware, HasOrder, Entity):
     priority: int = Priority.NORMAL
     dispatch_layer: int = DispatchLayer.LOCAL
 
-    wants_caller_kind: Type[Entity] = None
+    wants_caller_kind: Type[Any] | None = None
     wants_exact_kind: bool = True  # disallow caller-kind subclasses
 
-    def caller_kind(self, kind: Type[Entity]) -> bool:
+    def caller_kind(self, kind: Type[Any]) -> bool:
         """Return whether this behavior accepts a caller of ``kind``."""
         logger.debug("checking caller kind against wants_caller_kind")
         if self.wants_caller_kind is None:
@@ -299,15 +304,22 @@ class BehaviorRegistry(Registry[Behavior]):
     default_priority: Priority = Priority.NORMAL
     default_dispatch_layer: DispatchLayer = DispatchLayer.APPLICATION
 
-    def register(self, func: Callable, **kwargs) -> Callable:
-        """Register ``func`` as a :class:`Behavior` and return the original callable."""
-        kwargs.setdefault("task", self.default_task)
-        kwargs.setdefault("priority", self.default_priority)
-        kwargs.setdefault("dispatch_layer", self.default_dispatch_layer)
-        behavior = Behavior(func=func, **kwargs)
-        setattr(func, "_behavior", behavior)
-        self.add(behavior)
-        return func
+    def register(self, func: Callable | None = None, **kwargs):
+        """Register behavior function(s), supporting both direct and decorator use."""
+
+        def _register(target: Callable) -> Callable:
+            payload = dict(kwargs)
+            payload.setdefault("task", self.default_task)
+            payload.setdefault("priority", self.default_priority)
+            payload.setdefault("dispatch_layer", self.default_dispatch_layer)
+            behavior = Behavior(func=target, **payload)
+            setattr(target, "_behavior", behavior)
+            self.add(behavior)
+            return target
+
+        if func is None:
+            return _register
+        return _register(func)
 
     @classmethod
     def _get_receipts(cls, behaviors, *, call_args, call_kwargs, ctx) -> Iterator[CallReceipt]:
@@ -360,7 +372,8 @@ class BehaviorRegistry(Registry[Behavior]):
         registry = cls(default_dispatch_layer=DispatchLayer.LOCAL)
         for behavior in behaviors:
             if isinstance(behavior, Behavior):
-                registry.add(behavior)
+                # Keep original task/layer metadata without rebinding ownership.
+                registry.members[behavior.uid] = behavior
                 continue
             if callable(behavior):
                 registry.register(func=behavior, task=task)

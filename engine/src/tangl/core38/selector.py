@@ -96,6 +96,18 @@ class Selector(BaseModel, extra="allow"):
         for attrib_name, target_val in (self.__pydantic_extra__ or {}).items():
             if target_val is Any:
                 continue
+            if attrib_name in {"identifier", "alias"}:
+                attrib_name = "has_identifier"
+            if attrib_name in {"is_instance", "has_kind"}:
+                if hasattr(entity, attrib_name):
+                    attrib_value = getattr(entity, attrib_name)
+                    if callable(attrib_value):
+                        if not attrib_value(target_val):
+                            return False
+                        continue
+                if not isinstance(entity, target_val):
+                    return False
+                continue
             if not hasattr(entity, attrib_name):
                 return False
             attrib_value = getattr(entity, attrib_name)

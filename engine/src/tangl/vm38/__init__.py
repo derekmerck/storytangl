@@ -111,6 +111,7 @@ from .dispatch import (
     on_validate,
 )
 from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
+from . import system_handlers  # noqa: F401  # register default vm38 hooks
 
 
 __all__ = [

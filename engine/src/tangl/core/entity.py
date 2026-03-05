@@ -110,7 +110,38 @@ class Entity(BaseModelPlus):
 
     @classmethod
     def filter_by_criteria(cls, values: Iterable[EntityT], **criteria) -> Iterator[EntityT]:
-        return filter(lambda x: x.matches(**criteria), values)
+        selector = criteria.pop("selector", None)
+
+        try:
+            from tangl.core38.selector import Selector
+        except Exception:
+            def _legacy_matches(value: EntityT) -> bool:
+                if selector is not None:
+                    get_selection_criteria = getattr(value, "get_selection_criteria", None)
+                    if callable(get_selection_criteria):
+                        if not selector.matches(**get_selection_criteria()):
+                            return False
+                return value.matches(**criteria)
+
+            return filter(_legacy_matches, values)
+
+        translated = Selector(**criteria)
+
+        def _selector_matches(value: EntityT) -> bool:
+            if selector is not None:
+                get_selection_criteria = getattr(value, "get_selection_criteria", None)
+                if callable(get_selection_criteria):
+                    if not selector.matches(**get_selection_criteria()):
+                        return False
+            try:
+                return translated.matches(value)
+            except TypeError:
+                return value.matches(**criteria)
+
+        return filter(_selector_matches, values)
+
+    # Legacy helper alias used in older call-sites and docs.
+    filter_by_crit = filter_by_criteria
 
     # Any `has_` methods should not have side effects as they may be called through **criteria args
 
@@ -388,9 +419,10 @@ class Selectable(Entity):
 
     def matches(self, *, selector: Entity = None, **inline_criteria) -> bool:
         if selector is not None:
-            if not isinstance(selector, Entity):
-                raise TypeError("Selector must be an instance of Entity")
-            if not selector.matches(**self.get_selection_criteria()):
+            selector_matches = getattr(selector, "matches", None)
+            if not callable(selector_matches):
+                raise TypeError("Selector must provide a callable matches(**criteria)")
+            if not selector_matches(**self.get_selection_criteria()):
                 return False
         return super().matches(**inline_criteria)
 

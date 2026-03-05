@@ -11,9 +11,9 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional, Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from tangl.core38 import Entity, Graph, OrderedRegistry, Selector
+from tangl.core38 import BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
 from tangl.vm38.traversable import TraversableEdge, TraversableNode
 
@@ -43,6 +43,10 @@ class Ledger(Entity):
 
     graph: Graph
     output_stream: OrderedRegistry = Field(default_factory=OrderedRegistry)
+    local_behaviors: BehaviorRegistry = Field(
+        default_factory=lambda: BehaviorRegistry(label="ledger.local.dispatch"),
+        exclude=True,
+    )
 
     cursor_id: UUID
     cursor_history: list[UUID] = Field(default_factory=list)
@@ -52,6 +56,26 @@ class Ledger(Entity):
     causality_mode: CausalityMode = CausalityMode.CLEAN
     causality_break_reason: str | None = None
     causality_break_step_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_stream_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if "output_stream" not in data and "records" in data:
+            payload = dict(data)
+            payload["output_stream"] = payload["records"]
+            return payload
+        return data
+
+    @property
+    def records(self) -> OrderedRegistry:
+        """Legacy alias for :attr:`output_stream`."""
+        return self.output_stream
+
+    @records.setter
+    def records(self, value: OrderedRegistry) -> None:
+        self.output_stream = value
 
     @property
     def cursor(self) -> TraversableNode:
@@ -171,6 +195,7 @@ class Ledger(Entity):
             self.cursor,
             self.output_stream,
             self._call_stack(),
+            local_behaviors=self.local_behaviors,
             step_base=self.cursor_steps,
             meta=frame_meta,
             causality_mode=self.causality_mode,
@@ -343,14 +368,34 @@ class Ledger(Entity):
 
         self.save_snapshot(cadence=self.checkpoint_cadence)
 
+    @staticmethod
+    def _coerce_fragment_record(record: Any) -> Fragment | None:
+        """Normalize mixed fragment record shapes into vm38 fragments."""
+        if isinstance(record, Fragment):
+            return record
+        fragment_type = getattr(record, "fragment_type", None)
+        if fragment_type is None:
+            return None
+        step = int(getattr(record, "step", -1) or -1)
+        payload: dict[str, Any] = {
+            "fragment_type": str(fragment_type),
+            "step": step,
+        }
+        for key in ("content", "text", "source_id", "edge_id", "available", "unavailable_reason"):
+            if hasattr(record, key):
+                payload[key] = getattr(record, key)
+        return Fragment(**payload)
+
     def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
         """Return output fragments in chronological order, optionally filtered."""
-        selector = Selector(has_kind=Fragment)
         fragments: list[Fragment] = []
 
-        for record in selector.filter(self.output_stream):
-            if record.step >= since_step or record.step < 0:
-                fragments.append(record)
+        for record in self.output_stream.values():
+            fragment = self._coerce_fragment_record(record)
+            if fragment is None:
+                continue
+            if fragment.step >= since_step or fragment.step < 0:
+                fragments.append(fragment)
 
         if limit > 0 and len(fragments) > limit:
             fragments = fragments[-limit:]
@@ -360,20 +405,20 @@ class Ledger(Entity):
     def unstructure(self) -> UnstructuredData:
         """Serialize ledger state to plain data for persistence."""
         return {
-            "uid": str(self.uid),
+            "uid": self.uid,
             "label": self.label,
-            "cursor_id": str(self.cursor_id),
-            "cursor_history": [str(uid) for uid in self.cursor_history],
+            "cursor_id": self.cursor_id,
+            "cursor_history": list(self.cursor_history),
             "cursor_steps": self.cursor_steps,
             "choice_steps": self.choice_steps,
             "reentrant_steps": self.reentrant_steps,
-            "call_stack_ids": [str(uid) for uid in self.call_stack_ids],
+            "call_stack_ids": list(self.call_stack_ids),
             "last_redirect": self.last_redirect,
             "redirect_trace": self.redirect_trace,
             "causality_mode": self.causality_mode.value,
             "causality_break_reason": self.causality_break_reason,
             "causality_break_step_id": self.causality_break_step_id,
-            "user_id": str(self.user_id) if self.user_id else None,
+            "user_id": str(self.user_id) if self.user_id is not None else None,
             "replay_algorithm_id": self.replay_algorithm_id,
             "checkpoint_cadence": self.checkpoint_cadence,
             "graph": self.graph.unstructure(),
@@ -445,6 +490,14 @@ class Ledger(Entity):
         )
         self.output_stream.append(checkpoint)
         return checkpoint
+
+    def push_snapshot(self) -> Optional[CheckpointRecord]:
+        """Legacy alias for forcing a checkpoint save."""
+        return self.save_snapshot(force=True)
+
+    def record_stack_snapshot(self) -> Optional[CheckpointRecord]:
+        """Legacy compatibility alias for stack/snapshot persistence."""
+        return self.save_snapshot(force=True)
 
     def _ordered_records(self) -> list[Entity]:
         # Preserve actual stream append order. HasOrder.seq is class-local and

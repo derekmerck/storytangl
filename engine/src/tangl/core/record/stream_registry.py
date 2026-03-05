@@ -75,6 +75,17 @@ class StreamRegistry(Registry[HasSeq]):
             return item.model_copy(update={"seq": self.max_seq + 1})
         return item
 
+    @staticmethod
+    def _is_record_like(item: object) -> bool:
+        if isinstance(item, Record):
+            return True
+        return (
+            hasattr(item, "uid")
+            and hasattr(item, "seq")
+            and hasattr(item, "tags")
+            and callable(getattr(item, "model_copy", None))
+        )
+
     # ---- bookmarks ----
 
     def set_marker(
@@ -202,7 +213,7 @@ class StreamRegistry(Registry[HasSeq]):
     def add_record(self, item: Record | UnstructuredData):
         if isinstance(item, dict):
             item = Record.structure(item)
-        if not isinstance(item, Record):
+        if not self._is_record_like(item):
             raise ValueError(f"Trying to add wrong type {type(item)} to record stream")
         item = self._ensure_seq(item)
         self.max_seq = max(self.max_seq, item.seq)
@@ -223,10 +234,12 @@ class StreamRegistry(Registry[HasSeq]):
             return self.max_seq, self.max_seq
 
         # normalize & compute start
-        normalized: list[Record] = []
+        normalized: list[HasSeq] = []
         for it in items:
             if isinstance(it, dict):
                 it = Record.structure(it)
+            if not self._is_record_like(it):
+                raise ValueError(f"Trying to add wrong type {type(it)} to record stream")
             it = self._ensure_seq(it)
             normalized.append(it)
         start_seq = min(normalized).seq

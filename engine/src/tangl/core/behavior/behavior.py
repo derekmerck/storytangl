@@ -44,7 +44,7 @@ API
 """
 from __future__ import annotations
 from enum import IntEnum
-from typing import Type, Callable, TypeVar, Generic, Optional
+from typing import Type, Callable, TypeVar, Generic, Optional, Any
 from functools import total_ordering
 import inspect
 import weakref
@@ -214,7 +214,9 @@ class Behavior(Selectable, Entity, HasSeq, Generic[OT, CT]):
     # type, caller, owner classifications are inferred in `cls._populate_from_func_info`
     # unless explicitly provided
     handler_type: HandlerType
-    caller_cls: Type[CT] = None   # for selection and dist; can infer on bind/call
+    # Compatibility shim: during v38 blast-radius testing, allow non-Entity
+    # caller classes (for example legacy response models) to register.
+    caller_cls: type[Any] | None = None   # for selection and dist; can infer on bind/call
     owner: OT | weakref.ReferenceType[OT] | None = None
     owner_cls: Type[OT] = None
 

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import sys
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
 from tangl.story38.fabula import StoryCompiler38, World38
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
+
+if TYPE_CHECKING:
+    from tangl.story.fabula import AssetManager, DomainManager, World
 
 
 class WorldCompiler:
@@ -74,6 +76,8 @@ class WorldCompiler:
             )
             return world38
 
+        from tangl.story.fabula import AssetManager, DomainManager, World
+
         script_manager = self.script_compiler.compile(script_data)
 
         domain_manager = DomainManager()
@@ -127,6 +131,8 @@ class WorldCompiler:
                 world38_resources_facet,
             ) = self._build_world38_facets(bundle)
         else:
+            from tangl.story.fabula import DomainManager
+
             domain_manager = DomainManager()
             domain_module = self._get_domain_module(bundle)
             if domain_module:
@@ -136,6 +142,9 @@ class WorldCompiler:
                 bundle.media_dir,
                 organization_hints=bundle.manifest.media_organization,
             )
+
+        if runtime_version != "38":
+            from tangl.story.fabula import AssetManager, World
 
         worlds: dict[str, World | World38] = {}
         for story_key in bundle.manifest.story_keys():
@@ -197,6 +206,8 @@ class WorldCompiler:
         self,
         bundle: WorldBundle,
     ) -> tuple[DomainManager | None, AssetManager, Any]:
+        from tangl.story.fabula import AssetManager, DomainManager
+
         domain_facet: DomainManager | None = None
         domain_module = self._get_domain_module(bundle)
         if domain_module:

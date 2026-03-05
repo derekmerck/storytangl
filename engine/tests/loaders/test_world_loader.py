@@ -60,16 +60,17 @@ def test_loader_discovers_bundles(tmp_path: Path) -> None:
     assert "world2" in bundles
 
 
-def test_loader_creates_world_with_media_registry(media_mvp_path: Path) -> None:
+def test_loader_creates_runtime38_world_with_media_registry(media_mvp_path: Path) -> None:
     registry = WorldRegistry([media_mvp_path.parent])
 
-    world = registry.get_world("media_mvp")
+    world = registry.get_world("media_mvp", runtime_version="38")
 
     assert world.label == "media_mvp"
-    assert hasattr(world, "_bundle")
-    assert world.resource_manager.registry
+    assert world.bundle is not None
+    assert world.resources is not None
+    assert world.resources.registry
 
-    rit = world.resource_manager.get_rit("test_image.svg")
+    rit = world.resources.get_rit("test_image.svg")
     assert rit is not None
 
     with pytest.raises(ValueError):
@@ -99,7 +100,7 @@ def test_manifest_metadata_inheritance(tmp_path: Path) -> None:
 
     registry = WorldRegistry([tmp_path], compiler=WorldCompiler())
 
-    world = registry.get_world("my_world")
+    world = registry.get_world("my_world", runtime_version="38")
 
     assert world.metadata.get("author") == "TanglDev"
 
@@ -216,7 +217,10 @@ def test_custom_script_loader_bridge_used_when_codec_not_explicit(tmp_path: Path
     (bundle_root / "story.custom").write_text("Bridge Story", encoding="utf-8")
 
     bundle = WorldBundle.load(bundle_root)
-    world = WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(bundle)
+    world = WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(
+        bundle,
+        runtime_version="38",
+    )
 
     assert world.label == "bridge_world"
     assert world.metadata.get("title") == "Bridge Story"
@@ -239,7 +243,10 @@ def test_explicit_codec_disables_custom_script_loader_bridge(tmp_path: Path) -> 
     bundle = WorldBundle.load(bundle_root)
 
     with pytest.raises(Exception):
-        WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(bundle)
+        WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(
+            bundle,
+            runtime_version="38",
+        )
 
 
 def test_codec_merge_collisions_are_reported(tmp_path: Path) -> None:
@@ -286,6 +293,13 @@ def test_codec_merge_collisions_are_reported(tmp_path: Path) -> None:
     assert any("overwrote top-level keys" in warning for warning in warnings)
 
 
+@pytest.mark.skip(
+    reason=(
+        "Retired from v38 parity gate: validates runtime37 world internals "
+        "(domain_manager/resource_manager wiring). Runtime38 equivalent coverage is "
+        "provided by test_compile_anthology_runtime38_shares_world_facets."
+    )
+)
 def test_compile_anthology_shares_domain_and_media(tmp_path: Path) -> None:
     bundle_root = tmp_path / "anthology"
     scripts_dir = bundle_root / "scripts"
@@ -333,7 +347,7 @@ def test_compile_anthology_shares_domain_and_media(tmp_path: Path) -> None:
     (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
     (domain_pkg / "domain.py").write_text(
         """
-from tangl.core.entity import Entity
+from tangl.core import Entity
 
 
 class DomainCharacter(Entity):
@@ -410,7 +424,7 @@ def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None
     (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
     (domain_pkg / "domain.py").write_text(
         """
-from tangl.core.entity import Entity
+from tangl.core import Entity
 
 
 class DomainCharacter(Entity):
@@ -447,7 +461,7 @@ def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "domain.py").write_text(
         """
-from tangl.core.entity import Entity
+from tangl.core import Entity
 
 
 class DomainCharacter(Entity):
@@ -480,9 +494,11 @@ scenes: {}
 
     original_sys_path = list(sys.path)
     try:
-        world = compiler.compile(bundle)
+        world = compiler.compile(bundle, runtime_version="38")
 
-        assert "DomainCharacter" in world.domain_manager.class_registry
+        assert isinstance(world, World38)
+        assert world.domain is not None
+        assert "DomainCharacter" in world.domain.class_registry
         assert str(bundle_root) in sys.path
         assert str(bundle.domain_dir) not in sys.path
     finally:

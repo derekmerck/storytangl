@@ -103,7 +103,7 @@ class MediaProvisioner(Provisioner):
         yield DependencyOffer(
             requirement_id=requirement.uid,
             requirement=requirement,
-            operation=ProvisioningPolicy.CREATE_TEMPLATE,
+            operation=ProvisioningPolicy.CREATE,
             base_cost=ProvisionCost.CREATE,
             cost=float(ProvisionCost.CREATE),
             proximity=999.0,

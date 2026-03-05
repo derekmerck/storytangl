@@ -5,7 +5,8 @@ from uuid import UUID
 from pydantic import Field, field_serializer, field_validator
 
 from ..type_hints import StringMap
-from tangl.core import Graph, BehaviorRegistry
+from tangl.core.graph import Graph
+from tangl.core.behavior import BehaviorRegistry
 from tangl.core.factory import TemplateFactory
 from .dispatch import story_dispatch
 from .fabula import World

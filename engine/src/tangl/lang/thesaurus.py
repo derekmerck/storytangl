@@ -11,7 +11,7 @@ import jinja2
 import pydantic
 import yaml
 
-from tangl.core.singleton import Singleton
+from tangl.core38 import Singleton
 from .pos import PartOfSpeech
 from .pov import PoV
 from .helpers.pattern import conjugate

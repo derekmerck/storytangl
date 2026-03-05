@@ -5,12 +5,26 @@ import importlib
 import inspect
 import logging
 
-from tangl.core.behavior import BehaviorRegistry
-from tangl.core.entity import Entity
-from tangl.core.graph.node import Node
+from tangl.core import BehaviorRegistry, Entity, Node
+from tangl.core.entity import Entity as LegacyEntity
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+
+
+def _is_entity_subclass(candidate: object) -> bool:
+    if not inspect.isclass(candidate):
+        return False
+    for base in (Entity, LegacyEntity):
+        if not isinstance(base, type):
+            continue
+        try:
+            if issubclass(candidate, base):
+                return True
+        except TypeError:
+            continue
+    return False
+
 
 # todo: TypeManager?
 class DomainManager:
@@ -55,8 +69,8 @@ class DomainManager:
         if not obj_cls_str:
             return Node
 
-        if (isinstance(obj_cls_str, type) and
-                (obj_cls_str is Entity or issubclass(obj_cls_str, Entity))):
+        if isinstance(obj_cls_str, type):
+            # Compatibility: mixed legacy/v38 graphs may already carry concrete class objects.
             return obj_cls_str
 
         if obj_cls_str in self.class_registry:
@@ -76,7 +90,7 @@ class DomainManager:
             return Node
 
         if inspect.isclass(resolved):
-            if issubclass(resolved, Entity):
+            if _is_entity_subclass(resolved):
                 return resolved
 
             logger.warning(
@@ -92,5 +106,5 @@ class DomainManager:
         """Import ``module_path`` and register discovered :class:`Entity` subclasses."""
         module = importlib.import_module(module_path)
         for name, obj in inspect.getmembers(module, inspect.isclass):
-            if issubclass(obj, Entity) and obj is not Entity:
+            if _is_entity_subclass(obj) and obj not in {Entity, LegacyEntity}:
                 self.register_class(name, obj)

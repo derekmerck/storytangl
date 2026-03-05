@@ -121,14 +121,37 @@ def _assert_redirect_result(value, *, task: str):
 
 
 def _assert_journal_result(value):
+    from .fragments import Fragment
+
+    def _coerce_fragment(item):
+        if isinstance(item, Record):
+            return item
+        if hasattr(item, "fragment_type"):
+            payload = {
+                "fragment_type": str(getattr(item, "fragment_type", "fragment")),
+                "step": int(getattr(item, "step", -1) or -1),
+            }
+            for key in ("content", "text", "source_id", "edge_id", "available", "unavailable_reason"):
+                if hasattr(item, key):
+                    payload[key] = getattr(item, key)
+            return Fragment(**payload)
+        return None
+
     if value is None:
         return None
-    if isinstance(value, Record):
-        return value
+    normalized = _coerce_fragment(value)
+    if normalized is not None:
+        return normalized
     if isinstance(value, IterableABC) and not isinstance(value, (str, bytes, dict)):
-        fragments = list(value)
-        if all(isinstance(fragment, Record) for fragment in fragments):
-            return fragments
+        fragments = []
+        for fragment in value:
+            normalized_fragment = _coerce_fragment(fragment)
+            if normalized_fragment is None:
+                raise TypeError(
+                    "render_journal iterable entries must be Record-compatible fragment values"
+                )
+            fragments.append(normalized_fragment)
+        return fragments
     raise TypeError(
         "render_journal must return Record | Iterable[Record] | None"
     )
@@ -357,7 +380,12 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
     """
     _validate_dispatch_ctx(ctx)
 
-    ancestors = list(node.ancestors) if hasattr(node, "ancestors") else [node]
+    if hasattr(node, "ancestors"):
+        raw_ancestors = getattr(node, "ancestors")
+        ancestors_iter = raw_ancestors() if callable(raw_ancestors) else raw_ancestors
+        ancestors = list(ancestors_iter)
+    else:
+        ancestors = [node]
     layers: list[Mapping[str, Any]] = []
 
     for ancestor in ancestors:

@@ -16,8 +16,11 @@ See Also
 from __future__ import annotations
 
 import itertools
-from typing import Iterable, Iterator, Optional
+from fnmatch import fnmatch
+from typing import Any, Iterable, Iterator, Optional
 from uuid import UUID
+
+from pydantic import AliasChoices, Field
 
 from .entity import Entity
 from .registry import EntityGroup, HierarchicalGroup, Registry, RegistryAware
@@ -34,6 +37,74 @@ class GraphItem(RegistryAware):
     @property
     def graph(self) -> Graph:
         return self._registry
+
+    @graph.setter
+    def graph(self, value: Graph | None) -> None:
+        # Compatibility for legacy graph containers that assign item.graph directly.
+        self.bind_registry(value)
+
+    def _compat_parent(self) -> GraphItem | None:
+        parent = getattr(self, "parent", None)
+        if parent is not None:
+            return parent
+        registry = getattr(self, "registry", None)
+        if registry is None:
+            return None
+        for candidate in registry.find_all(Selector(has_member=self)):
+            if candidate is not self:
+                return candidate
+        return None
+
+    def ancestors(self):
+        """Legacy compatibility iterator from parent to root.
+
+        Falls back to membership-derived ancestry when no hierarchical
+        ``parent`` is available (for example, plain Subgraph membership).
+        """
+        seen: set[UUID | None] = {getattr(self, "uid", None)}
+        current: GraphItem | None = self
+        while current is not None:
+            parent = current._compat_parent()
+            if parent is None:
+                return
+            uid = getattr(parent, "uid", None)
+            if uid in seen:
+                return
+            seen.add(uid)
+            yield parent
+            current = parent
+
+    def has_path(self, pattern: str) -> bool:
+        """Legacy compatibility predicate for selector ``has_path`` criteria."""
+        path = getattr(self, "path", None)
+        if not isinstance(path, str):
+            labels: list[str] = [self.get_label()]
+            for ancestor in self.ancestors():
+                labels.append(ancestor.get_label())
+            path = ".".join(reversed(labels))
+        return fnmatch(path, pattern)
+
+    def has_ancestor_tags(self, tags: set[str]) -> bool:
+        """Legacy compatibility predicate for selector ``has_ancestor_tags``."""
+        if not tags:
+            return True
+        wanted = set(tags)
+        pooled: set[str] = set()
+        pooled.update(getattr(self, "tags", set()) or set())
+        for ancestor in self.ancestors():
+            pooled.update(getattr(ancestor, "tags", set()) or set())
+        return wanted.issubset(pooled)
+
+    def has_ancestor_tags__not(self, tags: set[str]) -> bool:
+        """Legacy compatibility negative scope predicate."""
+        if not tags:
+            return True
+        forbidden = set(tags)
+        pooled: set[str] = set()
+        pooled.update(getattr(self, "tags", set()) or set())
+        for ancestor in self.ancestors():
+            pooled.update(getattr(ancestor, "tags", set()) or set())
+        return forbidden.isdisjoint(pooled)
 
 
 class Graph(Registry[GraphItem]):
@@ -104,8 +175,19 @@ class Graph(Registry[GraphItem]):
         """
         return []
 
+    def add(self, value: GraphItem, _ctx=None) -> None:
+        """Add and bind legacy ``graph`` pointers when present."""
+        if hasattr(value, "graph"):
+            try:
+                value.graph = self
+            except Exception:
+                pass
+        super().add(value, _ctx=_ctx)
+
     def add_node(self, *, kind=None, **attrs) -> Node:
         """Create and add a node-like graph item."""
+        if kind is None and "obj_cls" in attrs:
+            kind = attrs.pop("obj_cls")
         kind = kind or Node
         node = kind(**attrs)
         self.add(node)
@@ -113,24 +195,32 @@ class Graph(Registry[GraphItem]):
 
     def add_edge(
         self,
-        predecessor: GraphItem,
-        successor: GraphItem,
+        predecessor: GraphItem | None = None,
+        successor: GraphItem | None = None,
         *,
         kind=None,
         **attrs,
     ) -> Edge:
         """Create and add an edge between predecessor and successor items."""
+        if kind is None and "obj_cls" in attrs:
+            kind = attrs.pop("obj_cls")
+        # Legacy arg aliases.
+        if predecessor is None and "source" in attrs:
+            predecessor = attrs.pop("source")
+        if successor is None and "destination" in attrs:
+            successor = attrs.pop("destination")
+
+        # Legacy id aliases when node refs are not supplied.
+        predecessor_id = attrs.pop("source_id", None)
+        successor_id = attrs.pop("destination_id", None)
+
         if predecessor is not None:
             self._validate_linkable(predecessor)
             predecessor_id = predecessor.uid
-        else:
-            predecessor_id = None
 
         if successor is not None:
             self._validate_linkable(successor)
             successor_id = successor.uid
-        else:
-            successor_id = None
 
         kind = kind or Edge
         edge = kind(
@@ -143,6 +233,8 @@ class Graph(Registry[GraphItem]):
 
     def add_subgraph(self, *, kind=None, members: Iterable[GraphItem] = None, **attrs) -> Subgraph:
         """Create and add a subgraph, then optionally add members."""
+        if kind is None and "obj_cls" in attrs:
+            kind = attrs.pop("obj_cls")
         kind = kind or Subgraph
         subgraph = kind(**attrs)
         self.add(subgraph)
@@ -150,41 +242,79 @@ class Graph(Registry[GraphItem]):
             subgraph.add_member(item)
         return subgraph
 
-    def find_subgraphs(self, selector: Selector = Selector()) -> Iterator[Subgraph]:
+    def find_subgraphs(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Subgraph]:
+        selector = self._normalize_selector(selector, **criteria) or Selector()
         selector = selector.with_criteria(has_kind=Subgraph)
-        return self.find_all(selector)
+        return self.find_all(selector=selector)
 
-    def find_subgraph(self, selector: Selector = Selector()) -> Optional[Subgraph]:
+    def find_subgraph(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Optional[Subgraph]:
+        selector = self._normalize_selector(selector, **criteria) or Selector()
         selector = selector.with_criteria(has_kind=Subgraph)
-        return self.find_one(selector)
+        return self.find_one(selector=selector)
 
     @property
     def subgraphs(self) -> list[Subgraph]:
         return list(self.find_subgraphs())
 
-    def find_edges(self, selector: Selector = Selector()) -> Iterator[Edge]:
+    def find_edges(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Edge]:
+        if "source" in criteria and "predecessor" not in criteria:
+            criteria["predecessor"] = criteria.pop("source")
+        if "destination" in criteria and "successor" not in criteria:
+            criteria["successor"] = criteria.pop("destination")
+        selector = self._normalize_selector(selector, **criteria) or Selector()
         selector = selector.with_criteria(has_kind=Edge)
-        return self.find_all(selector)
+        return self.find_all(selector=selector)
 
     @property
     def edges(self) -> list[Edge]:
         return list(self.find_edges())
 
-    def find_edge(self, selector: Selector = Selector()) -> Optional[Edge]:
+    def find_edge(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Optional[Edge]:
+        if "source" in criteria and "predecessor" not in criteria:
+            criteria["predecessor"] = criteria.pop("source")
+        if "destination" in criteria and "successor" not in criteria:
+            criteria["successor"] = criteria.pop("destination")
+        selector = self._normalize_selector(selector, **criteria) or Selector()
         selector = selector.with_criteria(has_kind=Edge)
-        return self.find_one(selector)
+        return self.find_one(selector=selector)
 
-    def find_nodes(self, selector: Selector = Selector()) -> Iterator[Node]:
+    def find_nodes(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Node]:
+        selector = self._normalize_selector(selector, **criteria) or Selector()
         selector = selector.with_criteria(has_kind=Node)
-        return self.find_all(selector)
+        return self.find_all(selector=selector)
 
     @property
     def nodes(self) -> list[Node]:
         return list(self.find_nodes())
 
-    def find_node(self, selector: Selector = Selector()) -> Optional[Node]:
+    def find_node(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Optional[Node]:
+        selector = self._normalize_selector(selector, **criteria) or Selector()
         selector = selector.with_criteria(has_kind=Node)
-        return self.find_one(selector)
+        return self.find_one(selector=selector)
 
     def _do_link(self, caller: GraphItem, node: Node, _ctx):
         """Bridge to dispatch ``do_link`` hook."""
@@ -250,8 +380,14 @@ class Edge(GraphItem):
         <Edge:anon->n>
     """
 
-    predecessor_id: Optional[UUID] = None
-    successor_id: Optional[UUID] = None
+    predecessor_id: Optional[UUID] = Field(
+        default=None,
+        validation_alias=AliasChoices("predecessor_id", "source_id"),
+    )
+    successor_id: Optional[UUID] = Field(
+        default=None,
+        validation_alias=AliasChoices("successor_id", "destination_id"),
+    )
 
     @property
     def predecessor(self) -> Optional[Node]:
@@ -297,6 +433,45 @@ class Edge(GraphItem):
     def successor(self, value: Node) -> None:
         self.set_successor(value)
 
+    # Legacy aliases retained for non-retiring call sites.
+    @property
+    def source(self) -> Optional[Node]:
+        return self.predecessor
+
+    def set_source(self, value: Node, _ctx=None) -> None:
+        self.set_predecessor(value, _ctx=_ctx)
+
+    @source.setter
+    def source(self, value: Node) -> None:
+        self.set_predecessor(value)
+
+    @property
+    def destination(self) -> Optional[Node]:
+        return self.successor
+
+    def set_destination(self, value: Node, _ctx=None) -> None:
+        self.set_successor(value, _ctx=_ctx)
+
+    @destination.setter
+    def destination(self, value: Node) -> None:
+        self.set_successor(value)
+
+    @property
+    def source_id(self) -> Optional[UUID]:
+        return self.predecessor_id
+
+    @source_id.setter
+    def source_id(self, value: UUID | None) -> None:
+        self.predecessor_id = value
+
+    @property
+    def destination_id(self) -> Optional[UUID]:
+        return self.successor_id
+
+    @destination_id.setter
+    def destination_id(self, value: UUID | None) -> None:
+        self.successor_id = value
+
     def __repr__(self) -> str:
         src = self.predecessor.get_label() if self.predecessor is not None else "anon"
         dst = self.successor.get_label() if self.successor is not None else "anon"
@@ -306,25 +481,60 @@ class Edge(GraphItem):
 class Node(GraphItem):
     """Graph vertex with directional edge navigation and wiring helpers."""
 
-    def edges_in(self, selector: Selector = None) -> Iterator[Edge]:
-        selector = (selector or Selector()).with_criteria(successor=self)
-        return self.graph.find_edges(selector)
+    def edges_in(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Edge]:
+        selector = (self.graph._normalize_selector(selector, **criteria) or Selector()).with_criteria(
+            successor=self
+        )
+        return self.graph.find_edges(selector=selector)
 
-    def predecessors(self, selector: Selector = None) -> Iterator[Node]:
+    def predecessors(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Node]:
         """Yield immediate predecessor nodes via incoming edges."""
-        return (edge.predecessor for edge in self.edges_in(selector) if edge.predecessor)
+        return (
+            edge.predecessor
+            for edge in self.edges_in(selector=selector, **criteria)
+            if edge.predecessor
+        )
 
-    def edges_out(self, selector: Selector = None) -> Iterator[Edge]:
-        selector = (selector or Selector()).with_criteria(predecessor=self)
-        return self.graph.find_edges(selector)
+    def edges_out(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Edge]:
+        selector = (self.graph._normalize_selector(selector, **criteria) or Selector()).with_criteria(
+            predecessor=self
+        )
+        return self.graph.find_edges(selector=selector)
 
-    def successors(self, selector: Selector = None) -> Iterator[Node]:
+    def successors(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Node]:
         """Yield immediate successor nodes via outgoing edges."""
-        return (edge.successor for edge in self.edges_out(selector) if edge.successor)
+        return (
+            edge.successor
+            for edge in self.edges_out(selector=selector, **criteria)
+            if edge.successor
+        )
 
-    def edges(self, selector: Selector = None) -> Iterator[Edge]:
+    def edges(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[Edge]:
         """Yield all incident edges (incoming then outgoing)."""
-        return itertools.chain(self.edges_in(selector), self.edges_out(selector))
+        return itertools.chain(
+            self.edges_in(selector=selector, **criteria),
+            self.edges_out(selector=selector, **criteria),
+        )
 
     def add_edge_to(self, node: Node, kind=None, **attrs) -> Edge:
         """Create an edge from this node to ``node``."""

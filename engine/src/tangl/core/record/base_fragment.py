@@ -1,12 +1,11 @@
 # tangl/core/record/base_fragment.py
-from typing import Optional, Literal
-import typing
+from typing import Any
 from enum import Enum
 
-from pydantic import Field, ConfigDict, model_serializer
+from pydantic import ConfigDict
 
-from tangl.type_hints import UnstructuredData
-from .record import Record
+from tangl.type_hints import Identifier, UnstructuredData
+from tangl.core38 import Record
 
 # note:
 # BaseFragment stays in core as the minimal narrative/UI record envelope.
@@ -57,20 +56,19 @@ class BaseFragment(Record):
     """
     model_config = ConfigDict(extra='allow')
 
-    fragment_type: str
+    fragment_type: str | Enum
     # intent for fragment, e.g., 'content', 'update', 'group', 'media', etc.
     # `See tangl.journal`, required if creating a bare BaseFragment
+    content: Any = None
+    origin_id: Identifier | None = None
+
+    def has_channel(self, name: str) -> bool:
+        return f"channel:{name}" in self.tags
 
     def model_dump(self, **kwargs) -> UnstructuredData:
         # Fragment-type will often be default b/c it's basically a class var.
+        kwargs.setdefault("by_alias", True)
+        kwargs.setdefault("exclude_none", True)
         data = super().model_dump(**kwargs)
         data['fragment_type'] = self.fragment_type
         return data
-
-    # @model_serializer(mode='wrap')
-    # def include_literals(self, next_serializer):
-    #     dumped = next_serializer(self)
-    #     for name, field_info in self.model_fields.items():
-    #         if typing.get_origin(field_info.annotation) == typing.Literal:
-    #             dumped[name] = getattr(self, name)
-    #     return dumped

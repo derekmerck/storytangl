@@ -148,6 +148,9 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
 
         if isinstance(item, Callable):
             payload = dict(attrs)
+            caller_alias = payload.pop("caller", None)
+            if caller_cls is None and caller_alias is not None:
+                caller_cls = caller_alias
             if handler_type is not None:
                 payload["handler_type"] = handler_type
             if caller_cls is not None:
@@ -173,6 +176,10 @@ class BehaviorRegistry(Selectable, Registry[Behavior]):
 
         Returns the original function unchanged.
         """
+        caller_alias = attrs.pop("caller", None)
+        if caller_alias is not None and "caller_cls" not in attrs:
+            attrs["caller_cls"] = caller_alias
+
         def deco(func):
             h = Behavior(func=func, origin=self, **attrs)
             self.add(h)

@@ -3,11 +3,14 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Self, Type
 from uuid import UUID, uuid4
 from inspect import isclass
+from importlib import import_module
 import logging
 
 from pydantic import Field, field_validator
 
 from tangl.type_hints import Typelike, UnstructuredData, StringMap
+import tangl.core as _core_api
+from tangl.core import Entity as _ActiveEntity
 from tangl.core.entity import Entity, Selectable
 from tangl.core.record import Record, ContentAddressable
 
@@ -15,6 +18,67 @@ logger = logging.getLogger(__name__)
 
 
 ET = TypeVar('ET', bound=Entity)
+
+
+def _entity_bases() -> tuple[type, ...]:
+    bases: list[type] = []
+    for candidate in (_ActiveEntity, Entity):
+        if isinstance(candidate, type) and candidate not in bases:
+            bases.append(candidate)
+    return tuple(bases)
+
+
+def _is_entity_subclass(candidate: object) -> bool:
+    if not isclass(candidate):
+        return False
+    for base in _entity_bases():
+        try:
+            if issubclass(candidate, base):
+                return True
+        except TypeError:
+            continue
+    return False
+
+
+def _resolve_obj_cls(name: str) -> type | None:
+    for base in _entity_bases():
+        resolver = getattr(base, "dereference_cls_name", None)
+        if callable(resolver):
+            resolved = resolver(name)
+            if resolved is not None:
+                return resolved
+
+    if "." not in name:
+        return None
+
+    try:
+        module_name, class_name = name.rsplit(".", 1)
+        module = import_module(module_name)
+        resolved = getattr(module, class_name)
+        if isclass(resolved):
+            return resolved
+    except Exception:
+        return None
+    return None
+
+
+def _map_to_active_entity(candidate: type) -> type:
+    if not isinstance(_ActiveEntity, type):
+        return candidate
+    try:
+        if issubclass(candidate, _ActiveEntity):
+            return candidate
+    except TypeError:
+        return candidate
+
+    mapped = getattr(_core_api, candidate.__name__, None)
+    if isclass(mapped):
+        try:
+            if issubclass(mapped, _ActiveEntity):
+                return mapped
+        except TypeError:
+            pass
+    return candidate
 
 class Template(Selectable, ContentAddressable, Record, Generic[ET]):
     """
@@ -59,16 +123,16 @@ class Template(Selectable, ContentAddressable, Record, Generic[ET]):
 
         # Hydrate string to type
         if isinstance(data, str):
-            resolved = Entity.dereference_cls_name(data)
+            resolved = _resolve_obj_cls(data)
             if resolved:
-                data = resolved
+                data = _map_to_active_entity(resolved)
             else:
                 raise ValueError(f"Could not resolve obj_cls {data}")
 
         logger.debug(f"resolved to {data}")
 
         # Validate that it is a class and Entity subclass (or None)
-        if not (data is Entity or (isclass(data) and issubclass(data, Entity))):
+        if not _is_entity_subclass(data):
             raise ValueError(f"obj_cls must be Entity or subclass, got {data}")
 
         return data

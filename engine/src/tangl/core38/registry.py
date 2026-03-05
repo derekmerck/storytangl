@@ -46,7 +46,7 @@ See Also
 
 """
 from __future__ import annotations
-from typing import TypeVar, Generic, Iterator, Iterable, Optional, Self, TypeAlias
+from typing import Any, TypeVar, Generic, Iterator, Iterable, Optional, Self, TypeAlias
 from uuid import UUID
 import itertools
 import logging
@@ -203,27 +203,71 @@ class Registry(Entity, Generic[ET]):
         else:
             yield from sorted(values, key=sort_key)
 
-    def find_all(self, selector: Selector = None, sort_key=None) -> Iterator[ET]:
-        """Yield members matching ``selector`` and optional ``sort_key``."""
+    @staticmethod
+    def _normalize_selector(
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Selector | None:
+        """Normalize v38 selectors and legacy criteria kwargs.
+
+        Compatibility notes
+        -------------------
+        Legacy callers frequently use:
+        - ``find_one(label="foo")``
+        - ``find_one(identifier=...)``
+        - ``find_one(<identifier>)``
+
+        v38 canonical shape is ``find_one(selector=Selector(...))``.
+        This helper accepts both forms.
+        """
+        if isinstance(selector, dict):
+            criteria = {**selector, **criteria}
+            selector = None
+        elif selector is not None and not isinstance(selector, Selector):
+            selector = Selector.from_identifier(selector)
+
+        if selector is None and not criteria:
+            return None
+        if selector is None:
+            return Selector(**criteria)
+        if criteria:
+            return selector.with_criteria(**criteria)
+        return selector
+
+    def find_all(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        sort_key=None,
+        **criteria: Any,
+    ) -> Iterator[ET]:
+        """Yield members matching selector/criteria and optional sort key."""
+        selector = self._normalize_selector(selector, **criteria)
         values = self.members.values()
         return self._filter_and_sort(values, selector=selector, sort_key=sort_key)
 
-    def find_one(self, selector: Selector = None, sort_key=None) -> Optional[ET]:
+    def find_one(
+        self,
+        selector: Selector | dict[str, Any] | Any = None,
+        sort_key=None,
+        **criteria: Any,
+    ) -> Optional[ET]:
         """Return first match from :meth:`find_all`, or ``None``."""
-        return next(self.find_all(selector, sort_key=sort_key), None)
+        return next(self.find_all(selector, sort_key=sort_key, **criteria), None)
 
     @classmethod
     def chain_find_all(
         cls,
         *registries: Self,
-        selector: Selector = None,
+        selector: Selector | dict[str, Any] | Any = None,
         sort_key=None,
+        **criteria: Any,
     ) -> Iterator[ET]:
         """Yield matches across registries in argument order.
 
         Use ``next(Registry.chain_find_all(...), None)`` for one-off first-match
         behavior.
         """
+        selector = cls._normalize_selector(selector, **criteria)
         values = itertools.chain.from_iterable(r.members.values() for r in registries)
         return cls._filter_and_sort(values, selector=selector, sort_key=sort_key)
 
@@ -249,6 +293,14 @@ class Registry(Entity, Generic[ET]):
         """Return registry member values."""
         return self.members.values()
 
+    def keys(self):
+        """Legacy mapping alias for member UUID keys."""
+        return self.members.keys()
+
+    def items(self):
+        """Legacy mapping alias for ``(uid, member)`` pairs."""
+        return self.members.items()
+
     def clear(self) -> None:
         """Remove all members."""
         self.members.clear()
@@ -262,6 +314,14 @@ class Registry(Entity, Generic[ET]):
     def __iter__(self) -> Iterator[ET]:
         # iter values not keys, gets '__contains__(item)' for free
         return iter(self.members.values())
+
+    def __contains__(self, item: Any) -> bool:
+        """Support both UUID-key and member-instance containment checks."""
+        if isinstance(item, UUID):
+            return item in self.members
+        if hasattr(item, "uid"):
+            return getattr(item, "uid") in self.members
+        return item in self.members.values()
 
     def __getitem__(self, key: UUID):
         return self.get(key)
@@ -333,7 +393,10 @@ class RegistryAware(Entity):
     def registry(self) -> Registry[RegistryAware] | None:
         return self._registry
 
-    def __init__(self, registry = None, **kwargs) -> None:
+    def __init__(self, registry=None, graph=None, **kwargs) -> None:
+        if registry is None and graph is not None:
+            # Compatibility alias: legacy graph items are commonly built with graph=...
+            registry = graph
         super().__init__(**kwargs)
         if registry is not None:
             registry.add(self)
@@ -352,14 +415,19 @@ class RegistryAware(Entity):
         """Return first owning :class:`HierarchicalGroup`, if present."""
         if self.registry is None:
             return None
-        return self.registry.find_one(
-            Selector(has_kind=HierarchicalGroup,
-                     has_member=self))
+        selector = Selector(has_kind=HierarchicalGroup, has_member=self)
+        find_one = getattr(self.registry, "find_one")
+        try:
+            return find_one(selector)
+        except TypeError:
+            # Legacy registries accept only criteria kwargs.
+            return find_one(has_kind=HierarchicalGroup, has_member=self)
 
     def _invalidate_parent_attr(self):
         # On reparent
-        if hasattr(self, "parent"):
-            delattr(self, "parent")
+        # `parent` is typically a cached_property; pop the cached value directly
+        # so property-only compatibility overrides do not raise on `delattr`.
+        self.__dict__.pop("parent", None)
 
 RT: TypeAlias = RegistryAware
 

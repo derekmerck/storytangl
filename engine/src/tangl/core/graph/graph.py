@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 import warnings
 from uuid import UUID
-from typing import Optional, Iterator, Iterable, TYPE_CHECKING
+from typing import Any, Optional, Iterator, Iterable, TYPE_CHECKING
 import functools
 
 from pydantic import Field, model_validator
@@ -56,13 +56,13 @@ class GraphItem(Entity):
     - :meth:`path` – dotted label path from root to self.
     - :meth:`_invalidate_parent_attr` – clear cached parent on re-parenting.
     """
-    graph: Graph = Field(default=None, exclude=True)
+    graph: Any = Field(default=None, exclude=True)
     # graph is for local dereferencing only, do not serialize to prevent recursions
     # hold id only for peer graph items to prevent recursions, see edge
 
     @model_validator(mode='after')
     def _register_with_graph(self):
-        if self.graph is not None:
+        if self.graph is not None and hasattr(self.graph, "add"):
             self.graph.add(self)
         return self
 

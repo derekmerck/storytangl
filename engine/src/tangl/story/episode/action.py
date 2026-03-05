@@ -2,10 +2,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Optional, Any
 
-from tangl.core import Node, BaseFragment, Graph
+from tangl.core.graph import Node, Graph
+from tangl.core.record import BaseFragment
 from tangl.journal.discourse import ChoiceFragment
 from tangl.story.runtime import ContentRenderer
-from tangl.vm import ChoiceEdge, Context
+from tangl.vm.context import Context
+from tangl.vm.frame import ChoiceEdge
 from tangl.vm.runtime import HasConditions, HasEffects
 from tangl.vm.provision import Dependency
 

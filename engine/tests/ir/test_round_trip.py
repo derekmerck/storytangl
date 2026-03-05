@@ -134,11 +134,11 @@ def test_yaml_story_script_roundtrips():
 
     assert script.scenes['intro'].label == "intro"
     assert isinstance(script.scenes['intro'], SceneScript)
-    from tangl.story.episode import Scene
+    from tangl.story import Scene
     assert script.scenes['intro'].obj_cls_ is None
     assert script.scenes['intro'].obj_cls == Scene
     assert isinstance(script.templates['global_guard'], BaseScriptItem)
-    from tangl.story.concepts.actor import Actor
+    from tangl.story import Actor
     assert script.templates['global_guard'].obj_cls_ == Actor
 
     exported_dict = script.unstructure_as_template()

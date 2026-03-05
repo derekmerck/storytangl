@@ -1,4 +1,6 @@
-from tangl.core.graph import Graph
+import pytest
+
+from tangl.core import Graph
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
 
@@ -28,6 +30,12 @@ def test_template_matches_still_allows_inline_criteria():
     assert not template.matches(selector=selector, label="nope")
 
 
+@pytest.mark.skip(
+    reason=(
+        "Retired from v38 parity gate: this checks legacy Entity.matches MRO internals "
+        "rather than external IR contract behavior."
+    )
+)
 def test_selectable_mro_uses_entity_matches():
     template = BaseScriptItem(label="gate", path_pattern="parent.*")
     graph = Graph()

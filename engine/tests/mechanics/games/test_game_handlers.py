@@ -6,7 +6,7 @@ import pytest
 
 from tangl.core import Graph
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
-from tangl.story.episode import Action, Block
+from tangl.story import Action, Block
 from tangl.mechanics.games.handlers import (
     generate_game_journal,
     inject_game_context,
@@ -61,22 +61,48 @@ def game_graph() -> Graph:
     return Graph(label="game_graph")
 
 
+def _add_node(graph: Graph, *, kind, **attrs):
+    try:
+        return graph.add_node(kind=kind, **attrs)
+    except TypeError:
+        return graph.add_node(obj_cls=kind, **attrs)
+
+
 @pytest.fixture()
 def game_block(game_graph: Graph) -> GameBlock:
-    return game_graph.add_node(obj_cls=GameBlock, label="game_block")
+    return _add_node(game_graph, kind=GameBlock, label="game_block")
 
 
 def make_frame(graph: Graph, cursor_id):
-    frame = Frame(graph=graph, cursor_id=cursor_id, cursor_history=[cursor_id])
-    # build context to attach _frame on the instance
-    _ = frame.context
+    cursor = graph.get(cursor_id)
+    try:
+        frame = Frame(graph=graph, cursor=cursor)
+    except TypeError:
+        frame = Frame(graph=graph, cursor_id=cursor_id, cursor_history=[cursor_id])
+    if not hasattr(frame, "cursor_history"):
+        frame.cursor_history = [cursor_id]
+    elif not frame.cursor_history:
+        frame.cursor_history = [cursor_id]
     return frame
+
+
+def make_ctx(frame: Frame):
+    if hasattr(frame, "context"):
+        ctx = frame.context
+    else:
+        ctx = frame._make_ctx(
+            incoming_edge=getattr(frame, "selected_edge", None),
+            incoming_payload=getattr(frame, "selected_payload", None),
+        )
+    if not hasattr(ctx, "_frame"):
+        object.__setattr__(ctx, "_frame", frame)
+    return ctx
 
 
 class TestSetupHandler:
     def test_setup_on_first_visit_initializes_game(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         assert game_block.game.phase is GamePhase.PENDING
 
@@ -86,10 +112,9 @@ class TestSetupHandler:
         assert game_block.locals["game_initialized"] is True
 
     def test_setup_skips_on_revisit(self, game_graph: Graph, game_block: GameBlock):
-        frame = Frame(
-            graph=game_graph, cursor_id=game_block.uid, cursor_history=[game_block.uid, game_block.uid]
-        )
-        ctx = frame.context
+        frame = make_frame(game_graph, game_block.uid)
+        frame.cursor_history = [game_block.uid, game_block.uid]
+        ctx = make_ctx(frame)
 
         setup_game_on_first_visit(game_block, ctx=ctx)
 
@@ -98,7 +123,7 @@ class TestSetupHandler:
 
     def test_setup_idempotent_when_ready(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         game_block.game_handler.setup(game_block.game)
         game_block.locals.clear()
@@ -112,7 +137,7 @@ class TestSetupHandler:
 class TestProvisioningHandler:
     def test_moves_provisioned_when_ready(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         game_block.game.phase = GamePhase.READY
 
@@ -126,7 +151,7 @@ class TestProvisioningHandler:
 
     def test_no_moves_when_not_ready(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         game_block.game.phase = GamePhase.PENDING
 
@@ -156,7 +181,7 @@ class TestUpdateHandler:
 
     def test_move_ignored_without_payload(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         game_block.game_handler.setup(game_block.game)
         frame.selected_edge = Action(
@@ -175,7 +200,7 @@ class TestUpdateHandler:
 class TestJournalHandler:
     def test_journal_generation_from_last_round(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         game_block.game_handler.setup(game_block.game)
         action = Action(
@@ -196,7 +221,7 @@ class TestJournalHandler:
 
     def test_no_fragments_without_round(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         fragments = generate_game_journal(game_block, ctx=ctx)
 
@@ -206,7 +231,7 @@ class TestJournalHandler:
 class TestContextHandler:
     def test_context_exports_predicates(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
-        ctx = frame.context
+        ctx = make_ctx(frame)
 
         game_block.game.result = GameResult.DRAW
         game_block.game.round = 2

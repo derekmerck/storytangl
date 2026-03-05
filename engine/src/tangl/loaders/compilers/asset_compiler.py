@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from tangl.story.fabula.asset_manager import AssetManager
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tangl.story.fabula.asset_manager import AssetManager
 
 
 class AssetCompiler:

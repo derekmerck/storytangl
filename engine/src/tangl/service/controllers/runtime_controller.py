@@ -74,6 +74,14 @@ class RuntimeController(HasApiEndpoints):
             Optional exclusive ending marker. When provided, the slice ends at the
             marker immediately following ``end_marker``.
         """
+        if isinstance(ledger, Ledger38):
+            fragments = ledger.get_journal(limit=limit)
+            if current_only and fragments:
+                non_negative_steps = [f.step for f in fragments if getattr(f, "step", -1) >= 0]
+                if non_negative_steps:
+                    latest_step = max(non_negative_steps)
+                    fragments = [f for f in fragments if getattr(f, "step", -1) in {-1, latest_step}]
+            return list(fragments)
 
         marker = marker or "latest"
         marker_type = marker_type or "entry"
@@ -423,6 +431,19 @@ class RuntimeController(HasApiEndpoints):
         choice_payload: Any = None,
     ) -> RuntimeInfo:
         """Resolve a player choice and update the ledger cursor."""
+
+        if isinstance(ledger, Ledger38):
+            choice = ledger.graph.get(choice_id)
+            if choice is None:
+                raise InvalidOperationError(f"Choice {choice_id} not found")
+            ledger.resolve_choice(choice_id, choice_payload=choice_payload)
+            return RuntimeInfo.ok(
+                cursor_id=ledger.cursor_id,
+                step=ledger.step,
+                message="Choice resolved",
+                choice_label=getattr(choice, "label", None),
+                choice_id=str(choice_id),
+            )
 
         choice = frame.graph.get(choice_id)
         if not isinstance(choice, ChoiceEdge):

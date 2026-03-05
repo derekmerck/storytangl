@@ -311,7 +311,10 @@ class PhaseCtx:
 
         # Then each ancestor's child set (template/location neighborhood).
         if hasattr(cursor, "ancestors"):
-            for ancestor in cursor.ancestors:
+            ancestor_iter = getattr(cursor, "ancestors")
+            if callable(ancestor_iter):
+                ancestor_iter = ancestor_iter()
+            for ancestor in ancestor_iter or ():
                 children = getattr(ancestor, "children", None)
                 if callable(children):
                     add_group(children())
@@ -438,6 +441,11 @@ class Frame:
     return_stack: list[TraversableEdge] = field(default_factory=list)
     """Call edges awaiting return.  Shared reference from Ledger."""
 
+    # Compatibility bridge: legacy call sites register per-frame handlers here.
+    local_behaviors: BehaviorRegistry = field(
+        default_factory=lambda: BehaviorRegistry(label="frame.local.dispatch")
+    )
+
     cursor_steps: int = 0
     """Number of cursor movements in this frame's lifetime."""
 
@@ -468,6 +476,37 @@ class Frame:
     _random: Random = field(default_factory=Random)
     selected_edge: AnyTraversableEdge | None = None
     selected_payload: Any = None
+
+    @staticmethod
+    def _compat_task_name(task: Any) -> Any:
+        """Translate legacy phase enums to vm38 dispatch task labels."""
+        legacy_phase_map = {
+            10: "validate_edge",
+            20: "provision_node",
+            30: "get_prereqs",
+            40: "apply_update",
+            50: "render_journal",
+            60: "finalize_step",
+            70: "get_postreqs",
+        }
+        if task in legacy_phase_map:
+            return legacy_phase_map[task]
+        try:
+            value = int(task)
+        except (TypeError, ValueError):
+            return task
+        return legacy_phase_map.get(value, task)
+
+    def _inline_behaviors(self) -> list[Behavior]:
+        """Build inline behavior list with legacy task translation."""
+        inline: list[Behavior] = []
+        for behavior in self.local_behaviors.find_all():
+            mapped_task = self._compat_task_name(behavior.task)
+            if mapped_task == behavior.task:
+                inline.append(behavior)
+                continue
+            inline.append(behavior.model_copy(update={"task": mapped_task}))
+        return inline
 
     def __post_init__(self) -> None:
         """Seed RNG deterministically from graph state + cursor + starting step."""
@@ -505,9 +544,24 @@ class Frame:
             mark_soft_dirty_callback=self.mark_soft_dirty_callback,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty_callback,
             random=self._random,
+            inline_behaviors=self._inline_behaviors(),
             incoming_edge=incoming_edge,
             incoming_payload=incoming_payload,
         )
+
+    @property
+    def cursor_id(self) -> UUID:
+        """Legacy alias for ``cursor.uid``."""
+        return self.cursor.uid
+
+    @property
+    def step(self) -> int:
+        """Legacy alias for absolute step in this frame."""
+        return self.step_base + self.cursor_steps
+
+    def _invalidate_context(self) -> None:
+        """Legacy no-op compatibility hook (v38 context is per-hop)."""
+        return None
 
     @staticmethod
     def _resolve_incoming_payload(
@@ -642,7 +696,9 @@ class Frame:
         if entry_phase <= ResolutionPhase.PLANNING:
             ctx.current_phase = ResolutionPhase.PLANNING
             do_provision(self.cursor, ctx=ctx)
-            for successor in self.cursor.successors():
+            # Snapshot successors so provisioning handlers can add edges/items
+            # without invalidating the active iterator.
+            for successor in list(self.cursor.successors()):
                 if isinstance(successor, TraversableNode):
                     do_provision(successor, ctx=ctx)
 
