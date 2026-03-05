@@ -12,10 +12,9 @@ from tangl.vm import AnonymousEdge, Frame, ResolutionPhase as P
 
 from media.helpers import MediaWorld, build_world_with_logo_media_block
 
-if hasattr(Frame, "_make_ctx"):
-    pytestmark = pytest.mark.skip(
-        reason="Deferred media planning parity in vm38; tracked as a dedicated follow-up.",
-    )
+pytestmark = pytest.mark.skip(
+    reason="Deferred media planning parity; tracked as a dedicated follow-up.",
+)
 
 
 def _make_frame(story, block):

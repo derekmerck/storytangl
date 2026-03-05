@@ -132,7 +132,7 @@ class HasGame:
             The created node instance.
         """
 
-        from tangl.vm import ChoiceEdge, ResolutionPhase as P
+        from tangl.vm38 import ResolutionPhase as P, TraversableEdge as ChoiceEdge
 
         node = _add_node_compat(graph, kind=cls, label=label, **kwargs)
 

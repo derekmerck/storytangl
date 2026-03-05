@@ -378,6 +378,7 @@ scenes:
     assert compiled.resources is not None
     assert compiled.templates is compiled.bundle.template_registry
     assert "DomainCharacter" in compiled.domain.class_registry
+    assert compiled.domain.dispatch_registry in compiled.get_authorities()
     result = compiled.create_story("loader_story", init_mode=InitMode.LAZY)
     assert result.graph.initial_cursor_id is not None
     assert result.codec_id in {"near_native", "near_native_yaml"}

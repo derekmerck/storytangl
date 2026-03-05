@@ -1,8 +1,52 @@
-"""Legacy compatibility shim exposing service38 surface with lazy aliases."""
+"""Legacy compatibility shim exposing switchable service surfaces."""
 
 from __future__ import annotations
 
+import os
 from importlib import import_module
+from typing import Any
+
+
+_V38_VALUES = {"1", "true", "yes", "on", "v38", "new"}
+_LEGACY_VALUES = {"0", "false", "no", "off", "legacy", "old"}
+
+
+def _load(module_name: str, attr_name: str) -> Any:
+    return getattr(import_module(module_name), attr_name)
+
+
+def _pick(
+    symbol: str,
+    legacy_target: tuple[str, str],
+    v38_target: tuple[str, str],
+    *,
+    default: str = "v38",
+):
+    raw_value = os.getenv(
+        f"TANGL_SHIM_SERVICE_{symbol}",
+        os.getenv("TANGL_SHIM_SERVICE_DEFAULT", default),
+    )
+    selected = str(raw_value).strip().lower()
+    if selected in _LEGACY_VALUES:
+        return _load(*legacy_target)
+    if selected in _V38_VALUES:
+        return _load(*v38_target)
+    raise ValueError(
+        f"Invalid shim value '{raw_value}' for TANGL_SHIM_SERVICE_{symbol}. "
+        f"Use one of {sorted(_LEGACY_VALUES | _V38_VALUES)}."
+    )
+
+
+ApiEndpoint = _pick(
+    "APIENDPOINT",
+    ("tangl.service.api_endpoint", "ApiEndpoint"),
+    ("tangl.service38.api_endpoint", "ApiEndpoint38"),
+)
+Orchestrator = _pick(
+    "ORCHESTRATOR",
+    ("tangl.service.orchestrator", "Orchestrator"),
+    ("tangl.service38.orchestrator", "Orchestrator38"),
+)
 
 _EXPORT_MAP: dict[str, tuple[str, str]] = {
     # Legacy endpoint contract surface.
@@ -10,9 +54,6 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "HasApiEndpoints": ("tangl.service.api_endpoint", "HasApiEndpoints"),
     "MethodType": ("tangl.service.api_endpoint", "MethodType"),
     "ResponseType": ("tangl.service.api_endpoint", "ResponseType"),
-    # Primary v38 aliases.
-    "ApiEndpoint": ("tangl.service38.api_endpoint", "ApiEndpoint38"),
-    "Orchestrator": ("tangl.service38.orchestrator", "Orchestrator38"),
     # Explicit v38 exports.
     "ApiEndpoint38": ("tangl.service38.api_endpoint", "ApiEndpoint38"),
     "EndpointPolicy": ("tangl.service38.api_endpoint", "EndpointPolicy"),
@@ -35,7 +76,7 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "user_id_by_key": ("tangl.service38.auth", "user_id_by_key"),
 }
 
-__all__ = sorted(_EXPORT_MAP)
+__all__ = sorted(set(_EXPORT_MAP) | {"ApiEndpoint", "Orchestrator"})
 
 
 def __getattr__(name: str):

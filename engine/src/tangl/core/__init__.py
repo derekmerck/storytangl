@@ -25,7 +25,7 @@ _V38_VALUES = {"1", "true", "yes", "on", "v38", "new"}
 _LEGACY_VALUES = {"0", "false", "no", "off", "legacy", "old"}
 
 
-def _pick(symbol: str, legacy_value, v38_value, *, default: str = "legacy"):
+def _pick(symbol: str, legacy_value, v38_value, *, default: str = "v38"):
     raw_value = os.getenv(
         f"TANGL_SHIM_CORE_{symbol}",
         os.getenv("TANGL_SHIM_CORE_DEFAULT", default),

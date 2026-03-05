@@ -2,24 +2,20 @@
 
 from __future__ import annotations
 
-from inspect import signature
 from uuid import UUID
 
-from tangl.core import Graph
+from tangl.core38 import Graph
 from tangl.mechanics.games import Game, GameHandler, GamePhase, RoundResult, HasGame
-from tangl.story import Block
+from tangl.story38 import Block
+from tangl.vm38 import ResolutionPhase as P
 
 
 def _add_node(graph: Graph, *, kind, **attrs):
-    if "kind" in signature(graph.add_node).parameters:
-        return graph.add_node(kind=kind, **attrs)
-    return graph.add_node(obj_cls=kind, **attrs)
+    return graph.add_node(kind=kind, **attrs)
 
 
 def _edge_available(edge, ns: dict[str, bool]) -> bool:
-    if "ns" in signature(edge.available).parameters:
-        return bool(edge.available(ns=ns))
-    return bool(edge.available(ns))
+    return bool(edge.available(ns=ns))
 
 
 class SampleGame(Game):
@@ -109,8 +105,6 @@ class TestGameBlockFactory:
         assert hasattr(block, "game_handler")
 
     def test_factory_creates_victory_edge(self) -> None:
-        from tangl.vm import ResolutionPhase as P
-
         graph = Graph(label="test")
         victory = _add_node(graph, kind=Block, label="victory")
 

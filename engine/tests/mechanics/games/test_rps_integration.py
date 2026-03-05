@@ -2,14 +2,12 @@ from __future__ import annotations
 
 """Integration tests covering RPS gameplay through the VM pipeline."""
 
-from inspect import signature
-
-from tangl.core import BaseFragment, Graph, StreamRegistry
+from tangl.core38 import Graph
 from tangl.mechanics.games import GamePhase, GameResult, HasGame
 from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler, RpsMove
-from tangl.story import Block
+from tangl.story38 import Block
 from tangl.mechanics.games.handlers import provision_game_moves
-from tangl.vm import ChoiceEdge, Ledger, get_visit_count
+from tangl.vm38 import Frame, Ledger, TraversableEdge as ChoiceEdge, get_visit_count
 
 
 class RpsBlock(HasGame, Block):
@@ -17,41 +15,23 @@ class RpsBlock(HasGame, Block):
 
 
 def _add_node(graph: Graph, *, kind, **attrs):
-    if "kind" in signature(graph.add_node).parameters:
-        return graph.add_node(kind=kind, **attrs)
-    return graph.add_node(obj_cls=kind, **attrs)
+    return graph.add_node(kind=kind, **attrs)
 
 
 def _make_ledger(graph: Graph, start_node: Block) -> Ledger:
-    if hasattr(Ledger, "from_graph"):
-        return Ledger.from_graph(graph=graph, entry_id=start_node.uid)
-    ledger = Ledger(graph=graph, cursor_id=start_node.uid, records=StreamRegistry())
-    ledger.cursor_history.append(start_node.uid)
-    return ledger
+    return Ledger.from_graph(graph=graph, entry_id=start_node.uid)
 
 
-def _frame_ctx(frame):
-    if hasattr(Ledger, "from_graph"):
-        return frame._make_ctx()
-    return frame.context
+def _frame_ctx(frame: Frame):
+    return frame._make_ctx()
 
 
 def _resolve_edge(ledger: Ledger, edge: ChoiceEdge, *, choice_payload=None) -> None:
-    if hasattr(ledger, "resolve_choice"):
-        ledger.resolve_choice(edge.uid, choice_payload=choice_payload)
-        return
-
-    frame = ledger.get_frame()
-    frame.selected_edge = edge
-    frame.resolve_choice(edge)
-    ledger.cursor_id = frame.cursor_id
-    ledger.step = frame.step
+    ledger.resolve_choice(edge.uid, choice_payload=choice_payload)
 
 
 def _journal_fragments(ledger: Ledger):
-    if hasattr(ledger, "get_journal"):
-        return ledger.get_journal()
-    return list(ledger.records.find_all(is_instance=BaseFragment))
+    return ledger.get_journal()
 
 
 def test_complete_rps_game_to_victory():

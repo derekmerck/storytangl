@@ -9,31 +9,27 @@ Terminology:
 These tests validate what exists and propose what might be needed.
 """
 from __future__ import annotations
+
 from uuid import UUID
-from tangl.core import Graph, OrderedRegistry, StreamRegistry
-from tangl.vm import Frame, ChoiceEdge, Ledger
+
+from tangl.core38 import Graph, OrderedRegistry
+from tangl.vm38 import Frame, Ledger, TraversableEdge as ChoiceEdge
+from tangl.vm38.replay import StepRecord
 
 
-def _make_frame(graph: Graph, cursor_id: UUID, records: OrderedRegistry | StreamRegistry | None = None):
+def _make_frame(graph: Graph, cursor_id: UUID, records: OrderedRegistry | None = None):
     cursor = graph.get(cursor_id)
-    if hasattr(Frame, "_make_ctx"):
-        kwargs = {"graph": graph, "cursor": cursor}
-        if records is not None:
-            kwargs["output_stream"] = records
-        return Frame(**kwargs)
-    kwargs = {"graph": graph, "cursor_id": cursor_id}
+    kwargs = {"graph": graph, "cursor": cursor}
     if records is not None:
-        kwargs["records"] = records
+        kwargs["output_stream"] = records
     return Frame(**kwargs)
 
 
 def _make_ledger(graph: Graph, cursor_id: UUID):
-    if hasattr(Ledger, "from_graph"):
-        ledger = Ledger.from_graph(graph=graph, entry_id=cursor_id)
-        if hasattr(ledger, "output_stream") and not isinstance(ledger.output_stream, OrderedRegistry):
-            ledger.output_stream = OrderedRegistry()
-        return ledger
-    return Ledger(graph=graph, cursor_id=cursor_id, records=StreamRegistry())
+    ledger = Ledger.from_graph(graph=graph, entry_id=cursor_id)
+    if not isinstance(ledger.output_stream, OrderedRegistry):
+        ledger.output_stream = OrderedRegistry()
+    return ledger
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -404,24 +400,12 @@ class TestMarkerBasedRoundTracking:
         node = g.add_node(label="game")
         
         loop = ChoiceEdge(graph=g, source_id=node.uid, destination_id=node.uid)
-        
-        if hasattr(Ledger, "resolve_choice"):
-            from tangl.vm38.replay import StepRecord
 
-            ledger = _make_ledger(g, node.uid)
-            for _ in range(3):
-                ledger.resolve_choice(loop.uid)
-            step_records = [
-                record for record in ledger.output_stream.values()
-                if isinstance(record, StepRecord)
-            ]
-            assert len(step_records) >= 3
-            return
-
-        records = StreamRegistry()
-        frame = _make_frame(g, node.uid, records=records)
-        frame.follow_edge(loop)
-        frame.follow_edge(loop)
-        frame.follow_edge(loop)
-        step_markers = records.markers["frame"]
-        assert len(step_markers) >= 3
+        ledger = _make_ledger(g, node.uid)
+        for _ in range(3):
+            ledger.resolve_choice(loop.uid)
+        step_records = [
+            record for record in ledger.output_stream.values()
+            if isinstance(record, StepRecord)
+        ]
+        assert len(step_records) >= 3

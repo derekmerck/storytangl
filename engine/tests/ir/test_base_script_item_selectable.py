@@ -4,6 +4,13 @@ from tangl.core import Graph
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only selector contract (`has_ancestor_tags` + Entity.matches internals); "
+        "ancestor-tag scope gates are retired in v38."
+    )
+)
+
 
 def test_template_gates_on_scope_via_selector():
     template = BaseScriptItem(label="cop", ancestor_tags={"town"})

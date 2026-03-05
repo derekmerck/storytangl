@@ -1,7 +1,16 @@
 """Test that template dicts auto-convert to BaseScriptItem with correct paths."""
 
+import pytest
+
 from tangl.ir.core_ir import BaseScriptItem
 from tangl.ir.story_ir import StoryScript
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only StoryScript front-end tree conversion/path inference; "
+        "v38 parity is owned by codec/compiler plus core38 template group tests."
+    )
+)
 
 
 def test_templates_convert_to_basescriptitem():

@@ -142,7 +142,7 @@ def provision_game_moves(
         accepting player input.
     """
 
-    from tangl.story import Action
+    from tangl.story38 import Action
 
     cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):

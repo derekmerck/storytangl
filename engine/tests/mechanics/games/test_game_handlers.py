@@ -2,13 +2,11 @@ from __future__ import annotations
 
 """Unit tests for VM handlers integrating :class:`HasGame`."""
 
-from inspect import signature
-
 import pytest
 
-from tangl.core import Graph
+from tangl.core38 import Graph
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
-from tangl.story import Action, Block
+from tangl.story38 import Action, Block
 from tangl.mechanics.games.handlers import (
     generate_game_journal,
     inject_game_context,
@@ -16,7 +14,7 @@ from tangl.mechanics.games.handlers import (
     provision_game_moves,
     setup_game_on_first_visit,
 )
-from tangl.vm import Frame
+from tangl.vm38 import Frame
 
 
 class SampleGame(Game):
@@ -64,9 +62,7 @@ def game_graph() -> Graph:
 
 
 def _add_node(graph: Graph, *, kind, **attrs):
-    if "kind" in signature(graph.add_node).parameters:
-        return graph.add_node(kind=kind, **attrs)
-    return graph.add_node(obj_cls=kind, **attrs)
+    return graph.add_node(kind=kind, **attrs)
 
 
 @pytest.fixture()
@@ -76,10 +72,7 @@ def game_block(game_graph: Graph) -> GameBlock:
 
 def make_frame(graph: Graph, cursor_id):
     cursor = graph.get(cursor_id)
-    if hasattr(Frame, "_make_ctx"):
-        frame = Frame(graph=graph, cursor=cursor)
-    else:
-        frame = Frame(graph=graph, cursor_id=cursor_id, cursor_history=[cursor_id])
+    frame = Frame(graph=graph, cursor=cursor)
     if not hasattr(frame, "cursor_history"):
         frame.cursor_history = [cursor_id]
     elif not frame.cursor_history:
@@ -88,13 +81,10 @@ def make_frame(graph: Graph, cursor_id):
 
 
 def make_ctx(frame: Frame):
-    if hasattr(Frame, "_make_ctx"):
-        ctx = frame._make_ctx(
-            incoming_edge=getattr(frame, "selected_edge", None),
-            incoming_payload=getattr(frame, "selected_payload", None),
-        )
-    else:
-        ctx = frame.context
+    ctx = frame._make_ctx(
+        incoming_edge=getattr(frame, "selected_edge", None),
+        incoming_payload=getattr(frame, "selected_payload", None),
+    )
     if not hasattr(ctx, "_frame"):
         object.__setattr__(ctx, "_frame", frame)
     return ctx

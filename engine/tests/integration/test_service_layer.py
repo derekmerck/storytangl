@@ -4,8 +4,8 @@ from typing import Any
 from uuid import UUID
 
 from tangl.core38 import Selector
-from tangl.service import Orchestrator
 from tangl.service.controllers import RuntimeController
+from tangl.service38 import Orchestrator38
 from tangl.service.user.user import User
 from tangl.story38 import InitMode, World38
 from tangl.story38.episode import Action
@@ -61,12 +61,12 @@ def _first_choice_edge(ledger: Ledger38) -> Action:
     return next(ledger.cursor.edges_out(Selector(has_kind=Action, trigger_phase=None)))
 
 
-def _create_story38_session() -> tuple[Orchestrator, _InMemoryPersistence, User, Ledger38]:
+def _create_story38_session() -> tuple[Orchestrator38, _InMemoryPersistence, User, Ledger38]:
     persistence = _InMemoryPersistence()
     user = User(label="integration-user")
     persistence.save(user)
 
-    orchestrator = Orchestrator(persistence)
+    orchestrator = Orchestrator38(persistence)
     orchestrator.register_controller(RuntimeController)
     orchestrator.set_endpoint_policy(
         "RuntimeController.create_story38",

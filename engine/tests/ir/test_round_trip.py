@@ -7,6 +7,14 @@ import yaml
 from tangl.ir.core_ir import MasterScript, BaseScriptItem
 from tangl.ir.story_ir import StoryScript, SceneScript
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only IR/YAML round-trip shape; v38 parity is validated in core38 template "
+        "compile/decompile and template-registry roundtrip tests."
+    )
+)
+
+
 def dict_compare(d1, d2):
     """Recursively compares two dictionaries and returns the differences."""
     if d1 == d2:

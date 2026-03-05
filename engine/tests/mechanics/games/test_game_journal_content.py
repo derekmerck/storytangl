@@ -9,10 +9,12 @@ from tangl.story import Block, LegacyStoryGraph as StoryGraph
 from tangl.mechanics.games import Game, HasGame
 from tangl.journal.content import ContentFragment
 
-if not hasattr(Frame, "run_phase"):
-    pytestmark = pytest.mark.skip(
-        reason="Legacy story-dispatch journal internals are retired in vm38 mode.",
-    )
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Retired from v38 parity gate: this module asserts legacy story-dispatch journal "
+        "internals rather than v38-observable mechanics contracts."
+    ),
+)
 
 
 class TestGame(Game):

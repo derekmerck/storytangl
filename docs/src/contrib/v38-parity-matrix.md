@@ -36,7 +36,7 @@ This experiment is now the active migration recipe:
 - Keep or reintroduce a retired test only when it demonstrates a legitimately missing feature relied on by another non-retiring area.
 - For media while v37/v38 mechanics are in transition, keep only stable contracts (resource indexing and RIT/URL dereference shape); retire legacy phase-runner/media-dependency internal assertions.
 
-## Secondary Scope File Matrix (Integration/Loaders/IR, 2026-03-04 pass 2)
+## Secondary Scope File Matrix (Integration/Loaders/IR, 2026-03-05 pass 3)
 | path | disposition | rationale | status |
 |---|---|---|---|
 | `engine/tests/integration/test_choice_availability_e2e.py` | `RETIRE_LEGACY_INTERNAL` | Hard-coupled to `LegacyStoryGraph` + legacy phase runner internals; no longer a v38 contract gate. | retired (module skipped) |
@@ -49,8 +49,39 @@ This experiment is now the active migration recipe:
 | `engine/tests/loaders/test_round_tripping.py` | `RETIRE_LEGACY_INTERNAL` | Relied on legacy ScriptManager template-shape assumptions that do not map 1:1 to story38 template bundle/runtime representation. | retired (module skipped) |
 | `engine/tests/loaders/test_world_bundle.py` | `KEEP_DIRECT` | Bundle manifest/path normalization contract is runtime-neutral and still required. | kept |
 | `engine/tests/loaders/test_world_manifest.py` | `KEEP_DIRECT` | Manifest schema/normalization contract is runtime-neutral and still required. | kept |
-| `engine/tests/ir/test_base_script_item_selectable.py::test_selectable_mro_uses_entity_matches` | `RETIRE_LEGACY_INTERNAL` | Explicitly checks legacy `Entity.matches` MRO mechanics; not a v38 external behavior contract. | retired (test skipped) |
-| `engine/tests/ir/* (remaining)` | `KEEP_ADAPT` | IR serialization/template-shorthand/path contracts remain relevant to loader/story38 ingest behavior. | kept |
+| `engine/tests/ir/test_base_script_item_path.py` | `RETIRE_LEGACY_INTERNAL` | Asserts live parent-chain path semantics from legacy `HierarchicalTemplate`; v38 scope parity is covered by core38 `admission_scope` tests. | retired (module skipped) |
+| `engine/tests/ir/test_base_script_item_selectable.py` | `RETIRE_LEGACY_INTERNAL` | Depends on legacy `Entity.matches` selector internals and `ancestor_tags` scope gates; those contracts are retired for v38 parity. | retired (module skipped) |
+| `engine/tests/ir/test_script_item_selection.py` | `RETIRE_LEGACY_INTERNAL` | Validates legacy criteria shape (`has_path` + `has_ancestor_tags`) rather than v38 template admission behavior. | retired (module skipped) |
+| `engine/tests/ir/test_template_field_conversion.py` | `RETIRE_MOVED` | Front-end tree conversion (`visit_field` + implicit path inference) belongs to codec/compiler migration track, not core template parity. | retired (module skipped) |
+| `engine/tests/ir/test_round_trip.py` | `RETIRE_MOVED` | YAML IR round-trip asserts legacy script shape; equivalent parity is already covered by core38 template compile/decompile/roundtrip tests. | retired (module skipped) |
+| `engine/tests/ir/test_script_round_trip.py` | `RETIRE_REMOVED` | `ancestor_tags` serialization is no longer a v38 template feature; scope matching now maps to admission-scope semantics. | retired (module skipped) |
+| `engine/tests/ir/{test_base_script_item.py,test_block_media_script.py,test_ir.py,test_role_setting_scripts.py,test_role_setting_shorthands.py,test_scene_block_templates.py}` | `KEEP_ADAPT` | These still validate active IR schema/shorthand/reference/media parsing contracts not duplicated by core38 template unit coverage. | kept |
+
+### IR Coverage Hand-Off to `core38.template`
+- Scope admission behavior (`path_pattern` parity lane) is covered by:
+  - `engine/tests/core38/template/test_template.py::test_admitted_to_matches_scope_prefix`
+  - `engine/tests/core38/template/test_template.py::test_admitted_to_non_wildcard_scope_requires_leaf_segment`
+  - `engine/tests/core38/template/test_template.py::test_selector_can_filter_with_admitted_to`
+- Template compile/decompile and round-trip behavior is covered by:
+  - `engine/tests/core38/template/test_template.py::test_unstructure_structure_roundtrip`
+  - `engine/tests/core38/template/test_template.py::test_template_group_decompile_roundtrip`
+  - `engine/tests/core38/template/test_template.py::test_template_group_compile_yields_depth_first`
+
+## IR Legacy-Only Triage Snapshot (2026-03-05 pass 4)
+- Module-level skips added for legacy IR mechanics now covered by `core38.template` or moved to compiler/codec migration:
+  - `engine/tests/ir/test_base_script_item_path.py`
+  - `engine/tests/ir/test_base_script_item_selectable.py`
+  - `engine/tests/ir/test_script_item_selection.py`
+  - `engine/tests/ir/test_template_field_conversion.py`
+  - `engine/tests/ir/test_round_trip.py`
+  - `engine/tests/ir/test_script_round_trip.py`
+- Validation runs:
+  - Command: `poetry run pytest -q engine/tests/ir`
+  - Result: `22 passed, 17 skipped, 1 xfailed`
+  - Command: `poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
 
 ## Deferred Track: Media Planning (2026-03-04)
 - Status: deferred by design for a dedicated follow-up track.
@@ -63,8 +94,8 @@ This experiment is now the active migration recipe:
 
 ## Non-Retiring Blast Snapshot (2026-03-04)
 - Validation run:
-  - Command: `poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story`
-  - Result: `1639 passed, 46 skipped, 10 xfailed`
+  - Command: `poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1640 passed, 48 skipped, 10 xfailed`
 - Full-v38 toggle validation run (updated):
   - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
   - Result: `1636 passed, 52 skipped, 10 xfailed`
@@ -97,7 +128,7 @@ This experiment is now the active migration recipe:
   - deferred/retired skip reasons are unchanged; no new trivial feature-gap regressions were introduced in this pass.
 
 ## Domain Registration + Persistence Snapshot (2026-03-04 pass 5)
-- Domain class registration now accepts explicit core38 entity inheritance even when top-level shims default to legacy:
+- Domain class registration now accepts explicit core38 entity inheritance (recorded before shim package defaults were later flipped to v38):
   - `tangl.story.fabula.domain_manager._is_entity_subclass(...)` includes `tangl.core38.Entity`.
   - `load_domain_module(...)` excludes `Entity38` base types from registration.
 - Domain facet now explicitly exposes dispatch authorities for runtime38 world authority cascades:
@@ -123,6 +154,29 @@ This experiment is now the active migration recipe:
   - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
   - Result: `1636 passed, 52 skipped, 10 xfailed`
 
+## VM/Story Surface Cleanup Snapshot (2026-03-04 pass 6)
+- Mechanics game tests now run v38-native surfaces directly (core38/vm38/story38) with constructor-vocabulary compatibility branches removed:
+  - `engine/tests/mechanics/games/test_has_game.py`
+  - `engine/tests/mechanics/games/test_game_handlers.py`
+  - `engine/tests/mechanics/games/test_rps_integration.py`
+  - `engine/tests/mechanics/games/test_step_turn_round.py`
+- Mechanics runtime sources aligned to v38 edge/action classes to avoid mixed-lane edge objects:
+  - `engine/src/tangl/mechanics/games/has_game.py` uses `vm38.TraversableEdge`/`ResolutionPhase` in game-block edge wiring.
+  - `engine/src/tangl/mechanics/games/handlers.py` provisions `story38.Action` edges.
+- Runtime38 loader parity assertion expanded:
+  - `engine/tests/story38/test_story38_init.py::test_loader_compiler_runtime_38_path` now asserts domain dispatch registry presence in `compiled.get_authorities()`.
+- Deferred media planning now uses explicit module skip in `engine/tests/media/test_system_media_integration.py` (consistent with deferred-track policy).
+- Focused validation run:
+  - Command: `poetry run pytest -q engine/tests/mechanics/games/test_has_game.py engine/tests/mechanics/games/test_game_handlers.py engine/tests/mechanics/games/test_rps_integration.py engine/tests/mechanics/games/test_step_turn_round.py`
+  - Result: `33 passed`
+- Non-retiring blast validation:
+  - Default lane: `1640 passed, 48 skipped, 10 xfailed`
+  - Full-v38 lane: `1636 passed, 52 skipped, 10 xfailed`
+- Remaining callsite inventory (current):
+  - VM constructor/vocabulary: `2` active helper callsites (`frame._make_ctx()` in mechanics tests), `16` legacy callsites in skipped/deferred modules (`integration/*`, `media/*`, `test_game_journal_content.py`).
+  - Domain registration/authority: `0` active blockers; `1` remaining legacy entity import callsite in skipped runtime37 loader fixture.
+  - IR/template authoring: `1` core bridge file (`tangl.ir.core_ir.base_script_model` -> `HierarchicalTemplate`) plus associated IR tests; this remains the architectural migration tail.
+
 ## Remaining Shim Work (Primary)
 - `core.factory` remains active in IR authoring models:
   - `engine/src/tangl/ir/core_ir/base_script_model.py` still subclasses legacy `HierarchicalTemplate`.
@@ -144,14 +198,50 @@ This experiment is now the active migration recipe:
   - `tangl.story`:
     - package default: `TANGL_SHIM_STORY_DEFAULT`
     - per symbol: `TANGL_SHIM_STORY_ACTION|BLOCK|SCENE|STORYGRAPH`
+  - `tangl.service`:
+    - package default: `TANGL_SHIM_SERVICE_DEFAULT`
+    - per symbol: `TANGL_SHIM_SERVICE_APIENDPOINT|ORCHESTRATOR`
 - Value semantics:
   - legacy: `legacy/old/0/false/off`
   - v38: `v38/new/1/true/on`
-- Default behavior is unchanged (non-retiring blast remains green with no env overrides).
+- Initial switchboard rollout kept package defaults unchanged; later cutover to v38 defaults is tracked under
+  `Shim Default Cutover (2026-03-05)`.
 - First canary cut:
   - Command: `TANGL_SHIM_STORY_BLOCK=v38 poetry run pytest ... --maxfail=20`
   - Result: `10 failed, 1629 passed, 46 skipped, 10 xfailed`
   - Signal: expected mixed-runtime breakage in mechanics/media paths that combine legacy story graph/runtime with a v38 block type.
+
+### Service Switchboard Validation (2026-03-05)
+- Added service switchboard in `tangl.service` for `ApiEndpoint` and `Orchestrator`.
+- Active integration service smoke now imports v38 orchestrator directly (`engine/tests/integration/test_service_layer.py`),
+  retiring dependence on shim-selected legacy service behavior.
+- Retired `engine/tests/mechanics/games/test_game_journal_content.py` from parity gate as legacy story-dispatch internals.
+- Non-retiring gate with service forced to v38:
+  - Command: `TANGL_SHIM_SERVICE_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+- Full-v38 gate with service forced to v38:
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 TANGL_SHIM_SERVICE_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+- Legacy canary (service default legacy):
+  - Command: `TANGL_SHIM_SERVICE_DEFAULT=legacy poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+  - Signal: no remaining non-retiring dependence on legacy `tangl.service.Orchestrator`.
+- Per-symbol canaries (service default v38):
+  - Command: `TANGL_SHIM_SERVICE_DEFAULT=v38 TANGL_SHIM_SERVICE_ORCHESTRATOR=legacy poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+  - Command: `TANGL_SHIM_SERVICE_DEFAULT=v38 TANGL_SHIM_SERVICE_APIENDPOINT=legacy poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+
+### Shim Default Cutover (2026-03-05)
+- Compatibility package defaults now prefer v38 while preserving env overrides:
+  - `tangl.core`: `_pick(..., default="v38")`
+  - `tangl.vm`: `_pick(..., default="v38")`
+  - `tangl.story`: `_pick(..., default="v38")`
+- Validation:
+  - Command: `poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
+  - Command: `TANGL_SHIM_CORE_DEFAULT=legacy TANGL_SHIM_VM_DEFAULT=legacy TANGL_SHIM_STORY_DEFAULT=legacy TANGL_SHIM_SERVICE_DEFAULT=legacy poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1621 passed, 68 skipped, 9 xfailed`
 
 ### Switchboard Deep-Dive (2026-03-04)
 - Toggle matrix against the same non-retiring gate:

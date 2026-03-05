@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
 
 # todo: merge with template tests, nothing script-ish
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only HierarchicalTemplate parent/path semantics; v38 parity is covered by "
+        "core38 template admission_scope tests."
+    )
+)
 
 
 def test_global_template_path_equals_plain_label() -> None:
