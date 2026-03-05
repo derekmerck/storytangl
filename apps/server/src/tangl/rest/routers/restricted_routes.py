@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import Body, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel
 
 from tangl.config import settings
-from tangl.rest.dependencies import get_orchestrator, get_user_locks
-from tangl.rest.dependencies38 import get_service_adapter38, resolve_user_auth38
-from tangl.service import Orchestrator
-from tangl.service.response import RuntimeInfo
+from tangl.rest.dependencies38 import (
+    get_service_adapter38,
+    get_user_locks38,
+    resolve_user_auth38,
+)
+from tangl.service.exceptions import AccessDeniedError
 from tangl.service38 import GatewayRestAdapter38
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -22,25 +26,34 @@ class DebugExprRequest(BaseModel):
     node_id: UniqueLabel | None = None
 
 
-def _call_legacy(
-    orchestrator: Orchestrator,
+def _call_endpoint38(
+    adapter: GatewayRestAdapter38,
     endpoint_name: str,
     /,
     *,
+    render_profile: str = "raw",
     user_id=None,
-    **params,
-):
-    kwargs = dict(params)
-    if user_id is not None:
-        kwargs["user_id"] = user_id
-    return orchestrator.execute(endpoint_name, **kwargs)
+    user_auth=None,
+    **params: Any,
+) -> Any:
+    try:
+        return adapter.gateway.execute_endpoint(
+            endpoint_name,
+            user_id=user_id,
+            user_auth=user_auth,
+            render_profile=render_profile,
+            **params,
+        )
+    except AccessDeniedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @story_router.put("/go", tags=["Restricted"])
 async def goto_story_block(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks=Depends(get_user_locks),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
         default=None,
@@ -49,23 +62,23 @@ async def goto_story_block(
     block_id: UniqueLabel = Query(example="scene_1/block_1"),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
-    """Jump the active frame to ``block_id`` via the legacy orchestrator path."""
-    _ = render_profile
+    """Jump the active frame to ``block_id``."""
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     async with user_locks[user_auth.user_id]:
-        return _call_legacy(
-            orchestrator,
+        return _call_endpoint38(
+            adapter,
             "RuntimeController.jump_to_node",
+            render_profile=render_profile,
             user_id=user_auth.user_id,
+            user_auth=user_auth,
             node_id=block_id,
         )
 
 
 @story_router.get("/inspect", tags=["Restricted"])
 async def inspect_story_node(
-    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks=Depends(get_user_locks),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
         default=None,
@@ -76,15 +89,16 @@ async def inspect_story_node(
         description="Optional node identifier; defaults to current cursor node.",
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-) -> RuntimeInfo:
+) -> Any:
     """Return debug inspection info for the active node (or a specific node)."""
-    _ = render_profile
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     async with user_locks[user_auth.user_id]:
-        return _call_legacy(
-            orchestrator,
+        return _call_endpoint38(
+            adapter,
             "RuntimeController.get_node_info",
+            render_profile=render_profile,
             user_id=user_auth.user_id,
+            user_auth=user_auth,
             node_id=node_id,
         )
 
@@ -92,24 +106,24 @@ async def inspect_story_node(
 @story_router.post("/check", tags=["Restricted"])
 async def check_expression(
     request: DebugExprRequest = Body(...),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks=Depends(get_user_locks),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
         default=None,
         alias="X-API-Key",
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-) -> RuntimeInfo:
+) -> Any:
     """Evaluate a debug expression in the active story context."""
-    _ = render_profile
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     async with user_locks[user_auth.user_id]:
-        return _call_legacy(
-            orchestrator,
+        return _call_endpoint38(
+            adapter,
             "RuntimeController.check_expr",
+            render_profile=render_profile,
             user_id=user_auth.user_id,
+            user_auth=user_auth,
             expr=request.expr,
             node_id=request.node_id,
         )
@@ -118,24 +132,24 @@ async def check_expression(
 @story_router.post("/apply", tags=["Restricted"])
 async def apply_effect_post(
     request: DebugExprRequest = Body(...),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks=Depends(get_user_locks),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
         default=None,
         alias="X-API-Key",
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-) -> RuntimeInfo:
+) -> Any:
     """Apply a debug expression in the active story context."""
-    _ = render_profile
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     async with user_locks[user_auth.user_id]:
-        return _call_legacy(
-            orchestrator,
+        return _call_endpoint38(
+            adapter,
             "RuntimeController.apply_effect",
+            render_profile=render_profile,
             user_id=user_auth.user_id,
+            user_auth=user_auth,
             expr=request.expr,
             node_id=request.node_id,
         )
@@ -144,20 +158,18 @@ async def apply_effect_post(
 @story_router.put("/apply", tags=["Restricted"])
 async def apply_effect_put(
     request: DebugExprRequest = Body(...),
-    orchestrator: Orchestrator = Depends(get_orchestrator),
     adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks=Depends(get_user_locks),
+    user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
         default=None,
         alias="X-API-Key",
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-) -> RuntimeInfo:
+) -> Any:
     """Compatibility alias for :route:`POST /story/apply`."""
     return await apply_effect_post(
         request=request,
-        orchestrator=orchestrator,
         adapter=adapter,
         user_locks=user_locks,
         api_key=api_key,

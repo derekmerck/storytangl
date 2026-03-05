@@ -23,17 +23,77 @@ from tangl.service38.api_endpoint import (
 from tangl.story38.fabula import World38
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.ordered_tuple_dict import OrderedTupleDict
+from tangl.utils.sanitize_str import sanitize_str
 
 
 _MANUAL_WORLDS38: dict[str, World38] = {}
+
+
+def _legacy_world_label(script_data: dict[str, Any]) -> str | None:
+    metadata = script_data.get("metadata")
+    if isinstance(metadata, dict):
+        title = metadata.get("title")
+        if isinstance(title, str) and title.strip():
+            return sanitize_str(title).lower()
+
+    raw_label = script_data.get("label")
+    if isinstance(raw_label, str) and raw_label.strip():
+        return sanitize_str(raw_label).lower()
+    return None
+
+
+def _world38_from_legacy_world(legacy_world: Any) -> World38:
+    """Compile a temporary ``World38`` view from a loaded legacy world singleton."""
+    script_manager = getattr(legacy_world, "script_manager", None)
+    master_script = getattr(script_manager, "master_script", None)
+    if master_script is None or not hasattr(master_script, "model_dump"):
+        raise ValueError(f"Legacy world '{legacy_world}' does not expose script data")
+
+    script_data = master_script.model_dump(mode="python")
+    if not isinstance(script_data, dict):
+        raise ValueError(f"Legacy world '{legacy_world}' produced invalid script data")
+
+    metadata = script_data.setdefault("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+        script_data["metadata"] = metadata
+    legacy_metadata = getattr(legacy_world, "metadata", None)
+    if isinstance(legacy_metadata, dict):
+        for key, value in legacy_metadata.items():
+            metadata.setdefault(key, value)
+
+    world_label = str(getattr(legacy_world, "label", "story38_world"))
+    script_data.setdefault("label", world_label)
+
+    world38 = World38.from_script_data(
+        script_data=script_data,
+        domain=getattr(legacy_world, "domain_manager", None),
+        assets=getattr(legacy_world, "asset_manager", None),
+        resources=getattr(legacy_world, "resource_manager", None),
+    )
+    world38.label = world_label
+    return world38
 
 
 def resolve_world38(world_id: str) -> World38:
     """Resolve a world from in-memory overrides or filesystem registry."""
     if world_id in _MANUAL_WORLDS38:
         return _MANUAL_WORLDS38[world_id]
+
     registry = WorldRegistry()
-    world = registry.get_world(world_id, runtime_version="38")
+    try:
+        world = registry.get_world(world_id, runtime_version="38")
+    except ValueError:
+        from tangl.story.fabula.world import World as LegacyWorld
+
+        legacy_world = LegacyWorld.get_instance(world_id)
+        if legacy_world is None:
+            raise
+
+        bridged_world = _world38_from_legacy_world(legacy_world)
+        _MANUAL_WORLDS38[world_id] = bridged_world
+        return bridged_world
+
     if not isinstance(world, World38):
         raise TypeError(f"Expected story38 world for '{world_id}', got {type(world)!r}")
     return world
@@ -126,7 +186,7 @@ class WorldController(HasApiEndpoints):
         return media_obj.get_content(**kwargs)
 
     @ApiEndpoint38.annotate(
-        access_level=AccessLevel.RESTRICTED,
+        access_level=AccessLevel.USER,
         method_type=MethodType.CREATE,
         response_type=ResponseType.RUNTIME,
         binds=(),
@@ -147,12 +207,15 @@ class WorldController(HasApiEndpoints):
             raise ValueError("script_data is required to load a world")
 
         world = World38.from_script_data(script_data=script_data)
+        legacy_label = _legacy_world_label(script_data)
+        if legacy_label:
+            world.label = legacy_label
         _MANUAL_WORLDS38[world.label] = world
         return RuntimeInfo.ok(message="World loaded", world_label=world.label)
 
     @ApiEndpoint38.annotate(
         preprocessors=[_dereference_world_id],
-        access_level=AccessLevel.RESTRICTED,
+        access_level=AccessLevel.USER,
         method_type=MethodType.DELETE,
         response_type=ResponseType.RUNTIME,
         binds=(),

@@ -337,8 +337,18 @@ class StoryCompiler38:
 
     @staticmethod
     def _build_payload(kind: type[Entity], payload: dict[str, Any], default_label: str) -> Entity:
+        payload = dict(payload)
+
+        if isinstance(payload.get("effects"), list):
+            normalized_effects: list[dict[str, Any]] = []
+            for effect in payload["effects"]:
+                if isinstance(effect, str):
+                    normalized_effects.append({"expr": effect})
+                elif isinstance(effect, dict):
+                    normalized_effects.append(dict(effect))
+            payload["effects"] = normalized_effects
+
         if kind is Action:
-            payload = dict(payload)
             if payload.get("successor_ref") is None:
                 mapped_ref = payload.get("successor") or payload.get("target_ref") or payload.get("target_node")
                 if mapped_ref is not None:

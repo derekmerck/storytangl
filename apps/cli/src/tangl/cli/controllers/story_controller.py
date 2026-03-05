@@ -87,6 +87,7 @@ class StoryController(CommandSet):
                     label = (
                         getattr(choice_frag, "label", None)
                         or getattr(choice_frag, "content", "")
+                        or getattr(choice_frag, "text", "")
                         or getattr(choice_frag, "source_label", "")
                     )
                     active = getattr(choice_frag, "active", True)
@@ -107,6 +108,7 @@ class StoryController(CommandSet):
                 label = (
                     getattr(fragment, "label", None)
                     or getattr(fragment, "content", "")
+                    or getattr(fragment, "text", "")
                     or getattr(fragment, "source_label", "")
                 )
                 active = getattr(fragment, "active", True)

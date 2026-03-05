@@ -41,8 +41,8 @@ class WorldController(CommandSet):
     @with_argparser(script_path_parser)
     def do_load_script(self, args: argparse.Namespace) -> None:
         import yaml
+
         script_data = yaml.safe_load(args.script_path.read_text())
-        from tangl.story.fabula.world import World
         result = self._call_legacy(
             "WorldController.load_world",
             script_data=script_data,
@@ -55,11 +55,14 @@ class WorldController(CommandSet):
         world_label = None
         if hasattr(result, "details") and result.details:
             world_label = result.details.get("world_label")
-        world = World.get_instance(world_label) if world_label else None
 
         title = None
-        if world is not None and world.script_manager is not None:
-            title = world.script_manager.get_story_metadata().get("title")
+        if isinstance(script_data, dict):
+            metadata = script_data.get("metadata")
+            if isinstance(metadata, dict):
+                raw_title = metadata.get("title")
+                if isinstance(raw_title, str) and raw_title.strip():
+                    title = raw_title.strip()
 
         title_text = title or world_label or "<unknown>"
         out = f"Loaded world: {title_text}"

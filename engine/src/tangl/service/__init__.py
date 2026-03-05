@@ -37,16 +37,18 @@ def _pick(
     )
 
 
-ApiEndpoint = _pick(
-    "APIENDPOINT",
-    ("tangl.service.api_endpoint", "ApiEndpoint"),
-    ("tangl.service38.api_endpoint", "ApiEndpoint38"),
-)
-Orchestrator = _pick(
-    "ORCHESTRATOR",
-    ("tangl.service.orchestrator", "Orchestrator"),
-    ("tangl.service38.orchestrator", "Orchestrator38"),
-)
+_DYNAMIC_EXPORT_MAP: dict[str, tuple[tuple[str, str], tuple[str, str], str]] = {
+    "ApiEndpoint": (
+        ("tangl.service.api_endpoint", "ApiEndpoint"),
+        ("tangl.service38.api_endpoint", "ApiEndpoint38"),
+        "v38",
+    ),
+    "Orchestrator": (
+        ("tangl.service.orchestrator", "Orchestrator"),
+        ("tangl.service38.orchestrator", "Orchestrator38"),
+        "v38",
+    ),
+}
 
 _EXPORT_MAP: dict[str, tuple[str, str]] = {
     # Legacy endpoint contract surface.
@@ -76,10 +78,17 @@ _EXPORT_MAP: dict[str, tuple[str, str]] = {
     "user_id_by_key": ("tangl.service38.auth", "user_id_by_key"),
 }
 
-__all__ = sorted(set(_EXPORT_MAP) | {"ApiEndpoint", "Orchestrator"})
+__all__ = sorted(set(_EXPORT_MAP) | set(_DYNAMIC_EXPORT_MAP))
 
 
 def __getattr__(name: str):
+    dynamic_target = _DYNAMIC_EXPORT_MAP.get(name)
+    if dynamic_target is not None:
+        legacy_target, v38_target, default = dynamic_target
+        value = _pick(name.upper(), legacy_target, v38_target, default=default)
+        globals()[name] = value
+        return value
+
     target = _EXPORT_MAP.get(name)
     if target is None:
         raise AttributeError(name)
