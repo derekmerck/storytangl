@@ -25,7 +25,8 @@ def _load_ledger(payload):
 def test_ledger_roundtrip_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="test_node")
-    ledger = Ledger(graph=graph, cursor_id=node.uid, cursor_steps=42)
+    ledger = Ledger.from_graph(graph=graph, entry_id=node.uid)
+    ledger.step = 42
     # ledger.domains.append(SingletonDomain(label="demo_domain"))
     ledger.push_snapshot()
 
@@ -44,7 +45,7 @@ def test_ledger_roundtrip_all_backends(manager):
 def test_event_sourced_rebuild_all_backends(manager):
     graph = Graph()
     node = graph.add_node(label="event_node")
-    ledger = Ledger(graph=graph, cursor_id=node.uid)
+    ledger = Ledger.from_graph(graph=graph, entry_id=node.uid)
     ledger.push_snapshot()
 
     manager.save(ledger)
@@ -52,5 +53,5 @@ def test_event_sourced_rebuild_all_backends(manager):
     retrieved = manager.get(ledger.uid)
     restored = _load_ledger(retrieved)
 
-    assert restored.records.last(is_instance=CheckpointRecord) is not None
+    assert restored.output_stream.last(is_instance=CheckpointRecord) is not None
     assert restored.graph.find_one(label="event_node") is not None

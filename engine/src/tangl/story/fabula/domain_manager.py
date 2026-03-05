@@ -1,12 +1,13 @@
 """Helpers for resolving domain-specific classes within a story world."""
 from __future__ import annotations
-from typing import Optional, Type
+from typing import Iterable, Optional, Type
 import importlib
 import inspect
 import logging
 
 from tangl.core import BehaviorRegistry, Entity, Node
 from tangl.core.entity import Entity as LegacyEntity
+from tangl.core38 import Entity as Entity38
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -15,7 +16,7 @@ logger.setLevel(logging.WARNING)
 def _is_entity_subclass(candidate: object) -> bool:
     if not inspect.isclass(candidate):
         return False
-    for base in (Entity, LegacyEntity):
+    for base in (Entity, LegacyEntity, Entity38):
         if not isinstance(base, type):
             continue
         try:
@@ -52,6 +53,7 @@ class DomainManager:
     - :meth:`register_class` – register aliases.
     - :meth:`resolve_class` – resolve script values.
     - :meth:`load_domain_module` – bulk-register subclasses from a module.
+    - :meth:`get_authorities` – expose domain dispatch authorities for runtime38 world facets.
     - :attr:`dispatch_registry` – :class:`~tangl.core.dispatch.BehaviorRegistry`
       for domain handlers.
     """
@@ -106,5 +108,9 @@ class DomainManager:
         """Import ``module_path`` and register discovered :class:`Entity` subclasses."""
         module = importlib.import_module(module_path)
         for name, obj in inspect.getmembers(module, inspect.isclass):
-            if _is_entity_subclass(obj) and obj not in {Entity, LegacyEntity}:
+            if _is_entity_subclass(obj) and obj not in {Entity, LegacyEntity, Entity38}:
                 self.register_class(name, obj)
+
+    def get_authorities(self) -> Iterable[BehaviorRegistry]:
+        """Return dispatch authorities contributed by this domain facet."""
+        return (self.dispatch_registry,)

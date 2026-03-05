@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """Integration tests covering RPS gameplay through the VM pipeline."""
 
+from inspect import signature
+
 from tangl.core import BaseFragment, Graph, StreamRegistry
 from tangl.mechanics.games import GamePhase, GameResult, HasGame
 from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler, RpsMove
@@ -15,10 +17,9 @@ class RpsBlock(HasGame, Block):
 
 
 def _add_node(graph: Graph, *, kind, **attrs):
-    try:
+    if "kind" in signature(graph.add_node).parameters:
         return graph.add_node(kind=kind, **attrs)
-    except TypeError:
-        return graph.add_node(obj_cls=kind, **attrs)
+    return graph.add_node(obj_cls=kind, **attrs)
 
 
 def _make_ledger(graph: Graph, start_node: Block) -> Ledger:
@@ -30,9 +31,9 @@ def _make_ledger(graph: Graph, start_node: Block) -> Ledger:
 
 
 def _frame_ctx(frame):
-    if hasattr(frame, "context"):
-        return frame.context
-    return frame._make_ctx()
+    if hasattr(Ledger, "from_graph"):
+        return frame._make_ctx()
+    return frame.context
 
 
 def _resolve_edge(ledger: Ledger, edge: ChoiceEdge, *, choice_payload=None) -> None:

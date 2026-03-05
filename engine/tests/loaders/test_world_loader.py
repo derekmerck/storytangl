@@ -424,7 +424,7 @@ def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None
     (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
     (domain_pkg / "domain.py").write_text(
         """
-from tangl.core import Entity
+from tangl.core38 import Entity
 
 
 class DomainCharacter(Entity):
@@ -449,6 +449,7 @@ class DomainCharacter(Entity):
     assert world_one.templates is world_one.bundle.template_registry
     assert world_two.templates is world_two.bundle.template_registry
     assert "DomainCharacter" in world_one.domain.class_registry
+    assert world_one.domain.dispatch_registry in world_one.get_authorities()
 
 
 def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:
@@ -461,7 +462,7 @@ def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "domain.py").write_text(
         """
-from tangl.core import Entity
+from tangl.core38 import Entity
 
 
 class DomainCharacter(Entity):
@@ -499,6 +500,7 @@ scenes: {}
         assert isinstance(world, World38)
         assert world.domain is not None
         assert "DomainCharacter" in world.domain.class_registry
+        assert world.domain.dispatch_registry in world.get_authorities()
         assert str(bundle_root) in sys.path
         assert str(bundle.domain_dir) not in sys.path
     finally:

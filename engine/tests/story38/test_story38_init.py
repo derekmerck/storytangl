@@ -337,7 +337,7 @@ def test_loader_compiler_runtime_38_path(tmp_path: Path) -> None:
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "domain.py").write_text(
         """
-from tangl.core.entity import Entity
+from tangl.core38 import Entity
 
 
 class DomainCharacter(Entity):

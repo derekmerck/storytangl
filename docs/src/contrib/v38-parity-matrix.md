@@ -80,6 +80,49 @@ This experiment is now the active migration recipe:
   - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests/mechanics/games/test_has_game.py engine/tests/mechanics/games/test_game_handlers.py engine/tests/mechanics/games/test_rps_integration.py engine/tests/media/test_system_media_integration.py engine/tests/persistence/test_structuring_handler.py`
   - Result: `25 passed, 2 skipped`
 
+## VM Constructor Migration Snapshot (2026-03-04 pass 4)
+- Active mechanics game callsites now use explicit capability checks instead of exception-driven compatibility branches.
+  - Updated source/test adapters:
+    - `engine/src/tangl/mechanics/games/has_game.py`
+    - `engine/tests/mechanics/games/test_has_game.py`
+    - `engine/tests/mechanics/games/test_game_handlers.py`
+    - `engine/tests/mechanics/games/test_rps_integration.py`
+- Focused validation run:
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests/mechanics/games/test_has_game.py engine/tests/mechanics/games/test_game_handlers.py engine/tests/mechanics/games/test_rps_integration.py engine/tests/mechanics/games/test_step_turn_round.py`
+  - Result: `33 passed`
+- Full non-retiring lane remained stable:
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1636 passed, 52 skipped, 10 xfailed`
+- Skip inventory check:
+  - deferred/retired skip reasons are unchanged; no new trivial feature-gap regressions were introduced in this pass.
+
+## Domain Registration + Persistence Snapshot (2026-03-04 pass 5)
+- Domain class registration now accepts explicit core38 entity inheritance even when top-level shims default to legacy:
+  - `tangl.story.fabula.domain_manager._is_entity_subclass(...)` includes `tangl.core38.Entity`.
+  - `load_domain_module(...)` excludes `Entity38` base types from registration.
+- Domain facet now explicitly exposes dispatch authorities for runtime38 world authority cascades:
+  - `tangl.story.fabula.domain_manager.DomainManager.get_authorities()` returns the domain `dispatch_registry`.
+- Runtime38 loader coverage now authors domain classes against `tangl.core38.Entity` in active tests:
+  - `engine/tests/loaders/test_world_loader.py::test_compile_anthology_runtime38_shares_world_facets`
+  - `engine/tests/loaders/test_world_loader.py::test_compiler_adds_bundle_root_for_domain_imports`
+  - `engine/tests/story38/test_story38_init.py::test_loader_compiler_runtime_38_path`
+- Persistence vm38 vocabulary cleanup:
+  - `engine/tests/persistence/test_ledger_persistence.py` now uses `Ledger.from_graph(...)` and `output_stream` assertions.
+- Focused validation runs:
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests/loaders/test_world_loader.py::test_compile_anthology_runtime38_shares_world_facets engine/tests/loaders/test_world_loader.py::test_compiler_adds_bundle_root_for_domain_imports`
+  - Result: `2 passed`
+  - Command: `poetry run pytest -q engine/tests/loaders/test_world_loader.py::test_compile_anthology_runtime38_shares_world_facets engine/tests/loaders/test_world_loader.py::test_compiler_adds_bundle_root_for_domain_imports`
+  - Result: `2 passed` (verifies runtime38 domain registration without shim env overrides)
+  - Coverage expansion:
+    - loader runtime38 assertions now verify world authority exposure includes domain dispatch registry.
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests/persistence/test_ledger_persistence.py`
+  - Result: `14 passed, 8 skipped`
+  - Command: `poetry run pytest -q engine/tests/story38/test_story38_init.py::test_loader_compiler_runtime_38_path`
+  - Result: `1 passed`
+- Full non-retiring lane remained stable:
+  - Command: `TANGL_SHIM_CORE_DEFAULT=v38 TANGL_SHIM_VM_DEFAULT=v38 TANGL_SHIM_STORY_DEFAULT=v38 poetry run pytest -q engine/tests --ignore=engine/tests/core --ignore=engine/tests/service --ignore=engine/tests/vm --ignore=engine/tests/story --maxfail=200`
+  - Result: `1636 passed, 52 skipped, 10 xfailed`
+
 ## Remaining Shim Work (Primary)
 - `core.factory` remains active in IR authoring models:
   - `engine/src/tangl/ir/core_ir/base_script_model.py` still subclasses legacy `HierarchicalTemplate`.

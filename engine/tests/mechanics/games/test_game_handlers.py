@@ -2,6 +2,8 @@ from __future__ import annotations
 
 """Unit tests for VM handlers integrating :class:`HasGame`."""
 
+from inspect import signature
+
 import pytest
 
 from tangl.core import Graph
@@ -62,10 +64,9 @@ def game_graph() -> Graph:
 
 
 def _add_node(graph: Graph, *, kind, **attrs):
-    try:
+    if "kind" in signature(graph.add_node).parameters:
         return graph.add_node(kind=kind, **attrs)
-    except TypeError:
-        return graph.add_node(obj_cls=kind, **attrs)
+    return graph.add_node(obj_cls=kind, **attrs)
 
 
 @pytest.fixture()
@@ -75,9 +76,9 @@ def game_block(game_graph: Graph) -> GameBlock:
 
 def make_frame(graph: Graph, cursor_id):
     cursor = graph.get(cursor_id)
-    try:
+    if hasattr(Frame, "_make_ctx"):
         frame = Frame(graph=graph, cursor=cursor)
-    except TypeError:
+    else:
         frame = Frame(graph=graph, cursor_id=cursor_id, cursor_history=[cursor_id])
     if not hasattr(frame, "cursor_history"):
         frame.cursor_history = [cursor_id]
@@ -87,13 +88,13 @@ def make_frame(graph: Graph, cursor_id):
 
 
 def make_ctx(frame: Frame):
-    if hasattr(frame, "context"):
-        ctx = frame.context
-    else:
+    if hasattr(Frame, "_make_ctx"):
         ctx = frame._make_ctx(
             incoming_edge=getattr(frame, "selected_edge", None),
             incoming_payload=getattr(frame, "selected_payload", None),
         )
+    else:
+        ctx = frame.context
     if not hasattr(ctx, "_frame"):
         object.__setattr__(ctx, "_frame", frame)
     return ctx

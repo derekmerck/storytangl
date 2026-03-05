@@ -16,23 +16,24 @@ from tangl.vm import Frame, ChoiceEdge, Ledger
 
 def _make_frame(graph: Graph, cursor_id: UUID, records: OrderedRegistry | StreamRegistry | None = None):
     cursor = graph.get(cursor_id)
-    try:
+    if hasattr(Frame, "_make_ctx"):
         kwargs = {"graph": graph, "cursor": cursor}
         if records is not None:
             kwargs["output_stream"] = records
         return Frame(**kwargs)
-    except TypeError:
-        kwargs = {"graph": graph, "cursor_id": cursor_id}
-        if records is not None:
-            kwargs["records"] = records
-        return Frame(**kwargs)
+    kwargs = {"graph": graph, "cursor_id": cursor_id}
+    if records is not None:
+        kwargs["records"] = records
+    return Frame(**kwargs)
 
 
 def _make_ledger(graph: Graph, cursor_id: UUID):
-    try:
-        return Ledger(graph=graph, cursor_id=cursor_id, output_stream=OrderedRegistry())
-    except TypeError:
-        return Ledger(graph=graph, cursor_id=cursor_id, records=StreamRegistry())
+    if hasattr(Ledger, "from_graph"):
+        ledger = Ledger.from_graph(graph=graph, entry_id=cursor_id)
+        if hasattr(ledger, "output_stream") and not isinstance(ledger.output_stream, OrderedRegistry):
+            ledger.output_stream = OrderedRegistry()
+        return ledger
+    return Ledger(graph=graph, cursor_id=cursor_id, records=StreamRegistry())
 
 
 # ─────────────────────────────────────────────────────────────────────────────

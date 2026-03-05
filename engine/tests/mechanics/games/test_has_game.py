@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from inspect import signature
 from uuid import UUID
 
 from tangl.core import Graph
@@ -10,17 +11,15 @@ from tangl.story import Block
 
 
 def _add_node(graph: Graph, *, kind, **attrs):
-    try:
+    if "kind" in signature(graph.add_node).parameters:
         return graph.add_node(kind=kind, **attrs)
-    except TypeError:
-        return graph.add_node(obj_cls=kind, **attrs)
+    return graph.add_node(obj_cls=kind, **attrs)
 
 
 def _edge_available(edge, ns: dict[str, bool]) -> bool:
-    try:
+    if "ns" in signature(edge.available).parameters:
         return bool(edge.available(ns=ns))
-    except TypeError:
-        return bool(edge.available(ns))
+    return bool(edge.available(ns))
 
 
 class SampleGame(Game):
