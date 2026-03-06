@@ -9,7 +9,7 @@ from tangl.config import settings
 from tangl.core import Selector
 from tangl.rest.app import app
 from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
-from tangl.rest.dependencies38 import get_service_gateway38
+from tangl.rest.dependencies_gateway import get_service_gateway
 from tangl.service.user.user import User
 from tangl.service.api_endpoint import AccessLevel
 from tangl.story.episode import Action
@@ -157,13 +157,8 @@ def test_story38_status_returns_403_when_endpoint_is_restricted_for_non_privileg
     )
     assert create.status_code == 200
 
-    gateway = get_service_gateway38()
-    endpoint_name = (
-        "RuntimeController.get_story_info"
-        if "RuntimeController.get_story_info" in gateway.orchestrator._endpoints
-        else "RuntimeController.get_story_info38"
-    )
-    binding = gateway.orchestrator._endpoints[endpoint_name]
+    gateway = get_service_gateway()
+    binding = gateway.orchestrator._endpoints["RuntimeController.get_story_info"]
     previous_level = binding.endpoint.access_level
     binding.endpoint.access_level = AccessLevel.RESTRICTED
     try:

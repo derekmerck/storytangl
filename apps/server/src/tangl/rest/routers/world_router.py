@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
-from tangl.rest.dependencies38 import get_service_adapter38
+from tangl.rest.dependencies_gateway import get_service_adapter
 from tangl.service import GatewayRestAdapter, ServiceOperation
 
 
@@ -11,7 +11,7 @@ router = APIRouter(tags=["World"])
 
 @router.get("/{world_id}/info")
 async def get_world_info(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     world_id: str = Path(example="my_world"),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> dict:

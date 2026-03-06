@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_adapter38
+from tangl.rest.dependencies_gateway import get_service_adapter
 from tangl.service.exceptions import AccessDeniedError
 from tangl.service import GatewayRestAdapter, ServiceOperation
 from tangl.service.response import SystemInfo, UserSecret
@@ -56,7 +56,7 @@ def _serialize(value: Any) -> Any:
 
 @router.get("/info")
 async def get_system_info(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> SystemInfo:
     """Return high-level information about the running service."""
@@ -75,7 +75,7 @@ async def get_system_info(
 
 @router.get("/worlds")
 async def get_worlds(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> list[dict[str, object]]:
     """List the available worlds registered with the service."""
@@ -91,7 +91,7 @@ async def get_worlds(
 
 @router.get("/secret")
 async def get_key_for_secret(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserSecret:

@@ -29,7 +29,7 @@ class RuntimeController(HasApiEndpoints):
     """Runtime endpoints for story sessions."""
 
     @staticmethod
-    def _serialize_vm38_fragment(fragment: Any) -> dict[str, Any]:
+    def _serialize_fragment(fragment: Any) -> dict[str, Any]:
         if hasattr(fragment, "model_dump"):
             return fragment.model_dump(mode="json")
         if hasattr(fragment, "unstructure"):
@@ -174,7 +174,7 @@ class RuntimeController(HasApiEndpoints):
             )
         return fragments
 
-    def _runtime38_envelope(
+    def _runtime_envelope(
         self,
         *,
         ledger: Ledger,
@@ -182,7 +182,7 @@ class RuntimeController(HasApiEndpoints):
         metadata: dict[str, Any] | None = None,
     ) -> RuntimeEnvelope:
         serialized_fragments = [
-            self._serialize_vm38_fragment(fragment) for fragment in fragments
+            self._serialize_fragment(fragment) for fragment in fragments
         ]
         merged_metadata = dict(metadata or {})
         blockers = self._collect_blocker_diagnostics(serialized_fragments)
@@ -227,8 +227,8 @@ class RuntimeController(HasApiEndpoints):
         response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.USER,),
     )
-    def create_story38(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
-        """Create a story38 graph and bootstrap a vm38 ledger for ``user``."""
+    def create_story(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
+        """Create a story graph and bootstrap a runtime ledger for ``user``."""
         import tangl.story  # noqa: F401  # ensure story-level vm38 hooks are registered
 
         world = kwargs.pop("world", None)
@@ -245,7 +245,7 @@ class RuntimeController(HasApiEndpoints):
         init_result = world.create_story(story_label, init_mode=mode)
         story_graph = init_result.graph
         if story_graph.initial_cursor_id is None:
-            raise RuntimeError("Story38 graph did not define an initial cursor")
+            raise RuntimeError("Story graph did not define an initial cursor")
 
         ledger = Ledger.from_graph(graph=story_graph, entry_id=story_graph.initial_cursor_id)
         ledger.user = user
@@ -255,7 +255,7 @@ class RuntimeController(HasApiEndpoints):
 
         cursor_node = story_graph.get(ledger.cursor_id)
         cursor_label = cursor_node.label if cursor_node is not None else "unknown"
-        envelope = self._runtime38_envelope(
+        envelope = self._runtime_envelope(
             ledger=ledger,
             fragments=ledger.get_journal(),
             metadata={"world_id": world_id, "ledger_id": str(ledger.uid)},
@@ -264,7 +264,7 @@ class RuntimeController(HasApiEndpoints):
         return RuntimeInfo.ok(
             cursor_id=ledger.cursor_id,
             step=ledger.step,
-            message="Story38 created",
+            message="Story created",
             ledger_id=str(ledger.uid),
             world_id=world_id,
             title=story_graph.label,
@@ -283,41 +283,6 @@ class RuntimeController(HasApiEndpoints):
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
-        method_type=MethodType.CREATE,
-        response_type=ResponseType.RUNTIME,
-        binds=(ResourceBinding.USER,),
-    )
-    def create_story(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
-        """Canonical story-create endpoint backed by the v38 runtime surface."""
-        return self.create_story38(user=user, world_id=world_id, **kwargs)
-
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        method_type=MethodType.UPDATE,
-        response_type=ResponseType.RUNTIME,
-        binds=(ResourceBinding.LEDGER,),
-    )
-    def resolve_choice38(
-        self,
-        ledger: Ledger,
-        choice_id: UUID,
-        choice_payload: Any = None,
-    ) -> RuntimeInfo:
-        """Resolve one vm38 choice edge and return the latest runtime envelope."""
-        before_step = ledger.step
-        ledger.resolve_choice(choice_id, choice_payload=choice_payload)
-        fragments = ledger.get_journal(since_step=max(before_step + 1, 0))
-        envelope = self._runtime38_envelope(ledger=ledger, fragments=fragments)
-        return RuntimeInfo.ok(
-            cursor_id=ledger.cursor_id,
-            step=ledger.step,
-            message="Story38 choice resolved",
-            choice_id=str(choice_id),
-            envelope=envelope.model_dump(mode="json"),
-        )
-
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.LEDGER,),
@@ -328,34 +293,16 @@ class RuntimeController(HasApiEndpoints):
         choice_id: UUID,
         choice_payload: Any = None,
     ) -> RuntimeInfo:
-        """Canonical story-choice endpoint backed by the v38 runtime surface."""
-        return self.resolve_choice38(
-            ledger=ledger,
-            choice_id=choice_id,
-            choice_payload=choice_payload,
-        )
-
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        method_type=MethodType.READ,
-        response_type=ResponseType.RUNTIME,
-        binds=(ResourceBinding.LEDGER,),
-    )
-    def get_story_update38(
-        self,
-        ledger: Ledger,
-        *,
-        since_step: int | None = None,
-        limit: int = 0,
-    ) -> RuntimeInfo:
-        """Return vm38 ordered fragments in an envelope."""
-        effective_since = 0 if since_step is None else since_step
-        fragments = ledger.get_journal(since_step=effective_since, limit=limit)
-        envelope = self._runtime38_envelope(ledger=ledger, fragments=fragments)
+        """Resolve one choice edge and return the latest runtime envelope."""
+        before_step = ledger.step
+        ledger.resolve_choice(choice_id, choice_payload=choice_payload)
+        fragments = ledger.get_journal(since_step=max(before_step + 1, 0))
+        envelope = self._runtime_envelope(ledger=ledger, fragments=fragments)
         return RuntimeInfo.ok(
             cursor_id=ledger.cursor_id,
             step=ledger.step,
-            message="Story38 update",
+            message="Story choice resolved",
+            choice_id=str(choice_id),
             envelope=envelope.model_dump(mode="json"),
         )
 
@@ -372,11 +319,15 @@ class RuntimeController(HasApiEndpoints):
         since_step: int | None = None,
         limit: int = 0,
     ) -> RuntimeInfo:
-        """Canonical story-update endpoint backed by the v38 runtime surface."""
-        return self.get_story_update38(
-            ledger=ledger,
-            since_step=since_step,
-            limit=limit,
+        """Return ordered runtime fragments in an envelope."""
+        effective_since = 0 if since_step is None else since_step
+        fragments = ledger.get_journal(since_step=effective_since, limit=limit)
+        envelope = self._runtime_envelope(ledger=ledger, fragments=fragments)
+        return RuntimeInfo.ok(
+            cursor_id=ledger.cursor_id,
+            step=ledger.step,
+            message="Story update",
+            envelope=envelope.model_dump(mode="json"),
         )
 
     @ApiEndpoint.annotate(
@@ -429,13 +380,13 @@ class RuntimeController(HasApiEndpoints):
         response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.LEDGER,),
     )
-    def get_story_info38(self, ledger: Ledger) -> RuntimeInfo:
-        """Return vm38 session summary with no legacy marker assumptions."""
+    def get_story_info(self, ledger: Ledger) -> RuntimeInfo:
+        """Return session summary with no legacy marker assumptions."""
         cursor_node = ledger.graph.get(ledger.cursor_id)
         return RuntimeInfo.ok(
             cursor_id=ledger.cursor_id,
             step=ledger.step,
-            message="Story38 info",
+            message="Story info",
             cursor_label=cursor_node.label if cursor_node is not None else None,
             turn=ledger.turn,
             choice_steps=ledger.choice_steps,
@@ -443,49 +394,6 @@ class RuntimeController(HasApiEndpoints):
             journal_size=len(ledger.get_journal()),
             last_redirect=ledger.last_redirect,
             redirect_trace=ledger.redirect_trace,
-        )
-
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        method_type=MethodType.READ,
-        response_type=ResponseType.RUNTIME,
-        binds=(ResourceBinding.LEDGER,),
-    )
-    def get_story_info(self, ledger: Ledger) -> RuntimeInfo:
-        """Canonical story-status endpoint backed by the v38 runtime surface."""
-        return self.get_story_info38(ledger=ledger)
-
-    @ApiEndpoint.annotate(
-        access_level=AccessLevel.PUBLIC,
-        method_type=MethodType.DELETE,
-        response_type=ResponseType.RUNTIME,
-        binds=(ResourceBinding.USER, ResourceBinding.LEDGER),
-    )
-    def drop_story38(
-        self,
-        user: User,
-        ledger: Ledger | None = None,
-        *,
-        archive: bool = False,
-    ) -> RuntimeInfo:
-        """Clear the active vm38 story and optionally delete persisted ledger."""
-        current_ledger_id = getattr(user, "current_ledger_id", None)
-        if current_ledger_id is None:
-            raise ValueError("User has no active story to drop")
-
-        user.current_ledger_id = None
-        details: dict[str, Any] = {
-            "dropped_ledger_id": str(current_ledger_id),
-            "archived": archive,
-        }
-        if not archive:
-            details["_delete_ledger_id"] = str(current_ledger_id)
-
-        return RuntimeInfo.ok(
-            cursor_id=getattr(ledger, "cursor_id", None),
-            step=getattr(ledger, "step", None),
-            message="Story38 dropped",
-            **details,
         )
 
     @ApiEndpoint.annotate(
@@ -501,11 +409,24 @@ class RuntimeController(HasApiEndpoints):
         *,
         archive: bool = False,
     ) -> RuntimeInfo:
-        """Canonical story-drop endpoint backed by the v38 runtime surface."""
-        return self.drop_story38(
-            user=user,
-            ledger=ledger,
-            archive=archive,
+        """Clear the active story and optionally delete persisted ledger."""
+        current_ledger_id = getattr(user, "current_ledger_id", None)
+        if current_ledger_id is None:
+            raise ValueError("User has no active story to drop")
+
+        user.current_ledger_id = None
+        details: dict[str, Any] = {
+            "dropped_ledger_id": str(current_ledger_id),
+            "archived": archive,
+        }
+        if not archive:
+            details["_delete_ledger_id"] = str(current_ledger_id)
+
+        return RuntimeInfo.ok(
+            cursor_id=getattr(ledger, "cursor_id", None),
+            step=getattr(ledger, "step", None),
+            message="Story dropped",
+            **details,
         )
 
 

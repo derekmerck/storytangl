@@ -386,12 +386,12 @@ scenes:
     assert len(result.source_map["__source_files__"]) == 1
 
 
-def test_runtime_controller_create_story38_with_world_param() -> None:
+def test_runtime_controller_create_story_with_world_param() -> None:
     world = World38.from_script_data(script_data=_base_script())
     controller = RuntimeController()
     user = User(label="test-user")
 
-    result = controller.create_story38(
+    result = controller.create_story(
         user=user,
         world_id=world.label,
         world=world,
@@ -521,9 +521,14 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
 
 
 def test_story38_source_has_no_legacy_core_vm_imports() -> None:
-    src_root = Path(__file__).resolve().parents[2] / "src" / "tangl" / "story38"
+    src_root = Path(__file__).resolve().parents[2] / "src" / "tangl" / "story"
     assert src_root.exists(), str(src_root)
-    bad_markers = ("from tangl.core ", "from tangl.vm ", "import tangl.core", "import tangl.vm")
+    bad_markers = (
+        "from tangl.core38 ",
+        "from tangl.vm38 ",
+        "import tangl.core38",
+        "import tangl.vm38",
+    )
 
     for file_path in src_root.rglob("*.py"):
         text = file_path.read_text(encoding="utf-8")

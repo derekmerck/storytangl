@@ -11,8 +11,6 @@ from .orchestrator import Orchestrator
 
 DEFAULT_ENDPOINT_POLICIES: dict[str, dict[str, tuple[str, ...]]] = {
     "RuntimeController.create_story": {"persist_paths": ("details.ledger",)},
-    # Temporary compatibility while suffixed endpoint names are retired.
-    "RuntimeController.create_story38": {"persist_paths": ("details.ledger",)},
     "UserController.create_user": {"persist_paths": ("details.user",)},
 }
 

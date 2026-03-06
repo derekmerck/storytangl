@@ -123,25 +123,25 @@ class TestRuntimeControllerBindingMetadata:
         assert isinstance(endpoint, ApiEndpoint38)
         return endpoint
 
-    def test_create_story38_binds_user(self) -> None:
-        ep = self._ep("create_story38")
+    def test_create_story_binds_user(self) -> None:
+        ep = self._ep("create_story")
         assert ep.binds == (ResourceBinding.USER,)
         assert ep.access_level == AccessLevel.PUBLIC
 
-    def test_resolve_choice38_binds_ledger(self) -> None:
-        ep = self._ep("resolve_choice38")
+    def test_resolve_choice_binds_ledger(self) -> None:
+        ep = self._ep("resolve_choice")
         assert ep.binds == (ResourceBinding.LEDGER,)
 
-    def test_get_story_update38_binds_ledger(self) -> None:
-        ep = self._ep("get_story_update38")
+    def test_get_story_update_binds_ledger(self) -> None:
+        ep = self._ep("get_story_update")
         assert ep.binds == (ResourceBinding.LEDGER,)
 
-    def test_get_story_info38_binds_ledger(self) -> None:
-        ep = self._ep("get_story_info38")
+    def test_get_story_info_binds_ledger(self) -> None:
+        ep = self._ep("get_story_info")
         assert ep.binds == (ResourceBinding.LEDGER,)
 
-    def test_drop_story38_binds_user_and_ledger(self) -> None:
-        ep = self._ep("drop_story38")
+    def test_drop_story_binds_user_and_ledger(self) -> None:
+        ep = self._ep("drop_story")
         assert ep.binds is not None
         assert ResourceBinding.USER in ep.binds
         assert ResourceBinding.LEDGER in ep.binds
@@ -161,19 +161,19 @@ def test_story38_operation_tokens_route_to_registered_runtime_endpoints(
         assert endpoint_name in orchestrator._endpoints
 
 
-def test_create_story38_via_orchestrator_persists_ledger_when_policy_set(
+def test_create_story_via_orchestrator_persists_ledger_when_policy_set(
     orchestrator: Orchestrator38,
     persistence: _FakePersistence,
     world: World38,
     existing_user: User,
 ) -> None:
     orchestrator.set_endpoint_policy(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         persist_paths=("details.ledger",),
     )
 
     result = orchestrator.execute(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         user_id=existing_user.uid,
         world_id=world.label,
         world=world,
@@ -191,18 +191,18 @@ def test_create_story38_via_orchestrator_persists_ledger_when_policy_set(
     assert isinstance(details.get("envelope"), dict)
 
 
-def test_resolve_choice38_via_orchestrator_updates_cursor_and_step(
+def test_resolve_choice_via_orchestrator_updates_cursor_and_step(
     orchestrator: Orchestrator38,
     persistence: _FakePersistence,
     world: World38,
     existing_user: User,
 ) -> None:
     orchestrator.set_endpoint_policy(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         persist_paths=("details.ledger",),
     )
     created = orchestrator.execute(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         user_id=existing_user.uid,
         world_id=world.label,
         world=world,
@@ -219,7 +219,7 @@ def test_resolve_choice38_via_orchestrator_updates_cursor_and_step(
     choice = _first_choice_edge(ledger)
 
     resolved = orchestrator.execute(
-        "RuntimeController.resolve_choice38",
+        "RuntimeController.resolve_choice",
         user_id=existing_user.uid,
         choice_id=choice.uid,
     )
@@ -242,11 +242,11 @@ def test_gateway_story38_status_and_update_return_runtime_info(
     existing_user: User,
 ) -> None:
     orchestrator.set_endpoint_policy(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         persist_paths=("details.ledger",),
     )
     orchestrator.execute(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         user_id=existing_user.uid,
         world_id=world.label,
         world=world,
@@ -272,18 +272,18 @@ def test_gateway_story38_status_and_update_return_runtime_info(
     assert isinstance(envelope.get("fragments"), list)
 
 
-def test_drop_story38_via_orchestrator_deletes_ledger_and_unlinks_user(
+def test_drop_story_via_orchestrator_deletes_ledger_and_unlinks_user(
     orchestrator: Orchestrator38,
     persistence: _FakePersistence,
     world: World38,
     existing_user: User,
 ) -> None:
     orchestrator.set_endpoint_policy(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         persist_paths=("details.ledger",),
     )
     created = orchestrator.execute(
-        "RuntimeController.create_story38",
+        "RuntimeController.create_story",
         user_id=existing_user.uid,
         world_id=world.label,
         world=world,
@@ -294,11 +294,7 @@ def test_drop_story38_via_orchestrator_deletes_ledger_and_unlinks_user(
     assert isinstance(ledger, Ledger38)
     assert ledger.uid in persistence
 
-    dropped = orchestrator.execute(
-        "RuntimeController.drop_story38",
-        user_id=existing_user.uid,
-        archive=False,
-    )
+    dropped = orchestrator.execute("RuntimeController.drop_story", user_id=existing_user.uid, archive=False)
     assert isinstance(dropped, RuntimeInfo)
     assert dropped.status == "ok"
     details = dropped.details or {}
