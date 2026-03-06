@@ -119,7 +119,7 @@ CI now enforces the post-swap gate mode.
   canonical operation routing.
 - Validation:
   - Targeted service/app routes:
-    - `poetry run pytest -q engine/tests/service38/controllers/test_runtime_controller.py engine/tests/integration/test_service_layer.py apps/server/tests/test_rest_dependencies38.py apps/server/tests/test_story38_endpoints.py` → `16 passed`
+    - `poetry run pytest -q engine/tests/service38/controllers/test_runtime_controller.py engine/tests/integration/test_service_layer.py apps/server/tests/test_rest_gateway_dependencies.py apps/server/tests/test_story_runtime_endpoints.py` → `16 passed`
   - Full suite: `1658 passed, 71 skipped, 10 xfailed`
   - Post-swap import audit: pass (`IR bridge: 0`, legacy imports: `0`, `*38` imports: `0`)
 
@@ -133,10 +133,10 @@ CI now enforces the post-swap gate mode.
 - Removed temporary duplicate endpoint policy key
   `RuntimeController.create_story38` from service bootstrap defaults.
 - Renamed REST dependency function surface to canonical names and moved module:
-  - `apps/server/src/tangl/rest/dependencies38.py`
+  - `apps/server/src/tangl/rest/dependencies_gateway.py`
     → `apps/server/src/tangl/rest/dependencies_gateway.py`
   - updated app/router/tests imports accordingly.
-- Fixed CI failure in `engine/tests/story38/test_story38_init.py`:
+- Fixed CI failure in `engine/tests/story38/test_story_init.py`:
   - import-guard test now scans `engine/src/tangl/story`
   - guard checks retired imports (`tangl.core38` / `tangl.vm38`) instead of canonical imports.
 - Validation:

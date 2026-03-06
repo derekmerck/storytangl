@@ -28,7 +28,7 @@ Status: In Progress (updated 2026-02-21)
 
 Tests:
 - [x] `apps/cli/tests/test_story_cli_integration.py`
-- [x] `apps/server/tests/test_story38_endpoints.py`
+- [x] `apps/server/tests/test_story_runtime_endpoints.py`
 - [x] `apps/server/tests/test_story_branching_endpoints.py`
 - [x] `apps/server/tests/test_story_linear_endpoints.py`
 - [x] `apps/server/tests/test_multi_world_switching.py`
@@ -94,7 +94,7 @@ Target code:
 - `engine/src/tangl/story38/fabula/materializer.py`
 
 Tests:
-- [x] Extend `engine/tests/story38/test_story38_init.py`
+- [x] Extend `engine/tests/story38/test_story_init.py`
 - [x] Extend `engine/tests/vm38/test_resolver.py`
 
 ### Phase 5 - World Facets (Lightweight Interfaces)
@@ -115,7 +115,7 @@ Target code:
 Tests:
 - [x] Extend `engine/tests/loaders/test_world_loader.py`
 - [x] Extend `engine/tests/loaders/test_world_bundle.py`
-- [x] Extend `engine/tests/story38/test_story38_init.py`
+- [x] Extend `engine/tests/story38/test_story_init.py`
 
 ### Phase 5.5 - Gateway Transport Adapter Alignment
 
@@ -126,13 +126,13 @@ Tests:
 
 Target code:
 - `engine/src/tangl/service38/rest_adapter.py` (new)
-- `apps/server/src/tangl/rest/dependencies38.py`
+- `apps/server/src/tangl/rest/dependencies_gateway.py`
 - `apps/server/src/tangl/rest/routers/`
 - `apps/cli/src/tangl/cli/app.py`
 
 Tests:
 - [x] New `engine/tests/service/test_rest_adapter38.py`
-- [x] Extend `apps/server/tests/test_rest_dependencies38.py`
+- [x] Extend `apps/server/tests/test_rest_gateway_dependencies.py`
 
 ### Phase 6 - Materialization Modes + Provisioning Semantics
 
@@ -147,14 +147,14 @@ Target code:
 - `engine/src/tangl/vm38/provision/`
 
 Tests:
-- [x] Add/extend `engine/tests/story38/test_story38_init.py` for `LAZY`/`EAGER` behavior
+- [x] Add/extend `engine/tests/story38/test_story_init.py` for `LAZY`/`EAGER` behavior
 - [x] Extend `engine/tests/vm38/test_resolver.py` for clone/update offer orchestration
 
 ## Testing Plan (Per Phase)
 
 - [x] Unit gate for each phase (target package tests only).
 - [x] Integration gate after Phases 3, 5, and 6:
-- [x] `apps/server/tests/test_story38_endpoints.py`
+- [x] `apps/server/tests/test_story_runtime_endpoints.py`
 - [x] `apps/server/tests/test_story_branching_endpoints.py`
 - [x] `apps/server/tests/test_story_linear_endpoints.py`
 - [x] `apps/cli/tests/test_story_cli_integration.py`
@@ -167,7 +167,7 @@ Validation snapshot (2026-02-21):
 - [x] `engine/tests/vm38/test_replay_mvp.py`
 - [x] `engine/tests/vm38/test_ledger.py`
 - [x] `engine/tests/loaders/test_world_bundle.py`
-- [x] `engine/tests/story38/test_story38_init.py`
+- [x] `engine/tests/story38/test_story_init.py`
 - [x] `engine/tests/vm38/test_resolver.py`
 
 ## Definition Of Done
