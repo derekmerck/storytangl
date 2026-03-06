@@ -103,8 +103,9 @@ class MediaResourceInventoryTag(Entity, ContentAddressable):
         return self
 
     def _resolve_content_hash(self) -> Hash:
-        if self.preset_content_hash is not None:
-            return self.preset_content_hash
+        preset_hash = getattr(self, "preset_content_hash", None)
+        if preset_hash is not None:
+            return preset_hash
         return super().content_hash()
 
     @property
