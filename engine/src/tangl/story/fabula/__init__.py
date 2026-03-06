@@ -1,6 +1,6 @@
-from .compiler import StoryCompiler38, StoryTemplateBundle
-from .materializer import StoryMaterializer38
-from .script_manager38 import ScriptManager38
+from .compiler import StoryCompiler, StoryCompiler38, StoryTemplateBundle
+from .materializer import StoryMaterializer, StoryMaterializer38
+from .script_manager38 import ScriptManager, ScriptManager38
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -22,9 +22,12 @@ __all__ = [
     "InitReport",
     "ResolutionError",
     "ResolutionFailureReason",
+    "ScriptManager",
     "ScriptManager38",
+    "StoryCompiler",
     "StoryCompiler38",
     "StoryInitResult",
+    "StoryMaterializer",
     "StoryMaterializer38",
     "StoryTemplateBundle",
     "UnresolvedDependency",
@@ -32,6 +35,6 @@ __all__ = [
     "WorldDomainFacet",
     "WorldResourcesFacet",
     "WorldTemplatesFacet",
-    "World38",
     "World",
+    "World38",
 ]

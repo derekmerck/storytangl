@@ -11,20 +11,20 @@ from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.service.api_endpoint import (
     AccessLevel,
-    ApiEndpoint38,
+    ApiEndpoint,
     HasApiEndpoints,
     MethodType,
     ResponseType,
 )
 from tangl.service.response import RuntimeInfo, WorldInfo, WorldList
 from tangl.service.world_registry import WorldRegistry
-from tangl.story.fabula import World38
+from tangl.story.fabula import World
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.ordered_tuple_dict import OrderedTupleDict
 from tangl.utils.sanitize_str import sanitize_str
 
 
-_MANUAL_WORLDS38: dict[str, World38] = {}
+_MANUAL_WORLDS: dict[str, World] = {}
 
 
 def _legacy_world_label(script_data: dict[str, Any]) -> str | None:
@@ -40,15 +40,15 @@ def _legacy_world_label(script_data: dict[str, Any]) -> str | None:
     return None
 
 
-def resolve_world38(world_id: str) -> World38:
+def resolve_world(world_id: str) -> World:
     """Resolve a world from in-memory overrides or filesystem registry."""
-    if world_id in _MANUAL_WORLDS38:
-        return _MANUAL_WORLDS38[world_id]
+    if world_id in _MANUAL_WORLDS:
+        return _MANUAL_WORLDS[world_id]
 
     registry = WorldRegistry()
     world = registry.get_world(world_id, runtime_version="38")
 
-    if not isinstance(world, World38):
+    if not isinstance(world, World):
         raise TypeError(f"Expected story38 world for '{world_id}', got {type(world)!r}")
     return world
 
@@ -56,14 +56,14 @@ def resolve_world38(world_id: str) -> World38:
 def _dereference_world_id(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[tuple[Any, ...], dict[str, Any]]:
     world_id = kwargs.pop("world_id", None)
     if world_id is not None:
-        kwargs["world"] = resolve_world38(str(world_id))
+        kwargs["world"] = resolve_world(str(world_id))
     return args, kwargs
 
 
 class WorldController(HasApiEndpoints):
     """World metadata and lifecycle endpoints for story38 worlds."""
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.CONTENT,
@@ -74,9 +74,9 @@ class WorldController(HasApiEndpoints):
         registry = WorldRegistry()
         worlds = registry.list_worlds()
 
-        if _MANUAL_WORLDS38:
+        if _MANUAL_WORLDS:
             known = {item.get("label") for item in worlds}
-            for label, world in _MANUAL_WORLDS38.items():
+            for label, world in _MANUAL_WORLDS.items():
                 if label in known:
                     continue
                 worlds.append(
@@ -98,14 +98,14 @@ class WorldController(HasApiEndpoints):
             fragments.append(WorldList(content=content))
         return fragments
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.INFO,
         binds=(),
     )
-    def get_world_info(self, world: World38, **kwargs: Any) -> WorldInfo:
+    def get_world_info(self, world: World, **kwargs: Any) -> WorldInfo:
         metadata = dict(world.metadata or {})
         metadata.pop("label", None)
         info_kwargs = dict(kwargs)
@@ -114,7 +114,7 @@ class WorldController(HasApiEndpoints):
         metadata.setdefault("author", "Unknown")
         return WorldInfo(label=world.label, **metadata, **info_kwargs)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
@@ -123,7 +123,7 @@ class WorldController(HasApiEndpoints):
     )
     def get_world_media(
         self,
-        world: World38,
+        world: World,
         media: MediaRIT | Identifier,
         **kwargs: Any,
     ) -> MediaDataType:
@@ -139,7 +139,7 @@ class WorldController(HasApiEndpoints):
             raise ValueError(f"Media '{media}' not found for world '{world.label}'")
         return media_obj.get_content(**kwargs)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.CREATE,
         response_type=ResponseType.RUNTIME,
@@ -160,22 +160,22 @@ class WorldController(HasApiEndpoints):
         if not isinstance(script_data, dict):
             raise ValueError("script_data is required to load a world")
 
-        world = World38.from_script_data(script_data=script_data)
+        world = World.from_script_data(script_data=script_data)
         legacy_label = _legacy_world_label(script_data)
         if legacy_label:
             world.label = legacy_label
-        _MANUAL_WORLDS38[world.label] = world
+        _MANUAL_WORLDS[world.label] = world
         return RuntimeInfo.ok(message="World loaded", world_label=world.label)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         preprocessors=[_dereference_world_id],
         access_level=AccessLevel.USER,
         method_type=MethodType.DELETE,
         response_type=ResponseType.RUNTIME,
         binds=(),
     )
-    def unload_world(self, world: World38) -> RuntimeInfo:
-        removed = _MANUAL_WORLDS38.pop(world.label, None)
+    def unload_world(self, world: World) -> RuntimeInfo:
+        removed = _MANUAL_WORLDS.pop(world.label, None)
         if removed is None:
             return RuntimeInfo.error(
                 code="WORLD_NOT_MANUAL",
@@ -185,4 +185,7 @@ class WorldController(HasApiEndpoints):
         return RuntimeInfo.ok(message="World unloaded", world_label=world.label)
 
 
-__all__ = ["WorldController", "resolve_world38"]
+resolve_world38 = resolve_world
+
+
+__all__ = ["WorldController", "resolve_world", "resolve_world38"]

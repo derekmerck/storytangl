@@ -6,9 +6,12 @@ from .fabula import (
     InitReport,
     ResolutionError,
     ResolutionFailureReason,
+    ScriptManager,
     ScriptManager38,
+    StoryCompiler,
     StoryCompiler38,
     StoryInitResult,
+    StoryMaterializer,
     StoryMaterializer38,
     StoryTemplateBundle,
     UnresolvedDependency,
@@ -16,9 +19,10 @@ from .fabula import (
     WorldDomainFacet,
     WorldResourcesFacet,
     WorldTemplatesFacet,
+    World,
     World38,
 )
-from .story_graph import StoryGraph38
+from .story_graph import StoryGraph, StoryGraph38
 from .dispatch import on_journal, story_dispatch
 from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
 from .ctx import StoryRuntimeCtx
@@ -26,8 +30,7 @@ from .ctx import StoryRuntimeCtx
 # Register story-level journal handlers.
 from . import system_handlers  # noqa: F401
 
-# Legacy compatibility aliases retained during namespace cutover.
-StoryGraph = StoryGraph38
+# Legacy compatibility alias retained during naming cutover.
 LegacyStoryGraph = StoryGraph38
 
 __all__ = [
@@ -43,15 +46,18 @@ __all__ = [
     "Location",
     "ResolutionError",
     "ResolutionFailureReason",
+    "ScriptManager",
     "Role",
     "ScriptManager38",
     "Scene",
     "Setting",
     "StoryRuntimeCtx",
+    "StoryCompiler",
     "StoryCompiler38",
     "StoryGraph",
     "StoryGraph38",
     "StoryInitResult",
+    "StoryMaterializer",
     "StoryMaterializer38",
     "StoryTemplateBundle",
     "UnresolvedDependency",
@@ -59,6 +65,7 @@ __all__ = [
     "WorldDomainFacet",
     "WorldResourcesFacet",
     "WorldTemplatesFacet",
+    "World",
     "World38",
     "LegacyStoryGraph",
     "on_journal",

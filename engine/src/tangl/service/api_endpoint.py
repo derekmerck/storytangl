@@ -243,8 +243,8 @@ class EndpointPolicy(BaseModel):
         return cls(writeback_mode=mode, persist_paths=tuple(str(path) for path in raw_paths))
 
 
-class ApiEndpoint38(LegacyApiEndpoint):
-    """Service38 endpoint type with policy metadata."""
+class ApiEndpoint(LegacyApiEndpoint):
+    """Service endpoint type with policy metadata."""
 
     writeback_mode: WritebackMode = WritebackMode.AUTO
     persist_paths: tuple[str, ...] = Field(default_factory=tuple)
@@ -299,7 +299,8 @@ class ApiEndpoint38(LegacyApiEndpoint):
         return decorator
 
 
-ApiEndpoint = ApiEndpoint38
+# Backwards-compatible alias retained during naming cutover.
+ApiEndpoint38 = ApiEndpoint
 
 
 __all__ = [

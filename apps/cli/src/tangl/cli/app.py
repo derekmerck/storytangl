@@ -8,7 +8,7 @@ from uuid import UUID
 import cmd2
 
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service import ServiceGateway38, ServiceOperation38, build_service_gateway38
+from tangl.service import ServiceGateway, ServiceOperation, build_service_gateway
 from tangl.service.operations import endpoint_for_operation
 
 
@@ -21,7 +21,7 @@ class StoryTanglCLI(cmd2.Cmd):
         self,
         orchestrator: Any | None = None,
         *,
-        service_gateway: ServiceGateway38 | None = None,
+        service_gateway: ServiceGateway | None = None,
         render_profile: str = "raw",
         user_id: UUID | None = None,
         ledger_id: UUID | None = None,
@@ -88,7 +88,7 @@ class StoryTanglCLI(cmd2.Cmd):
             kwargs["ledger_id"] = self.ledger_id
         return kwargs
 
-    def call_operation(self, operation: ServiceOperation38, /, **params) -> object:
+    def call_operation(self, operation: ServiceOperation, /, **params) -> object:
         """Execute ``operation`` with explicit per-request render profile."""
 
         kwargs = self._prepare_context_kwargs(params)
@@ -136,7 +136,7 @@ def create_cli_app() -> StoryTanglCLI:
     """Instantiate the CLI, orchestrator, and persistence plumbing."""
 
     persistence = PersistenceManagerFactory.create_persistence_manager()
-    service_gateway = build_service_gateway38(persistence, default_render_profile="raw")
+    service_gateway = build_service_gateway(persistence, default_render_profile="raw")
     return StoryTanglCLI(service_gateway=service_gateway)
 
 

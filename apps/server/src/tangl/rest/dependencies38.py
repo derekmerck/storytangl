@@ -11,25 +11,25 @@ from fastapi import HTTPException
 
 from tangl.rest.dependencies import get_orchestrator
 from tangl.service import (
-    GatewayRestAdapter38,
-    ServiceGateway38,
+    GatewayRestAdapter,
+    ServiceGateway,
     UserAuthInfo,
-    build_service_gateway38,
+    build_service_gateway,
     user_id_by_key,
 )
 
-_gateway38: ServiceGateway38 | None = None
-_adapter38: GatewayRestAdapter38 | None = None
+_gateway38: ServiceGateway | None = None
+_adapter38: GatewayRestAdapter | None = None
 _user_locks38: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
 _api_key_index38: dict[str, UUID] = {}
 
 
-def _build_service_gateway38() -> ServiceGateway38:
+def _build_service_gateway38() -> ServiceGateway:
     base_orchestrator = get_orchestrator()
-    return build_service_gateway38(base_orchestrator.persistence)
+    return build_service_gateway(base_orchestrator.persistence)
 
 
-def get_service_gateway38() -> ServiceGateway38:
+def get_service_gateway38() -> ServiceGateway:
     """Return process-wide service38 gateway singleton."""
 
     global _gateway38
@@ -41,7 +41,7 @@ def get_service_gateway38() -> ServiceGateway38:
 def _resolve_user_auth_from_key(
     api_key: str,
     *,
-    gateway: ServiceGateway38 | None = None,
+    gateway: ServiceGateway | None = None,
 ) -> UserAuthInfo:
     service_gateway = gateway or get_service_gateway38()
     auth = user_id_by_key(
@@ -54,15 +54,15 @@ def _resolve_user_auth_from_key(
     return auth
 
 
-def _build_service_adapter38() -> GatewayRestAdapter38:
+def _build_service_adapter38() -> GatewayRestAdapter:
     gateway = get_service_gateway38()
     resolver: Callable[[str], UserAuthInfo] = (
         lambda api_key: _resolve_user_auth_from_key(api_key, gateway=gateway)
     )
-    return GatewayRestAdapter38(gateway, auth_resolver=resolver)
+    return GatewayRestAdapter(gateway, auth_resolver=resolver)
 
 
-def get_service_adapter38() -> GatewayRestAdapter38:
+def get_service_adapter38() -> GatewayRestAdapter:
     """Return process-wide service38 REST adapter singleton."""
 
     global _adapter38
@@ -80,8 +80,8 @@ def get_user_locks38() -> dict[UUID, asyncio.Lock]:
 def resolve_user_auth38(
     api_key: str,
     *,
-    gateway: ServiceGateway38 | None = None,  # backward-compat call sites
-    adapter: GatewayRestAdapter38 | None = None,
+    gateway: ServiceGateway | None = None,  # backward-compat call sites
+    adapter: GatewayRestAdapter | None = None,
 ) -> UserAuthInfo:
     """Resolve API key to user auth context for route handlers."""
 
@@ -96,8 +96,8 @@ def resolve_user_auth38(
 def resolve_user_id38(
     api_key: str,
     *,
-    gateway: ServiceGateway38 | None = None,  # backward-compat call sites
-    adapter: GatewayRestAdapter38 | None = None,
+    gateway: ServiceGateway | None = None,  # backward-compat call sites
+    adapter: GatewayRestAdapter | None = None,
 ) -> UUID:
     """Resolve API key to user id for user-scoped operations."""
 

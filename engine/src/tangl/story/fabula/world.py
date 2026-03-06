@@ -3,30 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable
 
-from .compiler import StoryCompiler38, StoryTemplateBundle
-from .materializer import StoryMaterializer38
-from .script_manager38 import ScriptManager38
+from .compiler import StoryCompiler, StoryTemplateBundle
+from .materializer import StoryMaterializer
+from .script_manager38 import ScriptManager
 from .types import InitMode, StoryInitResult
 
 
 @dataclass(slots=True)
-class World38:
-    """Story38 world entrypoint over compiled template bundles."""
+class World:
+    """Story world entrypoint over compiled template bundles."""
 
     label: str
     bundle: StoryTemplateBundle
-    script_manager: ScriptManager38 | None = None
+    script_manager: ScriptManager | None = None
     domain: Any | None = None
     templates: Any | None = None
     assets: Any | None = None
     resources: Any | None = None
-    _instances: ClassVar[dict[str, "World38"]] = {}
+    _instances: ClassVar[dict[str, "World"]] = {}
 
     def __post_init__(self) -> None:
         if self.templates is None:
             self.templates = self.bundle.template_registry
         if self.script_manager is None:
-            self.script_manager = ScriptManager38(
+            self.script_manager = ScriptManager(
                 template_registry=self.bundle.template_registry,
                 world_scope_provider=self._world_template_scope_groups,
             )
@@ -42,7 +42,7 @@ class World38:
         *,
         init_mode: InitMode = InitMode.EAGER,
     ) -> StoryInitResult:
-        materializer = StoryMaterializer38()
+        materializer = StoryMaterializer()
         return materializer.create_story(
             bundle=self.bundle,
             story_label=story_label,
@@ -110,16 +110,16 @@ class World38:
         cls,
         *,
         script_data: dict[str, Any],
-        compiler: StoryCompiler38 | None = None,
+        compiler: StoryCompiler | None = None,
         domain: Any | None = None,
         templates: Any | None = None,
         assets: Any | None = None,
         resources: Any | None = None,
-    ) -> "World38":
-        compiler = compiler or StoryCompiler38()
+    ) -> "World":
+        compiler = compiler or StoryCompiler()
         bundle = compiler.compile(script_data)
         return cls(
-            label=script_data.get("label") or "story38_world",
+            label=script_data.get("label") or "story_world",
             bundle=bundle,
             domain=domain,
             templates=templates,
@@ -128,11 +128,11 @@ class World38:
         )
 
     @classmethod
-    def get_instance(cls, label: str) -> "World38 | None":
+    def get_instance(cls, label: str) -> "World | None":
         return cls._instances.get(label)
 
     @classmethod
-    def all_instances(cls) -> list["World38"]:
+    def all_instances(cls) -> list["World"]:
         return list(cls._instances.values())
 
     @classmethod
@@ -140,5 +140,5 @@ class World38:
         cls._instances.clear()
 
 
-# Legacy compatibility alias retained during namespace cutover.
-World = World38
+# Backwards-compatible alias retained during naming cutover.
+World38 = World

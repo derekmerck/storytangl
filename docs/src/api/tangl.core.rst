@@ -10,7 +10,7 @@ Identity
 --------
 .. autoclass:: tangl.core.Entity
 .. autoclass:: tangl.core.entity.Selectable
-.. autoclass:: tangl.core.entity.Conditional
+.. autoclass:: tangl.core.Selector
 .. autoclass:: tangl.core.Registry
 .. autoclass:: tangl.core.Singleton
 .. autoclass:: tangl.core.singleton.InheritingSingleton
@@ -23,7 +23,6 @@ Topology
 .. autoclass:: tangl.core.GraphItem
 .. autoclass:: tangl.core.Node
 .. autoclass:: tangl.core.Edge
-.. autoclass:: tangl.core.graph.AnonymousEdge
 .. autoclass:: tangl.core.Subgraph
 .. autoclass:: tangl.core.graph.token.Token
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Service38 orchestrator with strict endpoint binding and policy-aware persistence."""
+"""Service orchestrator with strict endpoint binding and policy-aware persistence."""
 
 from dataclasses import dataclass
 import inspect
@@ -13,7 +13,7 @@ from tangl.core import BaseFragment
 
 from .api_endpoint import (
     AccessLevel,
-    ApiEndpoint38,
+    ApiEndpoint,
     EndpointPolicy,
     HasApiEndpoints,
     LegacyApiEndpoint,
@@ -72,7 +72,7 @@ class _EndpointBinding:
     hydration_bindings: tuple[ResourceBinding, ...]
 
 
-class Orchestrator38:
+class Orchestrator:
     """Coordinates endpoint execution with strict binding and persistence policies."""
 
     def __init__(self, persistence_manager: Any | None = None) -> None:
@@ -121,7 +121,7 @@ class Orchestrator38:
         exec_options: ExecuteOptions | None = None,
         **params: Any,
     ) -> NativeResponse:
-        """Execute endpoint with service38 policy semantics."""
+        """Execute endpoint with policy semantics."""
 
         binding = self._endpoints.get(endpoint_name)
         if binding is None:
@@ -191,7 +191,7 @@ class Orchestrator38:
         user_auth: "UserAuthInfo | None",
         resolved_params: Mapping[str, Any],
     ) -> None:
-        if not isinstance(endpoint, ApiEndpoint38):
+        if not isinstance(endpoint, ApiEndpoint):
             return
 
         required_level = getattr(endpoint, "access_level", AccessLevel.RESTRICTED) or AccessLevel.RESTRICTED
@@ -445,9 +445,9 @@ class Orchestrator38:
         if hasattr(data, "get_frame") and hasattr(data, "unstructure"):
             return data
         if isinstance(data, Mapping):
-            from tangl.vm.runtime.ledger import Ledger as Ledger38
+            from tangl.vm.runtime.ledger import Ledger as Ledger
 
-            return Ledger38.structure(dict(data))
+            return Ledger.structure(dict(data))
         raise TypeError("Unsupported ledger payload")
 
     def _handle_result_cleanup(self, result: Any) -> Any:
@@ -666,7 +666,7 @@ class Orchestrator38:
             )
 
         # Backward-compatible fallback for legacy endpoints that do not
-        # provide service38 binding metadata.
+        # provide service binding metadata.
         signature = inspect.signature(endpoint.func)
         param_names = {name for name in signature.parameters if name != "self"}
         inferred: list[ResourceBinding] = []
@@ -680,8 +680,12 @@ class Orchestrator38:
         return tuple(inferred)
 
 
+Orchestrator38 = Orchestrator
+
+
 __all__ = [
     "ExecuteOptions",
+    "Orchestrator",
     "Orchestrator38",
     "WritebackMode",
 ]

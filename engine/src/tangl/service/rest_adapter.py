@@ -1,4 +1,4 @@
-"""Transport-facing adapter helpers for service38 gateway execution."""
+"""Transport-facing adapter helpers for service gateway execution."""
 
 from __future__ import annotations
 
@@ -7,31 +7,33 @@ from typing import Any, Callable, Mapping
 from uuid import UUID
 
 from .auth import UserAuthInfo
-from .gateway import ServiceGateway38
-from .operations import ServiceOperation38
+from .gateway import ServiceGateway
+from .operations import ServiceOperation
 
-AuthResolver38 = Callable[[str], UserAuthInfo]
+AuthResolver = Callable[[str], UserAuthInfo]
+# Backwards-compatible alias retained during naming cutover.
+AuthResolver38 = AuthResolver
 
 
 @dataclass(frozen=True)
-class GatewayRequest38:
-    """Operation request envelope consumed by :class:`GatewayRestAdapter38`."""
+class GatewayRequest:
+    """Operation request envelope consumed by :class:`GatewayRestAdapter`."""
 
-    operation: ServiceOperation38
+    operation: ServiceOperation
     params: Mapping[str, Any] = field(default_factory=dict)
     user_id: UUID | None = None
     user_auth: UserAuthInfo | None = None
     render_profile: str | None = None
 
 
-class GatewayRestAdapter38:
-    """Thin adapter that normalizes transport calls onto ``ServiceGateway38``."""
+class GatewayRestAdapter:
+    """Thin adapter that normalizes transport calls onto ``ServiceGateway``."""
 
     def __init__(
         self,
-        gateway: ServiceGateway38,
+        gateway: ServiceGateway,
         *,
-        auth_resolver: AuthResolver38 | None = None,
+        auth_resolver: AuthResolver | None = None,
         default_render_profile: str = "raw",
     ) -> None:
         self.gateway = gateway
@@ -56,7 +58,7 @@ class GatewayRestAdapter38:
 
         return self.resolve_user_auth(api_key).user_id
 
-    def execute_request(self, request: GatewayRequest38) -> Any:
+    def execute_request(self, request: GatewayRequest) -> Any:
         """Execute a prepared gateway request envelope."""
 
         return self.gateway.execute(
@@ -69,7 +71,7 @@ class GatewayRestAdapter38:
 
     def execute_operation(
         self,
-        operation: ServiceOperation38,
+        operation: ServiceOperation,
         /,
         *,
         user_id: UUID | None = None,
@@ -90,7 +92,7 @@ class GatewayRestAdapter38:
     def execute_authenticated(
         self,
         api_key: str,
-        operation: ServiceOperation38,
+        operation: ServiceOperation,
         /,
         *,
         render_profile: str | None = None,
@@ -108,8 +110,16 @@ class GatewayRestAdapter38:
         )
 
 
+# Backwards-compatible aliases retained during naming cutover.
+GatewayRequest38 = GatewayRequest
+GatewayRestAdapter38 = GatewayRestAdapter
+
+
 __all__ = [
+    "AuthResolver",
     "AuthResolver38",
+    "GatewayRequest",
     "GatewayRequest38",
+    "GatewayRestAdapter",
     "GatewayRestAdapter38",
 ]

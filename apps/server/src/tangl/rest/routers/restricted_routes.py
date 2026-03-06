@@ -12,7 +12,7 @@ from tangl.rest.dependencies38 import (
     get_user_locks38,
     resolve_user_auth38,
 )
-from tangl.service import GatewayRestAdapter38
+from tangl.service import GatewayRestAdapter
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -40,7 +40,7 @@ def _not_implemented_response(endpoint_name: str) -> JSONResponse:
 
 @story_router.put("/go", tags=["Restricted"])
 async def goto_story_block(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -59,7 +59,7 @@ async def goto_story_block(
 
 @story_router.get("/inspect", tags=["Restricted"])
 async def inspect_story_node(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -82,7 +82,7 @@ async def inspect_story_node(
 @story_router.post("/check", tags=["Restricted"])
 async def check_expression(
     request: DebugExprRequest = Body(...),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -101,7 +101,7 @@ async def check_expression(
 @story_router.post("/apply", tags=["Restricted"])
 async def apply_effect_post(
     request: DebugExprRequest = Body(...),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -120,7 +120,7 @@ async def apply_effect_post(
 @story_router.put("/apply", tags=["Restricted"])
 async def apply_effect_put(
     request: DebugExprRequest = Body(...),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),

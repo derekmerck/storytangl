@@ -7,7 +7,7 @@ from typing import Any
 
 from tangl.service.api_endpoint import (
     AccessLevel,
-    ApiEndpoint38,
+    ApiEndpoint,
     HasApiEndpoints,
     MethodType,
     ResourceBinding,
@@ -59,7 +59,7 @@ class ApiKeyInfo(InfoModel):
 class UserController(HasApiEndpoints):
     """Service38 user controller with explicit v38 semantics."""
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.CREATE,
         response_type=ResponseType.RUNTIME,
@@ -72,7 +72,7 @@ class UserController(HasApiEndpoints):
             user.set_secret(secret)
         return RuntimeInfo.ok(message="User created", user=user, user_id=str(user.uid))
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.USER,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
@@ -104,7 +104,7 @@ class UserController(HasApiEndpoints):
             details["api_key"] = api_key
         return RuntimeInfo.ok(message="User updated", **details)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.USER,
         method_type=MethodType.READ,
         response_type=ResponseType.INFO,
@@ -113,7 +113,7 @@ class UserController(HasApiEndpoints):
     def get_user_info(self, user: User, **kwargs: Hash) -> UserInfo:
         return UserInfo.from_user(user, **kwargs)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.USER,
         method_type=MethodType.DELETE,
         response_type=ResponseType.RUNTIME,
@@ -128,7 +128,7 @@ class UserController(HasApiEndpoints):
             details["dropped_ledger_id"] = str(dropped_ledger_id)
         return RuntimeInfo.ok(message="User dropped", **details)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         group="system",

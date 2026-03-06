@@ -108,7 +108,8 @@ class Registry(Entity, Generic[ET]):
     --------
     `tangl.core.graph.Graph`, `tangl.core.template.TemplateRegistry`
 
-    Example:
+    Examples
+    --------
         >>> a = Entity(label="abc"); b = Entity(label="def")
         >>> r = Registry(); r.add(a); r.add(b)
         >>> len(r.members)

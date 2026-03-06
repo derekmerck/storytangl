@@ -93,13 +93,12 @@ class CallReceipt(Record):
 
     Receipt aggregation or folding summarizes dispatch traces into a concrete result or list of results.  One key detail is that behaviors that return a None result are tracked with a receipt for audit, but do not participate in result reduction. Several generic aggregators are implemented as class functions on Receipt (handling for collections of receipts).  Additional aggregators can be introduced at other layers.
 
-    | Mode             | Function                  | Use Case              |
-    |------------------|---------------------------|-----------------------|
-    | `first_result`   | First non-None result     | Single result needed  |
-    | `last_result`    | Last non-None result      | Override pattern      |
-    | `all_true`       | All results truthy        | Validation gates      |
-    | `gather_results` | Collect all results       | Accumulation          |
-    | `merge_results`  | Flatten lists/merge dicts | Contribution collection |
+    Supported aggregation helpers:
+    - ``first_result``: first non-``None`` result (single winner).
+    - ``last_result``: last non-``None`` result (override pattern).
+    - ``all_true``: all non-``None`` results are truthy (validation gates).
+    - ``gather_results``: collect all non-``None`` results.
+    - ``merge_results``: flatten lists or merge dicts (later entries override).
 
     Examples:
         >>> receipts = [ CallReceipt(result=None),

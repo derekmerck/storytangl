@@ -10,17 +10,17 @@ from tangl import core as tangl_core
 from tangl.core import Selector
 from tangl.service.api_endpoint import (
     AccessLevel,
-    ApiEndpoint38,
+    ApiEndpoint,
     HasApiEndpoints,
     MethodType,
     ResourceBinding,
     ResponseType,
 )
-from tangl.service.response import RuntimeEnvelope38, RuntimeInfo
+from tangl.service.response import RuntimeEnvelope, RuntimeInfo
 from tangl.service.user import User
 from tangl.story.fabula import InitMode
-from tangl.story.fabula.world_controller import resolve_world38
-from tangl.vm.runtime.ledger import Ledger as Ledger38
+from tangl.story.fabula.world_controller import resolve_world
+from tangl.vm.runtime.ledger import Ledger
 
 BaseFragment = tangl_core.BaseFragment
 
@@ -132,7 +132,7 @@ class RuntimeController(HasApiEndpoints):
         }
 
     @staticmethod
-    def _synthetic_journal_from_cursor(ledger: Ledger38) -> list[BaseFragment]:
+    def _synthetic_journal_from_cursor(ledger: Ledger) -> list[BaseFragment]:
         """Fallback legacy journal view derived from the active cursor state."""
         cursor = getattr(ledger, "cursor", None)
         if cursor is None:
@@ -177,10 +177,10 @@ class RuntimeController(HasApiEndpoints):
     def _runtime38_envelope(
         self,
         *,
-        ledger: Ledger38,
+        ledger: Ledger,
         fragments: list[Any],
         metadata: dict[str, Any] | None = None,
-    ) -> RuntimeEnvelope38:
+    ) -> RuntimeEnvelope:
         serialized_fragments = [
             self._serialize_vm38_fragment(fragment) for fragment in fragments
         ]
@@ -189,7 +189,7 @@ class RuntimeController(HasApiEndpoints):
         if blockers:
             merged_metadata["blockers"] = blockers
 
-        return RuntimeEnvelope38(
+        return RuntimeEnvelope(
             cursor_id=ledger.cursor_id,
             step=ledger.step,
             fragments=serialized_fragments,
@@ -199,7 +199,7 @@ class RuntimeController(HasApiEndpoints):
         )
 
     @staticmethod
-    def _prime_initial_update(ledger: Ledger38) -> None:
+    def _prime_initial_update(ledger: Ledger) -> None:
         """Seed initial JOURNAL output so legacy surfaces can render entry content."""
         if ledger.get_journal():
             return
@@ -221,7 +221,7 @@ class RuntimeController(HasApiEndpoints):
         ledger.redirect_trace = list(frame.redirect_trace)
         ledger.save_snapshot(cadence=ledger.checkpoint_cadence)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.CREATE,
         response_type=ResponseType.RUNTIME,
@@ -233,7 +233,7 @@ class RuntimeController(HasApiEndpoints):
 
         world = kwargs.pop("world", None)
         if world is None:
-            world = resolve_world38(world_id)
+            world = resolve_world(world_id)
 
         story_label = kwargs.get("story_label") or f"story_{user.uid}"
         mode_raw = kwargs.get("init_mode") or kwargs.get("mode") or InitMode.EAGER.value
@@ -247,7 +247,7 @@ class RuntimeController(HasApiEndpoints):
         if story_graph.initial_cursor_id is None:
             raise RuntimeError("Story38 graph did not define an initial cursor")
 
-        ledger = Ledger38.from_graph(graph=story_graph, entry_id=story_graph.initial_cursor_id)
+        ledger = Ledger.from_graph(graph=story_graph, entry_id=story_graph.initial_cursor_id)
         ledger.user = user
         ledger.user_id = user.uid
         self._prime_initial_update(ledger)
@@ -281,7 +281,7 @@ class RuntimeController(HasApiEndpoints):
             },
         )
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.CREATE,
         response_type=ResponseType.RUNTIME,
@@ -291,7 +291,7 @@ class RuntimeController(HasApiEndpoints):
         """Legacy alias for ``create_story38`` using story38/vm38 mechanics."""
         return self.create_story38(user=user, world_id=world_id, **kwargs)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
@@ -299,7 +299,7 @@ class RuntimeController(HasApiEndpoints):
     )
     def resolve_choice38(
         self,
-        ledger: Ledger38,
+        ledger: Ledger,
         choice_id: UUID,
         choice_payload: Any = None,
     ) -> RuntimeInfo:
@@ -316,7 +316,7 @@ class RuntimeController(HasApiEndpoints):
             envelope=envelope.model_dump(mode="json"),
         )
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,
@@ -324,7 +324,7 @@ class RuntimeController(HasApiEndpoints):
     )
     def resolve_choice(
         self,
-        ledger: Ledger38,
+        ledger: Ledger,
         choice_id: UUID,
         choice_payload: Any = None,
     ) -> RuntimeInfo:
@@ -335,7 +335,7 @@ class RuntimeController(HasApiEndpoints):
             choice_payload=choice_payload,
         )
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.RUNTIME,
@@ -343,7 +343,7 @@ class RuntimeController(HasApiEndpoints):
     )
     def get_story_update38(
         self,
-        ledger: Ledger38,
+        ledger: Ledger,
         *,
         since_step: int | None = None,
         limit: int = 0,
@@ -359,7 +359,7 @@ class RuntimeController(HasApiEndpoints):
             envelope=envelope.model_dump(mode="json"),
         )
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.CONTENT,
@@ -367,7 +367,7 @@ class RuntimeController(HasApiEndpoints):
     )
     def get_journal_entries(
         self,
-        ledger: Ledger38,
+        ledger: Ledger,
         limit: int = 0,
         *,
         current_only: bool = True,
@@ -403,13 +403,13 @@ class RuntimeController(HasApiEndpoints):
             return self._synthetic_journal_from_cursor(ledger)
         return [self._to_compat_fragment(fragment) for fragment in fragments]
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.LEDGER,),
     )
-    def get_story_info38(self, ledger: Ledger38) -> RuntimeInfo:
+    def get_story_info38(self, ledger: Ledger) -> RuntimeInfo:
         """Return vm38 session summary with no legacy marker assumptions."""
         cursor_node = ledger.graph.get(ledger.cursor_id)
         return RuntimeInfo.ok(
@@ -425,17 +425,17 @@ class RuntimeController(HasApiEndpoints):
             redirect_trace=ledger.redirect_trace,
         )
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.RUNTIME,
         binds=(ResourceBinding.LEDGER,),
     )
-    def get_story_info(self, ledger: Ledger38) -> RuntimeInfo:
+    def get_story_info(self, ledger: Ledger) -> RuntimeInfo:
         """Legacy alias for ``get_story_info38``."""
         return self.get_story_info38(ledger=ledger)
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.DELETE,
         response_type=ResponseType.RUNTIME,
@@ -444,7 +444,7 @@ class RuntimeController(HasApiEndpoints):
     def drop_story38(
         self,
         user: User,
-        ledger: Ledger38 | None = None,
+        ledger: Ledger | None = None,
         *,
         archive: bool = False,
     ) -> RuntimeInfo:
@@ -468,7 +468,7 @@ class RuntimeController(HasApiEndpoints):
             **details,
         )
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.DELETE,
         response_type=ResponseType.RUNTIME,
@@ -477,7 +477,7 @@ class RuntimeController(HasApiEndpoints):
     def drop_story(
         self,
         user: User,
-        ledger: Ledger38 | None = None,
+        ledger: Ledger | None = None,
         *,
         archive: bool = False,
     ) -> RuntimeInfo:

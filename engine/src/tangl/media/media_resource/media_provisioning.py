@@ -9,6 +9,7 @@ from tangl.core import BehaviorRegistry, Priority, Record
 from tangl.type_hints import UnstructuredData
 from tangl.vm.provision import ProvisionOffer, ProvisionPolicy, Requirement
 
+from ..media_data_type import MediaDataType
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from .media_resource_registry import MediaResourceRegistry
 
@@ -72,7 +73,10 @@ class MediaProvisioner(Record):
     def _resolve_create(self, provider_template: UnstructuredData) -> MediaRIT:
         if "data" not in provider_template:
             raise ValueError("Media CREATE requires template.data")
-        provider = MediaRIT(data=provider_template["data"])
+        provider = MediaRIT(
+            data=provider_template["data"],
+            data_type=provider_template.get("data_type", MediaDataType.OTHER),
+        )
         if self.registries:
             self.registries[0].add(provider)
         return provider

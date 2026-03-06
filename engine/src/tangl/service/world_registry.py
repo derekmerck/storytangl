@@ -2,13 +2,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from tangl.loaders import UniqueLabel, WorldBundle, WorldCompiler
-from tangl.story.fabula import World38
-
-if TYPE_CHECKING:
-    from tangl.story.fabula import World38 as World
+from tangl.story.fabula import World
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +26,9 @@ class WorldRegistry:
     def __init__(self, world_dirs: list[Path] | None = None, compiler: WorldCompiler | None = None) -> None:
         self.compiler = compiler or WorldCompiler()
         self.bundles: dict[UniqueLabel, WorldBundle] = {}
-        self.worlds38: dict[UniqueLabel, World38] = {}
+        self.worlds: dict[UniqueLabel, World] = {}
+        # Compatibility alias for callers still referencing migration-era naming.
+        self.worlds38 = self.worlds
 
         if world_dirs is None:
             world_dirs = _get_world_dirs()
@@ -72,13 +70,13 @@ class WorldRegistry:
 
     def get_world(self, label: UniqueLabel, *, runtime_version: str = "38") -> World:
         _ = runtime_version
-        if label not in self.worlds38:
+        if label not in self.worlds:
             bundle = self.bundles.get(label)
             if not bundle:
                 msg = f"Unknown world: {label}"
                 raise ValueError(msg)
-            self.worlds38[label] = self.compiler.compile(bundle, runtime_version="38")
-        return self.worlds38[label]
+            self.worlds[label] = self.compiler.compile(bundle, runtime_version="38")
+        return self.worlds[label]
 
     def get_anthology(
         self,

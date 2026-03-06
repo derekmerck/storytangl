@@ -8,7 +8,7 @@ from typing import Any
 import humanize
 
 from tangl.info import __title__, __url__, __version__
-from tangl.service.api_endpoint import AccessLevel, ApiEndpoint38, HasApiEndpoints, MethodType, ResponseType
+from tangl.service.api_endpoint import AccessLevel, ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
 from tangl.service.response import RuntimeInfo, SystemInfo
 from tangl.service.world_registry import WorldRegistry
 from tangl.utils.app_uptime import app_uptime
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class SystemController(HasApiEndpoints):
     """Service metadata and diagnostics endpoints."""
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
         response_type=ResponseType.INFO,
@@ -48,7 +48,7 @@ class SystemController(HasApiEndpoints):
         logger.debug("system info requested: %s", info)
         return info
 
-    @ApiEndpoint38.annotate(
+    @ApiEndpoint.annotate(
         access_level=AccessLevel.RESTRICTED,
         method_type=MethodType.UPDATE,
         response_type=ResponseType.RUNTIME,

@@ -26,7 +26,7 @@ Dispatch chaining is driven by the runtime context protocol used by
 
 Callers normally pass ``_ctx`` to hook-aware APIs (for example ``Entity(..., _ctx=ctx)``,
 ``Entity.structure(..., _ctx=ctx)``, ``Registry.add(..., _ctx=ctx)``), or rely on ambient
-context via :func:`tangl.core.ctx.using_ctx`.
+context via ``using_ctx``.
 
 Aggregation contracts
 ---------------------
@@ -63,19 +63,18 @@ Example:
     >>> dispatch.clear()  # always clean up global registries after using
 
 
-## Dispatch Layer Mapping
+Dispatch Layer Mapping
+----------------------
 
-| Layer       | Package   | Registry            | Typical Tasks                   |
-|-------------|-----------|---------------------|---------------------------------|
-| GLOBAL      | core      | `core.dispatch`     | Auditing, logging               |
-| SYSTEM      | vm        | `vm.dispatch`       | Phase handlers, provisioning    |
-| SYSTEM      | service   | `service.dispatch`  | Api, persistence                |
-| APPLICATION | story     | `story.dispatch`    | Content rendering, domain rules |
-| APPLICATION | mechanics | `story.dispatch`    | Extend story semantics          |
-| APPLICATION | discourse | `story.dispatch`    | Extend story prose models       |
-| APPLICATION | media     | `story.dispatch`    | Extend story with media         |
-| AUTHOR      | world     | `world.dispatch`    | World-specific mechanics        |
-| LOCAL       | vm.frame  | `vm.frame.dispatch` | One-off handlers                |
+- GLOBAL / core / ``core.dispatch`` / auditing and logging
+- SYSTEM / vm / ``vm.dispatch`` / phase handlers and provisioning
+- SYSTEM / service / ``service.dispatch`` / API and persistence
+- APPLICATION / story / ``story.dispatch`` / content rendering and domain rules
+- APPLICATION / mechanics / ``story.dispatch`` / story semantics extensions
+- APPLICATION / discourse / ``story.dispatch`` / prose model extensions
+- APPLICATION / media / ``story.dispatch`` / media extensions
+- AUTHOR / world / ``world.dispatch`` / world-specific mechanics
+- LOCAL / vm.frame / ``vm.frame.dispatch`` / one-off handlers
 
 """
 from types import SimpleNamespace

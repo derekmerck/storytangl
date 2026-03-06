@@ -17,9 +17,9 @@ from tangl.vm import (
 
 from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, Scene
-from ..story_graph import StoryGraph38
+from ..story_graph import StoryGraph
 from .compiler import StoryTemplateBundle
-from .script_manager38 import ScriptManager38
+from .script_manager38 import ScriptManager
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -33,7 +33,7 @@ from .types import (
 
 @dataclass(slots=True)
 class _MaterializationState:
-    graph: StoryGraph38
+    graph: StoryGraph
     bundle: StoryTemplateBundle
     report: InitReport
     template_to_entity: dict[UUID, GraphItem] = field(default_factory=dict)
@@ -43,7 +43,7 @@ class _MaterializationState:
 
 @dataclass(slots=True)
 class _PrelinkCtx:
-    graph: StoryGraph38
+    graph: StoryGraph
     template_registry: TemplateRegistry
     cursor_id: UUID | None = None
     correlation_id: UUID | str | None = None
@@ -118,8 +118,8 @@ class _PrelinkCtx:
         return self.get_template_scope_groups()
 
 
-class StoryMaterializer38:
-    """Materialize story38 graphs from a compiled template bundle."""
+class StoryMaterializer:
+    """Materialize story graphs from a compiled template bundle."""
 
     def create_story(
         self,
@@ -131,9 +131,9 @@ class StoryMaterializer38:
     ) -> StoryInitResult:
         script_manager = getattr(world, "script_manager", None) if world is not None else None
         if script_manager is None:
-            script_manager = ScriptManager38(template_registry=bundle.template_registry)
+            script_manager = ScriptManager(template_registry=bundle.template_registry)
 
-        graph = StoryGraph38(
+        graph = StoryGraph(
             label=story_label,
             locals=dict(bundle.locals),
             factory=bundle.template_registry,
@@ -618,7 +618,7 @@ class StoryMaterializer38:
         # Compiler canonicalization is authoritative for action destinations.
         if not successor_ref:
             return None
-        if StoryMaterializer38._is_qualified_path(successor_ref):
+        if StoryMaterializer._is_qualified_path(successor_ref):
             return successor_ref
 
         parent = source.parent
@@ -630,3 +630,7 @@ class StoryMaterializer38:
     @staticmethod
     def _is_qualified_path(path: str | None) -> bool:
         return isinstance(path, str) and "." in path
+
+
+# Backwards-compatible alias retained during naming cutover.
+StoryMaterializer38 = StoryMaterializer

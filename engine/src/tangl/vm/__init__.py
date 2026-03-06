@@ -92,7 +92,7 @@ from .runtime import Frame, Ledger
 # Provides:
 # - journal fragment records
 from .fragments import Fragment
-from .replay import Patch
+from .replay import Event, Patch
 
 # Provides:
 # - phase bus hooks
@@ -143,6 +143,7 @@ __all__ = [
     "TraversableEdge",
     "TraversableNode",
     "Patch",
+    "Event",
     "BuildReceipt",
     "ChoiceEdge",
     "Context",

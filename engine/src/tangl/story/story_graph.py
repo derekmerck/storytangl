@@ -10,8 +10,8 @@ from tangl.core import Graph, TemplateRegistry
 from .dispatch import story_dispatch
 
 
-class StoryGraph38(Graph):
-    """Story graph specialization for story38 runtime state."""
+class StoryGraph(Graph):
+    """Story graph specialization for runtime state."""
 
     initial_cursor_id: UUID | None = None
     initial_cursor_ids: list[UUID] = Field(default_factory=list)
@@ -75,3 +75,7 @@ class StoryGraph38(Graph):
 
         add_group(self.factory.values())
         return groups
+
+
+# Backwards-compatible alias retained during naming cutover.
+StoryGraph38 = StoryGraph

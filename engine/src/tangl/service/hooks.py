@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Priority
 
-from .operations import ServiceOperation38
+from .operations import ServiceOperation
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class GatewayHooks:
         self,
         params: dict[str, Any],
         *,
-        operation: ServiceOperation38 | str,
+        operation: ServiceOperation | str,
         render_profile: str | Iterable[str] | None,
         user_id: Any,
     ) -> dict[str, Any]:
@@ -106,7 +106,7 @@ class GatewayHooks:
         self,
         result: Any,
         *,
-        operation: ServiceOperation38 | str,
+        operation: ServiceOperation | str,
         render_profile: str | Iterable[str] | None,
         user_id: Any,
     ) -> Any:
@@ -142,10 +142,10 @@ class GatewayHooks:
         def _normalize_story38_init_mode(
             params: dict[str, Any],
             *,
-            operation: ServiceOperation38,
+            operation: ServiceOperation,
             **_: Any,
         ) -> dict[str, Any]:
-            if operation != ServiceOperation38.STORY38_CREATE:
+            if operation != ServiceOperation.STORY38_CREATE:
                 return params
             init_mode = params.get("init_mode")
             if isinstance(init_mode, str):

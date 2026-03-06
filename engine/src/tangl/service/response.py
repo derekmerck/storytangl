@@ -1,4 +1,4 @@
-"""Service38-native response primitives."""
+"""Service-native response primitives."""
 
 from __future__ import annotations
 
@@ -17,13 +17,13 @@ from tangl.service.user.user import User
 
 
 class InfoModel(BaseModel):
-    """Marker base for service38 information payloads."""
+    """Marker base for service information payloads."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class RuntimeInfo(InfoModel):
-    """Service38 runtime acknowledgement payload."""
+    """Service runtime acknowledgement payload."""
 
     status: Literal["ok", "error"]
     code: str | None = None
@@ -70,8 +70,8 @@ class RuntimeInfo(InfoModel):
         )
 
 
-class RuntimeEnvelope38(BaseModel):
-    """Ordered-fragment runtime payload for vm38/story38 clients."""
+class RuntimeEnvelope(BaseModel):
+    """Ordered-fragment runtime payload for vm/story clients."""
 
     cursor_id: UUID | None = None
     step: int | None = None
@@ -189,12 +189,16 @@ FragmentStream: TypeAlias = list[BaseFragment]
 MediaNative: TypeAlias = MediaFragment
 NativeResponse: TypeAlias = FragmentStream | InfoModel | RuntimeInfo | MediaNative
 
+# Backwards-compatible alias retained during naming cutover.
+RuntimeEnvelope38 = RuntimeEnvelope
+
 
 __all__ = [
     "FragmentStream",
     "InfoModel",
     "MediaNative",
     "NativeResponse",
+    "RuntimeEnvelope",
     "RuntimeEnvelope38",
     "RuntimeInfo",
     "SystemInfo",

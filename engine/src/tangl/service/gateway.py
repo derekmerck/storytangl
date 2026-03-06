@@ -1,4 +1,4 @@
-"""Public service38 gateway for operation-token based execution."""
+"""Public service gateway for operation-token based execution."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from uuid import UUID
 
 from .api_endpoint import WritebackMode
 from .hooks import GatewayHooks
-from .operations import ServiceOperation38, endpoint_for_operation, operation_for_endpoint
-from .orchestrator import ExecuteOptions, Orchestrator38
+from .operations import ServiceOperation, endpoint_for_operation, operation_for_endpoint
+from .orchestrator import ExecuteOptions, Orchestrator
 
 if TYPE_CHECKING:  # pragma: no cover
     from .auth import UserAuthInfo
@@ -17,19 +17,19 @@ if TYPE_CHECKING:  # pragma: no cover
 
 @dataclass(frozen=True)
 class GatewayExecuteOptions:
-    """Optional call overrides for service38 gateway execution."""
+    """Optional call overrides for service gateway execution."""
 
     render_profile: str | Iterable[str] | None = "raw"
     writeback_mode: WritebackMode | None = None
     persist_paths: tuple[str, ...] | None = None
 
 
-class ServiceGateway38:
+class ServiceGateway:
     """High-level gateway that executes tokenized service operations."""
 
     def __init__(
         self,
-        orchestrator: Orchestrator38,
+        orchestrator: Orchestrator,
         *,
         hooks: GatewayHooks | None = None,
         default_render_profile: str = "raw",
@@ -47,7 +47,7 @@ class ServiceGateway38:
 
     def execute(
         self,
-        operation: ServiceOperation38 | str,
+        operation: ServiceOperation | str,
         *,
         user_id: UUID | None = None,
         user_auth: "UserAuthInfo | None" = None,
@@ -56,9 +56,9 @@ class ServiceGateway38:
         persist_paths: tuple[str, ...] | None = None,
         **params: Any,
     ) -> Any:
-        """Execute a service38 operation with per-request render profile."""
+        """Execute a service operation with per-request render profile."""
 
-        op = operation if isinstance(operation, ServiceOperation38) else ServiceOperation38(operation)
+        op = operation if isinstance(operation, ServiceOperation) else ServiceOperation(operation)
         endpoint_name = endpoint_for_operation(op)
         profile = render_profile if render_profile is not None else self.default_render_profile
 
@@ -140,7 +140,11 @@ class ServiceGateway38:
         )
 
 
+ServiceGateway38 = ServiceGateway
+
+
 __all__ = [
     "GatewayExecuteOptions",
+    "ServiceGateway",
     "ServiceGateway38",
 ]

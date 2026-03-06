@@ -1,4 +1,4 @@
-"""Service38 orchestrator/gateway surface."""
+"""Service orchestrator/gateway surface."""
 
 from .api_endpoint import (
     AccessLevel,
@@ -12,7 +12,7 @@ from .api_endpoint import (
     WritebackMode,
 )
 from .auth import UserAuthInfo, user_id_by_key
-from .bootstrap import build_service_gateway38
+from .bootstrap import build_service_gateway, build_service_gateway38
 from .exceptions import (
     AccessDeniedError,
     AuthMismatchError,
@@ -21,15 +21,21 @@ from .exceptions import (
     ServiceError,
     ValidationError,
 )
-from .gateway import GatewayExecuteOptions, ServiceGateway38
-from .operations import ServiceOperation38
-from .orchestrator import ExecuteOptions, Orchestrator38
-from .rest_adapter import GatewayRequest38, GatewayRestAdapter38
+from .gateway import GatewayExecuteOptions, ServiceGateway, ServiceGateway38
+from .operations import ServiceOperation, ServiceOperation38
+from .orchestrator import ExecuteOptions, Orchestrator, Orchestrator38
+from .rest_adapter import (
+    GatewayRequest,
+    GatewayRequest38,
+    GatewayRestAdapter,
+    GatewayRestAdapter38,
+)
 from .response import (
     FragmentStream,
     InfoModel,
     MediaNative,
     NativeResponse,
+    RuntimeEnvelope,
     RuntimeEnvelope38,
     RuntimeInfo,
     SystemInfo,
@@ -42,14 +48,6 @@ from .response import (
 )
 from .world_registry import WorldRegistry
 
-
-ApiEndpoint = ApiEndpoint38
-GatewayRequest = GatewayRequest38
-GatewayRestAdapter = GatewayRestAdapter38
-Orchestrator = Orchestrator38
-ServiceGateway = ServiceGateway38
-ServiceOperation = ServiceOperation38
-build_service_gateway = build_service_gateway38
 
 __all__ = [
     "AccessDeniedError",
@@ -75,6 +73,7 @@ __all__ = [
     "Orchestrator38",
     "ResourceNotFoundError",
     "RuntimeInfo",
+    "RuntimeEnvelope",
     "RuntimeEnvelope38",
     "ResponseType",
     "ResourceBinding",

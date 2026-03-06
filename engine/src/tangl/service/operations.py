@@ -1,11 +1,11 @@
-"""Operation tokens for service38 call sites."""
+"""Operation tokens for service call sites."""
 
 from __future__ import annotations
 
 from enum import Enum
 
 
-class ServiceOperation38(str, Enum):
+class ServiceOperation(str, Enum):
     """Stable external operation ids mapped to internal controller endpoints."""
 
     STORY38_CREATE = "story38.create"
@@ -30,50 +30,55 @@ class ServiceOperation38(str, Enum):
     SYSTEM_RESET = "system.reset"
 
 
-_OPERATION_ENDPOINTS: dict[ServiceOperation38, str] = {
-    ServiceOperation38.STORY38_CREATE: "RuntimeController.create_story38",
-    ServiceOperation38.STORY38_UPDATE: "RuntimeController.get_story_update38",
-    ServiceOperation38.STORY38_DO: "RuntimeController.resolve_choice38",
-    ServiceOperation38.STORY38_STATUS: "RuntimeController.get_story_info38",
-    ServiceOperation38.STORY38_DROP: "RuntimeController.drop_story38",
+_OPERATION_ENDPOINTS: dict[ServiceOperation, str] = {
+    ServiceOperation.STORY38_CREATE: "RuntimeController.create_story38",
+    ServiceOperation.STORY38_UPDATE: "RuntimeController.get_story_update38",
+    ServiceOperation.STORY38_DO: "RuntimeController.resolve_choice38",
+    ServiceOperation.STORY38_STATUS: "RuntimeController.get_story_info38",
+    ServiceOperation.STORY38_DROP: "RuntimeController.drop_story38",
 
-    ServiceOperation38.USER_INFO: "UserController.get_user_info",
-    ServiceOperation38.USER_CREATE: "UserController.create_user",
-    ServiceOperation38.USER_UPDATE: "UserController.update_user",
-    ServiceOperation38.USER_DROP: "UserController.drop_user",
-    ServiceOperation38.USER_KEY: "UserController.get_key_for_secret",
+    ServiceOperation.USER_INFO: "UserController.get_user_info",
+    ServiceOperation.USER_CREATE: "UserController.create_user",
+    ServiceOperation.USER_UPDATE: "UserController.update_user",
+    ServiceOperation.USER_DROP: "UserController.drop_user",
+    ServiceOperation.USER_KEY: "UserController.get_key_for_secret",
 
-    ServiceOperation38.WORLD_LIST: "WorldController.list_worlds",
-    ServiceOperation38.WORLD_INFO: "WorldController.get_world_info",
-    ServiceOperation38.WORLD_MEDIA: "WorldController.get_world_media",
-    ServiceOperation38.WORLD_LOAD: "WorldController.load_world",
-    ServiceOperation38.WORLD_UNLOAD: "WorldController.unload_world",
+    ServiceOperation.WORLD_LIST: "WorldController.list_worlds",
+    ServiceOperation.WORLD_INFO: "WorldController.get_world_info",
+    ServiceOperation.WORLD_MEDIA: "WorldController.get_world_media",
+    ServiceOperation.WORLD_LOAD: "WorldController.load_world",
+    ServiceOperation.WORLD_UNLOAD: "WorldController.unload_world",
 
-    ServiceOperation38.SYSTEM_INFO: "SystemController.get_system_info",
-    ServiceOperation38.SYSTEM_RESET: "SystemController.reset_system",
+    ServiceOperation.SYSTEM_INFO: "SystemController.get_system_info",
+    ServiceOperation.SYSTEM_RESET: "SystemController.reset_system",
 }
 
 
 _ENDPOINT_OPERATION = {endpoint: op for op, endpoint in _OPERATION_ENDPOINTS.items()}
 
 
-def endpoint_for_operation(operation: ServiceOperation38 | str) -> str:
-    """Resolve a service38 operation token to controller endpoint name."""
+def endpoint_for_operation(operation: ServiceOperation | str) -> str:
+    """Resolve a service operation token to controller endpoint name."""
 
-    op = operation if isinstance(operation, ServiceOperation38) else ServiceOperation38(operation)
+    op = operation if isinstance(operation, ServiceOperation) else ServiceOperation(operation)
     return _OPERATION_ENDPOINTS[op]
 
 
-def operation_for_endpoint(endpoint_name: str) -> ServiceOperation38:
-    """Resolve a controller endpoint name back to a service38 operation token."""
+def operation_for_endpoint(endpoint_name: str) -> ServiceOperation:
+    """Resolve a controller endpoint name back to a service operation token."""
 
     try:
         return _ENDPOINT_OPERATION[endpoint_name]
     except KeyError as exc:
-        raise KeyError(f"No service38 operation token for endpoint '{endpoint_name}'") from exc
+        raise KeyError(f"No service operation token for endpoint '{endpoint_name}'") from exc
+
+
+# Backwards-compatible alias retained during naming cutover.
+ServiceOperation38 = ServiceOperation
 
 
 __all__ = [
+    "ServiceOperation",
     "ServiceOperation38",
     "endpoint_for_operation",
     "operation_for_endpoint",

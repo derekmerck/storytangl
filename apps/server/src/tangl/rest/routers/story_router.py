@@ -13,7 +13,7 @@ from tangl.rest.dependencies38 import (
     resolve_user_auth38,
 )
 from tangl.service.exceptions import AccessDeniedError
-from tangl.service import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
+from tangl.service import GatewayRestAdapter, ServiceOperation, UserAuthInfo
 from tangl.service.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
@@ -130,8 +130,8 @@ def _normalize_choice_labels_in_fragments(fragments: list[Any]) -> list[Any]:
 
 
 def _call_service38(
-    adapter: GatewayRestAdapter38,
-    operation: ServiceOperation38,
+    adapter: GatewayRestAdapter,
+    operation: ServiceOperation,
     /,
     *,
     render_profile: str = "raw",
@@ -154,7 +154,7 @@ def _call_service38(
 
 
 def _call_endpoint38(
-    adapter: GatewayRestAdapter38,
+    adapter: GatewayRestAdapter,
     endpoint_name: str,
     /,
     *,
@@ -218,7 +218,7 @@ async def create_story(
     world_id: str = Query(..., description="World template to instantiate"),
     story_label: str | None = Query(None, description="Optional story label"),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: str = Header(..., alias="X-API-Key"),
 ):
     """Create a new story instance for the authenticated user."""
@@ -246,7 +246,7 @@ async def create_story(
 
 @router.get("/update")
 async def get_story_update(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
@@ -289,7 +289,7 @@ async def get_story_update(
 @router.post("/do")
 async def do_story_action(
     request: ChoiceRequest = Body(...),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
@@ -340,7 +340,7 @@ async def create_story38(
         description="Initialization mode: LAZY or EAGER",
     ),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: str = Header(..., alias="X-API-Key"),
 ) -> dict[str, Any]:
     """Create a vm38/story38 session and return the initial envelope."""
@@ -353,7 +353,7 @@ async def create_story38(
 
     result = _call_service38(
         adapter,
-        ServiceOperation38.STORY38_CREATE,
+        ServiceOperation.STORY38_CREATE,
         user_id=user_auth.user_id,
         user_auth=user_auth,
         render_profile=render_profile,
@@ -370,7 +370,7 @@ async def create_story38(
 
 @router.get("/story38/update")
 async def get_story_update38(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
@@ -385,7 +385,7 @@ async def get_story_update38(
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     result = _call_service38(
         adapter,
-        ServiceOperation38.STORY38_UPDATE,
+        ServiceOperation.STORY38_UPDATE,
         user_id=user_auth.user_id,
         user_auth=user_auth,
         render_profile=render_profile,
@@ -401,7 +401,7 @@ async def get_story_update38(
 @router.post("/story38/do")
 async def do_story_action38(
     request: ChoiceRequest = Body(...),
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
@@ -418,7 +418,7 @@ async def do_story_action38(
     async with user_locks[user_auth.user_id]:
         result = _call_service38(
             adapter,
-            ServiceOperation38.STORY38_DO,
+            ServiceOperation.STORY38_DO,
             user_id=user_auth.user_id,
             user_auth=user_auth,
             render_profile=render_profile,
@@ -433,7 +433,7 @@ async def do_story_action38(
 
 @router.get("/story38/status")
 async def get_story_status38(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
@@ -443,7 +443,7 @@ async def get_story_status38(
     user_auth = resolve_user_auth38(api_key, adapter=adapter)
     result = _call_service38(
         adapter,
-        ServiceOperation38.STORY38_STATUS,
+        ServiceOperation.STORY38_STATUS,
         user_id=user_auth.user_id,
         user_auth=user_auth,
         render_profile=render_profile,
@@ -455,7 +455,7 @@ async def get_story_status38(
 
 @router.get("/info")
 async def get_story_info(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
@@ -477,7 +477,7 @@ async def get_story_info(
 @router.get("/status")
 async def get_story_status_alias(
     response: Response,
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
     ),
@@ -497,7 +497,7 @@ async def get_story_status_alias(
 
 @router.delete("/drop")
 async def reset_story(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
@@ -533,7 +533,7 @@ async def reset_story(
 
 @router.delete("/story38/drop")
 async def reset_story38(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter38),
     user_locks=Depends(get_user_locks38),
     api_key: UniqueLabel = Header(
         ..., alias="X-API-Key", example=key_for_secret(settings.client.secret)
@@ -547,7 +547,7 @@ async def reset_story38(
         async with user_locks[user_auth.user_id]:
             result = _call_service38(
                 adapter,
-                ServiceOperation38.STORY38_DROP,
+                ServiceOperation.STORY38_DROP,
                 user_id=user_auth.user_id,
                 user_auth=user_auth,
                 render_profile=render_profile,

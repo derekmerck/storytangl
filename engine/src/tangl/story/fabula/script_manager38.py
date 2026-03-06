@@ -11,8 +11,8 @@ ScopeProvider = Callable[..., Iterable[Iterable[Any]]]
 
 
 @dataclass(slots=True)
-class ScriptManager38:
-    """Runtime template lookup and scope-group facade for story38."""
+class ScriptManager:
+    """Runtime template lookup and scope-group facade for story."""
 
     template_registry: TemplateRegistry
     world_scope_provider: ScopeProvider | None = None
@@ -79,3 +79,6 @@ class ScriptManager38:
 
         return groups
 
+
+# Backwards-compatible alias retained during naming cutover.
+ScriptManager38 = ScriptManager

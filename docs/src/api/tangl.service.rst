@@ -24,9 +24,9 @@ Orchestrator
 
 Response
 --------
-.. autoclass:: tangl.service.response.BaseResponse
-.. autoclass:: tangl.service.response.info_response.RuntimeInfo
-.. autoclass:: tangl.service.response.ContentResponse
+.. autoclass:: tangl.service.response.RuntimeInfo
+.. autoclass:: tangl.service.response.InfoModel
+.. autoclass:: tangl.service.response.RuntimeEnvelope
 
 User
 ----

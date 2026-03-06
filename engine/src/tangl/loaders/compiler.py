@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
-from tangl.story.fabula import StoryCompiler38, World38
+from tangl.story.fabula import StoryCompiler, World
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
-
-if TYPE_CHECKING:
-    from tangl.story.fabula import World
 
 
 class _WorldDomainFacet:
@@ -68,14 +65,16 @@ class WorldCompiler:
         asset_compiler: AssetCompiler | None = None,
         domain_compiler: DomainCompiler | None = None,
         media_compiler: MediaCompiler | None = None,
-        story38_compiler: StoryCompiler38 | None = None,
+        story_compiler: StoryCompiler | None = None,
+        story38_compiler: StoryCompiler | None = None,
         codec_registry: CodecRegistry | None = None,
     ) -> None:
         self.script_compiler = script_compiler or ScriptCompiler()
         self.asset_compiler = asset_compiler or AssetCompiler()
         self.domain_compiler = domain_compiler or DomainCompiler()
         self.media_compiler = media_compiler or MediaCompiler()
-        self.story38_compiler = story38_compiler or StoryCompiler38()
+        self.story_compiler = story_compiler or story38_compiler or StoryCompiler()
+        self.story38_compiler = self.story_compiler
         self.codec_registry = codec_registry or CodecRegistry()
 
     def compile(
@@ -84,7 +83,7 @@ class WorldCompiler:
         story_key: str | None = None,
         *,
         runtime_version: str = "37",
-    ) -> World | World38:
+    ) -> World:
         base_metadata = bundle.manifest.metadata.copy()
 
         decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
@@ -106,23 +105,23 @@ class WorldCompiler:
 
         if runtime_version == "38":
             domain_facet, assets_facet, resources_facet = self._build_world38_facets(bundle)
-            story38_bundle = self.story38_compiler.compile(
+            story_bundle = self.story_compiler.compile(
                 script_data,
                 source_map=decode_result.source_map,
                 codec_state=decode_result.codec_state,
                 codec_id=codec_id,
             )
-            world38 = World38(
+            world = World(
                 label=bundle.manifest.story_label(story_key),
-                bundle=story38_bundle,
+                bundle=story_bundle,
                 domain=domain_facet,
-                templates=story38_bundle.template_registry,
+                templates=story_bundle.template_registry,
                 assets=assets_facet,
                 resources=resources_facet,
             )
-            return world38
+            return world
 
-        from tangl.story.fabula import AssetManager, DomainManager, World
+        from tangl.story.fabula import AssetManager, DomainManager, World as LegacyWorld
 
         script_manager = self.script_compiler.compile(script_data)
 
@@ -142,7 +141,7 @@ class WorldCompiler:
         world_metadata = base_metadata.copy()
         world_metadata.update(script_manager.get_story_metadata())
 
-        world = World(
+        world = LegacyWorld(
             label=bundle.manifest.story_label(story_key),
             script_manager=script_manager,
             domain_manager=domain_manager,
@@ -158,7 +157,7 @@ class WorldCompiler:
         bundle: WorldBundle,
         *,
         runtime_version: str = "37",
-    ) -> dict[str, World | World38]:
+    ) -> dict[str, World]:
         if not bundle.manifest.is_anthology:
             msg = f"{bundle.manifest.label} is not an anthology"
             raise ValueError(msg)
@@ -190,9 +189,9 @@ class WorldCompiler:
             )
 
         if runtime_version != "38":
-            from tangl.story.fabula import AssetManager, World
+            from tangl.story.fabula import AssetManager, World as LegacyWorld
 
-        worlds: dict[str, World | World38] = {}
+        worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
             decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
             script_data = decode_result.story_data
@@ -212,17 +211,17 @@ class WorldCompiler:
             script_metadata.setdefault("title", default_title)
 
             if runtime_version == "38":
-                story38_bundle = self.story38_compiler.compile(
+                story_bundle = self.story_compiler.compile(
                     script_data,
                     source_map=decode_result.source_map,
                     codec_state=decode_result.codec_state,
                     codec_id=codec_id,
                 )
-                worlds[story_key] = World38(
+                worlds[story_key] = World(
                     label=bundle.manifest.story_label(story_key),
-                    bundle=story38_bundle,
+                    bundle=story_bundle,
                     domain=world38_domain_facet,
-                    templates=story38_bundle.template_registry,
+                    templates=story_bundle.template_registry,
                     assets=world38_assets_facet,
                     resources=world38_resources_facet,
                 )
@@ -235,7 +234,7 @@ class WorldCompiler:
             world_metadata = base_metadata.copy()
             world_metadata.update(script_manager.get_story_metadata())
 
-            world = World(
+            world = LegacyWorld(
                 label=bundle.manifest.story_label(story_key),
                 script_manager=script_manager,
                 domain_manager=domain_manager,
