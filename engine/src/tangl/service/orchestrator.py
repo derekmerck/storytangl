@@ -679,13 +679,8 @@ class Orchestrator:
                 inferred.append(binding)
         return tuple(inferred)
 
-
-Orchestrator38 = Orchestrator
-
-
 __all__ = [
     "ExecuteOptions",
     "Orchestrator",
-    "Orchestrator38",
     "WritebackMode",
 ]

@@ -41,14 +41,9 @@ def build_service_gateway(
     apply_default_endpoint_policies(orchestrator)
     return ServiceGateway(orchestrator, default_render_profile=default_render_profile)
 
-
-build_service_gateway38 = build_service_gateway
-
-
 __all__ = [
     "DEFAULT_ENDPOINT_POLICIES",
     "apply_default_endpoint_policies",
     "build_service_gateway",
-    "build_service_gateway38",
     "register_default_controllers",
 ]

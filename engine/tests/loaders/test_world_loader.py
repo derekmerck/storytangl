@@ -8,7 +8,7 @@ import pytest
 from tangl.loaders.bundle import WorldBundle
 from tangl.loaders.compiler import ScriptCompiler, WorldCompiler
 from tangl.service.world_registry import WorldRegistry
-from tangl.story import World38
+from tangl.story import World
 
 
 class _BridgeScriptCompiler(ScriptCompiler):
@@ -440,8 +440,8 @@ class DomainCharacter(Entity):
     world_one = anthology["book1"]
     world_two = anthology["book2"]
 
-    assert isinstance(world_one, World38)
-    assert isinstance(world_two, World38)
+    assert isinstance(world_one, World)
+    assert isinstance(world_two, World)
     assert world_one.domain is world_two.domain
     assert world_one.assets is world_two.assets
     assert world_one.resources is world_two.resources
@@ -497,7 +497,7 @@ scenes: {}
     try:
         world = compiler.compile(bundle, runtime_version="38")
 
-        assert isinstance(world, World38)
+        assert isinstance(world, World)
         assert world.domain is not None
         assert "DomainCharacter" in world.domain.class_registry
         assert world.domain.dispatch_registry in world.get_authorities()

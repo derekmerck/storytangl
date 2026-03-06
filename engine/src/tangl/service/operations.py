@@ -72,14 +72,8 @@ def operation_for_endpoint(endpoint_name: str) -> ServiceOperation:
     except KeyError as exc:
         raise KeyError(f"No service operation token for endpoint '{endpoint_name}'") from exc
 
-
-# Backwards-compatible alias retained during naming cutover.
-ServiceOperation38 = ServiceOperation
-
-
 __all__ = [
     "ServiceOperation",
-    "ServiceOperation38",
     "endpoint_for_operation",
     "operation_for_endpoint",
 ]

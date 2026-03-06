@@ -15,13 +15,13 @@ import pytest
 from tangl.loaders import WorldBundle, WorldCompiler
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.user.user import User
-from tangl.story import InitMode, World38
+from tangl.story import InitMode, World
 from tangl.story.concepts import Actor, Location, Role, Setting
 from tangl.story.fabula import (
     GraphInitializationError,
     ResolutionError,
     ResolutionFailureReason,
-    StoryCompiler38,
+    StoryCompiler,
 )
 from tangl.story.episode import Action, Block, Scene
 from tangl.core import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
@@ -69,7 +69,7 @@ def _base_script() -> dict:
 
 
 def test_compiler_emits_template_registry_and_entry_ids() -> None:
-    bundle = StoryCompiler38().compile(_base_script())
+    bundle = StoryCompiler().compile(_base_script())
 
     assert bundle.entry_template_ids == ["intro.start"]
     assert bundle.template_registry.find_one(Selector(label="intro")) is not None
@@ -77,7 +77,7 @@ def test_compiler_emits_template_registry_and_entry_ids() -> None:
 
 
 def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     result = world.create_story("run_lazy", init_mode=InitMode.LAZY)
 
     graph = result.graph
@@ -114,7 +114,7 @@ def test_lazy_mode_missing_canonical_destination_raises_resolution_error() -> No
         },
     }
 
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     with pytest.raises(ResolutionError) as exc_info:
         world.create_story("lazy_missing_story", init_mode=InitMode.LAZY)
 
@@ -166,7 +166,7 @@ def test_lazy_mode_ambiguous_destination_raises_resolution_error() -> None:
         registry=extra_templates,
     )
 
-    world = World38.from_script_data(
+    world = World.from_script_data(
         script_data=script,
         templates=_AmbiguousTemplates(extra=extra_templates),
     )
@@ -182,7 +182,7 @@ def test_lazy_mode_ambiguous_destination_raises_resolution_error() -> None:
 
 
 def test_eager_mode_materializes_all_and_wires_dependencies() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     result = world.create_story("run_eager", init_mode=InitMode.EAGER)
 
     graph = result.graph
@@ -205,7 +205,7 @@ def test_eager_mode_missing_hard_dependency_raises() -> None:
         {"label": "host", "actor_ref": "missing", "hard": True}
     ]
 
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     with pytest.raises(GraphInitializationError):
         world.create_story("run_fail", init_mode=InitMode.EAGER)
 
@@ -216,7 +216,7 @@ def test_eager_mode_missing_soft_dependency_is_reported() -> None:
         {"label": "optional_host", "actor_ref": "missing", "hard": False}
     ]
 
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("run_soft", init_mode=InitMode.EAGER)
 
     assert len(result.report.unresolved_hard) == 0
@@ -232,10 +232,10 @@ def test_eager_mode_prelink_selection_is_deterministic() -> None:
     }
     script["scenes"]["intro"]["blocks"]["start"]["roles"] = [{"label": "companion"}]
 
-    world_a = World38.from_script_data(script_data=script)
+    world_a = World.from_script_data(script_data=script)
     result_a = world_a.create_story("run_det_a", init_mode=InitMode.EAGER)
 
-    world_b = World38.from_script_data(script_data=script)
+    world_b = World.from_script_data(script_data=script)
     result_b = world_b.create_story("run_det_b", init_mode=InitMode.EAGER)
 
     role_a = next(Selector(has_kind=Role).filter(result_a.graph.values()))
@@ -260,7 +260,7 @@ def test_static_cyoa_traversal_needs_no_runtime_provisioning() -> None:
         },
     }
 
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("linear_eager", init_mode=InitMode.EAGER)
 
     assert result.report.unresolved_hard == []
@@ -290,7 +290,7 @@ def test_action_payload_is_materialized_from_script() -> None:
         "framework": "wx",
     }
 
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("payload_story", init_mode=InitMode.EAGER)
     start = result.graph.get(result.graph.initial_cursor_id)
     assert isinstance(start, Block)
@@ -313,7 +313,7 @@ def test_action_hint_aliases_payload_schema_and_presentation_hints() -> None:
         "widget": "chips",
     }
 
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("payload_alias_story", init_mode=InitMode.EAGER)
     start = result.graph.get(result.graph.initial_cursor_id)
     assert isinstance(start, Block)
@@ -372,7 +372,7 @@ scenes:
     bundle = WorldBundle.load(world_root)
     compiled = WorldCompiler().compile(bundle, runtime_version="38")
 
-    assert isinstance(compiled, World38)
+    assert isinstance(compiled, World)
     assert compiled.domain is not None
     assert compiled.assets is not None
     assert compiled.resources is not None
@@ -387,7 +387,7 @@ scenes:
 
 
 def test_runtime_controller_create_story_with_world_param() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     controller = RuntimeController()
     user = User(label="test-user")
 
@@ -406,7 +406,7 @@ def test_runtime_controller_create_story_with_world_param() -> None:
 
 
 def test_story_graph_authorities_include_story_and_world_authorities() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     result = world.create_story("auth_story", init_mode=InitMode.LAZY)
 
     world_authority = BehaviorRegistry(
@@ -421,7 +421,7 @@ def test_story_graph_authorities_include_story_and_world_authorities() -> None:
 
 
 def test_story_graph_template_lineage_is_nearest_first() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     result = world.create_story("scope_lineage_story", init_mode=InitMode.EAGER)
 
     graph = result.graph
@@ -434,7 +434,7 @@ def test_story_graph_template_lineage_is_nearest_first() -> None:
 
 
 def test_scene_finalize_container_contract_is_idempotent() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     result = world.create_story("scene_finalize_idempotent", init_mode=InitMode.EAGER)
     graph = result.graph
 
@@ -453,7 +453,7 @@ def test_scene_finalize_container_contract_is_idempotent() -> None:
 
 
 def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
     result = world.create_story("scope_groups_story", init_mode=InitMode.EAGER)
 
     graph = result.graph
@@ -473,7 +473,7 @@ def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
 
 
 def test_world_template_lookup_facade_finds_templates() -> None:
-    world = World38.from_script_data(script_data=_base_script())
+    world = World.from_script_data(script_data=_base_script())
 
     start_template = world.find_template("intro.start")
     assert start_template is not None
@@ -492,7 +492,7 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
         def get_template_scope_groups(self, *, caller=None, graph=None):
             return [self.extra_template_registry.values()]
 
-    base_world = World38.from_script_data(script_data=_base_script())
+    base_world = World.from_script_data(script_data=_base_script())
     extra_registry = TemplateRegistry(label="world_extra_templates")
     extra_template = EntityTemplate(
         label="world.extra.guest",
@@ -501,7 +501,7 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
     )
     _ = extra_template
 
-    world = World38(
+    world = World(
         label=base_world.label,
         bundle=base_world.bundle,
         templates=_TemplateScopeFacet(extra_template_registry=extra_registry),

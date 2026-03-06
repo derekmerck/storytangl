@@ -2,12 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from tangl.story import World38
+from tangl.story import World
 
 
 @pytest.fixture(autouse=True)
 def clear_world_instances() -> None:
-    clear_instances = getattr(World38, "clear_instances", None)
+    clear_instances = getattr(World, "clear_instances", None)
     if callable(clear_instances):
         clear_instances()
     yield

@@ -8,9 +8,9 @@ from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.vm import Frame as VmFrame
 
 if hasattr(VmFrame, "_make_ctx"):
-    from tangl.story import Block, StoryGraph38 as StoryGraph
+    from tangl.story import Block, StoryGraph as StoryGraph
 else:
-    from tangl.story import Block, LegacyStoryGraph as StoryGraph
+    from tangl.story import Block, StoryGraph as StoryGraph
 
 
 class MediaWorld(NamedTuple):

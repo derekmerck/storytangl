@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core.runtime_op import Predicate
-from tangl.story import StoryGraph38
+from tangl.story import StoryGraph
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
 from tangl.story.episode import Action, Block
 from tangl.story.system_handlers import (
@@ -59,7 +59,7 @@ def test_render_block_choice_unavailable_reason_missing_successor() -> None:
 
 
 def test_render_block_choice_missing_successor_uses_preview_blockers_when_dependency_exists() -> None:
-    graph = StoryGraph38()
+    graph = StoryGraph()
     start = Block(label="start")
     graph.add(start)
     action = Action(predecessor_id=start.uid, text="Broken")
@@ -186,7 +186,7 @@ def test_render_block_compatibility_facade_merges_split_handlers() -> None:
 
 
 def test_dispatch_journal_allows_custom_handler_injection() -> None:
-    graph = StoryGraph38()
+    graph = StoryGraph()
     start = Block(label="start", content="Hello {name}", media=[{"kind": "image", "src": "a.svg"}])
     end = Block(label="end")
     graph.add(start)
@@ -217,7 +217,7 @@ def test_dispatch_journal_allows_custom_handler_injection() -> None:
 
 
 def test_render_block_content_includes_graph_locals_from_gather_ns() -> None:
-    graph = StoryGraph38(locals={"gold": 10})
+    graph = StoryGraph(locals={"gold": 10})
     graph.world = SimpleNamespace(locals={"gold": 3})
     start = Block(label="start", content="Gold: {gold}")
     graph.add(start)

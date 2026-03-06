@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tangl.core import Selector
-from tangl.story import InitMode, World38
+from tangl.story import InitMode, World
 from tangl.story.episode import Action
 from tangl.vm import Dependency
 
@@ -35,7 +35,7 @@ def test_bare_successor_preserves_authored_path_and_marks_unqualified() -> None:
             }
         },
     }
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("meta_story", init_mode=InitMode.LAZY)
     graph = result.graph
 
@@ -65,7 +65,7 @@ def test_qualified_successor_preserves_authored_path_and_marks_qualified() -> No
             }
         },
     }
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("meta_story_qualified", init_mode=InitMode.LAZY)
     graph = result.graph
 
@@ -99,7 +99,7 @@ def test_cross_scene_bare_successor_marks_absolute() -> None:
             },
         },
     }
-    world = World38.from_script_data(script_data=script)
+    world = World.from_script_data(script_data=script)
     result = world.create_story("meta_story_cross_scene", init_mode=InitMode.LAZY)
     graph = result.graph
 

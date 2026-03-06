@@ -184,8 +184,4 @@ class WorldController(HasApiEndpoints):
             )
         return RuntimeInfo.ok(message="World unloaded", world_label=world.label)
 
-
-resolve_world38 = resolve_world
-
-
-__all__ = ["WorldController", "resolve_world", "resolve_world38"]
+__all__ = ["WorldController", "resolve_world"]

@@ -29,7 +29,7 @@ from tangl.core.runtime_op import Predicate
 from tangl.story.concepts import Actor, Location, Role, Setting
 from tangl.story.episode import Action, Block, Scene
 from tangl.story.fragments import ChoiceFragment, ContentFragment
-from tangl.story.story_graph import StoryGraph38
+from tangl.story.story_graph import StoryGraph
 from tangl.story.system_handlers import render_block, render_block_choices
 from tangl.vm import Dependency, Requirement
 
@@ -46,7 +46,7 @@ def _simple_ctx(ns: dict | None = None):
     return SimpleNamespace(get_ns=lambda _caller: dict(ns or {}))
 
 
-def _full_ctx(graph: StoryGraph38, cursor: Block, ns: dict | None = None):
+def _full_ctx(graph: StoryGraph, cursor: Block, ns: dict | None = None):
     from tangl.vm.runtime.frame import PhaseCtx
     ctx = PhaseCtx(graph=graph, cursor_id=cursor.uid)
     ctx._ns_cache[cursor.uid] = ns or {}
@@ -199,7 +199,7 @@ class TestMissingSuccessor:
         assert fragments[0].blockers == [{"type": "edge", "reason": "missing_successor"}]
 
     def test_unresolved_successor_is_available_when_preview_is_viable(self) -> None:
-        graph = StoryGraph38(label="preview_story")
+        graph = StoryGraph(label="preview_story")
         start = Block(label="start")
         graph.add(start)
         action = Action(predecessor_id=start.uid, text="Provisioned")
@@ -287,8 +287,8 @@ class TestDependencyGating:
 class TestConceptGating:
     """Choices guarded on Role/Setting namespace values."""
 
-    def _guarded_graph(self, guard_expr: str) -> tuple[StoryGraph38, Block, Block, Actor]:
-        graph = StoryGraph38(label="concept_story")
+    def _guarded_graph(self, guard_expr: str) -> tuple[StoryGraph, Block, Block, Actor]:
+        graph = StoryGraph(label="concept_story")
         scene = Scene(label="scene")
         start = Block(label="start", content="Hello {host_name}")
         end = Block(label="end", availability=[Predicate(expr=guard_expr)])

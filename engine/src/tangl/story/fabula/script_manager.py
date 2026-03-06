@@ -78,7 +78,3 @@ class ScriptManager:
                 _add_group(group)
 
         return groups
-
-
-# Backwards-compatible alias retained during naming cutover.
-ScriptManager38 = ScriptManager

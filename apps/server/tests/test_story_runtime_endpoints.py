@@ -14,7 +14,7 @@ from tangl.service.user.user import User
 from tangl.service.api_endpoint import AccessLevel
 from tangl.story.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
-from tangl.vm.runtime.ledger import Ledger as Ledger38
+from tangl.vm.runtime.ledger import Ledger
 
 
 def _write_story38_bundle(root: Path) -> str:
@@ -111,14 +111,14 @@ def test_story38_rest_envelope_flow(
     assert isinstance(envelope.get("fragments"), list)
 
     captured: dict[str, object] = {}
-    original_resolve = Ledger38.resolve_choice
+    original_resolve = Ledger.resolve_choice
 
     def _capture_resolve(self, edge_id, *, choice_payload=None):
         captured["edge_id"] = edge_id
         captured["choice_payload"] = choice_payload
         return original_resolve(self, edge_id, choice_payload=choice_payload)
 
-    monkeypatch.setattr(Ledger38, "resolve_choice", _capture_resolve)
+    monkeypatch.setattr(Ledger, "resolve_choice", _capture_resolve)
 
     payload = {"move": "knight", "to": "b6"}
     do = client.post(

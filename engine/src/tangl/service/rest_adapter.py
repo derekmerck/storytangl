@@ -11,8 +11,6 @@ from .gateway import ServiceGateway
 from .operations import ServiceOperation
 
 AuthResolver = Callable[[str], UserAuthInfo]
-# Backwards-compatible alias retained during naming cutover.
-AuthResolver38 = AuthResolver
 
 
 @dataclass(frozen=True)
@@ -110,16 +108,8 @@ class GatewayRestAdapter:
         )
 
 
-# Backwards-compatible aliases retained during naming cutover.
-GatewayRequest38 = GatewayRequest
-GatewayRestAdapter38 = GatewayRestAdapter
-
-
 __all__ = [
     "AuthResolver",
-    "AuthResolver38",
     "GatewayRequest",
-    "GatewayRequest38",
     "GatewayRestAdapter",
-    "GatewayRestAdapter38",
 ]

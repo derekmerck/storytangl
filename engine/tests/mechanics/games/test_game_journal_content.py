@@ -5,7 +5,7 @@ import pytest
 from tangl.vm import Frame, ResolutionPhase as P
 from tangl.vm.dispatch import dispatch as vm38_dispatch
 from tangl.story.dispatch import story_dispatch
-from tangl.story import Block, LegacyStoryGraph as StoryGraph
+from tangl.story import Block, StoryGraph as StoryGraph
 from tangl.mechanics.games import Game, HasGame
 from tangl.journal.content import ContentFragment
 

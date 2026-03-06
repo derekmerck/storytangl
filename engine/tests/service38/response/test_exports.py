@@ -30,32 +30,32 @@ def test_service38_response_types_importable() -> None:
 
 
 def test_service38_package_exports_include_response_and_gateway_contracts() -> None:
-    import tangl.service as service38
+    import tangl.service as service
 
     expected = {
-        "ApiEndpoint38",
+        "ApiEndpoint",
         "EndpointPolicy",
         "ExecuteOptions",
         "FragmentStream",
         "GatewayExecuteOptions",
-        "GatewayRequest38",
-        "GatewayRestAdapter38",
+        "GatewayRequest",
+        "GatewayRestAdapter",
         "InfoModel",
         "MediaNative",
         "NativeResponse",
-        "Orchestrator38",
+        "Orchestrator",
         "ResourceBinding",
         "RuntimeInfo",
-        "ServiceGateway38",
-        "ServiceOperation38",
+        "ServiceGateway",
+        "ServiceOperation",
         "UserAuthInfo",
         "WritebackMode",
-        "build_service_gateway38",
+        "build_service_gateway",
         "coerce_runtime_info",
         "user_id_by_key",
     }
 
-    exported = set(service38.__all__)
+    exported = set(service.__all__)
     assert expected.issubset(exported)
     for name in expected:
-        assert getattr(service38, name, None) is not None, f"Missing export: {name}"
+        assert getattr(service, name, None) is not None, f"Missing export: {name}"

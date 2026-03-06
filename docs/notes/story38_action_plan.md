@@ -89,7 +89,7 @@ Tests:
 - [x] Keep lookup API protocol-driven so story runtime and VM can share it.
 
 Target code:
-- `engine/src/tangl/story38/fabula/script_manager38.py` (new)
+- `engine/src/tangl/story38/fabula/script_manager.py` (new)
 - `engine/src/tangl/story38/fabula/world.py`
 - `engine/src/tangl/story38/fabula/materializer.py`
 
@@ -119,7 +119,7 @@ Tests:
 
 ### Phase 5.5 - Gateway Transport Adapter Alignment
 
-- [x] Add a transport-facing adapter around `ServiceGateway38` for auth resolution + operation execution.
+- [x] Add a transport-facing adapter around `ServiceGateway` for auth resolution + operation execution.
 - [x] Make `apps/server` use adapter dependencies rather than direct gateway/auth plumbing in routers.
 - [x] Keep CLI gateway-first by removing legacy orchestrator/controller bootstrap from default app wiring.
 - [x] Register service38-owned controller wrappers in bootstrap so operation endpoints no longer bind directly to legacy controller classes.
@@ -176,7 +176,7 @@ Validation snapshot (2026-02-21):
 - [x] Context protocol contracts documented and used in VM/story runtime surfaces.
 - [x] `on_get_ns` behavior documented as temporary and covered by tests.
 - [x] Journal composition is modular and externally extensible.
-- [x] World facets are available through `World38` and loader path.
+- [x] World facets are available through `World` and loader path.
 - [x] End-to-end CLI + REST story flows green on the full regression gate.
 
 ## Later Track (Deferred)

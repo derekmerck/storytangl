@@ -2,7 +2,7 @@
 
 These are the story38 replacements for the legacy ``test_simple_story.py``
 and ``test_branching_playthrough.py`` test modules.  They exercise the full
-pipeline from script compilation through ``World38.from_script_data`` →
+pipeline from script compilation through ``World.from_script_data`` →
 ``create_story`` (EAGER) → ``Ledger.resolve_choice``, validating:
 
 - Linear story traversal (cursor advances correctly on each step)
@@ -17,7 +17,7 @@ regression for Part A destination canonicalization.
 
 See Also
 --------
-- ``tangl.story.fabula.World38.from_script_data``
+- ``tangl.story.fabula.World.from_script_data``
 - ``tangl.vm.runtime.ledger.Ledger.resolve_choice``
 - ``tangl.vm.dispatch.do_journal``
 """
@@ -27,10 +27,10 @@ from __future__ import annotations
 import pytest
 
 from tangl.core import EntityTemplate, Selector, TemplateRegistry
-from tangl.story import InitMode, World38
+from tangl.story import InitMode, World
 from tangl.story.episode import Action, Block, Scene
 from tangl.story.fragments import ChoiceFragment, ContentFragment
-from tangl.story.story_graph import StoryGraph38
+from tangl.story.story_graph import StoryGraph
 from tangl.vm import Ledger
 from tangl.vm import Dependency, Requirement
 from tangl.vm.dispatch import do_journal
@@ -130,14 +130,14 @@ def _state_script() -> dict:
 
 @pytest.fixture()
 def linear_ledger() -> Ledger:
-    world = World38.from_script_data(script_data=_linear_script())
+    world = World.from_script_data(script_data=_linear_script())
     result = world.create_story("linear_play", init_mode=InitMode.EAGER)
     return Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
 
 @pytest.fixture()
 def branching_ledger() -> Ledger:
-    world = World38.from_script_data(script_data=_branching_script())
+    world = World.from_script_data(script_data=_branching_script())
     result = world.create_story("branching_play", init_mode=InitMode.EAGER)
     return Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
@@ -201,7 +201,7 @@ class TestLinearTraversal:
     def test_traversal_is_deterministic(self) -> None:
         """Same script produces same traversal path on two independent ledgers."""
         def _run() -> list[str]:
-            world = World38.from_script_data(script_data=_linear_script())
+            world = World.from_script_data(script_data=_linear_script())
             result = world.create_story("det_play", init_mode=InitMode.EAGER)
             ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
             path: list[str] = [ledger.cursor.label]
@@ -229,7 +229,7 @@ class TestBranchingTraversal:
         assert branching_ledger.cursor.label == "left_end"
 
     def test_right_choice_reaches_right_end(self) -> None:
-        world = World38.from_script_data(script_data=_branching_script())
+        world = World.from_script_data(script_data=_branching_script())
         result = world.create_story("branch_right", init_mode=InitMode.EAGER)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
@@ -271,12 +271,12 @@ class TestBranchingTraversal:
 
 class TestStoryGlobals:
     def test_globals_initialised_in_story_locals(self) -> None:
-        world = World38.from_script_data(script_data=_state_script())
+        world = World.from_script_data(script_data=_state_script())
         result = world.create_story("state_play", init_mode=InitMode.EAGER)
         assert result.graph.locals.get("gold") == 10
 
     def test_content_template_renders_with_globals(self) -> None:
-        world = World38.from_script_data(script_data=_state_script())
+        world = World.from_script_data(script_data=_state_script())
         result = world.create_story("state_render", init_mode=InitMode.EAGER)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
@@ -322,7 +322,7 @@ class TestMultiScene:
             },
         }
 
-        world = World38.from_script_data(script_data=script)
+        world = World.from_script_data(script_data=script)
         result = world.create_story("multi_play", init_mode=InitMode.EAGER)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
@@ -338,7 +338,7 @@ class TestMultiScene:
 
 class TestSelectionTimeProvisioning:
     def test_unresolved_but_viable_choice_provisions_then_traverses(self) -> None:
-        graph = StoryGraph38(label="selection_time")
+        graph = StoryGraph(label="selection_time")
         start = Block(label="start", content="Start")
         graph.add(start)
         action = Action(predecessor_id=start.uid, text="Go end")
@@ -404,7 +404,7 @@ class TestLazyCrossSceneProvisioning:
             },
         }
 
-        world = World38.from_script_data(script_data=script)
+        world = World.from_script_data(script_data=script)
         result = world.create_story("lazy_cross_scene_story", init_mode=InitMode.LAZY)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
@@ -460,7 +460,7 @@ class TestLazyCrossSceneProvisioning:
             },
         }
 
-        world = World38.from_script_data(script_data=script)
+        world = World.from_script_data(script_data=script)
         result = world.create_story("lazy_cross_scene_qualified_story", init_mode=InitMode.LAZY)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 

@@ -299,14 +299,9 @@ class ApiEndpoint(LegacyApiEndpoint):
         return decorator
 
 
-# Backwards-compatible alias retained during naming cutover.
-ApiEndpoint38 = ApiEndpoint
-
-
 __all__ = [
     "AccessLevel",
     "ApiEndpoint",
-    "ApiEndpoint38",
     "EndpointPolicy",
     "HasApiEndpoints",
     "LegacyApiEndpoint",

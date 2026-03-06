@@ -365,7 +365,3 @@ class StoryCompiler:
             if "locals" in payload and isinstance(payload["locals"], dict):
                 fallback.locals.update(payload["locals"])
             return fallback
-
-
-# Backwards-compatible alias retained during naming cutover.
-StoryCompiler38 = StoryCompiler

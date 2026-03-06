@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Iterable
 
 from .compiler import StoryCompiler, StoryTemplateBundle
 from .materializer import StoryMaterializer
-from .script_manager38 import ScriptManager
+from .script_manager import ScriptManager
 from .types import InitMode, StoryInitResult
 
 
@@ -138,7 +138,3 @@ class World:
     @classmethod
     def clear_instances(cls) -> None:
         cls._instances.clear()
-
-
-# Backwards-compatible alias retained during naming cutover.
-World38 = World

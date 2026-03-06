@@ -75,7 +75,3 @@ class StoryGraph(Graph):
 
         add_group(self.factory.values())
         return groups
-
-
-# Backwards-compatible alias retained during naming cutover.
-StoryGraph38 = StoryGraph

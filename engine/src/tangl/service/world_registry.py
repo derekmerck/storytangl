@@ -27,8 +27,6 @@ class WorldRegistry:
         self.compiler = compiler or WorldCompiler()
         self.bundles: dict[UniqueLabel, WorldBundle] = {}
         self.worlds: dict[UniqueLabel, World] = {}
-        # Compatibility alias for callers still referencing migration-era naming.
-        self.worlds38 = self.worlds
 
         if world_dirs is None:
             world_dirs = _get_world_dirs()

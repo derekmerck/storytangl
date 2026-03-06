@@ -189,17 +189,12 @@ FragmentStream: TypeAlias = list[BaseFragment]
 MediaNative: TypeAlias = MediaFragment
 NativeResponse: TypeAlias = FragmentStream | InfoModel | RuntimeInfo | MediaNative
 
-# Backwards-compatible alias retained during naming cutover.
-RuntimeEnvelope38 = RuntimeEnvelope
-
-
 __all__ = [
     "FragmentStream",
     "InfoModel",
     "MediaNative",
     "NativeResponse",
     "RuntimeEnvelope",
-    "RuntimeEnvelope38",
     "RuntimeInfo",
     "SystemInfo",
     "UserInfo",

@@ -5,7 +5,7 @@ This suite is the service38 replacement for:
   - ``engine/tests/service/test_orchestrator_basic.py``
 
 It focuses on response validation, error mapping, resource hydration, frame
-reuse, writeback behavior, and cleanup semantics in ``Orchestrator38``.
+reuse, writeback behavior, and cleanup semantics in ``Orchestrator``.
 """
 
 from __future__ import annotations
@@ -15,21 +15,20 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from tangl.core import BaseFragment
-from tangl.core import Graph as Graph38
+from tangl.core import BaseFragment, Graph
 from tangl.service.exceptions import InvalidOperationError
 from tangl.service.user.user import User
 from tangl.service.api_endpoint import (
     AccessLevel,
-    ApiEndpoint38,
+    ApiEndpoint,
     HasApiEndpoints,
     MethodType,
     ResourceBinding,
     ResponseType,
 )
-from tangl.service.orchestrator import Orchestrator38
+from tangl.service.orchestrator import Orchestrator
 from tangl.service.response import InfoModel, RuntimeInfo
-from tangl.vm.runtime.ledger import Ledger as Ledger38
+from tangl.vm.runtime.ledger import Ledger
 
 
 class _FakePersistence(dict):
@@ -72,10 +71,10 @@ class _Frag(BaseFragment):
     text: str
 
 
-def _make_ledger38() -> Ledger38:
-    graph = Graph38()
+def _make_ledger() -> Ledger:
+    graph = Graph()
     start = graph.add_node(label="start")
-    return Ledger38.from_graph(graph=graph, entry_id=start.uid)
+    return Ledger.from_graph(graph=graph, entry_id=start.uid)
 
 
 @pytest.fixture
@@ -84,13 +83,13 @@ def fake_persistence() -> _FakePersistence:
 
 
 @pytest.fixture
-def orchestrator(fake_persistence: _FakePersistence) -> Orchestrator38:
-    return Orchestrator38(fake_persistence)
+def orchestrator(fake_persistence: _FakePersistence) -> Orchestrator:
+    return Orchestrator(fake_persistence)
 
 
-def test_execute_returns_info_model(orchestrator: Orchestrator38) -> None:
+def test_execute_returns_info_model(orchestrator: Orchestrator) -> None:
     class _GoodController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.INFO,
@@ -105,9 +104,9 @@ def test_execute_returns_info_model(orchestrator: Orchestrator38) -> None:
     assert result.value == "ok"
 
 
-def test_orchestrator_validates_runtime_response_type(orchestrator: Orchestrator38) -> None:
+def test_orchestrator_validates_runtime_response_type(orchestrator: Orchestrator) -> None:
     class _BadController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.RUNTIME,
@@ -121,9 +120,9 @@ def test_orchestrator_validates_runtime_response_type(orchestrator: Orchestrator
         orchestrator.execute("_BadController.broken")
 
 
-def test_orchestrator_maps_service_errors(orchestrator: Orchestrator38) -> None:
+def test_orchestrator_maps_service_errors(orchestrator: Orchestrator) -> None:
     class _FailingController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.RUNTIME,
@@ -139,9 +138,9 @@ def test_orchestrator_maps_service_errors(orchestrator: Orchestrator38) -> None:
     assert result.code == InvalidOperationError.code
 
 
-def test_orchestrator_bubbles_non_service_errors(orchestrator: Orchestrator38) -> None:
+def test_orchestrator_bubbles_non_service_errors(orchestrator: Orchestrator) -> None:
     class _BuggyController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.RUNTIME,
@@ -155,9 +154,9 @@ def test_orchestrator_bubbles_non_service_errors(orchestrator: Orchestrator38) -
         orchestrator.execute("_BuggyController.buggy")
 
 
-def test_orchestrator_validates_content_response_type(orchestrator: Orchestrator38) -> None:
+def test_orchestrator_validates_content_response_type(orchestrator: Orchestrator) -> None:
     class _ContentController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.CONTENT,
@@ -166,7 +165,7 @@ def test_orchestrator_validates_content_response_type(orchestrator: Orchestrator
         def good_content(self) -> list[_Frag]:
             return [_Frag(text="hello")]
 
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.CONTENT,
@@ -175,7 +174,7 @@ def test_orchestrator_validates_content_response_type(orchestrator: Orchestrator
         def bad_content_type(self) -> list[int]:
             return [1, 2, 3]  # type: ignore[return-value]
 
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.CONTENT,
@@ -197,9 +196,9 @@ def test_orchestrator_validates_content_response_type(orchestrator: Orchestrator
         orchestrator.execute("_ContentController.not_a_list")
 
 
-def test_orchestrator_skips_media_validation(orchestrator: Orchestrator38) -> None:
+def test_orchestrator_skips_media_validation(orchestrator: Orchestrator) -> None:
     class _MediaController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.MEDIA,
@@ -215,24 +214,24 @@ def test_orchestrator_skips_media_validation(orchestrator: Orchestrator38) -> No
 
 
 def test_orchestrator_hydrates_user_and_ledger(
-    orchestrator: Orchestrator38,
+    orchestrator: Orchestrator,
     fake_persistence: _FakePersistence,
 ) -> None:
     class _LedgerController(HasApiEndpoints):
         def __init__(self) -> None:
-            self.last_call: tuple[User, Ledger38] | None = None
+            self.last_call: tuple[User, Ledger] | None = None
 
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.USER, ResourceBinding.LEDGER),
             response_type=ResponseType.INFO,
             method_type=MethodType.READ,
         )
-        def get_cursor(self, user: User, ledger: Ledger38) -> _CursorInfo:
+        def get_cursor(self, user: User, ledger: Ledger) -> _CursorInfo:
             self.last_call = (user, ledger)
             return _CursorInfo(cursor_id=ledger.cursor_id)
 
-    ledger = _make_ledger38()
+    ledger = _make_ledger()
     user = User(label="player")
     user.current_ledger_id = ledger.uid
     fake_persistence[user.uid] = user
@@ -252,10 +251,10 @@ def test_orchestrator_hydrates_user_and_ledger(
 
 
 def test_orchestrator_requires_user_id_for_user_hydration(
-    orchestrator: Orchestrator38,
+    orchestrator: Orchestrator,
 ) -> None:
     class _NeedsUserController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.USER,),
             response_type=ResponseType.INFO,
@@ -270,21 +269,21 @@ def test_orchestrator_requires_user_id_for_user_hydration(
 
 
 def test_orchestrator_reuses_cached_ledger_for_frame(
-    orchestrator: Orchestrator38,
+    orchestrator: Orchestrator,
     fake_persistence: _FakePersistence,
 ) -> None:
     class _FrameController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.LEDGER, ResourceBinding.FRAME),
             response_type=ResponseType.INFO,
             method_type=MethodType.READ,
         )
-        def get_frame_data(self, ledger: Ledger38, frame: Any) -> _CursorInfo:
+        def get_frame_data(self, ledger: Ledger, frame: Any) -> _CursorInfo:
             assert frame is not None
             return _CursorInfo(cursor_id=ledger.cursor_id)
 
-    ledger = _make_ledger38()
+    ledger = _make_ledger()
     fake_persistence[ledger.uid] = ledger.unstructure()
 
     orchestrator.register_controller(_FrameController)
@@ -299,30 +298,30 @@ def test_orchestrator_persists_mutations_and_skips_read_writeback(
     fake_persistence: _FakePersistence,
 ) -> None:
     class _UpdateController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.LEDGER,),
             response_type=ResponseType.RUNTIME,
             method_type=MethodType.UPDATE,
         )
-        def update_step(self, ledger: Ledger38) -> RuntimeInfo:
+        def update_step(self, ledger: Ledger) -> RuntimeInfo:
             ledger.step += 1
             return RuntimeInfo.ok(step=ledger.step)
 
     class _ReadController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.LEDGER,),
             response_type=ResponseType.INFO,
             method_type=MethodType.READ,
         )
-        def get_cursor(self, ledger: Ledger38) -> _CursorInfo:
+        def get_cursor(self, ledger: Ledger) -> _CursorInfo:
             return _CursorInfo(cursor_id=ledger.cursor_id)
 
-    ledger = _make_ledger38()
+    ledger = _make_ledger()
     fake_persistence[ledger.uid] = ledger.unstructure()
 
-    orchestrator = Orchestrator38(fake_persistence)
+    orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(_UpdateController)
     orchestrator.register_controller(_ReadController)
 
@@ -337,7 +336,7 @@ def test_orchestrator_persists_mutations_and_skips_read_writeback(
 
 def test_orchestrator_cleanup_invalid_delete_id_with_no_persistence() -> None:
     class _CleanupController(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.RUNTIME,
@@ -346,7 +345,7 @@ def test_orchestrator_cleanup_invalid_delete_id_with_no_persistence() -> None:
         def cleanup(self) -> RuntimeInfo:
             return RuntimeInfo.ok(_delete_ledger_id="not-a-uuid")
 
-    orchestrator = Orchestrator38(persistence_manager=None)
+    orchestrator = Orchestrator(persistence_manager=None)
     orchestrator.register_controller(_CleanupController)
 
     result = orchestrator.execute("_CleanupController.cleanup")
@@ -361,7 +360,7 @@ def test_orchestrator_cleanup_mapping_result_deletes_from_persistence() -> None:
     persistence: dict[Any, Any] = {ledger_id: {"ledger_uid": ledger_id}}
 
     class _DictCleanup(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(),
             response_type=ResponseType.MEDIA,
@@ -370,7 +369,7 @@ def test_orchestrator_cleanup_mapping_result_deletes_from_persistence() -> None:
         def cleanup(self) -> dict[str, Any]:
             return {"_delete_ledger_id": str(ledger_id)}
 
-    orchestrator = Orchestrator38(persistence)
+    orchestrator = Orchestrator(persistence)
     orchestrator.register_controller(_DictCleanup)
 
     result = orchestrator.execute("_DictCleanup.cleanup")
@@ -387,16 +386,16 @@ def test_orchestrator_build_ledger_rejects_unsupported_payload(
     fake_persistence[bogus_id] = object()
 
     class _NeedsLedger(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.LEDGER,),
             response_type=ResponseType.INFO,
             method_type=MethodType.READ,
         )
-        def needs_ledger(self, ledger: Ledger38) -> _CursorInfo:
+        def needs_ledger(self, ledger: Ledger) -> _CursorInfo:
             return _CursorInfo(cursor_id=ledger.cursor_id)
 
-    orchestrator = Orchestrator38(fake_persistence)
+    orchestrator = Orchestrator(fake_persistence)
     orchestrator.register_controller(_NeedsLedger)
 
     with pytest.raises(TypeError, match="Unsupported ledger payload"):
@@ -405,16 +404,16 @@ def test_orchestrator_build_ledger_rejects_unsupported_payload(
 
 def test_orchestrator_requires_persistence_for_ledger_hydration() -> None:
     class _NeedsLedger(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             access_level=AccessLevel.PUBLIC,
             binds=(ResourceBinding.LEDGER,),
             response_type=ResponseType.INFO,
             method_type=MethodType.READ,
         )
-        def needs_ledger(self, ledger: Ledger38) -> _CursorInfo:
+        def needs_ledger(self, ledger: Ledger) -> _CursorInfo:
             return _CursorInfo(cursor_id=ledger.cursor_id)
 
-    orchestrator = Orchestrator38(persistence_manager=None)
+    orchestrator = Orchestrator(persistence_manager=None)
     orchestrator.register_controller(_NeedsLedger)
 
     with pytest.raises(RuntimeError, match="Persistence manager required for resource hydration"):

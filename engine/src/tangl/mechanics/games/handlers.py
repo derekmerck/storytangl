@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from tangl.core import CallReceipt as CallReceipt38, Selector as Selector38
+from tangl.core import CallReceipt, Selector
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
     ResolutionPhase as P,
@@ -17,7 +17,6 @@ from tangl.vm import (
     on_update,
 )
 from tangl.vm.dispatch import vm_dispatch
-from tangl.core import CallReceipt
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.story.dispatch import on_gather_content
 from tangl.vm.dispatch import dispatch as vm38_dispatch
@@ -400,8 +399,8 @@ def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
             task="generate_journal",
             call_kwargs={"caller": game},
             ctx=ctx,
-            selector=Selector38(caller_kind=type(game)),
+            selector=Selector(caller_kind=type(game)),
         )
     )
-    vm38_content = CallReceipt38.first_result(*vm38_receipts)
+    vm38_content = CallReceipt.first_result(*vm38_receipts)
     return vm38_content if vm38_content else None

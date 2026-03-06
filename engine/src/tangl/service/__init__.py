@@ -3,7 +3,6 @@
 from .api_endpoint import (
     AccessLevel,
     ApiEndpoint,
-    ApiEndpoint38,
     EndpointPolicy,
     HasApiEndpoints,
     MethodType,
@@ -12,7 +11,7 @@ from .api_endpoint import (
     WritebackMode,
 )
 from .auth import UserAuthInfo, user_id_by_key
-from .bootstrap import build_service_gateway, build_service_gateway38
+from .bootstrap import build_service_gateway
 from .exceptions import (
     AccessDeniedError,
     AuthMismatchError,
@@ -21,22 +20,16 @@ from .exceptions import (
     ServiceError,
     ValidationError,
 )
-from .gateway import GatewayExecuteOptions, ServiceGateway, ServiceGateway38
-from .operations import ServiceOperation, ServiceOperation38
-from .orchestrator import ExecuteOptions, Orchestrator, Orchestrator38
-from .rest_adapter import (
-    GatewayRequest,
-    GatewayRequest38,
-    GatewayRestAdapter,
-    GatewayRestAdapter38,
-)
+from .gateway import GatewayExecuteOptions, ServiceGateway
+from .operations import ServiceOperation
+from .orchestrator import ExecuteOptions, Orchestrator
+from .rest_adapter import GatewayRequest, GatewayRestAdapter
 from .response import (
     FragmentStream,
     InfoModel,
     MediaNative,
     NativeResponse,
     RuntimeEnvelope,
-    RuntimeEnvelope38,
     RuntimeInfo,
     SystemInfo,
     UserInfo,
@@ -53,7 +46,6 @@ __all__ = [
     "AccessDeniedError",
     "AccessLevel",
     "ApiEndpoint",
-    "ApiEndpoint38",
     "AuthMismatchError",
     "EndpointPolicy",
     "ExecuteOptions",
@@ -61,8 +53,6 @@ __all__ = [
     "GatewayRequest",
     "GatewayRestAdapter",
     "GatewayExecuteOptions",
-    "GatewayRequest38",
-    "GatewayRestAdapter38",
     "HasApiEndpoints",
     "InfoModel",
     "InvalidOperationError",
@@ -70,18 +60,14 @@ __all__ = [
     "MethodType",
     "NativeResponse",
     "Orchestrator",
-    "Orchestrator38",
     "ResourceNotFoundError",
     "RuntimeInfo",
     "RuntimeEnvelope",
-    "RuntimeEnvelope38",
     "ResponseType",
     "ResourceBinding",
     "ServiceError",
     "ServiceGateway",
-    "ServiceGateway38",
     "ServiceOperation",
-    "ServiceOperation38",
     "SystemInfo",
     "UserAuthInfo",
     "UserInfo",
@@ -93,7 +79,6 @@ __all__ = [
     "WorldSceneList",
     "WritebackMode",
     "build_service_gateway",
-    "build_service_gateway38",
     "coerce_runtime_info",
     "user_id_by_key",
 ]

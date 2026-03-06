@@ -23,7 +23,7 @@ import pytest
 
 from tangl.story.episode import Action, Block
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
-from tangl.story.story_graph import StoryGraph38
+from tangl.story.story_graph import StoryGraph
 from tangl.story.system_handlers import render_block
 from tangl.vm.dispatch import do_journal
 from tangl.vm.runtime.frame import PhaseCtx
@@ -40,9 +40,9 @@ def _two_block_graph(
     content: str = "Hello {name}",
     media: list | None = None,
     has_action: bool = True,
-) -> tuple[StoryGraph38, Block, Block]:
+) -> tuple[StoryGraph, Block, Block]:
     """Return a graph with a ``start`` block wired to an ``end`` block."""
-    graph = StoryGraph38(label="order_story")
+    graph = StoryGraph(label="order_story")
     start = Block(label="start", content=content, media=media or [])
     end = Block(label="end", content="Done")
     graph.add(start)
@@ -52,7 +52,7 @@ def _two_block_graph(
     return graph, start, end
 
 
-def _ctx(graph: StoryGraph38, cursor: Block, ns: dict | None = None) -> PhaseCtx:
+def _ctx(graph: StoryGraph, cursor: Block, ns: dict | None = None) -> PhaseCtx:
     ctx = PhaseCtx(graph=graph, cursor_id=cursor.uid)
     ctx._ns_cache[cursor.uid] = ns or {}
     return ctx
@@ -109,7 +109,7 @@ class TestRenderBlockFacadeOrder:
         assert max(media_indices) < min(choice_indices)
 
     def test_multiple_choices_follow_all_content_and_media(self) -> None:
-        graph = StoryGraph38(label="multi_choice")
+        graph = StoryGraph(label="multi_choice")
         start = Block(label="start", content="Pick", media=[{"kind": "image", "src": "x.svg"}])
         a = Block(label="a")
         b = Block(label="b")
@@ -170,7 +170,7 @@ class TestDoJournalDispatchOrder:
     def test_do_journal_returns_empty_list_for_non_block(self) -> None:
         from tangl.story.episode import Scene
 
-        graph = StoryGraph38(label="g")
+        graph = StoryGraph(label="g")
         scene = Scene(label="s")
         graph.add(scene)
         ctx = _ctx(graph, Block(label="dummy"))  # cursor irrelevant; caller drives

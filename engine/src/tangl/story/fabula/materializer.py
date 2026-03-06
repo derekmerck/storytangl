@@ -19,7 +19,7 @@ from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, Scene
 from ..story_graph import StoryGraph
 from .compiler import StoryTemplateBundle
-from .script_manager38 import ScriptManager
+from .script_manager import ScriptManager
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -630,7 +630,3 @@ class StoryMaterializer:
     @staticmethod
     def _is_qualified_path(path: str | None) -> bool:
         return isinstance(path, str) and "." in path
-
-
-# Backwards-compatible alias retained during naming cutover.
-StoryMaterializer38 = StoryMaterializer

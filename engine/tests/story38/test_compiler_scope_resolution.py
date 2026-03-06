@@ -1,6 +1,6 @@
 """Template scope resolution and lineage-ordering contract tests for story38.
 
-Covers ``StoryGraph38.get_template_scope_groups`` and ``ScriptManager38.get_template_scope_groups``,
+Covers ``StoryGraph.get_template_scope_groups`` and ``ScriptManager.get_template_scope_groups``,
 validating the fundamental scope guarantee:
 
     nearest template (block's own template) → parent template (scene)
@@ -15,9 +15,9 @@ provisioner integration lives in ``engine/tests/vm38/test_resolver.py``.
 
 See Also
 --------
-- ``tangl.story.story_graph.StoryGraph38.get_template_scope_groups``
-- ``tangl.story.fabula.script_manager38.ScriptManager38.get_template_scope_groups``
-- ``tangl.story.fabula.materializer.StoryMaterializer38``
+- ``tangl.story.story_graph.StoryGraph.get_template_scope_groups``
+- ``tangl.story.fabula.script_manager.ScriptManager.get_template_scope_groups``
+- ``tangl.story.fabula.materializer.StoryMaterializer``
 """
 
 from __future__ import annotations
@@ -28,12 +28,12 @@ import pytest
 
 from tangl.core import EntityTemplate, Selector, TemplateRegistry
 from tangl.core.template import TemplateGroup
-from tangl.story import InitMode, World38
+from tangl.story import InitMode, World
 from tangl.story.concepts import Actor
 from tangl.story.episode import Block, Scene
-from tangl.story.fabula import StoryCompiler38, StoryMaterializer38
-from tangl.story.fabula.script_manager38 import ScriptManager38
-from tangl.story.story_graph import StoryGraph38
+from tangl.story.fabula import StoryCompiler, StoryMaterializer
+from tangl.story.fabula.script_manager import ScriptManager
+from tangl.story.story_graph import StoryGraph
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -76,17 +76,17 @@ def _multi_scene_script() -> dict:
 
 def _world_and_graph(script: dict | None = None, *, story_label: str = "scope_story"):
     """Return (world, StoryInitResult) for EAGER initialization."""
-    w = World38.from_script_data(script_data=script or _multi_scene_script())
+    w = World.from_script_data(script_data=script or _multi_scene_script())
     result = w.create_story(story_label, init_mode=InitMode.EAGER)
     return w, result
 
 
 # ---------------------------------------------------------------------------
-# ScriptManager38 scope-group ordering
+# ScriptManager scope-group ordering
 # ---------------------------------------------------------------------------
 
 class TestScriptManager38ScopeGroups:
-    """ScriptManager38.get_template_scope_groups returns lineage-ordered groups."""
+    """ScriptManager.get_template_scope_groups returns lineage-ordered groups."""
 
     def test_own_template_appears_in_first_group(self) -> None:
         _, result = _world_and_graph()
@@ -214,7 +214,7 @@ class TestWorldScopeProviderIntegration:
             def get_template_scope_groups(self, *, caller=None, graph=None):
                 return [list(self.extra.values())]
 
-        base_world = World38.from_script_data(script_data=_multi_scene_script())
+        base_world = World.from_script_data(script_data=_multi_scene_script())
         extra_reg = TemplateRegistry(label="extra")
         extra_tmpl = EntityTemplate(
             label="world.extra.npc",
@@ -223,7 +223,7 @@ class TestWorldScopeProviderIntegration:
         )
         _ = extra_tmpl
 
-        world = World38(
+        world = World(
             label=base_world.label,
             bundle=base_world.bundle,
             templates=_FakeFacet(extra=extra_reg),
@@ -247,7 +247,7 @@ class TestWorldScopeProviderIntegration:
             def get_template_scope_groups(self, *, caller=None, graph=None):
                 return [list(self.extra.values())]
 
-        base_world = World38.from_script_data(script_data=_multi_scene_script())
+        base_world = World.from_script_data(script_data=_multi_scene_script())
         extra_reg = TemplateRegistry(label="extra")
         _ = EntityTemplate(
             label="world.extra.npc",
@@ -255,7 +255,7 @@ class TestWorldScopeProviderIntegration:
             registry=extra_reg,
         )
 
-        world = World38(
+        world = World(
             label=base_world.label,
             bundle=base_world.bundle,
             templates=_FakeFacet(extra=extra_reg),
@@ -295,11 +295,11 @@ class TestWorldScopeProviderIntegration:
 
 
 # ---------------------------------------------------------------------------
-# ScriptManager38 standalone unit tests
+# ScriptManager standalone unit tests
 # ---------------------------------------------------------------------------
 
 class TestScriptManager38Standalone:
-    """ScriptManager38 scope-group logic in isolation (no world fixture)."""
+    """ScriptManager scope-group logic in isolation (no world fixture)."""
 
     def _minimal_registry(self) -> tuple[TemplateRegistry, EntityTemplate, EntityTemplate]:
         reg = TemplateRegistry(label="test_reg")
@@ -318,7 +318,7 @@ class TestScriptManager38Standalone:
 
     def test_lineage_ids_produce_first_groups(self) -> None:
         reg, scene_tmpl, block_tmpl = self._minimal_registry()
-        sm = ScriptManager38(template_registry=reg)
+        sm = ScriptManager(template_registry=reg)
 
         caller = Block(label="block_1")
         groups = sm.get_template_scope_groups(
@@ -332,7 +332,7 @@ class TestScriptManager38Standalone:
 
     def test_empty_lineage_returns_flat_pool(self) -> None:
         reg, _scene, _block = self._minimal_registry()
-        sm = ScriptManager38(template_registry=reg)
+        sm = ScriptManager(template_registry=reg)
 
         groups = sm.get_template_scope_groups(caller=None, lineage_ids=[])
 
@@ -343,7 +343,7 @@ class TestScriptManager38Standalone:
 
     def test_find_template_by_label(self) -> None:
         reg, scene_tmpl, block_tmpl = self._minimal_registry()
-        sm = ScriptManager38(template_registry=reg)
+        sm = ScriptManager(template_registry=reg)
 
         found = sm.find_template("scene_a.block_1")
         assert found is not None
@@ -351,13 +351,13 @@ class TestScriptManager38Standalone:
 
     def test_find_template_returns_none_for_unknown(self) -> None:
         reg, _, _ = self._minimal_registry()
-        sm = ScriptManager38(template_registry=reg)
+        sm = ScriptManager(template_registry=reg)
 
         assert sm.find_template("nonexistent.block") is None
 
     def test_find_templates_with_selector(self) -> None:
         reg, scene_tmpl, block_tmpl = self._minimal_registry()
-        sm = ScriptManager38(template_registry=reg)
+        sm = ScriptManager(template_registry=reg)
 
         results = sm.find_templates(Selector(has_payload_kind=Block))
         labels = {r.get_label() for r in results}
@@ -374,7 +374,7 @@ class TestCompilerCanonicalSuccessorPolicy:
 
     @staticmethod
     def _first_action_spec(script: dict, *, block_id: str) -> dict:
-        bundle = StoryCompiler38().compile(script)
+        bundle = StoryCompiler().compile(script)
         block_templ = bundle.template_registry.find_one(Selector(label=block_id))
         assert block_templ is not None
         payload = block_templ.payload
@@ -453,4 +453,4 @@ class TestCompilerCanonicalSuccessorPolicy:
         }
 
         with pytest.raises(ValueError, match="Duplicate root scene labels"):
-            StoryCompiler38().compile(script)
+            StoryCompiler().compile(script)

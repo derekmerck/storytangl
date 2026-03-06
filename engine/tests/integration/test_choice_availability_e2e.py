@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from tangl.story import Action, Block, LegacyStoryGraph as StoryGraph
+from tangl.story import Action, Block, StoryGraph as StoryGraph
 from tangl.vm import Frame, ResolutionPhase as P
 from tangl.vm.provision import Dependency, ProvisioningPolicy, Requirement
 
@@ -15,7 +15,7 @@ from fragment_helpers import (
 pytestmark = pytest.mark.skip(
     reason=(
         "Retired from v38 parity gate: this integration asserts legacy StoryGraph runtime mechanics "
-        "(LegacyStoryGraph + v37 phase runner) rather than v38-observable contracts."
+        "(StoryGraph + v37 phase runner) rather than v38-observable contracts."
     )
 )
 

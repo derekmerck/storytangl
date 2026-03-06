@@ -139,12 +139,7 @@ class ServiceGateway:
             **params,
         )
 
-
-ServiceGateway38 = ServiceGateway
-
-
 __all__ = [
     "GatewayExecuteOptions",
     "ServiceGateway",
-    "ServiceGateway38",
 ]

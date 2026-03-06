@@ -40,12 +40,12 @@
 
 ### 2. Story Fabula Compiler/Materializer Migration
 - Evidence: 28 modules; 13 high-risk; many script-manager and world-materialization tests require remapping.
-- Why high risk: legacy `ScriptManager`/manager stack is replaced by `StoryCompiler38` + `StoryMaterializer38` and init-mode reports.
+- Why high risk: legacy `ScriptManager`/manager stack is replaced by `StoryCompiler` + `StoryMaterializer` and init-mode reports.
 - Typical impacted tests: `engine/tests/story/fabula/test_script_manager*.py`, `test_world_*`, `test_template_*`.
 - Primary v38 anchors:
-  - `tangl.story.fabula.StoryCompiler38.compile`
-  - `tangl.story.fabula.StoryMaterializer38.create_story`
-  - `tangl.story.fabula.World38.from_script_data`
+  - `tangl.story.fabula.StoryCompiler.compile`
+  - `tangl.story.fabula.StoryMaterializer.create_story`
+  - `tangl.story.fabula.World.from_script_data`
 
 ### 3. Story Episode Journaling and Choice Availability Semantics
 - Evidence: 17 modules; 11 high-risk; heavy `PORT_ADAPT` around block pipeline/order/conditions.
@@ -61,9 +61,9 @@
 - Why high risk: endpoint/orchestrator behavior survives, but response/info-model contract focus shifts toward service38 operation + runtime-envelope patterns.
 - Typical impacted tests: `engine/tests/service/test_orchestrator*.py`, `test_api_endpoints.py`, response contract tests.
 - Primary v38 anchors:
-  - `tangl.service.orchestrator.Orchestrator38.execute`
-  - `tangl.service.api_endpoint.ApiEndpoint38.annotate`
-  - `tangl.service.gateway.ServiceGateway38.execute`
+  - `tangl.service.orchestrator.Orchestrator.execute`
+  - `tangl.service.api_endpoint.ApiEndpoint.annotate`
+  - `tangl.service.gateway.ServiceGateway.execute`
 
 ### 5. VM Replay Simplification (Watcher/Observer Model Retirement)
 - Evidence: 6 replay/event-model modules; 4 retired; remaining 2 require adaptation to diff-patch MVP.
