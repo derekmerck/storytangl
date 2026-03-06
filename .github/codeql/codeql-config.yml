@@ -1,0 +1,6 @@
+name: "StoryTangl CodeQL config"
+
+# Ignore archival / scratch code (not shipped, not maintained).
+paths-ignore:
+  - scratch/**
+  - "**/scratch/**"
