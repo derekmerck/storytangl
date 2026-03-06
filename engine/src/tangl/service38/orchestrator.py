@@ -10,12 +10,12 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from tangl.core import BaseFragment
-from tangl.service.api_endpoint import AccessLevel
-from tangl.service.exceptions import AccessDeniedError, AuthMismatchError, ServiceError
 
 from .api_endpoint import (
+    AccessLevel,
     ApiEndpoint38,
     EndpointPolicy,
+    HasApiEndpoints,
     LegacyApiEndpoint,
     MethodType,
     PostprocessResult,
@@ -24,6 +24,7 @@ from .api_endpoint import (
     ResponseType,
     WritebackMode,
 )
+from .exceptions import AccessDeniedError, AuthMismatchError, ServiceError
 from .response import (
     InfoModel,
     NativeResponse,
@@ -32,7 +33,6 @@ from .response import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
-    from tangl.service.api_endpoint import HasApiEndpoints
     from .auth import UserAuthInfo
 
 
@@ -445,17 +445,9 @@ class Orchestrator38:
         if hasattr(data, "get_frame") and hasattr(data, "unstructure"):
             return data
         if isinstance(data, Mapping):
-            if (
-                "graph" in data
-                and "output_stream" in data
-                and "cursor_history" in data
-            ):
-                from tangl.vm38.runtime.ledger import Ledger as Ledger38
+            from tangl.vm38.runtime.ledger import Ledger as Ledger38
 
-                return Ledger38.structure(dict(data))
-            from tangl.vm.ledger import Ledger
-
-            return Ledger.structure(dict(data))
+            return Ledger38.structure(dict(data))
         raise TypeError("Unsupported ledger payload")
 
     def _handle_result_cleanup(self, result: Any) -> Any:

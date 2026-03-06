@@ -8,7 +8,7 @@ from uuid import UUID
 
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import Orchestrator
-from tangl.service.controllers import (
+from tangl.service38.controllers import (
     RuntimeController,
     SystemController,
     UserController,

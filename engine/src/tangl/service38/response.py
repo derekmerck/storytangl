@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Mapping, TypeAlias
+from collections import namedtuple
+from datetime import datetime
+from typing import Any, Literal, Mapping, Optional, Self, TypeAlias
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, ValidationError, field_serializer
 
 from tangl.core import BaseFragment
+from tangl.info import __url__
+from tangl.journal.content import KvFragment
 from tangl.journal.media import MediaFragment
+from tangl.service38.user.user import User
 
 
 class InfoModel(BaseModel):
@@ -65,6 +70,77 @@ class RuntimeInfo(InfoModel):
         )
 
 
+class RuntimeEnvelope38(BaseModel):
+    """Ordered-fragment runtime payload for vm38/story38 clients."""
+
+    cursor_id: UUID | None = None
+    step: int | None = None
+    fragments: list[dict[str, Any]] = Field(default_factory=list)
+    last_redirect: dict[str, Any] | None = None
+    redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SystemInfo(InfoModel):
+    engine: str
+    version: str
+    uptime: str
+    worlds: list[str] | int
+    num_users: int
+    homepage_url: AnyUrl = __url__
+
+    @field_serializer("homepage_url")
+    @classmethod
+    def serialize_homepage(cls, value: AnyUrl, _info):
+        return str(value)
+
+
+class UserInfo(InfoModel):
+    user_id: UUID
+    user_secret: str
+    created_dt: datetime
+    last_played_dt: Optional[datetime] = None
+    worlds_played: set[str]
+    stories_finished: int = 0
+    turns_played: int = 0
+    achievements: Optional[set[str]] = None
+
+    @classmethod
+    def from_user(cls, user: User, **kwargs: object) -> Self:
+        return cls(
+            user_id=user.uid,
+            user_secret=getattr(user, "secret", ""),
+            created_dt=user.created_dt,
+            last_played_dt=user.last_played_dt,
+            worlds_played=set(getattr(user, "worlds_played", set())),
+            stories_finished=getattr(user, "stories_finished", 0),
+            turns_played=getattr(user, "turns_played", 0),
+            achievements=set(getattr(user, "achievements", set())) or None,
+            **kwargs,
+        )
+
+
+UserSecret = namedtuple("UserSecret", ["api_key", "user_secret", "user_id"], defaults=(None,))
+
+
+class WorldInfo(InfoModel):
+    label: str
+    title: str | None = None
+    author: str | None = None
+
+
+class WorldList(KvFragment):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"key": "TangldWorld", "value": "my_world", "style_hints": {"color": "orange"}},
+        }
+    )
+
+
+class WorldSceneList(KvFragment):
+    ...
+
+
 def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
     """Best-effort coercion from runtime-like payloads to ``RuntimeInfo``."""
 
@@ -119,6 +195,13 @@ __all__ = [
     "InfoModel",
     "MediaNative",
     "NativeResponse",
+    "RuntimeEnvelope38",
     "RuntimeInfo",
+    "SystemInfo",
+    "UserInfo",
+    "UserSecret",
+    "WorldInfo",
+    "WorldList",
+    "WorldSceneList",
     "coerce_runtime_info",
 ]

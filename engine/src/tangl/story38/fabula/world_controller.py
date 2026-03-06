@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -9,17 +10,15 @@ import yaml
 
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.service.api_endpoint import HasApiEndpoints
-from tangl.service.response import RuntimeInfo
-from tangl.service.response.info_response import WorldInfo
-from tangl.service.response.info_response.world_info import WorldList
-from tangl.service.world_registry import WorldRegistry
 from tangl.service38.api_endpoint import (
     AccessLevel,
     ApiEndpoint38,
+    HasApiEndpoints,
     MethodType,
     ResponseType,
 )
+from tangl.service38.response import RuntimeInfo, WorldInfo, WorldList
+from tangl.service38.world_registry import WorldRegistry
 from tangl.story38.fabula import World38
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.ordered_tuple_dict import OrderedTupleDict
@@ -84,9 +83,12 @@ def resolve_world38(world_id: str) -> World38:
     try:
         world = registry.get_world(world_id, runtime_version="38")
     except ValueError:
-        from tangl.story.fabula.world import World as LegacyWorld
+        legacy_module = importlib.import_module("tangl.story.fabula.world")
+        legacy_world_cls = getattr(legacy_module, "World", None)
+        if legacy_world_cls is None:
+            raise
 
-        legacy_world = LegacyWorld.get_instance(world_id)
+        legacy_world = legacy_world_cls.get_instance(world_id)
         if legacy_world is None:
             raise
 
@@ -186,7 +188,7 @@ class WorldController(HasApiEndpoints):
         return media_obj.get_content(**kwargs)
 
     @ApiEndpoint38.annotate(
-        access_level=AccessLevel.USER,
+        access_level=AccessLevel.PUBLIC,
         method_type=MethodType.CREATE,
         response_type=ResponseType.RUNTIME,
         binds=(),

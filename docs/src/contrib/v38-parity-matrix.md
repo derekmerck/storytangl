@@ -328,6 +328,19 @@ Planned target modules referenced by `PORT_*` rows:
   - Command: `poetry run pytest -q engine/tests/core38 engine/tests/vm38 engine/tests/story38 engine/tests/service38`
   - Result: `909 passed, 11 warnings`
 
+## Cutover Execution Status (2026-03-05)
+- Three-lane validation baseline is green:
+  - Lane A: `918 passed`
+  - Lane B: `665 passed, 62 skipped, 9 xfailed`
+  - Lane C: `37 passed, 2 skipped, 1 xfailed`
+- Pre-swap import gate is active via `scripts/audit_cutover_edges.py`:
+  - `IR bridge: 0`
+  - `Bypass imports: 0`
+  - `Intentional bridges: 34` (tracked in `scripts/cutover_import_allowlist.txt`)
+- App hygiene decisions are enforced:
+  - `/story/drop` returns v38-style success status (`"ok"`).
+  - Deferred debug endpoints remain routed but return explicit `501 Not Implemented`.
+
 ## Legacy vs V38 Surface Audit (2026-03-03)
 - Scope-completeness check:
   - In-scope legacy test modules discovered under scope lock: `128`

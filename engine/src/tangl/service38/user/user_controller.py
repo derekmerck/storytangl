@@ -5,17 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from tangl.service.api_endpoint import HasApiEndpoints
-from tangl.service.response.info_response import UserInfo
-from tangl.service.user.user import User
 from tangl.service38.api_endpoint import (
     AccessLevel,
     ApiEndpoint38,
+    HasApiEndpoints,
     MethodType,
     ResourceBinding,
     ResponseType,
 )
-from tangl.service38.response import InfoModel, RuntimeInfo
+from tangl.service38.response import InfoModel, RuntimeInfo, UserInfo
+from tangl.service38.user.user import User
 from tangl.type_hints import Hash
 from tangl.utils.hash_secret import key_for_secret
 

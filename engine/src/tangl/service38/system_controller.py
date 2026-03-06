@@ -8,11 +8,9 @@ from typing import Any
 import humanize
 
 from tangl.info import __title__, __url__, __version__
-from tangl.service.api_endpoint import HasApiEndpoints
-from tangl.service.response.info_response import SystemInfo
-from tangl.service.world_registry import WorldRegistry
-from tangl.service38.api_endpoint import AccessLevel, ApiEndpoint38, MethodType, ResponseType
-from tangl.service38.response import RuntimeInfo
+from tangl.service38.api_endpoint import AccessLevel, ApiEndpoint38, HasApiEndpoints, MethodType, ResponseType
+from tangl.service38.response import RuntimeInfo, SystemInfo
+from tangl.service38.world_registry import WorldRegistry
 from tangl.utils.app_uptime import app_uptime
 
 logger = logging.getLogger(__name__)

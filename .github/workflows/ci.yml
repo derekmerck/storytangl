@@ -32,6 +32,9 @@ jobs:
           pip install poetry
           poetry install --no-interaction --with dev
           pip install -e .
+      - name: Cutover import audit (pre-swap)
+        run: |
+          python scripts/audit_cutover_edges.py --mode pre-swap --enforce --json-out tmp/cutover_audit_ci.json
       - name: Run tests
         env:
           PYTHONPATH: "engine/src:apps/cli/src:apps/rest/src"

@@ -12,7 +12,7 @@ from tangl.rest.dependencies38 import (
     get_user_locks38,
     resolve_user_auth38,
 )
-from tangl.service.exceptions import AccessDeniedError
+from tangl.service38.exceptions import AccessDeniedError
 from tangl.service38 import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
 from tangl.service38.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel

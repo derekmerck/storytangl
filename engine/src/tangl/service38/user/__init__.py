@@ -1,5 +1,15 @@
-"""Service38 user controller package."""
+"""Service38 user package."""
 
-from .user_controller import ApiKeyInfo, UserController
+from __future__ import annotations
 
-__all__ = ["ApiKeyInfo", "UserController"]
+from .user import User
+
+__all__ = ["ApiKeyInfo", "User", "UserController"]
+
+
+def __getattr__(name: str):
+    if name in {"ApiKeyInfo", "UserController"}:
+        from .user_controller import ApiKeyInfo, UserController
+
+        return {"ApiKeyInfo": ApiKeyInfo, "UserController": UserController}[name]
+    raise AttributeError(name)
