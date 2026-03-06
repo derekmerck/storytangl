@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.bases`` traits."""
+"""Contract tests for ``tangl.core.bases`` traits."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 from pydantic import ConfigDict, Field
 from shortuuid import ShortUUID
 
-from tangl.core38.bases import (
+from tangl.core.bases import (
     BaseModelPlus,
     HasContent,
     HasIdentity,

@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import Field
 
-from tangl.core38 import (
+from tangl.core import (
     BehaviorRegistry,
     DispatchLayer,
     Entity,
@@ -22,9 +22,9 @@ from tangl.core38 import (
     Record,
     Selector,
 )
-from tangl.vm38.dispatch import dispatch as vm_dispatch
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.traversable import (
+from tangl.vm.dispatch import dispatch as vm_dispatch
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.traversable import (
     AnonymousEdge,
     TraversableEdge,
     TraversableNode,

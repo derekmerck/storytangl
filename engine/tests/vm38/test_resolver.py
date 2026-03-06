@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.provision.resolver``.
+"""Contract tests for ``tangl.vm.provision.resolver``.
 
 Organized by concept:
 - Offer gathering: FindProvisioner, TemplateProvisioner, StubProvisioner
@@ -15,7 +15,7 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core38 import (
+from tangl.core import (
     BehaviorRegistry,
     Entity,
     EntityTemplate,
@@ -29,7 +29,7 @@ from tangl.core38 import (
     Token,
     TokenCatalog,
 )
-from tangl.vm38.provision import (
+from tangl.vm.provision import (
     Affordance,
     Dependency,
     FindProvisioner,
@@ -41,7 +41,7 @@ from tangl.vm38.provision import (
     StubProvisioner,
     ProvisionOffer,
 )
-from tangl.vm38.traversable import TraversableNode
+from tangl.vm.traversable import TraversableNode
 
 
 class FinalizableContainer(TraversableNode):

@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.traversable``.
+"""Contract tests for ``tangl.vm.traversable``.
 
 Organized by concept:
 - LCA utilities: lca(), decompose_move()
@@ -16,11 +16,11 @@ from uuid import uuid4
 
 import pytest
 
-import tangl.vm38.traversable as traversable_module
-from tangl.core38 import Graph
-from tangl.core38.runtime_op import Predicate
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.traversable import (
+import tangl.vm.traversable as traversable_module
+from tangl.core import Graph
+from tangl.core.runtime_op import Predicate
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.traversable import (
     AnonymousEdge,
     AnyTraversableEdge,
     TraversableEffect,

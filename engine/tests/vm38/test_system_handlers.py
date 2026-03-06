@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.system_handlers``.
+"""Contract tests for ``tangl.vm.system_handlers``.
 
 Tests each system handler function directly, then verifies they fire
 correctly through the dispatch do_* functions.
@@ -17,9 +17,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import Graph, Selector
-from tangl.core38.runtime_op import Effect, Predicate
-from tangl.vm38.dispatch import (
+from tangl.core import Graph, Selector
+from tangl.core.runtime_op import Effect, Predicate
+from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     do_gather_ns,
     do_prereqs,
@@ -27,13 +27,13 @@ from tangl.vm38.dispatch import (
     do_validate,
     do_postreqs,
 )
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.traversable import (
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.traversable import (
     AnonymousEdge,
     TraversableEdge,
     TraversableNode,
 )
-from tangl.vm38 import Dependency, Requirement
+from tangl.vm import Dependency, Requirement
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -48,7 +48,7 @@ def _edge(graph: Graph, **kwargs) -> TraversableEdge:
     return edge
 
 # Import registers the handlers — must happen after clean_vm_dispatch yields
-import tangl.vm38.system_handlers as sh
+import tangl.vm.system_handlers as sh
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +59,7 @@ def register_system_handlers(clean_vm_dispatch):
     We need to re-import/re-register handlers for these tests.
     """
     # Re-register each handler explicitly
-    from tangl.vm38.dispatch import on_gather_ns, on_validate, on_prereqs, on_update, on_postreqs
+    from tangl.vm.dispatch import on_gather_ns, on_validate, on_prereqs, on_update, on_postreqs
     on_gather_ns(sh.contribute_runtime_baseline)
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)

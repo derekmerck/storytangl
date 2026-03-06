@@ -11,7 +11,7 @@ class Slot(BaseModel):
     """Slot(name: str, selection_criteria: dict[str, Any], max_count: int = 1, required: bool = False)
 
     Container slot that delegates eligibility checks to
-    :class:`tangl.core38.selector.Selector`.
+    :class:`tangl.core.selector.Selector`.
 
     Key Features
     ------------

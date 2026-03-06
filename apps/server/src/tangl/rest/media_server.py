@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from tangl.config import settings
 from tangl.info import __author__, __author_email__, __desc__, __title__, __url__, __version__
 from tangl.rest.media_mounts import mount_system_media
-from tangl.service38.world_registry import WorldRegistry
+from tangl.service.world_registry import WorldRegistry
 
 logger = logging.getLogger(__name__)
 

@@ -147,7 +147,7 @@ class ResolutionPhase(IntEnum):
     Why
     ----
     Defines the ordered pipeline for one frame and the vm38 phase-bus
-    aggregation contracts used by :mod:`tangl.vm38.dispatch`.
+    aggregation contracts used by :mod:`tangl.vm.dispatch`.
 
     Key Features
     ------------
@@ -166,7 +166,7 @@ class ResolutionPhase(IntEnum):
 ### S-P1-001 (`resolution_phase.py` stale cross-reference cleanup)
 ```text
 Defines the ordered pipeline for one frame and the vm38 phase-bus
-aggregation contracts used by :mod:`tangl.vm38.dispatch`.
+aggregation contracts used by :mod:`tangl.vm.dispatch`.
 ```
 
 ```text
@@ -207,7 +207,7 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
 ### S-P1-003 (`vm38/__init__.py` conceptual map)
 ```python
 """
-.. currentmodule:: tangl.vm38
+.. currentmodule:: tangl.vm
 
 Virtual machine mechanisms for phase-driven traversal, provisioning, and replay.
 
@@ -223,7 +223,7 @@ Conceptual layers
 2. Traversal contracts
 
    - :class:`TraversableNode` / :class:`TraversableEdge` define cursor movement.
-   - :mod:`tangl.vm38.traversal` provides pure history/call-stack queries.
+   - :mod:`tangl.vm.traversal` provides pure history/call-stack queries.
 
 3. Provisioning
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from tangl.story38 import World38
+from tangl.story import World38
 
 
 @pytest.fixture(autouse=True)

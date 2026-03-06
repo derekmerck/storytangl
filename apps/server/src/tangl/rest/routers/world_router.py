@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from tangl.rest.dependencies38 import get_service_adapter38
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
+from tangl.service import GatewayRestAdapter38, ServiceOperation38
 
 
 router = APIRouter(tags=["World"])

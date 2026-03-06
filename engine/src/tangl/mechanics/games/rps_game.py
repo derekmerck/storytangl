@@ -14,7 +14,7 @@ import random
 from pydantic import Field
 
 from tangl.journal.content import ContentFragment
-from tangl.vm38.dispatch import dispatch as vm38_dispatch
+from tangl.vm.dispatch import dispatch as vm38_dispatch
 
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord

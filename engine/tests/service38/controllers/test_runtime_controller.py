@@ -19,21 +19,21 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core38 import Selector
-from tangl.service38.api_endpoint import (
+from tangl.core import Selector
+from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint38,
     ResourceBinding,
 )
-from tangl.service38.controllers import RuntimeController
-from tangl.service38.gateway import ServiceGateway38
-from tangl.service38.operations import ServiceOperation38, endpoint_for_operation
-from tangl.service38.orchestrator import Orchestrator38
-from tangl.service38.response import RuntimeInfo
+from tangl.service.controllers import RuntimeController
+from tangl.service.gateway import ServiceGateway38
+from tangl.service.operations import ServiceOperation38, endpoint_for_operation
+from tangl.service.orchestrator import Orchestrator38
+from tangl.service.response import RuntimeInfo
 from tangl.service.user.user import User
-from tangl.story38 import InitMode, World38
-from tangl.story38.episode import Action
-from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.story import InitMode, World38
+from tangl.story.episode import Action
+from tangl.vm.runtime.ledger import Ledger as Ledger38
 
 
 class _FakePersistence:

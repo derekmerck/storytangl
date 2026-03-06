@@ -15,9 +15,9 @@ provisioner integration lives in ``engine/tests/vm38/test_resolver.py``.
 
 See Also
 --------
-- ``tangl.story38.story_graph.StoryGraph38.get_template_scope_groups``
-- ``tangl.story38.fabula.script_manager38.ScriptManager38.get_template_scope_groups``
-- ``tangl.story38.fabula.materializer.StoryMaterializer38``
+- ``tangl.story.story_graph.StoryGraph38.get_template_scope_groups``
+- ``tangl.story.fabula.script_manager38.ScriptManager38.get_template_scope_groups``
+- ``tangl.story.fabula.materializer.StoryMaterializer38``
 """
 
 from __future__ import annotations
@@ -26,15 +26,15 @@ from dataclasses import dataclass
 
 import pytest
 
-from tangl.core38 import EntityTemplate, Selector, TemplateRegistry
-from tangl.core38.template import TemplateGroup
-from tangl.story38 import InitMode, World38
-from tangl.story38.concepts import Actor
-from tangl.story38.episode import Block, Scene
-from tangl.story38.fabula import StoryCompiler38, StoryMaterializer38
-from tangl.story38.fabula.script_manager38 import ScriptManager38
-from tangl.story38.story_graph import StoryGraph38
-from tangl.vm38.runtime.frame import PhaseCtx
+from tangl.core import EntityTemplate, Selector, TemplateRegistry
+from tangl.core.template import TemplateGroup
+from tangl.story import InitMode, World38
+from tangl.story.concepts import Actor
+from tangl.story.episode import Block, Scene
+from tangl.story.fabula import StoryCompiler38, StoryMaterializer38
+from tangl.story.fabula.script_manager38 import ScriptManager38
+from tangl.story.story_graph import StoryGraph38
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 # ---------------------------------------------------------------------------

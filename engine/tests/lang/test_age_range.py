@@ -1,5 +1,5 @@
 from tangl.lang.age_range import AgeRange
-from tangl.core38 import Entity
+from tangl.core import Entity
 
 def test_age_range_from_age_basic_bucketing():
     """

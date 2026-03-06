@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from tangl.core38 import Selector
+from tangl.core import Selector
 from tangl.service.controllers import RuntimeController
-from tangl.service38 import Orchestrator38
+from tangl.service import Orchestrator38
 from tangl.service.user.user import User
-from tangl.story38 import InitMode, World38
-from tangl.story38.episode import Action
-from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.story import InitMode, World38
+from tangl.story.episode import Action
+from tangl.vm.runtime.ledger import Ledger as Ledger38
 
 
 class _InMemoryPersistence:

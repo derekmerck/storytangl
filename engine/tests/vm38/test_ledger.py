@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.runtime.ledger``.
+"""Contract tests for ``tangl.vm.runtime.ledger``.
 
 Organized by concept:
 - Cursor management: cursor property, cursor_id tracking
@@ -13,20 +13,20 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core38 import Graph, Selector, Snapshot
-from tangl.vm38.dispatch import on_prereqs
-from tangl.vm38.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.runtime.frame import Frame
-from tangl.vm38.runtime.causality import CausalityMode
-from tangl.vm38.runtime.ledger import Ledger
-from tangl.vm38.traversal import get_visit_count
-from tangl.vm38.traversable import (
+from tangl.core import Graph, Selector, Snapshot
+from tangl.vm.dispatch import on_prereqs
+from tangl.vm.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import Frame
+from tangl.vm.runtime.causality import CausalityMode
+from tangl.vm.runtime.ledger import Ledger
+from tangl.vm.traversal import get_visit_count
+from tangl.vm.traversable import (
     AnonymousEdge,
     TraversableEdge,
     TraversableNode,
 )
-from tangl.vm38.fragments import ChoiceFragment, ContentFragment
+from tangl.vm.fragments import ChoiceFragment, ContentFragment
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
@@ -314,7 +314,7 @@ class TestLedgerResolveChoice:
         _edge(g, predecessor_id=root.uid, successor_id=container.uid)
 
         # Register just the container descent prereq handler for this test.
-        import tangl.vm38.system_handlers as sh
+        import tangl.vm.system_handlers as sh
         on_prereqs(sh.descend_into_container)
 
         ledger = Ledger(graph=g, cursor_id=root.uid)

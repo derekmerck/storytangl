@@ -2,10 +2,10 @@ from collections.abc import Mapping
 
 import pytest
 
-from tangl.core38 import Graph
+from tangl.core import Graph
 # from tangl.core.domain.affiliate import SingletonDomain
-from tangl.vm38 import Ledger
-from tangl.vm38.replay import CheckpointRecord
+from tangl.vm import Ledger
+from tangl.vm.replay import CheckpointRecord
 
 
 def _load_ledger(payload):

@@ -12,9 +12,9 @@ from tangl.rest.dependencies38 import (
     get_user_locks38,
     resolve_user_auth38,
 )
-from tangl.service38.exceptions import AccessDeniedError
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
-from tangl.service38.response import RuntimeInfo
+from tangl.service.exceptions import AccessDeniedError
+from tangl.service import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
+from tangl.service.response import RuntimeInfo
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -526,8 +526,6 @@ async def reset_story(
         if isinstance(payload.get("details"), dict):
             details_payload = payload.pop("details")
             payload.update(details_payload)
-        if payload.get("message") == "Story dropped":
-            payload["status"] = "dropped"
         return _serialize(payload)
 
     return _serialize(result)

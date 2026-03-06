@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from cmd2 import CommandSet, with_default_category
-from tangl.service38 import ServiceOperation38
-from tangl.service38.operations import endpoint_for_operation
+from tangl.service import ServiceOperation38
+from tangl.service.operations import endpoint_for_operation
 
 if TYPE_CHECKING:
     from ..app import StoryTanglCLI

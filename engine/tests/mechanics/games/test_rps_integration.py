@@ -2,12 +2,12 @@ from __future__ import annotations
 
 """Integration tests covering RPS gameplay through the VM pipeline."""
 
-from tangl.core38 import Graph
+from tangl.core import Graph
 from tangl.mechanics.games import GamePhase, GameResult, HasGame
 from tangl.mechanics.games.rps_game import RpsGame, RpsGameHandler, RpsMove
-from tangl.story38 import Block
+from tangl.story import Block
 from tangl.mechanics.games.handlers import provision_game_moves
-from tangl.vm38 import Frame, Ledger, TraversableEdge as ChoiceEdge, get_visit_count
+from tangl.vm import Frame, Ledger, TraversableEdge as ChoiceEdge, get_visit_count
 
 
 class RpsBlock(HasGame, Block):

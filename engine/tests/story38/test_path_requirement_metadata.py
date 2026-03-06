@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from tangl.core38 import Selector
-from tangl.story38 import InitMode, World38
-from tangl.story38.episode import Action
-from tangl.vm38 import Dependency
+from tangl.core import Selector
+from tangl.story import InitMode, World38
+from tangl.story.episode import Action
+from tangl.vm import Dependency
 
 
 def _destination_dependency(graph, action: Action) -> Dependency:

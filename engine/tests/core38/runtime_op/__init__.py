@@ -1,1 +1,1 @@
-"""Tests for ``tangl.core38.runtime_op``."""
+"""Tests for ``tangl.core.runtime_op``."""

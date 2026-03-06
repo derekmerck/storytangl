@@ -1,66 +1,181 @@
-"""Legacy compatibility shim that re-exports ``tangl.vm38``."""
+"""
+.. currentmodule:: tangl.vm
 
-import os
+Virtual machine mechanisms for phase-driven traversal, provisioning, and replay.
 
-import tangl.vm38 as _vm38
+Conceptual layers
+-----------------
 
-from tangl.vm38 import *  # noqa: F401,F403
-from tangl.core import CallReceipt as _LegacyCallReceipt, Record as _LegacyRecord
-from tangl.core38 import CallReceipt as _Core38CallReceipt, Record as _Core38Record
-from tangl.vm.context import Context as LegacyContext
-from tangl.vm.frame import ChoiceEdge as LegacyChoiceEdge, Frame as LegacyFrame
-from tangl.vm.ledger import Ledger as LegacyLedger
-from tangl.vm.resolution_phase import ResolutionPhase as LegacyResolutionPhase
-from tangl.vm38.provision import ProvisionPolicy
-from tangl.vm38.replay import Patch
-from tangl.vm38.runtime.frame import PhaseCtx
-from tangl.vm38.traversable import TraversableEdge
+1. Resolution runtime
 
+   - :class:`Frame` executes one choice resolution loop.
+   - :class:`Ledger` persists cursor, stack, and replay artifacts across choices.
+   - :class:`ResolutionPhase` defines causal phase ordering.
 
-_V38_VALUES = {"1", "true", "yes", "on", "v38", "new"}
-_LEGACY_VALUES = {"0", "false", "no", "off", "legacy", "old"}
+2. Traversal contracts
 
+   - :class:`TraversableNode` / :class:`TraversableEdge` define cursor movement.
+   - :mod:`tangl.vm.traversal` provides pure history/call-stack queries.
 
-def _pick(symbol: str, legacy_value, v38_value, *, default: str = "v38"):
-    raw_value = os.getenv(
-        f"TANGL_SHIM_VM_{symbol}",
-        os.getenv("TANGL_SHIM_VM_DEFAULT", default),
-    )
-    selected = str(raw_value).strip().lower()
-    if selected in _LEGACY_VALUES:
-        return legacy_value
-    if selected in _V38_VALUES:
-        return v38_value
-    raise ValueError(
-        f"Invalid shim value '{raw_value}' for TANGL_SHIM_VM_{symbol}. "
-        f"Use one of {sorted(_LEGACY_VALUES | _V38_VALUES)}."
-    )
+3. Provisioning
 
+   - :class:`Requirement`, :class:`Dependency`, :class:`Affordance` define frontier
+     constraints.
+   - :class:`Resolver` and provisioners satisfy constraints from
+     entity/template scopes.
 
-__all__ = getattr(
-    _vm38,
-    "__all__",
-    [name for name in dir(_vm38) if not name.startswith("_")],
+4. Replay artifacts
+
+   - :class:`Event`, :class:`Patch`, :class:`StepRecord`,
+     :class:`CheckpointRecord` provide deterministic replay and rollback
+     primitives.
+
+Design intent
+-------------
+`vm38` defines deterministic execution mechanics and contracts while remaining
+policy-agnostic about story/domain semantics, which belong in higher layers.
+"""
+
+# Provides:
+# - stable names for phase bus stages
+from .resolution_phase import ResolutionPhase
+
+# Provides:
+# - requirements/providers
+# - resolution
+# - frontier planning
+from .provision import (
+    Affordance,
+    Blocker,
+    Dependency,
+    StubProvisioner,
+    FindProvisioner,
+    HasRequirement,
+    InlineTemplateProvisioner,
+    Provisioner,
+    ProvisionOffer,
+    ProvisionPolicy,
+    Requirement,
+    Resolver,
+    TemplateProvisioner,
+    TokenProvisioner,
+    UpdateCloneProvisioner,
+    ViabilityResult,
+    CloneProvisioner,
 )
 
-# Legacy compatibility aliases for import-surface blast-radius testing.
-BuildReceipt = _pick("BUILDRECEIPT", _LegacyCallReceipt, _Core38CallReceipt)
-ChoiceEdge = _pick("CHOICEEDGE", LegacyChoiceEdge, TraversableEdge)
-Context = _pick("CONTEXT", LegacyContext, PhaseCtx)
-Frame = _pick("FRAME", LegacyFrame, _vm38.Frame)
-Ledger = _pick("LEDGER", LegacyLedger, _vm38.Ledger)
-PlanningReceipt = _pick("PLANNINGRECEIPT", _LegacyRecord, _Core38Record)
-ProvisioningPolicy = ProvisionPolicy
-ResolutionPhase = _pick("RESOLUTIONPHASE", LegacyResolutionPhase, _vm38.ResolutionPhase)
+# Provides:
+# - cursor traversal rules
+from .traversable import (
+    TraversableEdge,
+    TraversableNode,
+    AnonymousEdge,
+    assert_traversal_contracts,
+    validate_traversal_contracts,
+)
+from .traversal import (
+    count_turns,
+    get_call_depth,
+    get_visit_count,
+    in_subroutine,
+    is_first_visit,
+    is_self_loop,
+    steps_since_last_visit,
+)
 
-__all__ += [
+# Provides:
+# - phase bus
+# - serializable graph with state and trace artifacts
+# - jump and return stack
+from .runtime import Frame, Ledger
+
+# Provides:
+# - journal fragment records
+from .fragments import Fragment
+from .replay import Patch
+
+# Provides:
+# - phase bus hooks
+from .dispatch import (
+    do_get_template_scope_groups,
+    do_get_token_catalogs,
+    on_get_template_scope_groups,
+    on_get_token_catalogs,
+    on_finalize,
+    on_gather_ns,
+    on_journal,
+    on_postreqs,
+    on_prereqs,
+    on_provision,
+    on_resolve,
+    on_update,
+    on_validate,
+)
+from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
+from . import system_handlers  # noqa: F401  # register default vm38 hooks
+from tangl.core import CallReceipt as BuildReceipt, Record as PlanningReceipt
+
+
+__all__ = [
+    "Affordance",
+    "AnonymousEdge",
+    "Blocker",
+    "Dependency",
+    "StubProvisioner",
+    "FindProvisioner",
+    "Frame",
+    "Fragment",
+    "HasRequirement",
+    "InlineTemplateProvisioner",
+    "Ledger",
+    "Provisioner",
+    "ProvisionOffer",
+    "ProvisionPolicy",
+    "ProvisioningPolicy",
+    "Requirement",
+    "ResolutionPhase",
+    "Resolver",
+    "TemplateProvisioner",
+    "TokenProvisioner",
+    "UpdateCloneProvisioner",
+    "ViabilityResult",
+    "CloneProvisioner",
+    "TraversableEdge",
+    "TraversableNode",
+    "Patch",
     "BuildReceipt",
     "ChoiceEdge",
     "Context",
-    "Frame",
-    "Ledger",
-    "Patch",
     "PlanningReceipt",
-    "ProvisioningPolicy",
-    "ResolutionPhase",
+    "count_turns",
+    "get_call_depth",
+    "get_visit_count",
+    "in_subroutine",
+    "is_first_visit",
+    "is_self_loop",
+    "assert_traversal_contracts",
+    "on_finalize",
+    "on_gather_ns",
+    "on_get_template_scope_groups",
+    "on_get_token_catalogs",
+    "on_journal",
+    "on_postreqs",
+    "on_prereqs",
+    "on_provision",
+    "on_resolve",
+    "on_update",
+    "on_validate",
+    "do_get_template_scope_groups",
+    "do_get_token_catalogs",
+    "steps_since_last_visit",
+    "validate_traversal_contracts",
+    "VmDispatchCtx",
+    "VmPhaseCtx",
+    "VmResolverCtx",
 ]
+
+
+# Compatibility aliases retained during namespace cutover.
+ChoiceEdge = TraversableEdge
+Context = VmPhaseCtx
+ProvisioningPolicy = ProvisionPolicy

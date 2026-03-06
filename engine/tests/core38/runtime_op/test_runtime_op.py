@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.runtime_op``."""
+"""Contract tests for ``tangl.core.runtime_op``."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from random import Random
 
 import pytest
 
-from tangl.core38.runtime_op import RuntimeOp
+from tangl.core.runtime_op import RuntimeOp
 
 
 class TestRuntimeOpNamespaceHandling:

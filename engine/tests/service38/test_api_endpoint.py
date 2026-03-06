@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.service38.api_endpoint``.
+"""Contract tests for ``tangl.service.api_endpoint``.
 
 This is the service38 replacement for ``engine/tests/service/test_api_endpoints.py``
 (see parity matrix row: PORT_ADAPT → ``engine/tests/service38/test_api_endpoint.py``).
@@ -18,9 +18,9 @@ legacy service surface.  These tests validate the *service38-specific* additions
 
 See Also
 --------
-- ``tangl.service38.api_endpoint`` – ``ApiEndpoint38``, ``EndpointPolicy``,
+- ``tangl.service.api_endpoint`` – ``ApiEndpoint38``, ``EndpointPolicy``,
   ``ResourceBinding``, ``WritebackMode``
-- ``tangl.service38.orchestrator.Orchestrator38._resolve_hydration_bindings``
+- ``tangl.service.orchestrator.Orchestrator38._resolve_hydration_bindings``
 - ``engine/tests/service/test_orchestrator38.py`` – integration evidence
 """
 
@@ -34,14 +34,14 @@ from tangl.service.api_endpoint import (
     MethodType,
     ResponseType,
 )
-from tangl.service38.api_endpoint import (
+from tangl.service.api_endpoint import (
     ApiEndpoint38,
     EndpointPolicy,
     LegacyApiEndpoint,
     ResourceBinding,
     WritebackMode,
 )
-from tangl.service38.orchestrator import Orchestrator38
+from tangl.service.orchestrator import Orchestrator38
 
 
 # ---------------------------------------------------------------------------

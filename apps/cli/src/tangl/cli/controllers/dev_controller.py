@@ -16,10 +16,7 @@ class DevController(CommandSet):
 
     _cmd: StoryTanglCLI
 
-    def _call_legacy(self, endpoint: str, **params):
-        call_legacy = getattr(self._cmd, "call_legacy_endpoint", None)
-        if callable(call_legacy):
-            return call_legacy(endpoint, **params)
+    def _call_endpoint(self, endpoint: str, **params):
         return self._cmd.call_endpoint(endpoint, **params)
 
     def _print_runtime(self, result: object) -> None:
@@ -46,7 +43,7 @@ class DevController(CommandSet):
         except ValueError:
             self._cmd.poutput("Invalid node id.")
             return
-        result = self._call_legacy("RuntimeController.jump_to_node", node_id=node_id)
+        result = self._call_endpoint("RuntimeController.jump_to_node", node_id=node_id)
         self._print_runtime(result)
 
     @with_argparser(node_parser)
@@ -58,7 +55,7 @@ class DevController(CommandSet):
             node_id: UUID | str = UUID(args.node_id)
         except ValueError:
             node_id = args.node_id
-        result = self._call_legacy("RuntimeController.get_node_info", node_id=node_id)
+        result = self._call_endpoint("RuntimeController.get_node_info", node_id=node_id)
         self._print_runtime(result)
 
     expr_parser = argparse.ArgumentParser()
@@ -69,7 +66,7 @@ class DevController(CommandSet):
         if self._cmd.ledger_id is None:
             self._cmd.poutput("No active ledger.")
             return
-        result = self._call_legacy("RuntimeController.check_expr", expr=args.expr)
+        result = self._call_endpoint("RuntimeController.check_expr", expr=args.expr)
         self._print_runtime(result)
 
     @with_argparser(expr_parser)
@@ -77,5 +74,5 @@ class DevController(CommandSet):
         if self._cmd.ledger_id is None:
             self._cmd.poutput("No active ledger.")
             return
-        result = self._call_legacy("RuntimeController.apply_effect", expr=args.expr)
+        result = self._call_endpoint("RuntimeController.apply_effect", expr=args.expr)
         self._print_runtime(result)

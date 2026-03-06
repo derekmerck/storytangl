@@ -14,26 +14,26 @@ through the full ``render_block`` facade so both call-paths are exercised.
 
 See Also
 --------
-- ``tangl.story38.system_handlers`` – ``_choice_unavailable_reason``, ``_choice_blockers``
-- ``tangl.vm38`` – ``Requirement``, ``Dependency``
-- ``tangl.core38.runtime_op`` – ``Predicate``
-- ``tangl.story38.concepts`` – ``Role``, ``Setting``
+- ``tangl.story.system_handlers`` – ``_choice_unavailable_reason``, ``_choice_blockers``
+- ``tangl.vm`` – ``Requirement``, ``Dependency``
+- ``tangl.core.runtime_op`` – ``Predicate``
+- ``tangl.story.concepts`` – ``Role``, ``Setting``
 """
 
 from __future__ import annotations
 
 import pytest
 
-from tangl.core38 import EntityTemplate, Graph, Selector, TemplateRegistry
-from tangl.core38.runtime_op import Predicate
-from tangl.story38.concepts import Actor, Location, Role, Setting
-from tangl.story38.episode import Action, Block, Scene
-from tangl.story38.fragments import ChoiceFragment, ContentFragment
-from tangl.story38.story_graph import StoryGraph38
-from tangl.story38.system_handlers import render_block, render_block_choices
-from tangl.vm38 import Dependency, Requirement
+from tangl.core import EntityTemplate, Graph, Selector, TemplateRegistry
+from tangl.core.runtime_op import Predicate
+from tangl.story.concepts import Actor, Location, Role, Setting
+from tangl.story.episode import Action, Block, Scene
+from tangl.story.fragments import ChoiceFragment, ContentFragment
+from tangl.story.story_graph import StoryGraph38
+from tangl.story.system_handlers import render_block, render_block_choices
+from tangl.vm import Dependency, Requirement
 
-import tangl.story38  # noqa: F401 – register story38 handlers
+import tangl.story  # noqa: F401 – register story38 handlers
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ def _simple_ctx(ns: dict | None = None):
 
 
 def _full_ctx(graph: StoryGraph38, cursor: Block, ns: dict | None = None):
-    from tangl.vm38.runtime.frame import PhaseCtx
+    from tangl.vm.runtime.frame import PhaseCtx
     ctx = PhaseCtx(graph=graph, cursor_id=cursor.uid)
     ctx._ns_cache[cursor.uid] = ns or {}
     return ctx

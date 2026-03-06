@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.template``."""
+"""Contract tests for ``tangl.core.template``."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from typing import Iterator
 import pytest
 from pydantic import ValidationError
 
-from tangl.core38.entity import Entity
-from tangl.core38.selector import Selector
-from tangl.core38.template import (
+from tangl.core.entity import Entity
+from tangl.core.selector import Selector
+from tangl.core.template import (
     MAX_SCOPE_BRACE_EXPANSIONS,
     EntityTemplate,
     Snapshot,

@@ -1,7 +1,7 @@
 import pytest
 
 from tangl.lang.body_parts import BodyRegion, BodyPart
-from tangl.core38 import Entity
+from tangl.core import Entity
 
 
 class DummyEntity(Entity):

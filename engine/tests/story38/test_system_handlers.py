@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core38 import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
-from tangl.core38.runtime_op import Predicate
-from tangl.story38 import StoryGraph38
-from tangl.story38.fragments import ChoiceFragment, ContentFragment, MediaFragment
-from tangl.story38.episode import Action, Block
-from tangl.story38.system_handlers import (
+from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
+from tangl.core.runtime_op import Predicate
+from tangl.story import StoryGraph38
+from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
+from tangl.story.episode import Action, Block
+from tangl.story.system_handlers import (
     render_block,
     render_block_choices,
     render_block_content,
     render_block_media,
 )
-from tangl.vm38.dispatch import do_journal
-from tangl.vm38 import Dependency, Requirement
-from tangl.vm38.runtime.frame import PhaseCtx
+from tangl.vm.dispatch import do_journal
+from tangl.vm import Dependency, Requirement
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _ctx_with_ns(ns: dict[str, object] | None = None) -> SimpleNamespace:

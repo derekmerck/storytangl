@@ -33,24 +33,24 @@ from typing import Callable, Iterator
 
 import pytest
 
-from tangl.core38 import Graph
-from tangl.vm38.dispatch import (
+from tangl.core import Graph
+from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     on_journal,
     on_update,
     on_validate,
 )
-from tangl.vm38.fragments import ContentFragment
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.runtime.frame import Frame
-from tangl.vm38.runtime.ledger import Ledger
-from tangl.vm38.replay import StepRecord
-from tangl.vm38.traversable import (
+from tangl.vm.fragments import ContentFragment
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import Frame
+from tangl.vm.runtime.ledger import Ledger
+from tangl.vm.replay import StepRecord
+from tangl.vm.traversable import (
     AnonymousEdge,
     TraversableEdge,
     TraversableNode,
 )
-import tangl.vm38.system_handlers  # side-effect: register default handlers
+import tangl.vm.system_handlers  # side-effect: register default handlers
 
 
 # ---------------------------------------------------------------------------
@@ -84,8 +84,8 @@ def _cleanup_behaviors(*funcs: Callable[..., object]) -> Iterator[None]:
 
 def _register_system_handlers():
     """Re-register system handlers after clean_vm_dispatch clears the registry."""
-    sh = tangl.vm38.system_handlers
-    from tangl.vm38.dispatch import (
+    sh = tangl.vm.system_handlers
+    from tangl.vm.dispatch import (
         on_gather_ns, on_validate as _ov, on_prereqs as _op,
         on_update as _ou, on_postreqs as _ops,
     )
@@ -380,7 +380,7 @@ class TestJournalOutput:
         b = _node(g, label="b")
         edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
 
-        from tangl.core38 import OrderedRegistry
+        from tangl.core import OrderedRegistry
         stream = OrderedRegistry()
         frame = Frame(graph=g, cursor=a, output_stream=stream)
 
@@ -400,7 +400,7 @@ class TestJournalOutput:
         b = _node(g, label="b")
         edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
 
-        from tangl.core38 import OrderedRegistry
+        from tangl.core import OrderedRegistry
         stream = OrderedRegistry()
         frame = Frame(graph=g, cursor=a, output_stream=stream)
 

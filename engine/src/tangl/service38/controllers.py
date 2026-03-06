@@ -1,25 +1,31 @@
-"""Compatibility barrel for service38 controller classes."""
+"""Compatibility barrel that resolves controller symbols lazily at runtime."""
 
 from __future__ import annotations
 
-from tangl.service38.system_controller import SystemController
-from tangl.service38.user.user_controller import UserController
-from tangl.story38.fabula.world_controller import WorldController
-from tangl.story38.story_controller import RuntimeController
-
-
-DEFAULT_CONTROLLERS = (
-    RuntimeController,
-    UserController,
-    SystemController,
-    WorldController,
-)
-
-
 __all__ = [
+    "ApiKeyInfo",
     "DEFAULT_CONTROLLERS",
     "RuntimeController",
     "SystemController",
     "UserController",
     "WorldController",
 ]
+
+_SYMBOL_TO_MODULE = {
+    "ApiKeyInfo": "tangl.service.controllers",
+    "DEFAULT_CONTROLLERS": "tangl.service.controllers",
+    "RuntimeController": "tangl.service.controllers",
+    "SystemController": "tangl.service.controllers",
+    "UserController": "tangl.service.controllers",
+    "WorldController": "tangl.service.controllers",
+}
+
+
+def __getattr__(name: str):
+    module_name = _SYMBOL_TO_MODULE.get(name)
+    if module_name is None:
+        raise AttributeError(name)
+    module = __import__(module_name, fromlist=[name])
+    value = getattr(module, name)
+    globals()[name] = value
+    return value

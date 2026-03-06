@@ -1,90 +1,28 @@
-# tangl/core/bases.py
-# language=markdown
-"""
-tangl.core
-==========
+"""Compatibility wrapper package that forwards ``tangl.core38`` to ``tangl.core``."""
 
-Core defines shared vocabulary and foundational data structures and algorithms.
+from __future__ import annotations
 
-Portability
------------
+import importlib
+import pkgutil
+import sys
 
-Core types should be easy to reason about and implementable in any language with:
-- Algebraic data types or class inheritance
-- First-class functions
-- Associative collections (dict/map)
-- Ordered collections (list/array)
+import tangl.core as _core
+from tangl.core import *  # noqa: F401,F403
 
-Avoid Python-specific magic where possible. Document where unavoidable.
 
-File Organization
------------------
+def _alias_submodules() -> None:
+    src_prefix = "tangl.core."
+    dst_prefix = f"{__name__}."
+    for mod in pkgutil.walk_packages(_core.__path__, src_prefix):
+        target = mod.name
+        alias = dst_prefix + target[len(src_prefix) :]
+        if alias in sys.modules:
+            continue
+        try:
+            sys.modules[alias] = importlib.import_module(target)
+        except Exception:
+            # Keep compatibility wrapper best-effort during staged cutover.
+            continue
 
-```
-tangl/core/
-├── __init__.py           # Public API exports
-├── bases.py              # HasIdentity, uid/label/tags, Unstructurable, un/structure(),
-│                         #    HasContent, HasOrder, sort_key(), HasState
-│
-│   # Discovery
-├── selector.py           # Selector, match()
-├── registry.py           # Registry, RegistryAware, EntityGroup, find_all(), chain_find_all()
-│
-│   # Lifecycle
-├── record.py             # Record, OrderedRegistry, get_slice()
-├── singleton.py          # Singleton, InstanceInheritance
-│
-│   # Relationships
-├── graph.py              # GraphItem, Graph, Subgraph, Node, Edge
-│
-│   # Creation
-├── token.py              # Delegate to singleton
-├── template.py           # Semi-structured data, TemplateRegistry
-│
-│   # Doing things
-├── runtime_op.py         # RuntimeOp, Query, Predicate, Effect
-├── behavior.py           # Behavior, CallReceipt, Priority, DispatchLayer, AggregationMode
-└── dispatch.py           # Hooks for create(), new(), add(), get(), remove()
-```
-"""
-# Provides:
-# - identity
-# - state
-# - un/structure
-from .entity import Entity
 
-# Requires:
-# - identity
-# - un/structure
-# Provides:
-# - selection (Selector.from_kind(), .with_criteria(**_), .matches(entity))
-# - discovery (Reg.find_all(selector), .chain_find_all(*reg, selector)
-# - grouping/membership
-from .selector import Selector
-from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
-
-# Requires:
-# - selection
-# - groups
-# Provides:
-# - specialized shapes (singleton, record, graph)
-# - provenance (record)
-# - behaviors (Behavior(), Behavior.defer())
-# - groups of behaviors (BehaviorRegistry.execute_all(), .chain_execute_al)
-from .runtime_op import RuntimeOp
-from .singleton import Singleton
-from .record import Record, OrderedRegistry
-from .graph import GraphItem, Graph, Subgraph, Edge, Node, HierarchicalNode
-from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRegistry, AggregationMode
-from .namespace import HasNamespace, contribute_ns
-
-# Requires:
-# - behaviors
-# Provides:
-# - building
-# - dispatch hooks
-from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
-from .token import Token, TokenCatalog, TokenFactory  # Delegated reference builder
-from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
-
-from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
+_alias_submodules()

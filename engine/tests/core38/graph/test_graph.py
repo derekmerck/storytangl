@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.graph``."""
+"""Contract tests for ``tangl.core.graph``."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import pickle
 
 import pytest
 
-from tangl.core38.graph import Edge, Graph, GraphItem, HierarchicalNode, Node, Subgraph
-from tangl.core38.selector import Selector
+from tangl.core.graph import Edge, Graph, GraphItem, HierarchicalNode, Node, Subgraph
+from tangl.core.selector import Selector
 
 
 class SubclassNode(Node):

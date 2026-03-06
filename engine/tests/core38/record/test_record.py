@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.record``."""
+"""Contract tests for ``tangl.core.record``."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from tangl.core38.entity import Entity
-from tangl.core38.record import OrderedRegistry, Record
-from tangl.core38.registry import Registry
-from tangl.core38.selector import Selector
+from tangl.core.entity import Entity
+from tangl.core.record import OrderedRegistry, Record
+from tangl.core.registry import Registry
+from tangl.core.selector import Selector
 
 from ..conftest import CustomRecord, PayloadRecord, PriorityRecord, SimpleRecord
 

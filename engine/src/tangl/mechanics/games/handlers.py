@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from tangl.core38 import CallReceipt as CallReceipt38, Selector as Selector38
+from tangl.core import CallReceipt as CallReceipt38, Selector as Selector38
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
     ResolutionPhase as P,
@@ -20,7 +20,7 @@ from tangl.vm.dispatch import vm_dispatch
 from tangl.core import CallReceipt
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.story.dispatch import on_gather_content
-from tangl.vm38.dispatch import dispatch as vm38_dispatch
+from tangl.vm.dispatch import dispatch as vm38_dispatch
 
 from .has_game import HasGame
 
@@ -142,7 +142,7 @@ def provision_game_moves(
         accepting player input.
     """
 
-    from tangl.story38 import Action
+    from tangl.story import Action
 
     cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):

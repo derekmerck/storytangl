@@ -16,10 +16,10 @@ from uuid import UUID, uuid4
 import pytest
 
 from tangl.core import BaseFragment
-from tangl.core38 import Graph as Graph38
+from tangl.core import Graph as Graph38
 from tangl.service.exceptions import InvalidOperationError
 from tangl.service.user.user import User
-from tangl.service38.api_endpoint import (
+from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint38,
     HasApiEndpoints,
@@ -27,9 +27,9 @@ from tangl.service38.api_endpoint import (
     ResourceBinding,
     ResponseType,
 )
-from tangl.service38.orchestrator import Orchestrator38
-from tangl.service38.response import InfoModel, RuntimeInfo
-from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.service.orchestrator import Orchestrator38
+from tangl.service.response import InfoModel, RuntimeInfo
+from tangl.vm.runtime.ledger import Ledger as Ledger38
 
 
 class _FakePersistence(dict):

@@ -9,8 +9,7 @@ from pydantic import Field, model_validator, ConfigDict
 
 from tangl.utils.shelved2 import shelved, clear_shelf
 from tangl.utils.hashing import compute_data_hash
-from tangl.core import Entity
-from tangl.core.record.content_addressable import ContentAddressable
+from tangl.core import ContentAddressable, Entity
 from tangl.media.media_data_type import MediaDataType
 
 # RITs are _technically_ resource-type Nodes when used in a graph,
@@ -41,6 +40,13 @@ class MediaResourceInventoryTag(Entity, ContentAddressable):
         elif 'path' in data:
             return compute_data_hash(Path(data['path']))
         raise ValueError("Must specify either a content hash, the data, or path")
+
+    def get_hashable_content(self) -> Any:
+        if self.data is not None:
+            return self.data
+        if self.path is not None:
+            return compute_data_hash(self.path)
+        raise ValueError("Must specify either media data or a media path")
 
     data_type: MediaDataType = None
 

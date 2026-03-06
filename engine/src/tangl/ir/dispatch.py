@@ -1,7 +1,13 @@
 from functools import partial
 from typing import Iterator
 
-from tangl.core.behavior import LayeredDispatch, HandlerLayer as L, HandlerPriority as Prio, ContextP, CallReceipt
+from tangl.core.behavior import (
+    BehaviorRegistry as LayeredDispatch,
+    CallReceipt,
+    DispatchLayer as L,
+    HandlerPriority as Prio,
+    RuntimeCtx as ContextP,
+)
 from tangl.ir.core_ir import BaseScriptItem
 
 script_dispatch = LayeredDispatch(label="script.dispatch", handler_layer=L.APPLICATION)

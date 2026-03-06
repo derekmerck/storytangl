@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from tangl.config import settings
 from tangl.rest.dependencies38 import get_service_adapter38
-from tangl.service38.exceptions import AccessDeniedError
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38
-from tangl.service38.response import SystemInfo, UserSecret
+from tangl.service.exceptions import AccessDeniedError
+from tangl.service import GatewayRestAdapter38, ServiceOperation38
+from tangl.service.response import SystemInfo, UserSecret
 from tangl.utils.hash_secret import key_for_secret
 
 

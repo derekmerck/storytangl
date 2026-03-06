@@ -8,8 +8,8 @@ from uuid import UUID
 import cmd2
 
 from tangl.persistence import PersistenceManagerFactory
-from tangl.service38 import ServiceGateway38, ServiceOperation38, build_service_gateway38
-from tangl.service38.operations import endpoint_for_operation
+from tangl.service import ServiceGateway38, ServiceOperation38, build_service_gateway38
+from tangl.service.operations import endpoint_for_operation
 
 
 class StoryTanglCLI(cmd2.Cmd):
@@ -119,14 +119,6 @@ class StoryTanglCLI(cmd2.Cmd):
         if self.orchestrator is None:
             raise RuntimeError("No orchestrator or service gateway configured")
         return self.orchestrator.execute(endpoint, **kwargs)
-
-    def call_legacy_endpoint(self, endpoint: str, /, **params) -> object:
-        """Execute endpoint against legacy orchestrator when configured."""
-
-        if self.orchestrator is not None:
-            kwargs = self._prepare_context_kwargs(params)
-            return self.orchestrator.execute(endpoint, **kwargs)
-        return self.call_endpoint(endpoint, **params)
 
     def remove_resources(self, identifiers: Iterable[UUID]) -> None:
         """Remove resources from persistence when ``drop_user`` returns ids."""

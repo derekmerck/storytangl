@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tangl.core38 import Graph, OrderedRegistry
-from tangl.vm38 import Frame, Ledger, TraversableEdge as ChoiceEdge
-from tangl.vm38.replay import StepRecord
+from tangl.core import Graph, OrderedRegistry
+from tangl.vm import Frame, Ledger, TraversableEdge as ChoiceEdge
+from tangl.vm.replay import StepRecord
 
 
 def _make_frame(graph: Graph, cursor_id: UUID, records: OrderedRegistry | None = None):

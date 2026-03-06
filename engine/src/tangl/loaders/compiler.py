@@ -1,16 +1,62 @@
 from __future__ import annotations
 
+import importlib
 import sys
 from typing import Any, TYPE_CHECKING
 
-from tangl.story38.fabula import StoryCompiler38, World38
+from tangl.story.fabula import StoryCompiler38, World38
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
 
 if TYPE_CHECKING:
-    from tangl.story.fabula import AssetManager, DomainManager, World
+    from tangl.story.fabula import World
+
+
+class _WorldDomainFacet:
+    """Lightweight world-domain facet for runtime-38 world assembly."""
+
+    def __init__(self) -> None:
+        from tangl.core import BehaviorRegistry
+
+        self.dispatch_registry = BehaviorRegistry(label="world_domain_dispatch")
+        self._authorities: list[Any] = [self.dispatch_registry]
+        self.modules: list[Any] = []
+        self.class_registry: dict[str, Any] = {}
+
+    def load_domain_module(self, domain_module: str) -> None:
+        module = importlib.import_module(domain_module)
+        self.modules.append(module)
+
+        get_authorities = getattr(module, "get_authorities", None)
+        if callable(get_authorities):
+            for authority in get_authorities() or ():
+                if authority not in self._authorities:
+                    self._authorities.append(authority)
+
+        try:
+            from tangl.core import Entity
+        except Exception:
+            Entity = object  # type: ignore[assignment]
+
+        for name, value in vars(module).items():
+            if not isinstance(value, type):
+                continue
+            if value is Entity:
+                continue
+            if issubclass(value, Entity):
+                self.class_registry[name] = value
+
+    def get_authorities(self) -> list[Any]:
+        return list(self._authorities)
+
+
+class _WorldAssetsFacet:
+    """Lightweight assets facet placeholder for runtime-38 world assembly."""
+
+    def __init__(self) -> None:
+        self.values: dict[str, Any] = {}
 
 
 class WorldCompiler:
@@ -119,7 +165,7 @@ class WorldCompiler:
 
         base_metadata = bundle.manifest.metadata.copy()
 
-        domain_manager: DomainManager | None = None
+        domain_manager: Any | None = None
         resource_manager = None
         world38_domain_facet = None
         world38_assets_facet = None
@@ -205,17 +251,14 @@ class WorldCompiler:
     def _build_world38_facets(
         self,
         bundle: WorldBundle,
-    ) -> tuple[DomainManager | None, AssetManager, Any]:
-        from tangl.story.fabula import AssetManager, DomainManager
-
-        domain_facet: DomainManager | None = None
+    ) -> tuple[Any | None, Any | None, Any]:
+        domain_facet: Any | None = None
         domain_module = self._get_domain_module(bundle)
         if domain_module:
-            domain_facet = DomainManager()
+            domain_facet = _WorldDomainFacet()
             self.domain_compiler.load_into(domain_module, domain_facet)
 
-        assets_facet = AssetManager()
-        self.asset_compiler.setup_defaults(assets_facet)
+        assets_facet: Any | None = _WorldAssetsFacet()
 
         resources_facet = self.media_compiler.index(
             bundle.media_dir,

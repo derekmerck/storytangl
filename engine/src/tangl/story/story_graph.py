@@ -1,50 +1,77 @@
+from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 from uuid import UUID
 
-from pydantic import Field, field_serializer, field_validator
+from pydantic import Field
 
-from ..type_hints import StringMap
-from tangl.core.graph import Graph
-from tangl.core.behavior import BehaviorRegistry
-from tangl.core.factory import TemplateFactory
+from tangl.core import Graph, TemplateRegistry
+
 from .dispatch import story_dispatch
-from .fabula import World
 
 
-class StoryGraph(Graph):
-    # A subclass of graph that knows that it is a story and who its author is
+class StoryGraph38(Graph):
+    """Story graph specialization for story38 runtime state."""
 
-    world: World | None = None
     initial_cursor_id: UUID | None = None
+    initial_cursor_ids: list[UUID] = Field(default_factory=list)
     locals: dict[str, Any] = Field(default_factory=dict)
-    factory: TemplateFactory | None = Field(default=None, exclude=True)
+    factory: TemplateRegistry | None = Field(default=None, exclude=True)
+    script_manager: Any | None = Field(default=None, exclude=True)
+    world: Any | None = Field(default=None, exclude=True)
+    template_by_entity_id: dict[UUID, UUID] = Field(default_factory=dict, exclude=True)
+    template_lineage_by_entity_id: dict[UUID, list[UUID]] = Field(default_factory=dict, exclude=True)
 
-    # Just override this in a subclass to create graph's that use
-    # variant dispatches, for testing, for example.
-    application_dispatch: ClassVar[BehaviorRegistry] = story_dispatch
+    def get_story_locals(self) -> dict[str, Any]:
+        """Return story-level locals exposed to runtime render/provision paths."""
+        return dict(self.locals)
 
-    def get_active_layers(self):
-        layers = { self.application_dispatch }
-        if self.world and hasattr(self.world, "get_active_layers"):
-            layers.update(*self.world.get_active_layers())
-        return layers
+    def get_authorities(self) -> list[object]:
+        """Return application/world authority registries when available."""
+        registries: list[object] = [story_dispatch]
+        get_world_authorities = getattr(self.world, "get_authorities", None)
+        if callable(get_world_authorities):
+            for registry in get_world_authorities() or ():
+                if registry not in registries:
+                    registries.append(registry)
+        return registries
 
-    # todo: there is definitely a more clever way to auto infer recursive
-    #       structuring for entities
-    @field_serializer("world")
-    @classmethod
-    def _dump_world(cls, data: World):
-        if data is not None:
-            return data.unstructure()
+    def get_template_scope_groups(self, caller) -> list[list[object]]:
+        """Return template groups ordered from closest template scope outward."""
+        caller_uid = getattr(caller, "uid", None)
+        lineage = self.template_lineage_by_entity_id.get(caller_uid, [])
 
-    @field_validator("world", mode="before")
-    @classmethod
-    def _structure_world(cls, value: dict):
-        if isinstance(value, dict):
-            return World.structure(value)
-        elif isinstance(value, World):
-            return value
-        elif value is None:
-            return None
-        raise ValueError(f"World {value} is not a valid data, World, or None")
+        get_groups = getattr(self.script_manager, "get_template_scope_groups", None)
+        if callable(get_groups):
+            groups = get_groups(caller=caller, graph=self, lineage_ids=lineage)
+            if groups:
+                return [list(group) for group in groups]
+
+        if self.factory is None:
+            return []
+
+        groups: list[list[object]] = []
+        seen_ids: set[UUID] = set()
+
+        def add_group(values) -> None:
+            bucket: list[object] = []
+            for value in values:
+                uid = getattr(value, "uid", None)
+                if uid is None or uid in seen_ids:
+                    continue
+                seen_ids.add(uid)
+                bucket.append(value)
+            if bucket:
+                groups.append(bucket)
+
+        for template_id in lineage:
+            template = self.factory.get(template_id)
+            if template is None:
+                continue
+            values: list[object] = [template]
+            if hasattr(template, "members"):
+                values.extend(list(template.members()))
+            add_group(values)
+
+        add_group(self.factory.values())
+        return groups

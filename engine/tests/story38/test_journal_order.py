@@ -12,23 +12,23 @@ real dispatch pipeline (``do_journal``), so we catch any priority-table drift.
 
 See Also
 --------
-- ``tangl.story38.system_handlers`` – handler registrations
-- ``tangl.vm38.dispatch.do_journal`` – phase pipeline entry point
-- ``tangl.story38.dispatch.story_dispatch`` – story-layer behavior registry
+- ``tangl.story.system_handlers`` – handler registrations
+- ``tangl.vm.dispatch.do_journal`` – phase pipeline entry point
+- ``tangl.story.dispatch.story_dispatch`` – story-layer behavior registry
 """
 
 from __future__ import annotations
 
 import pytest
 
-from tangl.story38.episode import Action, Block
-from tangl.story38.fragments import ChoiceFragment, ContentFragment, MediaFragment
-from tangl.story38.story_graph import StoryGraph38
-from tangl.story38.system_handlers import render_block
-from tangl.vm38.dispatch import do_journal
-from tangl.vm38.runtime.frame import PhaseCtx
+from tangl.story.episode import Action, Block
+from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
+from tangl.story.story_graph import StoryGraph38
+from tangl.story.system_handlers import render_block
+from tangl.vm.dispatch import do_journal
+from tangl.vm.runtime.frame import PhaseCtx
 
-import tangl.story38  # noqa: F401 – registers story38 handlers into story_dispatch
+import tangl.story  # noqa: F401 – registers story38 handlers into story_dispatch
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ class TestRenderBlockFacadeOrder:
         assert last_non_choice < first_choice
 
     def test_no_fragments_emitted_for_non_block_caller(self) -> None:
-        from tangl.story38.episode import Scene
+        from tangl.story.episode import Scene
         from types import SimpleNamespace
 
         scene = Scene(label="scene")
@@ -168,7 +168,7 @@ class TestDoJournalDispatchOrder:
         assert "Alice" in content.content
 
     def test_do_journal_returns_empty_list_for_non_block(self) -> None:
-        from tangl.story38.episode import Scene
+        from tangl.story.episode import Scene
 
         graph = StoryGraph38(label="g")
         scene = Scene(label="s")

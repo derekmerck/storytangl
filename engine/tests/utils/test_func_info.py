@@ -3,7 +3,7 @@ from typing import Self
 
 import pytest
 
-from tangl.core38 import Entity
+from tangl.core import Entity
 from tangl.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerType
 
 

@@ -5,15 +5,13 @@ import logging
 
 from pydantic import model_validator
 
-from tangl.core.registry import Registry
-from tangl.core.dispatch import HookedRegistry
-from tangl.core.behavior import BehaviorRegistry, Behavior, CallReceipt
+from tangl.core import Behavior, BehaviorRegistry, CallReceipt, Registry
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-class MediaResourceRegistry(HookedRegistry[MediaRIT]):
+class MediaResourceRegistry(Registry[MediaRIT]):
     """
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
@@ -47,11 +45,15 @@ class MediaResourceRegistry(HookedRegistry[MediaRIT]):
 
             # Check for duplicates by content
             if record in self:
-                results.append(self.find_one(alias=record.content_hash))
+                results.append(self.find_one(has_identifier=record.content_hash()))
                 continue
 
             # Run through indexing pipeline
-            receipts = self.on_index.dispatch(record, ctx=None, extra_handlers=extra_handlers)
+            receipts = self.on_index.execute_all(
+                call_args=(record,),
+                ctx=None,
+                inline_behaviors=extra_handlers,
+            )
             CallReceipt.gather_results(*receipts)
 
             # Add to registry
@@ -64,5 +66,5 @@ class MediaResourceRegistry(HookedRegistry[MediaRIT]):
     def __contains__(self, item: MediaRIT | UUID) -> bool:
         """Find existing record with matching content hash"""
         if isinstance(item, MediaRIT):
-            return bool( self.find_one(alias=item.content_hash) )
+            return bool(self.find_one(has_identifier=item.content_hash()))
         return super().__contains__(item)

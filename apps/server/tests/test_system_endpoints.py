@@ -23,7 +23,7 @@ def test_system_get_key(client):
     assert update[0] == key_for_secret(settings.client.secret)
     assert update[1] == settings.client.secret
 
-def test_system_list_worlds(client, world):
+def test_system_list_worlds(client):
     response = client.get(f"system/worlds")
     assert response.status_code == 200
     update = response.json()

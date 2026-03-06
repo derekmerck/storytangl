@@ -1,11 +1,11 @@
-"""Contract tests for ``tangl.core38.ctx``."""
+"""Contract tests for ``tangl.core.ctx``."""
 
 from __future__ import annotations
 
 import logging
 from uuid import uuid4
 
-from tangl.core38.ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
+from tangl.core.ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
 
 
 def test_ctx_implements_dispatch_and_core_protocols() -> None:

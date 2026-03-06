@@ -42,7 +42,7 @@ def _import_modules(path: Path) -> list[str]:
 
 
 def _is_legacy_import(module_name: str) -> bool:
-    if module_name.startswith("tangl.vm38") or module_name.startswith("tangl.story38"):
+    if module_name.startswith("tangl.vm") or module_name.startswith("tangl.story"):
         return False
     if module_name == "tangl.vm" or module_name.startswith("tangl.vm."):
         return True

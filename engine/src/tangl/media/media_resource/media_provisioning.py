@@ -1,117 +1,110 @@
 from __future__ import annotations
 
-from typing import Iterator, Optional
+from typing import Any, Iterator
+from uuid import UUID
 
-from tangl.type_hints import UnstructuredData
 from pydantic import ConfigDict, Field
 
-from tangl.core import BehaviorRegistry
-from tangl.vm.provision import DependencyOffer, ProvisionCost, Provisioner
-from tangl.vm.provision.provisioning_policy import ProvisioningPolicy
-from tangl.vm.provision.requirement import Requirement
-from tangl.media.type_hints import Media
-from tangl.media.media_creators.media_spec import MediaSpec
-from tangl.media.media_data_type import MediaDataType
+from tangl.core import BehaviorRegistry, Priority, Record
+from tangl.type_hints import UnstructuredData
+from tangl.vm.provision import ProvisionOffer, ProvisionPolicy, Requirement
+
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 from .media_resource_registry import MediaResourceRegistry
 
 on_provision_media = BehaviorRegistry(label="provision_media")
 
 
-class MediaProvisioner(Provisioner):
-    """Provisioner for media dependencies using inline data or specs."""
+class MediaDependencyOffer(ProvisionOffer):
+    """Compatibility offer wrapper used by media provisioning tests."""
+
+    provider_id: UUID | None = None
+
+    def accept(self, ctx: Any = None) -> Any:
+        callback = self.callback
+        if callback is None:
+            return None
+        try:
+            return callback(_ctx=ctx)
+        except TypeError:
+            return callback(ctx)
+
+
+class MediaProvisioner(Record):
+    """Provision media dependencies from existing registry entries or inline templates."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     requirement: Requirement
     registries: list[MediaResourceRegistry] = Field(default_factory=list)
 
+    @staticmethod
+    def _requirement_identifier(requirement: Requirement) -> str | None:
+        extra = requirement.__pydantic_extra__ or {}
+        identifier = extra.get("has_identifier") or extra.get("identifier")
+        return str(identifier) if isinstance(identifier, str) and identifier else None
+
+    @staticmethod
+    def _requirement_template(requirement: Requirement) -> UnstructuredData:
+        extra = requirement.__pydantic_extra__ or {}
+        template = extra.get("template")
+        return template if isinstance(template, dict) else {}
+
+    @staticmethod
+    def _requirement_policy(requirement: Requirement) -> ProvisionPolicy:
+        value = getattr(requirement, "provision_policy", ProvisionPolicy.ANY)
+        if isinstance(value, ProvisionPolicy):
+            return value
+        try:
+            return ProvisionPolicy(value)
+        except Exception:
+            return ProvisionPolicy.ANY
+
     def _resolve_existing(self, requirement: Requirement) -> MediaRIT | None:
-        identifier = requirement.identifier
-        criteria = requirement.criteria or {}
+        identifier = self._requirement_identifier(requirement)
         for registry in self.registries:
-            if identifier is not None:
-                rit = registry.find_one(has_identifier=identifier)
-                if rit:
-                    return rit
-            if "content_hash" in criteria:
-                rit = registry.find_one(content_hash=criteria["content_hash"])
-                if rit:
-                    return rit
+            if identifier:
+                existing = registry.find_one(has_identifier=identifier)
+                if existing is not None:
+                    return existing
         return None
 
-    def _resolve_update(self, *args, **kwargs):
-        raise NotImplementedError("Media UPDATE not implemented")
-
-    def _resolve_clone(self, *args, **kwargs):
-        raise NotImplementedError("Media CLONE not implemented")
-
     def _resolve_create(self, provider_template: UnstructuredData) -> MediaRIT:
-        """Create :class:`MediaRIT` from inline data or a spec template."""
-
-        if "data" in provider_template:
-            data = provider_template["data"]  # type: Media
-            provider = MediaRIT(data=data, data_type=MediaDataType.OTHER)
-        elif "spec" in provider_template:
-            spec = provider_template["spec"]  # type: MediaSpec
-            if hasattr(spec, "adapt_spec"):
-                adapted_spec = spec.adapt_spec(self.requirement.reference)
-                media, revised_spec = adapted_spec.create_media()
-                provider = MediaRIT(data=media, data_type=MediaDataType.OTHER)
-                provider.tags.add("spec")
-                provider.tags.add(adapted_spec.__class__.__name__)
-                provider.data = media
-            else:
-                raise ValueError("Media spec templates must implement adapt_spec/create_media")
-        else:
-            raise ValueError("Media CREATE requires either data or spec")
-
-        if not self.registries:
-            return provider
-        self.registries[0].add(provider)
+        if "data" not in provider_template:
+            raise ValueError("Media CREATE requires template.data")
+        provider = MediaRIT(data=provider_template["data"])
+        if self.registries:
+            self.registries[0].add(provider)
         return provider
 
-    def get_dependency_offers(
-        self, requirement: Requirement, *, ctx: "Context"
-    ) -> Iterator[DependencyOffer]:
-        if not requirement.policy & ProvisioningPolicy.ANY:
+    def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
+        policy = self._requirement_policy(requirement)
+        if not (policy & ProvisionPolicy.ANY):
             return
 
-        if existing := self._resolve_existing(requirement):
-            yield DependencyOffer(
-                requirement_id=requirement.uid,
-                requirement=requirement,
-                operation=ProvisioningPolicy.EXISTING,
-                base_cost=ProvisionCost.DIRECT,
-                cost=float(ProvisionCost.DIRECT),
-                proximity=0.0,
-                proximity_detail="media_existing",
-                accept_func=lambda _ctx: existing,
+        existing = self._resolve_existing(requirement)
+        if existing is not None and (policy & ProvisionPolicy.EXISTING):
+            yield MediaDependencyOffer(
+                origin_id=self.uid,
+                policy=ProvisionPolicy.EXISTING,
+                callback=lambda *_, _existing=existing, **__: _existing,
+                priority=Priority.NORMAL,
+                distance_from_caller=0,
+                candidate=existing,
                 provider_id=existing.uid,
-                source_provisioner_id=self.uid,
-                source_layer=self.layer,
             )
             return
 
-        template = requirement.template or {}
-        if not template:
-            return
+        template = self._requirement_template(requirement)
+        if template and (policy & ProvisionPolicy.CREATE):
+            yield MediaDependencyOffer(
+                origin_id=self.uid,
+                policy=ProvisionPolicy.CREATE,
+                callback=lambda *_, _templ=template, **__: self._resolve_create(_templ),
+                priority=Priority.LATE,
+                distance_from_caller=1,
+            )
 
-        def _accept(context: "Context") -> MediaRIT:
-            return self._resolve_create(template)
-
-        yield DependencyOffer(
-            requirement_id=requirement.uid,
-            requirement=requirement,
-            operation=ProvisioningPolicy.CREATE,
-            base_cost=ProvisionCost.CREATE,
-            cost=float(ProvisionCost.CREATE),
-            proximity=999.0,
-            proximity_detail="media_create",
-            accept_func=_accept,
-            source_provisioner_id=self.uid,
-            source_layer=self.layer,
-        )
-
-    def generate_offers(self, *, ctx: "Context") -> list[DependencyOffer]:
-        return list(self.get_dependency_offers(self.requirement, ctx=ctx))
+    def generate_offers(self, *, ctx: Any = None) -> list[ProvisionOffer]:
+        _ = ctx
+        return list(self.get_dependency_offers(self.requirement))

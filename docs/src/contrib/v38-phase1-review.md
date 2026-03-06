@@ -34,45 +34,45 @@
 - Why high risk: legacy planning receipts and provisioner classes were reshaped into vm38 resolver + side-effect planning semantics.
 - Typical impacted tests: `engine/tests/vm/planning/*`, `engine/tests/vm/provision/*`, and vm integration tests that depended on old planning object graphs.
 - Primary v38 anchors:
-  - `tangl.vm38.dispatch.do_provision`
-  - `tangl.vm38.provision.Resolver.resolve_dependency`
-  - `tangl.vm38.provision.Requirement`
+  - `tangl.vm.dispatch.do_provision`
+  - `tangl.vm.provision.Resolver.resolve_dependency`
+  - `tangl.vm.provision.Requirement`
 
 ### 2. Story Fabula Compiler/Materializer Migration
 - Evidence: 28 modules; 13 high-risk; many script-manager and world-materialization tests require remapping.
 - Why high risk: legacy `ScriptManager`/manager stack is replaced by `StoryCompiler38` + `StoryMaterializer38` and init-mode reports.
 - Typical impacted tests: `engine/tests/story/fabula/test_script_manager*.py`, `test_world_*`, `test_template_*`.
 - Primary v38 anchors:
-  - `tangl.story38.fabula.StoryCompiler38.compile`
-  - `tangl.story38.fabula.StoryMaterializer38.create_story`
-  - `tangl.story38.fabula.World38.from_script_data`
+  - `tangl.story.fabula.StoryCompiler38.compile`
+  - `tangl.story.fabula.StoryMaterializer38.create_story`
+  - `tangl.story.fabula.World38.from_script_data`
 
 ### 3. Story Episode Journaling and Choice Availability Semantics
 - Evidence: 17 modules; 11 high-risk; heavy `PORT_ADAPT` around block pipeline/order/conditions.
 - Why high risk: story38 centralizes output through journal handlers and vm38 phase contracts; legacy dialog/post-process/menu behavior does not map 1:1.
 - Typical impacted tests: `engine/tests/story/episode/test_block*.py`, `test_menu_block.py`, `test_complex_conditions.py`.
 - Primary v38 anchors:
-  - `tangl.story38.system_handlers.render_block`
-  - `tangl.story38.system_handlers._choice_unavailable_reason`
-  - `tangl.vm38.system_handlers.contribute_satisfied_deps`
+  - `tangl.story.system_handlers.render_block`
+  - `tangl.story.system_handlers._choice_unavailable_reason`
+  - `tangl.vm.system_handlers.contribute_satisfied_deps`
 
 ### 4. Service Contract Consolidation onto Service38 Gateway/Orchestrator
 - Evidence: 13 modules; 6 high-risk; legacy response-model tests include retired contract assumptions.
 - Why high risk: endpoint/orchestrator behavior survives, but response/info-model contract focus shifts toward service38 operation + runtime-envelope patterns.
 - Typical impacted tests: `engine/tests/service/test_orchestrator*.py`, `test_api_endpoints.py`, response contract tests.
 - Primary v38 anchors:
-  - `tangl.service38.orchestrator.Orchestrator38.execute`
-  - `tangl.service38.api_endpoint.ApiEndpoint38.annotate`
-  - `tangl.service38.gateway.ServiceGateway38.execute`
+  - `tangl.service.orchestrator.Orchestrator38.execute`
+  - `tangl.service.api_endpoint.ApiEndpoint38.annotate`
+  - `tangl.service.gateway.ServiceGateway38.execute`
 
 ### 5. VM Replay Simplification (Watcher/Observer Model Retirement)
 - Evidence: 6 replay/event-model modules; 4 retired; remaining 2 require adaptation to diff-patch MVP.
 - Why high risk: legacy event-sourcing watcher assumptions are intentionally deprecated; replay confidence now depends on patch/checkpoint invariants.
 - Typical impacted tests: `engine/tests/vm/events/test_watched.py`, `test_event_canonicalize.py`, `test_stack_event_sourcing.py`.
 - Primary v38 anchors:
-  - `tangl.vm38.replay.DiffReplayEngine.build_delta`
-  - `tangl.vm38.replay.Event.apply`
-  - `tangl.vm38.runtime.ledger.Ledger.save_snapshot`
+  - `tangl.vm.replay.DiffReplayEngine.build_delta`
+  - `tangl.vm.replay.Event.apply`
+  - `tangl.vm.runtime.ledger.Ledger.save_snapshot`
 
 ## Proposed Phase 2 Candidate Scope (Proposal Only)
 No lock or execution implied; this is a review-time recommendation for the first implementation slice.

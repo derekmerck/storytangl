@@ -29,18 +29,18 @@ from uuid import UUID
 
 import pytest
 
-from tangl.service38.api_endpoint import (
+from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint38,
     ResourceBinding,
     WritebackMode,
 )
-from tangl.service38.bootstrap import build_service_gateway38, register_default_controllers
-from tangl.service38.controllers import UserController
-from tangl.service38.gateway import ServiceGateway38
-from tangl.service38.operations import ServiceOperation38, endpoint_for_operation
-from tangl.service38.orchestrator import Orchestrator38
-from tangl.service38.response import RuntimeInfo
+from tangl.service.bootstrap import build_service_gateway38, register_default_controllers
+from tangl.service.controllers import UserController
+from tangl.service.gateway import ServiceGateway38
+from tangl.service.operations import ServiceOperation38, endpoint_for_operation
+from tangl.service.orchestrator import Orchestrator38
+from tangl.service.response import RuntimeInfo
 from tangl.service.user.user import User
 
 
@@ -369,7 +369,7 @@ class TestUserControllerGatewayRouting:
         """service38 bootstrap wires the service38 UserController, not the legacy one."""
         endpoint_name = endpoint_for_operation(ServiceOperation38.USER_CREATE)
         binding = orchestrator._endpoints[endpoint_name]
-        assert binding.endpoint.func.__module__ == "tangl.service38.user.user_controller"
+        assert binding.endpoint.func.__module__ == "tangl.service.user.user_controller"
 
 
 # ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ class TestGetKeyForSecret:
         self,
         orchestrator: Orchestrator38,
     ) -> None:
-        from tangl.service38.operations import endpoint_for_operation
+        from tangl.service.operations import endpoint_for_operation
         endpoint_name = endpoint_for_operation(ServiceOperation38.USER_KEY)
         result = orchestrator.execute(endpoint_name, secret="test-secret")
         # ApiKeyInfo or compatible info model with api_key field

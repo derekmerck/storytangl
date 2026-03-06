@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.story38.concepts import Actor, Location, Role, Setting
-from tangl.story38.episode import Block, Scene
-from tangl.story38.story_graph import StoryGraph38
-from tangl.vm38 import Requirement
-from tangl.vm38.runtime.frame import PhaseCtx
+from tangl.story.concepts import Actor, Location, Role, Setting
+from tangl.story.episode import Block, Scene
+from tangl.story.story_graph import StoryGraph38
+from tangl.vm import Requirement
+from tangl.vm.runtime.frame import PhaseCtx
 
 
 def _build_scene_with_block() -> tuple[StoryGraph38, Scene, Block]:

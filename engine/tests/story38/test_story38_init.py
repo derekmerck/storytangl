@@ -15,18 +15,18 @@ import pytest
 from tangl.loaders import WorldBundle, WorldCompiler
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.user.user import User
-from tangl.story38 import InitMode, World38
-from tangl.story38.concepts import Actor, Location, Role, Setting
-from tangl.story38.fabula import (
+from tangl.story import InitMode, World38
+from tangl.story.concepts import Actor, Location, Role, Setting
+from tangl.story.fabula import (
     GraphInitializationError,
     ResolutionError,
     ResolutionFailureReason,
     StoryCompiler38,
 )
-from tangl.story38.episode import Action, Block, Scene
-from tangl.core38 import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
-from tangl.story38.dispatch import story_dispatch
-from tangl.vm38 import Ledger
+from tangl.story.episode import Action, Block, Scene
+from tangl.core import BehaviorRegistry, DispatchLayer, EntityTemplate, Selector, TemplateRegistry
+from tangl.story.dispatch import story_dispatch
+from tangl.vm import Ledger
 
 
 def _base_script() -> dict:
@@ -337,7 +337,7 @@ def test_loader_compiler_runtime_38_path(tmp_path: Path) -> None:
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "domain.py").write_text(
         """
-from tangl.core38 import Entity
+from tangl.core import Entity
 
 
 class DomainCharacter(Entity):

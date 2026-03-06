@@ -6,13 +6,13 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core38 import Graph
+from tangl.core import Graph
 from tangl.persistence import PersistenceManager
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.persistence.storage import InMemoryStorage
 from tangl.persistence.structuring import StructuringHandler
 from tangl.service.user.user import User
-from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.vm.runtime.ledger import Ledger as Ledger38
 
 
 @pytest.fixture(autouse=True)

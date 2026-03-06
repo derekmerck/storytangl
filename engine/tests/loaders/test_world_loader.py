@@ -8,7 +8,7 @@ import pytest
 from tangl.loaders.bundle import WorldBundle
 from tangl.loaders.compiler import ScriptCompiler, WorldCompiler
 from tangl.service.world_registry import WorldRegistry
-from tangl.story38 import World38
+from tangl.story import World38
 
 
 class _BridgeScriptCompiler(ScriptCompiler):
@@ -424,7 +424,7 @@ def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None
     (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
     (domain_pkg / "domain.py").write_text(
         """
-from tangl.core38 import Entity
+from tangl.core import Entity
 
 
 class DomainCharacter(Entity):
@@ -462,7 +462,7 @@ def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:
     (package_dir / "__init__.py").write_text("", encoding="utf-8")
     (package_dir / "domain.py").write_text(
         """
-from tangl.core38 import Entity
+from tangl.core import Entity
 
 
 class DomainCharacter(Entity):

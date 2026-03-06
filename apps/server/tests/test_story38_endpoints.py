@@ -6,15 +6,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tangl.config import settings
-from tangl.core38 import Selector
+from tangl.core import Selector
 from tangl.rest.app import app
 from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
 from tangl.rest.dependencies38 import get_service_gateway38
 from tangl.service.user.user import User
-from tangl.service38.api_endpoint import AccessLevel
-from tangl.story38.episode import Action
+from tangl.service.api_endpoint import AccessLevel
+from tangl.story.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
-from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.vm.runtime.ledger import Ledger as Ledger38
 
 
 def _write_story38_bundle(root: Path) -> str:

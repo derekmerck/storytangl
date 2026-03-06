@@ -1,264 +1,277 @@
-# tangl/vm/requirement.py
-"""
-Requirements and provisioning policy.
-
-A :class:`Requirement` is a graph item that expresses *what must be linked*
-at the frontier and *how* to obtain it (via :class:`ProvisioningPolicy`).
-Requirements are carried by :class:`~tangl.vm.planning.open_edge.Dependency`
-and :class:`~tangl.vm.planning.open_edge.Affordance` edges.
-"""
+from __future__ import annotations
 from typing import Any, Optional, Generic, TypeVar
 from uuid import UUID
-from copy import deepcopy
 
-from pydantic import AliasChoices, Field, PrivateAttr, model_validator, field_validator
+from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
+from .provisioner import ProvisionPolicy
 
-from tangl.type_hints import StringMap, UnstructuredData, Identifier
-from tangl.core.graph import GraphItem, Node, Graph
-from tangl.core.factory import Template
-from tangl.core.singleton import Singleton
+PT = TypeVar('PT', bound=RegistryAware)  # 'ProviderType'
 
-from .provisioning_policy import ProvisioningPolicy
-
-NodeT = TypeVar('NodeT', bound=Node)
-
-class Requirement(GraphItem, Generic[NodeT]):
+class Requirement(Selector, Generic[PT]):
     """
-    Requirement(identifier | criteria | template, policy: ProvisioningPolicy = EXISTING, *, hard_requirement: bool = True)
-
-    GraphItem placeholder describing a needed provider at the resolution frontier.
-
-    Why
-    ----
-    Encodes *what must be linked* (by identifier/criteria) and *how to obtain it*
-    (via :class:`ProvisioningPolicy`). Requirements are carried on open edges
-    (e.g., :class:`Dependency`, :class:`Affordance`) and are satisfied by
-    binding a provider node.
-
-    In protocol / constraint-satisfaction terms, a Requirement is the VM's
-    **Constraint** object:
-
-    * Its **selector surface** is the combination of :attr:`identifier` and
-      :attr:`criteria`, exposed via :meth:`get_selection_criteria` and
-      :meth:`satisfied_by`. This describes *what* would be acceptable.
-    * Its **provisioning contract** is the combination of :attr:`policy`,
-      :attr:`template`, :attr:`reference_id`, and :attr:`hard_requirement`.
-      This describes *how* the engine may satisfy the selector once a match
-      is found.
-
-    Key Features
-    ------------
-    * **Multiple acquisition modes** – find, update, create, or clone via :class:`ProvisioningPolicy`.
-    * **Flexible targeting** – match by :attr:`identifier` or :attr:`criteria` (or both).
-    * **Templated provisioning** – :attr:`template` provides fields for UPDATE/CREATE_TEMPLATE/CLONE.
-    * **Explicit cloning** – :attr:`reference_id` binds CLONE operations to a specific source node.
-    * **Binding** – :attr:`provider` resolves to a live :class:`~tangl.core.graph.Node`; auto-added to the graph if needed.
-    * **Hard/soft semantics** – :attr:`hard_requirement` gates whether unresolved requirements block progress.
-    * **Scoped inheritance** – :attr:`satisfied_at_scope_id` records where a binding occurred for downstream reuse.
-
-    API
-    ---
-    - :attr:`identifier` – alias/uuid/label for a specific provider.
-    - :attr:`criteria` – dict used with :meth:`~tangl.core.registry.Registry.find_all` to discover candidates.
-    - :attr:`template` – unstructured data used to create/update/clone a provider.
-    - :attr:`policy` – :class:`ProvisioningPolicy` that validates required fields.
-    - :attr:`token_ref` – direct-addressed token reference to satisfy the requirement.
-    - :attr:`token_type` – token class name or Singleton type for token creation.
-    - :attr:`token_label` – label for token creation.
-    - :attr:`overlay` – token overlay fields applied during token creation.
-    - :attr:`provider` – get/set bound provider node (backed by :attr:`provider_id`).
-    - :attr:`reference_id` – explicit source node for :attr:`ProvisioningPolicy.CLONE`.
-    - :attr:`hard_requirement` – if ``True``, unresolved requirements are reported at planning end.
-    - :attr:`is_unresolvable` – sticky flag when prior attempts failed.
-    - :attr:`satisfied_at_scope_id` – scope node where the requirement was satisfied.
-    - :attr:`satisfied` – ``True`` if a provider is bound or the requirement is soft.
-
-    Notes
-    -----
-    Validation rules:
-
-    - ``EXISTING/UPDATE`` require :attr:`identifier` **or** :attr:`criteria`.
-    - ``CLONE`` requires :attr:`reference_id` and :attr:`template`.
-    - ``CREATE_TEMPLATE/UPDATE`` require :attr:`template`.
-    - ``CREATE_TOKEN`` requires :attr:`token_ref` or both :attr:`token_type` and
-      :attr:`token_label`.
-
-    Protocol view:
-
-    - **Constraint:** each Requirement instance attached to an open edge.
-    - **Selector:** the subset of fields used by
-      :meth:`get_selection_criteria` / :meth:`satisfied_by`.
-    - **Contract:** the provisioning fields (:attr:`policy`,
-      :attr:`template`, :attr:`reference_id`, :attr:`hard_requirement`)
-      that guide how offers and plans are constructed.
-
-    A future refinement (not yet implemented) is to formalize this selector
-    surface as a small :pep:`544` ``Protocol`` (e.g. ``Selector`` with
-    ``get_selection_criteria`` / ``satisfied_by``), so other constraint-like
-    objects can participate in the same matching pipeline without inheriting
-    from :class:`Requirement`.
+    Example:
+        >>> e = Entity(label='foo')
+        >>> req = Requirement.from_identifier('foo')
+        >>> req.satisfied
+        False
+        >>> req.satisfied_by(e)
+        True
+        >>> req.provider_id = e.uid
+        >>> req.satisfied
+        True
+        >>> req = Requirement(hard_requirement=False)
+        >>> req.satisfied
+        True
     """
+
+    # Not an entity, a serializable collection of traits that can be
+    # used as a component on an entity with a requirement.
+
+    provision_policy: ProvisionPolicy = ProvisionPolicy.ANY
     provider_id: Optional[UUID] = None
-
-    identifier: Optional[Identifier] = None  # aka 'ref' or 'alias'
-    token_ref: Optional[Identifier | type[Singleton]] = Field(
-        default=None,
-        validation_alias=AliasChoices("token_ref", "asset_ref"),
-    )
-    """Direct token reference (bypasses template lookup when provided)."""
-    token_type: Optional[str | type[Singleton]] = None
-    token_label: Optional[str] = None
-    overlay: dict[str, Any] = Field(default_factory=dict)
-    criteria: Optional[StringMap] = Field(default_factory=dict)
-    template: Optional[UnstructuredData | Template] = None
-    template_ref: Optional[Identifier] = None
-    policy: ProvisioningPolicy = ProvisioningPolicy.ANY
-    reference_id: Optional[UUID] = None
-    """Explicit reference node to support :attr:`ProvisioningPolicy.CLONE`."""
-
-    satisfied_at_scope_id: Optional[UUID] = None
-    """Scope identifier where the requirement was satisfied."""
-
-    _provider_obj: Optional[NodeT] = PrivateAttr(default=None)
-
-    @field_validator("template", mode="before")
-    @classmethod
-    def _coerce_template_instance(cls, value):
-        if isinstance(value, Template):
-            return value
-        return value
-
-    @model_validator(mode="after")
-    def _parse_token_ref(self):
-        if self.token_ref and self.token_type is None and self.token_label is None:
-            if isinstance(self.token_ref, str) and "." in self.token_ref:
-                token_type, token_label = self.token_ref.rsplit(".", 1)
-                if token_type and token_label:
-                    self.token_type = token_type
-                    self.token_label = token_label
-        return self
-
-    @model_validator(mode="after")
-    def _validate_policy(self):
-        # todo: this validates that the req is _independently_ complete.
-        #       But we also want to be able to _search_ for an appropriate
-        #       template based on criteria...
-        """
-        identifier is for unique EXISTING
-        criteria is filter for any EXISTING
-        template is fallback for CREATE_TEMPLATE or provides UPDATE/CLONE attribs
-
-        identifier only:     unique match, must be satisfied with EXISTING
-        criteria only:       any matching, must be satisfied with EXISTING
-        id/crit:             unique that also matches criteria, must be satisfied with EXISTING
-        template only:       must be satisfied with CREATE_TEMPLATE
-        id/crit, template:   match and UPDATE/CLONE according to template
-        """
-        if self.policy is ProvisioningPolicy.NOOP:
-            raise ValueError("Policy cannot be NOOP")
-
-        has_template_source = (
-            self.template is not None
-            or self.template_ref is not None
-        )
-        has_token_source = self.token_ref is not None or (
-            self.token_type is not None and self.token_label is not None
-        )
-        create_template_policies = {ProvisioningPolicy.CREATE_TEMPLATE}
-
-        if self.policy in [ProvisioningPolicy.EXISTING, ProvisioningPolicy.UPDATE]:
-            if self.identifier is None and self.criteria is None:
-                raise ValueError("EXISTING/UPDATE requires an identifier or match criteria")
-
-        if self.policy is ProvisioningPolicy.CLONE:
-            if self.reference_id is None:
-                raise ValueError("CLONE requires reference_id to specify source node")
-            if not has_template_source:
-                raise ValueError("CLONE requires template data to evolve clone")
-
-        if self.policy in create_template_policies | {ProvisioningPolicy.UPDATE}:
-            if not has_template_source:
-                raise ValueError(f"{self.policy.name} requires a template")
-
-        if self.policy is ProvisioningPolicy.CREATE_TOKEN:
-            if not has_token_source:
-                raise ValueError(
-                    "CREATE_TOKEN requires token_ref or both token_type and token_label"
-                )
-
-        if self.policy in [ProvisioningPolicy.ANY]:
-            if not (
-                self.identifier is not None
-                or bool(self.criteria)
-                or has_template_source
-                or has_token_source
-                or self.provider_id is not None
-            ):
-                return self
-
-        return self
-
-    is_unresolvable: bool = False  # tried to resolve previously, but failed
     hard_requirement: bool = True
 
-    @property
-    def provider(self) -> Optional[NodeT]:
-        # This needs to be a graph item rather than a component
-        # to ensure that we have access to the graph
-        if self.graph is None:
-            return self._provider_obj
-        if self.provider_id is not None:
-            return self.graph.get(self.provider_id) or self._provider_obj
-        return self._provider_obj
-
-    @provider.setter
-    def provider(self, value: NodeT) -> None:
-        if value is None:
-            self._provider_obj = None
-            self.provider_id = None
-            return
-        provider_graph = getattr(value, "graph", None)
-        if provider_graph is None or self.graph is None:
-            self._provider_obj = value
-            self.provider_id = getattr(value, "uid", None)
-            return
-        if provider_graph is not None and provider_graph is not self.graph:
-            self.provider_id = value.uid
-            self._provider_obj = value
-            return
-        if value not in self.graph:
-            self.graph.add(value)
-        self.graph._validate_linkable(value)  # redundant check that it's in the graph
-        self.provider_id = value.uid
-        self._provider_obj = value
-
-    @property
-    def asset_ref(self) -> Optional[Identifier | type[Singleton]]:
-        """Backward-compatible alias for :attr:`token_ref`."""
-        return self.token_ref
-
-    @asset_ref.setter
-    def asset_ref(self, value: Optional[Identifier | type[Singleton]]) -> None:
-        self.token_ref = value
+    # todo: validate not none selector
 
     @property
     def satisfied(self):
-        return self.provider is not None or not self.hard_requirement
+        return self.provider_id is not None or not self.hard_requirement
+
+    unsatisfiable: Optional[bool] = None           # unknown
+    unambiguously_resolved: Optional[bool] = None  # unknown
+    selected_offer_policy: Optional[ProvisionPolicy] = None
+    resolved_step: Optional[int] = None
+    resolved_cursor_id: Optional[UUID] = None
+    resolution_reason: Optional[str] = None
+    resolution_meta: Optional[dict[str, Any]] = None
+
+    def _matches_identifier(self, entity: PT) -> bool:
+        extra = self.__pydantic_extra__ or {}
+        identifier = extra.get("has_identifier")
+        if not isinstance(identifier, str) or not identifier:
+            return True
+
+        has_identifier = getattr(entity, "has_identifier", None)
+        if callable(has_identifier):
+            try:
+                if bool(has_identifier(identifier)):
+                    return True
+            except (TypeError, ValueError, AttributeError):
+                pass
+
+        if "." in identifier:
+            path = getattr(entity, "path", None)
+            if isinstance(path, str) and path == identifier:
+                return True
+
+        return False
+
+    def satisfied_by(self, entity: PT) -> bool:
+        if not self._matches_identifier(entity):
+            return False
+
+        criteria = dict(self.__pydantic_extra__ or {})
+        criteria.pop("has_identifier", None)
+        return Selector(predicate=self.predicate, **criteria).matches(entity)
+
+    def _validate_satisfied_by(self, entity: PT) -> bool:
+        if not self.satisfied_by(entity):
+            raise ValueError(f'Requirement {self} not satisfied by {entity!r}')
+        return True
+
+    fallback_templ: Optional[EntityTemplate] = None
+    # a requirement can satisfy itself if it carries an inline template
+    # a cloner could take such an offer and combine it with an existing source
+
+    # Authoring-path metadata used by qualified/unqualified policy forks.
+    authored_path: str | None = None
+    is_qualified: bool = False
+    is_absolute: bool = False
+
+    # Optional two-part formula for late synthesized UPDATE/CLONE offers.
+    # These are typed fields (not selector extras), so they do not participate
+    # in provider matching criteria.
+    reference_selector: Optional[Selector] = None
+    update_template_selector: Optional[Selector] = None
+
+
+class HasRequirement(RegistryAware, Generic[PT]):
+    """
+    Example:
+        >>> reg = Registry()
+        >>> r = HasRequirement(requirement={'has_identifier': 'foo'}); reg.add(r)
+        >>> r.satisfied
+        False
+        >>> e = RegistryAware(label='foo'); reg.add(e)
+        >>> r.satisfied_by(e)
+        True
+        >>> r.provider = e
+        >>> r.satisfied
+        True
+        >>> r.provider
+        <RegistryAware:foo>
+        >>> f = RegistryAware(label='bar'); reg.add(f)
+        >>> r.satisfied_by(f)
+        False
+        >>> try:
+        ...     r.provider = f
+        ... except ValueError as e:
+        ...     print(e)
+        Requirement ... not satisfied by <RegistryAware:bar>
+
+    """
+    # typically an entity will have only one requirement to avoid bookkeeping confusion.
+    # nodes may have multiple dependency edges, for example, but each dependency has
+    # a single requirement.
+
+    requirement: Requirement[PT]
+
+    # delegators
 
     @property
-    def reference(self) -> Optional[NodeT]:
-        """Return the reference node used for :attr:`ProvisioningPolicy.CLONE`."""
+    def provider(self) -> Optional[PT]:
+        if self.requirement.provider_id is not None:
+            return self.registry.get(self.requirement.provider_id)
 
-        if self.reference_id is None:
-            return None
-        return self.graph.get(self.reference_id)
+    def set_provider(self, provider: PT, _ctx=None) -> None:
+        if (self.requirement._validate_satisfied_by(provider) and
+                self.registry._validate_linkable(provider)):
+            self.requirement.provider_id = provider.uid
+            step = getattr(_ctx, "step", None)
+            if isinstance(step, int):
+                self.requirement.resolved_step = step
+            else:
+                self.requirement.resolved_step = None
 
-    def get_selection_criteria(self) -> StringMap:
-        criteria = deepcopy(self.criteria) or {}
-        if self.identifier:
-            criteria.setdefault("has_identifier", self.identifier)
-        return criteria
+            cursor_id = getattr(_ctx, "cursor_id", None)
+            if cursor_id is None:
+                cursor = getattr(_ctx, "cursor", None)
+                cursor_id = getattr(cursor, "uid", None)
+            if isinstance(cursor_id, UUID):
+                self.requirement.resolved_cursor_id = cursor_id
+            else:
+                self.requirement.resolved_cursor_id = None
 
-    def satisfied_by(self, other: NodeT) -> bool:
-        # Another inverted case of Match/Selected
-        return other.matches(**self.get_selection_criteria())
+    @provider.setter
+    def provider(self, value: PT) -> None:
+        self.set_provider(value)
+
+    @property
+    def satisfied(self):
+        return self.requirement.satisfied
+
+    @property
+    def resolution_reason(self) -> Optional[str]:
+        return self.requirement.resolution_reason
+
+    @property
+    def resolution_meta(self) -> Optional[dict[str, Any]]:
+        return self.requirement.resolution_meta
+
+    def satisfied_by(self, entity: PT) -> bool:
+        return self.requirement.satisfied_by(entity)
+
+
+# Provides the carrier mechanism to map requirements into the graph-topology.
+# Alternatively, they could be represented as control-Nodes that weld together
+# ingoing and outgoing edges under a given name.
+
+# These are dynamic edges that can provoke a topological update via an 'update' event
+# on their requirement component.  Need to be careful to watch that.
+
+
+class Dependency(Edge, HasRequirement[PT], Generic[PT]):
+    """
+    The frontier node is _always_ the source/predecessor, resource is _always_ the
+    dest/successor; dependencies link from frontier to resources.
+
+    Deps are 'pull' resources.
+
+    Example:
+        >>> reg = Registry()
+        >>> r = Dependency(requirement={'has_identifier': 'foo'}); reg.add(r)
+        >>> r.satisfied
+        False
+        >>> e = RegistryAware(label='foo'); reg.add(e)
+        >>> r.successor = e
+        >>> r.satisfied
+        True
+        >>> r.provider
+        <RegistryAware:foo>
+        >>> r.successor
+        <RegistryAware:foo>
+
+    """
+
+    # another layer of delegators, the important thing here is that the 'on_link'
+    # hook gets triggered when the provider is set.  Could do that by syncing the
+    # provider and successor, or by ignoring successor_id and rewiring set_provider to
+    # call the on_link hook.
+
+
+    def set_provider(self, value: Optional[PT], _ctx=None) -> None:
+        # could just leave successor_id None and defer to provider-id in all cases to
+        # entirely avoid syncing concern.  might also make the end-type more clear as
+        # the expected provider type.
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
+        super().set_provider(value, _ctx=_ctx)
+        super().set_successor(value, _ctx=_ctx)
+
+    def set_successor(self, value: Optional[PT], _ctx=None) -> None:
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
+        self.set_provider(value, _ctx=_ctx)
+
+
+class Affordance(Edge, HasRequirement[PT], Generic[PT]):
+    """
+    Frontier node is _always_ the source/predecessor, resource is always the
+    dest/successor; affordances provide resources to frontier.
+
+    Affordances are 'push' resources.
+
+    Example:
+            >>> reg = Registry()
+            >>> r = Affordance(requirement={'has_identifier': 'foo'}); reg.add(r)
+            >>> r.satisfied
+            False
+            >>> e = RegistryAware(label='foo'); reg.add(e)
+            >>> r.successor = e
+            >>> r.satisfied
+            True
+            >>> r.provider
+            <RegistryAware:foo>
+            >>> r.successor
+            <RegistryAware:foo>
+    """
+    # another layer of delegators
+
+    def set_provider(self, value: Optional[PT], _ctx=None) -> None:
+        """Bind provider and synchronize to ``successor`` (push resource)."""
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
+        super().set_provider(value, _ctx=_ctx)
+        super().set_successor(value, _ctx=_ctx)
+
+    def set_successor(self, value: Optional[PT], _ctx=None) -> None:
+        """Provider alias for ``successor`` on affordance edges."""
+        if value is None:
+            self.requirement.provider_id = None
+            self.requirement.resolved_step = None
+            self.requirement.resolved_cursor_id = None
+            super().set_successor(None, _ctx=_ctx)
+            return
+        self.set_provider(value, _ctx=_ctx)

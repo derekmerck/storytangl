@@ -1,12 +1,12 @@
-"""Contract tests for ``tangl.story38.ctx`` protocols."""
+"""Contract tests for ``tangl.story.ctx`` protocols."""
 
 from __future__ import annotations
 
-from tangl.core38 import TemplateRegistry
-from tangl.story38.ctx import StoryRuntimeCtx
-from tangl.story38.fabula.materializer import _PrelinkCtx
-from tangl.story38.story_graph import StoryGraph38
-from tangl.vm38.traversable import TraversableNode
+from tangl.core import TemplateRegistry
+from tangl.story.ctx import StoryRuntimeCtx
+from tangl.story.fabula.materializer import _PrelinkCtx
+from tangl.story.story_graph import StoryGraph38
+from tangl.vm.traversable import TraversableNode
 
 
 def test_prelink_ctx_satisfies_story_runtime_protocol() -> None:

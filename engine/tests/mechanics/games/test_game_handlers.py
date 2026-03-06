@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core38 import Graph
+from tangl.core import Graph
 from tangl.mechanics.games import Game, GameHandler, GamePhase, GameResult, RoundResult, HasGame
-from tangl.story38 import Action, Block
+from tangl.story import Action, Block
 from tangl.mechanics.games.handlers import (
     generate_game_journal,
     inject_game_context,
@@ -14,7 +14,7 @@ from tangl.mechanics.games.handlers import (
     provision_game_moves,
     setup_game_on_first_visit,
 )
-from tangl.vm38 import Frame
+from tangl.vm import Frame
 
 
 class SampleGame(Game):

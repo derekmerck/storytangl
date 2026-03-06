@@ -17,14 +17,11 @@ class WorldController(CommandSet):
 
     _cmd: StoryTanglCLI
 
-    def _call_legacy(self, endpoint: str, **params):
-        call_legacy = getattr(self._cmd, "call_legacy_endpoint", None)
-        if callable(call_legacy):
-            return call_legacy(endpoint, **params)
+    def _call_endpoint(self, endpoint: str, **params):
         return self._cmd.call_endpoint(endpoint, **params)
 
     def do_worlds(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
-        worlds = self._call_legacy("WorldController.list_worlds")
+        worlds = self._call_endpoint("WorldController.list_worlds")
         self._cmd.poutput(pformat(worlds))
 
     world_parser = argparse.ArgumentParser()
@@ -32,7 +29,7 @@ class WorldController(CommandSet):
 
     @with_argparser(world_parser)
     def do_world_info(self, args: argparse.Namespace) -> None:
-        info = self._call_legacy("WorldController.get_world_info", world_id=args.world)
+        info = self._call_endpoint("WorldController.get_world_info", world_id=args.world)
         self._cmd.poutput(pformat(info))
 
     script_path_parser = argparse.ArgumentParser()
@@ -43,7 +40,7 @@ class WorldController(CommandSet):
         import yaml
 
         script_data = yaml.safe_load(args.script_path.read_text())
-        result = self._call_legacy(
+        result = self._call_endpoint(
             "WorldController.load_world",
             script_data=script_data,
         )

@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.provision.requirement``.
+"""Contract tests for ``tangl.vm.provision.requirement``.
 
 Organized by concept:
 - Requirement: satisfaction, matching, policy
@@ -13,8 +13,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import Entity, Graph, Registry, RegistryAware, Selector
-from tangl.vm38.provision import (
+from tangl.core import Entity, Graph, Registry, RegistryAware, Selector
+from tangl.vm.provision import (
     Affordance,
     Dependency,
     HasRequirement,

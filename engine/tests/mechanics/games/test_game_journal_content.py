@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.vm import Frame, ResolutionPhase as P
-from tangl.vm38.dispatch import dispatch as vm38_dispatch
+from tangl.vm.dispatch import dispatch as vm38_dispatch
 from tangl.story.dispatch import story_dispatch
 from tangl.story import Block, LegacyStoryGraph as StoryGraph
 from tangl.mechanics.games import Game, HasGame

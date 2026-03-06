@@ -1,21 +1,3 @@
 # path_glob|import_glob
 # Temporary intentional bridges during transition.
-engine/src/tangl/story38/fabula/world_controller.py|tangl.story.fabula.world
-engine/src/tangl/service38/api_endpoint.py|tangl.service.api_endpoint
-engine/src/tangl/service38/exceptions.py|tangl.service.exceptions
-
-# IR/media/mechanics bridges deferred until vocabulary pass.
-engine/src/tangl/ir/dispatch.py|tangl.core.behavior
-engine/src/tangl/mechanics/**|tangl.core.*
-engine/src/tangl/mechanics/**|tangl.story.*
-engine/src/tangl/mechanics/**|tangl.vm.*
-engine/src/tangl/media/**|tangl.core.*
-engine/src/tangl/media/**|tangl.vm.*
-
-# Loader bridge still compiles legacy-style world facets until full codec cutover.
-engine/src/tangl/loaders/**|tangl.story.*
-
-# Relay manager is intentionally legacy/deferred.
-apps/server/src/tangl/rest/relay_service_manager.py|tangl.story.*
-apps/server/src/tangl/rest/relay_service_manager.py|tangl.core.*
-apps/server/src/tangl/rest/relay_service_manager.py|tangl.service.*
+# (none currently)

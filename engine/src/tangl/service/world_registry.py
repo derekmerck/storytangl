@@ -4,15 +4,24 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tangl.config import get_world_dirs
-from tangl.story38.fabula import World38
-
 from tangl.loaders import UniqueLabel, WorldBundle, WorldCompiler
+from tangl.story.fabula import World38
 
 if TYPE_CHECKING:
-    from tangl.story.fabula import World
+    from tangl.story.fabula import World38 as World
 
 logger = logging.getLogger(__name__)
+
+
+def _get_world_dirs() -> list[Path]:
+    return list(get_world_dirs())
+
+
+def get_world_dirs() -> list[Path]:
+    """Compatibility helper retained for existing tests and monkeypatch hooks."""
+    from tangl.config import get_world_dirs as _config_get_world_dirs
+
+    return list(_config_get_world_dirs())
 
 
 class WorldRegistry:
@@ -21,11 +30,10 @@ class WorldRegistry:
     def __init__(self, world_dirs: list[Path] | None = None, compiler: WorldCompiler | None = None) -> None:
         self.compiler = compiler or WorldCompiler()
         self.bundles: dict[UniqueLabel, WorldBundle] = {}
-        self.worlds: dict[UniqueLabel, World] = {}
         self.worlds38: dict[UniqueLabel, World38] = {}
 
         if world_dirs is None:
-            world_dirs = get_world_dirs()
+            world_dirs = _get_world_dirs()
 
         self._discover(world_dirs)
 
@@ -62,31 +70,22 @@ class WorldRegistry:
             for bundle in self.bundles.values()
         ]
 
-    def get_world(self, label: UniqueLabel, *, runtime_version: str = "37") -> World | World38:
-        if runtime_version == "38":
-            if label not in self.worlds38:
-                bundle = self.bundles.get(label)
-                if not bundle:
-                    msg = f"Unknown world: {label}"
-                    raise ValueError(msg)
-                self.worlds38[label] = self.compiler.compile(bundle, runtime_version="38")
-            return self.worlds38[label]
-
-        if label not in self.worlds:
+    def get_world(self, label: UniqueLabel, *, runtime_version: str = "38") -> World:
+        _ = runtime_version
+        if label not in self.worlds38:
             bundle = self.bundles.get(label)
             if not bundle:
                 msg = f"Unknown world: {label}"
                 raise ValueError(msg)
-
-            self.worlds[label] = self.compiler.compile(bundle)
-        return self.worlds[label]
+            self.worlds38[label] = self.compiler.compile(bundle, runtime_version="38")
+        return self.worlds38[label]
 
     def get_anthology(
         self,
         label: UniqueLabel,
         *,
-        runtime_version: str = "37",
-    ) -> dict[str, World] | dict[str, World38]:
+        runtime_version: str = "38",
+    ) -> dict[str, World]:
         bundle = self.bundles.get(label)
         if not bundle:
             msg = f"Unknown world: {label}"
@@ -96,4 +95,5 @@ class WorldRegistry:
             msg = f"World {label} is not an anthology"
             raise ValueError(msg)
 
-        return self.compiler.compile_anthology(bundle, runtime_version=runtime_version)
+        _ = runtime_version
+        return self.compiler.compile_anthology(bundle, runtime_version="38")

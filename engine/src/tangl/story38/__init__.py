@@ -1,61 +1,27 @@
-from .concepts import Actor, Location, Role, Setting
-from .episode import Action, Block, Scene
-from .fabula import (
-    GraphInitializationError,
-    InitMode,
-    InitReport,
-    ResolutionError,
-    ResolutionFailureReason,
-    ScriptManager38,
-    StoryCompiler38,
-    StoryInitResult,
-    StoryMaterializer38,
-    StoryTemplateBundle,
-    UnresolvedDependency,
-    WorldAssetsFacet,
-    WorldDomainFacet,
-    WorldResourcesFacet,
-    WorldTemplatesFacet,
-    World38,
-)
-from .story_graph import StoryGraph38
-from .dispatch import on_journal, story_dispatch
-from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
-from .ctx import StoryRuntimeCtx
+"""Compatibility wrapper package that forwards ``tangl.story38`` to ``tangl.story``."""
 
-# Register story-level journal handlers.
-from . import system_handlers  # noqa: F401
+from __future__ import annotations
 
-__all__ = [
-    "Action",
-    "Actor",
-    "Block",
-    "ChoiceFragment",
-    "ContentFragment",
-    "Fragment",
-    "GraphInitializationError",
-    "InitMode",
-    "InitReport",
-    "Location",
-    "ResolutionError",
-    "ResolutionFailureReason",
-    "Role",
-    "ScriptManager38",
-    "Scene",
-    "Setting",
-    "StoryRuntimeCtx",
-    "StoryCompiler38",
-    "StoryGraph38",
-    "StoryInitResult",
-    "StoryMaterializer38",
-    "StoryTemplateBundle",
-    "UnresolvedDependency",
-    "WorldAssetsFacet",
-    "WorldDomainFacet",
-    "WorldResourcesFacet",
-    "WorldTemplatesFacet",
-    "World38",
-    "on_journal",
-    "story_dispatch",
-    "MediaFragment",
-]
+import importlib
+import pkgutil
+import sys
+
+import tangl.story as _story
+from tangl.story import *  # noqa: F401,F403
+
+
+def _alias_submodules() -> None:
+    src_prefix = "tangl.story."
+    dst_prefix = f"{__name__}."
+    for mod in pkgutil.walk_packages(_story.__path__, src_prefix):
+        target = mod.name
+        alias = dst_prefix + target[len(src_prefix) :]
+        if alias in sys.modules:
+            continue
+        try:
+            sys.modules[alias] = importlib.import_module(target)
+        except Exception:
+            continue
+
+
+_alias_submodules()

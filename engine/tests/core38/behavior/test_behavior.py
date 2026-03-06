@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.behavior`` chain assembly."""
+"""Contract tests for ``tangl.core.behavior`` chain assembly."""
 
 from __future__ import annotations
 
@@ -6,15 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38.behavior import (
+from tangl.core.behavior import (
     Behavior,
     BehaviorRegistry,
     CallReceipt,
     DispatchLayer,
     Priority,
 )
-from tangl.core38.entity import Entity
-from tangl.core38.selector import Selector
+from tangl.core.entity import Entity
+from tangl.core.selector import Selector
 
 
 class SpecialEntity(Entity):

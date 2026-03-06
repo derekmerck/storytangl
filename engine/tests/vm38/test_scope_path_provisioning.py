@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core38 import EntityTemplate, Graph, TemplateRegistry
-from tangl.vm38.provision import (
+from tangl.core import EntityTemplate, Graph, TemplateRegistry
+from tangl.vm.provision import (
     ProvisionOffer,
     ProvisionPolicy,
     Requirement,
@@ -24,9 +24,9 @@ from tangl.vm38.provision import (
     scope_distance,
     target_context_candidates,
 )
-from tangl.vm38.provision.scope import MAX_SCOPE_BRACE_EXPANSIONS
-from tangl.vm38.traversable import TraversableNode
-from tangl.vm38 import Dependency
+from tangl.vm.provision.scope import MAX_SCOPE_BRACE_EXPANSIONS
+from tangl.vm.traversable import TraversableNode
+from tangl.vm import Dependency
 
 
 def _ctx(*, graph: Graph, cursor: TraversableNode) -> SimpleNamespace:

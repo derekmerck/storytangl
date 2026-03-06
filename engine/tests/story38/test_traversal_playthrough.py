@@ -17,25 +17,25 @@ regression for Part A destination canonicalization.
 
 See Also
 --------
-- ``tangl.story38.fabula.World38.from_script_data``
-- ``tangl.vm38.runtime.ledger.Ledger.resolve_choice``
-- ``tangl.vm38.dispatch.do_journal``
+- ``tangl.story.fabula.World38.from_script_data``
+- ``tangl.vm.runtime.ledger.Ledger.resolve_choice``
+- ``tangl.vm.dispatch.do_journal``
 """
 
 from __future__ import annotations
 
 import pytest
 
-from tangl.core38 import EntityTemplate, Selector, TemplateRegistry
-from tangl.story38 import InitMode, World38
-from tangl.story38.episode import Action, Block, Scene
-from tangl.story38.fragments import ChoiceFragment, ContentFragment
-from tangl.story38.story_graph import StoryGraph38
-from tangl.vm38 import Ledger
-from tangl.vm38 import Dependency, Requirement
-from tangl.vm38.dispatch import do_journal
+from tangl.core import EntityTemplate, Selector, TemplateRegistry
+from tangl.story import InitMode, World38
+from tangl.story.episode import Action, Block, Scene
+from tangl.story.fragments import ChoiceFragment, ContentFragment
+from tangl.story.story_graph import StoryGraph38
+from tangl.vm import Ledger
+from tangl.vm import Dependency, Requirement
+from tangl.vm.dispatch import do_journal
 
-import tangl.story38  # noqa: F401 – ensure story38 journal/phase handlers are registered
+import tangl.story  # noqa: F401 – ensure story38 journal/phase handlers are registered
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ class TestLinearTraversal:
         assert actions == []
 
     def test_journal_emits_content_at_each_step(self, linear_ledger: Ledger) -> None:
-        from tangl.vm38.runtime.frame import PhaseCtx
+        from tangl.vm.runtime.frame import PhaseCtx
 
         labels_seen: list[str] = []
         for _ in range(2):
@@ -254,7 +254,7 @@ class TestBranchingTraversal:
         assert "Go right" in texts
 
     def test_both_branches_are_marked_available(self, branching_ledger: Ledger) -> None:
-        from tangl.vm38.runtime.frame import PhaseCtx
+        from tangl.vm.runtime.frame import PhaseCtx
 
         ctx = PhaseCtx(
             graph=branching_ledger.graph,
@@ -280,7 +280,7 @@ class TestStoryGlobals:
         result = world.create_story("state_render", init_mode=InitMode.EAGER)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
 
-        from tangl.vm38.runtime.frame import PhaseCtx
+        from tangl.vm.runtime.frame import PhaseCtx
 
         ctx = PhaseCtx(graph=ledger.graph, cursor_id=ledger.cursor_id)
         fragments = do_journal(ledger.cursor, ctx=ctx)

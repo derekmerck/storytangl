@@ -5,14 +5,14 @@ This suite is the service38 replacement for:
   → ``engine/tests/service38/response/test_exports.py``
 
 It verifies that service38 public exports remain importable and that
-``tangl.service38.__all__`` advertises the expected compatibility surface.
+``tangl.service.__all__`` advertises the expected compatibility surface.
 """
 
 from __future__ import annotations
 
 
 def test_service38_response_types_importable() -> None:
-    from tangl.service38.response import (
+    from tangl.service.response import (
         FragmentStream,
         InfoModel,
         MediaNative,
@@ -30,7 +30,7 @@ def test_service38_response_types_importable() -> None:
 
 
 def test_service38_package_exports_include_response_and_gateway_contracts() -> None:
-    import tangl.service38 as service38
+    import tangl.service as service38
 
     expected = {
         "ApiEndpoint38",

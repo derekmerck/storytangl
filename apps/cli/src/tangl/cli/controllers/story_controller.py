@@ -126,10 +126,7 @@ class StoryController(CommandSet):
 
         return choices
 
-    def _call_legacy(self, endpoint: str, **params: Any) -> Any:
-        call_legacy = getattr(self._cmd, "call_legacy_endpoint", None)
-        if callable(call_legacy):
-            return call_legacy(endpoint, **params)
+    def _call_endpoint(self, endpoint: str, **params: Any) -> Any:
         return self._cmd.call_endpoint(endpoint, **params)
 
     # ------------------------------------------------------------------
@@ -149,7 +146,7 @@ class StoryController(CommandSet):
         if args.label:
             kwargs["story_label"] = args.label
 
-        result = self._call_legacy("RuntimeController.create_story", **kwargs)
+        result = self._call_endpoint("RuntimeController.create_story", **kwargs)
         if getattr(result, "status", None) == "error":
             self._cmd.perror(result.message or "Failed to create story")
             return
@@ -173,7 +170,7 @@ class StoryController(CommandSet):
         if ledger_id is not None:
             self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
 
-        fragments = self._call_legacy(
+        fragments = self._call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
         )
@@ -207,7 +204,7 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        fragments = self._call_legacy(
+        fragments = self._call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
         )
@@ -236,11 +233,11 @@ class StoryController(CommandSet):
             return
 
         choice = active_choices[index - 1]
-        self._call_legacy(
+        self._call_endpoint(
             "RuntimeController.resolve_choice",
             choice_id=choice.uid,
         )
-        fragments = self._call_legacy(
+        fragments = self._call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
         )
@@ -262,7 +259,7 @@ class StoryController(CommandSet):
             return
 
         try:
-            result = self._call_legacy(
+            result = self._call_endpoint(
                 "RuntimeController.drop_story",
                 archive=bool(args.archive),
             )
@@ -308,7 +305,7 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        info = self._call_legacy("RuntimeController.get_story_info")
+        info = self._call_endpoint("RuntimeController.get_story_info")
         if hasattr(info, "model_dump"):
             payload = info.model_dump()
         elif isinstance(info, dict):

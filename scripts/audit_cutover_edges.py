@@ -17,11 +17,11 @@ DEFAULT_ROOTS = (
     "apps/server/src",
 )
 
-LEGACY_SOURCE_DIRS = (
-    "engine/src/tangl/core/",
-    "engine/src/tangl/vm/",
-    "engine/src/tangl/story/",
-    "engine/src/tangl/service/",
+TRANSITIONAL_SOURCE_DIRS = (
+    "engine/src/tangl/core_legacy/",
+    "engine/src/tangl/vm_legacy/",
+    "engine/src/tangl/story_legacy/",
+    "engine/src/tangl/service_legacy/",
 )
 
 SKIP_PATH_PREFIXES = (
@@ -33,11 +33,15 @@ SKIP_PATH_PARTS = {
     "/docs/",
 }
 
-LEGACY_DEEP_PREFIXES = (
-    "tangl.core.",
-    "tangl.vm.",
-    "tangl.story.",
-    "tangl.service.",
+LEGACY_IMPORT_PREFIXES = (
+    "tangl.core_legacy",
+    "tangl.vm_legacy",
+    "tangl.story_legacy",
+    "tangl.service_legacy",
+    # Transitional app-only bridges that still route through pre-v38 interfaces.
+    "tangl.core.solver",
+    "tangl.story.world",
+    "tangl.service.service_manager_abc",
 )
 
 NAMESPACE38_PREFIXES = (
@@ -127,16 +131,20 @@ def _load_allow_rules(path: Path) -> list[AllowRule]:
     return rules
 
 
-def _is_legacy_source(rel_path: str) -> bool:
-    return any(rel_path.startswith(prefix) for prefix in LEGACY_SOURCE_DIRS)
+def _has_prefix(module: str, prefixes: Iterable[str]) -> bool:
+    return any(module == prefix or module.startswith(f"{prefix}.") for prefix in prefixes)
 
 
-def _is_legacy_deep(module: str) -> bool:
-    return any(module.startswith(prefix) for prefix in LEGACY_DEEP_PREFIXES)
+def _is_transitional_source(rel_path: str) -> bool:
+    return any(rel_path.startswith(prefix) for prefix in TRANSITIONAL_SOURCE_DIRS)
+
+
+def _is_legacy_import(module: str) -> bool:
+    return _has_prefix(module, LEGACY_IMPORT_PREFIXES)
 
 
 def _is_38_namespace(module: str) -> bool:
-    return any(module == prefix or module.startswith(f"{prefix}.") for prefix in NAMESPACE38_PREFIXES)
+    return _has_prefix(module, NAMESPACE38_PREFIXES)
 
 
 def _is_ir_bridge(edge: ImportEdge) -> bool:
@@ -199,25 +207,32 @@ def main() -> int:
     ir_bridge: list[ImportEdge] = []
     bypass_imports: list[ImportEdge] = []
     intentional_bridges: list[ImportEdge] = []
+    postswap_legacy_imports: list[ImportEdge] = []
     postswap_38_imports: list[ImportEdge] = []
 
     for edge in all_edges:
-        if _is_ir_bridge(edge) and not _is_legacy_source(edge.path):
+        source_is_transitional = _is_transitional_source(edge.path)
+
+        if _is_ir_bridge(edge) and not source_is_transitional:
             ir_bridge.append(edge)
 
         if _is_38_namespace(edge.module):
             postswap_38_imports.append(edge)
 
-        if args.mode != "pre-swap":
+        if source_is_transitional:
             continue
-        if not _is_legacy_deep(edge.module):
+
+        if not _is_legacy_import(edge.module):
             continue
-        if _is_legacy_source(edge.path):
-            continue
+
         if _is_allowed(edge, allow_rules):
             intentional_bridges.append(edge)
-        else:
+            continue
+
+        if args.mode == "pre-swap":
             bypass_imports.append(edge)
+        else:
+            postswap_legacy_imports.append(edge)
 
     print(f"Cutover import audit mode: {args.mode}")
     _report_block("IR bridge", ir_bridge)
@@ -225,6 +240,7 @@ def main() -> int:
         _report_block("Bypass imports", bypass_imports)
         _report_block("Intentional bridges", intentional_bridges)
     if args.mode == "post-swap":
+        _report_block("Post-swap disallowed legacy imports", postswap_legacy_imports)
         _report_block("Post-swap disallowed *38 imports", postswap_38_imports)
 
     report = {
@@ -232,6 +248,7 @@ def main() -> int:
         "ir_bridge": [asdict(edge) for edge in ir_bridge],
         "bypass_imports": [asdict(edge) for edge in bypass_imports],
         "intentional_bridges": [asdict(edge) for edge in intentional_bridges],
+        "postswap_legacy_imports": [asdict(edge) for edge in postswap_legacy_imports],
         "postswap_38_imports": [asdict(edge) for edge in postswap_38_imports],
     }
 
@@ -249,6 +266,10 @@ def main() -> int:
         violations.append(f"IR bridge edges present: {len(ir_bridge)}")
     if bypass_imports:
         violations.append(f"Bypass imports present: {len(bypass_imports)}")
+    if args.mode == "post-swap" and postswap_legacy_imports:
+        violations.append(
+            f"Post-swap legacy imports present: {len(postswap_legacy_imports)}"
+        )
     if args.mode == "post-swap" and intentional_bridges:
         violations.append(f"Intentional bridge allowlist entries still active: {len(intentional_bridges)}")
     if args.mode == "post-swap" and postswap_38_imports:

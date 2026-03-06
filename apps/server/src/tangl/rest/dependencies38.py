@@ -10,7 +10,7 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from tangl.rest.dependencies import get_orchestrator
-from tangl.service38 import (
+from tangl.service import (
     GatewayRestAdapter38,
     ServiceGateway38,
     UserAuthInfo,

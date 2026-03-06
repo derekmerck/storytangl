@@ -1,1 +1,1 @@
-"""Tests for ``tangl.core38.selector``."""
+"""Tests for ``tangl.core.selector``."""

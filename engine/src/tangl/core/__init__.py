@@ -1,70 +1,129 @@
-"""Legacy compatibility shim that re-exports ``tangl.core38``."""
+# tangl/core/bases.py
+# language=markdown
+from __future__ import annotations
 
-import os
+import importlib
+import sys
 
-import tangl.core38 as _core38
+"""
+tangl.core
+==========
 
-from tangl.core38 import *  # noqa: F401,F403
-from tangl.core38.bases import HasContent
-from tangl.core38 import BehaviorRegistry
+Core defines shared vocabulary and foundational data structures and algorithms.
 
-from tangl.core.entity import Entity as _LegacyEntity
-from tangl.core.graph import Edge as _LegacyEdge
-from tangl.core.graph import Graph as _LegacyGraph
-from tangl.core.graph import GraphItem as _LegacyGraphItem
-from tangl.core.graph.node import Node as _LegacyNode
-from tangl.core.graph.subgraph import Subgraph as _LegacySubgraph
-from tangl.core.record.base_fragment import BaseFragment as _LegacyBaseFragment
-from tangl.core.record.record import Record as _LegacyRecord
-from tangl.core.record.snapshot import Snapshot as _LegacySnapshot
-from tangl.core.record.stream_registry import StreamRegistry as _LegacyStreamRegistry
-from tangl.core.registry import Registry as _LegacyRegistry
+Portability
+-----------
+
+Core types should be easy to reason about and implementable in any language with:
+- Algebraic data types or class inheritance
+- First-class functions
+- Associative collections (dict/map)
+- Ordered collections (list/array)
+
+Avoid Python-specific magic where possible. Document where unavoidable.
+
+File Organization
+-----------------
+
+```
+tangl/core/
+├── __init__.py           # Public API exports
+├── bases.py              # HasIdentity, uid/label/tags, Unstructurable, un/structure(),
+│                         #    HasContent, HasOrder, sort_key(), HasState
+│
+│   # Discovery
+├── selector.py           # Selector, match()
+├── registry.py           # Registry, RegistryAware, EntityGroup, find_all(), chain_find_all()
+│
+│   # Lifecycle
+├── record.py             # Record, OrderedRegistry, get_slice()
+├── singleton.py          # Singleton, InstanceInheritance
+│
+│   # Relationships
+├── graph.py              # GraphItem, Graph, Subgraph, Node, Edge
+│
+│   # Creation
+├── token.py              # Delegate to singleton
+├── template.py           # Semi-structured data, TemplateRegistry
+│
+│   # Doing things
+├── runtime_op.py         # RuntimeOp, Query, Predicate, Effect
+├── behavior.py           # Behavior, CallReceipt, Priority, DispatchLayer, AggregationMode
+└── dispatch.py           # Hooks for create(), new(), add(), get(), remove()
+```
+"""
+# Provides:
+# - identity
+# - state
+# - un/structure
+from .entity import Entity
+
+# Requires:
+# - identity
+# - un/structure
+# Provides:
+# - selection (Selector.from_kind(), .with_criteria(**_), .matches(entity))
+# - discovery (Reg.find_all(selector), .chain_find_all(*reg, selector)
+# - grouping/membership
+from .selector import Selector
+from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
+
+# Requires:
+# - selection
+# - groups
+# Provides:
+# - specialized shapes (singleton, record, graph)
+# - provenance (record)
+# - behaviors (Behavior(), Behavior.defer())
+# - groups of behaviors (BehaviorRegistry.execute_all(), .chain_execute_al)
+from .runtime_op import RuntimeOp
+from .singleton import InheritingSingleton, Singleton
+from .record import Record, OrderedRegistry
+from .base_fragment import BaseFragment
+from .graph import GraphItem, Graph, Subgraph, Edge, Node, HierarchicalNode
+from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRegistry, AggregationMode
+from .namespace import HasNamespace, contribute_ns
+from .bases import HasContent
+
+# Requires:
+# - behaviors
+# Provides:
+# - building
+# - dispatch hooks
+from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
+from .token import Token, TokenCatalog, TokenFactory  # Delegated reference builder
+from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
+
+from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
 
 
-_V38_VALUES = {"1", "true", "yes", "on", "v38", "new"}
-_LEGACY_VALUES = {"0", "false", "no", "off", "legacy", "old"}
-
-
-def _pick(symbol: str, legacy_value, v38_value, *, default: str = "v38"):
-    raw_value = os.getenv(
-        f"TANGL_SHIM_CORE_{symbol}",
-        os.getenv("TANGL_SHIM_CORE_DEFAULT", default),
-    )
-    selected = str(raw_value).strip().lower()
-    if selected in _LEGACY_VALUES:
-        return legacy_value
-    if selected in _V38_VALUES:
-        return v38_value
-    raise ValueError(
-        f"Invalid shim value '{raw_value}' for TANGL_SHIM_CORE_{symbol}. "
-        f"Use one of {sorted(_LEGACY_VALUES | _V38_VALUES)}."
-    )
-
-
-__all__ = getattr(
-    _core38,
-    "__all__",
-    [name for name in dir(_core38) if not name.startswith("_")],
-)
-
-# Legacy compatibility aliases for import-surface blast-radius testing.
-Entity = _pick("ENTITY", _LegacyEntity, _core38.Entity)
-Registry = _pick("REGISTRY", _LegacyRegistry, _core38.Registry)
-GraphItem = _pick("GRAPHITEM", _LegacyGraphItem, _core38.GraphItem)
-Graph = _pick("GRAPH", _LegacyGraph, _core38.Graph)
-Edge = _pick("EDGE", _LegacyEdge, _core38.Edge)
-Subgraph = _pick("SUBGRAPH", _LegacySubgraph, _core38.Subgraph)
-Record = _pick("RECORD", _LegacyRecord, _core38.Record)
-Snapshot = _pick("SNAPSHOT", _LegacySnapshot, _core38.Snapshot)
-Node = _pick("NODE", _LegacyNode, _core38.Node)
-BaseFragment = _LegacyBaseFragment
+# Legacy-compatible aliases retained during namespace cutover.
 ContentAddressable = HasContent
 LayeredDispatch = BehaviorRegistry
-StreamRegistry = _LegacyStreamRegistry
+StreamRegistry = OrderedRegistry
 
-__all__ += [
-    "BaseFragment",
-    "ContentAddressable",
-    "LayeredDispatch",
-    "StreamRegistry",
-]
+
+def _alias_legacy_module(alias: str, target: str) -> None:
+    """Map legacy deep-import module paths to canonical flat modules."""
+    module = importlib.import_module(target)
+    sys.modules.setdefault(alias, module)
+    parent_name, _, child_name = alias.rpartition(".")
+    parent = sys.modules.get(parent_name)
+    if parent is not None and not hasattr(parent, child_name):
+        setattr(parent, child_name, module)
+
+
+for _alias, _target in (
+    # Legacy graph package paths.
+    ("tangl.core.graph.graph", "tangl.core.graph"),
+    ("tangl.core.graph.node", "tangl.core.graph"),
+    ("tangl.core.graph.edge", "tangl.core.graph"),
+    ("tangl.core.graph.subgraph", "tangl.core.graph"),
+    ("tangl.core.graph.token", "tangl.core.token"),
+    # Legacy record package paths.
+    ("tangl.core.record.record", "tangl.core.record"),
+    ("tangl.core.record.stream_registry", "tangl.core.record"),
+    ("tangl.core.record.snapshot", "tangl.core.template"),
+    ("tangl.core.record.base_fragment", "tangl.core.base_fragment"),
+):
+    _alias_legacy_module(_alias, _target)
