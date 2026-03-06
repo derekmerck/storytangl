@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Protocol
 
-if TYPE_CHECKING:
-    from tangl.story.fabula.asset_manager import AssetManager
+
+class AssetManagerProtocol(Protocol):
+    countable_classes: dict[str, type]
+
+    def register_countable_class(self, label: str, cls: type) -> None: ...
 
 
 class AssetCompiler:
-    """Register built-in assets onto an :class:`AssetManager`."""
+    """Register built-in assets onto an asset manager."""
 
-    def setup_defaults(self, asset_manager: AssetManager) -> None:
+    def setup_defaults(self, asset_manager: AssetManagerProtocol) -> None:
         if "countable" in asset_manager.countable_classes:
             return
 

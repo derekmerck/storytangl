@@ -1,6 +1,6 @@
 # tangl.vm — Design Notes
 
-> Architectural intent, design decisions, and rationale for the vm38 subpackage
+> Architectural intent, design decisions, and rationale for the canonical vm package
 > of the StoryTangl narrative engine (v3.8 framework).
 
 ---
@@ -415,7 +415,7 @@ item.registry.factory  ← registry's owning factory/world
 item.graph             ← GraphItem alias for item.registry
 item.graph.factory     ← same as registry.factory, via graph
 item.story             ← StoryItem alias for item.registry
-item.story.world       ← StoryGraph38.world (= story.factory)
+item.story.world       ← StoryGraph.world (= story.factory)
 ```
 
 All of these are the same underlying pointer walking through aliases defined at each

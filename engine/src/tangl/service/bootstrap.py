@@ -10,6 +10,8 @@ from .orchestrator import Orchestrator
 
 
 DEFAULT_ENDPOINT_POLICIES: dict[str, dict[str, tuple[str, ...]]] = {
+    "RuntimeController.create_story": {"persist_paths": ("details.ledger",)},
+    # Temporary compatibility while suffixed endpoint names are retired.
     "RuntimeController.create_story38": {"persist_paths": ("details.ledger",)},
     "UserController.create_user": {"persist_paths": ("details.user",)},
 }
@@ -29,7 +31,7 @@ def apply_default_endpoint_policies(orchestrator: Orchestrator) -> None:
         orchestrator.set_endpoint_policy(endpoint_name, **policy)
 
 
-def build_service_gateway38(
+def build_service_gateway(
     persistence_manager: Any,
     *,
     default_render_profile: str = "raw",
@@ -42,7 +44,7 @@ def build_service_gateway38(
     return ServiceGateway(orchestrator, default_render_profile=default_render_profile)
 
 
-build_service_gateway = build_service_gateway38
+build_service_gateway38 = build_service_gateway
 
 
 __all__ = [

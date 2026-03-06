@@ -147,7 +147,7 @@ class Graph(Registry[GraphItem]):
         The no-op default is correct for a bare ``Graph``.  Application graphs
         override this to return their registries:
 
-        - :class:`~tangl.story.StoryGraph38` returns ``[story_dispatch]``
+        - :class:`~tangl.story.StoryGraph` returns ``[story_dispatch]``
           and cascades to ``world.get_authorities()`` when a world is attached.
         - Future ``WorldGraph``, ``MechanicsGraph``, etc. follow the same pattern.
 
@@ -163,7 +163,7 @@ class Graph(Registry[GraphItem]):
         --------
         :meth:`tangl.vm.runtime.frame.PhaseCtx.get_authorities`
             Supplies graph/world authority registries to VM dispatch expansion.
-        :class:`tangl.story.story_graph.StoryGraph38`
+        :class:`tangl.story.story_graph.StoryGraph`
             Reference override — returns story and world authority registries.
 
         Notes

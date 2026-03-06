@@ -1,4 +1,4 @@
-"""Compatibility barrel for service38 controller classes."""
+"""Barrel exports for service controller classes."""
 
 from __future__ import annotations
 

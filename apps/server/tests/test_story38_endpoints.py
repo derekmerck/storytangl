@@ -158,7 +158,12 @@ def test_story38_status_returns_403_when_endpoint_is_restricted_for_non_privileg
     assert create.status_code == 200
 
     gateway = get_service_gateway38()
-    binding = gateway.orchestrator._endpoints["RuntimeController.get_story_info38"]
+    endpoint_name = (
+        "RuntimeController.get_story_info"
+        if "RuntimeController.get_story_info" in gateway.orchestrator._endpoints
+        else "RuntimeController.get_story_info38"
+    )
+    binding = gateway.orchestrator._endpoints[endpoint_name]
     previous_level = binding.endpoint.access_level
     binding.endpoint.access_level = AccessLevel.RESTRICTED
     try:

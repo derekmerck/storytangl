@@ -18,7 +18,12 @@ def test_get_service_gateway38_singleton_shares_persistence() -> None:
     assert gateway is get_service_gateway38()
     assert gateway.persistence is orchestrator.persistence
 
-    policy = gateway.orchestrator._endpoints["RuntimeController.create_story38"].policy
+    endpoint_name = (
+        "RuntimeController.create_story"
+        if "RuntimeController.create_story" in gateway.orchestrator._endpoints
+        else "RuntimeController.create_story38"
+    )
+    policy = gateway.orchestrator._endpoints[endpoint_name].policy
     assert "details.ledger" in policy.persist_paths
 
 

@@ -86,3 +86,39 @@ CI now enforces the post-swap gate mode.
   - `poetry run pytest -q engine/tests/service38/test_api_endpoint.py` → `29 passed`
   - `poetry run pytest -q engine/tests/service38` → `85 passed`
   - `poetry run pytest -q apps/cli/tests apps/server/tests` → `36 passed, 3 skipped, 1 xfailed`
+
+## Namespace Retirement Cleanup (2026-03-06)
+- Removed compatibility wrapper packages:
+  - `engine/src/tangl/core38`
+  - `engine/src/tangl/vm38`
+  - `engine/src/tangl/story38`
+  - `engine/src/tangl/service38`
+- Loader/runtime cleanup:
+  - `WorldCompiler` now enforces `runtime_version="38"` and no longer carries
+    legacy runtime37 compile branches.
+  - `WorldRegistry` now validates runtime version and passes through runtime
+    selection to compiler methods.
+- Validation:
+  - Lane A: `918 passed`
+  - Lane B: `665 passed, 62 skipped, 9 xfailed`
+  - Lane C: `36 passed, 3 skipped, 1 xfailed`
+  - Full suite: `1658 passed, 71 skipped, 10 xfailed`
+  - Import sanity: `python -c "import tangl.core, tangl.vm, tangl.story, tangl.service"` → `ok`
+
+## Endpoint Naming Cleanup (2026-03-06)
+- Service operation routing now targets canonical runtime endpoint names:
+  - `RuntimeController.create_story`
+  - `RuntimeController.get_story_update`
+  - `RuntimeController.resolve_choice`
+  - `RuntimeController.get_story_info`
+  - `RuntimeController.drop_story`
+- Backward-compatible `*38` endpoint aliases remain accepted:
+  - operation reverse-lookup maps suffixed names to canonical names
+  - default endpoint policy is applied to both `create_story` and `create_story38`
+- Added canonical `RuntimeController.get_story_update(...)` endpoint alias to match
+  canonical operation routing.
+- Validation:
+  - Targeted service/app routes:
+    - `poetry run pytest -q engine/tests/service38/controllers/test_runtime_controller.py engine/tests/integration/test_service_layer.py apps/server/tests/test_rest_dependencies38.py apps/server/tests/test_story38_endpoints.py` → `16 passed`
+  - Full suite: `1658 passed, 71 skipped, 10 xfailed`
+  - Post-swap import audit: pass (`IR bridge: 0`, legacy imports: `0`, `*38` imports: `0`)

@@ -31,11 +31,11 @@ class ServiceOperation(str, Enum):
 
 
 _OPERATION_ENDPOINTS: dict[ServiceOperation, str] = {
-    ServiceOperation.STORY38_CREATE: "RuntimeController.create_story38",
-    ServiceOperation.STORY38_UPDATE: "RuntimeController.get_story_update38",
-    ServiceOperation.STORY38_DO: "RuntimeController.resolve_choice38",
-    ServiceOperation.STORY38_STATUS: "RuntimeController.get_story_info38",
-    ServiceOperation.STORY38_DROP: "RuntimeController.drop_story38",
+    ServiceOperation.STORY38_CREATE: "RuntimeController.create_story",
+    ServiceOperation.STORY38_UPDATE: "RuntimeController.get_story_update",
+    ServiceOperation.STORY38_DO: "RuntimeController.resolve_choice",
+    ServiceOperation.STORY38_STATUS: "RuntimeController.get_story_info",
+    ServiceOperation.STORY38_DROP: "RuntimeController.drop_story",
 
     ServiceOperation.USER_INFO: "UserController.get_user_info",
     ServiceOperation.USER_CREATE: "UserController.create_user",
@@ -56,6 +56,15 @@ _OPERATION_ENDPOINTS: dict[ServiceOperation, str] = {
 
 _ENDPOINT_OPERATION = {endpoint: op for op, endpoint in _OPERATION_ENDPOINTS.items()}
 
+# Temporary compatibility during endpoint-name retirement.
+_ENDPOINT_ALIASES: dict[str, str] = {
+    "RuntimeController.create_story38": "RuntimeController.create_story",
+    "RuntimeController.get_story_update38": "RuntimeController.get_story_update",
+    "RuntimeController.resolve_choice38": "RuntimeController.resolve_choice",
+    "RuntimeController.get_story_info38": "RuntimeController.get_story_info",
+    "RuntimeController.drop_story38": "RuntimeController.drop_story",
+}
+
 
 def endpoint_for_operation(operation: ServiceOperation | str) -> str:
     """Resolve a service operation token to controller endpoint name."""
@@ -67,8 +76,9 @@ def endpoint_for_operation(operation: ServiceOperation | str) -> str:
 def operation_for_endpoint(endpoint_name: str) -> ServiceOperation:
     """Resolve a controller endpoint name back to a service operation token."""
 
+    canonical_endpoint = _ENDPOINT_ALIASES.get(endpoint_name, endpoint_name)
     try:
-        return _ENDPOINT_OPERATION[endpoint_name]
+        return _ENDPOINT_OPERATION[canonical_endpoint]
     except KeyError as exc:
         raise KeyError(f"No service operation token for endpoint '{endpoint_name}'") from exc
 

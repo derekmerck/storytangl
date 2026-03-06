@@ -1,6 +1,6 @@
 # tangl.core — Design Notes
 
-> Architectural intent, design decisions, and rationale for the core38 subpackage
+> Architectural intent, design decisions, and rationale for the canonical core package
 > of the StoryTangl narrative engine (v3.8 framework).
 
 ---
@@ -282,7 +282,7 @@ This hook exists because dispatch bootstrapping cannot use dispatch to assemble 
 the authority chain must be discoverable before any behavior fires. A duck-typed method
 on the graph is the right primitive — `Frame.get_registries()` checks
 `getattr(graph, "get_authorities", None)` and calls it if present, without type-coupling
-to any application graph class. `StoryGraph38` overrides it to return `[story_dispatch,
+to any application graph class. `StoryGraph` overrides it to return `[story_dispatch,
 *world.get_authorities()]`. Future `WorldGraph`, `MechanicsGraph`, etc. follow the same
 pattern.
 

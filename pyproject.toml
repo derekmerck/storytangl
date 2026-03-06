@@ -117,8 +117,8 @@ xfail_strict = true  # identify xpasses
 log_cli = true
 log_cli_level = "DEBUG"
 testpaths = [
-    "engine/src/tangl/core38",
-    "engine/src/tangl/vm38",
+    "engine/src/tangl/core",
+    "engine/src/tangl/vm",
     "engine/tests",               # base tests
     "docs/tests",                 # docs tests
 #    "apps/**/tests",             # all apps tests

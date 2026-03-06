@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 @with_default_category("World")
 class WorldController(CommandSet):
-    """World inspection commands powered by service38."""
+    """World inspection commands powered by the service gateway."""
 
     _cmd: StoryTanglCLI
 

@@ -344,13 +344,15 @@ Planned target modules referenced by `PORT_*` rows:
     - `Post-swap disallowed *38 imports: 0`
 - Active CI gate now runs in post-swap mode.
 - Legacy source and retired legacy test trees are archived under `scratch/legacy/...`.
-- Compatibility wrappers remain for `tangl.core38`, `tangl.vm38`, `tangl.story38`, and `tangl.service38` and forward to canonical namespaces.
+- Compatibility wrapper packages (`tangl.core38`, `tangl.vm38`, `tangl.story38`, `tangl.service38`) have been retired from production source trees.
 - Legacy call-routing shim plumbing removed in active app/service code:
   - CLI no longer exposes `call_legacy_endpoint(...)` and no longer uses `_call_legacy(...)` controller helpers.
   - `tangl.service.api_endpoint` no longer contains dead conditional legacy bridge initialization.
 - App hygiene decisions are enforced:
   - `/story/drop` returns v38-style success status (`"ok"`).
   - Deferred debug endpoints remain routed but return explicit `501 Not Implemented`.
+- Service operation routing now targets canonical runtime endpoint names, with
+  `*38` endpoint-name aliases retained for compatibility during cleanup.
 
 ## Legacy vs V38 Surface Audit (2026-03-03)
 - Scope-completeness check:

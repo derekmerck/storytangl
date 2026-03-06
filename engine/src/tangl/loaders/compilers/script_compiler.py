@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from tangl.story.fabula.script_manager import ScriptManager
-
-
 class ScriptCompiler:
-    """Compile script data into a :class:`ScriptManager`."""
+    """Deprecated runtime37 script compiler bridge.
 
-    def compile(self, script_data: dict) -> ScriptManager:
-        from tangl.story.fabula.script_manager import ScriptManager
+    Runtime37 script-manager compilation was retired during v38 namespace cutover.
+    World loading now uses codec decoding + ``StoryCompiler`` directly.
+    """
 
-        return ScriptManager.from_data(script_data)
+    def compile(self, script_data: dict):
+        _ = script_data
+        raise RuntimeError(
+            "ScriptCompiler.compile() is no longer supported; "
+            "runtime37 script-manager loading was retired."
+        )

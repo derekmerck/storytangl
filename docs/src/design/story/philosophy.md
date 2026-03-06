@@ -340,10 +340,10 @@ the research agenda.
 
 ## What This Document Does Not Cover
 
-- **How** the phase pipeline works → see `vm38/VM_DESIGN.md`
-- **How** the graph primitives work → see `core38/CORE_DESIGN.md`
-- **How** story concepts are modeled → see `story38/design/`
-- **How** the service layer transforms fragments → see `service38/design/`
+- **How** the phase pipeline works → see `engine/src/tangl/vm/VM_DESIGN.md`
+- **How** the graph primitives work → see `engine/src/tangl/core/CORE_DESIGN.md`
+- **How** story concepts are modeled → see `engine/src/tangl/story/`
+- **How** the service layer transforms fragments → see `engine/src/tangl/service/`
 - **What** research directions follow from this → see `storytangl-research-agenda.md`
 
 This document is the **why**.  The subpackage design docs are the **how**.

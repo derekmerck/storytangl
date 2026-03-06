@@ -1,4 +1,4 @@
-"""Import guardrails for service38 controller isolation."""
+"""Import guardrails for canonical service/story controller isolation."""
 
 from __future__ import annotations
 
@@ -8,15 +8,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2] / "src" / "tangl"
 
-
-def _module_name_for_path(path: Path) -> str:
-    relative = path.relative_to(ROOT).with_suffix("")
-    return f"tangl.{'.'.join(relative.parts)}"
-
-
 def _discover_implementation_modules() -> tuple[Path, ...]:
     modules: list[Path] = []
-    for package_root in (ROOT / "story38", ROOT / "service38"):
+    for package_root in (ROOT / "story", ROOT / "service" / "controllers"):
         for path in package_root.rglob("*_controller.py"):
             modules.append(path)
     return tuple(sorted(modules))
@@ -24,9 +18,14 @@ def _discover_implementation_modules() -> tuple[Path, ...]:
 
 IMPLEMENTATION_MODULES = _discover_implementation_modules()
 
-BARREL_MODULE = ROOT / "service38" / "controllers.py"
-
-BARREL_ALLOWED_IMPORTS = {_module_name_for_path(path) for path in IMPLEMENTATION_MODULES}
+BARREL_MODULE = ROOT / "service" / "controllers" / "__init__.py"
+BARREL_ALLOWED_IMPORTS = {
+    "__future__",
+    "runtime_controller",
+    "system_controller",
+    "user_controller",
+    "world_controller",
+}
 
 
 def _import_modules(path: Path) -> list[str]:
@@ -42,31 +41,34 @@ def _import_modules(path: Path) -> list[str]:
 
 
 def _is_legacy_import(module_name: str) -> bool:
-    if module_name.startswith("tangl.vm") or module_name.startswith("tangl.story"):
-        return False
-    if module_name == "tangl.vm" or module_name.startswith("tangl.vm."):
-        return True
-    if module_name == "tangl.story" or module_name.startswith("tangl.story."):
-        return True
-    if module_name == "tangl.service.controllers" or module_name.startswith("tangl.service.controllers."):
-        return True
-    return False
+    retired_prefixes = (
+        "tangl.core38",
+        "tangl.vm38",
+        "tangl.story38",
+        "tangl.service38",
+        "tangl.core_legacy",
+        "tangl.vm_legacy",
+        "tangl.story_legacy",
+        "tangl.service_legacy",
+    )
+    return any(
+        module_name == prefix or module_name.startswith(f"{prefix}.")
+        for prefix in retired_prefixes
+    )
 
 
-def test_service38_controller_modules_do_not_import_legacy_story_vm_or_controllers() -> None:
+def test_controller_modules_do_not_import_retired_namespace_paths() -> None:
     violations: list[tuple[str, str]] = []
     for path in IMPLEMENTATION_MODULES:
         for module_name in _import_modules(path):
             if _is_legacy_import(module_name):
                 violations.append((str(path), module_name))
-    assert not violations, f"Legacy imports found: {violations}"
+    assert not violations, f"Retired namespace imports found: {violations}"
 
 
-def test_service38_controller_barrel_imports_only_v38_controller_modules() -> None:
+def test_service_controller_barrel_imports_only_controller_modules() -> None:
     violations: list[str] = []
     for module_name in _import_modules(BARREL_MODULE):
-        if module_name == "__future__":
-            continue
         if module_name not in BARREL_ALLOWED_IMPORTS:
             violations.append(module_name)
     assert not violations, f"Unexpected barrel imports: {violations}"

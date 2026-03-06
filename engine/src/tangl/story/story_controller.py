@@ -1,4 +1,4 @@
-"""Service38 runtime controller for story38/vm38 endpoints only."""
+"""Runtime controller endpoints for story/vm sessions."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ BaseFragment = tangl_core.BaseFragment
 
 
 class RuntimeController(HasApiEndpoints):
-    """Runtime endpoints for story38 sessions."""
+    """Runtime endpoints for story sessions."""
 
     @staticmethod
     def _serialize_vm38_fragment(fragment: Any) -> dict[str, Any]:
@@ -288,7 +288,7 @@ class RuntimeController(HasApiEndpoints):
         binds=(ResourceBinding.USER,),
     )
     def create_story(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
-        """Legacy alias for ``create_story38`` using story38/vm38 mechanics."""
+        """Canonical story-create endpoint backed by the v38 runtime surface."""
         return self.create_story38(user=user, world_id=world_id, **kwargs)
 
     @ApiEndpoint.annotate(
@@ -328,7 +328,7 @@ class RuntimeController(HasApiEndpoints):
         choice_id: UUID,
         choice_payload: Any = None,
     ) -> RuntimeInfo:
-        """Legacy alias for ``resolve_choice38``."""
+        """Canonical story-choice endpoint backed by the v38 runtime surface."""
         return self.resolve_choice38(
             ledger=ledger,
             choice_id=choice_id,
@@ -357,6 +357,26 @@ class RuntimeController(HasApiEndpoints):
             step=ledger.step,
             message="Story38 update",
             envelope=envelope.model_dump(mode="json"),
+        )
+
+    @ApiEndpoint.annotate(
+        access_level=AccessLevel.PUBLIC,
+        method_type=MethodType.READ,
+        response_type=ResponseType.RUNTIME,
+        binds=(ResourceBinding.LEDGER,),
+    )
+    def get_story_update(
+        self,
+        ledger: Ledger,
+        *,
+        since_step: int | None = None,
+        limit: int = 0,
+    ) -> RuntimeInfo:
+        """Canonical story-update endpoint backed by the v38 runtime surface."""
+        return self.get_story_update38(
+            ledger=ledger,
+            since_step=since_step,
+            limit=limit,
         )
 
     @ApiEndpoint.annotate(
@@ -432,7 +452,7 @@ class RuntimeController(HasApiEndpoints):
         binds=(ResourceBinding.LEDGER,),
     )
     def get_story_info(self, ledger: Ledger) -> RuntimeInfo:
-        """Legacy alias for ``get_story_info38``."""
+        """Canonical story-status endpoint backed by the v38 runtime surface."""
         return self.get_story_info38(ledger=ledger)
 
     @ApiEndpoint.annotate(
@@ -481,7 +501,7 @@ class RuntimeController(HasApiEndpoints):
         *,
         archive: bool = False,
     ) -> RuntimeInfo:
-        """Legacy alias for ``drop_story38``."""
+        """Canonical story-drop endpoint backed by the v38 runtime surface."""
         return self.drop_story38(
             user=user,
             ledger=ledger,
