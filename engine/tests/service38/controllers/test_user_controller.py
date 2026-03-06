@@ -36,7 +36,7 @@ from tangl.service.api_endpoint import (
     WritebackMode,
 )
 from tangl.service.bootstrap import build_service_gateway, register_default_controllers
-from tangl.service.controllers import UserController
+from tangl.service.controllers.user_controller import UserController
 from tangl.service.gateway import ServiceGateway
 from tangl.service.operations import ServiceOperation, endpoint_for_operation
 from tangl.service.orchestrator import Orchestrator

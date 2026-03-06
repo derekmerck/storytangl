@@ -10,7 +10,10 @@ from ..dispatch import on_gather_ns
 
 
 class Setting(Dependency):
-    """Setting dependency edge (source node -> location provider)."""
+    """Setting()
+
+    Story-specific dependency edge that binds a location provider into local scope.
+    """
 
     @staticmethod
     def _invoke_provider_ns(provider: Any) -> dict[str, Any]:

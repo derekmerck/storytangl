@@ -488,12 +488,10 @@ def some_method(self, frame: Frame):
 ```python
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import Orchestrator
-from tangl.service.controllers import (
-    RuntimeController,
-    WorldController,
-    UserController,
-    SystemController
-)
+from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.controllers.world_controller import WorldController
+from tangl.service.controllers.user_controller import UserController
+from tangl.service.controllers.system_controller import SystemController
 
 # Create persistence
 persistence = PersistenceManagerFactory.create_persistence_manager(
@@ -728,7 +726,8 @@ class StoryCLI(cmd2.Cmd):
 from uuid import UUID
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import Orchestrator, User
-from tangl.service.controllers import RuntimeController, WorldController
+from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.controllers.world_controller import WorldController
 from tangl.story.fabula.world import World
 
 # Setup

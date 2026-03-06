@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .controllers import DEFAULT_CONTROLLERS
+from .controllers import get_default_controllers
 from .gateway import ServiceGateway
 from .orchestrator import Orchestrator
 
@@ -18,7 +18,7 @@ DEFAULT_ENDPOINT_POLICIES: dict[str, dict[str, tuple[str, ...]]] = {
 def register_default_controllers(orchestrator: Orchestrator) -> None:
     """Register the standard controller set for service."""
 
-    for controller in DEFAULT_CONTROLLERS:
+    for controller in get_default_controllers():
         orchestrator.register_controller(controller)
 
 

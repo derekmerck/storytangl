@@ -8,7 +8,16 @@ from tangl.vm import TraversableNode
 
 
 class Scene(TraversableNode):
-    """Container node grouping block members."""
+    """Scene()
+
+    Container node that groups blocks into a traversable narrative segment.
+
+    Why
+    ----
+    Scenes provide the structural scope that blocks, roles, and settings hang
+    from. They also maintain source and sink pointers so container traversal is
+    deterministic once children are materialized.
+    """
 
     title: str = ""
     roles: list[dict[str, Any]] = Field(default_factory=list)

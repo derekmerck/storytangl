@@ -7,7 +7,10 @@ from tangl.vm import TraversableNode
 
 
 class Location(TraversableNode):
-    """Minimal location concept node for story38."""
+    """Location()
+
+    Named place provider published into the story namespace.
+    """
 
     name: str = ""
 

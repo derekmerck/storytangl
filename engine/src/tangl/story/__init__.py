@@ -1,3 +1,56 @@
+"""
+.. currentmodule:: tangl.story
+
+Story-domain layer for authored narrative graphs, runtime story instances, and
+journal-ready output.
+
+Conceptual layers
+-----------------
+
+1. Fabula
+
+   - :class:`StoryCompiler` validates and normalizes authored scripts into a
+     :class:`StoryTemplateBundle`.
+   - :class:`StoryMaterializer` instantiates story graphs from compiled
+     templates.
+   - :class:`World` is the main external entry point for creating story runs.
+   - :class:`ScriptManager` resolves template lookups across lineage-aware
+     scope groups.
+
+2. Episode vocabulary
+
+   - :class:`Block` is the primary interactive cursor node.
+   - :class:`Scene` groups blocks and maintains container traversal contracts.
+   - :class:`Action` links choices and continuation edges between blocks.
+
+3. Story concepts
+
+   - :class:`Actor` and :class:`Location` are named providers published into
+     render namespaces.
+   - :class:`Role` and :class:`Setting` are story-specific dependency edges
+     that bind those providers into scene and block scopes.
+
+4. Runtime graph and journal output
+
+   - :class:`StoryGraph` carries story locals, template lineage, and world
+     references for runtime resolution.
+   - :class:`StoryRuntimeCtx` defines the context accessors expected by story
+     runtime helpers.
+   - :class:`Fragment`, :class:`ContentFragment`, :class:`ChoiceFragment`, and
+     :class:`MediaFragment` represent journal output.
+
+5. Dispatch
+
+   - :obj:`story_dispatch` is the shared story behavior registry.
+   - :func:`on_journal` registers JOURNAL-phase handlers.
+
+Design intent
+-------------
+``tangl.story`` owns narrative policy: the story-facing entity vocabulary,
+script-to-template compilation, and JOURNAL rendering. Traversal and
+provisioning mechanisms remain in :mod:`tangl.vm`.
+"""
+
 from .concepts import Actor, Location, Role, Setting
 from .episode import Action, Block, Scene
 from .fabula import (

@@ -119,7 +119,30 @@ class _PrelinkCtx:
 
 
 class StoryMaterializer:
-    """Materialize story graphs from a compiled template bundle."""
+    """StoryMaterializer()
+
+    Instantiate runtime story graphs from a compiled
+    :class:`~tangl.story.fabula.StoryTemplateBundle`.
+
+    Why
+    ----
+    Materialization translates the static template hierarchy into concrete graph
+    items, attaches lineage metadata, and optionally pre-resolves dependencies
+    so runtime traversal starts from a coherent story graph.
+
+    Key Features
+    ------------
+    * Supports :class:`InitMode.LAZY` and :class:`InitMode.EAGER`
+      initialization.
+    * Preserves template-to-entity lineage for runtime scope lookup.
+    * Finalizes scene contracts and wires node destinations after
+      instantiation.
+    * Uses vm resolver semantics instead of reimplementing provisioning logic.
+
+    API
+    ---
+    - :meth:`create_story` materializes one story graph from a compiled bundle.
+    """
 
     def create_story(
         self,
@@ -129,6 +152,12 @@ class StoryMaterializer:
         init_mode: InitMode,
         world: object | None = None,
     ) -> StoryInitResult:
+        """Create one runtime story graph from a compiled bundle.
+
+        ``LAZY`` mode materializes only entry paths and defers deeper
+        provisioning. ``EAGER`` mode materializes the full template registry and
+        fails fast on unresolved hard dependencies.
+        """
         script_manager = getattr(world, "script_manager", None) if world is not None else None
         if script_manager is None:
             script_manager = ScriptManager(template_registry=bundle.template_registry)

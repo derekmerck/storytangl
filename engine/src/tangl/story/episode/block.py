@@ -8,7 +8,16 @@ from tangl.vm import TraversableNode
 
 
 class Block(TraversableNode):
-    """Primary interactive cursor node in story38."""
+    """Block()
+
+    Primary interactive cursor node in a runtime story graph.
+
+    Why
+    ----
+    Blocks are the units a player or consumer actually visits. They hold the
+    authored narrative content together with local action, role, setting, and
+    media declarations that journaling and provisioning consume.
+    """
 
     content: str = ""
     actions: list[dict[str, Any]] = Field(default_factory=list)

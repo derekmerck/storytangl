@@ -32,7 +32,7 @@ Conceptual layers
 
 Design intent
 -------------
-`vm38` defines deterministic execution mechanics and contracts while remaining
+``tangl.vm`` defines deterministic execution mechanics and contracts while remaining
 policy-agnostic about story/domain semantics, which belong in higher layers.
 """
 
@@ -112,7 +112,7 @@ from .dispatch import (
     on_validate,
 )
 from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
-from . import system_handlers  # noqa: F401  # register default vm38 hooks
+from . import system_handlers  # noqa: F401  # register default vm hooks
 from tangl.core import CallReceipt as BuildReceipt, Record as PlanningReceipt
 
 

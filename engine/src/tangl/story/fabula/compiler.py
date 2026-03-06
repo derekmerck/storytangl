@@ -16,7 +16,24 @@ from ..episode import Action, Block, Scene
 
 @dataclass(slots=True)
 class StoryTemplateBundle:
-    """Canonical story38 compile artifact."""
+    """StoryTemplateBundle()
+
+    Canonical output of :class:`StoryCompiler`.
+
+    Why
+    ----
+    Separating compilation from materialization lets one validated script bundle
+    produce many independent story graphs without reparsing authored input.
+
+    Key Features
+    ------------
+    * Carries the validated :class:`~tangl.core.TemplateRegistry` tree used by
+      the materializer.
+    * Preserves ``metadata``, story ``locals``, source mapping, and codec state
+      alongside the template hierarchy.
+    * Records ``entry_template_ids`` so materialization can resolve the graph's
+      initial cursor positions deterministically.
+    """
 
     metadata: dict[str, Any]
     locals: dict[str, Any]
@@ -28,7 +45,31 @@ class StoryTemplateBundle:
 
 
 class StoryCompiler:
-    """Compile story script data into a template registry bundle."""
+    """StoryCompiler()
+
+    Validate and normalize authored story script data into a
+    :class:`StoryTemplateBundle`.
+
+    Why
+    ----
+    Authored story scripts are intentionally lightweight. The compiler turns
+    that loose authoring shape into a typed, scoped template tree that runtime
+    materialization and provisioning can trust.
+
+    Key Features
+    ------------
+    * Accepts raw dicts or validated :class:`~tangl.ir.story_ir.StoryScript`
+      instances.
+    * Builds scene and block template hierarchy used by runtime scope matching.
+    * Canonicalizes action references so authored shorthand and qualified
+      references resolve into a stable form.
+    * Resolves concrete Python classes during compilation so import failures
+      surface before graph initialization.
+
+    API
+    ---
+    - :meth:`compile` is the supported public entry point.
+    """
 
     def compile(
         self,
@@ -38,6 +79,12 @@ class StoryCompiler:
         codec_state: dict[str, Any] | None = None,
         codec_id: str | None = None,
     ) -> StoryTemplateBundle:
+        """Compile authored story data into a reusable template bundle.
+
+        Accepts either raw script dictionaries or validated
+        :class:`~tangl.ir.story_ir.StoryScript` objects. The returned bundle is
+        fully normalized and ready for :class:`~tangl.story.fabula.StoryMaterializer`.
+        """
         script = script_data if isinstance(script_data, StoryScript) else StoryScript.model_validate(script_data)
         data = script.model_dump(by_alias=True, exclude_none=True)
 

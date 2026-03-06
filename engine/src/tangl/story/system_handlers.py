@@ -1,3 +1,16 @@
+"""Default story dispatch handlers for namespace gathering and journaling.
+
+This module registers the story-layer handlers that:
+
+* expose story and world locals into render namespaces,
+* contribute template scopes and token catalogs for runtime provisioning, and
+* turn a :class:`~tangl.story.episode.block.Block` cursor into journal
+  fragments during the JOURNAL phase.
+
+These handlers define story-specific policy on top of the generic dispatch and
+resolver mechanisms in :mod:`tangl.vm`.
+"""
+
 from __future__ import annotations
 
 import logging

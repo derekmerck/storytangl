@@ -11,7 +11,16 @@ from .actor import Actor
 
 
 class Role(Dependency[Actor]):
-    """Role dependency edge (source node -> actor provider)."""
+    """Role()
+
+    Story-specific dependency edge that binds an actor provider into local scope.
+
+    Why
+    ----
+    ``Role`` turns generic dependency resolution into a narrative concept with a
+    stable namespace contract, making resolved actors available under both the
+    role label and derived metadata keys.
+    """
 
     @staticmethod
     def _invoke_provider_ns(provider: Any) -> dict[str, Any]:

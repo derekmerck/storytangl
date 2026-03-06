@@ -1,10 +1,12 @@
 tangl package
 =============
 
-.. toctree::
-   :maxdepth: 4
+Curated API reference grouped by subsystem rather than a single flat package page.
 
-   tangl.core
-   tangl.vm
-   tangl.story
-   tangl.service
+.. toctree::
+   :maxdepth: 2
+
+   core/index
+   vm/index
+   story/index
+   service/index

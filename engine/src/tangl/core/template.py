@@ -132,46 +132,34 @@ def _scope_admitted(template_scope: str | None, target_ctx: str | None) -> bool:
 
 
 class EntityTemplate(RegistryAware, Record, Generic[ET]):
-    """Template wrapper around an entity payload.
+    """EntityTemplate(payload: Entity)
 
-    An `EntityTemplate` stores a prototype entity (`payload`) and provides three distinct
-    operations:
+    Template wrapper around an entity payload.
 
-    - **compile**: `dict → EntityTemplate` (authoring loop)
-    - **decompile**: `EntityTemplate → dict` (authoring loop)
-    - **materialize**: `EntityTemplate → Entity` (runtime entry)
+    Why
+    ----
+    ``EntityTemplate`` separates authoring-time prototypes from runtime
+    entities. A template can be compiled, searched, stored, and materialized
+    repeatedly without becoming part of the live graph itself.
 
-    ### What a template is (and is not)
+    Key Features
+    ------------
+    * Supports authoring-loop transforms through ``compile`` and ``decompile``.
+    * Supports runtime instantiation through :meth:`materialize`.
+    * Distinguishes template-kind matching from payload-kind matching so callers
+      can query wrapper shape and produced entity kind independently.
+    * Can participate in template registries and hierarchical groups used by
+      provisioning and materialization.
 
-    - A template is **not** a live entity in the runtime graph.
-    - A template may be stored in a `TemplateRegistry` and searched using `Selector`.
-    - Templates can participate in hierarchy/grouping when combined with
-      `TemplateGroup` (see below).
+    API
+    ---
+    - :meth:`has_template_kind` checks the wrapper record type.
+    - :meth:`has_payload_kind` checks the materialized entity kind.
+    - :meth:`has_kind` matches either axis as a convenience.
+    - :meth:`materialize` creates a live entity from the stored payload.
 
-    ### Matching axes (important)
-
-    Templates expose two independent matching axes:
-
-    - **template-kind**: what wrapper record the template is (`EntityTemplate`, `Snapshot`, `TemplateGroup`)
-    - **payload-kind**: what entity kind the template would materialize (`Scene`, `Block`, `Entity`, ...)
-
-    Use `has_template_kind()` and `has_payload_kind()` to avoid ambiguity. The convenience
-    method `has_kind()` matches either axis.
-
-    ### Authoring vs persistence
-
-    - `compile()` / `decompile()` are for author scripts and strip framework noise by policy.
-    - `structure()` / `unstructure()` serialize the template record itself (including payload)
-      and are appropriate for caching/transport of templates, not authoring.
-
-    ```
-    Script ──compile─▶ Template ──materialize──▶ Live ◀──structure── Persistence
-    (dict)             (record)                (entity)                 (dict)
-      ▲                    │                       │                       ▲
-      └─────decompile──────┘                       └──────unstructure──────┘
-    ```
-
-    Example:
+    Example
+    -------
         >>> class PseudoEntity(Entity): ...
         >>> data = {'label': 'abc'}
         >>> templ = EntityTemplate.from_data(data, default_kind=PseudoEntity)

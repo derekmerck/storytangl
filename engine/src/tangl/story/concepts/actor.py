@@ -6,7 +6,10 @@ from tangl.core import Node, contribute_ns
 
 
 class Actor(Node):
-    """Minimal actor concept node for story38."""
+    """Actor()
+
+    Named character provider published into the story namespace.
+    """
 
     name: str = ""
 

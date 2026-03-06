@@ -25,7 +25,7 @@ from tangl.service.api_endpoint import (
     ApiEndpoint,
     ResourceBinding,
 )
-from tangl.service.controllers import RuntimeController
+from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.gateway import ServiceGateway
 from tangl.service.operations import ServiceOperation, endpoint_for_operation
 from tangl.service.orchestrator import Orchestrator

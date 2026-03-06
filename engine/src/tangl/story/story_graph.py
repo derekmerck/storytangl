@@ -11,7 +11,17 @@ from .dispatch import story_dispatch
 
 
 class StoryGraph(Graph):
-    """Story graph specialization for runtime state."""
+    """StoryGraph()
+
+    Runtime graph specialization for story-layer execution state.
+
+    Why
+    ----
+    Story execution needs more than generic graph topology. ``StoryGraph`` adds
+    story locals, template lineage, and world references so runtime handlers and
+    provisioning can resolve scoped data without reaching back into compile-time
+    structures directly.
+    """
 
     initial_cursor_id: UUID | None = None
     initial_cursor_ids: list[UUID] = Field(default_factory=list)

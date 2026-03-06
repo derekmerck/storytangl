@@ -55,6 +55,37 @@ class _MaterializeRole(StrEnum):
 
 @dataclass
 class Resolver:
+    """Resolver(location_entity_groups=(), template_scope_groups=())
+
+    Gather, rank, preview, and bind provisioning offers for frontier
+    requirements.
+
+    Why
+    ----
+    Provisioning is where runtime graph gaps become concrete providers. The
+    resolver centralizes offer discovery and binding so story-layer code can
+    define policy without reimplementing the selection mechanics.
+
+    Key Features
+    ------------
+    * Reads candidate providers from ordered entity groups and template scopes.
+    * Merges FIND, CREATE, TOKEN, inline-template, and synthesized
+      UPDATE/CLONE offers into one ranked stream.
+    * Supports preview mode through blocker diagnostics and optional stub
+      linkage.
+    * Writes selected providers and decision metadata back onto dependency
+      requirements.
+
+    API
+    ---
+    - :meth:`from_ctx` creates a resolver from a compatible vm context.
+    - :meth:`gather_offers` assembles ranked candidates for one requirement.
+    - :meth:`resolve_requirement` and :meth:`resolve_dependency` bind concrete
+      providers.
+    - :meth:`resolve_frontier_node` resolves all open dependencies for one
+      frontier node.
+    - :meth:`preview_requirement` reports viability without mutating topology.
+    """
 
     # order of the groups indicates 'distance' from the requirement carrier,
     # so resolver can be created per frontier node and then re-used multiple
@@ -112,6 +143,7 @@ class Resolver:
 
     @classmethod
     def from_ctx(cls, ctx: VmResolverCtx) -> Self:
+        """Build a resolver from the entity and template groups exposed by ``ctx``."""
         return cls(
             location_entity_groups=cls._ctx_location_entity_groups(ctx),
             template_scope_groups=cls._ctx_template_scope_groups(ctx),
@@ -311,6 +343,12 @@ class Resolver:
         preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> list[ProvisionOffer]:
+        """Return ranked offers that are currently admissible for ``requirement``.
+
+        Existing providers, template-driven candidates, token catalogs, inline
+        templates, synthesized UPDATE or CLONE offers, and optional dispatch
+        overrides all participate in this one ordered result set.
+        """
         offers: list[ProvisionOffer] = list(preferred_offers or [])
 
         # If there are more than 20 groups, the distance-based priorities will slip
@@ -483,6 +521,7 @@ class Resolver:
         preferred_offers: Iterable[ProvisionOffer] = (),
         _ctx=None,
     ) -> Optional[PT]:
+        """Resolve and materialize one provider for ``requirement`` if possible."""
         provider, _, _ = self._resolve_requirement_offer(
             requirement=requirement,
             allow_stubs=allow_stubs,
@@ -699,6 +738,7 @@ class Resolver:
         max_depth: int = 8,
         _ctx: Any = None,
     ) -> ViabilityResult:
+        """Return a non-mutating viability preview for one requirement."""
         # depth/visited are reserved for future recursive chain variants.
         _ = max_depth
         offers = self.gather_offers(
@@ -861,6 +901,7 @@ class Resolver:
         allow_stubs: bool = False,
         _ctx=None,
     ) -> bool:
+        """Resolve one dependency edge and bind its provider into the graph."""
         preferred_offers = self._linked_affordance_offers(
             requirement=dependency.requirement,
             frontier=dependency.predecessor,
@@ -942,6 +983,7 @@ class Resolver:
         allow_stubs: bool = False,
         _ctx=None,
     ) -> bool:
+        """Resolve all open dependencies on ``node`` and verify traversal viability."""
         # Note this is not unsatisfied deps, it's anyone without a provider
         # satisfied could mean not a hard req
         open_deps = node.edges_out(Selector(has_kind=Dependency, provider=None))
