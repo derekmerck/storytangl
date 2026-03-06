@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 class ServiceError(Exception):
     """Base for service-layer errors that surface as ``RuntimeInfo`` errors."""
 

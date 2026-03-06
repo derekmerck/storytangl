@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.registry`` classes."""
+"""Contract tests for ``tangl.core.registry`` classes."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core38.dispatch import on_add_item, on_get_item, on_remove_item
-from tangl.core38.entity import Entity
-from tangl.core38.registry import EntityGroup, HierarchicalGroup, Registry, RegistryAware
-from tangl.core38.selector import Selector
+from tangl.core.dispatch import on_add_item, on_get_item, on_remove_item
+from tangl.core.entity import Entity
+from tangl.core.registry import EntityGroup, HierarchicalGroup, Registry, RegistryAware
+from tangl.core.selector import Selector
 
 
 class TrackedEntity(RegistryAware):

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 
-from tangl.service.controllers.system_controller import SystemController
+from tangl.service.system_controller import SystemController
 
 
 def main() -> int:

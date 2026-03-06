@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.service38.api_endpoint``.
+"""Contract tests for ``tangl.service.api_endpoint``.
 
 This is the service38 replacement for ``engine/tests/service/test_api_endpoints.py``
 (see parity matrix row: PORT_ADAPT → ``engine/tests/service38/test_api_endpoint.py``).
@@ -6,11 +6,11 @@ This is the service38 replacement for ``engine/tests/service/test_api_endpoints.
 The legacy tests validated ``ApiEndpoint.annotate`` decorator plumbing against the
 legacy service surface.  These tests validate the *service38-specific* additions:
 
-- ``ApiEndpoint38.annotate`` stores ``binds``, ``writeback_mode``, ``persist_paths``
+- ``ApiEndpoint.annotate`` stores ``binds``, ``writeback_mode``, ``persist_paths``
 - ``ResourceBinding`` enum normalises string inputs
 - ``EndpointPolicy`` extracts defaults from an endpoint and merges runtime overrides
 - ``WritebackMode`` enum round-trips correctly
-- ``ApiEndpoint38`` is a subclass of ``LegacyApiEndpoint``, preserving existing
+- ``ApiEndpoint`` is a subclass of ``LegacyApiEndpoint``, preserving existing
   ``method_type``, ``response_type``, ``access_level``, ``preprocessors``,
   and ``postprocessors`` contracts inherited from the parent
 - Endpoints missing ``binds`` (i.e. pure legacy endpoints) still have the
@@ -18,9 +18,9 @@ legacy service surface.  These tests validate the *service38-specific* additions
 
 See Also
 --------
-- ``tangl.service38.api_endpoint`` – ``ApiEndpoint38``, ``EndpointPolicy``,
+- ``tangl.service.api_endpoint`` – ``ApiEndpoint``, ``EndpointPolicy``,
   ``ResourceBinding``, ``WritebackMode``
-- ``tangl.service38.orchestrator.Orchestrator38._resolve_hydration_bindings``
+- ``tangl.service.orchestrator.Orchestrator._resolve_hydration_bindings``
 - ``engine/tests/service/test_orchestrator38.py`` – integration evidence
 """
 
@@ -34,14 +34,14 @@ from tangl.service.api_endpoint import (
     MethodType,
     ResponseType,
 )
-from tangl.service38.api_endpoint import (
-    ApiEndpoint38,
+from tangl.service.api_endpoint import (
+    ApiEndpoint,
     EndpointPolicy,
     LegacyApiEndpoint,
     ResourceBinding,
     WritebackMode,
 )
-from tangl.service38.orchestrator import Orchestrator38
+from tangl.service.orchestrator import Orchestrator
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ def _make_annotated(
     """Return a minimal annotated controller class for inspection."""
 
     class _Controller(HasApiEndpoints):
-        @ApiEndpoint38.annotate(
+        @ApiEndpoint.annotate(
             binds=binds,
             writeback_mode=writeback_mode,
             persist_paths=persist_paths,
@@ -77,7 +77,7 @@ def _make_annotated(
 
 
 # ---------------------------------------------------------------------------
-# ApiEndpoint38.annotate — basic decorator contract
+# ApiEndpoint.annotate — basic decorator contract
 # ---------------------------------------------------------------------------
 
 class TestApiEndpoint38Annotate:
@@ -89,7 +89,7 @@ class TestApiEndpoint38Annotate:
     def test_endpoint_is_api_endpoint38_instance(self) -> None:
         ctrl = _make_annotated(binds=(ResourceBinding.USER,))
         ep = ctrl.my_endpoint._api_endpoint
-        assert isinstance(ep, ApiEndpoint38)
+        assert isinstance(ep, ApiEndpoint)
 
     def test_endpoint_is_also_legacy_api_endpoint_instance(self) -> None:
         """Confirms backward compatibility via inheritance."""
@@ -250,15 +250,15 @@ class TestEndpointPolicy:
 
 
 # ---------------------------------------------------------------------------
-# Orchestrator38 binding inference
+# Orchestrator binding inference
 # ---------------------------------------------------------------------------
 
 class TestOrchestratorBindingInference:
-    """Orchestrator38 resolves hydration bindings from ApiEndpoint38.binds."""
+    """Orchestrator resolves hydration bindings from ApiEndpoint.binds."""
 
     def test_explicit_binds_used_for_hydration(self) -> None:
         class _Ctrl(HasApiEndpoints):
-            @ApiEndpoint38.annotate(
+            @ApiEndpoint.annotate(
                 binds=(ResourceBinding.USER,),
                 method_type=MethodType.READ,
                 response_type=ResponseType.INFO,
@@ -266,14 +266,14 @@ class TestOrchestratorBindingInference:
             def needs_user(self, user) -> dict:
                 return {"user_label": user.label}
 
-        orchestrator = Orchestrator38(persistence_manager={})
+        orchestrator = Orchestrator(persistence_manager={})
         orchestrator.register_controller(_Ctrl)
         binding = orchestrator._endpoints["_Ctrl.needs_user"]
         assert ResourceBinding.USER in binding.hydration_bindings
 
     def test_empty_binds_result_in_no_hydration(self) -> None:
         class _Ctrl(HasApiEndpoints):
-            @ApiEndpoint38.annotate(
+            @ApiEndpoint.annotate(
                 binds=(),
                 method_type=MethodType.READ,
                 response_type=ResponseType.INFO,
@@ -281,14 +281,14 @@ class TestOrchestratorBindingInference:
             def needs_nothing(self) -> dict:
                 return {"ok": True}
 
-        orchestrator = Orchestrator38(persistence_manager={})
+        orchestrator = Orchestrator(persistence_manager={})
         orchestrator.register_controller(_Ctrl)
         binding = orchestrator._endpoints["_Ctrl.needs_nothing"]
         assert binding.hydration_bindings == ()
 
     def test_policy_defaults_extracted_from_endpoint(self) -> None:
         class _Ctrl(HasApiEndpoints):
-            @ApiEndpoint38.annotate(
+            @ApiEndpoint.annotate(
                 binds=(),
                 writeback_mode=WritebackMode.NEVER,
                 persist_paths=("details.ledger",),
@@ -298,7 +298,7 @@ class TestOrchestratorBindingInference:
             def create_thing(self) -> dict:
                 return {}
 
-        orchestrator = Orchestrator38(persistence_manager={})
+        orchestrator = Orchestrator(persistence_manager={})
         orchestrator.register_controller(_Ctrl)
         binding = orchestrator._endpoints["_Ctrl.create_thing"]
         assert binding.policy.writeback_mode is WritebackMode.NEVER
@@ -306,7 +306,7 @@ class TestOrchestratorBindingInference:
 
     def test_set_endpoint_policy_overrides_extracted_defaults(self) -> None:
         class _Ctrl(HasApiEndpoints):
-            @ApiEndpoint38.annotate(
+            @ApiEndpoint.annotate(
                 binds=(),
                 method_type=MethodType.CREATE,
                 response_type=ResponseType.RUNTIME,
@@ -314,7 +314,7 @@ class TestOrchestratorBindingInference:
             def create_thing(self) -> dict:
                 return {}
 
-        orchestrator = Orchestrator38(persistence_manager={})
+        orchestrator = Orchestrator(persistence_manager={})
         orchestrator.register_controller(_Ctrl)
         orchestrator.set_endpoint_policy(
             "_Ctrl.create_thing",
@@ -327,11 +327,11 @@ class TestOrchestratorBindingInference:
 
     def test_get_api_endpoints_returns_all_decorated_methods(self) -> None:
         class _Multi(HasApiEndpoints):
-            @ApiEndpoint38.annotate(binds=(), response_type=ResponseType.INFO, method_type=MethodType.READ)
+            @ApiEndpoint.annotate(binds=(), response_type=ResponseType.INFO, method_type=MethodType.READ)
             def alpha(self) -> dict:
                 return {}
 
-            @ApiEndpoint38.annotate(binds=(), response_type=ResponseType.INFO, method_type=MethodType.READ)
+            @ApiEndpoint.annotate(binds=(), response_type=ResponseType.INFO, method_type=MethodType.READ)
             def beta(self) -> dict:
                 return {}
 

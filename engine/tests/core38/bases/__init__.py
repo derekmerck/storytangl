@@ -1,1 +1,1 @@
-"""Tests for tangl.core38.bases traits."""
+"""Tests for tangl.core.bases traits."""

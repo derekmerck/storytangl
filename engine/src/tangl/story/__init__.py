@@ -1,26 +1,61 @@
+from .concepts import Actor, Location, Role, Setting
+from .episode import Action, Block, Scene
+from .fabula import (
+    GraphInitializationError,
+    InitMode,
+    InitReport,
+    ResolutionError,
+    ResolutionFailureReason,
+    ScriptManager,
+    StoryCompiler,
+    StoryInitResult,
+    StoryMaterializer,
+    StoryTemplateBundle,
+    UnresolvedDependency,
+    WorldAssetsFacet,
+    WorldDomainFacet,
+    WorldResourcesFacet,
+    WorldTemplatesFacet,
+    World,
+)
+from .story_graph import StoryGraph
+from .dispatch import on_journal, story_dispatch
+from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
+from .ctx import StoryRuntimeCtx
 
-__all__ = ["Concept", "Scene", "Block", "World", "story_dispatch"]
+# Register story-level journal handlers.
+from . import system_handlers  # noqa: F401
 
-
-def __getattr__(name: str):
-    if name == "World":
-        from .fabula import World as _World
-
-        return _World
-    if name == "Concept":
-        from .concepts import Concept as _Concept
-
-        return _Concept
-    if name == "Scene":
-        from .episode import Scene as _Scene
-
-        return _Scene
-    if name == "Block":
-        from .episode import Block as _Block
-
-        return _Block
-    if name == "story_dispatch":
-        from .dispatch import story_dispatch as _dispatch
-
-        return _dispatch
-    raise AttributeError(name)
+__all__ = [
+    "Action",
+    "Actor",
+    "Block",
+    "ChoiceFragment",
+    "ContentFragment",
+    "Fragment",
+    "GraphInitializationError",
+    "InitMode",
+    "InitReport",
+    "Location",
+    "ResolutionError",
+    "ResolutionFailureReason",
+    "ScriptManager",
+    "Role",
+    "Scene",
+    "Setting",
+    "StoryRuntimeCtx",
+    "StoryCompiler",
+    "StoryGraph",
+    "StoryInitResult",
+    "StoryMaterializer",
+    "StoryTemplateBundle",
+    "UnresolvedDependency",
+    "WorldAssetsFacet",
+    "WorldDomainFacet",
+    "WorldResourcesFacet",
+    "WorldTemplatesFacet",
+    "World",
+    "on_journal",
+    "story_dispatch",
+    "MediaFragment",
+]

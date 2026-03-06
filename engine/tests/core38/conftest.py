@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import Field
 
-from tangl.core38.bases import (
+from tangl.core.bases import (
     HasContent,
     HasIdentity,
     HasOrder,
@@ -15,10 +15,10 @@ from tangl.core38.bases import (
     Unstructurable,
     is_identifier,
 )
-from tangl.core38.singleton import Singleton
-from tangl.core38.token import Token
-from tangl.core38.record import Record
-from tangl.core38.entity import Entity
+from tangl.core.singleton import Singleton
+from tangl.core.token import Token
+from tangl.core.record import Record
+from tangl.core.entity import Entity
 
 
 class SimpleEntity(Unstructurable, HasIdentity):
@@ -153,7 +153,7 @@ def null_ctx() -> SimpleNamespace:
 @pytest.fixture
 def mock_ctx_with_registry() -> tuple[SimpleNamespace, object]:
     """Context paired with a fresh behavior registry for hook tests."""
-    from tangl.core38.behavior import BehaviorRegistry
+    from tangl.core.behavior import BehaviorRegistry
 
     registry = BehaviorRegistry()
     ctx = SimpleNamespace(
@@ -179,7 +179,7 @@ def inline_ctx() -> callable:
 @pytest.fixture
 def layered_ctx() -> callable:
     """Build a context containing registries at named dispatch layers."""
-    from tangl.core38.behavior import BehaviorRegistry, DispatchLayer
+    from tangl.core.behavior import BehaviorRegistry, DispatchLayer
 
     def _make(**layer_funcs):
         registries = []
@@ -205,7 +205,7 @@ def layered_ctx() -> callable:
 def clean_global_dispatch() -> None:
     """Keep global dispatch state isolated between tests."""
     yield
-    from tangl.core38.dispatch import dispatch
+    from tangl.core.dispatch import dispatch
 
     dispatch.clear()
 
@@ -214,7 +214,7 @@ def clean_global_dispatch() -> None:
 def ensure_no_ambient_ctx() -> None:
     """Fail fast if tests leak ambient context."""
     yield
-    from tangl.core38.ctx import get_ctx
+    from tangl.core.ctx import get_ctx
 
     assert get_ctx() is None, "Ambient ctx leaked between tests"
 

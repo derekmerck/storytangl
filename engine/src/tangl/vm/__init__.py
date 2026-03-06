@@ -1,139 +1,182 @@
 """
 .. currentmodule:: tangl.vm
 
-Virtual Machine for executing resolution steps over self-realizing narrative graphs.
-These classes define the *processes* (verbs) that operate on the foundational data
-structures of :mod:`tangl.core`.
+Virtual machine mechanisms for phase-driven traversal, provisioning, and replay.
 
 Conceptual layers
 -----------------
 
-1. :ref:`Graph Resolution<vm-resolver>`
+1. Resolution runtime
 
-   - :class:`Frame` executes a deterministic sequence of phases from a cursor (the program counter).
-   - :class:`ResolutionPhase` enumerates and aggregates per-phase handler pipelines.
-   - :class:`Context` provides the working graph, cursor, scope, and seeded RNG for one step.
-   - :class:`Ledger` holds the live :class:`~tangl.core.Graph`, current cursor,
-     and the append-only stream of patches, snapshots, and fragments.
+   - :class:`Frame` executes one choice resolution loop.
+   - :class:`Ledger` persists cursor, stack, and replay artifacts across choices.
+   - :class:`ResolutionPhase` defines causal phase ordering.
 
-   Each cursor advance provokes a cascade of phase handlers that validate, extend,
-   and navigate the resolution frontier. The ledger can rehydrate graphs from the
-   event stream and provide Journal fragments for discourse/presentation.
+2. Traversal contracts
 
-2. :ref:`Planning<vm-planning>`
+   - :class:`TraversableNode` / :class:`TraversableEdge` define cursor movement.
+   - :mod:`tangl.vm.traversal` provides pure history/call-stack queries.
 
-   - :class:`Requirement` expresses needed providers and their provisioning policy.
-   - :class:`Provisioner` resolves or creates providers according to policy.
-   - :class:`Offer` (alias for :class:`ProvisionOffer`) represents a proposed way to satisfy a requirement.
-   - :class:`Dependency` and :class:`Affordance` describe open edges at the frontier.
+3. Provisioning
 
-3. :ref:`Replay<vm-replay>`
+   - :class:`Requirement`, :class:`Dependency`, :class:`Affordance` define frontier
+     constraints.
+   - :class:`Resolver` and provisioners satisfy constraints from
+     entity/template scopes.
 
-   - :class:`Event` and :class:`EventType` capture CRUD operations as immutable records.
-   - :class:`Patch` and :class:`~tangl.core.Snapshot` provide reliable state reconstruction.
-   - :mod:`~tangl.vm.replay.watched_proxy` instruments entities/registries (event-sourced mutation capture).
-   - Canonicalization produces stable, minimal patch deltas for deterministic replay.
+4. Replay artifacts
+
+   - :class:`Event`, :class:`Patch`, :class:`StepRecord`,
+     :class:`CheckpointRecord` provide deterministic replay and rollback
+     primitives.
 
 Design intent
 -------------
-`tangl.vm` orchestrates how story graphs evolve during resolution. It defines the
-execution semantics—phases, handlers, planning, and event replay—without imposing
-any narrative or domain-specific content. VM code depends only on :mod:`tangl.core`
-(and lightweight utils).
-
-Notes
------
-*Design note:* `vm` uses dataclasses for ephemeral execution (`Frame`, `Context`) and Pydantic models for persisted artifacts (`Ledger`, `Event`, `Patch`, Receipts).
+`vm38` defines deterministic execution mechanics and contracts while remaining
+policy-agnostic about story/domain semantics, which belong in higher layers.
 """
 
-# Event sourced state manager
-from .replay import Event, EventType, EventWatcher, Patch
-
-# Resolution step
+# Provides:
+# - stable names for phase bus stages
 from .resolution_phase import ResolutionPhase
-from .context import Context
-from .frame import Frame, ChoiceEdge, StackFrame
-from .stack_snapshot import StackSnapshot
-from .ledger import Ledger
-from .traversal import (
-    TraversableSubgraph,
-    get_visit_count,
-    is_first_visit,
-    steps_since_last_visit,
-    is_self_loop,
-    in_subroutine,
-    get_caller_frame,
-    get_call_depth,
-    get_root_caller,
-)
 
-# Dispatch
-from .dispatch import vm_dispatch
-
-# Provisioning
+# Provides:
+# - requirements/providers
+# - resolution
+# - frontier planning
 from .provision import (
-    Requirement,
-    Provisioner,
-    GraphProvisioner,
-    TemplateProvisioner,
-    UpdatingProvisioner,
-    CloningProvisioner,
-    CompanionProvisioner,
-    Dependency,
     Affordance,
-    ProvisioningPolicy,
+    Blocker,
+    Dependency,
+    StubProvisioner,
+    FindProvisioner,
+    HasRequirement,
+    InlineTemplateProvisioner,
+    Provisioner,
     ProvisionOffer,
-    DependencyOffer,
-    AffordanceOffer,
-    ProvisionCost,
-    BuildReceipt,
-    PlanningReceipt,
+    ProvisionPolicy,
+    Requirement,
+    Resolver,
+    TemplateProvisioner,
+    TokenProvisioner,
+    UpdateCloneProvisioner,
+    ViabilityResult,
+    CloneProvisioner,
 )
-from .debug import PlanningDebugger
 
-Offer = ProvisionOffer
+# Provides:
+# - cursor traversal rules
+from .traversable import (
+    TraversableEdge,
+    TraversableNode,
+    AnonymousEdge,
+    assert_traversal_contracts,
+    validate_traversal_contracts,
+)
+from .traversal import (
+    count_turns,
+    get_call_depth,
+    get_visit_count,
+    in_subroutine,
+    is_first_visit,
+    is_self_loop,
+    steps_since_last_visit,
+)
+
+# Provides:
+# - phase bus
+# - serializable graph with state and trace artifacts
+# - jump and return stack
+from .runtime import Frame, Ledger
+
+# Provides:
+# - journal fragment records
+from .fragments import Fragment
+from .replay import Event, Patch
+
+# Provides:
+# - phase bus hooks
+from .dispatch import (
+    do_get_template_scope_groups,
+    do_get_token_catalogs,
+    on_get_template_scope_groups,
+    on_get_token_catalogs,
+    on_finalize,
+    on_gather_ns,
+    on_journal,
+    on_postreqs,
+    on_prereqs,
+    on_provision,
+    on_resolve,
+    on_update,
+    on_validate,
+)
+from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
+from . import system_handlers  # noqa: F401  # register default vm38 hooks
+from tangl.core import CallReceipt as BuildReceipt, Record as PlanningReceipt
+
 
 __all__ = [
-    # events/replay
-    "Event",
-    "EventType",
-    "Patch",
-    # resolution
-    "Frame",
-    "ChoiceEdge",
-    "StackFrame",
-    "StackSnapshot",
-    "ResolutionPhase",
-    "Ledger",
-    "Context",
-    "TraversableSubgraph",
-    "get_visit_count",
-    "is_first_visit",
-    "steps_since_last_visit",
-    "is_self_loop",
-    "in_subroutine",
-    "get_caller_frame",
-    "get_call_depth",
-    "get_root_caller",
-    # dispatch
-    "vm_dispatch",
-    # planning
-    "Requirement",
-    "Provisioner",
-    "GraphProvisioner",
-    "TemplateProvisioner",
-    "UpdatingProvisioner",
-    "CloningProvisioner",
-    "CompanionProvisioner",
-    "Dependency",
     "Affordance",
-    "ProvisioningPolicy",
-    "Offer",
+    "AnonymousEdge",
+    "Blocker",
+    "Dependency",
+    "StubProvisioner",
+    "FindProvisioner",
+    "Frame",
+    "Fragment",
+    "HasRequirement",
+    "InlineTemplateProvisioner",
+    "Ledger",
+    "Provisioner",
     "ProvisionOffer",
-    "DependencyOffer",
-    "AffordanceOffer",
-    "ProvisionCost",
+    "ProvisionPolicy",
+    "ProvisioningPolicy",
+    "Requirement",
+    "ResolutionPhase",
+    "Resolver",
+    "TemplateProvisioner",
+    "TokenProvisioner",
+    "UpdateCloneProvisioner",
+    "ViabilityResult",
+    "CloneProvisioner",
+    "TraversableEdge",
+    "TraversableNode",
+    "Patch",
+    "Event",
     "BuildReceipt",
+    "ChoiceEdge",
+    "Context",
     "PlanningReceipt",
-    "PlanningDebugger",
+    "count_turns",
+    "get_call_depth",
+    "get_visit_count",
+    "in_subroutine",
+    "is_first_visit",
+    "is_self_loop",
+    "assert_traversal_contracts",
+    "on_finalize",
+    "on_gather_ns",
+    "on_get_template_scope_groups",
+    "on_get_token_catalogs",
+    "on_journal",
+    "on_postreqs",
+    "on_prereqs",
+    "on_provision",
+    "on_resolve",
+    "on_update",
+    "on_validate",
+    "do_get_template_scope_groups",
+    "do_get_token_catalogs",
+    "steps_since_last_visit",
+    "validate_traversal_contracts",
+    "VmDispatchCtx",
+    "VmPhaseCtx",
+    "VmResolverCtx",
 ]
+
+
+# Compatibility aliases retained during namespace cutover.
+ChoiceEdge = TraversableEdge
+Context = VmPhaseCtx
+ProvisioningPolicy = ProvisionPolicy

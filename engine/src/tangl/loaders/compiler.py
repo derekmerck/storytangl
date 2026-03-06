@@ -1,14 +1,59 @@
 from __future__ import annotations
 
+import importlib
 import sys
 from typing import Any
 
-from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
-from tangl.story38.fabula import StoryCompiler38, World38
+from tangl.story.fabula import StoryCompiler, World
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
+
+
+class _WorldDomainFacet:
+    """Lightweight world-domain facet for runtime-38 world assembly."""
+
+    def __init__(self) -> None:
+        from tangl.core import BehaviorRegistry
+
+        self.dispatch_registry = BehaviorRegistry(label="world_domain_dispatch")
+        self._authorities: list[Any] = [self.dispatch_registry]
+        self.modules: list[Any] = []
+        self.class_registry: dict[str, Any] = {}
+
+    def load_domain_module(self, domain_module: str) -> None:
+        module = importlib.import_module(domain_module)
+        self.modules.append(module)
+
+        get_authorities = getattr(module, "get_authorities", None)
+        if callable(get_authorities):
+            for authority in get_authorities() or ():
+                if authority not in self._authorities:
+                    self._authorities.append(authority)
+
+        try:
+            from tangl.core import Entity
+        except Exception:
+            Entity = object  # type: ignore[assignment]
+
+        for name, value in vars(module).items():
+            if not isinstance(value, type):
+                continue
+            if value is Entity:
+                continue
+            if issubclass(value, Entity):
+                self.class_registry[name] = value
+
+    def get_authorities(self) -> list[Any]:
+        return list(self._authorities)
+
+
+class _WorldAssetsFacet:
+    """Lightweight assets facet placeholder for runtime-38 world assembly."""
+
+    def __init__(self) -> None:
+        self.values: dict[str, Any] = {}
 
 
 class WorldCompiler:
@@ -20,23 +65,31 @@ class WorldCompiler:
         asset_compiler: AssetCompiler | None = None,
         domain_compiler: DomainCompiler | None = None,
         media_compiler: MediaCompiler | None = None,
-        story38_compiler: StoryCompiler38 | None = None,
+        story_compiler: StoryCompiler | None = None,
         codec_registry: CodecRegistry | None = None,
     ) -> None:
         self.script_compiler = script_compiler or ScriptCompiler()
         self.asset_compiler = asset_compiler or AssetCompiler()
         self.domain_compiler = domain_compiler or DomainCompiler()
         self.media_compiler = media_compiler or MediaCompiler()
-        self.story38_compiler = story38_compiler or StoryCompiler38()
+        self.story_compiler = story_compiler or StoryCompiler()
         self.codec_registry = codec_registry or CodecRegistry()
+
+    @staticmethod
+    def _require_runtime38(runtime_version: str) -> None:
+        if runtime_version != "38":
+            raise ValueError(
+                "Only runtime_version='38' is supported after legacy runtime retirement."
+            )
 
     def compile(
         self,
         bundle: WorldBundle,
         story_key: str | None = None,
         *,
-        runtime_version: str = "37",
-    ) -> World | World38:
+        runtime_version: str = "38",
+    ) -> World:
+        self._require_runtime38(runtime_version)
         base_metadata = bundle.manifest.metadata.copy()
 
         decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
@@ -56,88 +109,43 @@ class WorldCompiler:
             default_title = bundle.manifest.story_label(story_key)
         script_metadata.setdefault("title", default_title)
 
-        if runtime_version == "38":
-            domain_facet, assets_facet, resources_facet = self._build_world38_facets(bundle)
-            story38_bundle = self.story38_compiler.compile(
-                script_data,
-                source_map=decode_result.source_map,
-                codec_state=decode_result.codec_state,
-                codec_id=codec_id,
-            )
-            world38 = World38(
-                label=bundle.manifest.story_label(story_key),
-                bundle=story38_bundle,
-                domain=domain_facet,
-                templates=story38_bundle.template_registry,
-                assets=assets_facet,
-                resources=resources_facet,
-            )
-            return world38
-
-        script_manager = self.script_compiler.compile(script_data)
-
-        domain_manager = DomainManager()
-        domain_module = self._get_domain_module(bundle)
-        if domain_module:
-            self.domain_compiler.load_into(domain_module, domain_manager)
-
-        asset_manager = AssetManager()
-        self.asset_compiler.setup_defaults(asset_manager)
-
-        resource_manager = self.media_compiler.index(
-            bundle.media_dir,
-            organization_hints=bundle.manifest.media_organization,
+        domain_facet, assets_facet, resources_facet = self._build_world38_facets(bundle)
+        story_bundle = self.story_compiler.compile(
+            script_data,
+            source_map=decode_result.source_map,
+            codec_state=decode_result.codec_state,
+            codec_id=codec_id,
         )
-
-        world_metadata = base_metadata.copy()
-        world_metadata.update(script_manager.get_story_metadata())
-
         world = World(
             label=bundle.manifest.story_label(story_key),
-            script_manager=script_manager,
-            domain_manager=domain_manager,
-            asset_manager=asset_manager,
-            resource_manager=resource_manager,
-            metadata=world_metadata,
+            bundle=story_bundle,
+            domain=domain_facet,
+            templates=story_bundle.template_registry,
+            assets=assets_facet,
+            resources=resources_facet,
         )
-        world._bundle = bundle  # noqa: SLF001
         return world
 
     def compile_anthology(
         self,
         bundle: WorldBundle,
         *,
-        runtime_version: str = "37",
-    ) -> dict[str, World | World38]:
+        runtime_version: str = "38",
+    ) -> dict[str, World]:
+        self._require_runtime38(runtime_version)
         if not bundle.manifest.is_anthology:
             msg = f"{bundle.manifest.label} is not an anthology"
             raise ValueError(msg)
 
         base_metadata = bundle.manifest.metadata.copy()
 
-        domain_manager: DomainManager | None = None
-        resource_manager = None
-        world38_domain_facet = None
-        world38_assets_facet = None
-        world38_resources_facet = None
-        if runtime_version == "38":
-            (
-                world38_domain_facet,
-                world38_assets_facet,
-                world38_resources_facet,
-            ) = self._build_world38_facets(bundle)
-        else:
-            domain_manager = DomainManager()
-            domain_module = self._get_domain_module(bundle)
-            if domain_module:
-                self.domain_compiler.load_into(domain_module, domain_manager)
+        (
+            world38_domain_facet,
+            world38_assets_facet,
+            world38_resources_facet,
+        ) = self._build_world38_facets(bundle)
 
-            resource_manager = self.media_compiler.index(
-                bundle.media_dir,
-                organization_hints=bundle.manifest.media_organization,
-            )
-
-        worlds: dict[str, World | World38] = {}
+        worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
             decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
             script_data = decode_result.story_data
@@ -156,39 +164,20 @@ class WorldCompiler:
                 default_title = bundle.manifest.story_label(story_key)
             script_metadata.setdefault("title", default_title)
 
-            if runtime_version == "38":
-                story38_bundle = self.story38_compiler.compile(
-                    script_data,
-                    source_map=decode_result.source_map,
-                    codec_state=decode_result.codec_state,
-                    codec_id=codec_id,
-                )
-                worlds[story_key] = World38(
-                    label=bundle.manifest.story_label(story_key),
-                    bundle=story38_bundle,
-                    domain=world38_domain_facet,
-                    templates=story38_bundle.template_registry,
-                    assets=world38_assets_facet,
-                    resources=world38_resources_facet,
-                )
-                continue
-
-            script_manager = self.script_compiler.compile(script_data)
-            asset_manager = AssetManager()
-            self.asset_compiler.setup_defaults(asset_manager)
-
-            world_metadata = base_metadata.copy()
-            world_metadata.update(script_manager.get_story_metadata())
-
+            story_bundle = self.story_compiler.compile(
+                script_data,
+                source_map=decode_result.source_map,
+                codec_state=decode_result.codec_state,
+                codec_id=codec_id,
+            )
             world = World(
                 label=bundle.manifest.story_label(story_key),
-                script_manager=script_manager,
-                domain_manager=domain_manager,
-                asset_manager=asset_manager,
-                resource_manager=resource_manager,
-                metadata=world_metadata,
+                bundle=story_bundle,
+                domain=world38_domain_facet,
+                templates=story_bundle.template_registry,
+                assets=world38_assets_facet,
+                resources=world38_resources_facet,
             )
-            world._bundle = bundle  # noqa: SLF001
             worlds[story_key] = world
 
         return worlds
@@ -196,15 +185,14 @@ class WorldCompiler:
     def _build_world38_facets(
         self,
         bundle: WorldBundle,
-    ) -> tuple[DomainManager | None, AssetManager, Any]:
-        domain_facet: DomainManager | None = None
+    ) -> tuple[Any | None, Any | None, Any]:
+        domain_facet: Any | None = None
         domain_module = self._get_domain_module(bundle)
         if domain_module:
-            domain_facet = DomainManager()
+            domain_facet = _WorldDomainFacet()
             self.domain_compiler.load_into(domain_module, domain_facet)
 
-        assets_facet = AssetManager()
-        self.asset_compiler.setup_defaults(assets_facet)
+        assets_facet: Any | None = _WorldAssetsFacet()
 
         resources_facet = self.media_compiler.index(
             bundle.media_dir,

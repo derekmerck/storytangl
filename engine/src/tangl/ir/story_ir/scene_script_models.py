@@ -136,7 +136,7 @@ class ActionScript(BaseScriptItem):
 
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
-        from tangl.story.episode import Action
+        from tangl.story import Action
         return Action
 
     text: Optional[str] = Field(
@@ -209,7 +209,7 @@ class BlockScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.episode import Block
+        from tangl.story import Block
         return Block
 
     media: list[MediaItemScript] | None = None
@@ -267,7 +267,7 @@ class SceneScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.episode import Scene
+        from tangl.story import Scene
         return Scene
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")

@@ -1,10 +1,10 @@
-"""Tests for ``tangl.vm38.traversal`` — pure cursor history and call stack queries."""
+"""Tests for ``tangl.vm.traversal`` — pure cursor history and call stack queries."""
 
 from __future__ import annotations
 
 from uuid import uuid4
 
-from tangl.vm38.traversal import (
+from tangl.vm.traversal import (
     count_turns,
     get_call_depth,
     get_round,

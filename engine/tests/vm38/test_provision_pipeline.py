@@ -27,13 +27,13 @@ from typing import Callable, Iterator
 
 import pytest
 
-from tangl.core38 import Entity, EntityTemplate, Graph, Registry, RegistryAware, TemplateRegistry
-from tangl.vm38.dispatch import (
+from tangl.core import Entity, EntityTemplate, Graph, Registry, RegistryAware, TemplateRegistry
+from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     do_provision,
     on_provision,
 )
-from tangl.vm38.provision import (
+from tangl.vm.provision import (
     Affordance,
     Dependency,
     InlineTemplateProvisioner,
@@ -41,8 +41,8 @@ from tangl.vm38.provision import (
     Requirement,
     Resolver,
 )
-from tangl.vm38.traversable import TraversableNode
-from tangl.core38.runtime_op import Predicate
+from tangl.vm.traversable import TraversableNode
+from tangl.core.runtime_op import Predicate
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ class TestAvailabilityGating:
 
     def test_satisfied_dep_in_ns_via_contribute_deps(self) -> None:
         """Once resolved, satisfied dep appears in namespace via contribute_satisfied_deps."""
-        import tangl.vm38.system_handlers as sh
+        import tangl.vm.system_handlers as sh
 
         g = Graph()
         frontier = TraversableNode(label="frontier", registry=g)
@@ -305,8 +305,8 @@ class TestDispatchIntegration:
         self, clean_vm_dispatch
     ) -> None:
         """A registered on_provision handler is called when frame runs PLANNING."""
-        from tangl.vm38.runtime.frame import Frame
-        from tangl.vm38.traversable import TraversableEdge
+        from tangl.vm.runtime.frame import Frame
+        from tangl.vm.traversable import TraversableEdge
 
         g = Graph()
         a = TraversableNode(label="a", registry=g)
@@ -323,8 +323,8 @@ class TestDispatchIntegration:
             return None
 
         # Also register validate_successor_exists so traversal doesn't fail
-        from tangl.vm38.dispatch import on_validate
-        import tangl.vm38.system_handlers as sh
+        from tangl.vm.dispatch import on_validate
+        import tangl.vm.system_handlers as sh
         on_validate(sh.validate_successor_exists)
 
         with _cleanup_behaviors(record_provision, sh.validate_successor_exists):
@@ -337,10 +337,10 @@ class TestDispatchIntegration:
         self, clean_vm_dispatch
     ) -> None:
         """A planning handler that materializes resources is side-effect-only."""
-        from tangl.vm38.runtime.frame import Frame
-        from tangl.vm38.traversable import TraversableEdge
-        from tangl.vm38.dispatch import on_validate
-        import tangl.vm38.system_handlers as sh
+        from tangl.vm.runtime.frame import Frame
+        from tangl.vm.traversable import TraversableEdge
+        from tangl.vm.dispatch import on_validate
+        import tangl.vm.system_handlers as sh
 
         g = Graph()
         a = TraversableNode(label="a", registry=g)
@@ -491,10 +491,10 @@ class TestFullPipelineRoundTrip:
         self, clean_vm_dispatch
     ) -> None:
         """When on_provision handler wires a Resolver, dep is satisfied by PLANNING."""
-        from tangl.vm38.runtime.frame import Frame
-        from tangl.vm38.traversable import TraversableEdge
-        from tangl.vm38.dispatch import on_validate
-        import tangl.vm38.system_handlers as sh
+        from tangl.vm.runtime.frame import Frame
+        from tangl.vm.traversable import TraversableEdge
+        from tangl.vm.dispatch import on_validate
+        import tangl.vm.system_handlers as sh
 
         g = Graph()
         a = TraversableNode(label="a", registry=g)

@@ -1,10 +1,10 @@
-"""Contract tests for ``tangl.core38.behavior.CallReceipt``."""
+"""Contract tests for ``tangl.core.behavior.CallReceipt``."""
 
 from __future__ import annotations
 
 import pytest
 
-from tangl.core38.behavior import AggregationMode, CallReceipt
+from tangl.core.behavior import AggregationMode, CallReceipt
 
 
 class TestCallReceiptResolve:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from tangl.core38 import Graph
-from tangl.vm38.replay import Event, OpEnum, Patch
-from tangl.vm38.traversable import TraversableNode
+from tangl.core import Graph
+from tangl.vm.replay import Event, OpEnum, Patch
+from tangl.vm.traversable import TraversableNode
 
 
 def test_patch_apply_to_updates_graph_entity() -> None:

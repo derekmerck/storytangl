@@ -7,15 +7,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import (
-    get_service_adapter38,
-    get_user_locks38,
-    resolve_user_auth38,
+from tangl.rest.dependencies_gateway import (
+    get_service_adapter,
+    get_user_locks,
+    resolve_user_auth,
 )
 from tangl.service.exceptions import AccessDeniedError
-from tangl.service.response.info_response import UserInfo
-from tangl.service.response.info_response.user_info import UserSecret
-from tangl.service38 import GatewayRestAdapter38, ServiceOperation38, UserAuthInfo
+from tangl.service import GatewayRestAdapter, ServiceOperation, UserAuthInfo
+from tangl.service.response import UserInfo, UserSecret
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -24,8 +23,8 @@ router = APIRouter(tags=["User"])
 
 
 def _call(
-    adapter: GatewayRestAdapter38,
-    operation: ServiceOperation38,
+    adapter: GatewayRestAdapter,
+    operation: ServiceOperation,
     /,
     *,
     user_id: UUID | None = None,
@@ -47,16 +46,16 @@ def _call(
 
 @router.get("/info")
 async def get_user_info(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserInfo:
     """Return profile information for the authenticated user."""
 
-    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key, adapter=adapter)
     return _call(
         adapter,
-        ServiceOperation38.USER_INFO,
+        ServiceOperation.USER_INFO,
         user_id=user_auth.user_id,
         user_auth=user_auth,
         render_profile=render_profile,
@@ -65,7 +64,7 @@ async def get_user_info(
 
 @router.post("/create")
 async def create_user(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
@@ -73,7 +72,7 @@ async def create_user(
 
     user = _call(
         adapter,
-        ServiceOperation38.USER_CREATE,
+        ServiceOperation.USER_CREATE,
         render_profile=render_profile,
         secret=secret,
     )
@@ -87,7 +86,7 @@ async def create_user(
         raise HTTPException(status_code=500, detail="Failed to create user")
     api_info = _call(
         adapter,
-        ServiceOperation38.USER_KEY,
+        ServiceOperation.USER_KEY,
         render_profile=render_profile,
         secret=secret,
     )
@@ -104,19 +103,19 @@ async def set_user_world():
 
 @router.put("/secret")
 async def update_user_secret(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
-    user_locks = Depends(get_user_locks38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
+    user_locks = Depends(get_user_locks),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Update the secret for the authenticated user and surface the new API key."""
 
-    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key, adapter=adapter)
     async with user_locks[user_auth.user_id]:
         info = _call(
             adapter,
-            ServiceOperation38.USER_UPDATE,
+            ServiceOperation.USER_UPDATE,
             user_id=user_auth.user_id,
             user_auth=user_auth,
             render_profile=render_profile,
@@ -135,16 +134,16 @@ async def update_user_secret(
 
 @router.delete("/drop")
 async def drop_user(
-    adapter: GatewayRestAdapter38 = Depends(get_service_adapter38),
+    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Remove the authenticated user and purge persisted resources."""
 
-    user_auth = resolve_user_auth38(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key, adapter=adapter)
     identifiers = _call(
         adapter,
-        ServiceOperation38.USER_DROP,
+        ServiceOperation.USER_DROP,
         user_id=user_auth.user_id,
         user_auth=user_auth,
         render_profile=render_profile,

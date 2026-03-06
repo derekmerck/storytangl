@@ -2,6 +2,7 @@
 from functools import total_ordering
 from typing import Any, Self, Type, Iterator, ClassVar, TypeVar, get_args, get_origin, Union
 import logging
+import importlib
 from uuid import uuid4
 from inspect import isclass
 
@@ -287,6 +288,24 @@ class BaseModelPlus(BaseModel):
         for _cls in cls.__subclasses__():
             if x := _cls.dereference_cls_name(name):
                 return x
+        # Compatibility fallback: resolve dotted paths that haven't been imported
+        # yet into the current subclass graph.
+        if "." in name:
+            parts = name.split(".")
+            for i in range(len(parts) - 1, 0, -1):
+                module_name = ".".join(parts[:i])
+                attr_chain = parts[i:]
+                try:
+                    module = importlib.import_module(module_name)
+                except Exception:
+                    continue
+                candidate = module
+                for attr in attr_chain:
+                    candidate = getattr(candidate, attr, None)
+                    if candidate is None:
+                        break
+                if isclass(candidate) and issubclass(candidate, cls):
+                    return candidate
 
 
 @total_ordering

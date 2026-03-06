@@ -1,13 +1,22 @@
-"""Service-layer controller exports."""
+"""Barrel exports for service controller classes."""
+
 from __future__ import annotations
 
 from .runtime_controller import RuntimeController
-from .world_controller import WorldController
-from .user_controller import ApiKeyInfo, UserController
 from .system_controller import SystemController
+from .user_controller import ApiKeyInfo, UserController
+from .world_controller import WorldController
+
+DEFAULT_CONTROLLERS = (
+    RuntimeController,
+    UserController,
+    SystemController,
+    WorldController,
+)
 
 __all__ = [
     "ApiKeyInfo",
+    "DEFAULT_CONTROLLERS",
     "RuntimeController",
     "SystemController",
     "UserController",

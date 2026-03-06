@@ -1,12 +1,12 @@
-"""Contract tests for ``tangl.core38.selector.Selector``."""
+"""Contract tests for ``tangl.core.selector.Selector``."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from tangl.core38.behavior import Behavior
-from tangl.core38.entity import Entity
-from tangl.core38.selector import Selector
+from tangl.core.behavior import Behavior
+from tangl.core.entity import Entity
+from tangl.core.selector import Selector
 
 
 class ReversibleEntity(Entity):

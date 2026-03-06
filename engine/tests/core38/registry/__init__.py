@@ -1,1 +1,1 @@
-"""Tests for ``tangl.core38.registry``."""
+"""Tests for ``tangl.core.registry``."""

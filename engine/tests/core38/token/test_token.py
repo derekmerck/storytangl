@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.token``."""
+"""Contract tests for ``tangl.core.token``."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from typing import TypeVar
 import pytest
 from pydantic import ValidationError
 
-from tangl.core38.entity import Entity
-from tangl.core38.graph import Graph, GraphItem, HierarchicalNode, Node
-from tangl.core38.selector import Selector
-from tangl.core38.singleton import Singleton
-from tangl.core38.token import Token, TokenCatalog, TokenFactory
+from tangl.core.entity import Entity
+from tangl.core.graph import Graph, GraphItem, HierarchicalNode, Node
+from tangl.core.selector import Selector
+from tangl.core.singleton import Singleton
+from tangl.core.token import Token, TokenCatalog, TokenFactory
 
 from ..conftest import ArmorType, NPCType, WeaponType
 
@@ -49,7 +49,7 @@ class TestTokenClassGeneration:
 
     def test_wrapper_registered_in_module(self) -> None:
         wrapper = Token[WeaponType]
-        assert getattr(__import__("tangl.core38.token", fromlist=[wrapper.__name__]), wrapper.__name__) is wrapper
+        assert getattr(__import__("tangl.core.token", fromlist=[wrapper.__name__]), wrapper.__name__) is wrapper
 
 
 class TestTokenCreation:

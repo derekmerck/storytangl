@@ -36,18 +36,18 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 
 from tangl.config import settings
-from tangl.rest.dependencies38 import get_service_gateway38
+from tangl.rest.dependencies_gateway import get_service_gateway
 from tangl.rest.media_mounts import mount_system_media
-from tangl.service38 import ServiceGateway38, ServiceOperation38
-from tangl.service38.response import RuntimeInfo
+from tangl.service import ServiceGateway, ServiceOperation
+from tangl.service.response import RuntimeInfo
 
 logger = logging.getLogger(__name__)
 
 
 # todo: this is a placeholder that creates a default user for testing
-def get_user_credentials(gateway: ServiceGateway38) -> UUID:
+def get_user_credentials(gateway: ServiceGateway) -> UUID:
     secret = settings.client.secret
-    result = gateway.execute(ServiceOperation38.USER_CREATE, secret=secret)
+    result = gateway.execute(ServiceOperation.USER_CREATE, secret=secret)
 
     user_id: UUID | None = None
     user_obj = None
@@ -72,15 +72,15 @@ def get_user_credentials(gateway: ServiceGateway38) -> UUID:
     if user_id is None:
         raise RuntimeError("Service gateway failed to return a user identifier")
 
-    logger.debug("Created dev user via service38 gateway", extra={"user_id": str(user_id)})
+    logger.debug("Created dev user via service gateway", extra={"user_id": str(user_id)})
     return user_id
 
 
 @asynccontextmanager
 async def _app_lifespan(_: FastAPI):
-    """Run startup initialization for service38-backed REST app."""
+    """Run startup initialization for service-backed REST app."""
     try:
-        get_user_credentials(get_service_gateway38())
+        get_user_credentials(get_service_gateway())
     except Exception:
         logger.exception("Failed to initialize dev user credentials during startup")
         raise

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core38.behavior import BehaviorRegistry, DispatchLayer
-from tangl.core38.dispatch import on_link, on_unlink
-from tangl.core38.graph import Graph
+from tangl.core.behavior import BehaviorRegistry, DispatchLayer
+from tangl.core.dispatch import on_link, on_unlink
+from tangl.core.graph import Graph
 
 
 class TestGraphDispatchHooks:

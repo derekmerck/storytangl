@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.singleton``."""
+"""Contract tests for ``tangl.core.singleton``."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pickle
 import pytest
 from pydantic import Field, ValidationError
 
-from tangl.core38.singleton import InstanceInheritance, Singleton
+from tangl.core.singleton import InstanceInheritance, Singleton
 
 
 class SimpleSingleton(Singleton):

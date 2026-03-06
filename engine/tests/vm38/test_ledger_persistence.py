@@ -6,13 +6,13 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core38 import Graph
+from tangl.core import Graph
 from tangl.persistence import PersistenceManager
 from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.persistence.storage import InMemoryStorage
 from tangl.persistence.structuring import StructuringHandler
 from tangl.service.user.user import User
-from tangl.vm38.runtime.ledger import Ledger as Ledger38
+from tangl.vm.runtime.ledger import Ledger
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +26,7 @@ def test_ledger38_json_round_trip_keeps_user_id_and_excludes_runtime_user() -> N
     graph = Graph()
     start = graph.add_node(label="start")
     user = User(label="vm38-user")
-    ledger = Ledger38.from_graph(graph=graph, entry_id=start.uid)
+    ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
     ledger.user = user
     ledger.user_id = user.uid
 
@@ -44,7 +44,7 @@ def test_ledger38_json_round_trip_keeps_user_id_and_excludes_runtime_user() -> N
     assert "user" not in payload
 
     loaded = manager.get(ledger.uid)
-    assert isinstance(loaded, Ledger38)
+    assert isinstance(loaded, Ledger)
     assert loaded.user is None
     assert loaded.user_id == user.uid
 
@@ -53,7 +53,7 @@ def test_ledger38_unstructure_remains_uuid_coercible_for_user_id() -> None:
     graph = Graph()
     start = graph.add_node(label="start")
     user = User(label="vm38-user")
-    ledger = Ledger38.from_graph(graph=graph, entry_id=start.uid)
+    ledger = Ledger.from_graph(graph=graph, entry_id=start.uid)
     ledger.user = user
     ledger.user_id = user.uid
 

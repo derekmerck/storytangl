@@ -53,6 +53,6 @@ def reset_orchestrator_for_testing() -> None:
     global _orchestrator
     _orchestrator = None
     _user_locks.clear()
-    from tangl.rest.dependencies38 import reset_service_gateway38_for_testing
+    from tangl.rest.dependencies_gateway import reset_service_gateway_for_testing
 
-    reset_service_gateway38_for_testing()
+    reset_service_gateway_for_testing()

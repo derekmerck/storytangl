@@ -2,15 +2,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tangl.journal.media import MediaFragment
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.world_registry import WorldRegistry
-from tangl.story.episode.block import Block
-from tangl.vm import ResolutionPhase as P
-from tangl.vm.context import Context
-from tangl.vm.frame import Frame
+from tangl.story import Block
+from tangl.vm import Context, Frame, ResolutionPhase as P
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Retired from v38 parity gate: this integration depends on legacy v37 "
+        "phase-runner/media-dependency mechanics rather than vm38 contract behavior."
+    )
+)
 
 
 

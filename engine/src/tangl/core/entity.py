@@ -1,237 +1,109 @@
+# tangl/core/entity.py
 from __future__ import annotations
-from uuid import UUID, uuid4
-from typing import Optional, Self, Iterator, Type, Callable, Iterable, TypeAlias, TypeVar
+
 import logging
 from copy import copy
+from typing import Any, Iterable, Iterator, Self
 from enum import Enum
 import re
-from inspect import isclass
 
-from pydantic import BaseModel, Field, field_validator
-import shortuuid
+from pydantic import Field
 
-from tangl.type_hints import StringMap, Tag, Predicate, Identifier, UnstructuredData
-from tangl.utils.hashing import hashing_func
-from tangl.utils.base_model_plus import BaseModelPlus
-from tangl.utils.sanitize_str import sanitize_str
+from tangl.type_hints import StringMap
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
-# match is so noisy that we put it into its own channel
-match_logger = logging.getLogger(__name__ + '.match')
-match_logger.setLevel(logging.WARNING)
+from .bases import HasIdentity, Unstructurable, is_identifier
+from .namespace import HasNamespace
 
-def is_identifier(func: Callable) -> Callable:
-    """Label Entity and subclass methods as providing an identifier for match."""
-    setattr(func, '_is_identifier', True)
-    return func
+match_logger = logging.getLogger(__name__ + ".match")
 
-class Entity(BaseModelPlus):
-    # language=rst
-    """
-    Entity(label: str, tags: set[str])
 
-    Base class for all managed objects in a narrative graph.
+class Entity(Unstructurable, HasIdentity, HasNamespace):
+    """Canonical concrete core entity composed from identity + constructor-form traits.
 
     Why
-    ----
-    Entities abstract identity and comparability across the system. They provide
-    uniform identifiers, search predicates, and serialization. Everything else
-    (graphs, records, handlers) builds on this.
-
-    Key Features
-    ------------
-    * **Identifiers** – Each entity has a UUID plus optional label and tags.
-      Identifiers can be discovered via :meth:`get_identifiers` and matched with
-      :meth:`matches(has_identifier='foo')<matches>`.
-    * **Serialization** – :meth:`structure` and :meth:`unstructure` provide
-      round-trip conversion between entities and dict data.
-    * **Audit tracking** – :attr:`is_dirty` flags non-reproducible mutations
-      for replay validation.
-    * **Search** – Entities can be filtered by arbitrary attribute criteria
-      (e.g. :meth:`registry.find_all(label="scene1", has_tags={"npc"})<Registry.find_all>`).
-
-    API
     ---
-    - :meth:`matches(**criteria)<matches>` – test entity against criteria
-    - :meth:`get_identifiers` – collect all identifiers
-    - :meth:`has_tags` – membership test for tags
-    - :meth:`structure` / :meth:`unstructure` – (de)serialization
+    :class:`Entity` is intentionally minimal. It adds no persistent fields beyond
+    :class:`Unstructurable` and :class:`HasIdentity` and exists mainly to:
 
-    See also
+    - fix the default trait composition order for core entities, and
+    - inject lifecycle dispatch hooks during creation paths.
+
+    Notes
+    -----
+    Inheritance order is ``(Unstructurable, HasNamespace, HasIdentity)``.
+    ``HasNamespace`` adds namespace contribution behavior, while ``__eq__`` still
+    compares by value via :meth:`Unstructurable.eq_by_value`.
+
+    - Two entities with the same ``uid`` but different constructor-form values are
+      not equal under ``==``.
+    - Use :meth:`HasIdentity.eq_by_id` when you need identity-only comparison.
+
+    **Dispatch hook control signal**
+
+    Pass ``_ctx`` to ``__init__`` or :meth:`structure` to activate dispatch hooks.
+    The underscore prefix means this is a control argument and is not stored as model
+    data. If a subclass also has a ``ctx`` data field, both can coexist:
+
+    .. code-block:: python
+
+        CallReceipt(result=5, ctx=context, _ctx=context)
+
+    Example:
+        >>> e = Entity(label="abc")
+        >>> f = Entity(uid=e.uid, label=e.label)
+        >>> e is not f and e.eq_by_value(f) and e == f
+        True
+        >>> e.eq_by_id(f)
+        True
+        >>> g = Entity(uid=e.uid, label="different")
+        >>> e.eq_by_id(g) and e != g
+        True
+
+    See Also
     --------
-    :class:`~tangl.core.entity.Selectable`
-    :class:`~tangl.core.entity.Conditional`
+    :mod:`tangl.core.dispatch`
+        Hook registration and execution behavior.
+    :mod:`tangl.core.ctx`
+        Ambient context helpers for hook propagation.
     """
-    uid: UUID = Field(default_factory=uuid4, json_schema_extra={'is_identifier': True})
-    label: Optional[str] = Field(None, json_schema_extra={'is_identifier': True})
-    tags: set[Tag] = Field(default_factory=set)
-    # tag syntax can be used by the _parser_ as sugar for various attributes
-    # - indicate membership               domain:<foo> or channel:<foo>
-    # - automatically set default values  str=100
-    # - indicate relationships            @other_node.friendship=+10
-    # However, such logic is NOT built into the base functionality
 
-    @field_validator('label', mode="after")
-    @classmethod
-    def _sanitize_label(cls, value):
-        # Any entity may be coerced into a namespace using its label in
-        # the identifier.  It's easiest to just sanitize it when set.
-        if isinstance(value, str):
-            value = sanitize_str(value)
-        return value
+    templ_hash: str | None = None
+    """Optional provenance hash of the template used to materialize this entity."""
 
-    @is_identifier
-    def get_label(self) -> str:
-        return self.label or self.short_uid()
-
-    def matches(self, *, predicate: MatchPredicate = None, **criteria) -> bool:
-        # Callable predicate funcs on self were passed
-        if predicate is not None and not predicate(self):
-            return False
-        for k, v in criteria.items():
-            # Sugar to test individual attributes
-            if not hasattr(self, k):
-                match_logger.debug(f'False: entity {self!r} has no attribute {k}')
-                # Doesn't exist
-                return False
-            item = getattr(self, k)
-            if (k.startswith("has_") or k.startswith("is_")) and callable(item):
-                if not item(v):
-                    # Is it a predicate attrib that returns false, like `has_tags={a,b,c}`?
-                    match_logger.debug(f'False: entity {self!r}.{k}({v}) is False')
-                    return False
-                match_logger.debug(f'True: entity {self!r}.{k}({v}) is True')
-            elif item != v:
-                match_logger.debug(f'False: entity {self!r}.{k} != {v}')
-                # Is it a straight comparison and not equal?
-                return False
-        return True
-
-    @classmethod
-    def filter_by_criteria(cls, values: Iterable[EntityT], **criteria) -> Iterator[EntityT]:
-        return filter(lambda x: x.matches(**criteria), values)
-
-    # Any `has_` methods should not have side effects as they may be called through **criteria args
-
-    def get_identifiers(self) -> set[Identifier]:
-        result = set()
-        for f in self._fields(is_identifier=(True, False)):
-            value = getattr(self, f)
-            if value is not None:
-                if isinstance(value, set):
-                    result.update(value)
-                else:
-                    result.add(value)
-        for cls in self.__class__.__mro__:
-            for ff in cls.__dict__.values():
-                func = None
-                if isinstance(ff, property):
-                    func = ff.fget
-                elif callable(ff):
-                    func = ff
-
-                if func is None or not getattr(func, '_is_identifier', False):
-                    continue
-
-                value = func(self)
-                if value is not None:
-                    if isinstance(value, set):
-                        result.update(value)
-                    else:
-                        result.add(value)
-        return result
-
-    def has_identifier(self, alias: Identifier) -> bool:
-        return alias in self.get_identifiers()
-
-    has_alias = has_identifier
-
-    def has_tags(self, *tags: Tag) -> bool:
-        # Normalize args to set[Tag]
-        if len(tags) == 1 and isinstance(tags[0], set):
-            tags = tags[0]  # already a set of tags
-        else:
-            tags = set(tags)
-        match_logger.debug(f"Comparing query tags {tags} against {self.tags}")
-        # return self._attrib_is_superset_of("tags", *tags)
-        return tags.issubset(self.tags)
-
-    def is_instance(self, obj_cls: type | tuple[type,...]) -> bool:
-        """Return True if self is an instance of the given class (or any class in a tuple)."""
-        if obj_cls is object:
-            match_logger.warning("Matching `is_instance(self, object)`: this is harmless but it always returns True and is almost certainly not what you intended to do.")
+    def is_instance(self, obj_cls: type | tuple[type, ...]) -> bool:
+        """Legacy alias for ``has_kind``."""
         if isinstance(obj_cls, tuple):
-            return all(isclass(c) for c in obj_cls) and isinstance(self, obj_cls)
-        return isclass(obj_cls) and isinstance(self, obj_cls)
+            return all(isinstance(c, type) for c in obj_cls) and isinstance(self, obj_cls)
+        return isinstance(obj_cls, type) and isinstance(self, obj_cls)
 
-    # todo: push this into a pure utility
-    def get_tag_kv(self,
-                   prefix: str | None = None,
-                   enum_type: type | None = None) -> set[Tag]:
-        # actually type hint: -> set[enum_type] if given
-        # language=rst
-        """
-        Extract tag values for a given key prefix and/or enum_type.
-
-        Tags may be:
-        - string key/value pairs like "foo:bar"
-        - enum members
-        - integers (used for quick filters or numeric locals)
-
-        Semantics
-        ---------
-        - At least one of `prefix` or `enum_type` must be provided.
-        - If only `prefix` is given, values are returned as strings
-          (i.e., `enum_type` is effectively `str`).
-        - If `enum_type` is an Enum subclass, matching string tags are
-          converted to that enum and any existing members of that enum
-          in `self.tags` are included.
-        - If `enum_type` is `int`, matching string tags are parsed as ints.
-        - If `enum_type` is `str`, matching string tags are returned as strings.
-        - If `enum_type` is `str` or `int`, a `prefix` is required; otherwise
-          the use is ambiguous and a TypeError is raised.
-
-        Examples
-        --------
-        enum_type=Foo, tags { "foo:bar", Foo.XYZZY } -> { Foo.BAR, Foo.XYZZY }
-        prefix="age", tags { "age:1", "age:2" } -> { "1", "2" }
-        prefix="age", enum_type=int, tags { "age:1", "age:2" } -> { 1, 2 }
-        """
-
+    def get_tag_kv(self, prefix: str | None = None, enum_type: type | None = None) -> set[Any]:
+        """Legacy tag parser for ``key:value`` tags with optional typed coercion."""
         if prefix is None and enum_type is None:
-            raise TypeError(...)
-
+            raise TypeError("Expected at least one of: prefix, enum_type")
         if prefix is None and enum_type in (str, int):
-            raise TypeError(...)
+            raise TypeError("prefix is required when enum_type is str or int")
 
         value_type: type = enum_type or str
-
         regex = None
         if prefix is not None:
-            esc_prefix = re.escape(prefix)
-            regex = re.compile(rf"^{esc_prefix}\W(.*)$")
+            regex = re.compile(rf"^{re.escape(prefix)}\W(.*)$")
 
-        result: set[Tag] = set()
-
+        result: set[Any] = set()
         for tag in self.tags:
-            # Step 1: pull out the "raw" value if we have a prefix
             if regex is not None and isinstance(tag, str):
-                m = regex.match(tag)
-                if not m:
+                match = regex.match(tag)
+                if not match:
                     continue
-                raw: object = m.group(1)
+                raw: object = match.group(1)
             else:
                 raw = tag
-            # Step 2: no enum_type -> just strings
+
             if enum_type is None:
                 if isinstance(raw, str):
                     result.add(raw)
                 continue
 
-            # Step 3: typed conversions
             if issubclass(value_type, Enum):
-                # Let EnumPlusMixin._missing_ do all the cleverness.
                 try:
                     result.add(value_type(raw))
                 except (ValueError, TypeError):
@@ -252,183 +124,84 @@ class Entity(BaseModelPlus):
 
         return result
 
-    @is_identifier
-    def short_uid(self) -> str:
-        return shortuuid.encode(self.uid)
+    def matches(self, *, predicate: Any = None, **criteria: Any) -> bool:
+        """Legacy-compatible criteria matcher."""
+        from .selector import Selector
 
-    is_dirty_: bool = Field(
-        default=False,
-        alias="is_dirty",
-        json_schema_extra={"doc_private": True},
-    )  #: :meta private:
-    # audit indicator that the entity has been tampered with, invalidates certain debugging
+        if predicate is not None and not predicate(self):
+            return False
 
-    @property
-    def is_dirty(self) -> bool:
-        return self.is_dirty_
+        selector_entity = criteria.pop("selector", None)
+        if selector_entity is not None:
+            get_selection_criteria = getattr(self, "get_selection_criteria", None)
+            if callable(get_selection_criteria):
+                if not selector_entity.matches(**get_selection_criteria()):
+                    return False
 
-    def mark_dirty(self, reason: str | None = None) -> None:
-        """Mark this entity as tainted by non-reproducible mutation."""
-        object.__setattr__(self, "is_dirty_", True)
-        if reason:
-            logger.warning("%r marked dirty: %s", self, reason)
+        return Selector(**criteria).matches(self)
 
-    def __repr__(self) -> str:
-        s = self.get_label()
-        return f"<{self.__class__.__name__}:{s}>"
+    def __init__(self, _ctx: Any = None, **kwargs: Any) -> None:
+        """Construct the entity and optionally run ``on_init`` dispatch hooks."""
+        super().__init__(**kwargs)
+        from .ctx import resolve_ctx
 
-    @is_identifier
-    def _id_hash(self) -> bytes:
-        # For persistent id's, use either the uid or a field annotated as UniqueLabel
-        return hashing_func(self.__class__, self.uid)
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is not None:
+            from .dispatch import do_init
 
-    # Entities are mutable, so they generally should not be hashed or used in sets.
-    # Use entity.uid if a hashable identifier is required.
-
-    # def __hash__(self) -> int:
-    #     return hash((self.uid, self.__class__))
-
-    # Let's not use state-hash as an identifier so it isn't called repeatedly
-    def _state_hash(self) -> bytes:
-        # Data thumbprint for auditing
-        state_data = self.unstructure()
-        logger.debug(state_data)
-        return hashing_func(state_data)
+            do_init(caller=self, ctx=_ctx)
 
     @classmethod
-    def structure(cls, data: UnstructuredData) -> Self:
-        """
-        Structure a string-keyed dict of unflattened data into an object of its
-        declared class type.
-        """
-        _data = dict(data)  # local copy
-        obj_cls = _data.pop("obj_cls", cls)
-        # This key _should_ be unflattened by the serializer when necessary,
-        # but if not, we can try to unflatten it as the qualified name against
-        # Entity
-        if isinstance(obj_cls, str):
-            obj_cls = cls.dereference_cls_name(obj_cls)
-        if obj_cls is not cls:
-            # Call the correct class's structure() method without an obj_cls override
-            return obj_cls.structure(_data)
-        return cls(**_data)
+    def structure(cls, data: Any, _ctx: Any = None) -> Self:
+        """Structure from constructor-form data and optionally run ``on_create`` hooks."""
+        from .ctx import resolve_ctx
 
-    def unstructure(self) -> UnstructuredData:
-        return self.model_dump()
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is not None:
+            # chance to modify kind-hint or construction kwargs
+            from .dispatch import do_create
 
-    def model_dump(self, **kwargs) -> UnstructuredData:
-        """
-        Unstructure an object into a string-keyed dict of unflattened data.
-        """
-        kwargs.setdefault("exclude_unset", False)  # too many mutable fields get lost to track
-        kwargs.setdefault("exclude_none", True)
-        kwargs.setdefault("exclude_defaults", True)
-        kwargs.setdefault("by_alias", True)
+            data = do_create(data=data, ctx=_ctx)
+        return super().structure(data)
 
-        # Automatically excludes any fields attrib 'exclude' (Pydantic only, not dataclass)
-        exclude = set(self._fields(serialize=False))
-        if exclude:
-            # logger.debug(f"exclude={exclude}")
-            kwargs.setdefault("exclude", set())
-            kwargs['exclude'].update(exclude)
+    @classmethod
+    def filter_by_criteria(
+        cls,
+        values: Iterable["Entity"],
+        **criteria: Any,
+    ) -> Iterator["Entity"]:
+        """Legacy bridge: accept both legacy ``matches`` and v38 selectors."""
+        from .selector import Selector
 
-        data = super().model_dump(**kwargs)
-        # guard for accidentally excluding uid when excluding unset;
-        # since uid is initially factoried, it is initially considered unset
-        if 'uid' not in data and 'uid' not in kwargs.get('exclude', []):
-            data['uid'] = self.uid
-        if "obj_cls" not in data and 'obj_cls' not in kwargs.get('exclude', []):
-            data["obj_cls"] = self.__class__
-        # The 'obj_cls' key _may_ be flattened by some serializers.
-        # If flattened as qual name, it can be unflattened with
-        # `Entity.dereference_cls_name`
-        return data
+        def _matches(value: Entity) -> bool:
+            if hasattr(value, "matches"):
+                try:
+                    return bool(value.matches(**criteria))
+                except TypeError:
+                    # Fall through to selector semantics if signatures differ.
+                    pass
+            selector = Selector(**criteria)
+            return selector.matches(value)
 
-EntityT = TypeVar('EntityT', bound=Entity)
-MatchPredicate: TypeAlias = Callable[[Entity], bool]
+        return filter(_matches, values)
 
-
-# Extension mixins
 
 class Selectable(Entity):
-    """
-    Selectable(selection_criteria: dict[str, ~typing.Any])
+    """Legacy inverse-matching mixin for published selection criteria."""
 
-    Inverse-matching mixin for publishing selection criteria.
-
-    Why
-    ----
-    Lets providers (domains, templates, handlers) declare what they *satisfy* so a
-    tester entity can call :meth:`Entity.matches` against those criteria.
-
-    Key Features
-    ------------
-    * **Static or dynamic** – override :meth:`get_selection_criteria` to compute
-      criteria from labels/types/state.
-    * **Helpers** – :meth:`satisfies` (entity → criteria) and
-      :meth:`filter_for_selector` (bulk filter).
-
-    Satisfies and filter both take `inline_criteria`, which tests the candidate node directly before checking its selection criteria against the selector.
-
-    API
-    ---
-    - :attr:`selection_criteria` – default criteria dict (may include `predicate`).
-    - :meth:`get_selection_criteria` – return criteria for inverse match.
-    - :meth:`satisfies` – :meth:`selector.matches(**selection_criteria)<matches>` sugar.
-    - :meth:`filter_for_selector` – iterator over values satisfying a selector.
-    """
     selection_criteria: StringMap = Field(default_factory=dict)
-    # include a selection MatchPredicate that will run on the _tester_ with the key
-    # {'predicate': lambda x: True}
-    # If you include a predicate, this becomes a behavior and WILL NOT be serializable
 
     def get_selection_criteria(self) -> StringMap:
-        # override this to create dynamic selections
         return copy(self.selection_criteria)
 
-    def matches(self, *, selector: Entity = None, **inline_criteria) -> bool:
+    def matches(self, *, selector: Entity | None = None, **inline_criteria: Any) -> bool:
         if selector is not None:
-            if not isinstance(selector, Entity):
-                raise TypeError("Selector must be an instance of Entity")
-            if not selector.matches(**self.get_selection_criteria()):
+            selector_matches = getattr(selector, "matches", None)
+            if not callable(selector_matches):
+                raise TypeError("Selector must provide a callable matches(**criteria)")
+            if not selector_matches(**self.get_selection_criteria()):
                 return False
         return super().matches(**inline_criteria)
 
-    def satisfies(self, selector: Entity, **inline_criteria) -> bool:
+    def satisfies(self, selector: Entity, **inline_criteria: Any) -> bool:
         return self.matches(selector=selector, **inline_criteria)
-
-
-# todo: is this a redundancy on Selectable with only the predicate function?
-#       it also duplicates some functionality from `tangl.vm.runtime.has_conditions`,
-#       making it unclear when to use each variant.
-class Conditional(BaseModel):
-    """
-    Conditional(predicate: ~tangl.type_hints.Predicate)
-
-    Lightweight predicate gate for availability checks.
-
-    Why
-    ----
-    Wraps simple predicates so conditionals can be stored, serialized, and
-    evaluated consistently across domains/handlers.
-
-    Key Features
-    ------------
-    * **Callable or string** – call ``predicate(ns)`` or read ``ns[predicate]``
-      when ``predicate`` is a key string.
-    * **Portable** – designed for small lambdas or namespace flags; richer
-      expressions can be layered later.
-
-    API
-    ---
-    - :attr:`predicate` – ``(ns: dict) -> bool`` or namespace key string.
-    - :meth:`available` – evaluate predicate against a namespace.
-    """
-
-    predicate: Predicate = Field(default=lambda x: True)
-
-    def available(self, ns: StringMap) -> bool:
-        if isinstance(self.predicate, str):
-            return bool(ns.get(self.predicate))
-
-        return self.predicate(ns) is True

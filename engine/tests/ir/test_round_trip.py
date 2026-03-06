@@ -7,6 +7,14 @@ import yaml
 from tangl.ir.core_ir import MasterScript, BaseScriptItem
 from tangl.ir.story_ir import StoryScript, SceneScript
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only IR/YAML round-trip shape; v38 parity is validated in core38 template "
+        "compile/decompile and template-registry roundtrip tests."
+    )
+)
+
+
 def dict_compare(d1, d2):
     """Recursively compares two dictionaries and returns the differences."""
     if d1 == d2:
@@ -134,11 +142,11 @@ def test_yaml_story_script_roundtrips():
 
     assert script.scenes['intro'].label == "intro"
     assert isinstance(script.scenes['intro'], SceneScript)
-    from tangl.story.episode import Scene
+    from tangl.story import Scene
     assert script.scenes['intro'].obj_cls_ is None
     assert script.scenes['intro'].obj_cls == Scene
     assert isinstance(script.templates['global_guard'], BaseScriptItem)
-    from tangl.story.concepts.actor import Actor
+    from tangl.story import Actor
     assert script.templates['global_guard'].obj_cls_ == Actor
 
     exported_dict = script.unstructure_as_template()

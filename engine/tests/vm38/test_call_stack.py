@@ -32,16 +32,16 @@ from typing import Callable, Iterator
 
 import pytest
 
-from tangl.core38 import Graph
-from tangl.vm38.dispatch import (
+from tangl.core import Graph
+from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     on_postreqs,
     on_prereqs,
 )
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.runtime.frame import Frame
-from tangl.vm38.runtime.ledger import Ledger
-from tangl.vm38.traversable import (
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import Frame
+from tangl.vm.runtime.ledger import Ledger
+from tangl.vm.traversable import (
     AnonymousEdge,
     TraversableEdge,
     TraversableNode,
@@ -448,7 +448,7 @@ class TestOverflowProtection:
         self, clean_vm_dispatch
     ) -> None:
         """More than MAX_RESOLVE_DEPTH redirects in one resolve_choice raises RecursionError."""
-        from tangl.vm38.runtime.frame import MAX_RESOLVE_DEPTH
+        from tangl.vm.runtime.frame import MAX_RESOLVE_DEPTH
 
         g = Graph()
         nodes = [_node(g, label=f"n{i}") for i in range(MAX_RESOLVE_DEPTH + 5)]
@@ -462,7 +462,7 @@ class TestOverflowProtection:
             )
             for i in range(MAX_RESOLVE_DEPTH + 4)
         ]
-        import tangl.vm38.system_handlers as sh
+        import tangl.vm.system_handlers as sh
 
         on_prereqs(sh.follow_triggered_prereqs)
         with _cleanup_behaviors(sh.follow_triggered_prereqs):

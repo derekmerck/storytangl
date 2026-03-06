@@ -5,8 +5,7 @@ from enum import Enum
 from pydantic import Field, model_validator
 
 from tangl.type_hints import Identifier, UnstructuredData
-from tangl.core.registry import Registry
-from tangl.core.record import BaseFragment
+from tangl.core import BaseFragment, Registry
 
 ControlFragmentType = Literal['update', 'delete']
 

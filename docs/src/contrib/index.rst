@@ -9,6 +9,7 @@ Contribution Guide
    exception_policy
    script_manager_facade_migration
    custom_world_handlers
+   cutover-log
    core38-doc-audit
    vm38-doc-audit
    v38-parity-matrix

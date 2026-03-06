@@ -14,7 +14,7 @@ import random
 from pydantic import Field
 
 from tangl.journal.content import ContentFragment
-from tangl.vm.dispatch import vm_dispatch
+from tangl.vm.dispatch import dispatch as vm38_dispatch
 
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord
@@ -326,20 +326,42 @@ def _round_journal_fragments(
     return fragments
 
 
-@vm_dispatch.register(task="generate_journal", caller=RpsGame)
-def rps_generate_journal(game: RpsGame, *, ctx, **kwargs) -> list[ContentFragment] | None:
+@vm38_dispatch.register(
+    task="generate_journal",
+    wants_caller_kind=RpsGame,
+    wants_exact_kind=False,
+)
+def rps_generate_journal(
+    game: RpsGame | None = None,
+    *,
+    caller: RpsGame | None = None,
+    ctx,
+    **kwargs,
+) -> list[ContentFragment] | None:
     """Generate Rock–Paper–Scissors journal fragments."""
 
+    game = game if isinstance(game, RpsGame) else caller
     if not isinstance(game, RpsGame):
         return None
 
     return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
 
 
-@vm_dispatch.register(task="generate_journal", caller=RpslsGame)
-def rpsls_generate_journal(game: RpslsGame, *, ctx, **kwargs) -> list[ContentFragment] | None:
+@vm38_dispatch.register(
+    task="generate_journal",
+    wants_caller_kind=RpslsGame,
+    wants_exact_kind=False,
+)
+def rpsls_generate_journal(
+    game: RpslsGame | None = None,
+    *,
+    caller: RpslsGame | None = None,
+    ctx,
+    **kwargs,
+) -> list[ContentFragment] | None:
     """Generate Rock–Paper–Scissors–Lizard–Spock journal fragments."""
 
+    game = game if isinstance(game, RpslsGame) else caller
     if not isinstance(game, RpslsGame):
         return None
 

@@ -1,1 +1,1 @@
-"""Tests for ``tangl.core38.singleton``."""
+"""Tests for ``tangl.core.singleton``."""

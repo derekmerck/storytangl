@@ -4,19 +4,19 @@ from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, Field
 
-from tangl.core import Entity
+from tangl.core import Entity, Selector
 
 
 class Slot(BaseModel):
     """Slot(name: str, selection_criteria: dict[str, Any], max_count: int = 1, required: bool = False)
 
-    Container slot that delegates eligibility checks to :meth:`tangl.core.entity.Entity.matches`.
+    Container slot that delegates eligibility checks to
+    :class:`tangl.core.selector.Selector`.
 
     Key Features
     ------------
-    * **Declarative selection** – ``selection_criteria`` mirrors the keyword arguments accepted by
-      :meth:`~tangl.core.entity.Entity.matches`, including ``is_instance``, ``has_tags``,
-      ``predicate``, and direct attribute comparisons.
+    * **Declarative selection** – ``selection_criteria`` mirrors selector criteria such as
+      ``is_instance``, ``has_tags``, ``predicate``, and direct attribute comparisons.
     * **Capacity limits** – ``max_count`` constrains how many components may occupy the slot.
     * **Required slots** – ``required`` marks slots that must be populated during validation.
 
@@ -49,7 +49,8 @@ class Slot(BaseModel):
         """
 
         try:
-            if component.matches(**self.selection_criteria):
+            selector = Selector(**self.selection_criteria)
+            if selector.matches(component):
                 return True, ""
             return False, f"Component doesn't match criteria: {self.selection_criteria}"
         except Exception as exc:  # pragma: no cover - defensive logging

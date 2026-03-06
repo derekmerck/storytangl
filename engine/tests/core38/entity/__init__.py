@@ -1,1 +1,1 @@
-"""Tests for ``tangl.core38.entity``."""
+"""Tests for ``tangl.core.entity``."""

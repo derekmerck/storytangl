@@ -1,7 +1,16 @@
 """Tests for script template path and ancestor tag serialization."""
 
+import pytest
+
 from tangl.ir.story_ir.actor_script_models import ActorScript
 from tangl.ir.story_ir.location_script_models import LocationScript
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only scope/ancestor-tag serialization contract; v38 uses admission_scope "
+        "and does not retain ancestor-tags in core template semantics."
+    )
+)
 
 
 

@@ -1,12 +1,12 @@
-"""Contract tests for ``tangl.vm38.ctx`` protocols."""
+"""Contract tests for ``tangl.vm.ctx`` protocols."""
 
 from __future__ import annotations
 
-from tangl.core38 import Graph
-from tangl.core38.ctx import CoreCtx
-from tangl.vm38.ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
-from tangl.vm38.runtime.frame import PhaseCtx
-from tangl.vm38.traversable import TraversableNode
+from tangl.core import Graph
+from tangl.core.ctx import CoreCtx
+from tangl.vm.ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
+from tangl.vm.runtime.frame import PhaseCtx
+from tangl.vm.traversable import TraversableNode
 
 
 def test_phase_ctx_satisfies_vm_protocols() -> None:
@@ -37,9 +37,9 @@ def test_phase_ctx_exposes_core_meta_surface() -> None:
 
 
 def test_protocol_exports_are_importable_from_vm38_package() -> None:
-    from tangl.vm38 import VmDispatchCtx as _VmDispatchCtx
-    from tangl.vm38 import VmPhaseCtx as _VmPhaseCtx
-    from tangl.vm38 import VmResolverCtx as _VmResolverCtx
+    from tangl.vm import VmDispatchCtx as _VmDispatchCtx
+    from tangl.vm import VmPhaseCtx as _VmPhaseCtx
+    from tangl.vm import VmResolverCtx as _VmResolverCtx
 
     assert _VmDispatchCtx is VmDispatchCtx
     assert _VmResolverCtx is VmResolverCtx

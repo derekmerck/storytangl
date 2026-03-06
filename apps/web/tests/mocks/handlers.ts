@@ -37,7 +37,7 @@ export const handlers = [
     return HttpResponse.json(mockWorldList)
   }),
 
-  http.get(`${apiBase}/story/status`, () => {
+  http.get(`${apiBase}/story/info`, () => {
     return HttpResponse.json(mockStatus)
   }),
 

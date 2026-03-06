@@ -21,17 +21,13 @@ Planning
 .. autoclass:: tangl.vm.Dependency
 .. autoclass:: tangl.vm.Affordance
 .. autoclass:: tangl.vm.Provisioner
-.. autoclass:: tangl.vm.Offer
 .. autoclass:: tangl.vm.ProvisionOffer
-.. autoclass:: tangl.vm.provision.BuildReceipt
-.. autoclass:: tangl.vm.provision.PlanningReceipt
+.. autoclass:: tangl.vm.BuildReceipt
+.. autoclass:: tangl.vm.PlanningReceipt
 
 .. _vm-replay:
 
 Event Sourced Replay
 --------------------
-.. autoclass:: tangl.vm.EventType
 .. autoclass:: tangl.vm.Event
 .. autoclass:: tangl.vm.Patch
-.. autoclass:: tangl.vm.replay.WatchedEntityProxy
-.. autoclass:: tangl.vm.replay.EventWatcher

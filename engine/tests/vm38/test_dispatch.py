@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.dispatch``.
+"""Contract tests for ``tangl.vm.dispatch``.
 
 Organized by concept:
 - Hook registration: on_* decorators
@@ -13,8 +13,8 @@ from contextlib import contextmanager
 
 import pytest
 
-from tangl.core38 import Graph, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
-from tangl.vm38.dispatch import (
+from tangl.core import Graph, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     do_finalize,
     do_gather_ns,
@@ -37,9 +37,9 @@ from tangl.vm38.dispatch import (
     on_update,
     on_validate,
 )
-import tangl.vm38 as vm38_api
-import tangl.vm38.dispatch as vm38_dispatch_api
-from tangl.vm38.traversable import AnonymousEdge, TraversableNode
+import tangl.vm as vm38_api
+import tangl.vm.dispatch as vm38_dispatch_api
+from tangl.vm.traversable import AnonymousEdge, TraversableNode
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:

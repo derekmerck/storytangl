@@ -1,0 +1,57 @@
+# tangl/vm/__init__.py
+"""Provisioning primitives for the planning phase."""
+
+from .asset_provisioner import AssetProvisioner
+from .provisioning_policy import ProvisioningPolicy
+from .requirement import Requirement
+from .provisioner import (
+    Provisioner,
+    GraphProvisioner,
+    TemplateProvisioner,
+    UpdatingProvisioner,
+    CloningProvisioner,
+    CompanionProvisioner,
+)
+from .token_provisioner import TokenProvisioner
+from .open_edge import Dependency, Affordance
+from .offer import (
+    ProvisionCost,
+    ProvisionOffer,
+    DependencyOffer,
+    AffordanceOffer,
+    BuildReceipt,
+    PlanningReceipt,
+)
+from .resolver import (
+    PlannedOffer,
+    ProvisioningContext,
+    ProvisioningPlan,
+    ProvisioningResult,
+    provision_node,
+)
+
+__all__ = [
+    "ProvisioningPolicy",
+    "Requirement",
+    "AssetProvisioner",
+    "Provisioner",
+    "GraphProvisioner",
+    "TemplateProvisioner",
+    "TokenProvisioner",
+    "UpdatingProvisioner",
+    "CloningProvisioner",
+    "CompanionProvisioner",
+    "Dependency",
+    "Affordance",
+    "ProvisionCost",
+    "ProvisionOffer",
+    "DependencyOffer",
+    "AffordanceOffer",
+    "BuildReceipt",
+    "PlanningReceipt",
+    "ProvisioningContext",
+    "PlannedOffer",
+    "ProvisioningPlan",
+    "ProvisioningResult",
+    "provision_node",
+]

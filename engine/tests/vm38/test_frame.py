@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.vm38.runtime.frame``.
+"""Contract tests for ``tangl.vm.runtime.frame``.
 
 Organized by concept:
 - PhaseCtx: namespace caching, registry assembly
@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core38 import (
+from tangl.core import (
     BehaviorRegistry,
     DispatchLayer,
     Graph,
@@ -22,7 +22,7 @@ from tangl.core38 import (
     Record,
     TemplateRegistry,
 )
-from tangl.vm38.dispatch import (
+from tangl.vm.dispatch import (
     on_get_template_scope_groups,
     on_journal,
     on_prereqs,
@@ -30,9 +30,9 @@ from tangl.vm38.dispatch import (
     on_update,
     on_validate,
 )
-from tangl.vm38.resolution_phase import ResolutionPhase
-from tangl.vm38.runtime.frame import Frame, PhaseCtx
-from tangl.vm38.traversable import (
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import Frame, PhaseCtx
+from tangl.vm.traversable import (
     AnonymousEdge,
     TraversableEdge,
     TraversableNode,
@@ -92,7 +92,7 @@ class TestPhaseCtx:
         def _noop(*, caller, ctx, **kw):
             return None
 
-        from tangl.vm38.dispatch import on_gather_ns
+        from tangl.vm.dispatch import on_gather_ns
         @on_gather_ns
         def _locals(*, caller, ctx, **kw):
             if hasattr(caller, "locals") and caller.locals:
@@ -259,7 +259,7 @@ class TestFollowEdge:
         g, [a, b] = _simple_graph("a", "b")
         b.locals = {}
         frame = Frame(graph=g, cursor=a)
-        caplog.set_level(logging.DEBUG, logger="tangl.vm38.runtime.frame")
+        caplog.set_level(logging.DEBUG, logger="tangl.vm.runtime.frame")
 
         frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
 

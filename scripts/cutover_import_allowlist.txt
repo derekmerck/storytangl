@@ -1,0 +1,3 @@
+# path_glob|import_glob
+# Temporary intentional bridges during transition.
+# (none currently)

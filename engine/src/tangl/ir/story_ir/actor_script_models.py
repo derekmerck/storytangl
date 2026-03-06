@@ -17,7 +17,7 @@ class ActorScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.concepts.actor import Actor
+        from tangl.story import Actor
         return Actor
 
     name: Optional[str] = None
@@ -43,7 +43,7 @@ class RoleScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.concepts.actor import Role
+        from tangl.story import Role
         return Role
 
     actor_template: Optional[ActorScript] = Field(None, json_schema_extra={'visit_field': True})
@@ -78,4 +78,3 @@ class RoleScript(BaseScriptItem):
         return self
 
 # class ExtrasScript ... ?
-

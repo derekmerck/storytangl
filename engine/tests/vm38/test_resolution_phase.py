@@ -1,8 +1,8 @@
-"""Contract tests for ``tangl.vm38.resolution_phase``."""
+"""Contract tests for ``tangl.vm.resolution_phase``."""
 
 from __future__ import annotations
 
-from tangl.vm38.resolution_phase import ResolutionPhase
+from tangl.vm.resolution_phase import ResolutionPhase
 
 
 class TestResolutionPhaseOrdering:

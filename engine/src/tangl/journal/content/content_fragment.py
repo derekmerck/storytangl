@@ -4,7 +4,7 @@ from enum import Enum
 
 from pydantic import Field
 
-from tangl.core.record import BaseFragment
+from tangl.core import BaseFragment
 from .presentation_hints import PresentationHints
 
 

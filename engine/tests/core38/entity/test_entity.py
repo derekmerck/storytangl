@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.core38.entity.Entity``."""
+"""Contract tests for ``tangl.core.entity.Entity``."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core38.bases import HasIdentity, Unstructurable
-from tangl.core38.ctx import using_ctx
-from tangl.core38.dispatch import on_create, on_init
-from tangl.core38.entity import Entity
+from tangl.core.bases import HasIdentity, Unstructurable
+from tangl.core.ctx import using_ctx
+from tangl.core.dispatch import on_create, on_init
+from tangl.core.entity import Entity
 
 
 class EntityWithAttrib(Entity):

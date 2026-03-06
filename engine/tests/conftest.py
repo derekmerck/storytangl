@@ -34,7 +34,7 @@ logging.getLogger("markdown_it").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 from tangl.type_hints import StringMap
-from tangl.core.graph import Graph, Node, Subgraph
+from tangl.core import Graph, Node, Subgraph
 
 from pydantic import create_model, Field
 

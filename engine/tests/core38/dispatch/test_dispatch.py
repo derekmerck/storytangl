@@ -1,11 +1,11 @@
-"""Dispatch hook integration tests for ``tangl.core38.dispatch``."""
+"""Dispatch hook integration tests for ``tangl.core.dispatch``."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
 
-from tangl.core38.behavior import BehaviorRegistry, DispatchLayer
-from tangl.core38.dispatch import (
+from tangl.core.behavior import BehaviorRegistry, DispatchLayer
+from tangl.core.dispatch import (
     do_add_item,
     do_create,
     do_get_item,
@@ -15,8 +15,8 @@ from tangl.core38.dispatch import (
     on_get_item,
     on_init,
 )
-from tangl.core38.entity import Entity
-from tangl.core38.registry import Registry
+from tangl.core.entity import Entity
+from tangl.core.registry import Registry
 
 
 class ChildEntity(Entity):

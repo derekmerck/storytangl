@@ -9,13 +9,27 @@ Terminology:
 These tests validate what exists and propose what might be needed.
 """
 from __future__ import annotations
+
 from uuid import UUID
-from dataclasses import dataclass, field
 
-import pytest
+from tangl.core import Graph, OrderedRegistry
+from tangl.vm import Frame, Ledger, TraversableEdge as ChoiceEdge
+from tangl.vm.replay import StepRecord
 
-from tangl.core import Graph, StreamRegistry
-from tangl.vm import Frame, ChoiceEdge, Ledger
+
+def _make_frame(graph: Graph, cursor_id: UUID, records: OrderedRegistry | None = None):
+    cursor = graph.get(cursor_id)
+    kwargs = {"graph": graph, "cursor": cursor}
+    if records is not None:
+        kwargs["output_stream"] = records
+    return Frame(**kwargs)
+
+
+def _make_ledger(graph: Graph, cursor_id: UUID):
+    ledger = Ledger.from_graph(graph=graph, entry_id=cursor_id)
+    if not isinstance(ledger.output_stream, OrderedRegistry):
+        ledger.output_stream = OrderedRegistry()
+    return ledger
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -35,7 +49,7 @@ class TestCurrentStepBehavior:
         ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
         bc = ChoiceEdge(graph=g, source_id=b.uid, destination_id=c.uid)
         
-        frame = Frame(graph=g, cursor_id=a.uid)
+        frame = _make_frame(g, a.uid)
         assert frame.step == 0
         
         frame.follow_edge(ab)
@@ -55,7 +69,7 @@ class TestCurrentStepBehavior:
         ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
         ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
         
-        frame = Frame(graph=g, cursor_id=a.uid)
+        frame = _make_frame(g, a.uid)
         
         frame.follow_edge(ab)  # A → B
         assert frame.step == 1
@@ -73,7 +87,7 @@ class TestCurrentStepBehavior:
         
         loop = ChoiceEdge(graph=g, source_id=node.uid, destination_id=node.uid)
         
-        frame = Frame(graph=g, cursor_id=node.uid)
+        frame = _make_frame(g, node.uid)
         
         for expected_step in range(1, 6):
             frame.follow_edge(loop)
@@ -108,7 +122,7 @@ class TestCursorHistoryProposal:
         ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
         bb = ChoiceEdge(graph=g, source_id=b.uid, destination_id=b.uid)
         
-        frame = Frame(graph=g, cursor_id=a.uid)
+        frame = _make_frame(g, a.uid)
         
         # Manual tracking (would be automated in Frame)
         cursor_history: list[UUID] = [frame.cursor_id]
@@ -152,7 +166,7 @@ class TestCursorHistoryProposal:
         ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
         bb = ChoiceEdge(graph=g, source_id=b.uid, destination_id=b.uid)
         
-        frame = Frame(graph=g, cursor_id=a.uid)
+        frame = _make_frame(g, a.uid)
         cursor_history: list[UUID] = [frame.cursor_id]
         
         frame.follow_edge(ab)
@@ -187,7 +201,7 @@ class TestCursorHistoryProposal:
         to_shrine = ChoiceEdge(graph=g, source_id=start.uid, destination_id=shrine.uid)
         back = ChoiceEdge(graph=g, source_id=shrine.uid, destination_id=start.uid)
         
-        frame = Frame(graph=g, cursor_id=start.uid)
+        frame = _make_frame(g, start.uid)
         cursor_history: list[UUID] = [frame.cursor_id]
         
         def is_first_visit(history: list[UUID]) -> bool:
@@ -241,7 +255,7 @@ class TestGameRoundTracking:
         # Game state (would be in Game entity)
         game_round = 0
         
-        frame = Frame(graph=g, cursor_id=intro.uid)
+        frame = _make_frame(g, intro.uid)
         
         # Step 1: Enter game
         frame.follow_edge(to_game)
@@ -272,7 +286,7 @@ class TestGameRoundTracking:
         play = ChoiceEdge(graph=g, source_id=game.uid, destination_id=game.uid)
         back = ChoiceEdge(graph=g, source_id=game.uid, destination_id=hub.uid)
         
-        frame = Frame(graph=g, cursor_id=hub.uid)
+        frame = _make_frame(g, hub.uid)
         
         # First playthrough
         game_round = 0
@@ -314,7 +328,7 @@ class TestLedgerLevelTracking:
         
         ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
         
-        ledger = Ledger(graph=g, cursor_id=a.uid, records=StreamRegistry())
+        ledger = _make_ledger(g, a.uid)
         ledger.push_snapshot()
         
         assert ledger.step == 0
@@ -342,7 +356,7 @@ class TestLedgerLevelTracking:
         ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
         ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
         
-        ledger = Ledger(graph=g, cursor_id=a.uid, records=StreamRegistry())
+        ledger = _make_ledger(g, a.uid)
         ledger.push_snapshot()
         
         # Proposed: ledger.cursor_history = []
@@ -386,16 +400,12 @@ class TestMarkerBasedRoundTracking:
         node = g.add_node(label="game")
         
         loop = ChoiceEdge(graph=g, source_id=node.uid, destination_id=node.uid)
-        
-        records = StreamRegistry()
-        frame = Frame(graph=g, cursor_id=node.uid, records=records)
-        
-        frame.follow_edge(loop)
-        frame.follow_edge(loop)
-        frame.follow_edge(loop)
-        
-        # Check for step markers
-        step_markers = records.markers['frame']
 
-        # Should have markers for step-0001, step-0002, step-0003
-        assert len(step_markers) >= 3
+        ledger = _make_ledger(g, node.uid)
+        for _ in range(3):
+            ledger.resolve_choice(loop.uid)
+        step_records = [
+            record for record in ledger.output_stream.values()
+            if isinstance(record, StepRecord)
+        ]
+        assert len(step_records) >= 3

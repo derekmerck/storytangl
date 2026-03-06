@@ -24,7 +24,7 @@ class _StubContext:
 
 def test_media_provisioner_creates_media_from_template() -> None:
     registry = MediaResourceRegistry(label="test_media")
-    requirement = Requirement(template={"data": b"sample"}, policy=ProvisioningPolicy.CREATE_TEMPLATE)
+    requirement = Requirement(template={"data": b"sample"}, policy=ProvisioningPolicy.CREATE)
     provisioner = MediaProvisioner(requirement=requirement, registries=[registry])
 
     offers = provisioner.generate_offers(ctx=_StubContext())
