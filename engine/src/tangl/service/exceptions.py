@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 class ServiceError(Exception):
     """Base for service-layer errors that surface as ``RuntimeInfo`` errors."""
 
@@ -28,6 +27,12 @@ class AccessDeniedError(ServiceError):
     """User lacks permission for the requested operation."""
 
     code = "ACCESS_DENIED"
+
+
+class AuthMismatchError(ServiceError):
+    """Provided user context conflicts with authenticated identity."""
+
+    code = "AUTH_MISMATCH"
 
 
 class ValidationError(ServiceError):

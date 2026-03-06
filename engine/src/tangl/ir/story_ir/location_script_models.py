@@ -16,7 +16,7 @@ class LocationScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.concepts.location import Location
+        from tangl.story import Location
         return Location
 
     assets: list[AssetsScript] = None   # assets associated with the loc
@@ -29,7 +29,7 @@ class SettingScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.concepts.location import Setting
+        from tangl.story import Setting
         return Setting
 
     location_template: Optional[LocationScript] = Field(None, json_schema_extra={'visit_field': True})
@@ -63,4 +63,3 @@ class SettingScript(BaseScriptItem):
             raise ValueError(msg)
 
         return self
-

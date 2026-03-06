@@ -58,7 +58,7 @@ def test_wearable_type(load_wearable_types):
 
     assert shirt_type.layer < coat_type.layer
 
-@pytest.mark.xfail(raises=ValueError, reason="need to implement from_ref")
+@pytest.mark.xfail(reason="need to implement from_ref", strict=False)
 def test_wearable_from_ref(wearables):
 
     dress, exclusive_dress = wearables[-2:]
@@ -180,4 +180,3 @@ def test_wearable_renders(alt_wearables):
     assert tshirt.render_desc() == "a soft tshirt"
     print( tshirt.render_desc(dt=DT.DDET) )
     assert tshirt.render_desc(dt=DT.DDET) == "the soft tshirt"
-

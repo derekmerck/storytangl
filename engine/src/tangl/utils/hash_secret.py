@@ -4,13 +4,20 @@ import functools
 import uuid
 
 from tangl.type_hints import Hash
-from tangl.utils.hashing import compute_data_hash
+from tangl.utils.hashing import hashing_func
 
 
 @functools.lru_cache
 def hash_for_secret(secret: str) -> Hash:
     # Hash a secret string with salt into a 16 byte digest
-    return compute_data_hash(secret, digest_size=16)
+    if isinstance(secret, str):
+        secret = secret.encode('utf-8')
+    if not isinstance(secret, bytes):
+        raise TypeError("Secret must be a bytes object")
+    return hashing_func(secret, digest_size=16)
+    # Call the hashing_func directly since compute_data_hash can read
+    # out files and 'secret' could be set to a valid path from user input
+    # return compute_data_hash(secret, digest_size=16)
 
 def uuid_for_secret(secret: str) -> uuid.UUID:
     # Compute a 16-byte uuid from a secret

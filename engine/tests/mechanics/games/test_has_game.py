@@ -6,7 +6,16 @@ from uuid import UUID
 
 from tangl.core import Graph
 from tangl.mechanics.games import Game, GameHandler, GamePhase, RoundResult, HasGame
-from tangl.story.episode import Block
+from tangl.story import Block
+from tangl.vm import ResolutionPhase as P
+
+
+def _add_node(graph: Graph, *, kind, **attrs):
+    return graph.add_node(kind=kind, **attrs)
+
+
+def _edge_available(edge, ns: dict[str, bool]) -> bool:
+    return bool(edge.available(ns=ns))
 
 
 class SampleGame(Game):
@@ -38,7 +47,7 @@ GameBlock.model_rebuild(_types_namespace={"UUID": UUID})
 class TestHasGameFacet:
     def test_game_lazy_initialization(self) -> None:
         graph = Graph(label="test")
-        block = graph.add_node(obj_cls=GameBlock, label="game_block")
+        block = _add_node(graph, kind=GameBlock, label="game_block")
 
         assert block._game is None
 
@@ -48,7 +57,7 @@ class TestHasGameFacet:
 
     def test_handler_lazy_initialization(self) -> None:
         graph = Graph(label="test")
-        block = graph.add_node(obj_cls=GameBlock, label="game_block")
+        block = _add_node(graph, kind=GameBlock, label="game_block")
 
         assert block._game_handler is None
 
@@ -58,7 +67,7 @@ class TestHasGameFacet:
 
     def test_game_state_serialization(self) -> None:
         graph = Graph(label="test")
-        block = graph.add_node(obj_cls=GameBlock, label="game_block")
+        block = _add_node(graph, kind=GameBlock, label="game_block")
 
         _ = block.game
         block.game.phase = GamePhase.READY
@@ -74,7 +83,7 @@ class TestHasGameFacet:
 
     def test_handler_not_serialized(self) -> None:
         graph = Graph(label="test")
-        block = graph.add_node(obj_cls=GameBlock, label="game_block")
+        block = _add_node(graph, kind=GameBlock, label="game_block")
 
         _ = block.game_handler
         data = block.model_dump()
@@ -96,10 +105,8 @@ class TestGameBlockFactory:
         assert hasattr(block, "game_handler")
 
     def test_factory_creates_victory_edge(self) -> None:
-        from tangl.vm.resolution_phase import ResolutionPhase as P
-
         graph = Graph(label="test")
-        victory = graph.add_node(obj_cls=Block, label="victory")
+        victory = _add_node(graph, kind=Block, label="victory")
 
         block = GameBlock.create_game_block(
             graph=graph, victory_dest=victory, label="game"
@@ -109,15 +116,15 @@ class TestGameBlockFactory:
 
         edge = graph.get(block.victory_edge_id)
         assert edge.predicate == "game_won"
-        assert edge.available({"game_won": True}) is True
-        assert edge.available({"game_won": False}) is False
+        assert _edge_available(edge, {"game_won": True}) is True
+        assert _edge_available(edge, {"game_won": False}) is False
         assert edge.source_id == block.uid
         assert edge.destination_id == victory.uid
         assert edge.trigger_phase is P.POSTREQS
 
     def test_factory_creates_defeat_edge(self) -> None:
         graph = Graph(label="test")
-        defeat = graph.add_node(obj_cls=Block, label="defeat")
+        defeat = _add_node(graph, kind=Block, label="defeat")
 
         block = GameBlock.create_game_block(
             graph=graph, defeat_dest=defeat, label="game"
@@ -127,12 +134,12 @@ class TestGameBlockFactory:
 
         edge = graph.get(block.defeat_edge_id)
         assert edge.predicate == "game_lost"
-        assert edge.available({"game_lost": True}) is True
-        assert edge.available({"game_lost": False}) is False
+        assert _edge_available(edge, {"game_lost": True}) is True
+        assert _edge_available(edge, {"game_lost": False}) is False
 
     def test_factory_creates_draw_edge(self) -> None:
         graph = Graph(label="test")
-        draw = graph.add_node(obj_cls=Block, label="draw")
+        draw = _add_node(graph, kind=Block, label="draw")
 
         block = GameBlock.create_game_block(graph=graph, draw_dest=draw, label="game")
 
@@ -140,8 +147,8 @@ class TestGameBlockFactory:
 
         edge = graph.get(block.draw_edge_id)
         assert edge.predicate == "game_draw"
-        assert edge.available({"game_draw": True}) is True
-        assert edge.available({"game_draw": False}) is False
+        assert _edge_available(edge, {"game_draw": True}) is True
+        assert _edge_available(edge, {"game_draw": False}) is False
 
     def test_factory_without_exits(self) -> None:
         graph = Graph(label="test")

@@ -1,5 +1,14 @@
+import pytest
+
 from tangl.ir.core_ir.base_script_model import BaseScriptItem
 # from tangl.ir.story_ir.story_script_models import ScopeSelector
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy-only selection criteria shape (`has_path`/`has_ancestor_tags`); "
+        "v38 scope matching is validated via core38 Template admission_scope tests."
+    )
+)
 
 
 def test_global_template_selection_criteria_empty():

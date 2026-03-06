@@ -1,21 +1,39 @@
 from __future__ import annotations
 
-"""Minimal orchestrator for controller endpoint execution."""
+"""Service orchestrator with strict endpoint binding and policy-aware persistence."""
 
 from dataclasses import dataclass
 import inspect
-from typing import Any, Mapping, MutableMapping, TYPE_CHECKING, Union, get_args, get_origin
+from typing import Any, Iterable, Mapping, MutableMapping, TYPE_CHECKING
 from uuid import UUID
 
-from .api_endpoint import ApiEndpoint, HasApiEndpoints, MethodType, ResponseType
+from pydantic import BaseModel
+
 from tangl.core import BaseFragment
-from tangl.service.exceptions import ServiceError
-from tangl.service.response import InfoModel, NativeResponse, RuntimeInfo
+
+from .api_endpoint import (
+    AccessLevel,
+    ApiEndpoint,
+    EndpointPolicy,
+    HasApiEndpoints,
+    LegacyApiEndpoint,
+    MethodType,
+    PostprocessResult,
+    PreprocessResult,
+    ResourceBinding,
+    ResponseType,
+    WritebackMode,
+)
+from .exceptions import AccessDeniedError, AuthMismatchError, ServiceError
+from .response import (
+    InfoModel,
+    NativeResponse,
+    RuntimeInfo,
+    coerce_runtime_info,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles in type checking only
-    from tangl.vm.frame import Frame
-    from tangl.vm.ledger import Ledger
-    from tangl.service.user.user import User
+    from .auth import UserAuthInfo
 
 
 @dataclass
@@ -26,49 +44,133 @@ class _CacheEntry:
     dirty: bool = False
 
 
+@dataclass(frozen=True)
+class ExecuteOptions:
+    """Per-call execution options for service38 orchestration."""
+
+    writeback_mode: WritebackMode | None = None
+    persist_paths: tuple[str, ...] | None = None
+
+    def as_policy(self) -> EndpointPolicy | None:
+        """Convert options into a policy override object."""
+
+        if self.writeback_mode is None and self.persist_paths is None:
+            return None
+        return EndpointPolicy(
+            writeback_mode=self.writeback_mode or WritebackMode.AUTO,
+            persist_paths=tuple(self.persist_paths or ()),
+        )
+
+
+@dataclass
+class _EndpointBinding:
+    """Internal endpoint binding for orchestrator dispatch."""
+
+    controller: Any
+    endpoint: LegacyApiEndpoint
+    policy: EndpointPolicy
+    hydration_bindings: tuple[ResourceBinding, ...]
+
+
 class Orchestrator:
-    """Coordinates endpoint execution with lightweight resource hydration."""
+    """Coordinates endpoint execution with strict binding and persistence policies."""
 
     def __init__(self, persistence_manager: Any | None = None) -> None:
         self.persistence = persistence_manager
-        self._endpoints: dict[str, tuple[HasApiEndpoints, ApiEndpoint]] = {}
+        self._endpoints: dict[str, _EndpointBinding] = {}
         self._resource_cache: dict[Any, _CacheEntry] = {}
 
-    def register_controller(self, controller: HasApiEndpoints | type[HasApiEndpoints]) -> None:
+    def register_controller(self, controller: "HasApiEndpoints" | type["HasApiEndpoints"]) -> None:
+        """Register controller endpoints for dispatch."""
+
         instance = controller() if inspect.isclass(controller) else controller
         for name, endpoint in instance.get_api_endpoints().items():
             key = f"{instance.__class__.__name__}.{name}"
-            self._endpoints[key] = (instance, endpoint)
+            self._endpoints[key] = _EndpointBinding(
+                controller=instance,
+                endpoint=endpoint,
+                policy=EndpointPolicy.from_endpoint(endpoint),
+                hydration_bindings=self._resolve_hydration_bindings(endpoint),
+            )
+
+    def set_endpoint_policy(
+        self,
+        endpoint_name: str,
+        *,
+        writeback_mode: WritebackMode | None = None,
+        persist_paths: Iterable[str] | None = None,
+    ) -> None:
+        """Override policy for a registered endpoint."""
+
+        binding = self._endpoints.get(endpoint_name)
+        if binding is None:
+            raise KeyError(f"Unknown endpoint: {endpoint_name}")
+
+        base_policy = binding.policy
+        binding.policy = EndpointPolicy(
+            writeback_mode=writeback_mode or base_policy.writeback_mode,
+            persist_paths=tuple(persist_paths) if persist_paths is not None else base_policy.persist_paths,
+        )
 
     def execute(
         self,
         endpoint_name: str,
         *,
         user_id: UUID | None = None,
+        user_auth: "UserAuthInfo | None" = None,
+        exec_options: ExecuteOptions | None = None,
         **params: Any,
     ) -> NativeResponse:
-        if endpoint_name not in self._endpoints:
+        """Execute endpoint with policy semantics."""
+
+        binding = self._endpoints.get(endpoint_name)
+        if binding is None:
             raise KeyError(f"Unknown endpoint: {endpoint_name}")
 
-        controller, endpoint = self._endpoints[endpoint_name]
         self._resource_cache = {}
-        resolved_params = self._hydrate_resources(endpoint, user_id, params)
+        endpoint = binding.endpoint
+        policy_override = exec_options.as_policy() if exec_options is not None else None
+        policy = binding.policy.merged(policy_override)
+
+        resolved_params = self._hydrate_resources(
+            endpoint,
+            binding.hydration_bindings,
+            user_id,
+            params,
+        )
+        self._enforce_access(
+            endpoint=endpoint,
+            endpoint_name=endpoint_name,
+            user_id=user_id,
+            user_auth=user_auth,
+            resolved_params=resolved_params,
+        )
 
         try:
-            result = endpoint(controller, **resolved_params)
+            result = self._invoke_endpoint(binding.controller, endpoint, resolved_params)
+            result = self._normalize_runtime_result(endpoint, result)
             self._validate_response(endpoint, result)
             result = self._handle_result_cleanup(result)
 
-            if endpoint.method_type in {MethodType.CREATE, MethodType.UPDATE, MethodType.DELETE}:
+            persisted_keys: set[Any] = set()
+
+            if self._should_write_back(endpoint.method_type, policy.writeback_mode):
                 for entry in self._resource_cache.values():
                     entry.dirty = True
-                self._write_back_resources()
+                self._write_back_resources(persisted_keys)
             else:
                 self._resource_cache.clear()
+
+            if policy.persist_paths:
+                self._persist_from_paths(result, policy.persist_paths, persisted_keys)
 
             return result
 
         except ServiceError as exc:
+            if isinstance(exc, AccessDeniedError):
+                self._resource_cache.clear()
+                raise
+
             ledger = resolved_params.get("ledger")
             cursor_id = getattr(ledger, "cursor_id", None)
             step = getattr(ledger, "step", None)
@@ -80,55 +182,231 @@ class Orchestrator:
                 step=step,
             )
 
+    def _enforce_access(
+        self,
+        *,
+        endpoint: LegacyApiEndpoint,
+        endpoint_name: str,
+        user_id: UUID | None,
+        user_auth: "UserAuthInfo | None",
+        resolved_params: Mapping[str, Any],
+    ) -> None:
+        if not isinstance(endpoint, ApiEndpoint):
+            return
+
+        required_level = getattr(endpoint, "access_level", AccessLevel.RESTRICTED) or AccessLevel.RESTRICTED
+        caller_level = self._resolve_caller_access_level(
+            user_id=user_id,
+            user_auth=user_auth,
+            resolved_params=resolved_params,
+        )
+        if caller_level < required_level:
+            raise AccessDeniedError(
+                f"Access denied for endpoint '{endpoint_name}' "
+                f"(required={required_level.name}, actual={caller_level.name})"
+            )
+
+    def _resolve_caller_access_level(
+        self,
+        *,
+        user_id: UUID | None,
+        user_auth: "UserAuthInfo | None",
+        resolved_params: Mapping[str, Any],
+    ) -> AccessLevel:
+        if user_auth is not None:
+            if user_id is not None and user_auth.user_id != user_id:
+                raise AuthMismatchError(
+                    f"user_id {user_id} does not match authenticated user {user_auth.user_id}"
+                )
+            return user_auth.access_level
+
+        hydrated_user = self._resolve_hydrated_user(resolved_params=resolved_params, user_id=user_id)
+        if hydrated_user is None:
+            return AccessLevel.PUBLIC
+        if bool(getattr(hydrated_user, "privileged", False)):
+            return AccessLevel.RESTRICTED
+        return AccessLevel.USER
+
+    @staticmethod
+    def _should_write_back(method_type: MethodType, mode: WritebackMode) -> bool:
+        if mode == WritebackMode.ALWAYS:
+            return True
+        if mode == WritebackMode.NEVER:
+            return False
+        return method_type in {MethodType.CREATE, MethodType.UPDATE, MethodType.DELETE}
+
     def _hydrate_resources(
         self,
-        endpoint: ApiEndpoint,
+        endpoint: LegacyApiEndpoint,
+        hydration_bindings: tuple[ResourceBinding, ...],
         user_id: UUID | None,
         params: MutableMapping[str, Any],
     ) -> dict[str, Any]:
         provided = dict(params)
-        signature = inspect.signature(endpoint.func)
-        func_params = {name for name in signature.parameters if name != "self"}
-        resolved = {key: value for key, value in provided.items() if key in func_params}
+        resolved = dict(provided)
 
         explicit_ledger_id = provided.get("ledger_id")
         computed_ledger_id: UUID | None = explicit_ledger_id
         hydrated_ledger: Any | None = resolved.get("ledger") if "ledger" in resolved else None
+        hydrated_user: Any | None = resolved.get("user") if "user" in resolved else None
+        user_required = self._is_binding_required(endpoint, ResourceBinding.USER)
+        ledger_required = self._is_binding_required(endpoint, ResourceBinding.LEDGER)
+        frame_required = self._is_binding_required(endpoint, ResourceBinding.FRAME)
 
-        hints = {k: v for k, v in endpoint.type_hints().items() if k != "return"}
-
-        for name, annotation in hints.items():
-            if name in resolved:
-                continue
-
-            if self._is_user_type(annotation):
-                if user_id is None:
+        if ResourceBinding.USER in hydration_bindings and "user" not in resolved:
+            if user_id is None:
+                if user_required:
                     raise ValueError("user_id is required to hydrate user parameter")
-                resolved[name] = self._get_or_load_user(user_id)
-                continue
+            else:
+                hydrated_user = self._get_or_load_user(user_id)
+                resolved["user"] = hydrated_user
 
-            if self._is_ledger_type(annotation):
-                ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
-                if ledger_id is None:
+        if ResourceBinding.LEDGER in hydration_bindings and "ledger" not in resolved:
+            ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
+            if ledger_id is None:
+                try:
                     ledger_id = self._infer_ledger_id(user_id)
                     computed_ledger_id = ledger_id
+                except ValueError:
+                    if ledger_required:
+                        raise
+                    ledger_id = None
+            if ledger_id is not None:
                 ledger = self._get_or_load_ledger(ledger_id)
                 hydrated_ledger = ledger
-                resolved[name] = ledger
-                continue
+                resolved["ledger"] = ledger
+                hydrated_user = hydrated_user or self._resolve_hydrated_user(
+                    resolved_params=resolved,
+                    user_id=user_id,
+                )
+                if hydrated_user is not None:
+                    self._attach_runtime_user(ledger, hydrated_user)
 
-            if self._is_frame_type(annotation):
-                ledger = hydrated_ledger
-                if ledger is None:
-                    ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
-                    if ledger_id is None:
+        if ResourceBinding.FRAME in hydration_bindings and "frame" not in resolved:
+            ledger = hydrated_ledger or resolved.get("ledger")
+            if ledger is None:
+                ledger_id = explicit_ledger_id if explicit_ledger_id is not None else computed_ledger_id
+                if ledger_id is None:
+                    try:
                         ledger_id = self._infer_ledger_id(user_id)
                         computed_ledger_id = ledger_id
+                    except ValueError:
+                        if frame_required:
+                            raise
+                        ledger_id = None
+                if ledger_id is not None:
                     ledger = self._get_or_load_ledger(ledger_id)
                     hydrated_ledger = ledger
-                resolved[name] = ledger.get_frame()
+            if ledger is not None:
+                hydrated_user = hydrated_user or self._resolve_hydrated_user(
+                    resolved_params=resolved,
+                    user_id=user_id,
+                )
+                if hydrated_user is not None:
+                    self._attach_runtime_user(ledger, hydrated_user)
+                resolved["frame"] = ledger.get_frame()
 
         return resolved
+
+    def _resolve_hydrated_user(
+        self,
+        *,
+        resolved_params: Mapping[str, Any],
+        user_id: UUID | None,
+    ) -> Any | None:
+        user = resolved_params.get("user")
+        if user is not None:
+            return user
+        if user_id is None:
+            return None
+        entry = self._resource_cache.get(user_id)
+        if entry is not None:
+            return entry.resource
+        try:
+            return self._get_or_load_user(user_id)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _attach_runtime_user(ledger: Any, user: Any) -> None:
+        if hasattr(ledger, "user"):
+            setattr(ledger, "user", user)
+
+        user_uid = getattr(user, "uid", None)
+        if user_uid is not None and hasattr(ledger, "user_id"):
+            setattr(ledger, "user_id", user_uid)
+
+    @staticmethod
+    def _is_binding_required(endpoint: LegacyApiEndpoint, binding: ResourceBinding) -> bool:
+        param_name = {
+            ResourceBinding.USER: "user",
+            ResourceBinding.LEDGER: "ledger",
+            ResourceBinding.FRAME: "frame",
+        }[binding]
+
+        parameter = inspect.signature(endpoint.func).parameters.get(param_name)
+        if parameter is None:
+            return False
+        return parameter.default is inspect.Parameter.empty
+
+    def _invoke_endpoint(
+        self,
+        controller: Any,
+        endpoint: LegacyApiEndpoint,
+        params: dict[str, Any],
+    ) -> Any:
+        args: tuple[Any, ...] = (controller,)
+        kwargs: dict[str, Any] = dict(params)
+
+        for pre in endpoint.preprocessors:
+            decision = pre(args, kwargs)
+
+            if isinstance(decision, PreprocessResult):
+                if decision.args is not None:
+                    args = tuple(decision.args)
+                if decision.kwargs is not None:
+                    kwargs = dict(decision.kwargs)
+                if decision.skip_main:
+                    return decision.result
+                continue
+
+            if decision is None:
+                continue
+
+            try:
+                args, kwargs = decision
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    "Preprocessor must return (args, kwargs) or PreprocessResult"
+                ) from exc
+
+        signature = inspect.signature(endpoint.func)
+        internal_params = {"user_id", "ledger_id"}
+        for internal_name in internal_params:
+            if internal_name not in signature.parameters:
+                kwargs.pop(internal_name, None)
+        try:
+            bound = signature.bind(*args, **kwargs)
+        except TypeError as exc:
+            raise TypeError(f"{endpoint.func.__qualname__} argument binding failed: {exc}") from exc
+
+        result = endpoint.func(*bound.args, **bound.kwargs)
+
+        for post in endpoint.postprocessors:
+            decision = post(result)
+
+            if isinstance(decision, PostprocessResult):
+                result = decision.result
+                if decision.stop:
+                    return result
+                continue
+
+            if decision is None:
+                continue
+
+            result = decision
+
+        return result
 
     def _infer_ledger_id(self, user_id: UUID | None) -> UUID:
         if user_id is None:
@@ -167,7 +445,7 @@ class Orchestrator:
         if hasattr(data, "get_frame") and hasattr(data, "unstructure"):
             return data
         if isinstance(data, Mapping):
-            from tangl.vm.ledger import Ledger
+            from tangl.vm.runtime.ledger import Ledger as Ledger
 
             return Ledger.structure(dict(data))
         raise TypeError("Unsupported ledger payload")
@@ -210,8 +488,8 @@ class Orchestrator:
         result["persistence_deleted"] = deleted
         return result
 
-    def _validate_response(self, endpoint: ApiEndpoint, result: Any) -> None:
-        """Ensure controller return type matches the declared :class:`ResponseType`."""
+    def _validate_response(self, endpoint: LegacyApiEndpoint, result: Any) -> None:
+        """Ensure controller return type matches declared response type."""
 
         response_type = getattr(endpoint, "response_type", None)
         if response_type is None:
@@ -230,10 +508,10 @@ class Orchestrator:
                 )
 
         elif response_type == ResponseType.INFO:
-            if not isinstance(result, InfoModel):
+            if not isinstance(result, (InfoModel, BaseModel)):
                 raise TypeError(
                     f"{endpoint.func.__qualname__} declared ResponseType.INFO "
-                    f"but returned {type(result).__name__}, expected InfoModel."
+                    f"but returned {type(result).__name__}, expected InfoModel or BaseModel."
                 )
 
         elif response_type == ResponseType.RUNTIME:
@@ -244,8 +522,16 @@ class Orchestrator:
                 )
 
         elif response_type == ResponseType.MEDIA:
-            # Media validation is deferred until MEDIA endpoints stabilize.
             return
+
+    @staticmethod
+    def _normalize_runtime_result(endpoint: LegacyApiEndpoint, result: Any) -> Any:
+        """Coerce runtime-like payloads onto service38-native ``RuntimeInfo``."""
+
+        response_type = getattr(endpoint, "response_type", None)
+        if response_type != ResponseType.RUNTIME:
+            return result
+        return coerce_runtime_info(result) or result
 
     @staticmethod
     def _update_runtime_details(result: RuntimeInfo, **updates: Any) -> None:
@@ -276,17 +562,55 @@ class Orchestrator:
             except KeyError:
                 return False
 
-    def _write_back_resources(self) -> None:
+    def _write_back_resources(self, persisted_keys: set[Any] | None = None) -> None:
         dirty_items = [entry.resource for entry in self._resource_cache.values() if entry.dirty]
         for resource in dirty_items:
-            self._persist_resource(resource)
+            self._persist_resource(resource, persisted_keys)
         self._resource_cache.clear()
 
-    def _persist_resource(self, resource: Any) -> None:
+    def _persist_resource(self, resource: Any, persisted_keys: set[Any] | None = None) -> None:
         if self.persistence is None:
             return
 
-        self._call_persistence_save(resource)
+        self._call_persistence_save(resource, persisted_keys)
+
+    def _persist_from_paths(
+        self,
+        result: Any,
+        paths: Iterable[str],
+        persisted_keys: set[Any] | None = None,
+    ) -> None:
+        if self.persistence is None:
+            return
+
+        for path in paths:
+            for payload in self._resolve_path_values(result, path):
+                self._persist_resource(payload, persisted_keys)
+
+    def _resolve_path_values(self, root: Any, path: str) -> list[Any]:
+        if not path:
+            return []
+
+        current: Any = root
+        for segment in path.split("."):
+            if current is None:
+                return []
+            if isinstance(current, RuntimeInfo):
+                if segment == "details":
+                    current = dict(current.details or {})
+                else:
+                    current = getattr(current, segment, None)
+                continue
+            if isinstance(current, Mapping):
+                current = current.get(segment)
+                continue
+            current = getattr(current, segment, None)
+
+        if current is None:
+            return []
+        if isinstance(current, (list, tuple, set)):
+            return [item for item in current if item is not None]
+        return [current]
 
     def _fetch_from_persistence(self, identifier: Any) -> Any:
         if self.persistence is None:
@@ -300,40 +624,63 @@ class Orchestrator:
         except KeyError:
             return None
 
-    def _call_persistence_save(self, payload: Any) -> None:
+    def _call_persistence_save(
+        self,
+        payload: Any,
+        persisted_keys: set[Any] | None = None,
+    ) -> None:
+        key = self._persistence_key(payload)
+        if persisted_keys is not None and key is not None and key in persisted_keys:
+            return
+
         saver = getattr(self.persistence, "save", None)
         if callable(saver):
             saver(payload)
+            if persisted_keys is not None and key is not None:
+                persisted_keys.add(key)
             return
 
+        if key is None:
+            raise ValueError("Unable to determine persistence key for payload")
+
+        self.persistence[key] = payload
+        if persisted_keys is not None:
+            persisted_keys.add(key)
+
+    @staticmethod
+    def _persistence_key(payload: Any) -> Any:
         key = getattr(payload, "uid", None)
         if key is None and isinstance(payload, Mapping):
             key = payload.get("uid") or payload.get("ledger_uid")
-        if key is None:
-            raise ValueError("Unable to determine persistence key for payload")
-        self.persistence[key] = payload
+        return key
 
-    def _is_user_type(self, annotation: Any) -> bool:
-        resolved = self._resolve_annotation(annotation)
-        name = getattr(resolved, "__name__", "")
-        return name.endswith("User")
+    @staticmethod
+    def _resolve_hydration_bindings(endpoint: LegacyApiEndpoint) -> tuple[ResourceBinding, ...]:
+        raw_binds = getattr(endpoint, "binds", None)
+        if raw_binds is not None:
+            return tuple(
+                binding
+                if isinstance(binding, ResourceBinding)
+                else ResourceBinding(str(binding).strip().lower())
+                for binding in raw_binds
+            )
 
-    def _is_ledger_type(self, annotation: Any) -> bool:
-        resolved = self._resolve_annotation(annotation)
-        name = getattr(resolved, "__name__", "")
-        return name.endswith("Ledger")
+        # Backward-compatible fallback for legacy endpoints that do not
+        # provide service binding metadata.
+        signature = inspect.signature(endpoint.func)
+        param_names = {name for name in signature.parameters if name != "self"}
+        inferred: list[ResourceBinding] = []
+        for param_name, binding in (
+            ("user", ResourceBinding.USER),
+            ("ledger", ResourceBinding.LEDGER),
+            ("frame", ResourceBinding.FRAME),
+        ):
+            if param_name in param_names:
+                inferred.append(binding)
+        return tuple(inferred)
 
-    def _is_frame_type(self, annotation: Any) -> bool:
-        resolved = self._resolve_annotation(annotation)
-        name = getattr(resolved, "__name__", "")
-        return name.endswith("Frame")
-
-    def _resolve_annotation(self, annotation: Any) -> Any:
-        origin = get_origin(annotation)
-        if origin is None:
-            return annotation
-        if origin is Union:
-            args = [arg for arg in get_args(annotation) if arg is not type(None)]
-            if len(args) == 1:
-                return self._resolve_annotation(args[0])
-        return annotation
+__all__ = [
+    "ExecuteOptions",
+    "Orchestrator",
+    "WritebackMode",
+]

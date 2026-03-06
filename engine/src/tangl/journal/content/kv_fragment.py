@@ -5,7 +5,7 @@ from enum import Enum
 from pydantic import Field
 
 from tangl.utils.ordered_tuple_dict import OrderedTupleDict
-from tangl.core.record import BaseFragment
+from tangl.core import BaseFragment
 
 # todo: OrderedTupleDict should be type OTDict[str, tuple[Primitive, PresentationHints]]
 # todo: implement __get_pydantic_core_schema__ on OTDict so it will get represented properly in dto schema
@@ -25,4 +25,3 @@ class KvFragment(BaseFragment, extra='allow', arbitrary_types_allowed=True):
     content: OrderedTupleDict = Field(...)
 
     # todo: converter from list of annotated items to otd
-

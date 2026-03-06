@@ -1,80 +1,109 @@
-# tangl/vm/replay/patch.py
-# language=rst
-"""
-Replay artifacts: Patch and Snapshot.
-
-A :class:`Patch` is a frozen sequence of canonicalized events that can be
-applied to a registry to reproduce mutations. A :class:`Snapshot` materializes
-a registry's state for fast recovery, trading a bit of storage for speed.
-"""
-from __future__ import annotations
-from typing import Optional, Literal, Iterable, TypeVar, Generic
+from enum import Enum
+from typing import Any
 from uuid import UUID
 
-from pydantic import field_validator
+from pydantic import Field
 
-from tangl.type_hints import Hash
-from tangl.core import Record, Registry, Entity
-from tangl.utils.hashing import hashing_func
-from .event import Event
+from tangl.core import Entity, Graph, Record, Registry
 
-# todo: may want to use different patch formats:
-#       - canonicalized events
-#       - raw event sequence (for audit)
-#       - dict-diff (update delta)
+class OpEnum(Enum):
+    CREATE = "create"
+    READ = "read"  # Unwatched
+    UPDATE = "update"
+    DELETE = "delete"
+
+
+class Event(Record):
+
+    operation: OpEnum
+
+    item_id: UUID | None = None          # entity.uid
+    field: str | None = None             # entity.locals
+    key: str | int | UUID | None = None  # entity.locals[foo] or registry.get(key)
+    value: Any = None             # entity.locals[foo] = bar or registry.add(value)
+
+    prior_value: Any = None
+
+    def apply(self, registry: Registry) -> None:
+        if not isinstance(registry, Registry):
+            raise ValueError(f"Invalid registry type {type(registry)} for patch")
+        item_id = self.item_id
+
+        # MVP replay uses entity-level CRUD deltas.
+        if self.operation == OpEnum.CREATE:
+            value = self.value
+            if isinstance(value, dict):
+                value = Entity.structure(value)
+            if not isinstance(value, Entity):
+                raise ValueError("CREATE event requires entity payload")
+            if item_id is not None and value.uid != item_id:
+                raise ValueError("CREATE event item_id does not match payload uid")
+            registry.add(value)
+            return
+
+        if self.operation == OpEnum.DELETE and item_id is not None and self.field is None:
+            registry.remove(item_id)
+            return
+
+        if self.operation == OpEnum.UPDATE and item_id is not None and self.field is None:
+            value = self.value
+            if isinstance(value, dict):
+                value = Entity.structure(value)
+            if not isinstance(value, Entity):
+                raise ValueError("UPDATE event requires entity payload")
+            if value.uid != item_id:
+                raise ValueError("UPDATE event item_id does not match payload uid")
+            # overwrite by uid while preserving key order
+            registry.add(value)
+            return
+
+        # Backward-compatible narrow field update path.
+        if item_id is None:
+            raise ValueError(f"Invalid event {self!r}: missing item_id")
+        item = registry.get(item_id)
+        if item is None:
+            raise ValueError(f"Invalid event {self!r}: target item not found")
+        if self.key is None and self.field is not None:
+            if self.operation == OpEnum.UPDATE:
+                setattr(item, self.field, self.value)
+                return
+            if self.operation == OpEnum.DELETE:
+                delattr(item, self.field)
+                return
+        raise ValueError(f"Invalid event {self!r} for item {item!r}.")
+
 
 class Patch(Record):
-    # language=rst
-    """
-    Patch(registry_id: UUID | None, registry_state_hash: bytes | None, events: list[Event])
 
-    Frozen record of canonicalized events that can replay mutations on a registry.
+    registry_id: UUID
+    initial_registry_value_hash: bytes
+    final_registry_value_hash: bytes
 
-    Why
-    ----
-    Captures a minimal, replayable history of state changes for a registry or graph.
-    A patch ensures deterministic reconstruction by verifying that the target
-    registry’s id and base state hash match before applying its events.
+    events: list[Event] = Field(default_factory=list)
+    # patch event chains can definitely be canonicalized, reduced by removing
+    # updates followed by deletes, and condensed into single multi-field/key
+    # updates for an item, but that is an optimization concern.
 
-    Key Features
-    ------------
-    * **Immutable** – patches are frozen once created; replay is pure and idempotent.
-    * **Guarded apply** – validates target registry id and state hash before mutation.
-    * **Canonical events** – events sorted and deduplicated by
-      :meth:`~tangl.vm.replay.event.Event.canonicalize_events`.
-    * **Integration** – works with :class:`~tangl.core.registry.Registry` and ledger
-      recovery to rebuild current state from snapshots.
+    def _validate_registry_pre(self, registry: Registry) -> bool:
+        if self.registry_id != registry.uid:
+            raise ValueError("Invalid registry for patch")
+        if self.initial_registry_value_hash != registry.value_hash():
+            raise ValueError("Invalid initial registry state for patch")
+        return True
 
-    API
-    ---
-    - :attr:`registry_id` – optional UUID guard ensuring patch applies to the right registry.
-    - :attr:`registry_state_hash` – optional guard verifying the base state hash.
-    - :attr:`events` – ordered, canonicalized list of :class:`~tangl.vm.replay.event.Event`.
-    - :meth:`apply(registry)` – validate guards and replay all events, returning the mutated registry.
-
-    Notes
-    -----
-    Patches are typically appended to the ledger between snapshots for efficient
-    incremental recovery.  Use :meth:`Event.canonicalize_events` to build canonical
-    patches suitable for deduplication and audit.
-    """
-    registry_id: Optional[UUID] = None
-    registry_state_hash: Hash = None
-    events: list[Event]
-
-    @field_validator("events")
-    @classmethod
-    def _canonicalize_events(cls, data) -> Iterable[Event]:
-        # may want an option just sort by seq instead
-        return Event.canonicalize_events(data)
+    def _validate_registry_post(self, registry: Registry) -> bool:
+        if self.final_registry_value_hash != registry.value_hash():
+            raise ValueError("Patch failed!  Invalid final registry state for patch")
+        return True
 
     def apply(self, registry: Registry) -> Registry:
-        if self.registry_id and self.registry_id != registry.uid:
-            raise ValueError(f"Wrong registry for patch {registry.uid} != {self.registry_id}")
-        if self.registry_state_hash:
-            current_hash = registry._state_hash()
-            valid_hashes = {current_hash, hashing_func(current_hash)}
-            if self.registry_state_hash not in valid_hashes:
-                raise ValueError(f"Wrong registry state hash for patch")
+        self._validate_registry_pre(registry)
+        for event in self.events:
+            event.apply(registry)
+        self._validate_registry_post(registry)
+        return registry
 
-        return Event.apply_all(self.events, registry)
+    def apply_to(self, graph: Graph) -> Graph:
+        """Protocol hook used by replay engines."""
+        self.apply(graph)
+        return graph

@@ -1,77 +1,129 @@
+# tangl/core/bases.py
+# language=markdown
+from __future__ import annotations
+
+import importlib
+import sys
+
 """
-.. currentmodule:: tangl.core
+tangl.core
+==========
 
-Foundational abstractions for self-realizing narrative graphs. These classes
-define the *vocabulary* (nouns) and *capabilities* (verbs) for higher-level
-story resolution.
+Core defines shared vocabulary and foundational data structures and algorithms.
 
-Conceptual layers
+Portability
+-----------
+
+Core types should be easy to reason about and implementable in any language with:
+- Algebraic data types or class inheritance
+- First-class functions
+- Associative collections (dict/map)
+- Ordered collections (list/array)
+
+Avoid Python-specific magic where possible. Document where unavoidable.
+
+File Organization
 -----------------
 
-1. :ref:`Identity and Collection<core-identity>`
-
-   - :class:`ContentAddressable` standardizes content-based identifiers for records.
-   - :class:`Entity` provides a universal base for all managed objects.
-   - :class:`Registry` organizes entities with robust search and chaining.
-   - :class:`Singleton` shared entities that are discoverable by a unique label.
-
-2. :ref:`Graph Topology<core-topology>`
-
-   - :class:`Graph`, and :class:`GraphItems<GraphItem>` like :class:`Node`,
-     :class:`Edge`, :class:`Subgraph` describe linked structures and hierarchy.
-
-3. :ref:`Runtime Artifacts<core-artifacts>`
-
-   - :class:`Record` captures immutable events, fragments, and notes.
-   - :class:`StreamRegistry` sequences records with bookmarks and channels.
-   - :class:`Snapshot` wraps a copy of an entity for record keeping and rematerialization.
-   - :class:`Fragment<BaseFragment>` is a record type that encodes narrative/UI output.
-
-4. :ref:`Behaviors<core-behaviors>`
-
-   - :class:`Behavior` wraps callable behaviors, returning a :class:`CallReceipt` record.
-   - :class:`BehaviorRegistry` executes handlers in ordered pipelines.
-
-4. :ref:`Dispatch<core-global-dispatch>`
-
-   - `core_dispatch` provides global hooks for identity and topology
-
-Design intent
--------------
-`tangl.core` isolates minimal abstractions so that story engines can reason about
-identity, relationships, and events *without presupposing narrative content*.
+```
+tangl/core/
+├── __init__.py           # Public API exports
+├── bases.py              # HasIdentity, uid/label/tags, Unstructurable, un/structure(),
+│                         #    HasContent, HasOrder, sort_key(), HasState
+│
+│   # Discovery
+├── selector.py           # Selector, match()
+├── registry.py           # Registry, RegistryAware, EntityGroup, find_all(), chain_find_all()
+│
+│   # Lifecycle
+├── record.py             # Record, OrderedRegistry, get_slice()
+├── singleton.py          # Singleton, InstanceInheritance
+│
+│   # Relationships
+├── graph.py              # GraphItem, Graph, Subgraph, Node, Edge
+│
+│   # Creation
+├── token.py              # Delegate to singleton
+├── template.py           # Semi-structured data, TemplateRegistry
+│
+│   # Doing things
+├── runtime_op.py         # RuntimeOp, Query, Predicate, Effect
+├── behavior.py           # Behavior, CallReceipt, Priority, DispatchLayer, AggregationMode
+└── dispatch.py           # Hooks for create(), new(), add(), get(), remove()
+```
 """
-
-# Base classes for all objects and collections
-from tangl.core.record.content_addressable import ContentAddressable
+# Provides:
+# - identity
+# - state
+# - un/structure
 from .entity import Entity
-from .registry import Registry
 
-# Sequential data artifacts
-from .record import Record, StreamRegistry, Snapshot, BaseFragment
+# Requires:
+# - identity
+# - un/structure
+# Provides:
+# - selection (Selector.from_kind(), .with_criteria(**_), .matches(entity))
+# - discovery (Reg.find_all(selector), .chain_find_all(*reg, selector)
+# - grouping/membership
+from .selector import Selector
+from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 
-# Globally reusable objects
-from .singleton import Singleton
+# Requires:
+# - selection
+# - groups
+# Provides:
+# - specialized shapes (singleton, record, graph)
+# - provenance (record)
+# - behaviors (Behavior(), Behavior.defer())
+# - groups of behaviors (BehaviorRegistry.execute_all(), .chain_execute_al)
+from .runtime_op import RuntimeOp
+from .singleton import InheritingSingleton, Singleton
+from .record import Record, OrderedRegistry
+from .base_fragment import BaseFragment
+from .graph import GraphItem, Graph, Subgraph, Edge, Node, HierarchicalNode
+from .behavior import Priority, DispatchLayer, Behavior, CallReceipt, BehaviorRegistry, AggregationMode
+from .namespace import HasNamespace, contribute_ns
+from .bases import HasContent
 
-# Topology and membership related extensions
-from .graph import GraphItem, Node, Edge, Subgraph, Graph
+# Requires:
+# - behaviors
+# Provides:
+# - building
+# - dispatch hooks
+from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
+from .token import Token, TokenCatalog, TokenFactory  # Delegated reference builder
+from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
 
-# Function dispatch, chaining, auditing
-from .behavior import CallReceipt, Behavior, BehaviorRegistry, LayeredDispatch
+from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
 
-from .dispatch import core_dispatch
 
-__all__ = [
-    # Identity & collections
-    "ContentAddressable", "Entity", "Registry",
-    # Singleton
-    "Singleton",
-    # Graph topology
-    "GraphItem", "Node", "Edge", "Subgraph", "Graph",
-    # Records/streams
-    "Record", "StreamRegistry", "Snapshot", "BaseFragment",
-    # Behaviors
-    "CallReceipt", "Behavior", "BehaviorRegistry", "LayeredDispatch",
-    # Core-dispatch
-    "core_dispatch"
-]
+# Legacy-compatible aliases retained during namespace cutover.
+ContentAddressable = HasContent
+LayeredDispatch = BehaviorRegistry
+StreamRegistry = OrderedRegistry
+
+
+def _alias_legacy_module(alias: str, target: str) -> None:
+    """Map legacy deep-import module paths to canonical flat modules."""
+    module = importlib.import_module(target)
+    sys.modules.setdefault(alias, module)
+    parent_name, _, child_name = alias.rpartition(".")
+    parent = sys.modules.get(parent_name)
+    if parent is not None and not hasattr(parent, child_name):
+        setattr(parent, child_name, module)
+
+
+for _alias, _target in (
+    # Legacy graph package paths.
+    ("tangl.core.graph.graph", "tangl.core.graph"),
+    ("tangl.core.graph.node", "tangl.core.graph"),
+    ("tangl.core.graph.edge", "tangl.core.graph"),
+    ("tangl.core.graph.subgraph", "tangl.core.graph"),
+    ("tangl.core.graph.token", "tangl.core.token"),
+    # Legacy record package paths.
+    ("tangl.core.record.record", "tangl.core.record"),
+    ("tangl.core.record.stream_registry", "tangl.core.record"),
+    ("tangl.core.record.snapshot", "tangl.core.template"),
+    ("tangl.core.record.base_fragment", "tangl.core.base_fragment"),
+):
+    _alias_legacy_module(_alias, _target)

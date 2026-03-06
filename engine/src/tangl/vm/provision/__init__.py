@@ -1,57 +1,31 @@
-# tangl/vm/__init__.py
-"""Provisioning primitives for the planning phase."""
-
-from .asset_provisioner import AssetProvisioner
-from .provisioning_policy import ProvisioningPolicy
-from .requirement import Requirement
+from .requirement import Requirement, HasRequirement, Dependency, Affordance
+from .preview import Blocker, ViabilityResult
+from .scope import (
+    admitted,
+    build_plan,
+    context_prefix,
+    is_qualified_path,
+    leaf_identifier,
+    levenshtein_components,
+    resolve_target_path,
+    scope_distance,
+    scope_prefix,
+    target_context_candidates,
+)
 from .provisioner import (
-    Provisioner,
-    GraphProvisioner,
-    TemplateProvisioner,
-    UpdatingProvisioner,
-    CloningProvisioner,
-    CompanionProvisioner,
-)
-from .token_provisioner import TokenProvisioner
-from .open_edge import Dependency, Affordance
-from .offer import (
-    ProvisionCost,
+    ProvisionPolicy,
     ProvisionOffer,
-    DependencyOffer,
-    AffordanceOffer,
-    BuildReceipt,
-    PlanningReceipt,
+    Provisioner,
+    TemplateProvisioner,
+    TokenProvisioner,
+    InlineTemplateProvisioner,
+    FindProvisioner,
+    StubProvisioner,
+    UpdateCloneProvisioner,
+    CloneProvisioner,
 )
-from .resolver import (
-    PlannedOffer,
-    ProvisioningContext,
-    ProvisioningPlan,
-    ProvisioningResult,
-    provision_node,
-)
+from .resolver import Resolver
 
-__all__ = [
-    "ProvisioningPolicy",
-    "Requirement",
-    "AssetProvisioner",
-    "Provisioner",
-    "GraphProvisioner",
-    "TemplateProvisioner",
-    "TokenProvisioner",
-    "UpdatingProvisioner",
-    "CloningProvisioner",
-    "CompanionProvisioner",
-    "Dependency",
-    "Affordance",
-    "ProvisionCost",
-    "ProvisionOffer",
-    "DependencyOffer",
-    "AffordanceOffer",
-    "BuildReceipt",
-    "PlanningReceipt",
-    "ProvisioningContext",
-    "PlannedOffer",
-    "ProvisioningPlan",
-    "ProvisioningResult",
-    "provision_node",
-]
+
+# Legacy compatibility alias retained during namespace cutover.
+ProvisioningPolicy = ProvisionPolicy

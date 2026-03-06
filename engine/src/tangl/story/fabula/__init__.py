@@ -1,47 +1,36 @@
-"""Runtime world management.
-
-## tangl.fabula
-
-The fabula is the latent, unrealized space of all possible stories. Worlds are
-their discrete runtime representation, bundling templates, domain classes,
-assets, and media resources.
-
-## Creation
-
-Service discovery with the :class:`~tangl.service.world_registry.WorldRegistry`
-is the preferred entry point:
-
-```python
-from tangl.service.world_registry import WorldRegistry
-
-registry = WorldRegistry()
-world = registry.get_world("my_world")
-```
-
-Tests can compile worlds directly from bundles when mocking discovery:
-
-```python
-from pathlib import Path
-
-from tangl.loaders import WorldBundle, WorldCompiler
-
-bundle = WorldBundle.load(Path("tests/worlds/my_world"))
-compiler = WorldCompiler()
-world = compiler.compile(bundle)
-```
-"""
-
-from __future__ import annotations
-
-from .asset_manager import AssetManager
-from .domain_manager import DomainManager
+from .compiler import StoryCompiler, StoryTemplateBundle
+from .materializer import StoryMaterializer
 from .script_manager import ScriptManager
+from .types import (
+    GraphInitializationError,
+    InitMode,
+    InitReport,
+    ResolutionError,
+    ResolutionFailureReason,
+    StoryInitResult,
+    UnresolvedDependency,
+    WorldAssetsFacet,
+    WorldDomainFacet,
+    WorldResourcesFacet,
+    WorldTemplatesFacet,
+)
 from .world import World
-from . import materialize_handlers  # register materialization handlers
 
 __all__ = [
-    "AssetManager",
-    "DomainManager",
+    "GraphInitializationError",
+    "InitMode",
+    "InitReport",
+    "ResolutionError",
+    "ResolutionFailureReason",
     "ScriptManager",
+    "StoryCompiler",
+    "StoryInitResult",
+    "StoryMaterializer",
+    "StoryTemplateBundle",
+    "UnresolvedDependency",
+    "WorldAssetsFacet",
+    "WorldDomainFacet",
+    "WorldResourcesFacet",
+    "WorldTemplatesFacet",
     "World",
 ]

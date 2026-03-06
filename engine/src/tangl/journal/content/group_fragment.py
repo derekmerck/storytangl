@@ -5,8 +5,7 @@ from enum import Enum
 
 from pydantic import Field
 
-from tangl.core.registry import Registry
-from tangl.core.record import BaseFragment
+from tangl.core import BaseFragment, Registry
 
 # This is basically a subgraph fragment
 class GroupFragment(BaseFragment, extra='allow'):

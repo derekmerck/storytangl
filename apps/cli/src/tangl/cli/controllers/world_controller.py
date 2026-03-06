@@ -13,12 +13,15 @@ if TYPE_CHECKING:
 
 @with_default_category("World")
 class WorldController(CommandSet):
-    """World inspection commands powered by the orchestrator."""
+    """World inspection commands powered by the service gateway."""
 
     _cmd: StoryTanglCLI
 
+    def _call_endpoint(self, endpoint: str, **params):
+        return self._cmd.call_endpoint(endpoint, **params)
+
     def do_worlds(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
-        worlds = self._cmd.call_endpoint("WorldController.list_worlds")
+        worlds = self._call_endpoint("WorldController.list_worlds")
         self._cmd.poutput(pformat(worlds))
 
     world_parser = argparse.ArgumentParser()
@@ -26,7 +29,7 @@ class WorldController(CommandSet):
 
     @with_argparser(world_parser)
     def do_world_info(self, args: argparse.Namespace) -> None:
-        info = self._cmd.call_endpoint("WorldController.get_world_info", world_id=args.world)
+        info = self._call_endpoint("WorldController.get_world_info", world_id=args.world)
         self._cmd.poutput(pformat(info))
 
     script_path_parser = argparse.ArgumentParser()
@@ -35,9 +38,9 @@ class WorldController(CommandSet):
     @with_argparser(script_path_parser)
     def do_load_script(self, args: argparse.Namespace) -> None:
         import yaml
+
         script_data = yaml.safe_load(args.script_path.read_text())
-        from tangl.story.fabula.world import World
-        result = self._cmd.call_endpoint(
+        result = self._call_endpoint(
             "WorldController.load_world",
             script_data=script_data,
         )
@@ -49,11 +52,14 @@ class WorldController(CommandSet):
         world_label = None
         if hasattr(result, "details") and result.details:
             world_label = result.details.get("world_label")
-        world = World.get_instance(world_label) if world_label else None
 
         title = None
-        if world is not None and world.script_manager is not None:
-            title = world.script_manager.get_story_metadata().get("title")
+        if isinstance(script_data, dict):
+            metadata = script_data.get("metadata")
+            if isinstance(metadata, dict):
+                raw_title = metadata.get("title")
+                if isinstance(raw_title, str) and raw_title.strip():
+                    title = raw_title.strip()
 
         title_text = title or world_label or "<unknown>"
         out = f"Loaded world: {title_text}"

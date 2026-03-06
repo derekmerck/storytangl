@@ -13,7 +13,7 @@ from .node import Node
 
 logger = logging.getLogger(__name__)
 
-WrappedType = TypeVar("WrappedType", bound=Singleton)
+WrappedType = TypeVar("WST", bound=Singleton)
 
 class SingletonNode(Node, Generic[WrappedType]):
     """

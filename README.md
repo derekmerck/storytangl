@@ -1,200 +1,106 @@
 # StoryTangl
 
-**A Research Platform for Graph-Based Computational Narratology**
+**A research platform for graph-based computational narratology.**
 
-[![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml) [![docs](https://app.readthedocs.org/projects/storytangl/badge/?version=latest)](https://storytangl.readthedocs.io/en/latest/)
+[![CI](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml/badge.svg)](https://github.com/derekmerck/storytangl/actions/workflows/ci.yml)
+[![docs](https://app.readthedocs.org/projects/storytangl/badge/?version=latest)](https://storytangl.readthedocs.io/en/latest/)
 
----
+StoryTangl models interactive narrative as a graph of interdependent
+possibilities that collapses into a specific story through traversal.
+Authors define a *possibility space* — characters, events, places, and the
+rules connecting them.  Readers navigate that space, and the engine
+resolves dependencies, tracks state, and emits a linear narrative journal.
 
-## What This Is
-
-StoryTangl is a **research platform** that implements narrative theory as executable code. It's designed for exploring how linear and interactive narrative spaces can be formally modeled, verified, and dynamically manipulated.
-
-**Core thesis:** Interactive narratives can be represented as graph structures where reader choices collapse possibility spaces into specific story paths. By modeling narrative as a computable embedding in a story-space, we can validate narratological theory, prove structural coherence, and enable systematic exploration of narrative space.
-
-### What Makes This Different
-
-Most interactive fiction tools (Twine, Ink, Ren'Py) are **authoring environments** optimized for content creation. StoryTangl is a **theoretical validation platform** that:
-
-- **Implements narratological theory as code** — semantics (fabula), structure (episodic process), and syntax (syuzhet) modeled as constellations of data structures, operations, and behaviors
-- **Enables formal verification** — Dependency graphs prove narrative coherence (no softlocks, all paths completable)
-- **Supports systematic exploration** — Graph topology + semantic analysis enable exhaustive narrative space navigation
-- **Separates structure from presentation** — Same story mechanics can render through different thematic vocabularies
-
-### When to Use StoryTangl
-
-**Use this when:** You want to explore computational narratology, experiment with graph-based story structures, build interactive narrative research tools, or need a formally-specified narrative engine.
-
-**Use something else when:** You want to ship a game quickly, need mature tooling and community support, or prioritize authoring convenience over architectural clarity.
+The name started as a backronym for *the Abstract Narrative Graph Library*.
+It stuck because the engine's real job is **untangling** — extracting a
+coherent story thread from a combinatorial web of requirements and
+consequences.
 
 ---
 
-## Current Status (v3.7)
+## Why StoryTangl
 
-StoryTangl is at **MVP milestone** — core systems are stable and functional, with active development on polish and demonstration content.
+Most interactive fiction tools are **authoring environments** optimized for
+content creation.  StoryTangl is a **theoretical validation platform**.
 
-### ✅ Working Systems
+**It implements narrative theory as executable code.**  The architecture
+maps directly to established narratological concepts: Bal's fabula/story/text
+trinity becomes graph/navigation/journal; Chatman's kernels and satellites
+become required and optional dependency edges; Genette's discourse operations
+become phase-bus transformations.  If the theory is right, the code works.
+If the code breaks, the theory has a gap worth studying.
 
-| System | Status | Notes |
-|--------|--------|-------|
-| **Graph entity model** | Stable | Nodes, edges, registries with UUID addressing |
-| **Phase bus execution** | Stable | Eight-phase pipeline with handler dispatch |
-| **Planning & provisioning** | Stable | Frontier resolution, offer selection, dependency satisfaction |
-| **Event-sourced ledger** | Stable | Record stream with multiple persistence backends |
-| **Service layer** | Stable | Orchestrator with controller endpoints, user isolation |
-| **CLI** | Functional | Interactive story playback |
-| **REST API** | Functional | FastAPI server with OpenAPI docs |
-| **Web client** | MVP Complete | Vue 3 + TypeScript, component testing |
+**It enables formal verification.**  Dependency graphs can prove structural
+properties — no softlocks, all paths completable, every role satisfiable —
+before a single word of prose is rendered.
 
-### ⚠️ Active Development
+**It separates structure from presentation.**  The same story mechanics
+render through different thematic vocabularies, different media pipelines,
+and different client interfaces without changing the underlying graph.
 
-- **Media provisioning** — Infrastructure exists; full integration with planning phase incomplete
-- **Reference worlds** — One complete example; expanding demonstration library
-- **Template scoping** — Registry operational; advanced scope selectors planned
+### When to use it
 
-### 📋 Research Explorations (Not MVP)
+Use StoryTangl when you want to explore computational narratology,
+experiment with graph-based story structures, build interactive narrative
+research tools, or need a formally-specified narrative engine with
+deterministic replay.
 
-- Semantic distance metrics for narrative similarity
-- Structural inference from play traces (Twine import)
-- Multi-lane storytelling with coordination protocols
-- Continuous narrative interpolation
-
----
-
-## Quick Start
-
-### Installation
-
-```bash
-# Clone repository
-git clone https://github.com/derekmerck/storytangl.git
-cd storytangl
-
-# Install with Poetry (recommended)
-poetry install
-
-# Or with pip
-pip install -e ".[cli,server]"
-```
-
-### Play a Story (CLI)
-
-```bash
-# System info
-poetry run tangl-info
-
-# Interactive play
-poetry run tangl-cli
-```
-
-### Start REST API Server
-
-```bash
-# Development server
-poetry run tangl-serve
-
-# Visit http://localhost:8000/docs for interactive API documentation
-```
-
-### Run Web Client
-
-```bash
-cd apps/web
-yarn install
-yarn dev
-
-# Visit http://localhost:5173
-```
-
-### Python API
-
-```python
-from tangl.service.orchestrator import Orchestrator
-from tangl.service.controllers import WorldController, RuntimeController
-import uuid
-
-# Initialize orchestrator
-orchestrator = Orchestrator()
-orchestrator.register_controller(WorldController())
-orchestrator.register_controller(RuntimeController())
-
-user_id = uuid.uuid4()
-
-# Load a world
-world_info = orchestrator.execute(
-    "WorldController.load_world",
-    user_id=user_id,
-    source="worlds/reference/script.yaml"
-)
-
-# Create story session
-runtime = orchestrator.execute(
-    "WorldController.create_story",
-    user_id=user_id,
-    world_id=world_info.world_id,
-    story_label="session_001"
-)
-
-# Get current narrative state
-update = orchestrator.execute(
-    "RuntimeController.get_story_update",
-    user_id=user_id,
-    ledger_id=runtime.ledger_id
-)
-
-# Execute a choice
-result = orchestrator.execute(
-    "RuntimeController.do_action",
-    user_id=user_id,
-    ledger_id=runtime.ledger_id,
-    action_id=update["choices"][0]["uid"]
-)
-```
+Use something else when you want to ship a game quickly, need mature
+tooling and a large community, or want a WYSIWYG authoring experience.
 
 ---
 
-## Architecture Overview
+## How It Works
 
-### Layered Design
+### The Three-Layer Model
 
 ```
-engine/src/tangl/
-├── core/        → Graph entities, registries, records (domain-agnostic)
-├── vm/          → Virtual machine with phase-based execution pipeline
-├── story/       → Domain model (episodes, scenes, actors, locations)
-├── ir/          → Intermediate fabula representations (YAML scripts, templates)
-├── journal/     → Narrative fragments and discourse structures
-└── service/     → Orchestrator pattern with controller endpoints
+Fabula          The possibility space — all events, characters, and
+(graph)         relationships that could be narrated.
 
-apps/
-├── cli/         → Command-line interface
-├── server/      → FastAPI REST API
-└── web/         → Vue 3 web client
+                         ↓  traverse + resolve
+
+Episodic        The resolution process — cursor-driven traversal that
+Process         provisions dependencies, applies effects, and emits
+(VM)            content at each step.
+
+                         ↓  emit fragments
+
+Syuzhet         The realized narrative — a linear journal of prose,
+(journal)       choices, and media as experienced by the reader.
 ```
 
-**Dependency flow is strictly unidirectional.** Core never imports from VM; VM never imports from Story. This enables the "compiler metaphor" where higher layers are syntactic sugar over lower-level semantics.
+An author writes **scripts** (YAML) that a **compiler** transforms into a
+story graph.  A **materializer** instantiates the graph for a specific
+playthrough.  As the reader makes choices, the **VM** walks the graph
+through an eight-phase pipeline:
 
-### Planning & Provisioning
+    VALIDATE → PLANNING → PREREQS → UPDATE → JOURNAL → FINALIZE → POSTREQS → advance
 
-The system implements **proactive dependency resolution**:
+Each phase is a dispatch point where registered handlers run in priority
+order and return auditable receipts.  The system is **event-sourced** — every
+state change is a ledger entry, so any playthrough is reproducible from a
+snapshot plus the choice log.
 
-1. **Frontier identification** — VM identifies reachable-next nodes from cursor
-2. **Requirement discovery** — Each frontier node declares what it needs
-3. **Offer generation** — Provisioners propose solutions (existing nodes, templates, clones)
-4. **Cost-based selection** — System picks best offers (prefer existing > modify > create)
-5. **Plan execution** — Selected offers materialize; requirements bind to providers
-6. **Viability assessment** — Unresolved hard requirements mark choices unavailable
+### Provisioning
 
-### Event Sourcing
+Before a node is visited, the engine **proactively resolves its
+dependencies**.  If a scene requires "a villain," the resolver searches for
+matching actors by proximity and specificity, proposes offers, and binds
+the best candidate.  This is the mechanism that collapses possibility into
+commitment — once bound, a role assignment is frozen for the rest of the
+story.
 
-Every narrative action records to an append-only ledger:
+### Extensibility
 
-```python
-Ledger = Stream[Record]
-Record = (timestamp, phase, handler, payload, outcome)
-```
+Story mechanics (minigames, dialog systems, world-specific rules) plug in
+as **behaviors** registered at specific pipeline phases with scoped
+priority.  A five-layer dispatch cascade (SYSTEM → APPLICATION → DOMAIN →
+INSTANCE → INLINE) lets world authors override engine defaults without
+modifying core code.
 
-This enables deterministic replay, formal audit trails, and structural analysis of playthroughs.
+For a deeper treatment of the conceptual foundations, see
+`engine/src/tangl/design/philosophy.md`.
 
 ---
 
@@ -203,104 +109,213 @@ This enables deterministic replay, formal audit trails, and structural analysis 
 ```
 storytangl/
 ├── engine/
-│   ├── src/tangl/         # Core engine package
-│   └── tests/             # Comprehensive test suite
+│   ├── src/tangl/              # Core engine package
+│   │   ├── core38/             # Timeless primitives: entity, graph, dispatch
+│   │   ├── vm38/               # Temporal evolution: frame, phases, provisioning
+│   │   ├── story38/            # Narrative semantics: episodes, concepts, journal
+│   │   ├── service38/          # Lifecycle: gateway, orchestrator, controllers
+│   │   ├── persistence/        # Storage abstraction across backends
+│   │   └── design/             # Project-wide design documentation
+│   └── tests/                  # Test suite mirroring src/ structure
 ├── apps/
-│   ├── cli/               # Command-line interface
-│   ├── server/            # FastAPI REST API
-│   └── web/               # Vue 3 web client
-├── docs/                  # Sphinx documentation
-├── worlds/                # Reference story bundles
-│   └── reference/         # "The Crossroads Inn" demo world
-├── deployment/            # Docker configuration
-└── scripts/               # Utility scripts
+│   ├── cli/                    # cmd2-based command-line interface
+│   ├── server/                 # FastAPI REST API
+│   └── web/                    # Vue 3 + TypeScript web client
+├── docs/                       # Sphinx documentation (RST + MyST)
+├── worlds/                     # Reference story bundles
+└── scripts/                    # Utility and analysis scripts
 ```
+
+Each engine subpackage contains its own `*_DESIGN.md` (or `design/`
+folder) with architectural intent, design decisions, and contracts.
+These are the authoritative references for how each layer works:
+
+| Layer | Design Docs | Scope |
+|-------|-------------|-------|
+| **core38** | `CORE_DESIGN.md` | Entity, graph, dispatch, templates, serialization |
+| **vm38** | `VM_DESIGN.md` | Phases, provisioning, namespace, traversal, replay |
+| **story38** | `design/` | Fabula compilation, journal, concepts, choices |
+| **service38** | `design/` | Gateway, orchestrator, response envelopes |
 
 ---
 
-## Testing
+## Getting Started
+
+### Prerequisites
+
+- Python ≥ 3.12
+- [Poetry](https://python-poetry.org/) for dependency management
+- Node.js 18+ and Yarn (for the web client)
+
+### Install
 
 ```bash
-# Full test suite
+git clone https://github.com/derekmerck/storytangl.git
+cd storytangl
+poetry install              # engine + dev dependencies
+```
+
+Optional extras:
+
+```bash
+poetry install -E server    # FastAPI + uvicorn + cmd2
+poetry install -E cli       # cmd2 CLI only
+```
+
+### Run the Tests
+
+```bash
+# Full engine suite
 poetry run pytest
 
-# Specific layers
+# Individual layers
 poetry run pytest engine/tests/core
-poetry run pytest engine/tests/vm
-poetry run pytest engine/tests/story
+poetry run pytest engine/tests/vm38
+poetry run pytest engine/tests/story38
 
 # With coverage
 poetry run pytest --cov=tangl --cov-report=html
 
-# Web client tests
-cd apps/web && yarn test
+# Web client
+cd apps/web && yarn install && yarn test
 ```
 
-**Test philosophy:** Architecture-first, test-after. Use `xfail(strict=True)` for intended-but-unimplemented features.
+### Play a Story
+
+```bash
+# CLI — interactive mode
+poetry run tangl-cli
+
+# REST server
+poetry run tangl-serve
+# then open http://localhost:8000/docs for the OpenAPI explorer
+
+# Web client (requires server running)
+cd apps/web && yarn dev
+# then open http://localhost:5173
+```
 
 ---
 
 ## Documentation
 
-### For Contributors
+### For Users and Authors
 
-Start here to understand the codebase:
-
-1. **`AGENTS.md`** — Coding conventions, architectural principles, testing patterns
-2. **`docs/source/contrib/`** — Architecture guides, design patterns, docstring style
-
-### Build Docs Locally
+Full documentation builds with Sphinx and hosts on Read the Docs:
 
 ```bash
 cd docs
 poetry run make html
-# Open docs/build/html/index.html
+open build/html/index.html
 ```
 
----
+### For Contributors
 
-## Research Directions
+Start here, in this order:
 
-StoryTangl is positioned as a research platform. Current explorations include:
+1. **`AGENTS.md`** — Coding conventions, layer boundaries, testing
+   patterns, core abstractions
+2. **`docs/source/contrib/`** — Coding style guide, docstring conventions,
+   exception policy
+3. **`*_DESIGN.md`** files in each subpackage — Architectural intent and
+   contracts for the layer you're working in
 
-**Theoretical validation:**
-- Proving equivalence between dependency systems and linear logic
-- Testing whether narratological taxonomies are computationally complete
-- Documenting where theory underdetermines implementation
+### For Researchers
 
-**Novel contributions:**
-- Semantic distance metrics for quantifying narrative similarity
-- Continuous interpolation through narrative space
-- Multi-lane storytelling with coordination protocols
-- Structural inference from existing IF corpora
-
----
-
-## Version History
-
-| Version | Year | Focus |
-|---------|------|-------|
-| 3.7 | 2025 | Dependency-driven interpreter, AI code agents |
-| 3.2 | 2025 | Three-layer narrative graph |
-| 2.9 | 2024 | Strategy-based task handlers |
-| 2.8 | 2023 | Switch attrs→pydantic, better serialization |
-| 2.5 | 2022 | Vue 3/Vite client, SVG avatars |
-| 2.3 | 2021 | Modular worlds, Vue 2 client |
+- **`engine/src/tangl/design/philosophy.md`** — Conceptual foundations:
+  fabula/syuzhet separation, narrative debt, parametric story space
+- **`engine/src/tangl/design/glossary.md`** — Canonical vocabulary mapping
+  narratological concepts to implementation
+- **`storytangl-research-agenda.md`** — Open problems and exploration
+  directions
+- **`StoryTangl_Lit_Review_2025.pdf`** — Annotated bibliography of
+  classical and interactive narratology
 
 ---
 
 ## Contributing
 
-We welcome contributions! Please read `AGENTS.md` for coding conventions and architectural guidance before submitting PRs.
+Contributions are welcome.  Please read `AGENTS.md` before starting — it
+covers the conventions that matter most:
 
-Key principles:
-- Type hints everywhere
-- Respect layer boundaries (core → vm → story → service)
-- Small, explicit functions over metaprogramming magic
-- RST docstrings for Sphinx compatibility
+- **Type hints everywhere.**  Functions, methods, attributes, return types.
+- **Respect layer boundaries.**  `core → vm → story → service` — lower
+  layers never import from higher ones.
+- **Small, explicit functions** over metaprogramming or implicit behavior.
+- **RST docstrings** for Sphinx compatibility, following the conventions in
+  `docs/source/contrib/docstring_style.md`.
+- **Tests validate behavior**, not implementation.  Use `xfail(strict=True)`
+  for intended-but-unimplemented features.
+
+### Workflow
+
+1. Read `AGENTS.md` and the relevant `*_DESIGN.md`
+2. Create a feature branch
+3. Write or update tests
+4. Implement
+5. Verify: `poetry run pytest` passes, types check clean
+6. Open a PR with a clear description of *what* and *why*
+
+---
+
+## Research Directions
+
+StoryTangl is positioned as a research platform for computational
+narratology.  Active and planned explorations include:
+
+- **Narrative planning as linear logic** — mapping dependency resolution to
+  Martens' Ceptre formalism for formal proof of narrative coherence
+- **Narrative shape space** — semantic distance metrics for quantifying
+  story similarity and enabling continuous interpolation
+- **Proppian re-entrant patterns** — compressing interactive narratives
+  through morphological function templates
+- **Parametric discourse** — projecting the same fabula through different
+  thematic vocabularies ("tell this story as noir / comedy / horror")
+- **Multi-lane storytelling** — multiple navigators traversing shared
+  fabula simultaneously with coordination protocols
+- **Structural inference** — recovering approximate story graphs from
+  existing IF corpora (Twine, Ink, ChoiceScript)
+
+See `storytangl-research-agenda.md` for detailed problem statements and
+proposed approaches.
+
+---
+
+## Acknowledgments
+
+StoryTangl has been in development since 2021 across roughly 38
+architectural iterations — from a gamebook parser to a full narrative
+virtual machine.  It draws on the author's background in medical imaging
+(shape theory, signal processing, high-dimensional optimization) and
+literary theory (undergraduate thesis on Sterne's *Tristram Shandy*,
+complete with hand-drawn MacPaint plot diagrams).
+
+The theoretical foundations rest on work by Mieke Bal, Gérard Genette,
+Seymour Chatman, Roland Barthes, Vladimir Propp, Espen Aarseth,
+Marie-Laure Ryan, Emily Short, Chris Martens, and others whose ideas
+about narrative structure turned out to be eminently computable.
+
+Development has been significantly aided by AI coding agents, who serve
+as tireless architectural reviewers and occasionally suggest things that
+are actually good.
+
+---
+
+## Version History
+
+| Epoch | Year | Focus |
+|-------|------|-------|
+| 3.7–3.8 | 2025–2026 | Dependency-driven VM, layered dispatch, AI agent collaboration |
+| 3.2 | 2025 | Three-layer narrative graph, provisioning architecture |
+| 2.9 | 2024 | Strategy-based task handlers |
+| 2.8 | 2023 | Pydantic migration, structured serialization |
+| 2.5 | 2022 | Vue 3 web client, SVG avatar system |
+| 2.3 | 2021 | Modular worlds, initial Vue 2 client |
+
+For detailed change history, see `CHANGELOG.md`.
 
 ---
 
 ## License
 
-MIT — See LICENSE file for details.
+MIT — see `LICENSE` for details.

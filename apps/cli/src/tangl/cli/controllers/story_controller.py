@@ -87,6 +87,7 @@ class StoryController(CommandSet):
                     label = (
                         getattr(choice_frag, "label", None)
                         or getattr(choice_frag, "content", "")
+                        or getattr(choice_frag, "text", "")
                         or getattr(choice_frag, "source_label", "")
                     )
                     active = getattr(choice_frag, "active", True)
@@ -107,6 +108,7 @@ class StoryController(CommandSet):
                 label = (
                     getattr(fragment, "label", None)
                     or getattr(fragment, "content", "")
+                    or getattr(fragment, "text", "")
                     or getattr(fragment, "source_label", "")
                 )
                 active = getattr(fragment, "active", True)
@@ -123,6 +125,9 @@ class StoryController(CommandSet):
                     )
 
         return choices
+
+    def _call_endpoint(self, endpoint: str, **params: Any) -> Any:
+        return self._cmd.call_endpoint(endpoint, **params)
 
     # ------------------------------------------------------------------
     # commands
@@ -141,7 +146,7 @@ class StoryController(CommandSet):
         if args.label:
             kwargs["story_label"] = args.label
 
-        result = self._cmd.call_endpoint("RuntimeController.create_story", **kwargs)
+        result = self._call_endpoint("RuntimeController.create_story", **kwargs)
         if getattr(result, "status", None) == "error":
             self._cmd.perror(result.message or "Failed to create story")
             return
@@ -151,7 +156,7 @@ class StoryController(CommandSet):
         ledger_id_value = details.get("ledger_id")
         ledger_id = UUID(ledger_id_value) if ledger_id_value is not None else None
 
-        if ledger_obj is not None and self._cmd.persistence is not None:
+        if ledger_obj is not None and getattr(self._cmd, "persistence", None) is not None:
             self._cmd.persistence.save(ledger_obj)
 
         if ledger_id is not None:
@@ -165,7 +170,7 @@ class StoryController(CommandSet):
         if ledger_id is not None:
             self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
 
-        fragments = self._cmd.call_endpoint(
+        fragments = self._call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
         )
@@ -199,7 +204,7 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        fragments = self._cmd.call_endpoint(
+        fragments = self._call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
         )
@@ -228,11 +233,11 @@ class StoryController(CommandSet):
             return
 
         choice = active_choices[index - 1]
-        self._cmd.call_endpoint(
+        self._call_endpoint(
             "RuntimeController.resolve_choice",
             choice_id=choice.uid,
         )
-        fragments = self._cmd.call_endpoint(
+        fragments = self._call_endpoint(
             "RuntimeController.get_journal_entries",
             limit=10,
         )
@@ -254,7 +259,7 @@ class StoryController(CommandSet):
             return
 
         try:
-            result = self._cmd.call_endpoint(
+            result = self._call_endpoint(
                 "RuntimeController.drop_story",
                 archive=bool(args.archive),
             )
@@ -300,7 +305,7 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        info = self._cmd.call_endpoint("RuntimeController.get_story_info")
+        info = self._call_endpoint("RuntimeController.get_story_info")
         if hasattr(info, "model_dump"):
             payload = info.model_dump()
         elif isinstance(info, dict):

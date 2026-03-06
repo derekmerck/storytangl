@@ -1,15 +1,59 @@
 from __future__ import annotations
 
+import importlib
 import sys
-from pathlib import Path
 from typing import Any
 
-import yaml
-
-from tangl.story.fabula import AssetManager, DomainManager, ScriptManager, World
+from tangl.story.fabula import StoryCompiler, World
 
 from .bundle import WorldBundle
+from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
+
+
+class _WorldDomainFacet:
+    """Lightweight world-domain facet for runtime-38 world assembly."""
+
+    def __init__(self) -> None:
+        from tangl.core import BehaviorRegistry
+
+        self.dispatch_registry = BehaviorRegistry(label="world_domain_dispatch")
+        self._authorities: list[Any] = [self.dispatch_registry]
+        self.modules: list[Any] = []
+        self.class_registry: dict[str, Any] = {}
+
+    def load_domain_module(self, domain_module: str) -> None:
+        module = importlib.import_module(domain_module)
+        self.modules.append(module)
+
+        get_authorities = getattr(module, "get_authorities", None)
+        if callable(get_authorities):
+            for authority in get_authorities() or ():
+                if authority not in self._authorities:
+                    self._authorities.append(authority)
+
+        try:
+            from tangl.core import Entity
+        except Exception:
+            Entity = object  # type: ignore[assignment]
+
+        for name, value in vars(module).items():
+            if not isinstance(value, type):
+                continue
+            if value is Entity:
+                continue
+            if issubclass(value, Entity):
+                self.class_registry[name] = value
+
+    def get_authorities(self) -> list[Any]:
+        return list(self._authorities)
+
+
+class _WorldAssetsFacet:
+    """Lightweight assets facet placeholder for runtime-38 world assembly."""
+
+    def __init__(self) -> None:
+        self.values: dict[str, Any] = {}
 
 
 class WorldCompiler:
@@ -21,125 +65,207 @@ class WorldCompiler:
         asset_compiler: AssetCompiler | None = None,
         domain_compiler: DomainCompiler | None = None,
         media_compiler: MediaCompiler | None = None,
+        story_compiler: StoryCompiler | None = None,
+        codec_registry: CodecRegistry | None = None,
     ) -> None:
         self.script_compiler = script_compiler or ScriptCompiler()
         self.asset_compiler = asset_compiler or AssetCompiler()
         self.domain_compiler = domain_compiler or DomainCompiler()
         self.media_compiler = media_compiler or MediaCompiler()
+        self.story_compiler = story_compiler or StoryCompiler()
+        self.codec_registry = codec_registry or CodecRegistry()
 
-    def compile(self, bundle: WorldBundle, story_key: str | None = None) -> World:
+    @staticmethod
+    def _require_runtime38(runtime_version: str) -> None:
+        if runtime_version != "38":
+            raise ValueError(
+                "Only runtime_version='38' is supported after legacy runtime retirement."
+            )
+
+    def compile(
+        self,
+        bundle: WorldBundle,
+        story_key: str | None = None,
+        *,
+        runtime_version: str = "38",
+    ) -> World:
+        self._require_runtime38(runtime_version)
         base_metadata = bundle.manifest.metadata.copy()
 
-        script_paths = bundle.get_script_paths(story_key)
-        script_data = self._load_and_merge_scripts(script_paths)
+        decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+        script_data = decode_result.story_data
+        codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
 
         script_metadata = script_data.setdefault("metadata", {})
         for key, value in base_metadata.items():
             script_metadata.setdefault(key, value)
+        script_metadata.setdefault("codec_id", codec_id)
+        if decode_result.warnings:
+            script_metadata.setdefault("codec_warnings", [])
+            script_metadata["codec_warnings"].extend(decode_result.warnings)
 
         default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
         if story_key is not None and default_title == bundle.manifest.label:
-            default_title = f"{bundle.manifest.label}_{story_key}"
+            default_title = bundle.manifest.story_label(story_key)
         script_metadata.setdefault("title", default_title)
 
-        script_manager = self.script_compiler.compile(script_data)
-
-        domain_manager = DomainManager()
-        domain_module = self._get_domain_module(bundle)
-        if domain_module:
-            self.domain_compiler.load_into(domain_module, domain_manager)
-
-        asset_manager = AssetManager()
-        self.asset_compiler.setup_defaults(asset_manager)
-
-        resource_manager = self.media_compiler.index(
-            bundle.media_dir,
-            organization_hints=bundle.manifest.media_organization,
+        domain_facet, assets_facet, resources_facet = self._build_world38_facets(bundle)
+        story_bundle = self.story_compiler.compile(
+            script_data,
+            source_map=decode_result.source_map,
+            codec_state=decode_result.codec_state,
+            codec_id=codec_id,
         )
-
-        world_metadata = base_metadata.copy()
-        world_metadata.update(script_manager.get_story_metadata())
-
-        label = bundle.manifest.label if story_key is None else f"{bundle.manifest.label}_{story_key}"
-
         world = World(
-            label=label,
-            script_manager=script_manager,
-            domain_manager=domain_manager,
-            asset_manager=asset_manager,
-            resource_manager=resource_manager,
-            metadata=world_metadata,
+            label=bundle.manifest.story_label(story_key),
+            bundle=story_bundle,
+            domain=domain_facet,
+            templates=story_bundle.template_registry,
+            assets=assets_facet,
+            resources=resources_facet,
         )
-        world._bundle = bundle  # noqa: SLF001
         return world
 
-    def compile_anthology(self, bundle: WorldBundle) -> dict[str, World]:
+    def compile_anthology(
+        self,
+        bundle: WorldBundle,
+        *,
+        runtime_version: str = "38",
+    ) -> dict[str, World]:
+        self._require_runtime38(runtime_version)
         if not bundle.manifest.is_anthology:
             msg = f"{bundle.manifest.label} is not an anthology"
             raise ValueError(msg)
 
         base_metadata = bundle.manifest.metadata.copy()
 
-        domain_manager = DomainManager()
-        domain_module = self._get_domain_module(bundle)
-        if domain_module:
-            self.domain_compiler.load_into(domain_module, domain_manager)
-
-        resource_manager = self.media_compiler.index(
-            bundle.media_dir,
-            organization_hints=bundle.manifest.media_organization,
-        )
+        (
+            world38_domain_facet,
+            world38_assets_facet,
+            world38_resources_facet,
+        ) = self._build_world38_facets(bundle)
 
         worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
-            script_paths = bundle.get_script_paths(story_key)
-            script_data = self._load_and_merge_scripts(script_paths)
+            decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+            script_data = decode_result.story_data
+            codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
 
             script_metadata = script_data.setdefault("metadata", {})
             for key, value in base_metadata.items():
                 script_metadata.setdefault(key, value)
+            script_metadata.setdefault("codec_id", codec_id)
+            if decode_result.warnings:
+                script_metadata.setdefault("codec_warnings", [])
+                script_metadata["codec_warnings"].extend(decode_result.warnings)
 
             default_title = script_metadata.get("title") or script_data.get("label") or bundle.manifest.label
             if default_title == bundle.manifest.label:
-                default_title = f"{bundle.manifest.label}_{story_key}"
+                default_title = bundle.manifest.story_label(story_key)
             script_metadata.setdefault("title", default_title)
 
-            script_manager = self.script_compiler.compile(script_data)
-            asset_manager = AssetManager()
-            self.asset_compiler.setup_defaults(asset_manager)
-
-            world_metadata = base_metadata.copy()
-            world_metadata.update(script_manager.get_story_metadata())
-
-            world = World(
-                label=f"{bundle.manifest.label}_{story_key}",
-                script_manager=script_manager,
-                domain_manager=domain_manager,
-                asset_manager=asset_manager,
-                resource_manager=resource_manager,
-                metadata=world_metadata,
+            story_bundle = self.story_compiler.compile(
+                script_data,
+                source_map=decode_result.source_map,
+                codec_state=decode_result.codec_state,
+                codec_id=codec_id,
             )
-            world._bundle = bundle  # noqa: SLF001
+            world = World(
+                label=bundle.manifest.story_label(story_key),
+                bundle=story_bundle,
+                domain=world38_domain_facet,
+                templates=story_bundle.template_registry,
+                assets=world38_assets_facet,
+                resources=world38_resources_facet,
+            )
             worlds[story_key] = world
 
         return worlds
 
-    # In tangl/loaders/compiler.py
-    def _load_and_merge_scripts(self, script_paths: list[Path]) -> dict[str, Any]:
-        script_data = {}
+    def _build_world38_facets(
+        self,
+        bundle: WorldBundle,
+    ) -> tuple[Any | None, Any | None, Any]:
+        domain_facet: Any | None = None
+        domain_module = self._get_domain_module(bundle)
+        if domain_module:
+            domain_facet = _WorldDomainFacet()
+            self.domain_compiler.load_into(domain_module, domain_facet)
 
-        for script_path in script_paths:
-            # Check if compiler has custom loading
-            if hasattr(self.script_compiler, 'load_from_path'):
-                data = self.script_compiler.load_from_path(script_path)
-            else:
-                # Fallback to raw YAML
-                with open(script_path) as f:
-                    data = yaml.safe_load(f)
+        assets_facet: Any | None = _WorldAssetsFacet()
 
-            script_data |= data
+        resources_facet = self.media_compiler.index(
+            bundle.media_dir,
+            organization_hints=bundle.manifest.media_organization,
+        )
+        return domain_facet, assets_facet, resources_facet
 
-        return script_data
+    def _decode_story_data(
+        self,
+        *,
+        bundle: WorldBundle,
+        story_key: str | None,
+    ) -> DecodeResult:
+        """Decode source files into runtime-ready script data.
+
+        Notes
+        -----
+        During migration we preserve an escape hatch for custom script compilers
+        that expose ``load_from_path``. This keeps research bundles usable while
+        codecs are being ported to the new explicit interface.
+        """
+
+        script_paths = bundle.get_script_paths(story_key)
+        codec_id = bundle.get_story_codec(story_key)
+        if hasattr(self.script_compiler, "load_from_path") and not bundle.manifest.is_story_codec_explicit(story_key):
+            merged: dict[str, Any] = {}
+            for script_path in script_paths:
+                loaded = self.script_compiler.load_from_path(script_path)
+                if not isinstance(loaded, dict):
+                    msg = f"Custom script compiler returned non-mapping for {script_path}"
+                    raise ValueError(msg)
+                merged |= loaded
+            return DecodeResult(
+                story_data=merged,
+                source_map={"__source_files__": []},
+                codec_state={
+                    "codec_id": "script_compiler_bridge",
+                    "script_paths": [str(path) for path in script_paths],
+                    "story_key": story_key,
+                },
+                warnings=[
+                    "Using legacy script compiler loading bridge; "
+                    "set manifest codec explicitly to disable this fallback."
+                ],
+            )
+
+        try:
+            codec = self.codec_registry.get(codec_id)
+        except ValueError:
+            if hasattr(self.script_compiler, "load_from_path"):
+                merged: dict[str, Any] = {}
+                for script_path in script_paths:
+                    loaded = self.script_compiler.load_from_path(script_path)
+                    if not isinstance(loaded, dict):
+                        msg = f"Custom script compiler returned non-mapping for {script_path}"
+                        raise ValueError(msg)
+                    merged |= loaded
+                return DecodeResult(
+                    story_data=merged,
+                    source_map={"__source_files__": []},
+                    codec_state={
+                        "codec_id": "script_compiler_bridge",
+                        "script_paths": [str(path) for path in script_paths],
+                        "story_key": story_key,
+                    },
+                    warnings=[
+                        "Using legacy script compiler loading bridge; "
+                        "define a manifest codec for deterministic decode semantics."
+                    ],
+                )
+            raise
+
+        return codec.decode(bundle=bundle, script_paths=script_paths, story_key=story_key)
 
     def _get_domain_module(self, bundle: WorldBundle) -> str | None:
         if bundle.manifest.domain_module is not None:

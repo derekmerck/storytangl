@@ -29,7 +29,7 @@ class StoryScript(MasterScript):
 
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
-        from tangl.story.story_graph import StoryGraph
+        from tangl.story import StoryGraph
         return StoryGraph
 
     label: UniqueLabel = Field(..., description="A unique name for this script.") # req for indexing

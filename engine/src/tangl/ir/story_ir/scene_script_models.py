@@ -136,7 +136,7 @@ class ActionScript(BaseScriptItem):
 
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
-        from tangl.story.episode import Action
+        from tangl.story import Action
         return Action
 
     text: Optional[str] = Field(
@@ -152,12 +152,38 @@ class ActionScript(BaseScriptItem):
         alias="trigger",
         description="The type of trigger for this action. Can be 'first' (jump before event), 'last' (automatic jump after event), or None (default, await user selection)."
     )
+    payload: Any = Field(
+        None,
+        description="Optional payload carried by the action edge when selected.",
+    )
+    accepts: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Optional payload acceptance schema for client-side input generation "
+            "(for example enum/range/pattern constraints)."
+        ),
+    )
+    ui_hints: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Optional client/renderer hint metadata for payload UI selection "
+            "(for example widget, max_length, framework hints)."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
     def _alias_successor_ref_to_target_node(cls, data):
+        if not isinstance(data, dict):
+            return data
         if 'successor_ref' in data:
             data['target_ref'] = data.pop('successor_ref')
+        if 'payload_schema' in data and 'accepts' not in data:
+            data['accepts'] = data.pop('payload_schema')
+        if 'hints' in data and 'ui_hints' not in data:
+            data['ui_hints'] = data.pop('hints')
+        if 'presentation_hints' in data and 'ui_hints' not in data:
+            data['ui_hints'] = data.pop('presentation_hints')
         return data
 
     @model_validator(mode='after')
@@ -183,7 +209,7 @@ class BlockScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.episode import Block
+        from tangl.story import Block
         return Block
 
     media: list[MediaItemScript] | None = None
@@ -241,7 +267,7 @@ class SceneScript(BaseScriptItem):
     @classmethod
     def get_default_obj_cls(cls) -> Type[Entity]:
         # Keep this import out of the main scope
-        from tangl.story.episode import Scene
+        from tangl.story import Scene
         return Scene
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
@@ -266,5 +292,3 @@ class SceneScript(BaseScriptItem):
     @classmethod
     def _expand_setting_shorthands(cls, value):
         return _expand_setting_shorthands(value)
-
-

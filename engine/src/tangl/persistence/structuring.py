@@ -29,18 +29,24 @@ class StructuringHandlerProtocol(Protocol):
 
 class StructuringHandler:
     """
-    Injects and references `obj_cls` annotations within the unstructured data to determine the specific class of entity to instantiate.
+    Injects and references class annotations within unstructured data to
+    determine which class to instantiate.
 
     Methods:
-      - `structure(data, obj_cls_map)`: Initializes an instance of the obj_cls with the data.
-      - `unstructure(entity)`: Extracts data from an entity instance into a dictionary format, appending the `obj_cls` to identify the entity class for future reconstruction.
+      - `structure(data, obj_cls_map)`: Initializes an instance of the
+        declared class using `kind` (preferred) or `obj_cls` (legacy alias).
+      - `unstructure(entity)`: Extracts data from an entity instance into a
+        dictionary and writes both `kind` and `obj_cls` for compatibility.
     """
 
     @classmethod
     def structure(cls,
                   unstructured: UnstructuredData,
                   obj_cls_map: Mapping[str, Type[HasUid]] = None) -> HasUid:
-        obj_cls = unstructured.pop('obj_cls')
+        unstructured = dict(unstructured)
+        obj_cls = unstructured.pop("kind", None)
+        if obj_cls is None:
+            obj_cls = unstructured.pop("obj_cls")
         if isinstance(obj_cls, str) and obj_cls_map is not None:
             obj_cls = obj_cls_map[ obj_cls ]
         if hasattr(obj_cls, 'structure'):
@@ -62,6 +68,11 @@ class StructuringHandler:
         else:
             # Trivial fallback for feral classes
             unstructured = {**structured.__dict__}
-        if 'obj_cls' not in unstructured:
-            unstructured['obj_cls'] = structured.__class__
+        if "kind" not in unstructured:
+            if "obj_cls" in unstructured:
+                unstructured["kind"] = unstructured["obj_cls"]
+            else:
+                unstructured["kind"] = structured.__class__
+        if "obj_cls" not in unstructured:
+            unstructured["obj_cls"] = unstructured["kind"]
         return unstructured

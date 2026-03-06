@@ -26,25 +26,9 @@ class WorldBundle:
         return default_domain if default_domain.exists() else None
 
     def get_script_paths(self, story_key: str | None = None) -> list[Path]:
-        scripts = self.manifest.scripts
+        scripts = self.manifest.get_story_scripts(story_key)
         if scripts is not None:
-            if isinstance(scripts, dict):
-                script_list: list[str] | str = []
-                if story_key:
-                    script_list = scripts[story_key]
-                else:
-                    for value in scripts.values():
-                        if isinstance(value, list):
-                            script_list.extend(value)
-                        else:
-                            script_list.append(value)
-            else:
-                script_list = scripts
-
-            if isinstance(script_list, str):
-                script_list = [script_list]
-
-            return [self.bundle_root / script for script in script_list]
+            return [self.bundle_root / script for script in scripts]
 
         single_file = self.bundle_root / "script.yaml"
         if single_file.exists():
@@ -60,6 +44,9 @@ class WorldBundle:
     @property
     def script_paths(self) -> list[Path]:
         return self.get_script_paths()
+
+    def get_story_codec(self, story_key: str | None = None) -> str:
+        return self.manifest.get_story_codec(story_key)
 
     @classmethod
     def load(cls, bundle_root: Path) -> "WorldBundle":

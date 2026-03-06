@@ -29,7 +29,7 @@ onMounted(async () => {
   try {
     loading.value = true
     error.value = null
-    const response = await $http.value.get<StoryStatusPayload>('/story/status')
+    const response = await $http.value.get<StoryStatusPayload>('/story/info')
     statusItems.value = (response.data ?? []).map((item) => ({
       ...item,
       style: normaliseStyle(item),

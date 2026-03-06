@@ -25,6 +25,7 @@ Default mounts:
 - media: `/media`
 
 """
+from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
 from uuid import UUID
@@ -35,26 +36,25 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 
 from tangl.config import settings
-from tangl.rest.dependencies import get_orchestrator
+from tangl.rest.dependencies_gateway import get_service_gateway
 from tangl.rest.media_mounts import mount_system_media
-from tangl.service import Orchestrator
+from tangl.service import ServiceGateway, ServiceOperation
 from tangl.service.response import RuntimeInfo
 
 logger = logging.getLogger(__name__)
 
 
 # todo: this is a placeholder that creates a default user for testing
-def get_user_credentials(orchestrator: Orchestrator) -> UUID:
+def get_user_credentials(gateway: ServiceGateway) -> UUID:
     secret = settings.client.secret
-    result = orchestrator.execute("UserController.create_user", secret=secret)
-    logger.debug("Created dev user via orchestrator", extra={"user": result})
+    result = gateway.execute(ServiceOperation.USER_CREATE, secret=secret)
 
     user_id: UUID | None = None
     user_obj = None
 
     if isinstance(result, RuntimeInfo):
         if result.status != "ok":
-            raise RuntimeError("Orchestrator failed to create dev user")
+            raise RuntimeError("Service gateway failed to create dev user")
         details = result.details or {}
         user_obj = details.get("user")
         raw_user_id = details.get("user_id")
@@ -70,24 +70,26 @@ def get_user_credentials(orchestrator: Orchestrator) -> UUID:
         user_id = getattr(result, "uid", None)
 
     if user_id is None:
-        raise RuntimeError("Orchestrator failed to return a user identifier")
+        raise RuntimeError("Service gateway failed to return a user identifier")
 
-    persistence = getattr(orchestrator, "persistence", None)
-    if persistence is not None and user_obj is not None:
-        persistence.save(user_obj)
-    else:
-        logger.warning("Skipping user persistence: orchestrator missing persistence manager")
-
-    info = orchestrator.execute("UserController.get_user_info", user_id=user_id)
-    logger.debug("Fetched dev user info", extra={"info": info})
+    logger.debug("Created dev user via service gateway", extra={"user_id": str(user_id)})
     return user_id
 
 
-get_user_credentials(get_orchestrator())
+@asynccontextmanager
+async def _app_lifespan(_: FastAPI):
+    """Run startup initialization for service-backed REST app."""
+    try:
+        get_user_credentials(get_service_gateway())
+    except Exception:
+        logger.exception("Failed to initialize dev user credentials during startup")
+        raise
+    yield
 
 app = FastAPI(
     docs_url=None,
-    redoc_url=None
+    redoc_url=None,
+    lifespan=_app_lifespan,
 )
 
 DEFAULT_APP_URL = "localhost:8000"

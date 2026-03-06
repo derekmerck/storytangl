@@ -6,7 +6,6 @@ from pydantic import field_serializer
 
 from tangl.type_hints import Pathlike
 from tangl.journal.content import ContentFragment, PresentationHints
-from tangl.core.behavior import BehaviorRegistry
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 
 # from tangl.media.enums import MediaRole
@@ -17,10 +16,6 @@ ContentFormatType = Literal['url', 'data', 'xml', 'json', 'rit']
 # Media fragments can have a RIT as content and need to be _dereferenced_ at the service
 # layer to an actual data object or file url
 # The final mime-type is assigned there as well
-
-media_fragment_handler = BehaviorRegistry(
-    label="media_fragment_handler",
-    aggregation_strategy="pipeline")
 
 class MediaFragment(ContentFragment, extra='allow'):
     """

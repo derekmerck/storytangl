@@ -1,3 +1,7 @@
+"""
+This is the ONLY place that should be flattening/unflattening data.
+"""
+
 from typing import Protocol, ClassVar
 import pickle
 import json
@@ -32,7 +36,7 @@ class SerializationHandlerProtocol(Protocol):
 
 
 class NoopSerializationHandler:
-    # This is an identity serializer that can use pythonic mapping as
+    # This is an identity serializer that can use a python-native mapping as
     # storage, like an in-memory dict.
 
     @classmethod
@@ -101,7 +105,7 @@ class JsonSerializationHandler:
         return obj
 
     @classmethod
-    def deserialize(self, flat: str) -> UnstructuredData:
+    def deserialize(cls, flat: str) -> UnstructuredData:
         unstructured = json.loads(flat, object_hook=JsonSerializationHandler.decode_object_hook)
         return unstructured
 
