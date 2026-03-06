@@ -22,6 +22,37 @@ def get_default_controllers() -> tuple[type, ...]:
         WorldController,
     )
 
+
+def __getattr__(name: str):
+    """Lazily expose controller classes for compatibility imports."""
+    if name == "RuntimeController":
+        from .runtime_controller import RuntimeController
+
+        return RuntimeController
+    if name == "SystemController":
+        from .system_controller import SystemController
+
+        return SystemController
+    if name == "UserController":
+        from .user_controller import UserController
+
+        return UserController
+    if name == "ApiKeyInfo":
+        from .user_controller import ApiKeyInfo
+
+        return ApiKeyInfo
+    if name == "WorldController":
+        from .world_controller import WorldController
+
+        return WorldController
+    raise AttributeError(name)
+
+
 __all__ = [
+    "ApiKeyInfo",
     "get_default_controllers",
+    "RuntimeController",
+    "SystemController",
+    "UserController",
+    "WorldController",
 ]
