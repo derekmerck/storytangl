@@ -82,6 +82,16 @@ class StoryCompiler:
     - :meth:`compile` is the supported public entry point.
     """
 
+    @staticmethod
+    def validate_ir(script_data: dict[str, Any]) -> StoryScript:
+        """Validate raw script data against the near-native IR schema.
+
+        Use this when authored near-native YAML should be linted explicitly.
+        Compilation itself accepts runtime-ready dicts directly so codecs are
+        not forced through the at-rest IR model.
+        """
+        return StoryScript.model_validate(script_data)
+
     def compile(
         self,
         script_data: dict[str, Any] | StoryScript,
@@ -92,20 +102,26 @@ class StoryCompiler:
     ) -> StoryTemplateBundle:
         """Compile authored story data into a reusable template bundle.
 
-        Accepts either raw script dictionaries or validated
-        :class:`~tangl.ir.story_ir.StoryScript` objects. The returned bundle is
-        fully normalized and ready for :class:`~tangl.story.fabula.StoryMaterializer`.
+        Accepts raw script dictionaries or validated
+        :class:`~tangl.ir.story_ir.StoryScript` objects.
+
+        Raw dicts are compiled directly. Use :meth:`validate_ir` separately
+        when authored near-native data should be linted against the IR schema.
         """
-        script = script_data if isinstance(script_data, StoryScript) else StoryScript.model_validate(script_data)
-        data = script.model_dump(by_alias=True, exclude_none=True)
+        if isinstance(script_data, StoryScript):
+            data = script_data.model_dump(by_alias=True, exclude_none=True)
+            label = script_data.label
+        else:
+            data = dict(script_data)
+            label = str(data.get("label") or "story")
 
         metadata = dict(data.get("metadata") or {})
-        locals_ns = dict(data.get("globals") or {})
+        locals_ns = dict(data.get("globals") or data.get("locals") or {})
 
-        registry = TemplateRegistry(label=f"{script.label}_templates")
+        registry = TemplateRegistry(label=f"{label}_templates")
         root = TemplateGroup(
-            label=script.label,
-            payload=Entity(label=script.label),
+            label=label,
+            payload=Entity(label=label),
             registry=registry,
         )
 
@@ -146,6 +162,12 @@ class StoryCompiler:
                 registry=registry,
             )
             root.add_child(scene_templ)
+
+            self._compile_section(
+                parent=scene_templ,
+                items=scene_data.get("templates"),
+                fallback_kind=TraversableNode,
+            )
 
             blocks = self._normalize_mapping(scene_data.get("blocks"))
             for block_label, block_data in blocks:
