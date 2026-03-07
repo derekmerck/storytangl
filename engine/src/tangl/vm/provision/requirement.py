@@ -134,6 +134,13 @@ class HasRequirement(RegistryAware, Generic[PT]):
     Resolver logic needs a uniform way to read satisfaction state, retrieve the
     resolved provider, and write resolution metadata back to the carrier edge.
 
+    Key Features
+    ------------
+    * Centralizes provider bookkeeping on the embedded
+      :class:`Requirement`.
+    * Mirrors satisfaction and resolution metadata through simple properties.
+    * Validates provider compatibility before storing the resolved provider id.
+
     API
     ---
     - :attr:`provider` and :meth:`set_provider` synchronize the embedded
@@ -225,7 +232,7 @@ class HasRequirement(RegistryAware, Generic[PT]):
 
 
 class Dependency(Edge, HasRequirement[PT], Generic[PT]):
-    """Dependency(predecessor_id: UUID, requirement: Requirement[PT])
+    """Dependency(predecessor_id: UUID | None = None, requirement: Requirement[PT])
 
     Pull-resource edge whose predecessor declares a needed provider.
 
@@ -234,6 +241,19 @@ class Dependency(Edge, HasRequirement[PT], Generic[PT]):
     Dependencies make missing topology explicit. A frontier node can advertise
     what it needs before any provider exists, then let the resolver bind a
     concrete successor later during planning.
+
+    Key Features
+    ------------
+    * Couples one embedded :class:`Requirement` to graph topology.
+    * Keeps ``provider`` and ``successor`` synchronized so resolution state is
+      visible through normal edge traversal.
+
+    API
+    ---
+    - :meth:`set_provider` validates and stores the resolved provider while
+      synchronizing ``successor``.
+    - :meth:`set_successor` provides a topology-first alias that also updates
+      requirement state.
 
     Example:
         >>> reg = Registry()
@@ -281,7 +301,7 @@ class Dependency(Edge, HasRequirement[PT], Generic[PT]):
 
 
 class Affordance(Edge, HasRequirement[PT], Generic[PT]):
-    """Affordance(predecessor_id: UUID, requirement: Requirement[PT])
+    """Affordance(predecessor_id: UUID | None = None, requirement: Requirement[PT])
 
     Push-resource edge whose predecessor offers a provider to nearby consumers.
 
@@ -290,19 +310,33 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
     Affordances model already-available local providers that should be treated
     as preferred EXISTING offers before wider search proceeds.
 
+    Key Features
+    ------------
+    * Couples one embedded :class:`Requirement` to a provider edge that pushes
+      availability outward from its predecessor.
+    * Keeps ``provider`` and ``successor`` synchronized so local offer graphs
+      stay consistent.
+
+    API
+    ---
+    - :meth:`set_provider` validates and stores the resolved provider while
+      synchronizing ``successor``.
+    - :meth:`set_successor` provides a topology-first alias that also updates
+      requirement state.
+
     Example:
-            >>> reg = Registry()
-            >>> r = Affordance(requirement={'has_identifier': 'foo'}); reg.add(r)
-            >>> r.satisfied
-            False
-            >>> e = RegistryAware(label='foo'); reg.add(e)
-            >>> r.successor = e
-            >>> r.satisfied
-            True
-            >>> r.provider
-            <RegistryAware:foo>
-            >>> r.successor
-            <RegistryAware:foo>
+        >>> reg = Registry()
+        >>> r = Affordance(requirement={'has_identifier': 'foo'}); reg.add(r)
+        >>> r.satisfied
+        False
+        >>> e = RegistryAware(label='foo'); reg.add(e)
+        >>> r.successor = e
+        >>> r.satisfied
+        True
+        >>> r.provider
+        <RegistryAware:foo>
+        >>> r.successor
+        <RegistryAware:foo>
     """
     # another layer of delegators
 

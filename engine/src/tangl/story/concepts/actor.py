@@ -9,6 +9,24 @@ class Actor(Node):
     """Actor()
 
     Named character provider published into the story namespace.
+
+    Why
+    ----
+    ``Actor`` gives story templates a lightweight provider node for named
+    characters. Role edges can resolve against these nodes without needing a
+    story-specific provider protocol.
+
+    Key Features
+    ------------
+    * Stores a human-friendly ``name`` alongside the graph label.
+    * Publishes actor metadata into local namespace composition via
+      :meth:`provide_actor_symbols`.
+
+    API
+    ---
+    - :attr:`name` stores the authored display name.
+    - :meth:`provide_actor_symbols` returns the namespace payload contributed by
+      this actor.
     """
 
     name: str = ""

@@ -29,6 +29,19 @@ class World:
       facets.
     * Keeps a lightweight process-local instance registry for convenience
       lookup.
+
+    API
+    ---
+    - :meth:`create_story` materializes one runtime graph from the compiled
+      bundle.
+    - :meth:`get_authorities` exposes optional world/domain dispatch
+      registries.
+    - :meth:`get_template_scope_groups` returns extra template groups available
+      at runtime.
+    - :meth:`find_template` and :meth:`find_templates` delegate template lookup
+      to the configured :class:`ScriptManager`.
+    - :meth:`get_instance`, :meth:`all_instances`, and :meth:`clear_instances`
+      manage the lightweight process-local world registry.
     """
 
     label: str

@@ -5,6 +5,11 @@ Some design material still lives beside the source tree rather than under
 review, but they should be migrated or linked more directly into the published
 design section over time.
 
+## Status
+
+- Last reviewed: March 6, 2026
+- Migration status: active
+
 ## Current inventory
 
 - `engine/src/tangl/core/CORE_DESIGN.md`

@@ -33,6 +33,16 @@ class StoryTemplateBundle:
       alongside the template hierarchy.
     * Records ``entry_template_ids`` so materialization can resolve the graph's
       initial cursor positions deterministically.
+
+    API
+    ---
+    - :attr:`metadata` stores story-level metadata used by runtime setup.
+    - :attr:`locals` stores authored top-level namespace values.
+    - :attr:`template_registry` contains the validated template hierarchy.
+    - :attr:`entry_template_ids` lists the template ids used for initial cursor
+      resolution.
+    - :attr:`source_map`, :attr:`codec_state`, and :attr:`codec_id` preserve
+      compile-time provenance and codec context.
     """
 
     metadata: dict[str, Any]
@@ -63,8 +73,9 @@ class StoryCompiler:
     * Builds scene and block template hierarchy used by runtime scope matching.
     * Canonicalizes action references so authored shorthand and qualified
       references resolve into a stable form.
-    * Resolves concrete Python classes during compilation so import failures
-      surface before graph initialization.
+    * Attempts to resolve authored ``obj_cls`` references during compilation and
+      falls back to the expected default kind when an override cannot be
+      imported.
 
     API
     ---

@@ -25,3 +25,29 @@ Dispatch module
 ---------------
 
 .. automodule:: tangl.core.dispatch
+
+Creation hooks
+--------------
+
+.. autofunction:: tangl.core.dispatch.on_create
+.. autofunction:: tangl.core.dispatch.do_create
+.. autofunction:: tangl.core.dispatch.on_init
+.. autofunction:: tangl.core.dispatch.do_init
+
+Registry hooks
+--------------
+
+.. autofunction:: tangl.core.dispatch.on_add_item
+.. autofunction:: tangl.core.dispatch.do_add_item
+.. autofunction:: tangl.core.dispatch.on_get_item
+.. autofunction:: tangl.core.dispatch.do_get_item
+.. autofunction:: tangl.core.dispatch.on_remove_item
+.. autofunction:: tangl.core.dispatch.do_remove_item
+
+Graph hooks
+-----------
+
+.. autofunction:: tangl.core.dispatch.on_link
+.. autofunction:: tangl.core.dispatch.do_link
+.. autofunction:: tangl.core.dispatch.on_unlink
+.. autofunction:: tangl.core.dispatch.do_unlink

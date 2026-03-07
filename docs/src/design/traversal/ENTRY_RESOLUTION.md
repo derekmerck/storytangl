@@ -125,7 +125,8 @@ class AnthologyWorld(World):
         return decorator
 
     def _resolve_entry_override(self, graph, namespace):
-        resolver = self._ENTRY_RESOLVERS.get(self.label)
+        story_key = self.label  # or any equivalent stable story identifier
+        resolver = self._ENTRY_RESOLVERS.get(story_key)
         if resolver is not None:
             return resolver(graph, namespace)
         return None

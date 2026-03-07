@@ -17,6 +17,20 @@ class Scene(TraversableNode):
     Scenes provide the structural scope that blocks, roles, and settings hang
     from. They also maintain source and sink pointers so container traversal is
     deterministic once children are materialized.
+
+    Key Features
+    ------------
+    * Groups blocks into a shared traversal and namespace scope.
+    * Carries scene-level role and setting declarations.
+    * Owns source/sink cursor pointers used by container traversal.
+
+    API
+    ---
+    - :attr:`title` stores the authored scene heading.
+    - :attr:`roles` and :attr:`settings` hold scene-scope provider
+      declarations.
+    - :meth:`finalize_container_contract` derives missing source/sink ids from
+      current child order.
     """
 
     title: str = ""

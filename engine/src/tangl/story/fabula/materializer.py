@@ -527,7 +527,13 @@ class StoryMaterializer:
         seq = getattr(item, "seq", None)
         has_seq = isinstance(seq, int)
         label = item.get_label() if hasattr(item, "get_label") else ""
-        return (0 if has_seq else 1, int(seq) if has_seq else 0, item.__class__.__name__, str(label), str(item.uid))
+        return (
+            0 if has_seq else 1,
+            int(seq) if has_seq else 0,
+            item.__class__.__name__,
+            str(label),
+            str(item.uid),
+        )
 
     @staticmethod
     def _resolve_policy(value: Any) -> ProvisionPolicy:
