@@ -11,7 +11,33 @@ from .dispatch import story_dispatch
 
 
 class StoryGraph(Graph):
-    """Story graph specialization for runtime state."""
+    """StoryGraph()
+
+    Runtime graph specialization for story-layer execution state.
+
+    Why
+    ----
+    Story execution needs more than generic graph topology. ``StoryGraph`` adds
+    story locals, template lineage, and world references so runtime handlers and
+    provisioning can resolve scoped data without reaching back into compile-time
+    structures directly.
+
+    Key Features
+    ------------
+    * Tracks one or more initial cursor ids for entry into the runtime graph.
+    * Carries story locals and world/script-manager references outside
+      serialized graph payloads.
+    * Records template lineage for each materialized entity so provisioning can
+      recover template scope.
+
+    API
+    ---
+    - :meth:`get_story_locals` returns the story-level namespace payload.
+    - :meth:`get_authorities` returns dispatch registries available to runtime
+      handlers.
+    - :meth:`get_template_scope_groups` returns template groups ordered from the
+      closest scope outward.
+    """
 
     initial_cursor_id: UUID | None = None
     initial_cursor_ids: list[UUID] = Field(default_factory=list)

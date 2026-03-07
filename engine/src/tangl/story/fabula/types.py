@@ -7,7 +7,7 @@ from uuid import UUID
 
 
 class InitMode(str, Enum):
-    """Graph initialization modes for story38."""
+    """Initialization depth for story graph materialization."""
 
     LAZY = "lazy"
     EAGER = "eager"
@@ -15,31 +15,31 @@ class InitMode(str, Enum):
 
 @runtime_checkable
 class WorldDomainFacet(Protocol):
-    """Lightweight domain facet contract for world-level authorities."""
+    """Protocol for world facets that contribute behavior authorities."""
 
     def get_authorities(self) -> Iterable[object]: ...
 
 
 @runtime_checkable
 class WorldTemplatesFacet(Protocol):
-    """Lightweight templates facet contract for provisioning scope groups."""
+    """Protocol for world facets that contribute runtime template scope groups."""
 
     def get_template_scope_groups(self, *, caller: Any = None, graph: Any = None) -> Iterable[Iterable[Any]]: ...
 
 
 @runtime_checkable
 class WorldAssetsFacet(Protocol):
-    """Lightweight assets facet contract (token/platonic factories)."""
+    """Protocol marker for world-level asset providers."""
 
 
 @runtime_checkable
 class WorldResourcesFacet(Protocol):
-    """Lightweight resources facet contract (media/data inventories)."""
+    """Protocol marker for world-level resource inventories."""
 
 
 @dataclass(slots=True)
 class UnresolvedDependency:
-    """Diagnostic payload for an unresolved dependency edge."""
+    """Structured diagnostic record for an unresolved dependency edge."""
 
     dependency_id: UUID
     source_id: UUID | None
@@ -50,7 +50,11 @@ class UnresolvedDependency:
 
 @dataclass(slots=True)
 class InitReport:
-    """Structured diagnostics emitted during story graph initialization."""
+    """Structured diagnostics emitted during story graph initialization.
+
+    Tracks materialized entity counts, dependency prelink results, and any hard
+    or soft unresolved requirements discovered during initialization.
+    """
 
     mode: InitMode
     materialized_counts: dict[str, int] = field(default_factory=dict)
@@ -67,7 +71,7 @@ class InitReport:
 
 
 class GraphInitializationError(RuntimeError):
-    """Raised when EAGER initialization cannot satisfy hard requirements."""
+    """Raised when eager initialization cannot satisfy hard requirements."""
 
     def __init__(self, report: InitReport):
         self.report = report
@@ -78,14 +82,14 @@ class GraphInitializationError(RuntimeError):
 
 
 class ResolutionFailureReason(str, Enum):
-    """Typed failure reasons for LAZY destination wiring checks."""
+    """Typed failure reasons for lazy destination wiring checks."""
 
     NO_TEMPLATE = "no_template"
     AMBIGUOUS_TEMPLATE = "ambiguous_template"
 
 
 class ResolutionError(RuntimeError):
-    """Raised when LAZY destination wiring cannot resolve canonical targets."""
+    """Raised when lazy destination wiring cannot resolve canonical targets."""
 
     def __init__(
         self,
@@ -120,7 +124,11 @@ class ResolutionError(RuntimeError):
 
 @dataclass(slots=True)
 class StoryInitResult:
-    """Result of creating a story graph from a story38 world."""
+    """Final result of materializing a runtime story graph.
+
+    Packages the graph, initialization report, resolved entry ids, and optional
+    source/codec metadata carried forward from compilation.
+    """
 
     graph: Any
     report: InitReport

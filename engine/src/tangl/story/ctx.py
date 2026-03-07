@@ -1,4 +1,4 @@
-"""Story38 runtime context protocol contracts."""
+"""Story runtime context protocol contracts."""
 
 from __future__ import annotations
 
@@ -10,7 +10,16 @@ from tangl.vm.ctx import VmResolverCtx
 
 @runtime_checkable
 class StoryRuntimeCtx(VmResolverCtx, Protocol):
-    """Thin story runtime context used by story38 materialization/runtime helpers."""
+    """StoryRuntimeCtx()
+
+    Structural protocol for story runtime helpers and handlers.
+
+    Why
+    ----
+    Story-layer rendering and provisioning helpers need only a focused slice of
+    the full vm context surface. This protocol documents that required accessor
+    contract without coupling helpers to one concrete context implementation.
+    """
 
     graph: Any
 

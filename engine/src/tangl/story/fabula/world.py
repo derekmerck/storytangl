@@ -11,7 +11,38 @@ from .types import InitMode, StoryInitResult
 
 @dataclass(slots=True)
 class World:
-    """Story world entrypoint over compiled template bundles."""
+    """World(label: str, bundle: StoryTemplateBundle)
+
+    Primary story entry point over a compiled template bundle.
+
+    Why
+    ----
+    ``World`` binds a reusable compiled story bundle to optional domain,
+    template, asset, and resource facets so applications can create runtime
+    stories without manually assembling materializer dependencies each time.
+
+    Key Features
+    ------------
+    * Owns the compiled bundle and default :class:`ScriptManager`.
+    * Delegates runtime graph creation to :class:`StoryMaterializer`.
+    * Exposes optional authority and template-scope hooks from attached world
+      facets.
+    * Keeps a lightweight process-local instance registry for convenience
+      lookup.
+
+    API
+    ---
+    - :meth:`create_story` materializes one runtime graph from the compiled
+      bundle.
+    - :meth:`get_authorities` exposes optional world/domain dispatch
+      registries.
+    - :meth:`get_template_scope_groups` returns extra template groups available
+      at runtime.
+    - :meth:`find_template` and :meth:`find_templates` delegate template lookup
+      to the configured :class:`ScriptManager`.
+    - :meth:`get_instance`, :meth:`all_instances`, and :meth:`clear_instances`
+      manage the lightweight process-local world registry.
+    """
 
     label: str
     bundle: StoryTemplateBundle

@@ -30,6 +30,12 @@ if TYPE_CHECKING:
 
 
 class ProvisionPolicy(Flag):
+    """Bitflag describing allowed or selected provisioning offer kinds.
+
+    Requirement instances use these flags to restrict acceptable offer types,
+    while :class:`ProvisionOffer` instances use them to declare what kind of
+    action they represent.
+    """
     # For offers only
     STUB = auto()  # debug/preview linkage that suspends requirement fidelity
     TOKEN = auto()  # indicate offer is for a token
@@ -50,6 +56,14 @@ class ProvisionPolicy(Flag):
 
 
 class ProvisionOffer(Record):
+    """Deferred, ranked candidate for satisfying one requirement.
+
+    Why
+    ----
+    Resolution gathers many possible candidates before committing to any single
+    one. ``ProvisionOffer`` keeps the selection process pure by storing a lazy
+    callback instead of materializing providers eagerly.
+    """
     # todo: seems like we want to attach the accepted offer to the requirement or
     #       requirement carrier, maybe exclude the callback and serialize as just the
     #       origin, policy, priority?  Or just track the accepted-offer-id in the
@@ -77,6 +91,7 @@ class ProvisionOffer(Record):
 
 
 class Provisioner(Protocol):
+    """Structural protocol implemented by offer-producing provisioning helpers."""
 
     def get_dependency_offers(self, requirement: Requirement) -> Iterable[ProvisionOffer]:
         ...
@@ -105,6 +120,7 @@ def _template_hash_value(template: EntityTemplate) -> str:
 
 @dataclass
 class FindProvisioner:
+    """Offer EXISTING providers already present in local entity groups."""
 
     values: SkipValidation[Iterable[Entity]]  # current graph, don't copy on create
     distance: int = 0
@@ -136,6 +152,7 @@ class FindProvisioner:
 
 @dataclass
 class TemplateProvisioner:
+    """Offer CREATE candidates from template registries using scope matching."""
 
     registries: SkipValidation[Iterable[TemplateRegistry]] = ()
     request_ctx: str = ""
@@ -318,7 +335,7 @@ class InlineTemplateProvisioner:
 
 
 class StubProvisioner:
-    """Debug-only provider that synthesizes minimal matching entities."""
+    """Preview-oriented provisioner that synthesizes minimal matching entities."""
 
     HIGH_COST_PRIORITY = Priority.LAST + 10_000
 

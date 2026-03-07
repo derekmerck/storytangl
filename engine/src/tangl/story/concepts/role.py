@@ -11,7 +11,36 @@ from .actor import Actor
 
 
 class Role(Dependency[Actor]):
-    """Role dependency edge (source node -> actor provider)."""
+    """Role()
+
+    Story-specific dependency edge that binds an actor provider into local scope.
+
+    Why
+    ----
+    ``Role`` turns generic dependency resolution into a narrative concept with a
+    stable namespace contract, making resolved actors available under both the
+    role label and derived metadata keys.
+
+    Key Features
+    ------------
+    * Extends :class:`~tangl.vm.provision.requirement.Dependency` so role edges
+      participate in standard provisioning and frontier resolution.
+    * Publishes the resolved actor under the role label plus derived metadata
+      keys such as ``guide_name``.
+    * Contributes a merged ``roles`` mapping during namespace gathering.
+
+    API
+    ---
+    - :meth:`provide_role_symbols` returns the namespace payload contributed by
+      the resolved actor.
+
+    See also
+    --------
+    :class:`Actor`
+        Default provider type bound by role dependencies.
+    :class:`~tangl.vm.provision.requirement.Dependency`
+        Base provisioning edge contract used by story roles.
+    """
 
     @staticmethod
     def _invoke_provider_ns(provider: Any) -> dict[str, Any]:

@@ -10,7 +10,29 @@ from ..dispatch import on_gather_ns
 
 
 class Setting(Dependency):
-    """Setting dependency edge (source node -> location provider)."""
+    """Setting()
+
+    Story-specific dependency edge that binds a location provider into local scope.
+
+    Why
+    ----
+    ``Setting`` specializes generic dependency resolution for location-like
+    providers so story blocks and scenes can expose a stable place contract
+    without hard-coding provider lookup rules.
+
+    Key Features
+    ------------
+    * Extends :class:`~tangl.vm.provision.requirement.Dependency` so settings
+      use the same provisioning mechanics as other frontier edges.
+    * Publishes the resolved provider under the setting label plus derived
+      metadata keys during namespace gathering.
+    * Contributes a merged ``settings`` mapping for render/provision helpers.
+
+    API
+    ---
+    - :meth:`provide_setting_symbols` returns the namespace payload contributed
+      by the resolved provider.
+    """
 
     @staticmethod
     def _invoke_provider_ns(provider: Any) -> dict[str, Any]:

@@ -8,12 +8,10 @@ from uuid import UUID
 
 from tangl.persistence import PersistenceManagerFactory
 from tangl.service import Orchestrator
-from tangl.service.controllers import (
-    RuntimeController,
-    SystemController,
-    UserController,
-    WorldController,
-)
+from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.controllers.system_controller import SystemController
+from tangl.service.controllers.user_controller import UserController
+from tangl.service.controllers.world_controller import WorldController
 
 _orchestrator: Orchestrator | None = None
 _user_locks: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)

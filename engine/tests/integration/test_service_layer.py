@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from tangl.core import Selector
-from tangl.service.controllers import RuntimeController
+from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service import Orchestrator
 from tangl.service.user.user import User
 from tangl.story import InitMode, World

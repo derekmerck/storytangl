@@ -1,14 +1,9 @@
 StoryTangl
 ==========
 
-Documentation is divided into sections:
-
-1. End user docs
-2. Story developer docs
-3. Reference library api
-4. Design guide
-5. Contribution guide
-
+Documentation is organized into curated reference, architecture, and contributor
+guides for the post-cutover ``tangl.story`` / ``tangl.vm`` / ``tangl.core`` /
+``tangl.service`` surface.
 
 .. toctree::
    :maxdepth: 2
@@ -17,4 +12,5 @@ Documentation is divided into sections:
    api/index
    mechanics/index
    design/index
+   notes/index
    contrib/index

@@ -7,7 +7,28 @@ from tangl.vm import TraversableNode
 
 
 class Location(TraversableNode):
-    """Minimal location concept node for story38."""
+    """Location()
+
+    Named place provider published into the story namespace.
+
+    Why
+    ----
+    ``Location`` provides a concrete traversable node that settings and runtime
+    namespace gathering can reference when a story needs a place-oriented
+    provider.
+
+    Key Features
+    ------------
+    * Carries a human-friendly ``name`` alongside the graph label.
+    * Publishes location metadata into the scoped namespace through
+      :meth:`provide_location_symbols`.
+
+    API
+    ---
+    - :attr:`name` stores the authored display name.
+    - :meth:`provide_location_symbols` returns the namespace payload exposed by
+      this location.
+    """
 
     name: str = ""
 

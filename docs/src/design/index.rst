@@ -1,6 +1,13 @@
 Design Plans
 ============
 
+Stable architecture and rationale for the published StoryTangl subsystems.
+
+See also
+--------
+- :doc:`../notes/reference/code_adjacent_design_docs` for design notes that still
+  live beside source modules and should eventually be folded into this section.
+
 .. toctree::
    :maxdepth: 4
 
@@ -28,6 +35,7 @@ Design Plans
    planning/TEMPLATES
 
    traversal/NAV_DESIGN
+   traversal/ENTRY_RESOLUTION
    traversal/notes-canonical_form
    traversal/notes-sinks
 

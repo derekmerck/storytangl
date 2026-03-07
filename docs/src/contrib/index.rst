@@ -1,16 +1,12 @@
 Contribution Guide
 ==================
 
+Contributor policy and working conventions for StoryTangl maintainers.
+
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
    coding_style
    docstring_style
    exception_policy
-   script_manager_facade_migration
    custom_world_handlers
-   cutover-log
-   core38-doc-audit
-   vm38-doc-audit
-   v38-parity-matrix
-   v38-phase1-review
