@@ -83,11 +83,15 @@ class TestReferenceWorldLoads:
 
     def test_scene_level_templates_compile(self, reference_world: World) -> None:
         aria_template = next(
-            template
-            for template in reference_world.find_templates()
-            if template.get_label() == "prologue.aria"
+            (
+                template
+                for template in reference_world.find_templates()
+                if template.get_label() == "prologue.aria"
+            ),
+            None,
         )
 
+        assert aria_template is not None
         assert isinstance(aria_template.payload, Actor)
         assert aria_template.payload.name == "Aria"
 
@@ -160,7 +164,12 @@ class TestCompilerIRDecoupling:
             }
         )
 
-        assert bundle.template_registry is not None
+        block_template = bundle.template_registry.find_one(Selector(has_identifier="s1.b1"))
+
+        assert block_template is not None
+        assert block_template.payload.media == [
+            {"name": "pic.png", "media_role": "hologram_3d"}
+        ]
 
     def test_compile_from_validated_storyscript_still_works(
         self,

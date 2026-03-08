@@ -374,12 +374,15 @@ class StoryMaterializer:
             successor_is_absolute = bool(spec.get("successor_is_absolute", False))
             if successor_ref is None:
                 successor_ref = self._coerce_str(
-                    spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
+                    spec.get("successor")
+                    or spec.get("next")
+                    or spec.get("target_ref")
+                    or spec.get("target_node")
                 )
             if not successor_ref:
                 msg = (
                     f"Block '{node.get_label()}' action[{index}] is missing successor "
-                    "(expected one of: successor, successor_ref, target_ref, target_node)"
+                    "(expected one of: successor, next, successor_ref, target_ref, target_node)"
                 )
                 raise ValueError(msg)
             activation = self._coerce_str(spec.get("trigger") or spec.get("activation"))
@@ -389,7 +392,8 @@ class StoryMaterializer:
                 registry=state.graph,
                 label=spec.get("label") or f"action_{node.label}_{index}",
                 predecessor_id=node.uid,
-                text=self._coerce_str(spec.get("text")) or "",
+                text=self._coerce_str(spec.get("text") or spec.get("content") or spec.get("label"))
+                or "",
                 successor_ref=successor_ref,
                 activation=activation,
                 payload=spec.get("payload"),

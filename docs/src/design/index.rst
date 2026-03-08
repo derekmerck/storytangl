@@ -23,6 +23,7 @@ See also
    story/ASSET_TYPE_DESIGN
    story/ASSET_COLLECTION_DESIGN
    story/CONCEPT_PROV_DESIGN
+   story/HUB_FANOUT
    story/menu_block
    story/compilers
    story/notes-create_world

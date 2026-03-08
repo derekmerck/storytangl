@@ -11,7 +11,7 @@ from tangl.ir.story_ir import StoryScript
 from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
-from ..episode import Action, Block, Scene
+from ..episode import Action, Block, MenuBlock, Scene
 
 
 @dataclass(slots=True)
@@ -170,7 +170,7 @@ class StoryCompiler:
             )
 
             blocks = self._normalize_mapping(scene_data.get("blocks"))
-            for block_label, block_data in blocks:
+            for block_index, (block_label, block_data) in enumerate(blocks):
                 qualified_label = f"{scene_label}.{block_label}"
                 actions = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("actions")),
@@ -187,9 +187,19 @@ class StoryCompiler:
                     scene_label=scene_label,
                     root_scene_labels=root_scene_labels,
                 )
+                next_qualified = self._next_block_label(blocks, block_index, scene_label)
+                for spec_list in (actions, continues, redirects):
+                    for spec in spec_list:
+                        if not spec.get("successor_ref") and next_qualified is not None:
+                            spec["successor_ref"] = next_qualified
+                            spec["successor_is_absolute"] = False
+                            spec["successor_is_inferred"] = True
+
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
-                        block_data.get("obj_cls") or block_data.get("block_cls"),
+                        block_data.get("obj_cls")
+                        or block_data.get("block_cls")
+                        or block_data.get("kind"),
                         fallback=Block,
                     ),
                     payload={
@@ -275,12 +285,18 @@ class StoryCompiler:
                 items.append((str(label), payload))
             return items
         items = []
+        anon_counter = 0
         for item in value:
             if isinstance(item, dict):
                 payload = dict(item)
             else:
                 payload = dict(getattr(item, "model_dump", lambda **_: {})())
-            label = payload.get("label") or "item"
+            label = payload.get("label")
+            if not label:
+                label = f"_anon_{anon_counter}"
+                anon_counter += 1
+                payload["label"] = label
+                payload["_is_anonymous"] = True
             items.append((str(label), payload))
         return items
 
@@ -327,6 +343,7 @@ class StoryCompiler:
                 if authored is None:
                     authored = (
                         payload.get("successor")
+                        or payload.get("next")
                         or payload.get("target_ref")
                         or payload.get("target_node")
                     )
@@ -367,6 +384,7 @@ class StoryCompiler:
         metadata: dict[str, Any],
         registry: TemplateRegistry,
     ) -> list[str]:
+        """Resolve compile-time entry template ids using authored priority rules."""
         start_at = metadata.get("start_at")
         if isinstance(start_at, str) and start_at:
             return [start_at]
@@ -375,11 +393,49 @@ class StoryCompiler:
             if values:
                 return values
 
+        block_templates = [
+            template
+            for template in registry.values()
+            if hasattr(template, "has_payload_kind") and template.has_payload_kind(Block)
+        ]
+
+        for tag_name in ("start", "entry"):
+            for template in block_templates:
+                if template.has_tags({tag_name}):
+                    return [template.get_label()]
+
+        for template in block_templates:
+            payload = getattr(template, "payload", None)
+            if payload is None:
+                continue
+            block_locals = getattr(payload, "locals", None) or {}
+            if isinstance(block_locals, dict) and (
+                block_locals.get("is_start") or block_locals.get("start_at")
+            ):
+                return [template.get_label()]
+
+        for template in block_templates:
+            label = template.get_label()
+            short_label = label.rsplit(".", 1)[-1] if "." in label else label
+            if short_label.lower() == "start":
+                return [label]
+
         first_block = registry.find_one(Selector(has_payload_kind=Block))
         if first_block is not None:
             return [first_block.get_label()]
 
         return []
+
+    @staticmethod
+    def _next_block_label(
+        blocks: list[tuple[str, dict[str, Any]]],
+        current_index: int,
+        scene_label: str,
+    ) -> str | None:
+        next_index = current_index + 1
+        if next_index >= len(blocks):
+            return None
+        return f"{scene_label}.{blocks[next_index][0]}"
 
     def _resolve_kind(self, raw_obj_cls: Any, *, fallback: type[Entity]) -> type[Entity]:
         if isinstance(raw_obj_cls, type):
@@ -408,7 +464,7 @@ class StoryCompiler:
             "Setting": Location,
             "Scene": Scene,
             "Block": Block,
-            "MenuBlock": Block,
+            "MenuBlock": MenuBlock,
             "Action": Action,
             "Node": TraversableNode,
             "TraversableNode": TraversableNode,
@@ -430,9 +486,19 @@ class StoryCompiler:
 
         if kind is Action:
             if payload.get("successor_ref") is None:
-                mapped_ref = payload.get("successor") or payload.get("target_ref") or payload.get("target_node")
+                mapped_ref = (
+                    payload.get("successor")
+                    or payload.get("next")
+                    or payload.get("target_ref")
+                    or payload.get("target_node")
+                )
                 if mapped_ref is not None:
                     payload["successor_ref"] = mapped_ref
+            if not payload.get("text") and payload.get("content"):
+                payload["text"] = payload.get("content")
+
+        if issubclass(kind, Block) and payload.get("_is_anonymous"):
+            payload["is_anonymous"] = True
 
         allowed = set(getattr(kind, "model_fields", {}).keys())
         filtered = {k: v for k, v in payload.items() if k in allowed}

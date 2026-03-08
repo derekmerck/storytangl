@@ -19,6 +19,7 @@ movement rules to :mod:`tangl.vm`.
 
 from .action import Action
 from .block import Block
+from .menu_block import MenuBlock
 from .scene import Scene
 
-__all__ = ["Action", "Block", "Scene"]
+__all__ = ["Action", "Block", "MenuBlock", "Scene"]

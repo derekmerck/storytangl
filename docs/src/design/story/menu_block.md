@@ -1,5 +1,9 @@
 # MenuBlock: Dynamic Choice Hubs
 
+**Status:** Early concrete consumer of the broader hub-fanout pattern. See
+[HUB_FANOUT.md](HUB_FANOUT.md) for the current generalized design direction,
+including sandbox-oriented hubs and fanout refresh policies.
+
 MenuBlock extends Block to automatically provision choices from compatible blocks.
 
 ## Use Cases

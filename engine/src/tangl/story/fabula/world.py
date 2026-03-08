@@ -72,14 +72,32 @@ class World:
         story_label: str,
         *,
         init_mode: InitMode = InitMode.EAGER,
+        namespace: dict[str, Any] | None = None,
     ) -> StoryInitResult:
         materializer = StoryMaterializer()
-        return materializer.create_story(
+        result = materializer.create_story(
             bundle=self.bundle,
             story_label=story_label,
             init_mode=init_mode,
             world=self,
         )
+
+        if namespace is not None:
+            override_uid = self._resolve_entry_override(result.graph, namespace)
+            if override_uid is not None:
+                result.graph.initial_cursor_id = override_uid
+                if override_uid not in result.graph.initial_cursor_ids:
+                    result.graph.initial_cursor_ids.append(override_uid)
+
+        return result
+
+    def _resolve_entry_override(
+        self,
+        graph: Any,
+        namespace: dict[str, Any],
+    ) -> Any | None:
+        """Return an optional init-time entry override for this world."""
+        return None
 
     def get_authorities(self) -> list[object]:
         """Return optional domain/world behavior registries."""
