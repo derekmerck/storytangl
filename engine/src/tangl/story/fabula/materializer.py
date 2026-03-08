@@ -7,6 +7,7 @@ from uuid import UUID
 from tangl.core import GraphItem, Selector, TemplateRegistry
 from tangl.vm import (
     Dependency,
+    Fanout,
     ProvisionPolicy,
     Requirement,
     Resolver,
@@ -16,7 +17,7 @@ from tangl.vm import (
 )
 
 from ..concepts import Actor, Location, Role, Setting
-from ..episode import Action, Block, Scene
+from ..episode import Action, Block, MenuBlock, Scene
 from ..story_graph import StoryGraph
 from .compiler import StoryTemplateBundle
 from .script_manager import ScriptManager
@@ -355,6 +356,8 @@ class StoryMaterializer:
                     templ_ref_key="location_template_ref",
                     state=state,
                 )
+                if isinstance(node, MenuBlock):
+                    self._wire_menu_fanout_for_block(node=node, state=state)
                 self._wire_actions_for_block(node=node, specs=node.redirects, state=state)
                 self._wire_actions_for_block(node=node, specs=node.continues, state=state)
                 self._wire_actions_for_block(node=node, specs=node.actions, state=state)
@@ -442,6 +445,27 @@ class StoryMaterializer:
                     f"{state.report.mode.value.upper()} init left action destination unresolved; "
                     f"action={action.get_label()!r}, expected={successor_ref!r}"
                 )
+
+    def _wire_menu_fanout_for_block(
+        self,
+        *,
+        node: MenuBlock,
+        state: _MaterializationState,
+    ) -> None:
+        for index, selector_spec in enumerate(MenuBlock.normalize_menu_selectors(node.menu_items)):
+            requirement_data = dict(selector_spec)
+            requirement_data.setdefault("has_kind", TraversableNode)
+            requirement = Requirement(
+                hard_requirement=False,
+                **requirement_data,
+            )
+            Fanout(
+                registry=state.graph,
+                label=f"fanout_{node.get_label()}_{index}",
+                predecessor_id=node.uid,
+                requirement=requirement,
+                tags={"dynamic", "fanout", "menu"},
+            )
 
     def _wire_dependencies_for_specs(
         self,

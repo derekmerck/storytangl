@@ -1,7 +1,7 @@
 # Hub Fanout and Sandbox Assembly
 
 **Document Version:** 1.0  
-**Status:** ACTIVE DESIGN — partially implemented on the current `tangl.story` runtime surface  
+**Status:** ACTIVE DESIGN — `vm.provision.Fanout` and `MenuBlock` planning-time action projection are implemented; refresh policy, call/return menu semantics, and sandbox scheduling layers remain deferred  
 **Relevant layers:** `tangl.story.episode`, `tangl.story.fabula`, `tangl.vm.provision`, `world` / domain schedule facets
 
 ---

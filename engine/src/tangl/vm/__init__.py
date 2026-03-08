@@ -19,8 +19,8 @@ Conceptual layers
 
 3. Provisioning
 
-   - :class:`Requirement`, :class:`Dependency`, :class:`Affordance` define frontier
-     constraints.
+   - :class:`Requirement`, :class:`Dependency`, :class:`Affordance`, and
+     :class:`Fanout` define frontier constraints.
    - :class:`Resolver` and provisioners satisfy constraints from
      entity/template scopes.
 
@@ -48,6 +48,7 @@ from .provision import (
     Affordance,
     Blocker,
     Dependency,
+    Fanout,
     StubProvisioner,
     FindProvisioner,
     HasRequirement,
@@ -121,6 +122,7 @@ __all__ = [
     "AnonymousEdge",
     "Blocker",
     "Dependency",
+    "Fanout",
     "StubProvisioner",
     "FindProvisioner",
     "Frame",

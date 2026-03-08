@@ -5,8 +5,10 @@ requirements into the runtime graph.
 """
 
 from __future__ import annotations
-from typing import Any, Optional, Generic, TypeVar
+from typing import Any, Optional, Generic, Iterable, TypeVar
 from uuid import UUID
+
+from pydantic import Field
 
 from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
 from .provisioner import ProvisionPolicy
@@ -360,3 +362,79 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
             super().set_successor(None, _ctx=_ctx)
             return
         self.set_provider(value, _ctx=_ctx)
+
+
+class Fanout(Edge, Generic[PT]):
+    """Fanout(predecessor_id: UUID | None = None, requirement: Requirement[PT])
+
+    Non-blocking gather edge that resolves to every eligible provider.
+
+    Why
+    ----
+    Some runtime nodes, such as activity hubs or sandbox menus, do not need one
+    best provider. They need the complete set of currently eligible providers so
+    later planning handlers can surface them as affordances or dynamic actions.
+
+    Key Features
+    ------------
+    * Carries one selector-shaped :class:`Requirement` while storing many
+      resolved provider ids.
+    * Exposes dereferenced ``providers`` plus explicit ``set_providers`` and
+      ``clear_providers`` helpers.
+    * Remains non-blocking: an empty provider set is valid and does not make
+      frontier resolution fail.
+
+    API
+    ---
+    - :attr:`providers` dereferences all currently linked provider ids.
+    - :meth:`set_providers` validates and stores a whole provider set.
+    - :meth:`clear_providers` removes all current links.
+    """
+
+    requirement: Requirement[PT]
+    provider_ids: list[UUID] = Field(default_factory=list)
+
+    @property
+    def providers(self) -> list[PT]:
+        registry = getattr(self, "registry", None)
+        if registry is None:
+            return []
+
+        providers: list[PT] = []
+        for provider_id in self.provider_ids:
+            provider = registry.get(provider_id)
+            if provider is not None:
+                providers.append(provider)
+        return providers
+
+    def set_providers(self, providers: Iterable[PT], _ctx=None) -> None:
+        registry = getattr(self, "registry", None)
+        if registry is None:
+            raise ValueError("Fanout must be bound to a registry before setting providers")
+
+        validated_ids: list[UUID] = []
+        seen_ids: set[UUID] = set()
+        for provider in providers:
+            if not self.requirement._validate_satisfied_by(provider):
+                continue
+            if registry._validate_linkable(provider):
+                if provider.uid in seen_ids:
+                    continue
+                seen_ids.add(provider.uid)
+                validated_ids.append(provider.uid)
+
+        self.provider_ids = validated_ids
+
+        step = getattr(_ctx, "step", None)
+        self.requirement.resolved_step = step if isinstance(step, int) else None
+
+        cursor_id = getattr(_ctx, "cursor_id", None)
+        if cursor_id is None:
+            cursor = getattr(_ctx, "cursor", None)
+            cursor_id = getattr(cursor, "uid", None)
+        self.requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
+
+    def clear_providers(self) -> None:
+        self.provider_ids.clear()
+        self.requirement.resolved_step = None
+        self.requirement.resolved_cursor_id = None

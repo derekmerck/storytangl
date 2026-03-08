@@ -27,7 +27,7 @@ from typing import Callable, Iterator
 
 import pytest
 
-from tangl.core import Entity, EntityTemplate, Graph, Registry, RegistryAware, TemplateRegistry
+from tangl.core import Entity, EntityTemplate, Graph, Priority, Registry, RegistryAware, Selector, TemplateRegistry
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     do_provision,
@@ -36,6 +36,7 @@ from tangl.vm.dispatch import (
 from tangl.vm.provision import (
     Affordance,
     Dependency,
+    Fanout,
     InlineTemplateProvisioner,
     ProvisionPolicy,
     Requirement,
@@ -366,6 +367,63 @@ class TestDispatchIntegration:
             frame.follow_edge(edge)
             assert len(created_entity) == 1
             assert g.get(created_entity[0].uid) is not None
+
+    def test_provision_created_prereq_edge_is_visible_same_arrival(
+        self, clean_vm_dispatch
+    ) -> None:
+        """PLANNING-created prereqs are scanned by the later PREREQS phase."""
+        from tangl.vm import ResolutionPhase
+        from tangl.vm.dispatch import do_prereqs, do_provision, on_prereqs
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+        from tangl.vm.traversable import TraversableEdge
+        import tangl.vm.system_handlers as sh
+
+        g = Graph()
+        hub = TraversableNode(label="hub", registry=g)
+        target = TraversableNode(label="target", registry=g, tags={"menu"})
+        Fanout(
+            registry=g,
+            predecessor_id=hub.uid,
+            requirement=Requirement(has_kind=TraversableNode, has_tags={"menu"}),
+        )
+
+        @on_provision(priority=Priority.LATE)
+        def build_dynamic_prereq(caller, *, ctx, **kwargs):
+            _ = (ctx, kwargs)
+            if caller is not hub:
+                return None
+            if next(
+                hub.edges_out(
+                    Selector(
+                        has_kind=TraversableEdge,
+                        trigger_phase=ResolutionPhase.PREREQS,
+                    )
+                ),
+                None,
+            ) is not None:
+                return None
+            affordance = next(hub.edges_out(Selector(has_kind=Affordance)), None)
+            if affordance is None or affordance.successor is None:
+                return None
+            TraversableEdge(
+                registry=g,
+                predecessor_id=hub.uid,
+                successor_id=affordance.successor.uid,
+                trigger_phase=ResolutionPhase.PREREQS,
+                tags={"dynamic", "fanout", "prereq"},
+            )
+            return None
+
+        on_prereqs(sh.follow_triggered_prereqs)
+        on_provision(provision_node)
+
+        with _cleanup_behaviors(build_dynamic_prereq, sh.follow_triggered_prereqs, provision_node):
+            ctx = PhaseCtx(graph=g, cursor_id=hub.uid)
+            do_provision(hub, ctx=ctx)
+            redirect = do_prereqs(hub, ctx=ctx)
+            assert redirect is not None
+            assert redirect.successor is target
 
 
 # ---------------------------------------------------------------------------

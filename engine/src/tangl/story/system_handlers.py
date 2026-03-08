@@ -19,14 +19,16 @@ from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
 from tangl.vm import (
+    Affordance,
     Dependency,
     Resolver,
+    on_provision,
     on_get_template_scope_groups,
     on_get_token_catalogs,
 )
 
 from .dispatch import on_gather_ns, on_journal
-from .episode import Action, Block
+from .episode import Action, Block, MenuBlock
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 
 logger = logging.getLogger(__name__)
@@ -248,6 +250,59 @@ def gather_world_token_catalogs(*, caller, requirement=None, ctx, **_kw):
             )
         )
     return catalogs or None
+
+
+def _has_tags(value: Any, *tags: str) -> bool:
+    actual = getattr(value, "tags", set()) or set()
+    return set(tags).issubset(actual)
+
+
+def _clear_dynamic_menu_actions(menu: MenuBlock, *, ctx) -> None:
+    graph = getattr(menu, "graph", None)
+    if graph is None:
+        return
+
+    for edge in list(menu.edges_out(Selector(has_kind=Action, trigger_phase=None))):
+        if _has_tags(edge, "dynamic", "fanout", "menu"):
+            graph.remove(edge.uid, _ctx=ctx)
+
+
+def _iter_menu_affordances(menu: MenuBlock):
+    for affordance in list(menu.edges_out(Selector(has_kind=Affordance))):
+        if _has_tags(affordance, "dynamic", "fanout"):
+            yield affordance
+
+
+@on_provision(
+    wants_caller_kind=MenuBlock,
+    wants_exact_kind=False,
+    priority=Priority.LATE,
+)
+def project_menu_affordances(*, caller, ctx, **_kw):
+    """Project fanout-produced affordances into ordinary choice edges."""
+    if not isinstance(caller, MenuBlock):
+        return None
+    if not caller.auto_provision:
+        return None
+
+    _clear_dynamic_menu_actions(caller, ctx=ctx)
+
+    for index, affordance in enumerate(_iter_menu_affordances(caller)):
+        provider = affordance.successor
+        if provider is None:
+            provider = affordance.provider
+        if provider is None:
+            continue
+
+        Action(
+            registry=caller.graph,
+            label=f"menu_{caller.get_label()}_{index}",
+            predecessor_id=caller.uid,
+            successor_id=provider.uid,
+            text=MenuBlock.action_text_for(provider),
+            tags={"dynamic", "fanout", "menu"},
+        )
+    return None
 
 
 class _SafeFormatDict(dict):

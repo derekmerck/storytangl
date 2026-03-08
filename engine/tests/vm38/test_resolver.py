@@ -32,6 +32,7 @@ from tangl.core import (
 from tangl.vm.provision import (
     Affordance,
     Dependency,
+    Fanout,
     FindProvisioner,
     InlineTemplateProvisioner,
     ProvisionPolicy,
@@ -638,6 +639,141 @@ class TestResolverOfferGathering:
             resolver.resolve_requirement(req, _ctx=_ctx_with_seed(9))
 
 
+class TestResolverFanout:
+    def test_gather_fanout_offers_returns_all_matching_existing_in_stable_order(self) -> None:
+        graph = Graph()
+        near_a = _node(graph, label="near_a", tags={"menu"})
+        near_b = _node(graph, label="near_b", tags={"menu"})
+        far = _node(graph, label="far", tags={"menu"})
+        resolver = Resolver(location_entity_groups=[[near_a, near_b], [far]], template_scope_groups=[])
+        requirement = Requirement(has_kind=TraversableNode, has_tags={"menu"})
+
+        offers = resolver.gather_fanout_offers(requirement)
+
+        assert [offer.callback() for offer in offers] == [near_a, near_b, far]
+
+    def test_gather_fanout_offers_includes_template_backed_traversables(self) -> None:
+        graph = Graph()
+        hub = _node(graph, label="scene")
+        templ = EntityTemplate(
+            label="scene.leaf",
+            admission_scope="scene.*",
+            payload=TraversableNode(label="leaf"),
+        )
+        resolver = Resolver(
+            location_entity_groups=[[hub]],
+            template_scope_groups=[_template_registry(templ)],
+        )
+        requirement = Requirement(
+            has_kind=TraversableNode,
+            has_identifier="scene.leaf",
+            authored_path="scene.leaf",
+            is_qualified=True,
+        )
+        ctx = SimpleNamespace(graph=graph, cursor=hub, cursor_id=hub.uid)
+
+        offers = resolver.gather_fanout_offers(requirement, _ctx=ctx)
+
+        assert len(offers) == 1
+        assert offers[0].policy == ProvisionPolicy.CREATE
+        assert offers[0].candidate is templ
+
+    def test_gather_fanout_offers_excludes_token_and_stub_sources(self) -> None:
+        class GearType(Singleton):
+            pass
+
+        GearType(label="torch")
+        catalog = TokenCatalog(wst=GearType)
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        requirement = Requirement(
+            has_kind=GearType,
+            has_identifier="torch",
+            provision_policy=ProvisionPolicy.CREATE,
+        )
+
+        all_offers = resolver.gather_offers(
+            requirement,
+            allow_stubs=True,
+            _ctx=_ctx_with_token_catalogs(catalog),
+        )
+        fanout_offers = resolver.gather_fanout_offers(
+            requirement,
+            _ctx=_ctx_with_token_catalogs(catalog),
+        )
+
+        assert any(bool(offer.policy & ProvisionPolicy.TOKEN) for offer in all_offers)
+        assert fanout_offers == []
+
+    def test_gather_fanout_offers_excludes_update_and_clone_sources(self) -> None:
+        source = Entity(label="source")
+        template = EntityTemplate(payload=Entity(label="patched"))
+        resolver = Resolver(
+            location_entity_groups=[[source]],
+            template_scope_groups=[_template_registry(template)],
+        )
+        requirement = Requirement(
+            has_kind=Entity,
+            provision_policy=ProvisionPolicy.UPDATE | ProvisionPolicy.CLONE,
+            reference_selector=Selector(has_identifier="source"),
+            update_template_selector=Selector(has_identifier="patched"),
+        )
+
+        all_offers = resolver.gather_offers(requirement)
+        fanout_offers = resolver.gather_fanout_offers(requirement)
+
+        assert any(bool(offer.policy & ProvisionPolicy.UPDATE) for offer in all_offers)
+        assert any(bool(offer.policy & ProvisionPolicy.CLONE) for offer in all_offers)
+        assert fanout_offers
+        assert all(not bool(offer.policy & ProvisionPolicy.UPDATE) for offer in fanout_offers)
+        assert all(not bool(offer.policy & ProvisionPolicy.CLONE) for offer in fanout_offers)
+
+    def test_resolve_fanout_creates_one_affordance_per_provider(self) -> None:
+        graph = Graph()
+        hub = _node(graph, label="hub")
+        alpha = _node(graph, label="alpha", tags={"menu"})
+        beta = _node(graph, label="beta", tags={"menu"})
+        fanout = Fanout(
+            registry=graph,
+            predecessor_id=hub.uid,
+            requirement=Requirement(has_kind=TraversableNode, has_tags={"menu"}),
+        )
+        resolver = Resolver(location_entity_groups=[[alpha, beta]], template_scope_groups=[])
+
+        providers = resolver.resolve_fanout(fanout)
+
+        affordances = [
+            affordance
+            for affordance in hub.edges_out(Selector(has_kind=Affordance))
+            if "fanout" in (getattr(affordance, "tags", set()) or set())
+        ]
+        assert providers == [alpha, beta]
+        assert fanout.providers == [alpha, beta]
+        assert [affordance.successor for affordance in affordances] == [alpha, beta]
+
+    def test_resolve_fanout_refresh_removes_stale_affordances(self) -> None:
+        graph = Graph()
+        hub = _node(graph, label="hub")
+        alpha = _node(graph, label="alpha", tags={"menu"})
+        beta = _node(graph, label="beta", tags={"menu"})
+        fanout = Fanout(
+            registry=graph,
+            predecessor_id=hub.uid,
+            requirement=Requirement(has_kind=TraversableNode, has_tags={"menu"}),
+        )
+
+        Resolver(location_entity_groups=[[alpha, beta]], template_scope_groups=[]).resolve_fanout(fanout)
+        Resolver(location_entity_groups=[[beta]], template_scope_groups=[]).resolve_fanout(fanout)
+
+        affordances = [
+            affordance
+            for affordance in hub.edges_out(Selector(has_kind=Affordance))
+            if "fanout" in (getattr(affordance, "tags", set()) or set())
+        ]
+        assert fanout.providers == [beta]
+        assert len(affordances) == 1
+        assert affordances[0].successor is beta
+
+
 class TestResolverRequirementResolution:
     def test_resolves_existing_entity(self) -> None:
         e = Entity(label="sword")
@@ -976,3 +1112,15 @@ class TestResolverFrontierNode:
         container.sink_id = sink.uid
         resolver = Resolver(entity_groups=[])
         assert resolver.resolve_frontier_node(container) is False
+
+    def test_node_with_empty_fanout_still_resolves_true(self) -> None:
+        g = Graph()
+        node = _node(g, label="hub")
+        Fanout(
+            registry=g,
+            predecessor_id=node.uid,
+            requirement=Requirement(has_kind=TraversableNode, has_tags={"menu"}),
+        )
+
+        resolver = Resolver(entity_groups=[], template_groups=[])
+        assert resolver.resolve_frontier_node(node) is True
