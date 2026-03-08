@@ -4,6 +4,9 @@
 **Status:** ACTIVE DESIGN — `vm.provision.Fanout` and `MenuBlock` planning-time action projection are implemented; refresh policy, call/return menu semantics, and sandbox scheduling layers remain deferred  
 **Relevant layers:** `tangl.story.episode`, `tangl.story.fabula`, `tangl.vm.provision`, `world` / domain schedule facets
 
+See also [SANDBOX_FANOUT_DESIGN.md](SANDBOX_FANOUT_DESIGN.md) for the more
+concrete sandbox-location interpretation of this pattern.
+
 ---
 
 ## Problem Statement
