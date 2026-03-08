@@ -73,8 +73,8 @@ class StoryCompiler:
     * Builds scene and block template hierarchy used by runtime scope matching.
     * Canonicalizes action references so authored shorthand and qualified
       references resolve into a stable form.
-    * Attempts to resolve authored ``obj_cls`` references during compilation and
-      falls back to the expected default kind when an override cannot be
+    * Attempts to resolve authored ``kind`` references during compilation and
+      still tolerates legacy ``obj_cls`` input when an override cannot be
       imported.
 
     API
@@ -146,7 +146,10 @@ class StoryCompiler:
         root_scene_labels = {scene_label for scene_label, _ in scenes}
         for scene_label, scene_data in scenes:
             scene_payload = self._build_payload(
-                kind=self._resolve_kind(scene_data.get("obj_cls"), fallback=Scene),
+                kind=self._resolve_kind(
+                    scene_data.get("kind") or scene_data.get("obj_cls"),
+                    fallback=Scene,
+                ),
                 payload={
                     **scene_data,
                     "label": scene_data.get("label") or scene_label,
@@ -197,9 +200,9 @@ class StoryCompiler:
 
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
-                        block_data.get("obj_cls")
-                        or block_data.get("block_cls")
-                        or block_data.get("kind"),
+                        block_data.get("kind")
+                        or block_data.get("obj_cls")
+                        or block_data.get("block_cls"),
                         fallback=Block,
                     ),
                     payload={
@@ -254,7 +257,10 @@ class StoryCompiler:
                 else f"{parent_label}.{label}"
             )
             payload = self._build_payload(
-                kind=self._resolve_kind(item_data.get("obj_cls"), fallback=fallback_kind),
+                kind=self._resolve_kind(
+                    item_data.get("kind") or item_data.get("obj_cls"),
+                    fallback=fallback_kind,
+                ),
                 payload={**item_data, "label": item_data.get("label") or label},
                 default_label=label,
             )
@@ -437,16 +443,16 @@ class StoryCompiler:
             return None
         return f"{scene_label}.{blocks[next_index][0]}"
 
-    def _resolve_kind(self, raw_obj_cls: Any, *, fallback: type[Entity]) -> type[Entity]:
-        if isinstance(raw_obj_cls, type):
-            return self._map_external_kind(raw_obj_cls.__name__, fallback=fallback)
+    def _resolve_kind(self, raw_kind: Any, *, fallback: type[Entity]) -> type[Entity]:
+        if isinstance(raw_kind, type):
+            return self._map_external_kind(raw_kind.__name__, fallback=fallback)
 
-        if isinstance(raw_obj_cls, str):
-            mapped = self._map_external_kind(raw_obj_cls.split(".")[-1], fallback=fallback)
+        if isinstance(raw_kind, str):
+            mapped = self._map_external_kind(raw_kind.split(".")[-1], fallback=fallback)
             if mapped is not fallback:
                 return mapped
             try:
-                module_name, class_name = raw_obj_cls.rsplit(".", 1)
+                module_name, class_name = raw_kind.rsplit(".", 1)
                 cls = getattr(import_module(module_name), class_name)
                 if isinstance(cls, type):
                     return self._map_external_kind(cls.__name__, fallback=fallback)
