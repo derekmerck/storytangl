@@ -5,6 +5,7 @@ Organized by concept:
 - HasRequirement: provider linking
 - Dependency: pull-resource edge, provider syncs successor
 - Affordance: push-resource edge, provider syncs successor
+- Fanout: gather edge, provider ids sync a provider set
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from tangl.core import Entity, Graph, Registry, RegistryAware, Selector
 from tangl.vm.provision import (
     Affordance,
     Dependency,
+    Fanout,
     HasRequirement,
     ProvisionPolicy,
     Requirement,
@@ -238,3 +240,55 @@ class TestAffordance:
         assert aff.predecessor is frontier
         assert aff.provider is None
         assert not aff.satisfied
+
+
+# ============================================================================
+# Fanout — gather resource set
+# ============================================================================
+
+
+class TestFanout:
+    def test_set_providers_tracks_multiple_matches(self) -> None:
+        graph = Graph()
+        hub = RegistryAware(label="hub", registry=graph)
+        alpha = RegistryAware(label="alpha", registry=graph, tags={"menu"})
+        beta = RegistryAware(label="beta", registry=graph, tags={"menu"})
+        fanout = Fanout(
+            registry=graph,
+            predecessor_id=hub.uid,
+            requirement=Requirement(has_tags={"menu"}),
+        )
+
+        fanout.set_providers([alpha, beta])
+
+        assert fanout.provider_ids == [alpha.uid, beta.uid]
+        assert fanout.providers == [alpha, beta]
+
+    def test_clear_providers_resets_provider_ids(self) -> None:
+        graph = Graph()
+        hub = RegistryAware(label="hub", registry=graph)
+        alpha = RegistryAware(label="alpha", registry=graph, tags={"menu"})
+        fanout = Fanout(
+            registry=graph,
+            predecessor_id=hub.uid,
+            requirement=Requirement(has_tags={"menu"}),
+        )
+        fanout.set_providers([alpha])
+
+        fanout.clear_providers()
+
+        assert fanout.provider_ids == []
+        assert fanout.providers == []
+
+    def test_set_providers_rejects_non_matching_provider(self) -> None:
+        graph = Graph()
+        hub = RegistryAware(label="hub", registry=graph)
+        wrong = RegistryAware(label="wrong", registry=graph, tags={"other"})
+        fanout = Fanout(
+            registry=graph,
+            predecessor_id=hub.uid,
+            requirement=Requirement(has_tags={"menu"}),
+        )
+
+        with pytest.raises(ValueError, match="not satisfied"):
+            fanout.set_providers([wrong])

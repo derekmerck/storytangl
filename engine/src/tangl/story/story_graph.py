@@ -41,6 +41,7 @@ class StoryGraph(Graph):
 
     initial_cursor_id: UUID | None = None
     initial_cursor_ids: list[UUID] = Field(default_factory=list)
+    frozen_shape: bool = False
     locals: dict[str, Any] = Field(default_factory=dict)
     factory: TemplateRegistry | None = Field(default=None, exclude=True)
     script_manager: Any | None = Field(default=None, exclude=True)

@@ -49,7 +49,7 @@ scenes:
         
         media:
           - name: companion.svg
-            media_role: character_portrait
+            media_role: avatar_im
         
         actions:
           - text: "I'm looking for the Northern Pass"

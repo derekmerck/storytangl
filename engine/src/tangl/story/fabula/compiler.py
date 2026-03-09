@@ -11,7 +11,7 @@ from tangl.ir.story_ir import StoryScript
 from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
-from ..episode import Action, Block, Scene
+from ..episode import Action, Block, MenuBlock, Scene
 
 
 @dataclass(slots=True)
@@ -73,14 +73,24 @@ class StoryCompiler:
     * Builds scene and block template hierarchy used by runtime scope matching.
     * Canonicalizes action references so authored shorthand and qualified
       references resolve into a stable form.
-    * Attempts to resolve authored ``obj_cls`` references during compilation and
-      falls back to the expected default kind when an override cannot be
+    * Attempts to resolve authored ``kind`` references during compilation and
+      still tolerates legacy ``obj_cls`` input when an override cannot be
       imported.
 
     API
     ---
     - :meth:`compile` is the supported public entry point.
     """
+
+    @staticmethod
+    def validate_ir(script_data: dict[str, Any]) -> StoryScript:
+        """Validate raw script data against the near-native IR schema.
+
+        Use this when authored near-native YAML should be linted explicitly.
+        Compilation itself accepts runtime-ready dicts directly so codecs are
+        not forced through the at-rest IR model.
+        """
+        return StoryScript.model_validate(script_data)
 
     def compile(
         self,
@@ -92,20 +102,26 @@ class StoryCompiler:
     ) -> StoryTemplateBundle:
         """Compile authored story data into a reusable template bundle.
 
-        Accepts either raw script dictionaries or validated
-        :class:`~tangl.ir.story_ir.StoryScript` objects. The returned bundle is
-        fully normalized and ready for :class:`~tangl.story.fabula.StoryMaterializer`.
+        Accepts raw script dictionaries or validated
+        :class:`~tangl.ir.story_ir.StoryScript` objects.
+
+        Raw dicts are compiled directly. Use :meth:`validate_ir` separately
+        when authored near-native data should be linted against the IR schema.
         """
-        script = script_data if isinstance(script_data, StoryScript) else StoryScript.model_validate(script_data)
-        data = script.model_dump(by_alias=True, exclude_none=True)
+        if isinstance(script_data, StoryScript):
+            data = script_data.model_dump(by_alias=True, exclude_none=True)
+            label = script_data.label
+        else:
+            data = dict(script_data)
+            label = str(data.get("label") or "story")
 
         metadata = dict(data.get("metadata") or {})
-        locals_ns = dict(data.get("globals") or {})
+        locals_ns = dict(data.get("globals") or data.get("locals") or {})
 
-        registry = TemplateRegistry(label=f"{script.label}_templates")
+        registry = TemplateRegistry(label=f"{label}_templates")
         root = TemplateGroup(
-            label=script.label,
-            payload=Entity(label=script.label),
+            label=label,
+            payload=Entity(label=label),
             registry=registry,
         )
 
@@ -130,7 +146,10 @@ class StoryCompiler:
         root_scene_labels = {scene_label for scene_label, _ in scenes}
         for scene_label, scene_data in scenes:
             scene_payload = self._build_payload(
-                kind=self._resolve_kind(scene_data.get("obj_cls"), fallback=Scene),
+                kind=self._resolve_kind(
+                    scene_data.get("kind") or scene_data.get("obj_cls"),
+                    fallback=Scene,
+                ),
                 payload={
                     **scene_data,
                     "label": scene_data.get("label") or scene_label,
@@ -147,8 +166,14 @@ class StoryCompiler:
             )
             root.add_child(scene_templ)
 
+            self._compile_section(
+                parent=scene_templ,
+                items=scene_data.get("templates"),
+                fallback_kind=TraversableNode,
+            )
+
             blocks = self._normalize_mapping(scene_data.get("blocks"))
-            for block_label, block_data in blocks:
+            for block_index, (block_label, block_data) in enumerate(blocks):
                 qualified_label = f"{scene_label}.{block_label}"
                 actions = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("actions")),
@@ -165,9 +190,19 @@ class StoryCompiler:
                     scene_label=scene_label,
                     root_scene_labels=root_scene_labels,
                 )
+                next_qualified = self._next_block_label(blocks, block_index, scene_label)
+                for spec_list in (actions, continues, redirects):
+                    for spec in spec_list:
+                        if not spec.get("successor_ref") and next_qualified is not None:
+                            spec["successor_ref"] = next_qualified
+                            spec["successor_is_absolute"] = False
+                            spec["successor_is_inferred"] = True
+
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
-                        block_data.get("obj_cls") or block_data.get("block_cls"),
+                        block_data.get("kind")
+                        or block_data.get("obj_cls")
+                        or block_data.get("block_cls"),
                         fallback=Block,
                     ),
                     payload={
@@ -222,7 +257,10 @@ class StoryCompiler:
                 else f"{parent_label}.{label}"
             )
             payload = self._build_payload(
-                kind=self._resolve_kind(item_data.get("obj_cls"), fallback=fallback_kind),
+                kind=self._resolve_kind(
+                    item_data.get("kind") or item_data.get("obj_cls"),
+                    fallback=fallback_kind,
+                ),
                 payload={**item_data, "label": item_data.get("label") or label},
                 default_label=label,
             )
@@ -253,12 +291,18 @@ class StoryCompiler:
                 items.append((str(label), payload))
             return items
         items = []
+        anon_counter = 0
         for item in value:
             if isinstance(item, dict):
                 payload = dict(item)
             else:
                 payload = dict(getattr(item, "model_dump", lambda **_: {})())
-            label = payload.get("label") or "item"
+            label = payload.get("label")
+            if not label:
+                label = f"_anon_{anon_counter}"
+                anon_counter += 1
+                payload["label"] = label
+                payload["_is_anonymous"] = True
             items.append((str(label), payload))
         return items
 
@@ -305,6 +349,7 @@ class StoryCompiler:
                 if authored is None:
                     authored = (
                         payload.get("successor")
+                        or payload.get("next")
                         or payload.get("target_ref")
                         or payload.get("target_node")
                     )
@@ -345,6 +390,7 @@ class StoryCompiler:
         metadata: dict[str, Any],
         registry: TemplateRegistry,
     ) -> list[str]:
+        """Resolve compile-time entry template ids using authored priority rules."""
         start_at = metadata.get("start_at")
         if isinstance(start_at, str) and start_at:
             return [start_at]
@@ -353,22 +399,60 @@ class StoryCompiler:
             if values:
                 return values
 
+        block_templates = [
+            template
+            for template in registry.values()
+            if hasattr(template, "has_payload_kind") and template.has_payload_kind(Block)
+        ]
+
+        for tag_name in ("start", "entry"):
+            for template in block_templates:
+                if template.has_tags({tag_name}):
+                    return [template.get_label()]
+
+        for template in block_templates:
+            payload = getattr(template, "payload", None)
+            if payload is None:
+                continue
+            block_locals = getattr(payload, "locals", None) or {}
+            if isinstance(block_locals, dict) and (
+                block_locals.get("is_start") or block_locals.get("start_at")
+            ):
+                return [template.get_label()]
+
+        for template in block_templates:
+            label = template.get_label()
+            short_label = label.rsplit(".", 1)[-1] if "." in label else label
+            if short_label.lower() == "start":
+                return [label]
+
         first_block = registry.find_one(Selector(has_payload_kind=Block))
         if first_block is not None:
             return [first_block.get_label()]
 
         return []
 
-    def _resolve_kind(self, raw_obj_cls: Any, *, fallback: type[Entity]) -> type[Entity]:
-        if isinstance(raw_obj_cls, type):
-            return self._map_external_kind(raw_obj_cls.__name__, fallback=fallback)
+    @staticmethod
+    def _next_block_label(
+        blocks: list[tuple[str, dict[str, Any]]],
+        current_index: int,
+        scene_label: str,
+    ) -> str | None:
+        next_index = current_index + 1
+        if next_index >= len(blocks):
+            return None
+        return f"{scene_label}.{blocks[next_index][0]}"
 
-        if isinstance(raw_obj_cls, str):
-            mapped = self._map_external_kind(raw_obj_cls.split(".")[-1], fallback=fallback)
+    def _resolve_kind(self, raw_kind: Any, *, fallback: type[Entity]) -> type[Entity]:
+        if isinstance(raw_kind, type):
+            return self._map_external_kind(raw_kind.__name__, fallback=fallback)
+
+        if isinstance(raw_kind, str):
+            mapped = self._map_external_kind(raw_kind.split(".")[-1], fallback=fallback)
             if mapped is not fallback:
                 return mapped
             try:
-                module_name, class_name = raw_obj_cls.rsplit(".", 1)
+                module_name, class_name = raw_kind.rsplit(".", 1)
                 cls = getattr(import_module(module_name), class_name)
                 if isinstance(cls, type):
                     return self._map_external_kind(cls.__name__, fallback=fallback)
@@ -386,7 +470,7 @@ class StoryCompiler:
             "Setting": Location,
             "Scene": Scene,
             "Block": Block,
-            "MenuBlock": Block,
+            "MenuBlock": MenuBlock,
             "Action": Action,
             "Node": TraversableNode,
             "TraversableNode": TraversableNode,
@@ -408,9 +492,19 @@ class StoryCompiler:
 
         if kind is Action:
             if payload.get("successor_ref") is None:
-                mapped_ref = payload.get("successor") or payload.get("target_ref") or payload.get("target_node")
+                mapped_ref = (
+                    payload.get("successor")
+                    or payload.get("next")
+                    or payload.get("target_ref")
+                    or payload.get("target_node")
+                )
                 if mapped_ref is not None:
                     payload["successor_ref"] = mapped_ref
+            if not payload.get("text") and payload.get("content"):
+                payload["text"] = payload.get("content")
+
+        if issubclass(kind, Block) and payload.get("_is_anonymous"):
+            payload["is_anonymous"] = True
 
         allowed = set(getattr(kind, "model_fields", {}).keys())
         filtered = {k: v for k, v in payload.items() if k in allowed}

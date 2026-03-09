@@ -47,6 +47,13 @@ class HasGame:
       recreated when needed.
     - **Factory wiring**: :meth:`create_game_block` adds POSTREQS edges for
       victory/defeat/draw exits.
+
+    Notes
+    -----
+    Current move provisioning happens dynamically during ``PLANNING``, but the
+    formal model is closer to a self-fanout: each available move is an edge
+    variant carrying different payload/label data while still targeting this
+    same node.
     """
 
     _game_class: ClassVar[type[Game]] = Game

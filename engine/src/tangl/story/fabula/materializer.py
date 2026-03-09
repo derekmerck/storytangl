@@ -6,7 +6,9 @@ from uuid import UUID
 
 from tangl.core import GraphItem, Selector, TemplateRegistry
 from tangl.vm import (
+    Affordance,
     Dependency,
+    Fanout,
     ProvisionPolicy,
     Requirement,
     Resolver,
@@ -16,7 +18,7 @@ from tangl.vm import (
 )
 
 from ..concepts import Actor, Location, Role, Setting
-from ..episode import Action, Block, Scene
+from ..episode import Action, Block, MenuBlock, Scene
 from ..story_graph import StoryGraph
 from .compiler import StoryTemplateBundle
 from .script_manager import ScriptManager
@@ -150,6 +152,7 @@ class StoryMaterializer:
         bundle: StoryTemplateBundle,
         story_label: str,
         init_mode: InitMode,
+        freeze_shape: bool = False,
         world: object | None = None,
     ) -> StoryInitResult:
         """Create one runtime story graph from a compiled bundle.
@@ -164,6 +167,7 @@ class StoryMaterializer:
 
         graph = StoryGraph(
             label=story_label,
+            frozen_shape=(init_mode is InitMode.EAGER and freeze_shape),
             locals=dict(bundle.locals),
             factory=bundle.template_registry,
             script_manager=script_manager,
@@ -190,6 +194,8 @@ class StoryMaterializer:
 
         if init_mode is InitMode.EAGER:
             self._prelink_all_dependencies(state=state)
+            if graph.frozen_shape:
+                self._prelink_all_fanouts(state=state)
             assert_traversal_contracts(state.graph)
             if state.report.unresolved_hard:
                 raise GraphInitializationError(state.report)
@@ -355,6 +361,8 @@ class StoryMaterializer:
                     templ_ref_key="location_template_ref",
                     state=state,
                 )
+                if isinstance(node, MenuBlock):
+                    self._wire_menu_fanout_for_block(node=node, state=state)
                 self._wire_actions_for_block(node=node, specs=node.redirects, state=state)
                 self._wire_actions_for_block(node=node, specs=node.continues, state=state)
                 self._wire_actions_for_block(node=node, specs=node.actions, state=state)
@@ -374,12 +382,15 @@ class StoryMaterializer:
             successor_is_absolute = bool(spec.get("successor_is_absolute", False))
             if successor_ref is None:
                 successor_ref = self._coerce_str(
-                    spec.get("successor") or spec.get("target_ref") or spec.get("target_node")
+                    spec.get("successor")
+                    or spec.get("next")
+                    or spec.get("target_ref")
+                    or spec.get("target_node")
                 )
             if not successor_ref:
                 msg = (
                     f"Block '{node.get_label()}' action[{index}] is missing successor "
-                    "(expected one of: successor, successor_ref, target_ref, target_node)"
+                    "(expected one of: successor, next, successor_ref, target_ref, target_node)"
                 )
                 raise ValueError(msg)
             activation = self._coerce_str(spec.get("trigger") or spec.get("activation"))
@@ -389,7 +400,8 @@ class StoryMaterializer:
                 registry=state.graph,
                 label=spec.get("label") or f"action_{node.label}_{index}",
                 predecessor_id=node.uid,
-                text=self._coerce_str(spec.get("text")) or "",
+                text=self._coerce_str(spec.get("text") or spec.get("content") or spec.get("label"))
+                or "",
                 successor_ref=successor_ref,
                 activation=activation,
                 payload=spec.get("payload"),
@@ -438,6 +450,27 @@ class StoryMaterializer:
                     f"{state.report.mode.value.upper()} init left action destination unresolved; "
                     f"action={action.get_label()!r}, expected={successor_ref!r}"
                 )
+
+    def _wire_menu_fanout_for_block(
+        self,
+        *,
+        node: MenuBlock,
+        state: _MaterializationState,
+    ) -> None:
+        for index, selector_spec in enumerate(MenuBlock.normalize_menu_selectors(node.menu_items)):
+            requirement_data = dict(selector_spec)
+            requirement_data.setdefault("has_kind", TraversableNode)
+            requirement = Requirement(
+                hard_requirement=False,
+                **requirement_data,
+            )
+            Fanout(
+                registry=state.graph,
+                label=f"fanout_{node.get_label()}_{index}",
+                predecessor_id=node.uid,
+                requirement=requirement,
+                tags={"dynamic", "fanout", "menu"},
+            )
 
     def _wire_dependencies_for_specs(
         self,
@@ -514,6 +547,62 @@ class StoryMaterializer:
                     state.report.unresolved_hard.append(unresolved)
                 else:
                     state.report.unresolved_soft.append(unresolved)
+
+    def _prelink_all_fanouts(self, *, state: _MaterializationState) -> None:
+        fanouts = sorted(
+            Selector(has_kind=Fanout).filter(state.graph.values()),
+            key=self._order_key,
+        )
+
+        for fanout in fanouts:
+            ctx = _PrelinkCtx(
+                graph=state.graph,
+                template_registry=state.bundle.template_registry,
+                cursor_id=fanout.predecessor_id,
+            )
+            resolver = Resolver.from_ctx(ctx)
+            resolver.resolve_fanout(fanout, _ctx=ctx)
+            state.report.bump_prelinked("fanout_resolved")
+
+        menus = sorted(
+            Selector(has_kind=MenuBlock).filter(state.graph.values()),
+            key=self._order_key,
+        )
+        for menu in menus:
+            self._project_prelinked_menu_actions(menu=menu, state=state)
+
+    def _project_prelinked_menu_actions(
+        self,
+        *,
+        menu: MenuBlock,
+        state: _MaterializationState,
+    ) -> None:
+        graph = state.graph
+
+        for edge in list(menu.edges_out(Selector(has_kind=Action, trigger_phase=None))):
+            tags = getattr(edge, "tags", set()) or set()
+            if {"dynamic", "fanout", "menu"}.issubset(tags):
+                graph.remove(edge.uid)
+
+        affordances = [
+            affordance
+            for affordance in menu.edges_out(Selector(has_kind=Affordance))
+            if {"dynamic", "fanout"}.issubset(getattr(affordance, "tags", set()) or set())
+        ]
+
+        for index, affordance in enumerate(affordances):
+            provider = affordance.successor or affordance.provider
+            if provider is None:
+                continue
+
+            Action(
+                registry=graph,
+                label=f"menu_{menu.get_label()}_{index}",
+                predecessor_id=menu.uid,
+                successor_id=provider.uid,
+                text=MenuBlock.action_text_for(provider),
+                tags={"dynamic", "fanout", "menu"},
+            )
 
     @staticmethod
     def _coerce_str(value: Any) -> str | None:

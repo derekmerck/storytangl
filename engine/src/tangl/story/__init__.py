@@ -52,7 +52,7 @@ provisioning mechanisms remain in :mod:`tangl.vm`.
 """
 
 from .concepts import Actor, Location, Role, Setting
-from .episode import Action, Block, Scene
+from .episode import Action, Block, MenuBlock, Scene
 from .fabula import (
     GraphInitializationError,
     InitMode,
@@ -90,6 +90,7 @@ __all__ = [
     "InitMode",
     "InitReport",
     "Location",
+    "MenuBlock",
     "ResolutionError",
     "ResolutionFailureReason",
     "ScriptManager",

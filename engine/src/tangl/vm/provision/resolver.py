@@ -34,7 +34,7 @@ from .provisioner import (
     _next_provision_uid,
     _template_hash_value,
 )
-from .requirement import Requirement, PT, Dependency, Affordance
+from .requirement import Requirement, PT, Dependency, Affordance, Fanout
 from .scope import (
     build_plan,
     prefix_paths,
@@ -462,6 +462,275 @@ class Resolver:
                 )
             )
         return offers
+
+    @staticmethod
+    def _clone_requirement(requirement: Requirement[PT]) -> Requirement[PT]:
+        clone = requirement.model_copy(deep=True)
+        clone.provider_id = None
+        clone.unsatisfiable = None
+        clone.unambiguously_resolved = None
+        clone.selected_offer_policy = None
+        clone.resolved_step = None
+        clone.resolved_cursor_id = None
+        clone.resolution_reason = None
+        clone.resolution_meta = None
+        return clone
+
+    @staticmethod
+    def _fanout_edge_tag(fanout: Fanout[Any]) -> str:
+        return f"fanout:{fanout.uid}"
+
+    @classmethod
+    def _fanout_affordance_tags(cls, fanout: Fanout[Any]) -> set[str]:
+        return {"dynamic", "fanout", cls._fanout_edge_tag(fanout)}
+
+    def _iter_fanout_affordances(self, fanout: Fanout[Any]) -> Iterator[Affordance[Any]]:
+        source = fanout.predecessor
+        if source is None or fanout.registry is None:
+            return
+
+        marker = self._fanout_edge_tag(fanout)
+        for affordance in source.edges_out(Selector(has_kind=Affordance)):
+            tags = getattr(affordance, "tags", set()) or set()
+            if marker not in tags:
+                continue
+            yield affordance
+
+    def _clear_fanout_affordances(self, fanout: Fanout[Any], *, _ctx: Any = None) -> None:
+        graph = fanout.registry
+        if graph is None:
+            return
+        for affordance in list(self._iter_fanout_affordances(fanout)):
+            graph.remove(affordance.uid, _ctx=_ctx)
+
+    @staticmethod
+    def _stamp_requirement_resolution(requirement: Requirement[Any], *, _ctx: Any = None) -> None:
+        step = getattr(_ctx, "step", None)
+        requirement.resolved_step = step if isinstance(step, int) else None
+
+        cursor_id = getattr(_ctx, "cursor_id", None)
+        if cursor_id is None:
+            cursor = getattr(_ctx, "cursor", None)
+            cursor_id = getattr(cursor, "uid", None)
+        requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
+
+    def gather_fanout_offers(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx=None,
+    ) -> list[ProvisionOffer]:
+        """Return all admissible EXISTING/CREATE offers for ``requirement``."""
+        offers: list[ProvisionOffer] = []
+
+        for i, entity_group in enumerate(self.location_entity_groups):
+            offers.extend(
+                FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement)
+            )
+
+        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
+
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is not None:
+            from tangl.vm.dispatch import do_resolve
+
+            try:
+                resolved_offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
+            except TypeError as exc:
+                requirement.resolution_reason = "override_invalid"
+                requirement.resolution_meta = {"error": str(exc)}
+            else:
+                if resolved_offers is not None:
+                    offers = list(resolved_offers)
+
+        offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
+
+        def _allowed(offer: ProvisionOffer) -> bool:
+            if offer.policy & ProvisionPolicy.STUB:
+                return False
+            if offer.policy & ProvisionPolicy.TOKEN:
+                return False
+            if offer.policy & ProvisionPolicy.UPDATE:
+                return False
+            if offer.policy & ProvisionPolicy.CLONE:
+                return False
+            return bool(offer.policy & (ProvisionPolicy.EXISTING | ProvisionPolicy.CREATE))
+
+        offers = [offer for offer in offers if _allowed(offer)]
+        offers.sort(key=lambda v: v.sort_key())
+
+        deduped: list[ProvisionOffer] = []
+        seen_keys: set[tuple[UUID, str | None]] = set()
+        for offer in offers:
+            candidate = getattr(offer, "candidate", None)
+            candidate_uid = getattr(candidate, "uid", None)
+            if not isinstance(candidate_uid, UUID):
+                deduped.append(offer)
+                continue
+
+            key = (candidate_uid, getattr(offer, "target_ctx", None))
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            deduped.append(offer)
+
+        return deduped
+
+    def _accept_fanout_offer(
+        self,
+        *,
+        requirement: Requirement[PT],
+        offer: ProvisionOffer,
+        graph: Any,
+        _ctx: Any = None,
+    ) -> PT | None:
+        def _existing_instance_for_template() -> PT | None:
+            candidate = getattr(offer, "candidate", None)
+            if not isinstance(candidate, EntityTemplate):
+                return None
+
+            candidate_label = candidate.get_label()
+            candidate_hash = _template_hash_value(candidate)
+
+            for entity_group in self.location_entity_groups:
+                for existing in entity_group:
+                    if not isinstance(existing, RegistryAware):
+                        continue
+                    if existing.registry is not graph:
+                        continue
+
+                    existing_path = getattr(existing, "path", None)
+                    if isinstance(existing_path, str) and existing_path == candidate_label:
+                        return existing
+
+                    if getattr(existing, "templ_hash", None) == candidate_hash:
+                        return existing
+
+            return None
+
+        target_ctx = getattr(offer, "target_ctx", None)
+        if isinstance(target_ctx, str) and target_ctx:
+            existing = self._find_existing_path_node(graph, target_ctx)
+            if isinstance(existing, RegistryAware):
+                try:
+                    if requirement.satisfied_by(existing):
+                        return existing
+                except Exception as exc:
+                    logger.debug(
+                        "fanout existing-path reuse failed for requirement=%s target_ctx=%s",
+                        requirement,
+                        target_ctx,
+                        exc_info=exc,
+                    )
+
+        if offer.policy & ProvisionPolicy.CREATE:
+            existing = _existing_instance_for_template()
+            if existing is not None:
+                try:
+                    if requirement.satisfied_by(existing):
+                        return existing
+                except Exception:
+                    pass
+                return None
+
+        provider = offer.callback(_ctx=_ctx)
+        if provider is None:
+            return None
+        if not isinstance(provider, RegistryAware):
+            raise TypeError("Fanout providers must be RegistryAware")
+
+        parent = self._execute_build_chain(
+            requirement=requirement,
+            offer=offer,
+            graph=graph,
+            _ctx=_ctx,
+        )
+
+        if provider.registry is not graph:
+            graph.add(provider, _ctx=_ctx)
+            if getattr(provider, "parent", None) is not parent:
+                self._attach_child(parent, provider)
+        elif parent is not None and getattr(provider, "parent", None) is not parent:
+            self._attach_child(parent, provider)
+
+        requirement._validate_satisfied_by(provider)
+        return provider
+
+    def resolve_fanout(
+        self,
+        fanout: Fanout[PT],
+        *,
+        _ctx=None,
+    ) -> list[PT]:
+        """Resolve and publish every eligible provider for ``fanout``."""
+        graph = fanout.registry
+        if graph is None:
+            raise ValueError("Fanout must be bound to a registry before resolution")
+
+        offers = self.gather_fanout_offers(fanout.requirement, _ctx=_ctx)
+        providers: list[PT] = []
+        accepted_offers: list[ProvisionOffer] = []
+        seen_provider_ids: set[UUID] = set()
+
+        for offer in offers:
+            try:
+                provider = self._accept_fanout_offer(
+                    requirement=fanout.requirement,
+                    offer=offer,
+                    graph=graph,
+                    _ctx=_ctx,
+                )
+            except (TypeError, ValueError, RuntimeError) as exc:
+                logger.debug(
+                    "Skipping invalid fanout offer origin=%s for fanout=%s",
+                    getattr(offer, "origin_id", None),
+                    fanout,
+                    exc_info=exc,
+                )
+                continue
+
+            if provider is None:
+                continue
+            if provider.uid in seen_provider_ids:
+                continue
+
+            seen_provider_ids.add(provider.uid)
+            providers.append(provider)
+            accepted_offers.append(offer)
+
+        fanout.set_providers(providers, _ctx=_ctx)
+        self._clear_fanout_affordances(fanout, _ctx=_ctx)
+
+        source = fanout.predecessor
+        if source is not None:
+            affordance_tags = self._fanout_affordance_tags(fanout)
+            for provider in providers:
+                affordance = Affordance(
+                    registry=graph,
+                    predecessor_id=source.uid,
+                    requirement=self._clone_requirement(fanout.requirement),
+                    tags=set(affordance_tags),
+                )
+                affordance.set_provider(provider, _ctx=_ctx)
+
+        requirement = fanout.requirement
+        self._stamp_requirement_resolution(requirement, _ctx=_ctx)
+        requirement.unsatisfiable = False
+        requirement.unambiguously_resolved = len(providers) == 1
+        requirement.selected_offer_policy = accepted_offers[0].policy if accepted_offers else None
+
+        if providers:
+            requirement.resolution_reason = "resolved"
+        else:
+            requirement.resolution_reason = "provider_none" if offers else "no_offers"
+
+        requirement.resolution_meta = {
+            "provider_ids": [str(provider.uid) for provider in providers],
+            "selected": [summarize_offer(offer) for offer in accepted_offers[:5]],
+            "alternatives": [summarize_offer(offer) for offer in offers[:5]],
+        }
+
+        return providers
 
     def _resolve_requirement_offer(
         self,
@@ -986,9 +1255,14 @@ class Resolver:
         """Resolve all open dependencies on ``node`` and verify traversal viability."""
         # Note this is not unsatisfied deps, it's anyone without a provider
         # satisfied could mean not a hard req
-        open_deps = node.edges_out(Selector(has_kind=Dependency, provider=None))
+        open_deps = list(node.edges_out(Selector(has_kind=Dependency, provider=None)))
         for dep in open_deps:
             self.resolve_dependency(dep, allow_stubs=allow_stubs, _ctx=_ctx)
+
+        graph = getattr(node, "graph", None)
+        if not bool(getattr(graph, "frozen_shape", False)):
+            for fanout in list(node.edges_out(Selector(has_kind=Fanout))):
+                self.resolve_fanout(fanout, _ctx=_ctx)
 
         # Find unsat blockers with no provider and a hard-requirement
         unsatisfied_deps = node.edges_out(Selector(has_kind=Dependency, satisfied=False))

@@ -11,7 +11,8 @@ Conceptual layers
    - :class:`Requirement` describes an unsatisfied resource contract.
    - :class:`HasRequirement` embeds one requirement into a registry-aware
      carrier.
-   - :class:`Dependency` and :class:`Affordance` carry requirements through the
+   - :class:`Dependency`, :class:`Affordance`, and :class:`Fanout` carry
+     requirements through the graph topology.
      graph topology.
 
 2. Offer protocol
@@ -42,7 +43,7 @@ This package owns mechanism rather than narrative policy. Story-specific meaning
 for requirements and providers lives in :mod:`tangl.story`.
 """
 
-from .requirement import Requirement, HasRequirement, Dependency, Affordance
+from .requirement import Requirement, HasRequirement, Dependency, Affordance, Fanout
 from .preview import Blocker, ViabilityResult
 from .scope import (
     admitted,
@@ -79,6 +80,7 @@ __all__ = [
     "HasRequirement",
     "Dependency",
     "Affordance",
+    "Fanout",
     "Blocker",
     "ViabilityResult",
     "admitted",

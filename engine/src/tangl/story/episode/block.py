@@ -42,3 +42,10 @@ class Block(TraversableNode):
     roles: list[dict[str, Any]] = Field(default_factory=list)
     settings: list[dict[str, Any]] = Field(default_factory=list)
     media: list[dict[str, Any]] = Field(default_factory=list)
+    action_name: str = ""
+    is_anonymous: bool = False
+
+    @property
+    def _is_anonymous(self) -> bool:
+        """Compatibility alias for authored anonymous-block provenance."""
+        return self.is_anonymous
