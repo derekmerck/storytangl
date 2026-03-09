@@ -1259,8 +1259,10 @@ class Resolver:
         for dep in open_deps:
             self.resolve_dependency(dep, allow_stubs=allow_stubs, _ctx=_ctx)
 
-        for fanout in list(node.edges_out(Selector(has_kind=Fanout))):
-            self.resolve_fanout(fanout, _ctx=_ctx)
+        graph = getattr(node, "graph", None)
+        if not bool(getattr(graph, "frozen_shape", False)):
+            for fanout in list(node.edges_out(Selector(has_kind=Fanout))):
+                self.resolve_fanout(fanout, _ctx=_ctx)
 
         # Find unsat blockers with no provider and a hard-requirement
         unsatisfied_deps = node.edges_out(Selector(has_kind=Dependency, satisfied=False))

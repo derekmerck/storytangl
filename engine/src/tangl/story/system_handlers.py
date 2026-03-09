@@ -282,6 +282,9 @@ def project_menu_affordances(*, caller, ctx, **_kw):
     """Project fanout-produced affordances into ordinary choice edges."""
     if not isinstance(caller, MenuBlock):
         return None
+    graph = getattr(caller, "graph", None)
+    if bool(getattr(graph, "frozen_shape", False)):
+        return None
     if not caller.auto_provision:
         return None
 

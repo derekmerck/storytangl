@@ -242,7 +242,12 @@ class RuntimeController(HasApiEndpoints):
         else:
             mode = InitMode(mode_raw)
 
-        init_result = world.create_story(story_label, init_mode=mode)
+        freeze_shape = bool(kwargs.get("freeze_shape", False))
+        init_result = world.create_story(
+            story_label,
+            init_mode=mode,
+            freeze_shape=freeze_shape,
+        )
         story_graph = init_result.graph
         if story_graph.initial_cursor_id is None:
             raise RuntimeError("Story graph did not define an initial cursor")

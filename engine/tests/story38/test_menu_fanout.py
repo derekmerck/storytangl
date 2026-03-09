@@ -68,9 +68,13 @@ def _menu_script() -> dict:
     }
 
 
-def _create_story(script: dict | None = None):
+def _create_story(script: dict | None = None, *, freeze_shape: bool = False):
     world = World.from_script_data(script_data=script or _menu_script())
-    return world.create_story("menu_story", init_mode=InitMode.EAGER)
+    return world.create_story(
+        "menu_story",
+        init_mode=InitMode.EAGER,
+        freeze_shape=freeze_shape,
+    )
 
 
 def _block(graph, label: str) -> Block:
@@ -178,3 +182,37 @@ def test_menu_refresh_rebuilds_actions_and_removes_stale_choices() -> None:
     assert "Brew tea" not in {action.text for action in refreshed_actions}
     assert initial_ids.isdisjoint({action.uid for action in refreshed_actions})
     assert len(refreshed_actions) == 4
+
+
+def test_frozen_shape_eager_init_prebuilds_menu_actions() -> None:
+    result = _create_story(freeze_shape=True)
+    hub = _block(result.graph, "hub")
+
+    actions = _dynamic_menu_actions(hub)
+
+    assert result.graph.frozen_shape is True
+    assert len(actions) == 5
+    assert {action.text for action in actions} >= {
+        "Listen to Aria",
+        "Brew tea",
+        "Read the notes",
+        "archive",
+        "Secret project",
+    }
+
+
+def test_frozen_shape_menu_does_not_refresh_during_planning() -> None:
+    result = _create_story(freeze_shape=True)
+    hub = _block(result.graph, "hub")
+    initial_actions = _dynamic_menu_actions(hub)
+    initial_ids = {action.uid for action in initial_actions}
+
+    brew = _block(result.graph, "brew")
+    brew.tags.discard("activity")
+
+    ctx = PhaseCtx(graph=result.graph, cursor_id=hub.uid)
+    do_provision(hub, ctx=ctx)
+    refreshed_actions = _dynamic_menu_actions(hub)
+
+    assert {action.uid for action in refreshed_actions} == initial_ids
+    assert "Brew tea" in {action.text for action in refreshed_actions}

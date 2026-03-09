@@ -6,6 +6,7 @@ from uuid import UUID
 
 from tangl.core import GraphItem, Selector, TemplateRegistry
 from tangl.vm import (
+    Affordance,
     Dependency,
     Fanout,
     ProvisionPolicy,
@@ -151,6 +152,7 @@ class StoryMaterializer:
         bundle: StoryTemplateBundle,
         story_label: str,
         init_mode: InitMode,
+        freeze_shape: bool = False,
         world: object | None = None,
     ) -> StoryInitResult:
         """Create one runtime story graph from a compiled bundle.
@@ -165,6 +167,7 @@ class StoryMaterializer:
 
         graph = StoryGraph(
             label=story_label,
+            frozen_shape=(init_mode is InitMode.EAGER and freeze_shape),
             locals=dict(bundle.locals),
             factory=bundle.template_registry,
             script_manager=script_manager,
@@ -191,6 +194,8 @@ class StoryMaterializer:
 
         if init_mode is InitMode.EAGER:
             self._prelink_all_dependencies(state=state)
+            if graph.frozen_shape:
+                self._prelink_all_fanouts(state=state)
             assert_traversal_contracts(state.graph)
             if state.report.unresolved_hard:
                 raise GraphInitializationError(state.report)
@@ -542,6 +547,62 @@ class StoryMaterializer:
                     state.report.unresolved_hard.append(unresolved)
                 else:
                     state.report.unresolved_soft.append(unresolved)
+
+    def _prelink_all_fanouts(self, *, state: _MaterializationState) -> None:
+        fanouts = sorted(
+            Selector(has_kind=Fanout).filter(state.graph.values()),
+            key=self._order_key,
+        )
+
+        for fanout in fanouts:
+            ctx = _PrelinkCtx(
+                graph=state.graph,
+                template_registry=state.bundle.template_registry,
+                cursor_id=fanout.predecessor_id,
+            )
+            resolver = Resolver.from_ctx(ctx)
+            resolver.resolve_fanout(fanout, _ctx=ctx)
+            state.report.bump_prelinked("fanout_resolved")
+
+        menus = sorted(
+            Selector(has_kind=MenuBlock).filter(state.graph.values()),
+            key=self._order_key,
+        )
+        for menu in menus:
+            self._project_prelinked_menu_actions(menu=menu, state=state)
+
+    def _project_prelinked_menu_actions(
+        self,
+        *,
+        menu: MenuBlock,
+        state: _MaterializationState,
+    ) -> None:
+        graph = state.graph
+
+        for edge in list(menu.edges_out(Selector(has_kind=Action, trigger_phase=None))):
+            tags = getattr(edge, "tags", set()) or set()
+            if {"dynamic", "fanout", "menu"}.issubset(tags):
+                graph.remove(edge.uid)
+
+        affordances = [
+            affordance
+            for affordance in menu.edges_out(Selector(has_kind=Affordance))
+            if {"dynamic", "fanout"}.issubset(getattr(affordance, "tags", set()) or set())
+        ]
+
+        for index, affordance in enumerate(affordances):
+            provider = affordance.successor or affordance.provider
+            if provider is None:
+                continue
+
+            Action(
+                registry=graph,
+                label=f"menu_{menu.get_label()}_{index}",
+                predecessor_id=menu.uid,
+                successor_id=provider.uid,
+                text=MenuBlock.action_text_for(provider),
+                tags={"dynamic", "fanout", "menu"},
+            )
 
     @staticmethod
     def _coerce_str(value: Any) -> str | None:

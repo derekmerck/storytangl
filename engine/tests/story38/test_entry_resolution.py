@@ -529,6 +529,8 @@ class TestInitTimeOverride:
         result = world.create_story("test", namespace={"start_at_label": "b"})
         entry = result.graph.get(result.graph.initial_cursor_id)
         assert entry.label == "b"
+        assert result.entry_ids == [entry.uid]
+        assert result.graph.initial_cursor_ids == [entry.uid]
 
     def test_override_returning_none_uses_default(self) -> None:
         class NullOverride(World):

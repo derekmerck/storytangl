@@ -6,6 +6,8 @@
 
 See also [SANDBOX_FANOUT_DESIGN.md](SANDBOX_FANOUT_DESIGN.md) for the more
 concrete sandbox-location interpretation of this pattern.
+See also [MU_AFFORDANCES.md](MU_AFFORDANCES.md) for relationship-bound
+microconcepts that can ride on gathered providers without becoming graph peers.
 
 ---
 

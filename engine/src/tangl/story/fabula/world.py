@@ -72,13 +72,18 @@ class World:
         story_label: str,
         *,
         init_mode: InitMode = InitMode.EAGER,
+        freeze_shape: bool = False,
         namespace: dict[str, Any] | None = None,
     ) -> StoryInitResult:
+        if freeze_shape and init_mode is not InitMode.EAGER:
+            raise ValueError("freeze_shape requires InitMode.EAGER")
+
         materializer = StoryMaterializer()
         result = materializer.create_story(
             bundle=self.bundle,
             story_label=story_label,
             init_mode=init_mode,
+            freeze_shape=freeze_shape,
             world=self,
         )
 
@@ -86,8 +91,7 @@ class World:
             override_uid = self._resolve_entry_override(result.graph, namespace)
             if override_uid is not None:
                 result.graph.initial_cursor_id = override_uid
-                if override_uid not in result.graph.initial_cursor_ids:
-                    result.graph.initial_cursor_ids.append(override_uid)
+                result.graph.initial_cursor_ids[:] = [override_uid]
 
         return result
 

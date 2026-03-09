@@ -94,6 +94,13 @@ def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
 
 
+def test_freeze_shape_requires_eager_mode() -> None:
+    world = World.from_script_data(script_data=_base_script())
+
+    with pytest.raises(ValueError, match="freeze_shape requires InitMode.EAGER"):
+        world.create_story("run_lazy_frozen", init_mode=InitMode.LAZY, freeze_shape=True)
+
+
 def test_lazy_mode_missing_canonical_destination_raises_resolution_error() -> None:
     script = {
         "label": "lazy_missing_destination",

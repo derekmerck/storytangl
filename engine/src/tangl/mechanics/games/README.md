@@ -86,6 +86,20 @@ Exit edges use string predicates (``"game_won"``, ``"game_lost"``, ``"game_draw"
 that map directly to the keys injected by the ``inject_game_context`` handler, so
 the VM reads the shared namespace instead of reaching into the facet internals.
 
+## Design Note: Self-Fanout Interpretation
+
+`HasGame` move provisioning is currently implemented as planning-time dynamic
+action creation, but conceptually it is a special case of fanout:
+
+- the game node surveys its currently available moves
+- each move becomes an edge variant with distinct payload/label metadata
+- every such edge points back to the same provider node: the game block itself
+
+In other words, a game block's move set can be understood as a **self-fanout of
+traversable edges** rather than a fundamentally separate mechanism. The current
+PLANNING implementation is still appropriate, but this interpretation is useful
+for future unification with provisioning and frozen-shape graph modes.
+
 ## Creating New Games
 
 1. Subclass ``Game`` and implement scoring/round resolution.
