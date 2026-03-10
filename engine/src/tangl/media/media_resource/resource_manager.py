@@ -3,14 +3,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 import logging
 
+from tangl.core import Behavior
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
+
+IndexHandler = Behavior | Callable[..., Any]
 
 class ResourceManager:
     """ResourceManager(resource_path: Path)
@@ -27,6 +30,8 @@ class ResourceManager:
     ------------
     * **Directory indexing** – :meth:`index_directory` scans a folder and
       registers :class:`MediaRIT` entries.
+    * **Index handlers** – world/local callables can retag or relabel records
+      as they are indexed without subclassing the registry.
     * **Lookup helpers** – :meth:`get_rit` fetches entries by alias, hash, or
       filename.
     * **URL generation** – :meth:`get_url` derives a frontend path from the
@@ -46,18 +51,25 @@ class ResourceManager:
         scope: str = "world",
         label: str | None = None,
         default_tags: Iterable[str] = (),
+        index_handlers: Iterable[IndexHandler] = (),
     ) -> None:
         self.resource_path = resource_path
         self.scope = scope
         self.label = label or f"{scope}_media"
         self.default_tags = {f"scope:{scope}", *default_tags}
+        self.index_handlers = list(index_handlers)
         self.registry = MediaResourceRegistry(label=self.label)
+
+    def register_index_handler(self, handler: IndexHandler) -> None:
+        """Register one reusable indexing handler for this manager."""
+        self.index_handlers.append(handler)
 
     def index_directory(
         self,
         subdir: str = "images",
         *,
         tags: Iterable[str] = (),
+        index_handlers: Iterable[IndexHandler] = (),
     ) -> list[MediaRIT]:
         """Index all files in ``subdir`` relative to :attr:`resource_path`."""
         path = self.resource_path / subdir
@@ -66,7 +78,8 @@ class ResourceManager:
             return []
 
         files = [item for item in path.iterdir() if item.is_file()]
-        records = self.registry.index(files)
+        handlers = [*self.index_handlers, *list(index_handlers)]
+        records = self.registry.index(files, extra_handlers=handlers or None)
         for record, source in zip(records, files):
             if not record.label:
                 record.label = source.name

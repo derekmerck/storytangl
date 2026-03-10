@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Iterator, Mapping, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -82,6 +82,75 @@ class Ctx:
             meta=merged,
         )
 
+    def with_authorities(self, *authorities: Any) -> "Ctx":
+        """Return a copy with additional authority registries appended once."""
+        values = list(self.registries)
+        changed = False
+        for authority in authorities:
+            if authority is None or authority in values:
+                continue
+            values.append(authority)
+            changed = True
+        if not changed:
+            return self
+        return replace(self, registries=tuple(values))
+
+
+def _normalize_authorities(authorities: Any = None) -> tuple[Any, ...]:
+    if authorities is None:
+        return ()
+    if isinstance(authorities, (list, tuple, set, frozenset)):
+        values = authorities
+    else:
+        values = (authorities,)
+    return tuple(value for value in values if value is not None)
+
+
+@dataclass(frozen=True)
+class _AuthorityOverlayCtx:
+    """Duck-typed context wrapper that appends per-call authorities."""
+
+    base: Any
+    authorities: tuple[Any, ...] = ()
+
+    def get_authorities(self) -> list[Any]:
+        values: list[Any] = []
+
+        get_authorities = getattr(self.base, "get_authorities", None)
+        if callable(get_authorities):
+            values.extend(get_authorities() or ())
+        else:
+            registries = getattr(self.base, "registries", ()) or ()
+            for registry in registries:
+                if registry not in values:
+                    values.append(registry)
+            dispatch = getattr(self.base, "dispatch", None)
+            if dispatch is not None:
+                dispatch_values = dispatch if isinstance(dispatch, (list, tuple, set)) else (dispatch,)
+                for registry in dispatch_values:
+                    if registry is not None and registry not in values:
+                        values.append(registry)
+
+        for authority in self.authorities:
+            if authority not in values:
+                values.append(authority)
+        return values
+
+    def get_inline_behaviors(self) -> list[Any]:
+        get_inline_behaviors = getattr(self.base, "get_inline_behaviors", None)
+        if callable(get_inline_behaviors):
+            return list(get_inline_behaviors() or ())
+        return list(getattr(self.base, "inline_behaviors", ()) or ())
+
+    def get_meta(self) -> Mapping[str, Any]:
+        get_meta = getattr(self.base, "get_meta", None)
+        if callable(get_meta):
+            return get_meta()
+        return dict(getattr(self.base, "meta", None) or {})
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.base, name)
+
 
 _current_ctx: ContextVar[Any | None] = ContextVar("tangl_current_ctx", default=None)
 
@@ -92,10 +161,18 @@ def get_ctx() -> Any | None:
     return _current_ctx.get()
 
 
-def resolve_ctx(ctx: Any = None) -> Any | None:
-    """Resolve local context first, then ambient context."""
+def resolve_ctx(ctx: Any = None, authorities: Any = None) -> Any | None:
+    """Resolve local context first, then ambient context, with optional authority overlay."""
 
-    return ctx if ctx is not None else get_ctx()
+    resolved = ctx if ctx is not None else get_ctx()
+    extra_authorities = _normalize_authorities(authorities)
+    if not extra_authorities:
+        return resolved
+    if resolved is None:
+        return Ctx(registries=extra_authorities)
+    if isinstance(resolved, Ctx):
+        return resolved.with_authorities(*extra_authorities)
+    return _AuthorityOverlayCtx(base=resolved, authorities=extra_authorities)
 
 
 @contextmanager

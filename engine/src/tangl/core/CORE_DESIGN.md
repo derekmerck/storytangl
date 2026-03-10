@@ -168,6 +168,12 @@ with actor registries and world-level asset managers. Each layer should define a
 for what it minimally expects. The legacy `core.ctx.Ctx` frozen dataclass is a
 placeholder/stub.
 
+**Per-call authority overlays stay explicit.** `resolve_ctx(_ctx, authorities=[...])`
+can layer extra registries onto an explicit or ambient context for one call path
+without mutating the original context object. This is the preferred escape hatch for
+object-local registries participating in a specific hook (for example media indexing)
+rather than a blanket `get_authorities()` discovery rule.
+
 **Deferred imports are intentional.** Entity's dispatch/ctx imports are deferred to
 break circular dependencies. Entity is a low-level concept; dispatch and ctx are
 higher-order mechanisms. Entity just provides launching points for hooks.

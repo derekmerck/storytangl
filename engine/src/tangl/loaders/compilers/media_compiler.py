@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +15,8 @@ class MediaCompiler:
         self,
         media_dir: Path,
         organization_hints: dict | None = None,
+        *,
+        index_handlers: Iterable[Any] = (),
     ):
         try:
             from tangl.media.media_resource.resource_manager import ResourceManager
@@ -23,7 +27,11 @@ class MediaCompiler:
         if not media_dir.exists():
             return None
 
-        resource_manager = ResourceManager(resource_path=media_dir, scope="world")
+        resource_manager = ResourceManager(
+            resource_path=media_dir,
+            scope="world",
+            index_handlers=index_handlers,
+        )
 
         if organization_hints:
             for subdir, _config in organization_hints.items():

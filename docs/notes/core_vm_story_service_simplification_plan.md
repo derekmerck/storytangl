@@ -114,6 +114,10 @@ Completed:
 - Confirmed VM dispatch ordering already routes through `Behavior.sort_key`.
 - Deduplicated graph typed-query narrowing through shared private helpers in
   `core/graph.py`.
+- Replaced the media-specific `on_index` bootstrap with a generic
+  `resolve_ctx(..., authorities=...)` overlay path so objects can opt specific
+  local `BehaviorRegistry` instances into selected dispatch calls without
+  reviving automatic ambient per-instance local-behavior discovery.
 
 Acceptance gates:
 
@@ -250,9 +254,10 @@ Green targeted runs after the refactors in this tracker:
   `engine/tests/vm38/test_scope_path_provisioning.py`
   `engine/tests/story38/test_story_init.py`
   `engine/tests/story38/test_compiler_scope_resolution.py`
-- `1701 passed`, `68 skipped`, `9 xfailed`:
+- `1707 passed`, `68 skipped`, `9 xfailed`:
   full `poetry run pytest engine/tests -q` regression after the media fragment,
-  logger-noise, and registry-binding fixes landed.
+  logger-noise, registry-binding, media index-handler, and authority-overlay
+  fixes landed.
 
 ## Next Execution Slice
 
