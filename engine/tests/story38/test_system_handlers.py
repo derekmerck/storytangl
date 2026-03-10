@@ -259,9 +259,39 @@ def test_render_block_media_emits_canonical_formats(tmp_path) -> None:
 
     assert fragments is not None
     assert isinstance(fragments[0], JournalMediaFragment)
+    assert fragments[0].fragment_type == "media"
     assert fragments[0].content_format == "url"
     assert isinstance(fragments[1], JournalMediaFragment)
+    assert fragments[1].fragment_type == "media"
     assert fragments[1].content_format == "data"
     assert isinstance(fragments[2], JournalMediaFragment)
+    assert fragments[2].fragment_type == "media"
     assert fragments[2].content_format == "rit"
     assert fragments[2].content == rit
+
+
+def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_fallback() -> None:
+    graph = StoryGraph()
+    block = Block(
+        label="start",
+        media=[{"name": "missing.svg", "source_kind": "inventory", "media_role": "narrative_im"}],
+    )
+    graph.add(block)
+
+    dep = MediaDep(registry=graph, predecessor_id=block.uid, media_id="missing.svg", scope="world")
+    dep.requirement.resolution_reason = "no_offers"
+    dep.requirement.resolution_meta = {"alternatives": []}
+    block.media[0]["dependency_id"] = dep.uid
+
+    fragments = render_block_media(caller=block, ctx=_ctx_with_ns())
+
+    assert fragments is not None
+    assert len(fragments) == 1
+    assert isinstance(fragments[0], JournalMediaFragment)
+    assert fragments[0].fragment_type == "media"
+    assert fragments[0].content_format == "json"
+    assert fragments[0].scope == "world"
+    assert fragments[0].content["name"] == "missing.svg"
+    assert fragments[0].content["source_kind"] == "inventory"
+    assert fragments[0].content["unresolved_reason"] == "no_offers"
+    assert fragments[0].content["resolution_meta"] == {"alternatives": []}

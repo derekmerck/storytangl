@@ -431,6 +431,44 @@ def _scope_from_provider(provider: Any, *, default: str = "world") -> str:
     return default
 
 
+def _unresolved_media_placeholder(
+    *,
+    caller: Block,
+    payload: dict[str, Any],
+    dependency: MediaDep | None,
+    source_kind: str,
+) -> MediaFragment:
+    scope = payload.get("scope") or "world"
+    unresolved_reason = "unresolved_media"
+    resolution_meta: dict[str, Any] | None = None
+
+    if isinstance(dependency, MediaDep):
+        scope = dependency.scope or scope
+        unresolved_reason = dependency.requirement.resolution_reason or unresolved_reason
+        if isinstance(dependency.requirement.resolution_meta, dict):
+            resolution_meta = dict(dependency.requirement.resolution_meta)
+    elif source_kind == "potential":
+        unresolved_reason = "unsupported_media_spec"
+
+    placeholder_payload = {
+        "name": payload.get("name") or payload.get("label"),
+        "source_kind": source_kind,
+        "unresolved_reason": unresolved_reason,
+    }
+    if resolution_meta:
+        placeholder_payload["resolution_meta"] = resolution_meta
+
+    return MediaFragment(
+        source_id=caller.uid,
+        media_role=payload.get("media_role"),
+        content=placeholder_payload,
+        content_format="json",
+        content_type=_media_type_for_item(payload),
+        text=payload.get("text"),
+        scope=scope,
+    )
+
+
 @on_journal(priority=Priority.EARLY)
 def render_block_content(*, caller, ctx, **_kw):
     """Render block narrative text into content fragments."""
@@ -504,6 +542,15 @@ def render_block_media(*, caller, ctx, **_kw):
             fallback = payload.get("fallback_text") or payload.get("text")
             if isinstance(fallback, str) and fallback.strip():
                 fragments.append(ContentFragment(content=fallback, source_id=caller.uid))
+            else:
+                fragments.append(
+                    _unresolved_media_placeholder(
+                        caller=caller,
+                        payload=payload,
+                        dependency=dependency if isinstance(dependency, MediaDep) else None,
+                        source_kind=str(source_kind),
+                    )
+                )
             continue
 
         fragments.append(

@@ -37,6 +37,7 @@ class MediaFragment(ContentFragment, extra='allow'):
     staging_hints: Optional[StagingHints] = None
     media_role: Optional[str] = None  # fragment's intended use
     scope: Optional[str] = "world"
+    fragment_type: str = "media"
 
     # todo: could also pickle it if creating a dto to a python client
     @field_serializer("content")

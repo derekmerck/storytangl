@@ -72,10 +72,7 @@ Acceptance gates:
 - `engine/tests/service38/test_orchestrator.py`
 - `engine/tests/service38/controllers/test_runtime_controller.py`
 - `engine/tests/service38/controllers/test_user_controller.py`
-- `engine/tests/integration/test_service_layer.py` pending:
-  `test_story38_choice_resolution_flow` currently fails because the runtime
-  envelope no longer includes a media fragment for the integration script's
-  terminal block.
+- `engine/tests/integration/test_service_layer.py`
 
 ### Wave 2: Story/service decoupling and handler cleanup
 
@@ -90,6 +87,10 @@ Completed:
 - Extracted shared provider-collection helpers into
   `story/provider_collection.py`.
 - Reused those helpers from `story/system_handlers.py`.
+- Restored canonical journal media handling so authored media keeps
+  `fragment_type="media"` and unresolved inventory entries emit a placeholder
+  media fragment plus diagnostics instead of disappearing from runtime
+  envelopes.
 - Tightened the layering import guard so `tangl.story` no longer imports the
   service layer directly.
 
@@ -97,8 +98,7 @@ Acceptance gates:
 
 - `engine/tests/story38/test_system_handlers.py`
 - `engine/tests/integration/test_layering_import_guards.py`
-- `engine/tests/integration/test_service_layer.py` pending until the media
-  fragment regression above is resolved.
+- `engine/tests/integration/test_service_layer.py`
 
 ### Wave 3: Core/VM contract canon
 
@@ -250,11 +250,9 @@ Green targeted runs after the refactors in this tracker:
   `engine/tests/vm38/test_scope_path_provisioning.py`
   `engine/tests/story38/test_story_init.py`
   `engine/tests/story38/test_compiler_scope_resolution.py`
-
-Full `pytest engine/tests` was started after the targeted gates, but not recorded
-as a completion checkpoint from this turn because the live debug log volume made
-the run impractical to use as a clean signal. The targeted gate suites above are
-the authoritative verification for this checkpoint.
+- `1701 passed`, `68 skipped`, `9 xfailed`:
+  full `poetry run pytest engine/tests -q` regression after the media fragment,
+  logger-noise, and registry-binding fixes landed.
 
 ## Next Execution Slice
 
@@ -263,5 +261,5 @@ the authoritative verification for this checkpoint.
 2. Break `StoryMaterializer.create_story()` into explicit passes while preserving
    `LAZY` and `EAGER` behavior.
 3. Refactor `Frame.follow_edge()` / `Frame.resolve_choice()` into reducer phases.
-4. Re-run `pytest engine/tests` with quieter logging as the first Wave 4/5
-   closeout gate.
+4. Use the now-green full `engine/tests` regression as the next Wave 4/5
+   checkpoint baseline while continuing structural splits.
