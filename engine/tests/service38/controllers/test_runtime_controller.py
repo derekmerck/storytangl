@@ -19,7 +19,7 @@ from uuid import UUID
 
 import pytest
 
-from tangl.core import Selector
+from tangl.core import Graph, Selector
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,
@@ -271,6 +271,18 @@ def test_gateway_story38_status_and_update_return_runtime_info(
     assert isinstance(envelope, dict)
     assert isinstance(envelope.get("fragments"), list)
 
+
+
+def test_get_story_info_handles_ledger_without_graph_binding() -> None:
+    graph = Graph()
+    start = graph.add_node(label="start")
+    ledger = Ledger.from_graph(graph, start.uid)
+    ledger.graph = None
+
+    info = RuntimeController().get_story_info(ledger)
+
+    assert isinstance(info, RuntimeInfo)
+    assert (info.details or {}).get("cursor_label") is None
 
 
 def test_resolve_choice_rejects_legacy_passback_param(

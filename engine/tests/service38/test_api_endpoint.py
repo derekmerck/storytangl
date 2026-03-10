@@ -194,6 +194,11 @@ class TestPersistPaths:
         ep = ctrl.my_endpoint._api_endpoint
         assert ep.persist_paths == ("details.ledger", "details.user")
 
+    def test_bare_string_persist_path_becomes_single_tuple_item(self) -> None:
+        ctrl = _make_annotated(persist_paths="details.ledger")
+        ep = ctrl.my_endpoint._api_endpoint
+        assert ep.persist_paths == ("details.ledger",)
+
 
 # ---------------------------------------------------------------------------
 # EndpointPolicy

@@ -456,7 +456,12 @@ class RuntimeController(HasApiEndpoints):
     )
     def get_story_info(self, ledger: Ledger) -> RuntimeInfo:
         """Return session summary with no legacy marker assumptions."""
-        cursor_node = ledger.graph.get(ledger.cursor_id)
+        graph = getattr(ledger, "graph", None)
+        cursor_node = (
+            graph.get(ledger.cursor_id)
+            if graph is not None and ledger.cursor_id is not None
+            else None
+        )
         return RuntimeInfo.ok(
             cursor_id=ledger.cursor_id,
             step=ledger.step,

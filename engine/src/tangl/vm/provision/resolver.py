@@ -299,6 +299,145 @@ class Resolver:
                 continue
             yield from registry.values()
 
+    def _existing_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+    ) -> list[ProvisionOffer]:
+        offers: list[ProvisionOffer] = []
+        # If there are more than 20 groups, the distance-based priorities will slip
+        # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
+        # out but not global into "far away" tier and then include globals as the last group.
+        for i, entity_group in enumerate(self.location_entity_groups):
+            offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
+        return offers
+
+    def _inline_template_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        return list(
+            InlineTemplateProvisioner(
+                materialize_node=materialize_template_entity,
+                story_materialize=resolve_story_materialize_hook(_ctx),
+            ).iter_dependency_offers(requirement)
+        )
+
+    def _discover_requirement_offers(
+        self,
+        requirement: Requirement[PT],
+        *,
+        preferred_offers: Iterable[ProvisionOffer] = (),
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        offers: list[ProvisionOffer] = list(preferred_offers or [])
+        offers.extend(self._existing_offers_for_requirement(requirement))
+        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(self._token_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(self._media_inventory_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(self._inline_template_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
+        return offers
+
+    def _discover_fanout_offers(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        offers = self._existing_offers_for_requirement(requirement)
+        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
+        return offers
+
+    @staticmethod
+    def _apply_resolve_override(
+        requirement: Requirement[PT],
+        offers: list[ProvisionOffer],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is None:
+            return offers
+
+        from tangl.vm.dispatch import do_resolve
+
+        try:
+            resolved_offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
+        except TypeError as exc:
+            requirement.resolution_reason = "override_invalid"
+            requirement.resolution_meta = {"error": str(exc)}
+            return offers
+        if resolved_offers is None:
+            return offers
+        return list(resolved_offers)
+
+    @staticmethod
+    def _annotate_offers(
+        requirement: Requirement[PT],
+        offers: Iterable[ProvisionOffer],
+    ) -> list[ProvisionOffer]:
+        return [annotate_offer_specificity(requirement, offer) for offer in offers]
+
+    def _filter_requirement_offers(
+        self,
+        requirement: Requirement[PT],
+        offers: list[ProvisionOffer],
+        *,
+        allow_stubs: bool = False,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        stubs_allowed = self._stubs_allowed(allow_stubs=allow_stubs, _ctx=_ctx)
+
+        def _allowed(offer: ProvisionOffer) -> bool:
+            if offer.policy & ProvisionPolicy.STUB:
+                return stubs_allowed
+            return bool(offer.policy & requirement.provision_policy)
+
+        filtered = [offer for offer in offers if _allowed(offer)]
+        if stubs_allowed and not filtered:
+            filtered.extend(StubProvisioner.get_dependency_offers(requirement))
+        return filtered
+
+    @staticmethod
+    def _filter_fanout_offers(offers: list[ProvisionOffer]) -> list[ProvisionOffer]:
+        def _allowed(offer: ProvisionOffer) -> bool:
+            if offer.policy & ProvisionPolicy.STUB:
+                return False
+            if offer.policy & ProvisionPolicy.TOKEN:
+                return False
+            if offer.policy & ProvisionPolicy.UPDATE:
+                return False
+            if offer.policy & ProvisionPolicy.CLONE:
+                return False
+            return bool(offer.policy & (ProvisionPolicy.EXISTING | ProvisionPolicy.CREATE))
+
+        return [offer for offer in offers if _allowed(offer)]
+
+    @staticmethod
+    def _sort_offers(offers: list[ProvisionOffer]) -> list[ProvisionOffer]:
+        offers.sort(key=lambda v: v.sort_key())
+        return offers
+
+    @staticmethod
+    def _dedupe_offers_by_candidate_target(offers: list[ProvisionOffer]) -> list[ProvisionOffer]:
+        deduped: list[ProvisionOffer] = []
+        seen_keys: set[tuple[UUID, str | None]] = set()
+        for offer in offers:
+            candidate = getattr(offer, "candidate", None)
+            candidate_uid = getattr(candidate, "uid", None)
+            if not isinstance(candidate_uid, UUID):
+                deduped.append(offer)
+                continue
+
+            key = (candidate_uid, getattr(offer, "target_ctx", None))
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            deduped.append(offer)
+        return deduped
+
     def gather_offers(
         self,
         requirement: Requirement[PT],
@@ -313,56 +452,20 @@ class Resolver:
         templates, synthesized UPDATE or CLONE offers, and optional dispatch
         overrides all participate in this one ordered result set.
         """
-        offers: list[ProvisionOffer] = list(preferred_offers or [])
-
-        # If there are more than 20 groups, the distance-based priorities will slip
-        # from the NORMAL tier to LATE, maybe just collapse everything after a few scopes
-        # out but not global into "far away" tier and then include globals as the last group.
-        for i, entity_group in enumerate(self.location_entity_groups):
-            offers.extend(FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement))
-
-        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
-        offers.extend(self._token_offers_for_requirement(requirement, _ctx=_ctx))
-        offers.extend(self._media_inventory_offers_for_requirement(requirement, _ctx=_ctx))
-
-        offers.extend(
-            InlineTemplateProvisioner(
-                materialize_node=materialize_template_entity,
-                story_materialize=resolve_story_materialize_hook(_ctx),
-            ).iter_dependency_offers(requirement)
+        offers = self._discover_requirement_offers(
+            requirement,
+            preferred_offers=preferred_offers,
+            _ctx=_ctx,
         )
-        offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
-
-        _ctx = resolve_ctx(_ctx)
-        if _ctx is not None:
-            # give dispatch a chance to modify the offers
-            from tangl.vm.dispatch import do_resolve
-            try:
-                resolved_offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
-            except TypeError as exc:
-                requirement.resolution_reason = "override_invalid"
-                requirement.resolution_meta = {"error": str(exc)}
-            else:
-                if resolved_offers is not None:
-                    offers = resolved_offers
-
-        offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
-        stubs_allowed = self._stubs_allowed(allow_stubs=allow_stubs, _ctx=_ctx)
-
-        def _allowed(offer: ProvisionOffer) -> bool:
-            if offer.policy & ProvisionPolicy.STUB:
-                return stubs_allowed
-            return bool(offer.policy & requirement.provision_policy)
-
-        offers = [offer for offer in offers if _allowed(offer)]
-
-        # Debug/preview behavior: stubs keep traversal alive when authored
-        # dependencies are unsatisfied or impossible from the current state.
-        if stubs_allowed and not offers:
-            offers.extend(StubProvisioner.get_dependency_offers(requirement))
-
-        offers.sort(key=lambda v: v.sort_key())
-        return offers
+        offers = self._apply_resolve_override(requirement, offers, _ctx=_ctx)
+        offers = self._annotate_offers(requirement, offers)
+        offers = self._filter_requirement_offers(
+            requirement,
+            offers,
+            allow_stubs=allow_stubs,
+            _ctx=_ctx,
+        )
+        return self._sort_offers(offers)
 
     @staticmethod
     def _iter_local_affordance_providers(frontier: Node | None) -> Iterable[RegistryAware]:
@@ -486,60 +589,12 @@ class Resolver:
         _ctx=None,
     ) -> list[ProvisionOffer]:
         """Return all admissible EXISTING/CREATE offers for ``requirement``."""
-        offers: list[ProvisionOffer] = []
-
-        for i, entity_group in enumerate(self.location_entity_groups):
-            offers.extend(
-                FindProvisioner(values=entity_group, distance=i).get_dependency_offers(requirement)
-            )
-
-        offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
-
-        _ctx = resolve_ctx(_ctx)
-        if _ctx is not None:
-            from tangl.vm.dispatch import do_resolve
-
-            try:
-                resolved_offers = do_resolve(requirement=requirement, offers=offers, ctx=_ctx)
-            except TypeError as exc:
-                requirement.resolution_reason = "override_invalid"
-                requirement.resolution_meta = {"error": str(exc)}
-            else:
-                if resolved_offers is not None:
-                    offers = list(resolved_offers)
-
-        offers = [annotate_offer_specificity(requirement, offer) for offer in offers]
-
-        def _allowed(offer: ProvisionOffer) -> bool:
-            if offer.policy & ProvisionPolicy.STUB:
-                return False
-            if offer.policy & ProvisionPolicy.TOKEN:
-                return False
-            if offer.policy & ProvisionPolicy.UPDATE:
-                return False
-            if offer.policy & ProvisionPolicy.CLONE:
-                return False
-            return bool(offer.policy & (ProvisionPolicy.EXISTING | ProvisionPolicy.CREATE))
-
-        offers = [offer for offer in offers if _allowed(offer)]
-        offers.sort(key=lambda v: v.sort_key())
-
-        deduped: list[ProvisionOffer] = []
-        seen_keys: set[tuple[UUID, str | None]] = set()
-        for offer in offers:
-            candidate = getattr(offer, "candidate", None)
-            candidate_uid = getattr(candidate, "uid", None)
-            if not isinstance(candidate_uid, UUID):
-                deduped.append(offer)
-                continue
-
-            key = (candidate_uid, getattr(offer, "target_ctx", None))
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            deduped.append(offer)
-
-        return deduped
+        offers = self._discover_fanout_offers(requirement, _ctx=_ctx)
+        offers = self._apply_resolve_override(requirement, offers, _ctx=_ctx)
+        offers = self._annotate_offers(requirement, offers)
+        offers = self._filter_fanout_offers(offers)
+        offers = self._sort_offers(offers)
+        return self._dedupe_offers_by_candidate_target(offers)
 
     def _accept_fanout_offer(
         self,

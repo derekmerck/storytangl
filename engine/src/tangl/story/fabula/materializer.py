@@ -153,6 +153,41 @@ class StoryMaterializer:
         provisioning. ``EAGER`` mode materializes the full template registry and
         fails fast on unresolved hard dependencies.
         """
+        state = self._initialize_state(
+            bundle=bundle,
+            story_label=story_label,
+            init_mode=init_mode,
+            freeze_shape=freeze_shape,
+            world=world,
+        )
+        entry_templates = self._require_entry_templates(bundle)
+        self._materialize_templates(
+            state=state,
+            templates=self._materialization_templates(
+                bundle=bundle,
+                entry_templates=entry_templates,
+                init_mode=init_mode,
+            ),
+        )
+        self._run_topology_passes(state=state)
+        self._run_prelink_passes(state=state)
+
+        entry_nodes = self._require_entry_nodes(
+            state=state,
+            entry_templates=entry_templates,
+        )
+        self._set_initial_cursor(state.graph, entry_nodes)
+        return self._build_story_init_result(state=state)
+
+    def _initialize_state(
+        self,
+        *,
+        bundle: StoryTemplateBundle,
+        story_label: str,
+        init_mode: InitMode,
+        freeze_shape: bool,
+        world: object | None,
+    ) -> _MaterializationState:
         script_manager = getattr(world, "script_manager", None) if world is not None else None
         if script_manager is None:
             script_manager = ScriptManager(template_registry=bundle.template_registry)
@@ -167,45 +202,78 @@ class StoryMaterializer:
         )
         graph.story_id = graph.uid
         graph.story_resources = get_story_resource_manager(graph.story_id, create=True)
-        report = InitReport(mode=init_mode)
-        state = _MaterializationState(graph=graph, bundle=bundle, report=report)
+        return _MaterializationState(
+            graph=graph,
+            bundle=bundle,
+            report=InitReport(mode=init_mode),
+        )
 
+    def _require_entry_templates(self, bundle: StoryTemplateBundle) -> list[Any]:
         entry_templates = self._resolve_entry_templates(bundle)
         if not entry_templates:
             raise ValueError("No entry templates resolved for story initialization")
+        return entry_templates
 
+    def _materialization_templates(
+        self,
+        *,
+        bundle: StoryTemplateBundle,
+        entry_templates: list[Any],
+        init_mode: InitMode,
+    ) -> list[Any]:
         if init_mode is InitMode.LAZY:
-            for templ in entry_templates:
-                self._materialize_with_ancestors(templ=templ, state=state)
-        elif init_mode is InitMode.EAGER:
-            for templ in sorted(bundle.template_registry.values(), key=self._template_depth):
-                self._materialize_with_ancestors(templ=templ, state=state)
-        else:
-            raise ValueError(f"Unsupported init mode: {init_mode}")
+            return list(entry_templates)
+        if init_mode is InitMode.EAGER:
+            return sorted(bundle.template_registry.values(), key=self._template_depth)
+        raise ValueError(f"Unsupported init mode: {init_mode}")
 
+    def _materialize_templates(
+        self,
+        *,
+        state: _MaterializationState,
+        templates: list[Any],
+    ) -> None:
+        for templ in templates:
+            self._materialize_with_ancestors(templ=templ, state=state)
+
+    def _run_topology_passes(self, *, state: _MaterializationState) -> None:
         self._finalize_scene_contracts(state=state)
         self._wire_materialized_nodes(state=state)
 
-        if init_mode is InitMode.EAGER:
-            self._prelink_all_dependencies(state=state)
-            if graph.frozen_shape:
-                self._prelink_all_fanouts(state=state)
-            assert_traversal_contracts(state.graph)
-            if state.report.unresolved_hard:
-                raise GraphInitializationError(state.report)
+    def _run_prelink_passes(self, *, state: _MaterializationState) -> None:
+        if state.report.mode is not InitMode.EAGER:
+            return
+        self._prelink_all_dependencies(state=state)
+        if state.graph.frozen_shape:
+            self._prelink_all_fanouts(state=state)
+        assert_traversal_contracts(state.graph)
+        if state.report.unresolved_hard:
+            raise GraphInitializationError(state.report)
 
-        entry_nodes: list[TraversableNode] = []
-        for templ in entry_templates:
-            node = state.template_to_entity.get(templ.uid)
-            if isinstance(node, TraversableNode):
-                entry_nodes.append(node)
-
+    def _require_entry_nodes(
+        self,
+        *,
+        state: _MaterializationState,
+        entry_templates: list[Any],
+    ) -> list[TraversableNode]:
+        entry_nodes = [
+            node
+            for templ in entry_templates
+            if isinstance((node := state.template_to_entity.get(templ.uid)), TraversableNode)
+        ]
         if not entry_nodes:
             raise ValueError("Entry templates did not materialize traversable nodes")
+        return entry_nodes
 
+    @staticmethod
+    def _set_initial_cursor(graph: StoryGraph, entry_nodes: list[TraversableNode]) -> None:
         graph.initial_cursor_ids = [node.uid for node in entry_nodes]
         graph.initial_cursor_id = graph.initial_cursor_ids[0]
 
+    @staticmethod
+    def _build_story_init_result(*, state: _MaterializationState) -> StoryInitResult:
+        graph = state.graph
+        bundle = state.bundle
         return StoryInitResult(
             graph=graph,
             report=state.report,

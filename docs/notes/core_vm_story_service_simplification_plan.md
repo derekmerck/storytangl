@@ -140,13 +140,18 @@ Completed in this checkpoint:
   `vm/provision/materialization.py`.
 - Reused the shared helper from both `Resolver` and `StoryMaterializer`.
 - Removed the story-layer dependency on `Resolver._materialize_node`.
+- Split `StoryMaterializer.create_story()` into explicit initialization,
+  materialization, topology, prelink, and result-assembly passes.
+- Extracted `Resolver` helper seams for raw offer discovery, resolve overrides,
+  policy filtering, sorting, and fanout deduplication so `gather_offers()` and
+  `gather_fanout_offers()` are orchestration wrappers rather than monoliths.
 
 Remaining:
 
-- Split resolver internals further into discovery/ranking, build-chain
-  execution, dependency binding, and preview/blocker helpers.
-- Decompose `StoryMaterializer.create_story()` into explicit passes rather than
-  one long control path.
+- Split resolver preview/blocker diagnosis and structural build-chain execution
+  further into smaller helpers.
+- Continue narrowing the story materializer wiring/prelink helpers where the
+  per-node wiring passes still mix multiple responsibilities.
 
 Acceptance gates reached for this checkpoint:
 
@@ -199,7 +204,7 @@ Recorded before structural cleanup:
 
 ## Checkpoint Metrics
 
-Measured after Waves 0-3 and the first Wave 4 extraction:
+Measured after Waves 0-3 and the current Wave 4 decomposition checkpoint:
 
 | Hotspot | Baseline Lines | Current Lines | Delta |
 | --- | ---: | ---: | ---: |
@@ -207,10 +212,10 @@ Measured after Waves 0-3 and the first Wave 4 extraction:
 | `engine/src/tangl/service/api_endpoint.py` | 315 | 280 | -35 |
 | `engine/src/tangl/core/behavior.py` | 502 | 496 | -6 |
 | `engine/src/tangl/vm/dispatch.py` | 584 | 581 | -3 |
-| `engine/src/tangl/vm/provision/resolver.py` | 1319 | 1260 | -59 |
+| `engine/src/tangl/vm/provision/resolver.py` | 1319 | 1314 | -5 |
 | `engine/src/tangl/vm/runtime/frame.py` | 878 | 866 | -12 |
 | `engine/src/tangl/vm/traversable.py` | 933 | 933 | 0 |
-| `engine/src/tangl/story/fabula/materializer.py` | 813 | 794 | -19 |
+| `engine/src/tangl/story/fabula/materializer.py` | 813 | 861 | +48 |
 | `engine/src/tangl/story/fabula/compiler.py` | 520 | 520 | 0 |
 | `engine/src/tangl/story/system_handlers.py` | 732 | 567 | -165 |
 | `engine/src/tangl/core/registry.py` | 597 | 597 | 0 |
@@ -220,9 +225,11 @@ Notable wins already visible:
 
 - `story/system_handlers.py` is down by 22.5%.
 - `service/api_endpoint.py` is down by 11.1%.
-- `vm/provision/resolver.py` is down by 4.5% before the larger split.
-- `story/fabula/materializer.py` is down by 2.3% before the explicit-pass
-  decomposition.
+- `vm/provision/resolver.py` remains slightly below baseline while exposing
+  clearer internal seams for the next Wave 4 split.
+- `story/fabula/materializer.py` is temporarily above baseline because the
+  initialization flow is now decomposed into named passes; this checkpoint
+  improved control-flow clarity first, with deeper consolidation still pending.
 
 ## Verified Test Checkpoints
 
@@ -254,17 +261,23 @@ Green targeted runs after the refactors in this tracker:
   `engine/tests/vm38/test_scope_path_provisioning.py`
   `engine/tests/story38/test_story_init.py`
   `engine/tests/story38/test_compiler_scope_resolution.py`
-- `1707 passed`, `68 skipped`, `9 xfailed`:
+- `145 passed`:
+  `engine/tests/vm38/test_resolver.py`
+  `engine/tests/vm38/test_provision_pipeline.py`
+  `engine/tests/vm38/test_scope_path_provisioning.py`
+  `engine/tests/story38/test_story_init.py`
+  `engine/tests/story38/test_compiler_scope_resolution.py`
+- `1708 passed`, `68 skipped`, `9 xfailed`:
   full `poetry run pytest engine/tests -q` regression after the media fragment,
-  logger-noise, registry-binding, media index-handler, and authority-overlay
-  fixes landed.
+  logger-noise, registry-binding, media index-handler, authority-overlay, and
+  Wave 4 resolver/materializer decomposition fixes landed.
 
 ## Next Execution Slice
 
-1. Split `Resolver` internals into smaller offer-discovery, chain-execution,
-   dependency-binding, and preview helpers.
-2. Break `StoryMaterializer.create_story()` into explicit passes while preserving
-   `LAZY` and `EAGER` behavior.
+1. Split resolver preview/blocker diagnosis and structural chain execution into
+   smaller helpers.
+2. Narrow story-materializer wiring and prelink helpers where node-specific
+   cases still share one control path.
 3. Refactor `Frame.follow_edge()` / `Frame.resolve_choice()` into reducer phases.
 4. Use the now-green full `engine/tests` regression as the next Wave 4/5
    checkpoint baseline while continuing structural splits.

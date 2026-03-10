@@ -94,15 +94,22 @@ class ResourceManager:
         rit = self.registry.find_one(has_identifier=alias)
         if rit is not None:
             return rit
+
+        def _matches_alias(record: MediaRIT) -> bool:
+            if not record.path:
+                return False
+            if record.path.name == alias:
+                return True
+            try:
+                return str(record.path.relative_to(self.resource_path)) == alias
+            except ValueError:
+                return False
+
         return next(
             (
                 record
                 for record in self.registry.values()
-                if record.path
-                and (
-                    record.path.name == alias
-                    or str(record.path.relative_to(self.resource_path)) == alias
-                )
+                if _matches_alias(record)
             ),
             None,
         )

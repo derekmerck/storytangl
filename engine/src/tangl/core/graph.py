@@ -245,11 +245,29 @@ class Graph(Registry[GraphItem]):
     @staticmethod
     def _normalize_edge_criteria(criteria: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(criteria)
-        if "source" in normalized and "predecessor" not in normalized:
-            normalized["predecessor"] = normalized.pop("source")
-        if "destination" in normalized and "successor" not in normalized:
-            normalized["successor"] = normalized.pop("destination")
+        if "source" in normalized:
+            normalized.setdefault("predecessor", normalized.pop("source"))
+        if "destination" in normalized:
+            normalized.setdefault("successor", normalized.pop("destination"))
         return normalized
+
+    @classmethod
+    def _normalize_edge_selector(
+        cls,
+        selector: Selector | dict[str, Any] | Any,
+    ) -> Selector | dict[str, Any] | Any:
+        if isinstance(selector, dict):
+            return cls._normalize_edge_criteria(selector)
+        if isinstance(selector, Selector):
+            payload = dict(selector.__pydantic_extra__ or {})
+            for field_name in type(selector).model_fields:
+                value = getattr(selector, field_name)
+                if value is not None:
+                    payload[field_name] = value
+            normalized_payload = cls._normalize_edge_criteria(payload)
+            if normalized_payload != payload:
+                return Selector(**normalized_payload)
+        return selector
 
     def _typed_selector(
         self,
@@ -258,6 +276,7 @@ class Graph(Registry[GraphItem]):
         **criteria: Any,
     ) -> Selector:
         if issubclass(kind, Edge):
+            selector = self._normalize_edge_selector(selector)
             criteria = self._normalize_edge_criteria(criteria)
         base_selector = self._normalize_selector(selector, **criteria) or Selector()
         return base_selector.with_criteria(has_kind=kind)

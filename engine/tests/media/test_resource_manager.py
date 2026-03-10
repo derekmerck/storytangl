@@ -14,6 +14,14 @@ def _write_svg(path: Path) -> None:
     )
 
 
+def _write_blue_svg(path: Path) -> None:
+    path.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
+        '<circle cx="16" cy="16" r="14" fill="blue"/></svg>',
+        encoding="utf-8",
+    )
+
+
 def test_resource_manager_index_handlers_can_replace_records(tmp_path: Path) -> None:
     media_dir = tmp_path / "media"
     media_dir.mkdir()
@@ -84,3 +92,22 @@ def test_media_registry_on_index_alias_registers_index_handler(tmp_path: Path) -
     assert rit is not None
     assert rit.path == svg_path
     assert {"hero", "book3", "scope:world"}.issubset(set(rit.tags or set()))
+
+
+def test_resource_manager_get_rit_skips_records_outside_resource_root(tmp_path: Path) -> None:
+    resource_root = tmp_path / "media"
+    images_dir = resource_root / "images"
+    images_dir.mkdir(parents=True)
+    inside_path = images_dir / "cover.svg"
+    _write_svg(inside_path)
+
+    outside_path = tmp_path / "outside.svg"
+    _write_blue_svg(outside_path)
+
+    resource_manager = ResourceManager(resource_path=resource_root, scope="world")
+    resource_manager.registry.add(MediaRIT.from_source(outside_path))
+    resource_manager.index_directory("images")
+
+    rit = resource_manager.get_rit("images/cover.svg")
+    assert rit is not None
+    assert rit.path == inside_path

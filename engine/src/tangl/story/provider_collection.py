@@ -83,6 +83,7 @@ def collect_token_catalogs(
     graph: Any = None,
 ) -> list[TokenCatalog]:
     catalogs: list[TokenCatalog] = []
+    seen_ids: set[int] = set()
     for provider in providers:
         if provider is None:
             continue
@@ -97,8 +98,13 @@ def collect_token_catalogs(
         values = list(raw) if isinstance(raw, IterableABC) else [raw]
         for value in values:
             catalog = _coerce_token_catalog_item(value)
-            if catalog is not None:
-                catalogs.append(catalog)
+            if catalog is None:
+                continue
+            catalog_id = id(catalog)
+            if catalog_id in seen_ids:
+                continue
+            seen_ids.add(catalog_id)
+            catalogs.append(catalog)
     return catalogs
 
 

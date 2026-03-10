@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import functools
 import inspect
-from typing import Any, Callable, Mapping, get_type_hints
+from typing import Any, Callable, Iterable, Mapping, get_type_hints
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -178,6 +178,21 @@ class ApiEndpoint(BaseModel):
 
         return result
 
+    @staticmethod
+    def _normalize_persist_paths(
+        persist_paths: Iterable[str] | str | None,
+    ) -> tuple[str, ...]:
+        if persist_paths is None:
+            return ()
+        if isinstance(persist_paths, str):
+            path = persist_paths.strip()
+            return (path,) if path else ()
+        return tuple(
+            value
+            for value in (str(path).strip() for path in persist_paths)
+            if value
+        )
+
     @classmethod
     def annotate(
         cls,
@@ -189,10 +204,10 @@ class ApiEndpoint(BaseModel):
         preprocessors: list | None = None,
         postprocessors: list | None = None,
         writeback_mode: WritebackMode = WritebackMode.AUTO,
-        persist_paths: tuple[str, ...] | None = None,
+        persist_paths: Iterable[str] | str | None = None,
         binds: tuple[ResourceBinding | str, ...] | None = None,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        persist_paths = tuple(persist_paths or ())
+        normalized_persist_paths = cls._normalize_persist_paths(persist_paths)
         normalized_binds: tuple[ResourceBinding, ...] | None
         if binds is None:
             normalized_binds = None
@@ -215,7 +230,7 @@ class ApiEndpoint(BaseModel):
                 preprocessors=preprocessors,
                 postprocessors=postprocessors,
                 writeback_mode=writeback_mode,
-                persist_paths=persist_paths,
+                persist_paths=normalized_persist_paths,
                 binds=normalized_binds,
             )
 

@@ -47,3 +47,16 @@ def test_get_story_media_dir_optional(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
     assert config.get_story_media_dir() == tmp_path
     assert config.get_story_media_dir("story-1") == tmp_path / "story-1"
+
+
+def test_get_story_media_dir_rejects_invalid_story_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    settings = _make_settings(worlds=None, system_media=None)
+    settings.service.paths.story_media = str(tmp_path / "story_media")
+    monkeypatch.setattr(config, "settings", settings)
+
+    assert config.get_story_media_dir("../escape") is None
+    assert config.get_story_media_dir("nested/story") is None
+    assert config.get_story_media_dir(r"nested\\story") is None

@@ -71,6 +71,20 @@ class TestGraphCreationAndFind:
         assert graph.find_edge(Selector(predecessor=a)) is e
         assert graph.find_subgraph(Selector(label="s")) is s
 
+    def test_find_edge_normalizes_legacy_direction_aliases_in_dict_selector(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        edge = graph.add_edge(a, b)
+        assert graph.find_edge({"source": a, "destination": b}) is edge
+
+    def test_find_edge_normalizes_legacy_direction_aliases_in_selector(self) -> None:
+        graph = Graph()
+        a = graph.add_node(label="a")
+        b = graph.add_node(label="b")
+        edge = graph.add_edge(a, b)
+        assert graph.find_edge(Selector(source=a, destination=b)) is edge
+
 
 class TestEdgeAndNode:
     def test_add_edge_from_direction(self) -> None:
