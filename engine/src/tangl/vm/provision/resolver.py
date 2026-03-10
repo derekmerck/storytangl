@@ -17,7 +17,7 @@ from tangl.core import (
     Node,
     Selector,
 )
-from ..dispatch import do_get_token_catalogs, on_provision
+from ..dispatch import do_get_media_inventories, do_get_token_catalogs, on_provision
 from ..ctx import VmResolverCtx
 from ..traversable import TraversableNode
 from .matching import annotate_offer_specificity, summarize_offer
@@ -308,6 +308,29 @@ class Resolver:
             return []
         return list(TokenProvisioner(catalogs=catalogs).get_dependency_offers(requirement))
 
+    def _media_inventory_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is None:
+            return []
+
+        caller = getattr(_ctx, "cursor", None)
+        inventories = do_get_media_inventories(
+            caller,
+            requirement=requirement,
+            ctx=_ctx,
+        )
+        if not inventories:
+            return []
+
+        from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
+
+        return list(MediaInventoryProvisioner(inventories=inventories).get_dependency_offers(requirement))
+
     def inspect_template_dependency_offers(
         self,
         requirement: Requirement[PT],
@@ -359,6 +382,7 @@ class Resolver:
 
         offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._token_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(self._media_inventory_offers_for_requirement(requirement, _ctx=_ctx))
 
         offers.extend(
             InlineTemplateProvisioner(

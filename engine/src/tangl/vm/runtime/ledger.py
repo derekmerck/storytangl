@@ -138,9 +138,18 @@ class Ledger(Entity):
     user_id: Optional[UUID] = None
 
     @classmethod
-    def from_graph(cls, graph: Graph, entry_id: UUID) -> Self:
+    def from_graph(
+        cls,
+        graph: Graph,
+        entry_id: UUID,
+        *,
+        uid: UUID | None = None,
+    ) -> Self:
         """Construct and initialize a ledger at a graph entry node."""
-        ledger = cls(graph=graph, cursor_id=entry_id)
+        payload: dict[str, Any] = {"graph": graph, "cursor_id": entry_id}
+        if uid is not None:
+            payload["uid"] = uid
+        ledger = cls(**payload)
         ledger._seed_counters(entry_id=entry_id)
         ledger.initialize_entry()
         return ledger

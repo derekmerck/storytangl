@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterable
 from markdown_it import MarkdownIt
 from pydantic import BaseModel
 
-from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Priority
+from tangl.core import BehaviorRegistry, DispatchLayer, Priority
 
 from .operations import ServiceOperation
 
@@ -86,20 +86,20 @@ class GatewayHooks:
 
         current: dict[str, Any] = dict(params)
         for phase in (HookPhase.EARLY, HookPhase.NORMAL, HookPhase.LATE):
-            receipts = list(
-                self._registry.execute_all(
-                    task=f"inbound.{phase.value}",
-                    call_args=(current,),
-                    call_kwargs={
-                        "operation": operation,
-                        "render_profile": render_profile,
-                        "user_id": user_id,
-                    },
-                )
+            behaviors = self._registry.find_all(
+                task=f"inbound.{phase.value}",
+                sort_key=lambda value: value.sort_key,
             )
-            updated = CallReceipt.last_result(*receipts)
-            if isinstance(updated, dict):
-                current = updated
+            for behavior in behaviors:
+                receipt = behavior(
+                    current,
+                    operation=operation,
+                    render_profile=render_profile,
+                    user_id=user_id,
+                )
+                updated = receipt.result
+                if isinstance(updated, dict):
+                    current = updated
         return current
 
     def run_outbound(
@@ -114,20 +114,20 @@ class GatewayHooks:
 
         current = result
         for phase in (HookPhase.EARLY, HookPhase.NORMAL, HookPhase.LATE):
-            receipts = list(
-                self._registry.execute_all(
-                    task=f"outbound.{phase.value}",
-                    call_args=(current,),
-                    call_kwargs={
-                        "operation": operation,
-                        "render_profile": render_profile,
-                        "user_id": user_id,
-                    },
-                )
+            behaviors = self._registry.find_all(
+                task=f"outbound.{phase.value}",
+                sort_key=lambda value: value.sort_key,
             )
-            updated = CallReceipt.last_result(*receipts)
-            if updated is not None:
-                current = updated
+            for behavior in behaviors:
+                receipt = behavior(
+                    current,
+                    operation=operation,
+                    render_profile=render_profile,
+                    user_id=user_id,
+                )
+                updated = receipt.result
+                if updated is not None:
+                    current = updated
         return current
 
     def install_default_hooks(self) -> None:
@@ -233,9 +233,23 @@ class GatewayHooks:
                 key: self._transform_media_fields(item) for key, item in value.items()
             }
             if transformed.get("fragment_type") == "media" and "url" not in transformed:
+                content_format = transformed.get("content_format") or transformed.get("format")
+                if transformed.get("data") is not None or content_format not in {None, "json"}:
+                    return transformed
                 scope = transformed.get("scope") or "world"
-                label = transformed.get("label") or transformed.get("source_label") or "media"
-                transformed["url"] = f"/media/{scope}/{label}"
+                label = (
+                    transformed.get("label")
+                    or transformed.get("source_label")
+                    or transformed.get("name")
+                    or transformed.get("src")
+                    or "media"
+                )
+                if scope == "story" and transformed.get("story_id"):
+                    transformed["url"] = f"/media/story/{transformed['story_id']}/{label}"
+                elif scope == "sys":
+                    transformed["url"] = f"/media/sys/{label}"
+                else:
+                    transformed["url"] = f"/media/{scope}/{label}"
             return transformed
         if isinstance(value, BaseModel):
             data = value.model_dump(mode="python")

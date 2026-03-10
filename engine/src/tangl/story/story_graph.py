@@ -46,6 +46,8 @@ class StoryGraph(Graph):
     factory: TemplateRegistry | None = Field(default=None, exclude=True)
     script_manager: Any | None = Field(default=None, exclude=True)
     world: Any | None = Field(default=None, exclude=True)
+    story_id: UUID | None = Field(default=None, exclude=True)
+    story_resources: Any | None = Field(default=None, exclude=True)
     template_by_entity_id: dict[UUID, UUID] = Field(default_factory=dict, exclude=True)
     template_lineage_by_entity_id: dict[UUID, list[UUID]] = Field(default_factory=dict, exclude=True)
 

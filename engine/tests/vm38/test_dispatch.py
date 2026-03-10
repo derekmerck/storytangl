@@ -14,10 +14,12 @@ from contextlib import contextmanager
 import pytest
 
 from tangl.core import Graph, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.media.media_resource import MediaInventory, MediaResourceRegistry
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     do_finalize,
     do_gather_ns,
+    do_get_media_inventories,
     do_get_template_scope_groups,
     do_get_token_catalogs,
     do_journal,
@@ -28,6 +30,7 @@ from tangl.vm.dispatch import (
     do_validate,
     on_finalize,
     on_gather_ns,
+    on_get_media_inventories,
     on_get_template_scope_groups,
     on_get_token_catalogs,
     on_journal,
@@ -93,6 +96,7 @@ class TestHookRegistration:
             (on_finalize, "finalize_step"),
             (on_postreqs, "get_postreqs"),
             (on_gather_ns, "gather_ns"),
+            (on_get_media_inventories, "get_media_inventories"),
             (on_get_template_scope_groups, "get_template_scope_groups"),
             (on_get_token_catalogs, "get_token_catalogs"),
         ]
@@ -288,6 +292,34 @@ class TestDiscoveryHooks:
         node = _node(g, label="n")
         with pytest.raises(TypeError, match="TokenCatalog entries only"):
             do_get_token_catalogs(node, requirement=None, ctx=null_ctx)
+
+    def test_media_inventories_dedupe_by_registry(self, null_ctx) -> None:
+        registry = MediaResourceRegistry(label="media")
+        inv_a = MediaInventory(registry=registry, scope="world", label="a")
+        inv_b = MediaInventory(registry=registry, scope="world", label="b")
+
+        @on_get_media_inventories
+        def first(*, caller, requirement, ctx, **kw):
+            return [inv_a]
+
+        @on_get_media_inventories
+        def second(*, caller, requirement, ctx, **kw):
+            return [inv_b]
+
+        g = Graph()
+        node = _node(g, label="n")
+        inventories = do_get_media_inventories(node, requirement=None, ctx=null_ctx)
+        assert inventories == [inv_a]
+
+    def test_media_inventories_invalid_entries_raise(self, null_ctx) -> None:
+        @on_get_media_inventories
+        def bad(*, caller, requirement, ctx, **kw):
+            return ["not-an-inventory"]
+
+        g = Graph()
+        node = _node(g, label="n")
+        with pytest.raises(TypeError, match="MediaInventory entries only"):
+            do_get_media_inventories(node, requirement=None, ctx=null_ctx)
 
     def test_discovery_uses_subdispatch_context_when_available(self) -> None:
         seen_ctx = {"value": None}

@@ -18,10 +18,15 @@ from collections.abc import Iterable as IterableABC
 from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.media import get_system_resource_manager
+from tangl.media.media_data_type import MediaDataType
+from tangl.media.media_resource import MediaDep, MediaInventory
+from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    on_get_media_inventories,
     on_provision,
     on_get_template_scope_groups,
     on_get_token_catalogs,
@@ -252,6 +257,117 @@ def gather_world_token_catalogs(*, caller, requirement=None, ctx, **_kw):
     return catalogs or None
 
 
+def _coerce_media_inventory_item(value: Any, *, scope: str | None = None) -> MediaInventory | None:
+    return MediaInventory.from_provider(value, scope=scope)
+
+
+def _collect_provider_media_inventories(
+    provider: Any,
+    *,
+    caller: Any,
+    requirement: Any = None,
+    graph: Any = None,
+    scope: str | None = None,
+) -> list[MediaInventory]:
+    if provider is None:
+        return []
+
+    raw = None
+    get_inventories = getattr(provider, "get_media_inventories", None)
+    if callable(get_inventories):
+        raw = get_inventories(caller=caller, requirement=requirement, graph=graph)
+    else:
+        raw = provider
+
+    if raw is None:
+        return []
+    if isinstance(raw, (str, bytes, dict)):
+        values = [raw]
+    elif isinstance(raw, IterableABC):
+        values = list(raw)
+    else:
+        values = [raw]
+
+    inventories: list[MediaInventory] = []
+    seen_registry_ids: set[int] = set()
+    for value in values:
+        inventory = _coerce_media_inventory_item(value, scope=scope)
+        if inventory is None:
+            continue
+        registry_id = id(inventory.registry)
+        if registry_id in seen_registry_ids:
+            continue
+        seen_registry_ids.add(registry_id)
+        inventories.append(inventory)
+    return inventories
+
+
+@on_get_media_inventories(priority=Priority.FIRST)
+def gather_story_media_inventories(*, caller, requirement=None, ctx, **_kw):
+    """Contribute story-local media inventory ahead of world/system scopes."""
+    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
+    if graph is None:
+        return None
+
+    manager = getattr(graph, "story_resources", None)
+    if manager is None and getattr(graph, "story_id", None) is not None:
+        manager = get_story_resource_manager(graph.story_id, create=False)
+        if manager is not None:
+            graph.story_resources = manager
+
+    inventories = _collect_provider_media_inventories(
+        manager,
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+        scope="story",
+    )
+    return inventories or None
+
+
+@on_get_media_inventories(priority=Priority.LATE)
+def gather_world_media_inventories(*, caller, requirement=None, ctx, **_kw):
+    """Contribute world-scoped media inventories after story-local sources."""
+    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
+    if graph is None:
+        return None
+
+    world = getattr(graph, "world", None)
+    if world is None:
+        return None
+
+    providers = [
+        getattr(world, "resources", None),
+        world,
+    ]
+    inventories: list[MediaInventory] = []
+    for provider in providers:
+        inventories.extend(
+            _collect_provider_media_inventories(
+                provider,
+                caller=caller,
+                requirement=requirement,
+                graph=graph,
+                scope="world",
+            )
+        )
+    return inventories or None
+
+
+@on_get_media_inventories(priority=Priority.LAST)
+def gather_system_media_inventories(*, caller, requirement=None, ctx, **_kw):
+    """Contribute shared system media inventory last."""
+    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
+    inventories = _collect_provider_media_inventories(
+        get_system_resource_manager(),
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+        scope="sys",
+    )
+    return inventories or None
+
+
 def _has_tags(value: Any, *tags: str) -> bool:
     actual = getattr(value, "tags", set()) or set()
     return set(tags).issubset(actual)
@@ -446,6 +562,40 @@ def _merge_fragment_batches(*batches: Any) -> list[Record]:
     return merged
 
 
+def _coerce_media_type(value: Any) -> MediaDataType:
+    if isinstance(value, MediaDataType):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return MediaDataType(value)
+        except ValueError:
+            return MediaDataType(value.strip("."))
+    return MediaDataType.MEDIA
+
+
+def _media_type_for_item(item: dict[str, Any]) -> MediaDataType:
+    explicit = item.get("content_type") or item.get("media_type") or item.get("kind")
+    if explicit is not None:
+        return _coerce_media_type(explicit)
+
+    for key in ("url", "name", "src"):
+        value = item.get(key)
+        if isinstance(value, str) and "." in value:
+            return MediaDataType.from_path(value)
+    data = item.get("data")
+    if isinstance(data, str) and data.lstrip().startswith("<svg"):
+        return MediaDataType.VECTOR
+    return MediaDataType.MEDIA
+
+
+def _scope_from_provider(provider: Any, *, default: str = "world") -> str:
+    tags = getattr(provider, "tags", set()) or set()
+    for tag in tags:
+        if isinstance(tag, str) and tag.startswith("scope:"):
+            return tag.split(":", 1)[1]
+    return default
+
+
 @on_journal(priority=Priority.EARLY)
 def render_block_content(*, caller, ctx, **_kw):
     """Render block narrative text into content fragments."""
@@ -464,10 +614,74 @@ def render_block_media(*, caller, ctx, **_kw):
     if not isinstance(caller, Block):
         return None
 
-    fragments: list[MediaFragment] = []
+    graph = getattr(caller, "graph", None)
+    fragments: list[Record] = []
     for media_item in caller.media:
         payload = media_item if isinstance(media_item, dict) else {"value": media_item}
-        fragments.append(MediaFragment(source_id=caller.uid, payload=payload))
+        source_kind = payload.get("source_kind")
+
+        dependency_id = payload.get("dependency_id")
+        dependency = graph.get(dependency_id) if graph is not None and dependency_id is not None else None
+        if isinstance(dependency, MediaDep) and dependency.provider is not None:
+            provider = dependency.provider
+            fragments.append(
+                MediaFragment(
+                    source_id=caller.uid,
+                    media_role=payload.get("media_role"),
+                    content=provider,
+                    content_format="rit",
+                    content_type=getattr(provider, "data_type", MediaDataType.MEDIA),
+                    text=payload.get("text"),
+                    scope=dependency.scope or _scope_from_provider(provider),
+                )
+            )
+            continue
+
+        if source_kind == "url" and payload.get("url") is not None:
+            fragments.append(
+                MediaFragment(
+                    source_id=caller.uid,
+                    media_role=payload.get("media_role"),
+                    content=str(payload.get("url")),
+                    content_format="url",
+                    content_type=_media_type_for_item(payload),
+                    text=payload.get("text"),
+                    scope=payload.get("scope") or "external",
+                )
+            )
+            continue
+
+        if source_kind == "data" and payload.get("data") is not None:
+            fragments.append(
+                MediaFragment(
+                    source_id=caller.uid,
+                    media_role=payload.get("media_role"),
+                    content=payload.get("data"),
+                    content_format="data",
+                    content_type=_media_type_for_item(payload),
+                    text=payload.get("text"),
+                    scope=payload.get("scope"),
+                )
+            )
+            continue
+
+        if source_kind in {"inventory", "potential"}:
+            fallback = payload.get("fallback_text") or payload.get("text")
+            if isinstance(fallback, str) and fallback.strip():
+                fragments.append(ContentFragment(content=fallback, source_id=caller.uid))
+            continue
+
+        fragments.append(
+            MediaFragment(
+                source_id=caller.uid,
+                media_role=payload.get("media_role"),
+                content=payload,
+                content_format="json",
+                content_type=_media_type_for_item(payload),
+                text=payload.get("text"),
+                scope=payload.get("scope") or "world",
+            )
+        )
 
     return fragments or None
 

@@ -23,13 +23,13 @@ class MediaCompiler:
         if not media_dir.exists():
             return None
 
-        resource_manager = ResourceManager(resource_path=media_dir)
+        resource_manager = ResourceManager(resource_path=media_dir, scope="world")
 
         if organization_hints:
             for subdir, _config in organization_hints.items():
                 subdir_path = media_dir / subdir
                 if subdir_path.exists():
-                    resource_manager.index_directory(subdir, tags={f"category:{subdir}"})
+                    resource_manager.index_directory(subdir)
         else:
             resource_manager.index_directory(".")
 

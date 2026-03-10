@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import UUID
 
 from tangl.core import Record
+from tangl.journal.media import MediaFragment
 
 
 class Fragment(Record):
@@ -29,12 +30,5 @@ class ChoiceFragment(Fragment):
     accepts: dict[str, Any] | None = None
     ui_hints: dict[str, Any] | None = None
     fragment_type: str = "choice"
-
-
-class MediaFragment(Fragment):
-    source_id: Optional[UUID] = None
-    payload: dict[str, object] | None = None
-    fragment_type: str = "media"
-
 
 __all__ = ["Fragment", "ContentFragment", "ChoiceFragment", "MediaFragment"]

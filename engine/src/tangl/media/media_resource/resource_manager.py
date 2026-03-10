@@ -1,5 +1,7 @@
-"""Utilities for indexing and serving media resources within a world."""
+"""Utilities for indexing and serving media resources within one inventory scope."""
 from __future__ import annotations
+
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 import logging
@@ -37,11 +39,26 @@ class ResourceManager:
     - :meth:`get_url`
     """
 
-    def __init__(self, resource_path: Path) -> None:
+    def __init__(
+        self,
+        resource_path: Path,
+        *,
+        scope: str = "world",
+        label: str | None = None,
+        default_tags: Iterable[str] = (),
+    ) -> None:
         self.resource_path = resource_path
-        self.registry = MediaResourceRegistry(label="world_media")
+        self.scope = scope
+        self.label = label or f"{scope}_media"
+        self.default_tags = {f"scope:{scope}", *default_tags}
+        self.registry = MediaResourceRegistry(label=self.label)
 
-    def index_directory(self, subdir: str = "images") -> list[MediaRIT]:
+    def index_directory(
+        self,
+        subdir: str = "images",
+        *,
+        tags: Iterable[str] = (),
+    ) -> list[MediaRIT]:
         """Index all files in ``subdir`` relative to :attr:`resource_path`."""
         path = self.resource_path / subdir
         if not path.exists():
@@ -53,6 +70,7 @@ class ResourceManager:
         for record, source in zip(records, files):
             if not record.label:
                 record.label = source.name
+            record.tags = set(record.tags or set()) | self.default_tags | set(tags)
         return records
 
     def get_rit(self, alias: str) -> Optional[MediaRIT]:
@@ -67,7 +85,11 @@ class ResourceManager:
             (
                 record
                 for record in self.registry.values()
-                if record.path and record.path.name == alias
+                if record.path
+                and (
+                    record.path.name == alias
+                    or str(record.path.relative_to(self.resource_path)) == alias
+                )
             ),
             None,
         )

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from tangl import core as tangl_core
 from tangl.core import Selector
+from tangl.media.media_resource import MediaDep
+from tangl.media.story_media import remove_story_media
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,
@@ -16,6 +17,7 @@ from tangl.service.api_endpoint import (
     ResourceBinding,
     ResponseType,
 )
+from tangl.service.media import media_fragment_to_payload
 from tangl.service.response import RuntimeEnvelope, RuntimeInfo
 from tangl.service.user import User
 from tangl.story.fabula import InitMode
@@ -29,7 +31,19 @@ class RuntimeController(HasApiEndpoints):
     """Runtime endpoints for story sessions."""
 
     @staticmethod
-    def _serialize_fragment(fragment: Any) -> dict[str, Any]:
+    def _serialize_fragment(
+        fragment: Any,
+        *,
+        world_id: str | None = None,
+        story_id: str | None = None,
+    ) -> dict[str, Any]:
+        media_payload = media_fragment_to_payload(
+            fragment,
+            world_id=world_id,
+            story_id=story_id,
+        )
+        if media_payload is not None:
+            return media_payload
         if hasattr(fragment, "model_dump"):
             return fragment.model_dump(mode="json")
         if hasattr(fragment, "unstructure"):
@@ -39,6 +53,20 @@ class RuntimeController(HasApiEndpoints):
                 data["kind"] = kind.__name__
             return data
         return {"fragment_type": "unknown", "content": str(fragment)}
+
+    @staticmethod
+    def _resolve_world_id(
+        ledger: Ledger,
+        metadata: dict[str, Any] | None = None,
+    ) -> str | None:
+        if metadata and metadata.get("world_id") is not None:
+            return str(metadata["world_id"])
+        world = getattr(getattr(ledger, "graph", None), "world", None)
+        for attr in ("label", "uid"):
+            value = getattr(world, attr, None)
+            if value is not None:
+                return str(value)
+        return None
 
     @staticmethod
     def _collect_blocker_diagnostics(
@@ -64,10 +92,23 @@ class RuntimeController(HasApiEndpoints):
         return diagnostics
 
     @staticmethod
-    def _to_compat_fragment(fragment: Any) -> BaseFragment:
+    def _to_compat_fragment(
+        fragment: Any,
+        *,
+        world_id: str | None = None,
+        story_id: str | None = None,
+    ) -> BaseFragment:
         """Convert vm38 journal records into legacy-compatible BaseFragment payloads."""
         if isinstance(fragment, BaseFragment):
             return fragment
+
+        media_payload = media_fragment_to_payload(
+            fragment,
+            world_id=world_id,
+            story_id=story_id,
+        )
+        if media_payload is not None:
+            return BaseFragment(**media_payload)
 
         if hasattr(fragment, "model_dump"):
             data = fragment.model_dump(mode="python")
@@ -96,40 +137,49 @@ class RuntimeController(HasApiEndpoints):
 
     def _dereference_media(self, fragment: Any, world_id: str) -> dict[str, Any]:
         """Legacy compatibility helper: convert MediaRIT-backed fragments to API payloads."""
-        from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+        payload = media_fragment_to_payload(
+            fragment,
+            world_id=world_id,
+            story_id=getattr(fragment, "story_id", None) or world_id,
+        )
+        if payload is None:
+            raise TypeError(f"Expected media-compatible fragment, got {type(fragment)}")
+        return payload
 
-        rit = getattr(fragment, "content", None)
-        if not isinstance(rit, MediaRIT):
-            raise TypeError(f"Expected MediaRIT in MediaFragment.content, got {type(rit)}")
+    @staticmethod
+    def _collect_media_diagnostics(ledger: Ledger) -> list[dict[str, Any]]:
+        cursor = getattr(ledger, "cursor", None)
+        if cursor is None or not hasattr(cursor, "media"):
+            return []
 
-        filename: str | None = None
-        path_value = getattr(rit, "path", None)
-        if isinstance(path_value, Path):
-            filename = path_value.name
-        elif getattr(rit, "label", None):
-            filename = rit.label
+        graph = getattr(ledger, "graph", None)
+        diagnostics: list[dict[str, Any]] = []
+        for media_item in getattr(cursor, "media", []) or []:
+            if not isinstance(media_item, dict):
+                continue
 
-        if not filename:
-            raise ValueError(f"Cannot determine filename for MediaRIT {rit!r}")
+            if media_item.get("source_kind") == "potential":
+                diagnostics.append(
+                    {
+                        "reason": "unsupported_media_spec",
+                        "scope": media_item.get("scope") or "story",
+                        "fallback": media_item.get("fallback_text") or media_item.get("text"),
+                    }
+                )
+                continue
 
-        scope = getattr(fragment, "scope", None) or "world"
-        if scope == "sys":
-            url_prefix = "/media/sys"
-        else:
-            url_prefix = f"/media/world/{world_id}"
-
-        source_id = getattr(fragment, "source_id", None)
-        content_type = getattr(rit, "data_type", None)
-
-        return {
-            "fragment_type": "media",
-            "media_role": getattr(fragment, "media_role", None),
-            "url": f"{url_prefix}/{filename}",
-            "media_type": content_type.value if content_type is not None else None,
-            "text": getattr(fragment, "text", None),
-            "source_id": str(source_id) if source_id is not None else None,
-            "scope": scope,
-        }
+            dependency_id = media_item.get("dependency_id")
+            dependency = graph.get(dependency_id) if graph is not None and dependency_id is not None else None
+            if isinstance(dependency, MediaDep) and dependency.provider is None:
+                diagnostics.append(
+                    {
+                        "reason": dependency.requirement.resolution_reason or "unresolved_media",
+                        "scope": dependency.scope or media_item.get("scope") or "world",
+                        "fallback": media_item.get("fallback_text") or media_item.get("text"),
+                        "label": media_item.get("name") or media_item.get("label"),
+                    }
+                )
+        return diagnostics
 
     @staticmethod
     def _synthetic_journal_from_cursor(ledger: Ledger) -> list[BaseFragment]:
@@ -181,13 +231,22 @@ class RuntimeController(HasApiEndpoints):
         fragments: list[Any],
         metadata: dict[str, Any] | None = None,
     ) -> RuntimeEnvelope:
+        world_id = self._resolve_world_id(ledger, metadata=metadata)
+        story_id = str((metadata or {}).get("ledger_id") or ledger.uid)
         serialized_fragments = [
-            self._serialize_fragment(fragment) for fragment in fragments
+            self._serialize_fragment(fragment, world_id=world_id, story_id=story_id)
+            for fragment in fragments
         ]
         merged_metadata = dict(metadata or {})
+        if world_id is not None:
+            merged_metadata.setdefault("world_id", world_id)
+        merged_metadata.setdefault("ledger_id", str(ledger.uid))
         blockers = self._collect_blocker_diagnostics(serialized_fragments)
         if blockers:
             merged_metadata["blockers"] = blockers
+        media_diagnostics = self._collect_media_diagnostics(ledger)
+        if media_diagnostics:
+            merged_metadata["media_diagnostics"] = media_diagnostics
 
         return RuntimeEnvelope(
             cursor_id=ledger.cursor_id,
@@ -252,7 +311,11 @@ class RuntimeController(HasApiEndpoints):
         if story_graph.initial_cursor_id is None:
             raise RuntimeError("Story graph did not define an initial cursor")
 
-        ledger = Ledger.from_graph(graph=story_graph, entry_id=story_graph.initial_cursor_id)
+        ledger = Ledger.from_graph(
+            graph=story_graph,
+            entry_id=story_graph.initial_cursor_id,
+            uid=story_graph.story_id or story_graph.uid,
+        )
         ledger.user = user
         ledger.user_id = user.uid
         self._prime_initial_update(ledger)
@@ -377,7 +440,12 @@ class RuntimeController(HasApiEndpoints):
             fragments = list(ledger.get_journal(limit=limit))
         if not fragments:
             return self._synthetic_journal_from_cursor(ledger)
-        return [self._to_compat_fragment(fragment) for fragment in fragments]
+        world_id = self._resolve_world_id(ledger)
+        story_id = str(ledger.uid)
+        return [
+            self._to_compat_fragment(fragment, world_id=world_id, story_id=story_id)
+            for fragment in fragments
+        ]
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
@@ -425,6 +493,7 @@ class RuntimeController(HasApiEndpoints):
             "archived": archive,
         }
         if not archive:
+            details["story_media_deleted"] = remove_story_media(current_ledger_id)
             details["_delete_ledger_id"] = str(current_ledger_id)
 
         return RuntimeInfo.ok(

@@ -13,6 +13,8 @@ from types import SimpleNamespace
 import pytest
 
 from tangl.loaders import WorldBundle, WorldCompiler
+from tangl.media.media_resource import MediaDep
+from tangl.media.media_resource.resource_manager import ResourceManager
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
@@ -391,6 +393,37 @@ scenes:
     assert result.codec_id in {"near_native", "near_native_yaml"}
     assert "__source_files__" in result.source_map
     assert len(result.source_map["__source_files__"]) == 1
+
+
+def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(tmp_path: Path) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    asset = media_root / "cover.svg"
+    asset.write_text(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"></svg>",
+        encoding="utf-8",
+    )
+    resources = ResourceManager(media_root, scope="world")
+    resources.index_directory(".")
+
+    script = _base_script()
+    script["scenes"]["intro"]["blocks"]["start"]["media"] = [
+        {"name": "cover.svg", "text": "Cover"},
+        {"url": "https://example.com/poster.svg"},
+        {"data": "<svg xmlns='http://www.w3.org/2000/svg'></svg>"},
+    ]
+
+    world = World.from_script_data(script_data=script, resources=resources)
+    result = world.create_story("media_story", init_mode=InitMode.EAGER)
+
+    start = next(node for node in Selector(has_kind=Block, label="start").filter(result.graph.values()))
+    media_deps = [edge for edge in start.edges_out() if isinstance(edge, MediaDep)]
+
+    assert len(media_deps) == 1
+    assert media_deps[0].provider is not None
+    assert start.media[0].get("dependency_id") == media_deps[0].uid
+    assert "dependency_id" not in start.media[1]
+    assert "dependency_id" not in start.media[2]
 
 
 def test_runtime_controller_create_story_with_world_param() -> None:

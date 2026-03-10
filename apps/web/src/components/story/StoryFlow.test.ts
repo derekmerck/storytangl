@@ -137,6 +137,37 @@ describe('StoryFlow', () => {
     expect((block.props('block') as any).actions?.[0]?.text).toBe('Continue')
   })
 
+  it('normalizes canonical media fragments and remaps media URLs', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({
+          cursor_id: 'cursor-1',
+          step: 1,
+          fragments: [
+            { fragment_type: 'content', content: 'With media' },
+            {
+              fragment_type: 'media',
+              media_role: 'narrative_im',
+              url: '/media/world/tangl_world/scene.svg',
+            },
+          ],
+        }),
+      ),
+    )
+
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    const block = wrapper.findComponent(StoryBlock)
+    expect(block.exists()).toBe(true)
+    expect((block.props('block') as any).media?.[0]?.url).toBe(
+      'http://localhost:8000/media/world/tangl_world/scene.svg',
+    )
+    expect((block.props('block') as any).media_dict?.narrative_im?.url).toBe(
+      'http://localhost:8000/media/world/tangl_world/scene.svg',
+    )
+  })
+
   it('assigns unique keys to blocks', async () => {
     const wrapper = mountFlow()
     await flushPromises()

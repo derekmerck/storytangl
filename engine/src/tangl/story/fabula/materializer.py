@@ -5,6 +5,8 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.core import GraphItem, Selector, TemplateRegistry
+from tangl.media.media_resource import MediaDep
+from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import (
     Affordance,
     Dependency,
@@ -173,6 +175,8 @@ class StoryMaterializer:
             script_manager=script_manager,
             world=world,
         )
+        graph.story_id = graph.uid
+        graph.story_resources = get_story_resource_manager(graph.story_id, create=True)
         report = InitReport(mode=init_mode)
         state = _MaterializationState(graph=graph, bundle=bundle, report=report)
 
@@ -366,8 +370,48 @@ class StoryMaterializer:
                 self._wire_actions_for_block(node=node, specs=node.redirects, state=state)
                 self._wire_actions_for_block(node=node, specs=node.continues, state=state)
                 self._wire_actions_for_block(node=node, specs=node.actions, state=state)
+                self._wire_media_for_block(node=node, state=state)
 
             state.wired_node_ids.add(node.uid)
+
+    def _wire_media_for_block(
+        self,
+        *,
+        node: Block,
+        state: _MaterializationState,
+    ) -> None:
+        for index, spec in enumerate(node.media):
+            if not isinstance(spec, dict):
+                continue
+
+            source_kind = self._media_source_kind(spec)
+            spec.setdefault("source_kind", source_kind)
+
+            if source_kind == "potential":
+                spec.setdefault("script_spec", spec.get("spec"))
+                spec.setdefault("realized_spec", None)
+                spec.setdefault("final_spec", None)
+                continue
+
+            if source_kind != "inventory":
+                continue
+
+            media_id = self._coerce_str(spec.get("name"))
+            if not media_id:
+                continue
+
+            dep = MediaDep(
+                registry=state.graph,
+                label=self._coerce_str(spec.get("label")) or f"media_{node.get_label()}_{index}",
+                predecessor_id=node.uid,
+                media_id=media_id,
+                media_role=self._coerce_str(spec.get("media_role")),
+                caption=self._coerce_str(spec.get("text") or spec.get("caption")),
+                scope=self._coerce_str(spec.get("scope")),
+                hard=bool(spec.get("hard", False)),
+            )
+            spec["dependency_id"] = dep.uid
+            spec.setdefault("fallback_text", self._coerce_str(spec.get("text")))
 
     def _wire_actions_for_block(
         self,
@@ -512,6 +556,18 @@ class StoryMaterializer:
                 if isinstance(candidate, provider_kind):
                     dep.set_provider(candidate)
 
+    @staticmethod
+    def _media_source_kind(spec: Mapping[str, Any]) -> str:
+        if spec.get("url") is not None:
+            return "url"
+        if spec.get("data") is not None:
+            return "data"
+        if spec.get("name"):
+            return "inventory"
+        if spec.get("spec") is not None:
+            return "potential"
+        return "legacy"
+
     def _prelink_all_dependencies(self, *, state: _MaterializationState) -> None:
         dependencies = sorted(
             Selector(has_kind=Dependency).filter(state.graph.values()),
@@ -526,7 +582,7 @@ class StoryMaterializer:
             )
             resolver = Resolver.from_ctx(ctx)
             was_satisfied = dep.satisfied
-            resolved = resolver.resolve_dependency(dep, allow_stubs=False)
+            resolved = resolver.resolve_dependency(dep, allow_stubs=False, _ctx=ctx)
 
             if resolved and dep.satisfied:
                 if not was_satisfied:

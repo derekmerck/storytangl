@@ -67,3 +67,16 @@ def get_sys_media_dir() -> Path | None:
     if not system_media:
         return None
     return Path(system_media)
+
+
+def get_story_media_dir(story_id: str | os.PathLike[str] | None = None) -> Path | None:
+    """Return the configured story-media root or one story-specific directory."""
+
+    story_media = getattr(settings.service.paths, "story_media", None)
+    if not story_media:
+        return None
+
+    root = Path(story_media)
+    if story_id is None:
+        return root
+    return root / str(story_id)

@@ -6,7 +6,7 @@ from typing import Any, ClassVar, Optional, Self
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from tangl.core import ContentAddressable, Entity
+from tangl.core import ContentAddressable, RegistryAware
 from tangl.core.bases import Hash, is_identifier
 from tangl.media.media_data_type import MediaDataType
 from tangl.utils.hashing import compute_data_hash
@@ -29,7 +29,7 @@ class _ContentHash(bytes):
         return bytes(self)
 
 
-class MediaResourceInventoryTag(Entity, ContentAddressable):
+class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
     """
     MediaResourceInventoryTags track data resources, in-mem or on disk.
 

@@ -1,9 +1,10 @@
-from typing import ClassVar
+from pathlib import Path
+from typing import Any, ClassVar
 
 from pydantic import ConfigDict, model_validator, Field
 
 from tangl.type_hints import Identifier
-from tangl.vm import Dependency, Requirement, ProvisioningPolicy
+from tangl.vm import Dependency, ProvisionPolicy, Requirement
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
@@ -30,29 +31,50 @@ class MediaDep(Dependency[MediaRIT]):
 
     @model_validator(mode="before")
     @classmethod
-    def _pre_resolve(cls, data):
-        # Does the linked rit resolve the type?
-        req_kwargs = {}
-        if "media_id" in data:
-            req_kwargs["identifier"] = data.pop("media_id")
-        if "media_path" in data:
-            req_kwargs["criteria"] = {'path': data.pop("media_path")}
-        if "media_data" in data:
-            # embedded data
-            req_kwargs["template"] = {'data': data.pop("media_data")}
-        if "media_spec" in data:
-            # create on demand
-            req_kwargs["template"] = {'spec': data.pop("media_spec")}
+    def _pre_resolve(cls, data: Any):
+        if not isinstance(data, dict) or "requirement" in data:
+            return data
 
-        requirement = Requirement.model_construct(
-            graph=data.get("graph"),
-            policy=req_kwargs.get("policy", ProvisioningPolicy.ANY),
-            identifier=req_kwargs.get("identifier"),
-            criteria=req_kwargs.get("criteria"),
-            template=req_kwargs.get("template"),
-        )
-        data['requirement'] = requirement
-        return data
+        payload = dict(data)
+        identifier = payload.get("media_id")
+        media_path = payload.get("media_path")
+        media_scope = payload.get("scope")
+        media_data = payload.get("media_data")
+        media_spec = payload.get("media_spec")
+        hard = bool(payload.pop("hard_requirement", payload.pop("hard", False)))
+        policy_value = payload.pop("provision_policy", payload.pop("policy", ProvisionPolicy.EXISTING))
+
+        requirement_kwargs: dict[str, Any] = {
+            "has_kind": MediaRIT,
+            "provision_policy": policy_value,
+            "hard_requirement": hard,
+        }
+
+        if identifier:
+            requirement_kwargs["has_identifier"] = identifier
+            requirement_kwargs["authored_path"] = str(identifier)
+        elif media_path:
+            media_path_obj = Path(media_path)
+            requirement_kwargs["has_identifier"] = media_path_obj.name
+            requirement_kwargs["path"] = media_path_obj
+            requirement_kwargs["authored_path"] = str(media_path)
+
+        if media_scope:
+            requirement_kwargs["has_tags"] = {f"scope:{media_scope}"}
+
+        if media_data is not None:
+            requirement_kwargs["fallback_templ"] = MediaRIT(
+                data=media_data,
+                data_type=payload.get("data_type"),
+            )
+
+        if media_spec is not None:
+            payload.setdefault("script_spec", media_spec)
+            payload.setdefault("realized_spec", None)
+            payload.setdefault("final_spec", None)
+
+        payload["requirement"] = Requirement(**requirement_kwargs)
+        return payload
 
     media_id: Identifier | None = Field(default=None, init_var=True)
     media_path: str | None = Field(default=None, init_var=True)
@@ -61,3 +83,6 @@ class MediaDep(Dependency[MediaRIT]):
     media_role: str | None = None
     caption: str | None = None
     scope: str | None = None
+    script_spec: dict[str, Any] | None = None
+    realized_spec: dict[str, Any] | None = None
+    final_spec: dict[str, Any] | None = None

@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Iterator
 from uuid import UUID
 
 from pydantic import ConfigDict, Field
 
-from tangl.core import BehaviorRegistry, Priority, Record
+from tangl.core import BehaviorRegistry, Priority, Record, Selector
 from tangl.type_hints import UnstructuredData
-from tangl.vm.provision import ProvisionOffer, ProvisionPolicy, Requirement
+from tangl.vm.provision.provisioner import ProvisionOffer, ProvisionPolicy
+from tangl.vm.provision.requirement import Requirement
 
 from ..media_data_type import MediaDataType
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+from .media_inventory import MediaInventory
 from .media_resource_registry import MediaResourceRegistry
 
 on_provision_media = BehaviorRegistry(label="provision_media")
@@ -112,3 +115,45 @@ class MediaProvisioner(Record):
     def generate_offers(self, *, ctx: Any = None) -> list[ProvisionOffer]:
         _ = ctx
         return list(self.get_dependency_offers(self.requirement))
+
+
+@dataclass
+class MediaInventoryProvisioner:
+    """Offer EXISTING media providers discovered through authority inventories."""
+
+    inventories: list[MediaInventory]
+
+    @staticmethod
+    def _graph_local_copy(candidate: MediaRIT, *, _ctx: Any = None) -> MediaRIT:
+        graph = getattr(_ctx, "graph", None)
+        if graph is not None:
+            existing = graph.find_one(
+                Selector(
+                    has_kind=MediaRIT,
+                    has_identifier=candidate.get_content_hash().hex(),
+                )
+            )
+            if isinstance(existing, MediaRIT):
+                return existing
+
+        provider = type(candidate).model_validate(candidate.model_dump(mode="python"))
+        provider.bind_registry(None)
+        return provider
+
+    def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
+        if not self.inventories:
+            return
+
+        selector = Selector(predicate=requirement.satisfied_by)
+        for candidate in MediaInventory.chain_find_all(*self.inventories, selector=selector):
+            yield ProvisionOffer(
+                origin_id="MediaInventoryProvisioner",
+                policy=ProvisionPolicy.EXISTING,
+                priority=Priority.NORMAL,
+                distance_from_caller=0,
+                candidate=candidate,
+                callback=lambda *_, _candidate=candidate, **kw: self._graph_local_copy(
+                    _candidate,
+                    _ctx=kw.get("_ctx"),
+                ),
+            )

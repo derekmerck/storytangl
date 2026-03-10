@@ -138,6 +138,34 @@ class World:
             return [list(values())]
         return []
 
+    def get_media_inventories(
+        self,
+        *,
+        caller: Any = None,
+        requirement: Any = None,
+        graph: Any = None,
+    ) -> list[Any]:
+        """Optional world-authoritative media inventories for runtime provisioning."""
+        from tangl.media.media_resource import MediaInventory
+
+        resource_facet = self.resources
+        if resource_facet is None:
+            return []
+
+        get_inventories = getattr(resource_facet, "get_media_inventories", None)
+        if callable(get_inventories):
+            return list(
+                get_inventories(
+                    caller=caller,
+                    requirement=requirement,
+                    graph=graph,
+                )
+                or []
+            )
+
+        inventory = MediaInventory.from_provider(resource_facet, scope="world")
+        return [inventory] if inventory is not None else []
+
     def _world_template_scope_groups(
         self,
         *,

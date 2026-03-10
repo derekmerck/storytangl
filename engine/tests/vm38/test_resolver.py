@@ -29,6 +29,11 @@ from tangl.core import (
     Token,
     TokenCatalog,
 )
+from tangl.media.media_resource import (
+    MediaInventory,
+    MediaResourceInventoryTag as MediaRIT,
+    MediaResourceRegistry,
+)
 from tangl.vm.provision import (
     Affordance,
     Dependency,
@@ -94,11 +99,34 @@ def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> SimpleNamespace:
     )
 
 
+def _ctx_with_media_inventories(*inventories: MediaInventory, graph: Graph | None = None) -> SimpleNamespace:
+    registry = BehaviorRegistry(label="media_inventory_registry")
+
+    def _inventories(*, caller, requirement, ctx, **kw):
+        return list(inventories)
+    registry.register(func=_inventories, task="get_media_inventories")
+
+    return SimpleNamespace(
+        graph=graph,
+        cursor=None,
+        get_authorities=lambda: [registry],
+        get_registries=lambda: [registry],
+        get_inline_behaviors=lambda: [],
+    )
+
+
 def _template_registry(*templates: EntityTemplate) -> TemplateRegistry:
     registry = TemplateRegistry(label="resolver_test_templates")
     for template in templates:
         registry.add(template)
     return registry
+
+
+def _media_inventory(label: str, *records: MediaRIT) -> MediaInventory:
+    registry = MediaResourceRegistry(label=label)
+    for record in records:
+        registry.add(record)
+    return MediaInventory(registry=registry, scope=label, label=label)
 
 
 # ============================================================================
@@ -352,6 +380,67 @@ class TestResolverOfferGathering:
 
         offers = resolver.gather_offers(req, _ctx=_ctx_with_token_catalogs(catalog))
         assert offers == []
+
+    def test_media_inventory_offers_follow_discovery_order(self, tmp_path) -> None:
+        story_file = tmp_path / "story.svg"
+        world_file = tmp_path / "world.svg"
+        sys_file = tmp_path / "sys.svg"
+        for item in (story_file, world_file, sys_file):
+            item.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+
+        story_inventory = _media_inventory(
+            "story",
+            MediaRIT(path=story_file, label="poster.svg", tags={"scope:story"}),
+        )
+        world_inventory = _media_inventory(
+            "world",
+            MediaRIT(path=world_file, label="poster.svg", tags={"scope:world"}),
+        )
+        sys_inventory = _media_inventory(
+            "sys",
+            MediaRIT(path=sys_file, label="poster.svg", tags={"scope:sys"}),
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(has_kind=MediaRIT, has_identifier="poster.svg")
+
+        offers = resolver.gather_offers(
+            req,
+            _ctx=_ctx_with_media_inventories(story_inventory, world_inventory, sys_inventory),
+        )
+
+        assert offers
+        assert getattr(offers[0].candidate, "path", None) == story_file
+
+    def test_media_inventory_offers_respect_pinned_scope(self, tmp_path) -> None:
+        story_file = tmp_path / "story.svg"
+        sys_file = tmp_path / "sys.svg"
+        for item in (story_file, sys_file):
+            item.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+
+        story_inventory = _media_inventory(
+            "story",
+            MediaRIT(path=story_file, label="badge.svg", tags={"scope:story"}),
+        )
+        sys_inventory = _media_inventory(
+            "sys",
+            MediaRIT(path=sys_file, label="badge.svg", tags={"scope:sys"}),
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=MediaRIT,
+            has_identifier="badge.svg",
+            has_tags={"scope:sys"},
+        )
+
+        offers = resolver.gather_offers(
+            req,
+            _ctx=_ctx_with_media_inventories(story_inventory, sys_inventory),
+        )
+
+        assert offers
+        assert getattr(offers[0].candidate, "path", None) == sys_file
 
     def test_gathers_from_entity_groups(self) -> None:
         e = Entity(label="sword")
@@ -916,6 +1005,34 @@ class TestResolverDependencyResolution:
         success = resolver.resolve_dependency(dep)
         assert success is True
         assert dep.provider is bob
+
+    def test_resolve_dependency_binds_media_inventory_provider_into_graph(self, tmp_path) -> None:
+        asset = tmp_path / "cover.svg"
+        asset.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+
+        inventory = _media_inventory(
+            "world",
+            MediaRIT(path=asset, label="cover.svg", tags={"scope:world"}),
+        )
+        graph = Graph()
+        node = _node(graph, label="start")
+        dep = _dependency(
+            graph,
+            requirement=Requirement(has_kind=MediaRIT, has_identifier="cover.svg"),
+            predecessor_id=node.uid,
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        success = resolver.resolve_dependency(
+            dep,
+            _ctx=_ctx_with_media_inventories(inventory, graph=graph),
+        )
+
+        assert success is True
+        assert isinstance(dep.provider, MediaRIT)
+        assert dep.provider is not None
+        assert dep.provider.registry is graph
+        assert dep.provider.path == asset
 
     def test_stub_offer_bypasses_requirement_validation(self) -> None:
         class Person(RegistryAware):
