@@ -280,14 +280,14 @@ onMounted(fetchInitialBlocks)
 const doAction = async (
   _block: JournalStoryUpdate,
   actionUid: string,
-  passback?: unknown,
+  payload?: unknown,
 ) => {
   try {
     loading.value = true
     error.value = null
     const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
-      uid: actionUid,
-      passback,
+      choice_id: actionUid,
+      payload,
     })
     await handleResponse(normalizePayload(response.data))
   } catch (err) {

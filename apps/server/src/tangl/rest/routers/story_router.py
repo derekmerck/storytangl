@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from tangl.config import settings
 from tangl.rest.dependencies_gateway import (
@@ -23,15 +23,14 @@ class ChoiceRequest(BaseModel):
     """Request payload for resolving a player choice."""
 
     choice_id: UUID | None = None
-    uid: UUID | None = None
     payload: Any = None
+
+    model_config = ConfigDict(extra="forbid")
 
     def resolve_choice_id(self) -> UUID:
         if self.choice_id is not None:
             return self.choice_id
-        if self.uid is not None:
-            return self.uid
-        raise ValueError("choice_id or uid must be provided")
+        raise ValueError("choice_id must be provided")
 
 
 router = APIRouter(tags=["Story"])

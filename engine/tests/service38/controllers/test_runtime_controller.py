@@ -272,6 +272,37 @@ def test_gateway_story38_status_and_update_return_runtime_info(
     assert isinstance(envelope.get("fragments"), list)
 
 
+
+def test_resolve_choice_rejects_legacy_passback_param(
+    orchestrator: Orchestrator,
+    world: World,
+    existing_user: User,
+) -> None:
+    orchestrator.set_endpoint_policy(
+        "RuntimeController.create_story",
+        persist_paths=("details.ledger",),
+    )
+    created = orchestrator.execute(
+        "RuntimeController.create_story",
+        user_id=existing_user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc38_story_payload_only",
+    )
+    ledger = (created.details or {}).get("ledger")
+    assert isinstance(ledger, Ledger)
+
+    choice = _first_choice_edge(ledger)
+    with pytest.raises(TypeError, match="passback"):
+        orchestrator.execute(
+            "RuntimeController.resolve_choice",
+            user_id=existing_user.uid,
+            choice_id=choice.uid,
+            passback={"route": "legacy-client"},
+        )
+
+
 def test_drop_story_via_orchestrator_deletes_ledger_and_unlinks_user(
     orchestrator: Orchestrator,
     persistence: _FakePersistence,
