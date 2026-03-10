@@ -242,23 +242,55 @@ class Graph(Registry[GraphItem]):
             subgraph.add_member(item)
         return subgraph
 
+    @staticmethod
+    def _normalize_edge_criteria(criteria: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(criteria)
+        if "source" in normalized and "predecessor" not in normalized:
+            normalized["predecessor"] = normalized.pop("source")
+        if "destination" in normalized and "successor" not in normalized:
+            normalized["successor"] = normalized.pop("destination")
+        return normalized
+
+    def _typed_selector(
+        self,
+        kind: type[GraphItem],
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Selector:
+        if issubclass(kind, Edge):
+            criteria = self._normalize_edge_criteria(criteria)
+        base_selector = self._normalize_selector(selector, **criteria) or Selector()
+        return base_selector.with_criteria(has_kind=kind)
+
+    def _find_typed_all(
+        self,
+        kind: type[GraphItem],
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> Iterator[GraphItem]:
+        return self.find_all(selector=self._typed_selector(kind, selector, **criteria))
+
+    def _find_typed_one(
+        self,
+        kind: type[GraphItem],
+        selector: Selector | dict[str, Any] | Any = None,
+        **criteria: Any,
+    ) -> GraphItem | None:
+        return self.find_one(selector=self._typed_selector(kind, selector, **criteria))
+
     def find_subgraphs(
         self,
         selector: Selector | dict[str, Any] | Any = None,
         **criteria: Any,
     ) -> Iterator[Subgraph]:
-        selector = self._normalize_selector(selector, **criteria) or Selector()
-        selector = selector.with_criteria(has_kind=Subgraph)
-        return self.find_all(selector=selector)
+        return self._find_typed_all(Subgraph, selector, **criteria)
 
     def find_subgraph(
         self,
         selector: Selector | dict[str, Any] | Any = None,
         **criteria: Any,
     ) -> Optional[Subgraph]:
-        selector = self._normalize_selector(selector, **criteria) or Selector()
-        selector = selector.with_criteria(has_kind=Subgraph)
-        return self.find_one(selector=selector)
+        return self._find_typed_one(Subgraph, selector, **criteria)
 
     @property
     def subgraphs(self) -> list[Subgraph]:
@@ -269,13 +301,7 @@ class Graph(Registry[GraphItem]):
         selector: Selector | dict[str, Any] | Any = None,
         **criteria: Any,
     ) -> Iterator[Edge]:
-        if "source" in criteria and "predecessor" not in criteria:
-            criteria["predecessor"] = criteria.pop("source")
-        if "destination" in criteria and "successor" not in criteria:
-            criteria["successor"] = criteria.pop("destination")
-        selector = self._normalize_selector(selector, **criteria) or Selector()
-        selector = selector.with_criteria(has_kind=Edge)
-        return self.find_all(selector=selector)
+        return self._find_typed_all(Edge, selector, **criteria)
 
     @property
     def edges(self) -> list[Edge]:
@@ -286,22 +312,14 @@ class Graph(Registry[GraphItem]):
         selector: Selector | dict[str, Any] | Any = None,
         **criteria: Any,
     ) -> Optional[Edge]:
-        if "source" in criteria and "predecessor" not in criteria:
-            criteria["predecessor"] = criteria.pop("source")
-        if "destination" in criteria and "successor" not in criteria:
-            criteria["successor"] = criteria.pop("destination")
-        selector = self._normalize_selector(selector, **criteria) or Selector()
-        selector = selector.with_criteria(has_kind=Edge)
-        return self.find_one(selector=selector)
+        return self._find_typed_one(Edge, selector, **criteria)
 
     def find_nodes(
         self,
         selector: Selector | dict[str, Any] | Any = None,
         **criteria: Any,
     ) -> Iterator[Node]:
-        selector = self._normalize_selector(selector, **criteria) or Selector()
-        selector = selector.with_criteria(has_kind=Node)
-        return self.find_all(selector=selector)
+        return self._find_typed_all(Node, selector, **criteria)
 
     @property
     def nodes(self) -> list[Node]:
@@ -312,9 +330,7 @@ class Graph(Registry[GraphItem]):
         selector: Selector | dict[str, Any] | Any = None,
         **criteria: Any,
     ) -> Optional[Node]:
-        selector = self._normalize_selector(selector, **criteria) or Selector()
-        selector = selector.with_criteria(has_kind=Node)
-        return self.find_one(selector=selector)
+        return self._find_typed_one(Node, selector, **criteria)
 
     def _do_link(self, caller: GraphItem, node: Node, _ctx):
         """Bridge to dispatch ``do_link`` hook."""

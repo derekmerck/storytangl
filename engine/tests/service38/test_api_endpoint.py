@@ -10,9 +10,9 @@ legacy service surface.  These tests validate the *service38-specific* additions
 - ``ResourceBinding`` enum normalises string inputs
 - ``EndpointPolicy`` extracts defaults from an endpoint and merges runtime overrides
 - ``WritebackMode`` enum round-trips correctly
-- ``ApiEndpoint`` is a subclass of ``LegacyApiEndpoint``, preserving existing
+- ``ApiEndpoint`` is the canonical endpoint model and preserves the existing
   ``method_type``, ``response_type``, ``access_level``, ``preprocessors``,
-  and ``postprocessors`` contracts inherited from the parent
+  and ``postprocessors`` contracts
 - Endpoints missing ``binds`` (i.e. pure legacy endpoints) still have the
   ``_api_endpoint`` attribute and are accepted by the orchestrator
 
@@ -37,7 +37,6 @@ from tangl.service.api_endpoint import (
 from tangl.service.api_endpoint import (
     ApiEndpoint,
     EndpointPolicy,
-    LegacyApiEndpoint,
     ResourceBinding,
     WritebackMode,
 )
@@ -90,12 +89,6 @@ class TestApiEndpoint38Annotate:
         ctrl = _make_annotated(binds=(ResourceBinding.USER,))
         ep = ctrl.my_endpoint._api_endpoint
         assert isinstance(ep, ApiEndpoint)
-
-    def test_endpoint_is_also_legacy_api_endpoint_instance(self) -> None:
-        """Confirms backward compatibility via inheritance."""
-        ctrl = _make_annotated()
-        ep = ctrl.my_endpoint._api_endpoint
-        assert isinstance(ep, LegacyApiEndpoint)
 
     def test_method_type_is_forwarded(self) -> None:
         ctrl = _make_annotated(method_type=MethodType.UPDATE)

@@ -78,7 +78,7 @@ def _dependency(graph: Graph, **kwargs) -> Dependency:
 def _ctx_with_seed(seed: int) -> SimpleNamespace:
     rng = Random(seed)
     return SimpleNamespace(
-        get_registries=lambda: [],
+        get_authorities=lambda: [],
         get_inline_behaviors=lambda: [],
         get_random=lambda: rng,
     )
@@ -94,7 +94,6 @@ def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> SimpleNamespace:
     return SimpleNamespace(
         cursor=None,
         get_authorities=lambda: [registry],
-        get_registries=lambda: [registry],
         get_inline_behaviors=lambda: [],
     )
 
@@ -110,7 +109,6 @@ def _ctx_with_media_inventories(*inventories: MediaInventory, graph: Graph | Non
         graph=graph,
         cursor=None,
         get_authorities=lambda: [registry],
-        get_registries=lambda: [registry],
         get_inline_behaviors=lambda: [],
     )
 
@@ -463,7 +461,7 @@ class TestResolverOfferGathering:
         req = Requirement.from_identifier("missing")
         ctx = SimpleNamespace(
             causality_mode="hard_dirty",
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
         offers = resolver.gather_offers(req, allow_stubs=False, _ctx=ctx)
@@ -890,7 +888,7 @@ class TestResolverRequirementResolution:
 
     def test_from_ctx_requires_provision_context_shape(self) -> None:
         ctx = SimpleNamespace()
-        with pytest.raises(TypeError, match="get_location_entity_groups|get_entity_groups"):
+        with pytest.raises(TypeError, match="get_location_entity_groups"):
             Resolver.from_ctx(ctx)
 
     def test_invalid_resolve_override_sets_override_reason(self) -> None:
@@ -900,7 +898,7 @@ class TestResolverRequirementResolution:
         local_registry = BehaviorRegistry(label="test_resolve_req_registry")
         local_registry.register(func=bad_override, task="resolve_req")
         ctx = SimpleNamespace(
-            get_registries=lambda: [local_registry],
+            get_authorities=lambda: [local_registry],
             get_inline_behaviors=lambda: [],
         )
         resolver = Resolver(entity_groups=[])
@@ -916,9 +914,7 @@ class TestResolverRequirementResolution:
         template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
         ctx = SimpleNamespace(
             get_location_entity_groups=lambda: [[provider]],
-            get_entity_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy entity groups called")),
             get_template_scope_groups=lambda: [_template_registry(template)],
-            get_template_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy template groups called")),
         )
 
         resolver = Resolver.from_ctx(ctx)
@@ -926,27 +922,6 @@ class TestResolverRequirementResolution:
         registry = list(resolver.template_scope_groups)[0]
         assert isinstance(registry, TemplateRegistry)
         assert registry.find_one(Selector(has_identifier="templ")) is template
-
-    def test_from_ctx_legacy_entity_groups_warns(self) -> None:
-        provider = Entity(label="provider")
-        ctx = SimpleNamespace(
-            get_entity_groups=lambda: [[provider]],
-            get_template_scope_groups=lambda: [],
-        )
-        with pytest.deprecated_call(match="get_entity_groups"):
-            resolver = Resolver.from_ctx(ctx)
-        assert resolver.location_entity_groups
-
-    def test_from_ctx_legacy_template_groups_warns(self) -> None:
-        template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
-        ctx = SimpleNamespace(
-            get_location_entity_groups=lambda: [],
-            get_template_groups=lambda: [_template_registry(template)],
-        )
-        with pytest.deprecated_call(match="get_template_groups"):
-            resolver = Resolver.from_ctx(ctx)
-        assert resolver.template_scope_groups
-
 
 class TestResolverDependencyResolution:
     def test_resolve_dependency_links_provider(self) -> None:
@@ -974,7 +949,7 @@ class TestResolverDependencyResolution:
         ctx = SimpleNamespace(
             step=3,
             cursor_id=node.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
 
@@ -1053,7 +1028,7 @@ class TestResolverDependencyResolution:
         ctx = SimpleNamespace(
             step=11,
             cursor_id=node.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
         success = resolver.resolve_dependency(dep, allow_stubs=True, _ctx=ctx)
@@ -1123,7 +1098,7 @@ class TestResolverDependencyResolution:
         ctx = SimpleNamespace(
             step=11,
             cursor_id=node.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
             escalate_to_hard_dirty=_escalate,
         )
@@ -1167,7 +1142,7 @@ class TestResolverDependencyResolution:
             graph=g,
             cursor=cursor,
             cursor_id=cursor.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
 

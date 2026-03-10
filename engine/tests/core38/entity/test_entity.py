@@ -159,12 +159,12 @@ class TestEntityDispatchHooks:
     def test_init_with_ambient_ctx(self) -> None:
         calls = {"registries": 0}
 
-        def get_registries() -> list[object]:
+        def get_authorities() -> list[object]:
             calls["registries"] += 1
             return []
 
         ctx = SimpleNamespace(
-            get_registries=get_registries,
+            get_authorities=get_authorities,
             get_inline_behaviors=lambda: [],
         )
         with using_ctx(ctx):
@@ -197,7 +197,7 @@ class TestEntityDispatchHooks:
         entity = Entity(label="x", _ctx=ctx)
         assert entity.has_tags("global", "ctx")
 
-    def test_ctx_without_get_registries_is_graceful(self) -> None:
+    def test_ctx_without_get_authorities_is_graceful(self) -> None:
         bad_ctx = SimpleNamespace(get_inline_behaviors=lambda: [])
         entity = Entity(label="x", _ctx=bad_ctx)
         assert entity.label == "x"

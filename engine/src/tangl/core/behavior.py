@@ -42,7 +42,7 @@ from .selector import Selector
 from .ctx import DispatchCtx
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 class Priority(IntEnum):
     """Execution priority within one dispatch layer (lower values run earlier)."""
@@ -73,8 +73,6 @@ class RuntimeCtx(DispatchCtx, Protocol):
     """
 
     def get_authorities(self) -> Iterable[BehaviorRegistry]: ...
-    # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self) -> Iterable[BehaviorRegistry]: ...
     def get_inline_behaviors(self) -> Iterable[Behavior | Callable[..., Any]]: ...
 
 
@@ -405,14 +403,10 @@ class BehaviorRegistry(Registry[Behavior]):
 
     @classmethod
     def _ctx_authorities(cls, ctx: Any) -> Iterable[BehaviorRegistry]:
-        """Yield registry authorities provided by ctx (new API, then compatibility alias)."""
+        """Yield registry authorities provided by ``ctx``."""
         get_authorities = getattr(ctx, "get_authorities", None)
         if callable(get_authorities):
             return get_authorities() or ()
-
-        get_registries = getattr(ctx, "get_registries", None)
-        if callable(get_registries):
-            return get_registries() or ()
 
         return ()
 

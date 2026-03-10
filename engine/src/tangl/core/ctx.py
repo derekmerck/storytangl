@@ -14,8 +14,6 @@ class DispatchCtx(Protocol):
     """Minimal dispatch context contract for hook execution chains."""
 
     def get_authorities(self) -> Iterable[Any]: ...
-    # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self) -> Iterable[Any]: ...
     def get_inline_behaviors(self) -> Iterable[Any]: ...
 
 
@@ -65,10 +63,6 @@ class Ctx:
             if registry not in values:
                 values.append(registry)
         return values
-
-    # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self) -> list[Any]:
-        return self.get_authorities()
 
     def get_inline_behaviors(self) -> list[Any]:
         return list(self.inline_behaviors)

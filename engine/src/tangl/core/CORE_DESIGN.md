@@ -162,7 +162,7 @@ with domain fields that might be named `ctx` (e.g., a `CallReceipt` legitimately
 both `ctx=` and `_ctx=` in the same call).
 
 **Ctx is duck-typed.** The `_ctx` parameter accepts `Any`. The dispatch contract is
-progressive by layer: core expects `get_registries()` and `get_inline_behaviors()`;
+progressive by layer: core expects `get_authorities()` and `get_inline_behaviors()`;
 VM extends with graph access, template data, and `get_receipts()`; Story extends further
 with actor registries and world-level asset managers. Each layer should define a Protocol
 for what it minimally expects. The legacy `core.ctx.Ctx` frozen dataclass is a
@@ -275,12 +275,12 @@ edges are created before their targets exist.
 
 **`get_authorities()` is the dispatch bootstrapping extension point.** Application-layer
 graph subclasses override this to expose domain-specific behavior registries to the VM's
-`Frame.get_registries()`. The no-op default on a bare `Graph` is correct — core has no
+`Frame.get_authorities()`. The no-op default on a bare `Graph` is correct — core has no
 policy registries to contribute.
 
 This hook exists because dispatch bootstrapping cannot use dispatch to assemble itself:
 the authority chain must be discoverable before any behavior fires. A duck-typed method
-on the graph is the right primitive — `Frame.get_registries()` checks
+on the graph is the right primitive — `Frame.get_authorities()` checks
 `getattr(graph, "get_authorities", None)` and calls it if present, without type-coupling
 to any application graph class. `StoryGraph` overrides it to return `[story_dispatch,
 *world.get_authorities()]`. Future `WorldGraph`, `MechanicsGraph`, etc. follow the same
@@ -436,12 +436,12 @@ modifying the base classes.
 
 **Dispatch is a mechanism in Core; which registries are active is context selection (VM).**
 Core provides the chaining and execution machinery. The VM (and higher layers) determine
-which BehaviorRegistries participate in a given dispatch by populating `ctx.get_registries()`
+which BehaviorRegistries participate in a given dispatch by populating `ctx.get_authorities()`
 and `ctx.get_inline_behaviors()`.
 
 **Ctx-aware chain assembly.** `chain_execute` pulls registries from three sources:
 1. Explicitly passed registries (includes the global `dispatch` singleton)
-2. `ctx.get_registries()` — layer-specific registries from the runtime context
+2. `ctx.get_authorities()` — layer-specific registries from the runtime context
 3. `ctx.get_inline_behaviors()` — ad-hoc callables normalized into a temporary LOCAL
    registry
 

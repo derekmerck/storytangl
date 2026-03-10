@@ -237,7 +237,7 @@ place.
 The dispatch context for one `follow_edge` invocation. Created fresh at each cursor hop;
 discarded when the hop completes.
 
-**Registry assembly at call time.** `get_registries()` always includes `vm_dispatch`.
+**Registry assembly at call time.** `get_authorities()` always includes `vm_dispatch`.
 If the graph exposes `get_authorities()`, those registries are appended in declaration
 order. This means story_dispatch, world dispatch, and any author-layer registries
 participate automatically — no context configuration required. The assembly cannot use
@@ -423,7 +423,7 @@ layer. Higher-layer code uses the ergonomic alias; lower-layer code uses the can
 name. Nothing new at the vm layer — vm just consumes `ctx.graph` and
 `graph.get_authorities()`.
 
-**`Frame.get_registries()` is the authority aggregation point.** It calls
+**`Frame.get_authorities()` is the authority aggregation point.** It calls
 `graph.get_authorities()` once per `resolve_choice` and includes all returned
 registries in `chain_execute`. Authority dispatch is therefore automatic: anything in
 `get_authorities()` participates in every vm dispatch call without any per-handler
@@ -488,7 +488,7 @@ descend recursively through normal pipeline execution.
 
 The authority chain (`graph.get_authorities()` → `[story_dispatch, world_registries]`)
 must be assembled before any dispatch call fires. This means the assembly mechanism
-cannot be a dispatch hook. `Frame.get_registries()` uses `getattr(graph, "get_authorities",
+cannot be a dispatch hook. `Frame.get_authorities()` uses `getattr(graph, "get_authorities",
 None)` — a plain duck-type check — for exactly this reason.
 
 This is a fundamental structural constraint: **you cannot use dispatch to assemble the

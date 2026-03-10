@@ -14,13 +14,12 @@ resolver mechanisms in :mod:`tangl.vm`.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable as IterableABC
 from typing import Any, Iterable
 
-from tangl.core import Priority, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.core import Priority, Record, Selector, TemplateRegistry
 from tangl.media import get_system_resource_manager
 from tangl.media.media_data_type import MediaDataType
-from tangl.media.media_resource import MediaDep, MediaInventory
+from tangl.media.media_resource import MediaDep
 from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import (
     Affordance,
@@ -35,6 +34,11 @@ from tangl.vm import (
 from .dispatch import on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
+from .provider_collection import (
+    collect_media_inventories,
+    collect_template_registries,
+    collect_token_catalogs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,70 +89,6 @@ def gather_story_template_scope_groups(*, caller, ctx, **_kw):
     return None
 
 
-def _registry_from_values(values: Iterable[Any]) -> TemplateRegistry | None:
-    found: TemplateRegistry | None = None
-    for item in values:
-        registry = getattr(item, "registry", None)
-        if not isinstance(registry, TemplateRegistry):
-            continue
-        if found is None:
-            found = registry
-            continue
-        if found is not registry:
-            return None
-    return found
-
-
-def _coerce_template_registry_item(value: Any) -> TemplateRegistry | None:
-    if isinstance(value, TemplateRegistry):
-        return value
-    nested = getattr(value, "template_registry", None)
-    if isinstance(nested, TemplateRegistry):
-        return nested
-    if isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
-        return None
-    return _registry_from_values(value)
-
-
-def _collect_provider_template_registries(
-    provider: Any,
-    *,
-    caller: Any,
-    graph: Any = None,
-) -> list[TemplateRegistry]:
-    if provider is None:
-        return []
-
-    raw = None
-    get_scope_groups = getattr(provider, "get_template_scope_groups", None)
-    if callable(get_scope_groups):
-        raw = get_scope_groups(caller=caller, graph=graph)
-    else:
-        raw = provider
-
-    if raw is None:
-        return []
-    if isinstance(raw, TemplateRegistry):
-        values = [raw]
-    elif isinstance(raw, (str, bytes, dict)) or not isinstance(raw, IterableABC):
-        values = [raw]
-    else:
-        values = list(raw)
-
-    registries: list[TemplateRegistry] = []
-    seen_ids: set[int] = set()
-    for value in values:
-        registry = _coerce_template_registry_item(value)
-        if registry is None:
-            continue
-        registry_id = id(registry)
-        if registry_id in seen_ids:
-            continue
-        seen_ids.add(registry_id)
-        registries.append(registry)
-    return registries
-
-
 @on_get_template_scope_groups(priority=Priority.LATE)
 def gather_world_template_scope_groups(*, caller, ctx, **_kw):
     """Contribute world-level template registries after story-local sources."""
@@ -166,64 +106,12 @@ def gather_world_template_scope_groups(*, caller, ctx, **_kw):
         getattr(world, "templates", None),
         world,
     ]
-    registries: list[TemplateRegistry] = []
-    seen_ids: set[int] = set()
-    for provider in providers:
-        for registry in _collect_provider_template_registries(
-            provider,
-            caller=caller,
-            graph=graph,
-        ):
-            registry_id = id(registry)
-            if registry_id in seen_ids:
-                continue
-            seen_ids.add(registry_id)
-            registries.append(registry)
+    registries = collect_template_registries(
+        providers,
+        caller=caller,
+        graph=graph,
+    )
     return registries or None
-
-
-def _coerce_token_catalog_item(value: Any) -> TokenCatalog | None:
-    if isinstance(value, TokenCatalog):
-        return value
-    if isinstance(value, type) and issubclass(value, Singleton):
-        return TokenCatalog(wst=value)
-    return None
-
-
-def _collect_provider_token_catalogs(
-    provider: Any,
-    *,
-    caller: Any,
-    requirement: Any = None,
-    graph: Any = None,
-) -> list[TokenCatalog]:
-    if provider is None:
-        return []
-
-    raw = None
-    get_catalogs = getattr(provider, "get_token_catalogs", None)
-    if callable(get_catalogs):
-        raw = get_catalogs(caller=caller, requirement=requirement, graph=graph)
-    else:
-        get_tokenizable = getattr(provider, "get_tokenizable", None)
-        if callable(get_tokenizable):
-            raw = get_tokenizable()
-
-    if raw is None:
-        return []
-    if isinstance(raw, (str, bytes, dict)):
-        return []
-    if isinstance(raw, Iterable):
-        values = list(raw)
-    else:
-        values = [raw]
-
-    catalogs: list[TokenCatalog] = []
-    for value in values:
-        catalog = _coerce_token_catalog_item(value)
-        if catalog is not None:
-            catalogs.append(catalog)
-    return catalogs
 
 
 @on_get_token_catalogs(priority=Priority.LATE)
@@ -244,62 +132,13 @@ def gather_world_token_catalogs(*, caller, requirement=None, ctx, **_kw):
         getattr(world, "domain", None),
         world,
     ]
-    catalogs: list[TokenCatalog] = []
-    for provider in providers:
-        catalogs.extend(
-            _collect_provider_token_catalogs(
-                provider,
-                caller=caller,
-                requirement=requirement,
-                graph=graph,
-            )
-        )
+    catalogs = collect_token_catalogs(
+        providers,
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+    )
     return catalogs or None
-
-
-def _coerce_media_inventory_item(value: Any, *, scope: str | None = None) -> MediaInventory | None:
-    return MediaInventory.from_provider(value, scope=scope)
-
-
-def _collect_provider_media_inventories(
-    provider: Any,
-    *,
-    caller: Any,
-    requirement: Any = None,
-    graph: Any = None,
-    scope: str | None = None,
-) -> list[MediaInventory]:
-    if provider is None:
-        return []
-
-    raw = None
-    get_inventories = getattr(provider, "get_media_inventories", None)
-    if callable(get_inventories):
-        raw = get_inventories(caller=caller, requirement=requirement, graph=graph)
-    else:
-        raw = provider
-
-    if raw is None:
-        return []
-    if isinstance(raw, (str, bytes, dict)):
-        values = [raw]
-    elif isinstance(raw, IterableABC):
-        values = list(raw)
-    else:
-        values = [raw]
-
-    inventories: list[MediaInventory] = []
-    seen_registry_ids: set[int] = set()
-    for value in values:
-        inventory = _coerce_media_inventory_item(value, scope=scope)
-        if inventory is None:
-            continue
-        registry_id = id(inventory.registry)
-        if registry_id in seen_registry_ids:
-            continue
-        seen_registry_ids.add(registry_id)
-        inventories.append(inventory)
-    return inventories
 
 
 @on_get_media_inventories(priority=Priority.FIRST)
@@ -315,8 +154,8 @@ def gather_story_media_inventories(*, caller, requirement=None, ctx, **_kw):
         if manager is not None:
             graph.story_resources = manager
 
-    inventories = _collect_provider_media_inventories(
-        manager,
+    inventories = collect_media_inventories(
+        [manager],
         caller=caller,
         requirement=requirement,
         graph=graph,
@@ -340,17 +179,13 @@ def gather_world_media_inventories(*, caller, requirement=None, ctx, **_kw):
         getattr(world, "resources", None),
         world,
     ]
-    inventories: list[MediaInventory] = []
-    for provider in providers:
-        inventories.extend(
-            _collect_provider_media_inventories(
-                provider,
-                caller=caller,
-                requirement=requirement,
-                graph=graph,
-                scope="world",
-            )
-        )
+    inventories = collect_media_inventories(
+        providers,
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+        scope="world",
+    )
     return inventories or None
 
 
@@ -358,8 +193,8 @@ def gather_world_media_inventories(*, caller, requirement=None, ctx, **_kw):
 def gather_system_media_inventories(*, caller, requirement=None, ctx, **_kw):
     """Contribute shared system media inventory last."""
     graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
-    inventories = _collect_provider_media_inventories(
-        get_system_resource_manager(),
+    inventories = collect_media_inventories(
+        [get_system_resource_manager()],
         caller=caller,
         requirement=requirement,
         graph=graph,

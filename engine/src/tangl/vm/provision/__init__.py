@@ -69,6 +69,7 @@ from .provisioner import (
     UpdateCloneProvisioner,
     CloneProvisioner,
 )
+from .materialization import MaterializeRole, attach_child, materialize_template_entity
 from .resolver import Resolver
 
 
@@ -104,5 +105,8 @@ __all__ = [
     "StubProvisioner",
     "UpdateCloneProvisioner",
     "CloneProvisioner",
+    "MaterializeRole",
+    "attach_child",
+    "materialize_template_entity",
     "Resolver",
 ]

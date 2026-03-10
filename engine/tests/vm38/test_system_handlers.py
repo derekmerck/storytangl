@@ -75,7 +75,7 @@ def register_system_handlers(clean_vm_dispatch):
 @pytest.fixture
 def ctx() -> SimpleNamespace:
     return SimpleNamespace(
-        get_registries=lambda: [vm_dispatch],
+        get_authorities=lambda: [vm_dispatch],
         get_inline_behaviors=lambda: [],
     )
 
@@ -116,7 +116,7 @@ class TestContributeRuntimeBaseline:
         baseline_ctx = SimpleNamespace(
             graph=g,
             cursor=node,
-            get_registries=lambda: [vm_dispatch],
+            get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
         )
         ns = do_gather_ns(node, ctx=baseline_ctx)
@@ -189,7 +189,7 @@ class TestContributeRuntimeUserContext:
             graph=g,
             cursor=node,
             get_meta=lambda: {"user": user, "user_id": user.uid},
-            get_registries=lambda: [vm_dispatch],
+            get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
         )
 
@@ -207,7 +207,7 @@ class TestContributeRuntimeUserContext:
             graph=g,
             cursor=node,
             get_meta=lambda: {"user": user, "user_id": user.uid},
-            get_registries=lambda: [vm_dispatch],
+            get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
         )
 
@@ -227,7 +227,7 @@ class TestContributeRuntimeUserContext:
             graph=g,
             cursor=node,
             get_meta=lambda: {"user": user, "user_id": user.uid},
-            get_registries=lambda: [vm_dispatch],
+            get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
         )
 

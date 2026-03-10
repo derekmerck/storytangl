@@ -58,17 +58,6 @@ class TestBehaviorRegistryChainExecute:
         CallReceipt.gather_results(*base.chain_execute(base, task="x", ctx=ctx))
         assert order == ["base", "app"]
 
-    def test_chain_execute_supports_legacy_ctx_registries_alias(self) -> None:
-        order: list[str] = []
-        base = BehaviorRegistry(default_dispatch_layer=DispatchLayer.GLOBAL)
-        app = BehaviorRegistry(default_dispatch_layer=DispatchLayer.APPLICATION)
-        base.register(task="x", func=lambda *, ctx=None: order.append("base"))
-        app.register(task="x", func=lambda *, ctx=None: order.append("app"))
-
-        ctx = SimpleNamespace(get_registries=lambda: [app], get_inline_behaviors=lambda: [])
-        CallReceipt.gather_results(*base.chain_execute(base, task="x", ctx=ctx))
-        assert order == ["base", "app"]
-
     def test_chain_execute_wraps_ctx_inline_behaviors_as_local(self) -> None:
         layers: list[int] = []
         base = BehaviorRegistry(default_dispatch_layer=DispatchLayer.GLOBAL)

@@ -71,14 +71,11 @@ vm_dispatch = dispatch
 
 def _validate_dispatch_ctx(ctx: Any) -> None:
     """Raise ``TypeError`` when ctx lacks dispatch protocol methods."""
-    has_authorities = callable(getattr(ctx, "get_authorities", None)) or callable(
-        getattr(ctx, "get_registries", None)
-    )
+    has_authorities = callable(getattr(ctx, "get_authorities", None))
     has_inline = callable(getattr(ctx, "get_inline_behaviors", None))
     if not has_authorities or not has_inline:
         raise TypeError(
-            "Dispatch context must provide get_authorities()/get_registries() "
-            "and get_inline_behaviors()"
+            "Dispatch context must provide get_authorities() and get_inline_behaviors()"
         )
     return None
 

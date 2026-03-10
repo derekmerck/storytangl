@@ -18,6 +18,7 @@ from tangl.vm import (
     assert_traversal_contracts,
     do_get_template_scope_groups,
 )
+from tangl.vm.provision import MaterializeRole, attach_child, materialize_template_entity
 
 from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, MenuBlock, Scene
@@ -66,10 +67,6 @@ class _PrelinkCtx:
             return list(getter() or [])
         return []
 
-    # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self) -> list[object]:
-        return self.get_authorities()
-
     def get_inline_behaviors(self):
         return []
 
@@ -113,13 +110,6 @@ class _PrelinkCtx:
             if registries:
                 return registries
         return [self.template_registry]
-
-    # Legacy aliases retained for compatibility with old resolver contexts.
-    def get_entity_groups(self):
-        return self.get_location_entity_groups()
-
-    def get_template_groups(self):
-        return self.get_template_scope_groups()
 
 
 class StoryMaterializer:
@@ -263,10 +253,10 @@ class StoryMaterializer:
         if templ.uid in state.template_to_entity:
             return state.template_to_entity[templ.uid]
 
-        entity = Resolver._materialize_node(
+        entity = materialize_template_entity(
             templ,
             _ctx=state,
-            role="init",
+            role=MaterializeRole.INIT,
         )
         if not isinstance(entity, GraphItem):
             return None
@@ -290,18 +280,9 @@ class StoryMaterializer:
             parent_entity = state.template_to_entity.get(parent_templ.uid)
             if isinstance(parent_entity, TraversableNode) and isinstance(entity, GraphItem):
                 if hasattr(parent_entity, "add_child"):
-                    self._attach_child(parent_entity, entity)
+                    attach_child(parent_entity, entity)
 
         return entity
-
-    @staticmethod
-    def _attach_child(parent: Any, child: Any) -> None:
-        if parent is None or not hasattr(parent, "add_child"):
-            return
-        parent.add_child(child)
-        finalize = getattr(parent, "finalize_container_contract", None)
-        if callable(finalize):
-            finalize()
 
     @staticmethod
     def _template_lineage_ids(templ: Any) -> list[UUID]:

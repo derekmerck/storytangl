@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-from enum import StrEnum
 import logging
-import warnings
 from typing import Any, Iterable, Iterator, Optional, TypeAlias, Union, Self
 from uuid import UUID
 
@@ -20,6 +18,12 @@ from tangl.core import (
 from ..dispatch import do_get_media_inventories, do_get_token_catalogs, on_provision
 from ..ctx import VmResolverCtx
 from ..traversable import TraversableNode
+from .materialization import (
+    MaterializeRole,
+    attach_child,
+    materialize_template_entity,
+    resolve_story_materialize_hook,
+)
 from .matching import annotate_offer_specificity, summarize_offer
 from .preview import Blocker, ViabilityResult
 from .provisioner import (
@@ -31,7 +35,6 @@ from .provisioner import (
     StubProvisioner,
     UpdateCloneProvisioner,
     ProvisionPolicy,
-    _next_provision_uid,
     _template_hash_value,
 )
 from .requirement import Requirement, PT, Dependency, Affordance, Fanout
@@ -45,12 +48,6 @@ from .scope import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class _MaterializeRole(StrEnum):
-    INIT = "init"
-    PROVISION_INTERMEDIATE = "provision_intermediate"
-    PROVISION_LEAF = "provision_leaf"
 
 
 @dataclass
@@ -110,36 +107,14 @@ class Resolver:
         getter = getattr(ctx, "get_location_entity_groups", None)
         if callable(getter):
             return getter()
-        getter = getattr(ctx, "get_entity_groups", None)
-        if callable(getter):
-            warnings.warn(
-                "Resolver context uses legacy get_entity_groups(); "
-                "prefer get_location_entity_groups().",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return getter()
-        raise TypeError(
-            "Resolver context must provide get_location_entity_groups() or get_entity_groups()"
-        )
+        raise TypeError("Resolver context must provide get_location_entity_groups()")
 
     @staticmethod
     def _ctx_template_scope_groups(ctx) -> Iterable[TemplateRegistry]:
         getter = getattr(ctx, "get_template_scope_groups", None)
         if callable(getter):
             return getter()
-        getter = getattr(ctx, "get_template_groups", None)
-        if callable(getter):
-            warnings.warn(
-                "Resolver context uses legacy get_template_groups(); "
-                "prefer get_template_scope_groups().",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return getter()
-        raise TypeError(
-            "Resolver context must provide get_template_scope_groups() or get_template_groups()"
-        )
+        raise TypeError("Resolver context must provide get_template_scope_groups()")
 
     @classmethod
     def from_ctx(cls, ctx: VmResolverCtx) -> Self:
@@ -187,19 +162,6 @@ class Resolver:
         return ""
 
     @staticmethod
-    def _story_materialize_hook(_ctx: Any) -> Any:
-        hook = getattr(_ctx, "story_materialize", None)
-        if callable(hook):
-            return hook
-
-        meta = getattr(_ctx, "meta", None)
-        if isinstance(meta, dict):
-            meta_hook = meta.get("story_materialize")
-            if callable(meta_hook):
-                return meta_hook
-        return None
-
-    @staticmethod
     def _ctx_causality_mode(_ctx: Any) -> Any | None:
         mode = getattr(_ctx, "causality_mode", None)
         if mode is not None:
@@ -229,36 +191,15 @@ class Resolver:
         template: EntityTemplate,
         *,
         _ctx: Any = None,
-        role: _MaterializeRole | str = _MaterializeRole.PROVISION_LEAF,
+        role: MaterializeRole | str = MaterializeRole.PROVISION_LEAF,
         story_materialize: Any = None,
     ) -> Entity:
-        if isinstance(role, str):
-            role = _MaterializeRole(role)
-        if role in (_MaterializeRole.INIT, _MaterializeRole.PROVISION_INTERMEDIATE):
-            provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        elif role is _MaterializeRole.PROVISION_LEAF:
-            if callable(story_materialize):
-                provider = story_materialize(template, _ctx)
-            else:
-                provider = template.materialize(uid=_next_provision_uid(_ctx=_ctx))
-        else:
-            raise ValueError(f"Unsupported materialization role: {role!r}")
-
-        if not isinstance(provider, Entity):
-            raise TypeError(
-                "Template materialization must yield Entity-compatible providers"
-            )
-        provider.templ_hash = _template_hash_value(template)
-        return provider
-
-    @staticmethod
-    def _attach_child(parent: Any, child: Any) -> None:
-        if parent is None or not hasattr(parent, "add_child"):
-            return
-        parent.add_child(child)
-        finalize = getattr(parent, "finalize_container_contract", None)
-        if callable(finalize):
-            finalize()
+        return materialize_template_entity(
+            template,
+            _ctx=_ctx,
+            role=role,
+            story_materialize=story_materialize,
+        )
 
     def _resolve_target_path_for_requirement(self, requirement: Requirement, *, _ctx: Any = None) -> str | None:
         return resolve_target_path(
@@ -277,14 +218,14 @@ class Resolver:
     ) -> list[ProvisionOffer]:
         request_ctx = self._request_ctx_path(_ctx)
         graph = getattr(_ctx, "graph", None)
-        story_materialize = self._story_materialize_hook(_ctx)
+        story_materialize = resolve_story_materialize_hook(_ctx)
 
         provisioner = TemplateProvisioner(
             registries=self.template_scope_groups,
             request_ctx=request_ctx,
             graph=graph,
             story_materialize=story_materialize,
-            materialize_node=self._materialize_node,
+            materialize_node=materialize_template_entity,
         )
         return list(provisioner.get_dependency_offers(requirement))
 
@@ -386,8 +327,8 @@ class Resolver:
 
         offers.extend(
             InlineTemplateProvisioner(
-                materialize_node=self._materialize_node,
-                story_materialize=self._story_materialize_hook(_ctx),
+                materialize_node=materialize_template_entity,
+                story_materialize=resolve_story_materialize_hook(_ctx),
             ).iter_dependency_offers(requirement)
         )
         offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
@@ -673,9 +614,9 @@ class Resolver:
         if provider.registry is not graph:
             graph.add(provider, _ctx=_ctx)
             if getattr(provider, "parent", None) is not parent:
-                self._attach_child(parent, provider)
+                attach_child(parent, provider)
         elif parent is not None and getattr(provider, "parent", None) is not parent:
-            self._attach_child(parent, provider)
+            attach_child(parent, provider)
 
         requirement._validate_satisfied_by(provider)
         return provider
@@ -990,14 +931,14 @@ class Resolver:
             created = self._materialize_node(
                 template,
                 _ctx=_ctx,
-                role=_MaterializeRole.PROVISION_INTERMEDIATE,
+                role=MaterializeRole.PROVISION_INTERMEDIATE,
             )
             if not isinstance(created, RegistryAware):
                 raise TypeError("Structural template materialization must yield RegistryAware nodes")
 
             if created.registry is not graph:
                 graph.add(created, _ctx=_ctx)
-            self._attach_child(current, created)
+            attach_child(current, created)
             current = created
 
         return current
@@ -1017,7 +958,7 @@ class Resolver:
         if created:
             dependency.registry.add(provider, _ctx=_ctx)
             if getattr(provider, "parent", None) is not parent:
-                Resolver._attach_child(parent, provider)
+                attach_child(parent, provider)
 
         dependency.set_provider(provider, _ctx=_ctx)
         return True

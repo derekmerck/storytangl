@@ -19,7 +19,6 @@ def test_get_authorities_merges_dispatch_and_explicit_registries_without_duplica
     b = object()
     ctx = Ctx(dispatch=[a, b], registries=(b,))
     assert ctx.get_authorities() == [b, a]
-    assert ctx.get_registries() == [b, a]
 
 
 def test_resolve_ctx_prefers_explicit_then_ambient() -> None:

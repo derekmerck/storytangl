@@ -139,7 +139,6 @@ class PhaseCtx:
     API
     ---
     - ``get_authorities()`` — authority registries for dispatch expansion.
-    - ``get_registries()`` — compatibility alias for ``get_authorities()``.
     - ``get_inline_behaviors()`` — inline behaviors (empty for now).
     - ``get_ns(node)`` — cached scoped namespace from local + dispatch contributors.
     - ``get_random()`` — deterministic RNG for this frame.
@@ -181,10 +180,6 @@ class PhaseCtx:
                 if isinstance(registry, BehaviorRegistry) and registry not in registries:
                     registries.append(registry)
         return registries
-
-    # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self) -> list[BehaviorRegistry]:
-        return self.get_authorities()
 
     def get_inline_behaviors(self) -> list[Callable | Behavior]:
         return self.inline_behaviors
@@ -335,13 +330,6 @@ class PhaseCtx:
         if isinstance(factory, TemplateRegistry):
             return [factory]
         return []
-
-    # Backwards-compatible aliases for existing resolver contexts.
-    def get_entity_groups(self) -> list[Iterable]:
-        return self.get_location_entity_groups()
-
-    def get_template_groups(self) -> list[TemplateRegistry]:
-        return self.get_template_scope_groups()
 
 
 # ---------------------------------------------------------------------------
