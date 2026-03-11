@@ -282,6 +282,19 @@ class TestLedgerResolveChoice:
         assert ledger.cursor_id == c.uid
         assert get_visit_count(b.uid, ledger.cursor_history) == 1
 
+    def test_ledger_local_behaviors_participate_in_frame_phase_dispatch(self) -> None:
+        ledger, [a, b] = _make_ledger("a", "b")
+        b.locals = {}
+        edge = list(a.edges_out())[0]
+
+        ledger.local_behaviors.register(
+            task="apply_update",
+            func=lambda *, caller, ctx, **_: caller.locals.__setitem__("ledger_local", True),
+        )
+
+        ledger.resolve_choice(edge.uid)
+        assert b.locals["ledger_local"] is True
+
     def test_resolve_choice_copies_redirect_observability(self) -> None:
         g = Graph()
         a = _node(g, label="a")

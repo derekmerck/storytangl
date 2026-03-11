@@ -50,6 +50,25 @@ from .scope import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _StructuralChainPlan:
+    target_ctx: str | None
+    build_segments: tuple[str, ...] = ()
+
+    @property
+    def requires_chain(self) -> bool:
+        return bool(self.build_segments)
+
+    @property
+    def parent_path(self) -> str | None:
+        if not isinstance(self.target_ctx, str) or not self.target_ctx:
+            return None
+        parent_parts = split_path(self.target_ctx)[:-1]
+        if not parent_parts:
+            return None
+        return ".".join(parent_parts)
+
+
 @dataclass
 class Resolver:
     """Resolver(location_entity_groups=(), template_scope_groups=())
@@ -893,6 +912,31 @@ class Resolver:
             return None
         return best[2]
 
+    def _chain_plan_for_offer(
+        self,
+        requirement: Requirement,
+        *,
+        offer: ProvisionOffer,
+        _ctx: Any = None,
+    ) -> _StructuralChainPlan:
+        offer_target_ctx = getattr(offer, "target_ctx", None)
+        target_ctx = (
+            offer_target_ctx
+            if isinstance(offer_target_ctx, str) and offer_target_ctx
+            else self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
+        )
+        return _StructuralChainPlan(
+            target_ctx=target_ctx,
+            build_segments=tuple(getattr(offer, "build_plan", None) or ()),
+        )
+
+    @staticmethod
+    def _chain_plan_for_target_ctx(target_ctx: str | None, *, graph: Any) -> _StructuralChainPlan:
+        return _StructuralChainPlan(
+            target_ctx=target_ctx,
+            build_segments=tuple(build_plan(target_ctx, graph)),
+        )
+
     def _chain_paths_resolvable(
         self,
         *,
@@ -926,6 +970,69 @@ class Resolver:
             segment_index += 1
         return plan_index == len(build_segments)
 
+    def _chain_plan_is_resolvable(
+        self,
+        plan: _StructuralChainPlan,
+        *,
+        graph: Any,
+    ) -> bool:
+        if not plan.requires_chain:
+            return True
+        if graph is None or plan.target_ctx is None:
+            return False
+        return self._chain_paths_resolvable(
+            build_segments=list(plan.build_segments),
+            target_ctx=plan.target_ctx,
+            graph=graph,
+        )
+
+    def _parent_for_chain_plan(
+        self,
+        plan: _StructuralChainPlan,
+        *,
+        graph: Any,
+    ) -> Any | None:
+        if not plan.parent_path:
+            return None
+        return self._find_existing_path_node(graph, plan.parent_path)
+
+    def _find_chain_segment_node(
+        self,
+        *,
+        graph: Any,
+        current: Any | None,
+        segment: str,
+    ) -> Any | None:
+        if current is None:
+            return self._find_top_level_node(graph, segment)
+        return self._find_child_node(current, segment)
+
+    def _materialize_structural_segment(
+        self,
+        *,
+        segment_path: str,
+        target_ctx: str,
+        graph: Any,
+        _ctx: Any = None,
+    ) -> RegistryAware:
+        template = self._find_structural_template(
+            identifier=segment_path,
+            target_ctx=target_ctx,
+        )
+        if template is None:
+            raise ValueError(f"Missing structural template for segment {segment_path!r}")
+
+        created = self._materialize_node(
+            template,
+            _ctx=_ctx,
+            role=MaterializeRole.PROVISION_INTERMEDIATE,
+        )
+        if not isinstance(created, RegistryAware):
+            raise TypeError("Structural template materialization must yield RegistryAware nodes")
+        if created.registry is not graph:
+            graph.add(created, _ctx=_ctx)
+        return created
+
     def _execute_build_chain(
         self,
         *,
@@ -934,65 +1041,36 @@ class Resolver:
         graph: Any,
         _ctx: Any = None,
     ) -> Any | None:
-        build_segments = list(offer.build_plan or [])
-        offer_target_ctx = getattr(offer, "target_ctx", None)
-        if not build_segments:
-            target_path = offer_target_ctx or self._resolve_target_path_for_requirement(
-                requirement,
-                _ctx=_ctx,
-            )
-            if not target_path:
-                return None
-            parent_path_parts = split_path(target_path)[:-1]
-            if not parent_path_parts:
-                return None
-            return self._find_existing_path_node(graph, ".".join(parent_path_parts))
-
-        target_ctx = offer_target_ctx or self._resolve_target_path_for_requirement(
-            requirement,
-            _ctx=_ctx,
-        )
-        if target_ctx is None:
+        plan = self._chain_plan_for_offer(requirement, offer=offer, _ctx=_ctx)
+        if not plan.requires_chain:
+            return self._parent_for_chain_plan(plan, graph=graph)
+        if plan.target_ctx is None:
             raise ValueError("Cannot execute structural chain without a target path")
-
-        if not self._chain_paths_resolvable(
-            build_segments=build_segments,
-            target_ctx=target_ctx,
-            graph=graph,
-        ):
+        if not self._chain_plan_is_resolvable(plan, graph=graph):
             raise ValueError("structural build chain is not resolvable")
 
-        segments = split_path(target_ctx)
+        segments = split_path(plan.target_ctx)
         parent_segments = segments[:-1]
         if not parent_segments:
             return None
 
         current: Any | None = None
         for index, segment in enumerate(parent_segments):
-            if index == 0:
-                existing = self._find_top_level_node(graph, segment)
-            else:
-                existing = self._find_child_node(current, segment)
-
+            existing = self._find_chain_segment_node(
+                graph=graph,
+                current=current,
+                segment=segment,
+            )
             if existing is not None:
                 current = existing
                 continue
 
-            segment_path = ".".join(segments[: index + 1])
-            template = self._find_structural_template(identifier=segment_path, target_ctx=target_ctx)
-            if template is None:
-                raise ValueError(f"Missing structural template for segment {segment_path!r}")
-
-            created = self._materialize_node(
-                template,
+            created = self._materialize_structural_segment(
+                segment_path=".".join(segments[: index + 1]),
+                target_ctx=plan.target_ctx,
+                graph=graph,
                 _ctx=_ctx,
-                role=MaterializeRole.PROVISION_INTERMEDIATE,
             )
-            if not isinstance(created, RegistryAware):
-                raise TypeError("Structural template materialization must yield RegistryAware nodes")
-
-            if created.registry is not graph:
-                graph.add(created, _ctx=_ctx)
             attach_child(current, created)
             current = created
 
@@ -1038,37 +1116,84 @@ class Resolver:
         )
 
         graph = getattr(_ctx, "graph", None)
-        for offer in offers:
-            chain = list(offer.build_plan or [])
-            target_ctx = getattr(offer, "target_ctx", None) or self._resolve_target_path_for_requirement(
-                requirement,
-                _ctx=_ctx,
-            )
-            if chain and (
-                target_ctx is None
-                or not self._chain_paths_resolvable(
-                    build_segments=chain,
-                    target_ctx=target_ctx,
-                    graph=graph,
-                )
-            ):
-                continue
-            return ViabilityResult(
-                viable=True,
-                chain=chain,
-                scope_distance=int(getattr(offer, "scope_distance", 0) or 0),
-                blockers=[],
-            )
+        preview = self._preview_viable_offer(
+            requirement=requirement,
+            offers=offers,
+            graph=graph,
+            _ctx=_ctx,
+        )
+        if preview is not None:
+            return preview
 
         blockers = self._diagnose_blockers(requirement=requirement, _ctx=_ctx)
         return ViabilityResult(viable=False, chain=[], scope_distance=0, blockers=blockers)
 
-    def _diagnose_blockers(self, *, requirement: Requirement, _ctx: Any = None) -> list[Blocker]:
+    def _preview_viable_offer(
+        self,
+        *,
+        requirement: Requirement,
+        offers: Iterable[ProvisionOffer],
+        graph: Any,
+        _ctx: Any = None,
+    ) -> ViabilityResult | None:
+        for offer in offers:
+            plan = self._chain_plan_for_offer(requirement, offer=offer, _ctx=_ctx)
+            if not self._chain_plan_is_resolvable(plan, graph=graph):
+                continue
+            return ViabilityResult(
+                viable=True,
+                chain=list(plan.build_segments),
+                scope_distance=int(getattr(offer, "scope_distance", 0) or 0),
+                blockers=[],
+            )
+        return None
+
+    @staticmethod
+    def _blocker_context(
+        *,
+        identifier: str | None,
+        target_ctxs: list[str],
+        include_candidates: bool = False,
+        **extra: Any,
+    ) -> dict[str, Any]:
+        context: dict[str, Any] = {
+            "identifier": identifier,
+            "target_ctx": target_ctxs[0] if target_ctxs else None,
+        }
+        if include_candidates:
+            context["target_ctx_candidates"] = list(target_ctxs)
+        context.update(extra)
+        return context
+
+    def _blocker(
+        self,
+        reason: str,
+        *,
+        identifier: str | None,
+        target_ctxs: list[str],
+        include_candidates: bool = False,
+        **context: Any,
+    ) -> Blocker:
+        return Blocker(
+            reason=reason,
+            context=self._blocker_context(
+                identifier=identifier,
+                target_ctxs=target_ctxs,
+                include_candidates=include_candidates,
+                **context,
+            ),
+        )
+
+    def _target_contexts_for_requirement(
+        self,
+        requirement: Requirement,
+        *,
+        _ctx: Any = None,
+    ) -> list[str]:
         identifier = self._selector_identifier(requirement)
-        request_ctx = self._request_ctx_path(_ctx)
         target_ctxs = target_context_candidates(
             identifier=identifier,
-            request_ctx=request_ctx,
+            request_ctx=self._request_ctx_path(_ctx),
             authored_path=requirement.authored_path,
             is_qualified=requirement.is_qualified,
             is_absolute=requirement.is_absolute,
@@ -1077,109 +1202,179 @@ class Resolver:
             target_ctx = self._resolve_target_path_for_requirement(requirement, _ctx=_ctx)
             if target_ctx is not None:
                 target_ctxs = [target_ctx]
+        return target_ctxs
 
-        templates = list(self._iter_templates())
-        identity_candidates = [
+    @staticmethod
+    def _identity_template_candidates(
+        requirement: Requirement,
+        templates: list[EntityTemplate],
+    ) -> list[EntityTemplate]:
+        return [
             template
             for template in templates
             if TemplateProvisioner._matches_non_identifier_criteria(requirement, template)
             and TemplateProvisioner._matches_template_identity(requirement, template)
         ]
 
-        if not identity_candidates:
-            kind = (requirement.__pydantic_extra__ or {}).get("has_kind")
-            if isinstance(kind, type):
-                kind_candidates = [template for template in templates if template.has_kind(kind)]
-                if kind_candidates:
-                    return [
-                        Blocker(
-                            reason="name_mismatch",
-                            context={
-                                "identifier": identifier,
-                                "target_ctx": target_ctxs[0] if target_ctxs else None,
-                            },
-                        )
-                    ]
-            return [
-                Blocker(
-                    reason="no_template",
-                    context={
-                        "identifier": identifier,
-                        "target_ctx": target_ctxs[0] if target_ctxs else None,
-                    },
-                )
-            ]
+    @staticmethod
+    def _kind_template_candidates(
+        requirement: Requirement,
+        templates: list[EntityTemplate],
+    ) -> list[EntityTemplate]:
+        kind = (requirement.__pydantic_extra__ or {}).get("has_kind")
+        if not isinstance(kind, type):
+            return []
+        return [template for template in templates if template.has_kind(kind)]
 
-        admitted_candidates = [
+    @staticmethod
+    def _admitted_template_candidates(
+        identity_candidates: list[EntityTemplate],
+        target_ctxs: list[str],
+    ) -> list[tuple[EntityTemplate, str]]:
+        return [
             (template, target_ctx)
             for template in identity_candidates
             for target_ctx in target_ctxs
             if template.admitted_to(target_ctx)
         ]
-        if not admitted_candidates:
+
+    def _diagnose_identity_blockers(
+        self,
+        *,
+        requirement: Requirement,
+        templates: list[EntityTemplate],
+        target_ctxs: list[str],
+    ) -> list[Blocker] | None:
+        identifier = self._selector_identifier(requirement)
+        if self._identity_template_candidates(requirement, templates):
+            return None
+        if self._kind_template_candidates(requirement, templates):
             return [
-                Blocker(
-                    reason="scope_rejected",
-                    context={
-                        "identifier": identifier,
-                        "target_ctx": target_ctxs[0] if target_ctxs else None,
-                        "target_ctx_candidates": list(target_ctxs),
-                        "scopes": [template.admission_scope for template in identity_candidates],
-                    },
+                self._blocker(
+                    "name_mismatch",
+                    identifier=identifier,
+                    target_ctxs=target_ctxs,
+                )
+            ]
+        return [
+            self._blocker(
+                "no_template",
+                identifier=identifier,
+                target_ctxs=target_ctxs,
+            )
+        ]
+
+    def _diagnose_scope_blockers(
+        self,
+        *,
+        requirement: Requirement,
+        identity_candidates: list[EntityTemplate],
+        target_ctxs: list[str],
+    ) -> list[Blocker] | None:
+        if self._admitted_template_candidates(identity_candidates, target_ctxs):
+            return None
+        return [
+            self._blocker(
+                "scope_rejected",
+                identifier=self._selector_identifier(requirement),
+                target_ctxs=target_ctxs,
+                include_candidates=True,
+                scopes=[template.admission_scope for template in identity_candidates],
+            )
+        ]
+
+    def _diagnose_episode_scope_policy_blockers(
+        self,
+        *,
+        requirement: Requirement,
+        admitted_candidates: list[tuple[EntityTemplate, str]],
+        target_ctxs: list[str],
+        _ctx: Any = None,
+    ) -> list[Blocker] | None:
+        if not self._is_episode_requirement(requirement):
+            return None
+
+        identifier = self._selector_identifier(requirement)
+        distances = [
+            scope_distance(template.admission_scope, target_ctx)
+            for template, target_ctx in admitted_candidates
+        ]
+        if not requirement.is_qualified and distances and min(distances) > 0:
+            return [
+                self._blocker(
+                    "scope_rejected",
+                    identifier=identifier,
+                    target_ctxs=target_ctxs,
+                    include_candidates=True,
+                    distances=distances,
+                    policy="unqualified_episode_requires_distance_0",
                 )
             ]
 
-        if self._is_episode_requirement(requirement):
-            distances = [
-                scope_distance(template.admission_scope, target_ctx)
-                for template, target_ctx in admitted_candidates
-            ]
-            if not requirement.is_qualified and distances and min(distances) > 0:
-                return [
-                    Blocker(
-                        reason="scope_rejected",
-                        context={
-                            "identifier": identifier,
-                            "target_ctx": target_ctxs[0] if target_ctxs else None,
-                            "target_ctx_candidates": list(target_ctxs),
-                            "distances": distances,
-                            "policy": "unqualified_episode_requires_distance_0",
-                        },
-                    )
-                ]
+        if not requirement.is_qualified or not target_ctxs:
+            return None
 
-            graph = getattr(_ctx, "graph", None)
-            if requirement.is_qualified and target_ctxs:
-                unresolved: list[dict[str, Any]] = []
-                for _template, target_ctx in admitted_candidates:
-                    chain = build_plan(target_ctx, graph)
-                    if not self._chain_paths_resolvable(
-                        build_segments=chain,
-                        target_ctx=target_ctx,
-                        graph=graph,
-                    ):
-                        unresolved.append({"target_ctx": target_ctx, "chain": chain})
-                if unresolved and len(unresolved) == len(admitted_candidates):
-                    return [
-                        Blocker(
-                            reason="chain_unresolvable",
-                            context={
-                                "identifier": identifier,
-                                "target_ctx": target_ctxs[0] if target_ctxs else None,
-                                "target_ctx_candidates": list(target_ctxs),
-                                "chains": unresolved,
-                            },
-                        )
-                    ]
+        graph = getattr(_ctx, "graph", None)
+        unresolved: list[dict[str, Any]] = []
+        for _template, target_ctx in admitted_candidates:
+            plan = self._chain_plan_for_target_ctx(target_ctx, graph=graph)
+            if self._chain_plan_is_resolvable(plan, graph=graph):
+                continue
+            unresolved.append(
+                {
+                    "target_ctx": target_ctx,
+                    "chain": list(plan.build_segments),
+                }
+            )
+
+        if unresolved and len(unresolved) == len(admitted_candidates):
+            return [
+                self._blocker(
+                    "chain_unresolvable",
+                    identifier=identifier,
+                    target_ctxs=target_ctxs,
+                    include_candidates=True,
+                    chains=unresolved,
+                )
+            ]
+        return None
+
+    def _diagnose_blockers(self, *, requirement: Requirement, _ctx: Any = None) -> list[Blocker]:
+        target_ctxs = self._target_contexts_for_requirement(requirement, _ctx=_ctx)
+        templates = list(self._iter_templates())
+        blockers = self._diagnose_identity_blockers(
+            requirement=requirement,
+            templates=templates,
+            target_ctxs=target_ctxs,
+        )
+        if blockers is not None:
+            return blockers
+
+        identity_candidates = self._identity_template_candidates(requirement, templates)
+        blockers = self._diagnose_scope_blockers(
+            requirement=requirement,
+            identity_candidates=identity_candidates,
+            target_ctxs=target_ctxs,
+        )
+        if blockers is not None:
+            return blockers
+
+        admitted_candidates = self._admitted_template_candidates(identity_candidates, target_ctxs)
+        blockers = self._diagnose_episode_scope_policy_blockers(
+            requirement=requirement,
+            admitted_candidates=admitted_candidates,
+            target_ctxs=target_ctxs,
+            _ctx=_ctx,
+        )
+        if blockers is not None:
+            return blockers
 
         return [
-            Blocker(
-                reason="no_template",
-                context={
-                    "identifier": identifier,
-                    "target_ctx": target_ctxs[0] if target_ctxs else None,
-                    "target_ctx_candidates": list(target_ctxs),
-                },
+            self._blocker(
+                "no_template",
+                identifier=self._selector_identifier(requirement),
+                target_ctxs=target_ctxs,
+                include_candidates=True,
             )
         ]
 

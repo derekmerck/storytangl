@@ -163,6 +163,7 @@ class PhaseCtx:
 
     random: Random = field(default_factory=Random)
     inline_behaviors: list[Callable | Behavior] = field(default_factory=list)
+    local_authorities: list[BehaviorRegistry] = field(default_factory=list)
     incoming_edge: Any | None = None
     incoming_payload: Any = None
 
@@ -179,6 +180,9 @@ class PhaseCtx:
             for registry in get_authorities() or ():
                 if isinstance(registry, BehaviorRegistry) and registry not in registries:
                     registries.append(registry)
+        for registry in self.local_authorities:
+            if isinstance(registry, BehaviorRegistry) and registry not in registries:
+                registries.append(registry)
         return registries
 
     def get_inline_behaviors(self) -> list[Callable | Behavior]:
@@ -429,10 +433,10 @@ class Frame:
     return_stack: list[TraversableEdge] = field(default_factory=list)
     """Call edges awaiting return.  Shared reference from Ledger."""
 
-    # Compatibility bridge: legacy call sites register per-frame handlers here.
     local_behaviors: BehaviorRegistry = field(
         default_factory=lambda: BehaviorRegistry(label="frame.local.dispatch")
     )
+    ledger_local_behaviors: BehaviorRegistry | None = None
 
     cursor_steps: int = 0
     """Number of cursor movements in this frame's lifetime."""
@@ -465,37 +469,6 @@ class Frame:
     selected_edge: AnyTraversableEdge | None = None
     selected_payload: Any = None
 
-    @staticmethod
-    def _compat_task_name(task: Any) -> Any:
-        """Translate legacy phase enums to vm38 dispatch task labels."""
-        legacy_phase_map = {
-            10: "validate_edge",
-            20: "provision_node",
-            30: "get_prereqs",
-            40: "apply_update",
-            50: "render_journal",
-            60: "finalize_step",
-            70: "get_postreqs",
-        }
-        if task in legacy_phase_map:
-            return legacy_phase_map[task]
-        try:
-            value = int(task)
-        except (TypeError, ValueError):
-            return task
-        return legacy_phase_map.get(value, task)
-
-    def _inline_behaviors(self) -> list[Behavior]:
-        """Build inline behavior list with legacy task translation."""
-        inline: list[Behavior] = []
-        for behavior in self.local_behaviors.find_all():
-            mapped_task = self._compat_task_name(behavior.task)
-            if mapped_task == behavior.task:
-                inline.append(behavior)
-                continue
-            inline.append(behavior.model_copy(update={"task": mapped_task}))
-        return inline
-
     def __post_init__(self) -> None:
         """Seed RNG deterministically from graph state + cursor + starting step."""
         seed_hash = hashing_func(
@@ -506,6 +479,16 @@ class Frame:
         )
         seed = int.from_bytes(seed_hash[:8], byteorder="big", signed=False)
         self._random.seed(seed)
+
+    def _local_authorities(self) -> list[BehaviorRegistry]:
+        registries: list[BehaviorRegistry] = []
+        for registry in (self.local_behaviors, self.ledger_local_behaviors):
+            if not isinstance(registry, BehaviorRegistry):
+                continue
+            if not registry.members:
+                continue
+            registries.append(registry)
+        return registries
 
     # -- Context factory ----------------------------------------------------
 
@@ -532,7 +515,7 @@ class Frame:
             mark_soft_dirty_callback=self.mark_soft_dirty_callback,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty_callback,
             random=self._random,
-            inline_behaviors=self._inline_behaviors(),
+            local_authorities=self._local_authorities(),
             incoming_edge=incoming_edge,
             incoming_payload=incoming_payload,
         )
@@ -626,6 +609,152 @@ class Frame:
         self.step_observer(trace)
         self._last_step_trace = None
 
+    @staticmethod
+    def _entry_phase(edge: AnyTraversableEdge) -> ResolutionPhase:
+        return getattr(edge, "entry_phase", None) or ResolutionPhase.VALIDATE
+
+    def _snapshot_before_hop(self) -> Graph | None:
+        if self.step_observer is None:
+            return None
+        return self._snapshot_graph()
+
+    def _validate_before_move(
+        self,
+        *,
+        edge: AnyTraversableEdge,
+        entry_phase: ResolutionPhase,
+        incoming_payload: Any,
+    ) -> None:
+        if entry_phase > ResolutionPhase.VALIDATE:
+            return
+        pre_ctx = self._make_ctx(
+            incoming_edge=edge,
+            incoming_payload=incoming_payload,
+        )
+        pre_ctx.current_phase = ResolutionPhase.VALIDATE
+        if not do_validate(edge, ctx=pre_ctx):
+            raise ValueError(f"Edge validation failed: {edge!r}")
+
+    def _advance_cursor(self, edge: AnyTraversableEdge) -> None:
+        self.cursor = edge.successor
+        self.cursor_steps += 1
+        self.cursor_trace.append(self.cursor.uid)
+
+    def _run_planning_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+        if entry_phase > ResolutionPhase.PLANNING:
+            return
+        ctx.current_phase = ResolutionPhase.PLANNING
+        do_provision(self.cursor, ctx=ctx)
+        for successor in list(self.cursor.successors()):
+            if isinstance(successor, TraversableNode):
+                do_provision(successor, ctx=ctx)
+
+    def _handle_redirect(
+        self,
+        *,
+        ctx: VmPhaseCtx,
+        phase: ResolutionPhase,
+        redirect: AnyTraversableEdge | None,
+        edge: AnyTraversableEdge,
+        entry_phase: ResolutionPhase,
+        was_choice: bool,
+        before_graph: Graph | None,
+    ) -> AnyTraversableEdge | None:
+        if redirect is None:
+            return None
+        self.causality_mode = ctx.causality_mode
+        self._record_redirect(phase=phase, edge=redirect)
+        self._capture_step_trace(
+            edge=edge,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
+        return redirect
+
+    def _run_update_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+        if entry_phase > ResolutionPhase.UPDATE:
+            return
+        ctx.current_phase = ResolutionPhase.UPDATE
+        do_update(self.cursor, ctx=ctx)
+
+    def _append_phase_records(self, values: Any, *, step: int) -> None:
+        if not values:
+            return
+        if isinstance(values, Iterable) and not isinstance(values, (Record, str, bytes)):
+            for value in values:
+                self._append_phase_records(value, step=step)
+            return
+        record = self._with_step(values, step=step) if isinstance(values, Record) else values
+        self.output_stream.append(record)
+
+    def _run_journal_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+        if entry_phase > ResolutionPhase.JOURNAL:
+            return
+        ctx.current_phase = ResolutionPhase.JOURNAL
+        journal_hash_before = self.graph.value_hash()
+        self._append_phase_records(do_journal(self.cursor, ctx=ctx), step=ctx.step)
+        if logger.isEnabledFor(logging.DEBUG):
+            journal_hash_after = self.graph.value_hash()
+            if journal_hash_after != journal_hash_before:
+                logger.debug(
+                    "JOURNAL mutation detected at step=%s cursor_id=%s; "
+                    "prefer UPDATE/FINALIZE for state mutation or emit annotation records",
+                    ctx.step,
+                    self.cursor.uid,
+                )
+
+    def _run_finalize_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+        if entry_phase > ResolutionPhase.FINALIZE:
+            return
+        ctx.current_phase = ResolutionPhase.FINALIZE
+        self._append_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
+
+    def _finish_follow_edge(
+        self,
+        *,
+        ctx: VmPhaseCtx,
+        edge: AnyTraversableEdge,
+        entry_phase: ResolutionPhase,
+        was_choice: bool,
+        before_graph: Graph | None,
+    ) -> None:
+        self.causality_mode = ctx.causality_mode
+        self._capture_step_trace(
+            edge=edge,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
+
+    @staticmethod
+    def _check_resolve_depth(
+        *,
+        depth: int,
+        max_depth: int,
+        cursor: TraversableNode,
+    ) -> None:
+        if depth >= max_depth:
+            raise RecursionError(
+                f"resolve_choice exceeded {max_depth} steps — "
+                f"likely a redirect loop at {cursor!r}"
+            )
+
+    def _push_call_edge_if_needed(self, edge: AnyTraversableEdge) -> None:
+        if getattr(edge, "return_phase", None) is not None:
+            self.return_stack.append(edge)
+
+    def _next_resolve_edge(
+        self,
+        *,
+        redirect: AnyTraversableEdge | None,
+    ) -> AnyTraversableEdge | None:
+        if redirect is not None:
+            return redirect
+        if self.return_stack:
+            return self.return_stack.pop().get_return_edge()
+        return None
+
     # -- Pipeline execution -------------------------------------------------
 
     def follow_edge(
@@ -650,117 +779,58 @@ class Frame:
         ValueError
             If VALIDATE fails (the edge is not traversable).
         """
-        entry_phase = getattr(edge, "entry_phase", None) or ResolutionPhase.VALIDATE
+        entry_phase = self._entry_phase(edge)
         incoming_payload = self._resolve_incoming_payload(edge, selected_payload_override)
         self.selected_edge = edge
         self.selected_payload = incoming_payload
 
-        before_graph: Graph | None = None
-        if self.step_observer is not None:
-            before_graph = self._snapshot_graph()
-
-        # -- VALIDATE (pre-move) --------------------------------------------
-        if entry_phase <= ResolutionPhase.VALIDATE:
-            pre_ctx = self._make_ctx(
-                incoming_edge=edge,
-                incoming_payload=incoming_payload,
-            )
-            pre_ctx.current_phase = ResolutionPhase.VALIDATE
-            if not do_validate(edge, ctx=pre_ctx):
-                raise ValueError(f"Edge validation failed: {edge!r}")
-
-        # -- Update cursor --------------------------------------------------
-        self.cursor = edge.successor
-        self.cursor_steps += 1
-        self.cursor_trace.append(self.cursor.uid)
-
-        # -- Build context at new position ----------------------------------
+        before_graph = self._snapshot_before_hop()
+        self._validate_before_move(
+            edge=edge,
+            entry_phase=entry_phase,
+            incoming_payload=incoming_payload,
+        )
+        self._advance_cursor(edge)
         ctx = self._make_ctx(
             incoming_edge=edge,
             incoming_payload=incoming_payload,
         )
+        self._run_planning_phase(ctx=ctx, entry_phase=entry_phase)
 
-        # -- PLANNING -------------------------------------------------------
-        if entry_phase <= ResolutionPhase.PLANNING:
-            ctx.current_phase = ResolutionPhase.PLANNING
-            do_provision(self.cursor, ctx=ctx)
-            # Snapshot successors so provisioning handlers can add edges/items
-            # without invalidating the active iterator.
-            for successor in list(self.cursor.successors()):
-                if isinstance(successor, TraversableNode):
-                    do_provision(successor, ctx=ctx)
-
-        # -- PREREQS --------------------------------------------------------
         if entry_phase <= ResolutionPhase.PREREQS:
             ctx.current_phase = ResolutionPhase.PREREQS
-            prereq_result = do_prereqs(self.cursor, ctx=ctx)
-            if prereq_result is not None:
-                self.causality_mode = ctx.causality_mode
-                self._record_redirect(phase=ResolutionPhase.PREREQS, edge=prereq_result)
-                self._capture_step_trace(
-                    edge=edge,
-                    entry_phase=entry_phase,
-                    was_choice=was_choice,
-                    before_graph=before_graph,
-                )
-                return prereq_result
+            redirect = self._handle_redirect(
+                ctx=ctx,
+                phase=ResolutionPhase.PREREQS,
+                redirect=do_prereqs(self.cursor, ctx=ctx),
+                edge=edge,
+                entry_phase=entry_phase,
+                was_choice=was_choice,
+                before_graph=before_graph,
+            )
+            if redirect is not None:
+                return redirect
 
-        # -- UPDATE ---------------------------------------------------------
-        if entry_phase <= ResolutionPhase.UPDATE:
-            ctx.current_phase = ResolutionPhase.UPDATE
-            do_update(self.cursor, ctx=ctx)
+        self._run_update_phase(ctx=ctx, entry_phase=entry_phase)
+        self._run_journal_phase(ctx=ctx, entry_phase=entry_phase)
+        self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase)
 
-        # -- JOURNAL --------------------------------------------------------
-        if entry_phase <= ResolutionPhase.JOURNAL:
-            ctx.current_phase = ResolutionPhase.JOURNAL
-            journal_hash_before = self.graph.value_hash()
-            fragments = do_journal(self.cursor, ctx=ctx)
-            if fragments:
-                if isinstance(fragments, Iterable) and not isinstance(fragments, (Record, str, bytes)):
-                    for f in fragments:
-                        if isinstance(f, Record):
-                            f = self._with_step(f, step=ctx.step)
-                        self.output_stream.append(f)
-                else:
-                    if isinstance(fragments, Record):
-                        fragments = self._with_step(fragments, step=ctx.step)
-                    self.output_stream.append(fragments)
-            if logger.isEnabledFor(logging.DEBUG):
-                journal_hash_after = self.graph.value_hash()
-                if journal_hash_after != journal_hash_before:
-                    logger.debug(
-                        "JOURNAL mutation detected at step=%s cursor_id=%s; "
-                        "prefer UPDATE/FINALIZE for state mutation or emit annotation records",
-                        ctx.step,
-                        self.cursor.uid,
-                    )
-
-        # -- FINALIZE -------------------------------------------------------
-        if entry_phase <= ResolutionPhase.FINALIZE:
-            ctx.current_phase = ResolutionPhase.FINALIZE
-            patch = do_finalize(self.cursor, ctx=ctx)
-            if patch:
-                if isinstance(patch, Record):
-                    patch = self._with_step(patch, step=ctx.step)
-                self.output_stream.append(patch)
-
-        # -- POSTREQS -------------------------------------------------------
         if entry_phase <= ResolutionPhase.POSTREQS:
             ctx.current_phase = ResolutionPhase.POSTREQS
-            postreq_result = do_postreqs(self.cursor, ctx=ctx)
-            if postreq_result is not None:
-                self.causality_mode = ctx.causality_mode
-                self._record_redirect(phase=ResolutionPhase.POSTREQS, edge=postreq_result)
-                self._capture_step_trace(
-                    edge=edge,
-                    entry_phase=entry_phase,
-                    was_choice=was_choice,
-                    before_graph=before_graph,
-                )
-                return postreq_result
+            redirect = self._handle_redirect(
+                ctx=ctx,
+                phase=ResolutionPhase.POSTREQS,
+                redirect=do_postreqs(self.cursor, ctx=ctx),
+                edge=edge,
+                entry_phase=entry_phase,
+                was_choice=was_choice,
+                before_graph=before_graph,
+            )
+            if redirect is not None:
+                return redirect
 
-        self.causality_mode = ctx.causality_mode
-        self._capture_step_trace(
+        self._finish_follow_edge(
+            ctx=ctx,
             edge=edge,
             entry_phase=entry_phase,
             was_choice=was_choice,
@@ -805,34 +875,16 @@ class Frame:
         is_choice_edge = True
 
         while edge is not None:
-            if depth >= max_depth:
-                raise RecursionError(
-                    f"resolve_choice exceeded {max_depth} steps — "
-                    f"likely a redirect loop at {self.cursor!r}"
-                )
-
+            self._check_resolve_depth(depth=depth, max_depth=max_depth, cursor=self.cursor)
             current_edge = edge
-            payload_override = choice_payload if is_choice_edge else None
-            result = self.follow_edge(
+            redirect = self.follow_edge(
                 current_edge,
                 was_choice=is_choice_edge,
-                selected_payload_override=payload_override,
+                selected_payload_override=choice_payload if is_choice_edge else None,
             )
             depth += 1
-
-            if getattr(current_edge, "return_phase", None) is not None:
-                self.return_stack.append(current_edge)
-
-            if result is not None:
-                edge = result
-
-            elif self.return_stack:
-                call_edge = self.return_stack.pop()
-                edge = call_edge.get_return_edge()
-
-            else:
-                edge = None
-
+            self._push_call_edge_if_needed(current_edge)
+            edge = self._next_resolve_edge(redirect=redirect)
             self._emit_step_trace()
             is_choice_edge = False
 

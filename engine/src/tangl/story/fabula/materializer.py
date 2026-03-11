@@ -237,18 +237,29 @@ class StoryMaterializer:
             self._materialize_with_ancestors(templ=templ, state=state)
 
     def _run_topology_passes(self, *, state: _MaterializationState) -> None:
+        nodes = self._unwired_traversable_nodes(state=state)
         self._finalize_scene_contracts(state=state)
-        self._wire_materialized_nodes(state=state)
+        self._wire_role_and_setting_dependencies(nodes=nodes, state=state)
+        self._wire_menu_fanouts(nodes=nodes, state=state)
+        self._wire_block_actions(nodes=nodes, state=state)
+        self._wire_media_dependencies(nodes=nodes, state=state)
+        self._mark_nodes_wired(nodes=nodes, state=state)
 
     def _run_prelink_passes(self, *, state: _MaterializationState) -> None:
         if state.report.mode is not InitMode.EAGER:
             return
-        self._prelink_all_dependencies(state=state)
+        dependencies = self._sorted_dependencies(state=state)
+        self._prelink_dependencies(dependencies=dependencies, state=state)
+        self._project_action_successors_from_dependencies(dependencies=dependencies)
         if state.graph.frozen_shape:
-            self._prelink_all_fanouts(state=state)
-        assert_traversal_contracts(state.graph)
-        if state.report.unresolved_hard:
-            raise GraphInitializationError(state.report)
+            fanouts = self._sorted_fanouts(state=state)
+            self._prelink_fanouts(fanouts=fanouts, state=state)
+            self._project_prelinked_menu_actions_for_menus(
+                menus=self._sorted_menu_blocks(state=state),
+                state=state,
+            )
+        self._verify_prelinked_story_graph(state=state)
+        self._raise_on_unresolved_hard_dependencies(state=state)
 
     def _require_entry_nodes(
         self,
@@ -368,14 +379,20 @@ class StoryMaterializer:
         for scene in Selector(has_kind=Scene).filter(state.graph.values()):
             scene.finalize_container_contract()
 
-    def _wire_materialized_nodes(self, *, state: _MaterializationState) -> None:
+    def _unwired_traversable_nodes(self, *, state: _MaterializationState) -> list[TraversableNode]:
         nodes = sorted(
             Selector(has_kind=TraversableNode).filter(state.graph.values()),
             key=self._order_key,
         )
+        return [node for node in nodes if node.uid not in state.wired_node_ids]
+
+    def _wire_role_and_setting_dependencies(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
         for node in nodes:
-            if node.uid in state.wired_node_ids:
-                continue
             if isinstance(node, Scene):
                 self._wire_dependencies_for_specs(
                     source=node,
@@ -414,13 +431,46 @@ class StoryMaterializer:
                     templ_ref_key="location_template_ref",
                     state=state,
                 )
-                if isinstance(node, MenuBlock):
-                    self._wire_menu_fanout_for_block(node=node, state=state)
+
+    def _wire_menu_fanouts(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
+            if isinstance(node, MenuBlock):
+                self._wire_menu_fanout_for_block(node=node, state=state)
+
+    def _wire_block_actions(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
+            if isinstance(node, Block):
                 self._wire_actions_for_block(node=node, specs=node.redirects, state=state)
                 self._wire_actions_for_block(node=node, specs=node.continues, state=state)
                 self._wire_actions_for_block(node=node, specs=node.actions, state=state)
+
+    def _wire_media_dependencies(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
+            if isinstance(node, Block):
                 self._wire_media_for_block(node=node, state=state)
 
+    @staticmethod
+    def _mark_nodes_wired(
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
             state.wired_node_ids.add(node.uid)
 
     def _wire_media_for_block(
@@ -617,18 +667,14 @@ class StoryMaterializer:
             return "potential"
         return "legacy"
 
-    def _prelink_all_dependencies(self, *, state: _MaterializationState) -> None:
-        dependencies = sorted(
-            Selector(has_kind=Dependency).filter(state.graph.values()),
-            key=self._order_key,
-        )
-
+    def _prelink_dependencies(
+        self,
+        *,
+        dependencies: list[Dependency],
+        state: _MaterializationState,
+    ) -> None:
         for dep in dependencies:
-            ctx = _PrelinkCtx(
-                graph=state.graph,
-                template_registry=state.bundle.template_registry,
-                cursor_id=dep.predecessor_id,
-            )
+            ctx = self._make_prelink_ctx(state=state, cursor_id=dep.predecessor_id)
             resolver = Resolver.from_ctx(ctx)
             was_satisfied = dep.satisfied
             resolved = resolver.resolve_dependency(dep, allow_stubs=False, _ctx=ctx)
@@ -636,9 +682,6 @@ class StoryMaterializer:
             if resolved and dep.satisfied:
                 if not was_satisfied:
                     state.report.bump_prelinked("resolved")
-                predecessor = dep.predecessor
-                if isinstance(predecessor, Action) and isinstance(dep.successor, TraversableNode):
-                    predecessor.set_successor(dep.successor)
             else:
                 state.report.bump_prelinked("unresolved")
                 unresolved = UnresolvedDependency(
@@ -653,28 +696,75 @@ class StoryMaterializer:
                 else:
                     state.report.unresolved_soft.append(unresolved)
 
-    def _prelink_all_fanouts(self, *, state: _MaterializationState) -> None:
-        fanouts = sorted(
-            Selector(has_kind=Fanout).filter(state.graph.values()),
-            key=self._order_key,
-        )
+    def _project_action_successors_from_dependencies(
+        self,
+        *,
+        dependencies: list[Dependency],
+    ) -> None:
+        for dep in dependencies:
+            predecessor = dep.predecessor
+            if isinstance(predecessor, Action) and isinstance(dep.successor, TraversableNode):
+                predecessor.set_successor(dep.successor)
 
+    def _prelink_fanouts(
+        self,
+        *,
+        fanouts: list[Fanout],
+        state: _MaterializationState,
+    ) -> None:
         for fanout in fanouts:
-            ctx = _PrelinkCtx(
-                graph=state.graph,
-                template_registry=state.bundle.template_registry,
-                cursor_id=fanout.predecessor_id,
-            )
+            ctx = self._make_prelink_ctx(state=state, cursor_id=fanout.predecessor_id)
             resolver = Resolver.from_ctx(ctx)
             resolver.resolve_fanout(fanout, _ctx=ctx)
             state.report.bump_prelinked("fanout_resolved")
 
-        menus = sorted(
+    def _project_prelinked_menu_actions_for_menus(
+        self,
+        *,
+        menus: list[MenuBlock],
+        state: _MaterializationState,
+    ) -> None:
+        for menu in menus:
+            self._project_prelinked_menu_actions(menu=menu, state=state)
+
+    @staticmethod
+    def _verify_prelinked_story_graph(*, state: _MaterializationState) -> None:
+        assert_traversal_contracts(state.graph)
+
+    @staticmethod
+    def _raise_on_unresolved_hard_dependencies(*, state: _MaterializationState) -> None:
+        if state.report.unresolved_hard:
+            raise GraphInitializationError(state.report)
+
+    def _sorted_dependencies(self, *, state: _MaterializationState) -> list[Dependency]:
+        return sorted(
+            Selector(has_kind=Dependency).filter(state.graph.values()),
+            key=self._order_key,
+        )
+
+    def _sorted_fanouts(self, *, state: _MaterializationState) -> list[Fanout]:
+        return sorted(
+            Selector(has_kind=Fanout).filter(state.graph.values()),
+            key=self._order_key,
+        )
+
+    def _sorted_menu_blocks(self, *, state: _MaterializationState) -> list[MenuBlock]:
+        return sorted(
             Selector(has_kind=MenuBlock).filter(state.graph.values()),
             key=self._order_key,
         )
-        for menu in menus:
-            self._project_prelinked_menu_actions(menu=menu, state=state)
+
+    @staticmethod
+    def _make_prelink_ctx(
+        *,
+        state: _MaterializationState,
+        cursor_id: UUID | None,
+    ) -> _PrelinkCtx:
+        return _PrelinkCtx(
+            graph=state.graph,
+            template_registry=state.bundle.template_registry,
+            cursor_id=cursor_id,
+        )
 
     def _project_prelinked_menu_actions(
         self,

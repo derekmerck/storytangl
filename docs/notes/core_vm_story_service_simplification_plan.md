@@ -1,6 +1,6 @@
 # Core / VM / Story / Service Simplification Tracker
 
-Status: Waves 0-3 Complete, Wave 4 In Progress (updated 2026-03-10)
+Status: Waves 0-4 Complete, Wave 5 In Progress (updated 2026-03-10)
 
 ## Goal
 
@@ -8,8 +8,9 @@ Reduce cognitive overhead in `tangl.core`, `tangl.vm`, `tangl.story`, and
 `tangl.service` while preserving the current feature set, deterministic behavior,
 and strict layer separation.
 
-This tracker replaces the earlier draft plan with implementation status, hard
-gates, and measured checkpoints.
+This tracker is the canonical execution record for the simplification effort.
+The external draft plan remains directionally correct, but this note should
+reflect what is actually implemented in the repo today.
 
 ## Guardrails
 
@@ -19,6 +20,8 @@ gates, and measured checkpoints.
 - Do not unify endpoints with core behavior entities in this pass.
 - Remove compatibility bridges in the same wave that replaces them.
 - Prefer explicit failures over silent compatibility fallbacks.
+- Optimize primarily for cognitive overhead reduction. Line count remains a
+  tracking signal, but not the primary definition of success.
 
 ## Interface Decisions
 
@@ -33,6 +36,8 @@ gates, and measured checkpoints.
   `get_template_scope_groups()`.
 - Story no longer owns controller bridge modules; controller implementations now
   live under `tangl.service.controllers`.
+- `InitMode.LAZY` and `InitMode.EAGER` remain the only story materialization
+  modes in this cleanup effort.
 
 ## Wave Status
 
@@ -59,9 +64,10 @@ Status: Complete
 Completed:
 
 - Refactored `service/orchestrator.py` into explicit private stages for binding,
-  policy resolution, hydration, invocation, normalization, persistence, cleanup,
-  and service-error mapping.
-- Centralized endpoint metadata and policy defaults in `service/api_endpoint.py`.
+  policy resolution, hydration, invocation, normalization, persistence,
+  cleanup, and service-error mapping.
+- Centralized endpoint metadata and policy defaults in
+  `service/api_endpoint.py`.
 - Removed `LegacyApiEndpoint` entirely.
 - Tightened runtime result normalization so runtime endpoints must return
   `RuntimeInfo`-compatible payloads or raise `TypeError`.
@@ -132,9 +138,11 @@ Acceptance gates:
 
 ### Wave 4: Resolver and materialization decomposition
 
-Status: In Progress
+Status: Complete
 
-Completed in this checkpoint:
+#### Checkpoint A complete
+
+Completed:
 
 - Extracted shared template materialization helpers into
   `vm/provision/materialization.py`.
@@ -146,14 +154,7 @@ Completed in this checkpoint:
   policy filtering, sorting, and fanout deduplication so `gather_offers()` and
   `gather_fanout_offers()` are orchestration wrappers rather than monoliths.
 
-Remaining:
-
-- Split resolver preview/blocker diagnosis and structural build-chain execution
-  further into smaller helpers.
-- Continue narrowing the story materializer wiring/prelink helpers where the
-  per-node wiring passes still mix multiple responsibilities.
-
-Acceptance gates reached for this checkpoint:
+Checkpoint A gates reached:
 
 - `engine/tests/vm38/test_resolver.py`
 - `engine/tests/vm38/test_provision_pipeline.py`
@@ -161,16 +162,93 @@ Acceptance gates reached for this checkpoint:
 - `engine/tests/story38/test_story_init.py`
 - `engine/tests/story38/test_compiler_scope_resolution.py`
 
+#### Checkpoint B complete: resolver decomposition
+
+Completed:
+
+- Split preview viability into smaller helpers for viable-offer detection,
+  blocker-diagnosis entry, shared blocker-context construction, and
+  per-blocker-family diagnosis.
+- Split structural chain work into smaller helpers for target-path resolution,
+  structural plan construction, existing-path lookup, chain viability
+  checking, and chain materialization/execution.
+- Removed repeated target-path and chain-resolution logic from preview and
+  structural dependency execution while keeping blocker reasons and metadata
+  shapes stable.
+
+Checkpoint B acceptance:
+
+- `engine/tests/vm38/test_resolver.py`
+- `engine/tests/vm38/test_scope_path_provisioning.py`
+- `engine/tests/vm38/test_provision_pipeline.py`
+
+#### Checkpoint C complete: materializer decomposition
+
+Completed:
+
+- Split topology wiring into explicit scene-contract, role/setting dependency,
+  menu fanout, action, and media-dependency passes.
+- Split eager prelink into explicit dependency prelink, action successor
+  projection, fanout prelink, menu action projection, traversal-contract
+  verification, and hard-error promotion passes.
+- Extracted repeated `_PrelinkCtx` construction into one helper.
+- Kept `LAZY` and `EAGER` as the only init modes.
+
+Checkpoint C acceptance:
+
+- `engine/tests/story38/test_story_init.py`
+- `engine/tests/story38/test_compiler_scope_resolution.py`
+- `engine/tests/media/test_media_provisioning.py`
+- `engine/tests/integration/test_media_e2e.py`
+- `engine/tests/integration/test_system_media_e2e.py`
+
+#### Wave 4 closeout
+
+Reached:
+
+- Refreshed hotspot metrics after the Wave 4 refactors landed.
+- Ran `pytest engine/tests`.
+- Ran app/server story endpoint suites.
+- Accepted the metric tradeoff that `resolver.py` and `materializer.py` grew in
+  line count while their control flow became more explicit and locally readable.
+
 ### Wave 5: Frame and traversal simplification
 
-Status: Pending
+Status: In Progress
 
-Not started:
+Started:
 
-- `Frame.follow_edge()` / `Frame.resolve_choice()` reducer extraction.
-- Removal of `Frame.local_behaviors`, `Ledger.local_behaviors`, and numeric
-  task-name translation.
-- Traversable helper narrowing.
+- Simplified frame/ledger local behavior support so `Frame.local_behaviors` and
+  `Ledger.local_behaviors` participate as explicit `PhaseCtx` authorities when
+  populated, instead of being wrapped as inline behaviors.
+- Removed the numeric task-name translation bridge from `Frame`; local
+  registries now use the canonical vm dispatch task names directly.
+- Began splitting `follow_edge()` and `resolve_choice()` into named helper
+  phases so the traversal loop reads as orchestration instead of one long
+  control-flow block.
+
+Remaining:
+
+- Refactor `Frame.follow_edge()` into phase reducers plus one coordinator for
+  validation, cursor move/context build, planning, prereq redirect handling,
+  update/journal/finalize, postreq redirect handling, and trace/causality
+  bookkeeping.
+- Refactor `Frame.resolve_choice()` into a small loop coordinator around depth
+  guard, call-edge stack push, redirect selection, return-edge continuation,
+  and step-trace emission.
+- Keep `Frame.local_behaviors` and `Ledger.local_behaviors` as explicit opt-in
+  local authority registries. Do not revive ambient per-instance discovery.
+- Keep `TraversableNode` and `TraversableEdge` in VM. Limit this wave to helper
+  extraction and state-flow simplification rather than moving concepts between
+  layers.
+
+Acceptance gates:
+
+- `engine/tests/vm38/test_frame.py`
+- `engine/tests/vm38/test_phase_integration.py`
+- `engine/tests/vm38/test_call_stack.py`
+- `engine/tests/vm38/test_ledger.py`
+- `engine/tests/vm38/test_traversable.py`
 
 ### Wave 6: Final cleanup and measurement
 
@@ -179,9 +257,13 @@ Status: Pending
 Exit criteria:
 
 - Remove only compatibility code with no remaining internal references.
-- Update design docs in the same changes that finalize implementation.
-- Achieve at least two roughly 20% metric improvements per touched package, or
-  document the accepted shortfall explicitly.
+- Refresh metrics one final time and document any category that did not reach
+  the target reduction.
+- Update design docs and this tracker in the same changes that finalize
+  implementation.
+- Run final regression:
+  `pytest engine/tests`, app/server story endpoint suites, and media
+  integration suites.
 
 ## Baseline Metrics
 
@@ -202,38 +284,44 @@ Recorded before structural cleanup:
 | `engine/src/tangl/core/registry.py` | 597 | 0 | 4 | 31 |
 | `engine/src/tangl/core/graph.py` | 564 | 0 | 6 | 48 |
 
-## Checkpoint Metrics
+## Current Metrics
 
-Measured after Waves 0-3 and the current Wave 4 decomposition checkpoint:
+Measured after Waves 0-4, the initial Wave 5 runtime simplification slice, and
+the latest maintenance hardening:
 
 | Hotspot | Baseline Lines | Current Lines | Delta |
 | --- | ---: | ---: | ---: |
-| `engine/src/tangl/service/orchestrator.py` | 687 | 741 | +54 |
-| `engine/src/tangl/service/api_endpoint.py` | 315 | 280 | -35 |
-| `engine/src/tangl/core/behavior.py` | 502 | 496 | -6 |
-| `engine/src/tangl/vm/dispatch.py` | 584 | 581 | -3 |
-| `engine/src/tangl/vm/provision/resolver.py` | 1319 | 1314 | -5 |
-| `engine/src/tangl/vm/runtime/frame.py` | 878 | 866 | -12 |
-| `engine/src/tangl/vm/traversable.py` | 933 | 933 | 0 |
-| `engine/src/tangl/story/fabula/materializer.py` | 813 | 861 | +48 |
-| `engine/src/tangl/story/fabula/compiler.py` | 520 | 520 | 0 |
-| `engine/src/tangl/story/system_handlers.py` | 732 | 567 | -165 |
-| `engine/src/tangl/core/registry.py` | 597 | 597 | 0 |
-| `engine/src/tangl/core/graph.py` | 564 | 580 | +16 |
+| `engine/src/tangl/service/orchestrator.py` | 687 | 740 | +53 |
+| `engine/src/tangl/service/api_endpoint.py` | 315 | 294 | -21 |
+| `engine/src/tangl/core/behavior.py` | 502 | 495 | -7 |
+| `engine/src/tangl/vm/dispatch.py` | 584 | 580 | -4 |
+| `engine/src/tangl/vm/provision/resolver.py` | 1319 | 1509 | +190 |
+| `engine/src/tangl/vm/runtime/frame.py` | 878 | 917 | +39 |
+| `engine/src/tangl/vm/traversable.py` | 933 | 932 | -1 |
+| `engine/src/tangl/story/fabula/materializer.py` | 813 | 951 | +138 |
+| `engine/src/tangl/story/fabula/compiler.py` | 520 | 519 | -1 |
+| `engine/src/tangl/story/system_handlers.py` | 732 | 613 | -119 |
+| `engine/src/tangl/core/registry.py` | 597 | 603 | +6 |
+| `engine/src/tangl/core/graph.py` | 564 | 598 | +34 |
 
-Notable wins already visible:
+Notes:
 
-- `story/system_handlers.py` is down by 22.5%.
-- `service/api_endpoint.py` is down by 11.1%.
-- `vm/provision/resolver.py` remains slightly below baseline while exposing
-  clearer internal seams for the next Wave 4 split.
-- `story/fabula/materializer.py` is temporarily above baseline because the
-  initialization flow is now decomposed into named passes; this checkpoint
-  improved control-flow clarity first, with deeper consolidation still pending.
+- `story/system_handlers.py` remains materially smaller than baseline.
+- `service/api_endpoint.py` remains smaller than baseline while exposing
+  clearer seams.
+- `vm/provision/resolver.py` and `story/fabula/materializer.py` are both above
+  baseline after the Wave 4 helper extraction. This checkpoint improved local
+  readability and responsibility boundaries first, at the cost of additional
+  internal scaffolding.
+- `vm/runtime/frame.py` is now slightly above baseline as Wave 5 helper
+  extraction begins. This is the same tradeoff pattern: more explicit internal
+  phase seams before deeper consolidation.
+- These metrics are descriptive only. The primary success criterion remains
+  lower cognitive overhead.
 
 ## Verified Test Checkpoints
 
-Green targeted runs after the refactors in this tracker:
+Green checkpoints currently on record:
 
 - `95 passed`:
   `engine/tests/service38/test_api_endpoint.py`
@@ -261,23 +349,64 @@ Green targeted runs after the refactors in this tracker:
   `engine/tests/vm38/test_scope_path_provisioning.py`
   `engine/tests/story38/test_story_init.py`
   `engine/tests/story38/test_compiler_scope_resolution.py`
-- `145 passed`:
-  `engine/tests/vm38/test_resolver.py`
-  `engine/tests/vm38/test_provision_pipeline.py`
-  `engine/tests/vm38/test_scope_path_provisioning.py`
-  `engine/tests/story38/test_story_init.py`
-  `engine/tests/story38/test_compiler_scope_resolution.py`
-- `1708 passed`, `68 skipped`, `9 xfailed`:
-  full `poetry run pytest engine/tests -q` regression after the media fragment,
-  logger-noise, registry-binding, media index-handler, authority-overlay, and
-  Wave 4 resolver/materializer decomposition fixes landed.
+- `106 passed`:
+  Wave 4 Checkpoint B acceptance covering
+  `engine/tests/vm38/test_resolver.py`,
+  `engine/tests/vm38/test_scope_path_provisioning.py`,
+  and `engine/tests/vm38/test_provision_pipeline.py`.
+- `42 passed`, `1 skipped`:
+  Wave 4 Checkpoint C acceptance covering
+  `engine/tests/story38/test_story_init.py`,
+  `engine/tests/story38/test_compiler_scope_resolution.py`,
+  `engine/tests/media/test_media_provisioning.py`,
+  `engine/tests/integration/test_media_e2e.py`,
+  and `engine/tests/integration/test_system_media_e2e.py`.
+- `83 passed`, `1 skipped`:
+  targeted service/core/media/server hardening slice covering
+  `engine/tests/service38/test_api_endpoint.py`,
+  `engine/tests/service38/controllers/test_runtime_controller.py`,
+  `engine/tests/core38/graph/test_graph.py`,
+  `engine/tests/media/test_resource_manager.py`,
+  `engine/tests/media/test_media_fragment.py`,
+  `engine/tests/story38/test_provider_collection.py`,
+  and the affected app/server story endpoint suites.
+- `14 passed`, `1 skipped`:
+  story REST/router slice covering
+  `apps/server/tests/test_story_linear_endpoints.py`,
+  `apps/server/tests/test_story_branching_endpoints.py`,
+  `apps/server/tests/test_story_runtime_endpoints.py`,
+  and `apps/server/tests/test_multi_world_switching.py`.
+- `153 passed`:
+  Wave 5 acceptance slice covering
+  `engine/tests/vm38/test_frame.py`,
+  `engine/tests/vm38/test_phase_integration.py`,
+  `engine/tests/vm38/test_call_stack.py`,
+  `engine/tests/vm38/test_ledger.py`,
+  and `engine/tests/vm38/test_traversable.py`.
+- `1718 passed`, `68 skipped`, `9 xfailed`:
+  full `poetry run pytest engine/tests -q` regression after the initial Wave 5
+  frame/ledger simplification slice.
+
+## Non-wave Stability Maintenance
+
+The following recent changes improved correctness and CI stability, but are not
+counted as Wave 4 completion work:
+
+- media path-hardening and CodeQL-oriented story-media safety checks
+- media fragment serialization and journal media-type normalization fixes
+- provider-collection dedupe and resource-manager alias hardening
+- REST choice payload migration to `choice_id` in app/server tests
+- small service/core compatibility fixes discovered during CI and targeted test
+  runs
 
 ## Next Execution Slice
 
-1. Split resolver preview/blocker diagnosis and structural chain execution into
-   smaller helpers.
-2. Narrow story-materializer wiring and prelink helpers where node-specific
-   cases still share one control path.
-3. Refactor `Frame.follow_edge()` / `Frame.resolve_choice()` into reducer phases.
-4. Use the now-green full `engine/tests` regression as the next Wave 4/5
-   checkpoint baseline while continuing structural splits.
+1. Continue Wave 5 by refactoring `Frame.follow_edge()` into explicit phase
+   reducers plus one coordinator while keeping the public signature unchanged.
+2. Refactor `Frame.resolve_choice()` into a small loop coordinator around depth
+   guard, redirect selection, return-edge continuation, and step-trace
+   bookkeeping.
+3. Preserve `Frame.local_behaviors` and `Ledger.local_behaviors` as explicit
+   context authorities while simplifying the rest of the frame state flow.
+4. Rerun the Wave 5 acceptance slice, then move into Wave 6 cleanup and final
+   measurement.

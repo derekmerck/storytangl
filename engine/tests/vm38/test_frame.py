@@ -126,6 +126,17 @@ class TestPhaseCtx:
         authorities = ctx.get_authorities()
         assert authority in authorities
 
+    def test_authorities_include_explicit_local_authorities(self) -> None:
+        authority = BehaviorRegistry(
+            label="frame.local.auth",
+            default_dispatch_layer=DispatchLayer.LOCAL,
+        )
+        g = Graph()
+        a = _node(g, label="a")
+        ctx = PhaseCtx(graph=g, cursor_id=a.uid, local_authorities=[authority])
+        authorities = ctx.get_authorities()
+        assert authority in authorities
+
     def test_location_groups_include_immediate_neighbors_at_distance_zero(self) -> None:
         g = Graph()
         a = _node(g, label="a")
@@ -266,6 +277,19 @@ class TestFollowEdge:
         assert any(
             "JOURNAL mutation detected" in record.message for record in caplog.records
         )
+
+    def test_frame_local_behaviors_participate_as_context_authorities(self) -> None:
+        g, [a, b] = _simple_graph("a", "b")
+        b.locals = {}
+        frame = Frame(graph=g, cursor=a)
+
+        frame.local_behaviors.register(
+            task="apply_update",
+            func=lambda *, caller, ctx, **_: caller.locals.__setitem__("frame_local", True),
+        )
+
+        frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
+        assert b.locals["frame_local"] is True
 
 
 class TestFollowEdgeEntryPhase:

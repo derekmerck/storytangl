@@ -204,7 +204,7 @@ class Ledger(Entity):
             self.cursor,
             self.output_stream,
             self._call_stack(),
-            local_behaviors=self.local_behaviors,
+            ledger_local_behaviors=self.local_behaviors,
             step_base=self.cursor_steps,
             meta=frame_meta,
             causality_mode=self.causality_mode,
