@@ -16,7 +16,7 @@ Current Story Building Blocks
 * **Structural traversal nodes** – Blocks and Scenes inherit traversal helpers so they
   can participate directly in the VM pipeline: blocks render content/effects and expose
   choices, while scenes coordinate blocks, roles, and settings through namespace hooks.【F:engine/src/tangl/story/episode/block.py†L1-L109】【F:engine/src/tangl/story/episode/scene.py†L1-L120】
-  ``Action`` edges specialize :class:`~tangl.vm.frame.ChoiceEdge` so successors can be
+  ``Action`` edges specialize :class:`~tangl.vm.ChoiceEdge` so successors can be
   linked lazily via script references.【F:engine/src/tangl/story/episode/action.py†L1-L44】
 * **Resource concepts** – Actors, locations, and Role/Setting placeholders are
   implemented as graph-aware nodes. Roles cast actors on demand and settings scout
@@ -46,18 +46,18 @@ Strategy for the Core/VM Runtime
 
 1. **Lean on the ledger/frame loop.** ``Ledger`` seeds ``Frame`` instances with behavior
    layers, so blocks/scenes only need to register the right handlers to benefit from the
-   shared cursor management, receipts, and journaling pipeline.【F:engine/src/tangl/vm/ledger.py†L1-L118】【F:engine/src/tangl/vm/frame.py†L23-L200】
+   shared cursor management, receipts, and journaling pipeline.【F:engine/src/tangl/vm/runtime/ledger.py†L1-L654】【F:engine/src/tangl/vm/runtime/frame.py†L1-L962】
 2. **Treat structural nodes as VM entry points.** Scenes resolve entry blocks and project
    dependencies into namespaces, while blocks assemble choice edges for the frame to
    evaluate. Both surfaces are activated through the shared behavior dispatch instead of
-   bespoke traversal stacks.【F:engine/src/tangl/story/episode/scene.py†L17-L120】【F:engine/src/tangl/story/episode/block.py†L1-L162】【F:engine/src/tangl/vm/dispatch/__init__.py†L1-L21】
+   bespoke traversal stacks.【F:engine/src/tangl/story/episode/scene.py†L17-L120】【F:engine/src/tangl/story/episode/block.py†L1-L162】【F:engine/src/tangl/vm/dispatch.py†L1-L580】
 3. **Model resources as dynamic dependencies.** Continue the Role/Setting pattern for
    characters, locations, items, concepts, and relationships: placeholder nodes inherit
    script-friendly fields (refs, templates, criteria) while concrete resources enforce
    uniqueness and push context into namespaces.【F:engine/src/tangl/story/concepts/actor/role.py†L37-L120】【F:engine/src/tangl/story/concepts/location/setting.py†L12-L78】【F:engine/src/tangl/story/concepts/actor/actor.py†L10-L89】
 4. **Publish namespaces through behavior hooks.** Scenes, blocks, and resources register
    ``on_get_ns`` handlers so actors, locations, and other affordances are discoverable by
-   downstream renderers without hand-rolled context plumbing.【F:engine/src/tangl/story/episode/scene.py†L63-L105】【F:engine/src/tangl/vm/dispatch/__init__.py†L6-L21】【F:scratch/legacy_src/story/scene.py†L28-L43】
+   downstream renderers without hand-rolled context plumbing.【F:engine/src/tangl/story/episode/scene.py†L63-L105】【F:engine/src/tangl/vm/dispatch.py†L1-L580】【F:scratch/legacy_src/story/scene.py†L28-L43】
 5. **Embed casting/scouting hooks in handler pipelines.** Roles and settings can expose
    explicit behaviors (availability checks, provisioning) invoked during planning, letting
    the VM ensure prerequisites are resolved before traversal continues. Plugging the

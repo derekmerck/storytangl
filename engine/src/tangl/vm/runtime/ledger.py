@@ -539,10 +539,6 @@ class Ledger(Entity):
         """Legacy alias for forcing a checkpoint save."""
         return self.save_snapshot(force=True)
 
-    def record_stack_snapshot(self) -> Optional[CheckpointRecord]:
-        """Legacy compatibility alias for stack/snapshot persistence."""
-        return self.save_snapshot(force=True)
-
     def _ordered_records(self) -> list[Entity]:
         # Preserve actual stream append order. HasOrder.seq is class-local and
         # cannot be used to globally sort mixed record kinds.

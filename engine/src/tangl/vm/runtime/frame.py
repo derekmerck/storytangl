@@ -530,10 +530,6 @@ class Frame:
         """Legacy alias for absolute step in this frame."""
         return self.step_base + self.cursor_steps
 
-    def _invalidate_context(self) -> None:
-        """Legacy no-op compatibility hook (v38 context is per-hop)."""
-        return None
-
     @staticmethod
     def _resolve_incoming_payload(
         edge: AnyTraversableEdge,

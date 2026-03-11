@@ -1,6 +1,6 @@
 # Core / VM / Story / Service Simplification Tracker
 
-Status: Waves 0-5 Complete, Wave 6 Pending (updated 2026-03-10)
+Status: Waves 0-6 Complete (updated 2026-03-10)
 
 ## Goal
 
@@ -257,16 +257,41 @@ Wave 5 closeout:
 
 ### Wave 6: Final cleanup and measurement
 
-Status: Pending
+Status: Complete
 
-Exit criteria:
+Completed:
 
-- Remove only compatibility code with no remaining internal references.
-- Refresh metrics one final time and document any category that did not reach
-  the target reduction.
-- Update design docs and this tracker in the same changes that finalize
-  implementation.
-- Run final regression:
+- Removed the dead `Frame._invalidate_context()` compatibility seam and its
+  last internal caller in the mechanics game handlers, since vm38 phase
+  contexts are already per-hop and the handler now clears `PhaseCtx` namespace
+  caches directly.
+- Removed the unused `Ledger.record_stack_snapshot()` alias; `push_snapshot()`
+  remains the only internal snapshot-forcing helper still referenced in tests.
+- Removed dead shim-only exports from `tangl.vm.frame` and
+  `tangl.vm.context`:
+  `StackFrame`, the `ChoiceEdge` re-export from `tangl.vm.frame`, and the
+  `MaterializationContext` alias.
+- Updated contributor/design notes that still referenced the removed
+  materialization bus or old shim symbols so the architectural record matches
+  the code again.
+- Re-ran the mechanics/game runtime slice, full engine regression, app/server
+  story endpoint slice, and media integration suites after the cleanup.
+
+Retained intentionally:
+
+- Kept `Ledger.initialize_ledger()`, `Ledger.push_snapshot()`, and the
+  `Ledger.records` compatibility bridge because they still have internal-test or
+  persistence-facing value.
+- Kept `tangl.vm.ChoiceEdge` and `CloneProvisioner` because they still have
+  active public import and documentation weight.
+
+Wave 6 closeout:
+
+- Removed only compatibility code with no remaining internal references.
+- Refreshed metrics and recorded the categories that remain above baseline.
+- Updated contributor/design docs and this tracker together so the
+  architectural record stays current.
+- Ran final regression:
   `pytest engine/tests`, app/server story endpoint suites, and media
   integration suites.
 
@@ -291,8 +316,8 @@ Recorded before structural cleanup:
 
 ## Current Metrics
 
-Measured after Waves 0-5, including the completed Wave 5 runtime
-simplification, and the latest maintenance hardening:
+Measured at Wave 6 closeout, including the compatibility sweep and recent
+stability maintenance:
 
 | Hotspot | Baseline Lines | Current Lines | Delta |
 | --- | ---: | ---: | ---: |
@@ -301,7 +326,7 @@ simplification, and the latest maintenance hardening:
 | `engine/src/tangl/core/behavior.py` | 502 | 495 | -7 |
 | `engine/src/tangl/vm/dispatch.py` | 584 | 580 | -4 |
 | `engine/src/tangl/vm/provision/resolver.py` | 1319 | 1509 | +190 |
-| `engine/src/tangl/vm/runtime/frame.py` | 878 | 966 | +88 |
+| `engine/src/tangl/vm/runtime/frame.py` | 878 | 962 | +84 |
 | `engine/src/tangl/vm/traversable.py` | 933 | 932 | -1 |
 | `engine/src/tangl/story/fabula/materializer.py` | 813 | 951 | +138 |
 | `engine/src/tangl/story/fabula/compiler.py` | 520 | 519 | -1 |
@@ -321,6 +346,9 @@ Notes:
 - `vm/runtime/frame.py` is further above baseline after completing Wave 5 with
   an explicit bus plus named coordinators. The tradeoff remains the same:
   clearer runtime seams first, with line count still a secondary metric.
+- Wave 6 removed several dead runtime compatibility seams, but it did not
+  materially change the main hotspot counts; the main value here was reducing
+  misleading aliases and stale docs.
 - These metrics are descriptive only. The primary success criterion remains
   lower cognitive overhead.
 
@@ -381,6 +409,23 @@ Green checkpoints currently on record:
   `apps/server/tests/test_story_branching_endpoints.py`,
   `apps/server/tests/test_story_runtime_endpoints.py`,
   and `apps/server/tests/test_multi_world_switching.py`.
+- `72 passed`:
+  Wave 6 compatibility cleanup slice covering
+  `engine/tests/mechanics/games/test_step_turn_round.py`,
+  `engine/tests/mechanics/games/test_rps_integration.py`,
+  `engine/tests/vm38/test_frame.py`,
+  and `engine/tests/vm38/test_ledger.py`.
+- `14 passed`, `2 skipped`:
+  app/server story plus media slice covering
+  `apps/server/tests/test_media_server_integration.py`,
+  `apps/server/tests/test_story_linear_endpoints.py`,
+  `apps/server/tests/test_story_branching_endpoints.py`,
+  `apps/server/tests/test_story_runtime_endpoints.py`,
+  and `apps/server/tests/test_multi_world_switching.py`.
+- `1 passed`, `1 skipped`:
+  media integration closeout slice covering
+  `engine/tests/integration/test_media_e2e.py`
+  and `engine/tests/integration/test_system_media_e2e.py`.
 - `154 passed`:
   Wave 5 acceptance slice covering
   `engine/tests/vm38/test_frame.py`,
@@ -389,8 +434,7 @@ Green checkpoints currently on record:
   `engine/tests/vm38/test_ledger.py`,
   and `engine/tests/vm38/test_traversable.py`.
 - `1719 passed`, `68 skipped`, `9 xfailed`:
-  full `poetry run pytest engine/tests -q` regression after the completed Wave 5
-  runtime simplification slice.
+  full `poetry run pytest engine/tests -q` regression at Wave 6 closeout.
 
 ## Non-wave Stability Maintenance
 
@@ -404,13 +448,13 @@ counted as Wave 4 completion work:
 - small service/core compatibility fixes discovered during CI and targeted test
   runs
 
-## Next Execution Slice
+## Post-wave Follow-up
 
-1. Start Wave 6 by identifying remaining compatibility helpers with no internal
-   references and remove only the ones that are now truly dead.
-2. Refresh the hotspot metrics one more time and document where cognitive
-   overhead improved even if line count did not.
-3. Update the design docs and this tracker together as Wave 6 changes land so
-   the architectural record stays current.
-4. Rerun the full engine, media integration, and app/server story endpoint
-   regressions for the Wave 6 closeout checkpoint.
+If additional cleanup is desired, treat it as targeted maintenance rather than
+an extension of the six-wave simplification program:
+
+1. Revisit retained compatibility helpers only when their remaining internal
+   callers or persistence bridges are removed.
+2. Keep favoring cognitive overhead reduction over line-count-only churn.
+3. Record any future cleanup as discrete maintenance notes rather than
+   reopening Wave 6 implicitly.
