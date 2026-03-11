@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from tangl.core import BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
+from tangl.core import BaseFragment, BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
 from tangl.vm.traversable import TraversableEdge, TraversableNode
 
@@ -413,14 +413,15 @@ class Ledger(Entity):
         self._commit_frame_choice(frame=frame)
 
     @staticmethod
-    def _coerce_fragment_record(record: Any) -> Fragment | None:
+    def _coerce_fragment_record(record: Any) -> Fragment | BaseFragment | None:
         """Normalize mixed fragment record shapes into vm38 fragments."""
-        if isinstance(record, Fragment):
+        if isinstance(record, (Fragment, BaseFragment)):
             return record
         fragment_type = getattr(record, "fragment_type", None)
         if fragment_type is None:
             return None
-        step = int(getattr(record, "step", -1) or -1)
+        raw_step = getattr(record, "step", -1)
+        step = -1 if raw_step is None else int(raw_step)
         payload: dict[str, Any] = {
             "fragment_type": str(fragment_type),
             "step": step,
@@ -430,15 +431,17 @@ class Ledger(Entity):
                 payload[key] = getattr(record, key)
         return Fragment(**payload)
 
-    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
+    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment | BaseFragment]:
         """Return output fragments in chronological order, optionally filtered."""
-        fragments: list[Fragment] = []
+        fragments: list[Fragment | BaseFragment] = []
 
         for record in self.output_stream.values():
             fragment = self._coerce_fragment_record(record)
             if fragment is None:
                 continue
-            if fragment.step >= since_step or fragment.step < 0:
+            raw_step = getattr(fragment, "step", -1)
+            step = -1 if raw_step is None else int(raw_step)
+            if step >= since_step or step < 0:
                 fragments.append(fragment)
 
         if limit > 0 and len(fragments) > limit:

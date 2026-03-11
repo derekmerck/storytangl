@@ -77,7 +77,7 @@ class ResourceManager:
             logger.debug("Resource directory %s does not exist", path)
             return []
 
-        files = [item for item in path.iterdir() if item.is_file()]
+        files = sorted(item for item in path.rglob("*") if item.is_file())
         handlers = [*self.index_handlers, *list(index_handlers)]
         records = self.registry.index(files, extra_handlers=handlers or None)
         for record, source in zip(records, files):

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from tangl import core as tangl_core
+from tangl.config import get_story_media_dir, get_sys_media_dir
 from tangl.core import Selector
 from tangl.media.media_resource import MediaDep
 from tangl.media.story_media import remove_story_media
@@ -37,11 +39,17 @@ class RuntimeController(HasApiEndpoints):
         *,
         world_id: str | None = None,
         story_id: str | None = None,
+        world_media_root: Path | None = None,
+        story_media_root: Path | None = None,
+        system_media_root: Path | None = None,
     ) -> dict[str, Any]:
         media_payload = media_fragment_to_payload(
             fragment,
             world_id=world_id,
             story_id=story_id,
+            world_media_root=world_media_root,
+            story_media_root=story_media_root,
+            system_media_root=system_media_root,
         )
         if media_payload is not None:
             return media_payload
@@ -54,6 +62,49 @@ class RuntimeController(HasApiEndpoints):
                 data["kind"] = kind.__name__
             return data
         return {"fragment_type": "unknown", "content": str(fragment)}
+
+    @staticmethod
+    def _coerce_media_root(value: Any) -> Path | None:
+        if value is None:
+            return None
+        if isinstance(value, Path):
+            return value
+        try:
+            return Path(value)
+        except TypeError:
+            return None
+
+    @classmethod
+    def _resolve_media_roots(
+        cls,
+        *,
+        ledger: Ledger | None = None,
+        world_id: str | None = None,
+        story_id: str | None = None,
+    ) -> dict[str, Path | None]:
+        graph = getattr(ledger, "graph", None)
+
+        world_root = getattr(
+            getattr(getattr(graph, "world", None), "resources", None),
+            "resource_path",
+            None,
+        )
+        if world_root is None and world_id is not None:
+            try:
+                world = resolve_world(world_id)
+            except Exception:
+                world = None
+            world_root = getattr(getattr(world, "resources", None), "resource_path", None)
+
+        story_root = getattr(getattr(graph, "story_resources", None), "resource_path", None)
+        if story_root is None and story_id is not None:
+            story_root = get_story_media_dir(story_id)
+
+        return {
+            "world": cls._coerce_media_root(world_root),
+            "story": cls._coerce_media_root(story_root),
+            "sys": cls._coerce_media_root(get_sys_media_dir()),
+        }
 
     @staticmethod
     def _resolve_world_id(
@@ -98,6 +149,9 @@ class RuntimeController(HasApiEndpoints):
         *,
         world_id: str | None = None,
         story_id: str | None = None,
+        world_media_root: Path | None = None,
+        story_media_root: Path | None = None,
+        system_media_root: Path | None = None,
     ) -> BaseFragment:
         """Convert vm38 journal records into legacy-compatible BaseFragment payloads."""
         if isinstance(fragment, BaseFragment):
@@ -107,6 +161,9 @@ class RuntimeController(HasApiEndpoints):
             fragment,
             world_id=world_id,
             story_id=story_id,
+            world_media_root=world_media_root,
+            story_media_root=story_media_root,
+            system_media_root=system_media_root,
         )
         if media_payload is not None:
             return BaseFragment(**media_payload)
@@ -138,10 +195,18 @@ class RuntimeController(HasApiEndpoints):
 
     def _dereference_media(self, fragment: Any, world_id: str) -> dict[str, Any]:
         """Convert MediaRIT-backed fragments to API payloads."""
+        story_id = getattr(fragment, "story_id", None) or world_id
+        media_roots = self._resolve_media_roots(
+            world_id=world_id,
+            story_id=story_id,
+        )
         payload = media_fragment_to_payload(
             fragment,
             world_id=world_id,
-            story_id=getattr(fragment, "story_id", None) or world_id,
+            story_id=story_id,
+            world_media_root=media_roots["world"],
+            story_media_root=media_roots["story"],
+            system_media_root=media_roots["sys"],
         )
         if payload is None:
             raise TypeError(f"Expected media-compatible fragment, got {type(fragment)}")
@@ -234,8 +299,20 @@ class RuntimeController(HasApiEndpoints):
     ) -> RuntimeEnvelope:
         world_id = self._resolve_world_id(ledger, metadata=metadata)
         story_id = str((metadata or {}).get("ledger_id") or ledger.uid)
+        media_roots = self._resolve_media_roots(
+            ledger=ledger,
+            world_id=world_id,
+            story_id=story_id,
+        )
         serialized_fragments = [
-            self._serialize_fragment(fragment, world_id=world_id, story_id=story_id)
+            self._serialize_fragment(
+                fragment,
+                world_id=world_id,
+                story_id=story_id,
+                world_media_root=media_roots["world"],
+                story_media_root=media_roots["story"],
+                system_media_root=media_roots["sys"],
+            )
             for fragment in fragments
         ]
         merged_metadata = dict(metadata or {})
@@ -443,8 +520,20 @@ class RuntimeController(HasApiEndpoints):
             return self._synthetic_journal_from_cursor(ledger)
         world_id = self._resolve_world_id(ledger)
         story_id = str(ledger.uid)
+        media_roots = self._resolve_media_roots(
+            ledger=ledger,
+            world_id=world_id,
+            story_id=story_id,
+        )
         return [
-            self._to_compat_fragment(fragment, world_id=world_id, story_id=story_id)
+            self._to_compat_fragment(
+                fragment,
+                world_id=world_id,
+                story_id=story_id,
+                world_media_root=media_roots["world"],
+                story_media_root=media_roots["story"],
+                system_media_root=media_roots["sys"],
+            )
             for fragment in fragments
         ]
 

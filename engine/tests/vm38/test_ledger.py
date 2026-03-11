@@ -14,6 +14,8 @@ from uuid import uuid4
 import pytest
 
 from tangl.core import Graph, Selector, Snapshot
+from tangl.journal.media import MediaFragment as JournalMediaFragment
+from tangl.media.media_data_type import MediaDataType
 from tangl.vm.dispatch import on_prereqs
 from tangl.vm.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
 from tangl.vm.resolution_phase import ResolutionPhase
@@ -424,6 +426,18 @@ class TestLedgerJournal:
 
         assert ledger.get_journal(since_step=2) == [f2, f3]
         assert ledger.get_journal(limit=2) == [f2, f3]
+
+    def test_get_journal_preserves_base_media_fragments(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        media = JournalMediaFragment(
+            content="https://example.com/cover.svg",
+            content_type=MediaDataType.IMAGE,
+            content_format="url",
+            step=1,
+        )
+        ledger.output_stream.append(media)
+
+        assert ledger.get_journal() == [media]
 
 
 class TestLedgerReplayRollback:

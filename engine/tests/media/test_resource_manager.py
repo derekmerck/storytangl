@@ -7,6 +7,7 @@ from tangl.media.media_resource.resource_manager import ResourceManager
 
 
 def _write_svg(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
         '<circle cx="16" cy="16" r="14" fill="red"/></svg>',
@@ -111,3 +112,17 @@ def test_resource_manager_get_rit_skips_records_outside_resource_root(tmp_path: 
     rit = resource_manager.get_rit("images/cover.svg")
     assert rit is not None
     assert rit.path == inside_path
+
+
+def test_resource_manager_indexes_nested_paths_recursively(tmp_path: Path) -> None:
+    resource_root = tmp_path / "media"
+    nested_path = resource_root / "book1" / "scene1" / "cover.svg"
+    _write_svg(nested_path)
+
+    resource_manager = ResourceManager(resource_path=resource_root, scope="world")
+    records = resource_manager.index_directory(".")
+
+    assert len(records) == 1
+    rit = resource_manager.get_rit("book1/scene1/cover.svg")
+    assert rit is not None
+    assert rit.path == nested_path

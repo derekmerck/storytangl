@@ -18,9 +18,21 @@ _UNSUPPORTED_MEDIA_TYPES = {
 }
 
 
-def _filename_for_rit(rit: MediaRIT) -> str:
+def _relative_url_path_for_rit(
+    rit: MediaRIT,
+    *,
+    media_root: Path | None = None,
+) -> str:
     path_value = getattr(rit, "path", None)
     if isinstance(path_value, Path):
+        if media_root is not None:
+            try:
+                relative_path = path_value.resolve().relative_to(media_root.resolve())
+                return relative_path.as_posix()
+            except (OSError, ValueError):
+                pass
+        if not path_value.is_absolute() and ".." not in path_value.parts:
+            return path_value.as_posix()
         return path_value.name
     label = getattr(rit, "label", None)
     if isinstance(label, str) and label:
@@ -45,6 +57,9 @@ def media_fragment_to_payload(
     *,
     world_id: str | None = None,
     story_id: str | None = None,
+    world_media_root: Path | None = None,
+    story_media_root: Path | None = None,
+    system_media_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Flatten canonical media fragments into service-facing payloads."""
 
@@ -72,8 +87,15 @@ def media_fragment_to_payload(
                 return payload
 
             prefix = _url_prefix(scope=scope, world_id=world_id, story_id=story_id)
+            media_root = None
+            if scope == "sys":
+                media_root = system_media_root
+            elif scope == "story":
+                media_root = story_media_root
+            else:
+                media_root = world_media_root
             if prefix is not None:
-                payload["url"] = f"{prefix}/{_filename_for_rit(rit)}"
+                payload["url"] = f"{prefix}/{_relative_url_path_for_rit(rit, media_root=media_root)}"
             return payload
 
         if fragment.content_format == "url":
