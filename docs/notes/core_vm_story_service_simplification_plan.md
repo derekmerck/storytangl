@@ -1,6 +1,6 @@
 # Core / VM / Story / Service Simplification Tracker
 
-Status: Waves 0-4 Complete, Wave 5 In Progress (updated 2026-03-10)
+Status: Waves 0-5 Complete, Wave 6 Pending (updated 2026-03-10)
 
 ## Goal
 
@@ -214,28 +214,26 @@ Reached:
 
 ### Wave 5: Frame and traversal simplification
 
-Status: In Progress
+Status: Complete
 
-Started:
+Completed:
 
 - Simplified frame/ledger local behavior support so `Frame.local_behaviors` and
   `Ledger.local_behaviors` participate as explicit `PhaseCtx` authorities when
   populated, instead of being wrapped as inline behaviors.
 - Removed the numeric task-name translation bridge from `Frame`; local
   registries now use the canonical vm dispatch task names directly.
-- Began splitting `follow_edge()` and `resolve_choice()` into named helper
-  phases so the traversal loop reads as orchestration instead of one long
-  control-flow block.
-
-Remaining:
-
-- Refactor `Frame.follow_edge()` into phase reducers plus one coordinator for
-  validation, cursor move/context build, planning, prereq redirect handling,
-  update/journal/finalize, postreq redirect handling, and trace/causality
-  bookkeeping.
-- Refactor `Frame.resolve_choice()` into a small loop coordinator around depth
-  guard, call-edge stack push, redirect selection, return-edge continuation,
-  and step-trace emission.
+- Kept the phase bus explicit rather than reintroducing a generic phase-spec
+  loop, while splitting `follow_edge()` into hop preparation, redirect-phase,
+  terminal-phase, and completion helpers.
+- Split `resolve_choice()` into a small loop coordinator around depth guard,
+  per-hop execution, return-edge continuation, and step-trace emission.
+- Split the ledger/frame handshake into smaller metadata, validation, sync, and
+  commit helpers so `Ledger.resolve_choice()` reads as orchestration rather than
+  one mixed state-update block.
+- Reused the explicit local-authority path in ledger provisioning contexts so
+  selection-time dependency resolution can opt into populated ledger-local
+  registries without reviving ambient discovery.
 - Keep `Frame.local_behaviors` and `Ledger.local_behaviors` as explicit opt-in
   local authority registries. Do not revive ambient per-instance discovery.
 - Keep `TraversableNode` and `TraversableEdge` in VM. Limit this wave to helper
@@ -249,6 +247,13 @@ Acceptance gates:
 - `engine/tests/vm38/test_call_stack.py`
 - `engine/tests/vm38/test_ledger.py`
 - `engine/tests/vm38/test_traversable.py`
+
+Wave 5 closeout:
+
+- Reran the Wave 5 acceptance slice after the explicit bus/helper refactor.
+- Reran full `pytest engine/tests`.
+- Reran the app/server story endpoint suites to confirm the runtime refactor did
+  not change transport behavior.
 
 ### Wave 6: Final cleanup and measurement
 
@@ -286,8 +291,8 @@ Recorded before structural cleanup:
 
 ## Current Metrics
 
-Measured after Waves 0-4, the initial Wave 5 runtime simplification slice, and
-the latest maintenance hardening:
+Measured after Waves 0-5, including the completed Wave 5 runtime
+simplification, and the latest maintenance hardening:
 
 | Hotspot | Baseline Lines | Current Lines | Delta |
 | --- | ---: | ---: | ---: |
@@ -296,7 +301,7 @@ the latest maintenance hardening:
 | `engine/src/tangl/core/behavior.py` | 502 | 495 | -7 |
 | `engine/src/tangl/vm/dispatch.py` | 584 | 580 | -4 |
 | `engine/src/tangl/vm/provision/resolver.py` | 1319 | 1509 | +190 |
-| `engine/src/tangl/vm/runtime/frame.py` | 878 | 917 | +39 |
+| `engine/src/tangl/vm/runtime/frame.py` | 878 | 966 | +88 |
 | `engine/src/tangl/vm/traversable.py` | 933 | 932 | -1 |
 | `engine/src/tangl/story/fabula/materializer.py` | 813 | 951 | +138 |
 | `engine/src/tangl/story/fabula/compiler.py` | 520 | 519 | -1 |
@@ -313,9 +318,9 @@ Notes:
   baseline after the Wave 4 helper extraction. This checkpoint improved local
   readability and responsibility boundaries first, at the cost of additional
   internal scaffolding.
-- `vm/runtime/frame.py` is now slightly above baseline as Wave 5 helper
-  extraction begins. This is the same tradeoff pattern: more explicit internal
-  phase seams before deeper consolidation.
+- `vm/runtime/frame.py` is further above baseline after completing Wave 5 with
+  an explicit bus plus named coordinators. The tradeoff remains the same:
+  clearer runtime seams first, with line count still a secondary metric.
 - These metrics are descriptive only. The primary success criterion remains
   lower cognitive overhead.
 
@@ -376,16 +381,16 @@ Green checkpoints currently on record:
   `apps/server/tests/test_story_branching_endpoints.py`,
   `apps/server/tests/test_story_runtime_endpoints.py`,
   and `apps/server/tests/test_multi_world_switching.py`.
-- `153 passed`:
+- `154 passed`:
   Wave 5 acceptance slice covering
   `engine/tests/vm38/test_frame.py`,
   `engine/tests/vm38/test_phase_integration.py`,
   `engine/tests/vm38/test_call_stack.py`,
   `engine/tests/vm38/test_ledger.py`,
   and `engine/tests/vm38/test_traversable.py`.
-- `1718 passed`, `68 skipped`, `9 xfailed`:
-  full `poetry run pytest engine/tests -q` regression after the initial Wave 5
-  frame/ledger simplification slice.
+- `1719 passed`, `68 skipped`, `9 xfailed`:
+  full `poetry run pytest engine/tests -q` regression after the completed Wave 5
+  runtime simplification slice.
 
 ## Non-wave Stability Maintenance
 
@@ -401,12 +406,11 @@ counted as Wave 4 completion work:
 
 ## Next Execution Slice
 
-1. Continue Wave 5 by refactoring `Frame.follow_edge()` into explicit phase
-   reducers plus one coordinator while keeping the public signature unchanged.
-2. Refactor `Frame.resolve_choice()` into a small loop coordinator around depth
-   guard, redirect selection, return-edge continuation, and step-trace
-   bookkeeping.
-3. Preserve `Frame.local_behaviors` and `Ledger.local_behaviors` as explicit
-   context authorities while simplifying the rest of the frame state flow.
-4. Rerun the Wave 5 acceptance slice, then move into Wave 6 cleanup and final
-   measurement.
+1. Start Wave 6 by identifying remaining compatibility helpers with no internal
+   references and remove only the ones that are now truly dead.
+2. Refresh the hotspot metrics one more time and document where cognitive
+   overhead improved even if line count did not.
+3. Update the design docs and this tracker together as Wave 6 changes land so
+   the architectural record stays current.
+4. Rerun the full engine, media integration, and app/server story endpoint
+   regressions for the Wave 6 closeout checkpoint.

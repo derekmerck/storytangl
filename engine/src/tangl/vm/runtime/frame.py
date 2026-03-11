@@ -640,6 +640,30 @@ class Frame:
         self.cursor_steps += 1
         self.cursor_trace.append(self.cursor.uid)
 
+    def _prepare_follow_edge(
+        self,
+        *,
+        edge: AnyTraversableEdge,
+        selected_payload_override: Any = None,
+    ) -> tuple[ResolutionPhase, Graph | None, VmPhaseCtx]:
+        entry_phase = self._entry_phase(edge)
+        incoming_payload = self._resolve_incoming_payload(edge, selected_payload_override)
+        self.selected_edge = edge
+        self.selected_payload = incoming_payload
+
+        before_graph = self._snapshot_before_hop()
+        self._validate_before_move(
+            edge=edge,
+            entry_phase=entry_phase,
+            incoming_payload=incoming_payload,
+        )
+        self._advance_cursor(edge)
+        ctx = self._make_ctx(
+            incoming_edge=edge,
+            incoming_payload=incoming_payload,
+        )
+        return entry_phase, before_graph, ctx
+
     def _run_planning_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
         if entry_phase > ResolutionPhase.PLANNING:
             return
@@ -671,6 +695,31 @@ class Frame:
             before_graph=before_graph,
         )
         return redirect
+
+    def _run_redirect_phase(
+        self,
+        *,
+        ctx: VmPhaseCtx,
+        edge: AnyTraversableEdge,
+        entry_phase: ResolutionPhase,
+        phase: ResolutionPhase,
+        dispatch_func: Callable[..., AnyTraversableEdge | None],
+        was_choice: bool,
+        before_graph: Graph | None,
+    ) -> AnyTraversableEdge | None:
+        if entry_phase > phase:
+            return None
+        ctx.current_phase = phase
+        redirect = dispatch_func(self.cursor, ctx=ctx)
+        return self._handle_redirect(
+            ctx=ctx,
+            phase=phase,
+            redirect=redirect,
+            edge=edge,
+            entry_phase=entry_phase,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
 
     def _run_update_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
         if entry_phase > ResolutionPhase.UPDATE:
@@ -709,6 +758,11 @@ class Frame:
             return
         ctx.current_phase = ResolutionPhase.FINALIZE
         self._append_phase_records(do_finalize(self.cursor, ctx=ctx), step=ctx.step)
+
+    def _run_terminal_phases(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
+        self._run_update_phase(ctx=ctx, entry_phase=entry_phase)
+        self._run_journal_phase(ctx=ctx, entry_phase=entry_phase)
+        self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase)
 
     def _finish_follow_edge(
         self,
@@ -755,6 +809,23 @@ class Frame:
             return self.return_stack.pop().get_return_edge()
         return None
 
+    def _run_resolve_iteration(
+        self,
+        *,
+        edge: AnyTraversableEdge,
+        is_choice_edge: bool,
+        choice_payload: Any = None,
+    ) -> AnyTraversableEdge | None:
+        redirect = self.follow_edge(
+            edge,
+            was_choice=is_choice_edge,
+            selected_payload_override=choice_payload if is_choice_edge else None,
+        )
+        self._push_call_edge_if_needed(edge)
+        next_edge = self._next_resolve_edge(redirect=redirect)
+        self._emit_step_trace()
+        return next_edge
+
     # -- Pipeline execution -------------------------------------------------
 
     def follow_edge(
@@ -779,55 +850,37 @@ class Frame:
         ValueError
             If VALIDATE fails (the edge is not traversable).
         """
-        entry_phase = self._entry_phase(edge)
-        incoming_payload = self._resolve_incoming_payload(edge, selected_payload_override)
-        self.selected_edge = edge
-        self.selected_payload = incoming_payload
-
-        before_graph = self._snapshot_before_hop()
-        self._validate_before_move(
+        entry_phase, before_graph, ctx = self._prepare_follow_edge(
             edge=edge,
-            entry_phase=entry_phase,
-            incoming_payload=incoming_payload,
-        )
-        self._advance_cursor(edge)
-        ctx = self._make_ctx(
-            incoming_edge=edge,
-            incoming_payload=incoming_payload,
+            selected_payload_override=selected_payload_override,
         )
         self._run_planning_phase(ctx=ctx, entry_phase=entry_phase)
 
-        if entry_phase <= ResolutionPhase.PREREQS:
-            ctx.current_phase = ResolutionPhase.PREREQS
-            redirect = self._handle_redirect(
-                ctx=ctx,
-                phase=ResolutionPhase.PREREQS,
-                redirect=do_prereqs(self.cursor, ctx=ctx),
-                edge=edge,
-                entry_phase=entry_phase,
-                was_choice=was_choice,
-                before_graph=before_graph,
-            )
-            if redirect is not None:
-                return redirect
+        redirect = self._run_redirect_phase(
+            ctx=ctx,
+            edge=edge,
+            entry_phase=entry_phase,
+            phase=ResolutionPhase.PREREQS,
+            dispatch_func=do_prereqs,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
+        if redirect is not None:
+            return redirect
 
-        self._run_update_phase(ctx=ctx, entry_phase=entry_phase)
-        self._run_journal_phase(ctx=ctx, entry_phase=entry_phase)
-        self._run_finalize_phase(ctx=ctx, entry_phase=entry_phase)
+        self._run_terminal_phases(ctx=ctx, entry_phase=entry_phase)
 
-        if entry_phase <= ResolutionPhase.POSTREQS:
-            ctx.current_phase = ResolutionPhase.POSTREQS
-            redirect = self._handle_redirect(
-                ctx=ctx,
-                phase=ResolutionPhase.POSTREQS,
-                redirect=do_postreqs(self.cursor, ctx=ctx),
-                edge=edge,
-                entry_phase=entry_phase,
-                was_choice=was_choice,
-                before_graph=before_graph,
-            )
-            if redirect is not None:
-                return redirect
+        redirect = self._run_redirect_phase(
+            ctx=ctx,
+            edge=edge,
+            entry_phase=entry_phase,
+            phase=ResolutionPhase.POSTREQS,
+            dispatch_func=do_postreqs,
+            was_choice=was_choice,
+            before_graph=before_graph,
+        )
+        if redirect is not None:
+            return redirect
 
         self._finish_follow_edge(
             ctx=ctx,
@@ -876,16 +929,12 @@ class Frame:
 
         while edge is not None:
             self._check_resolve_depth(depth=depth, max_depth=max_depth, cursor=self.cursor)
-            current_edge = edge
-            redirect = self.follow_edge(
-                current_edge,
-                was_choice=is_choice_edge,
-                selected_payload_override=choice_payload if is_choice_edge else None,
+            edge = self._run_resolve_iteration(
+                edge=edge,
+                is_choice_edge=is_choice_edge,
+                choice_payload=choice_payload,
             )
             depth += 1
-            self._push_call_edge_if_needed(current_edge)
-            edge = self._next_resolve_edge(redirect=redirect)
-            self._emit_step_trace()
             is_choice_edge = False
 
     # -- Direct jump --------------------------------------------------------

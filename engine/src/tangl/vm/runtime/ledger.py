@@ -193,12 +193,6 @@ class Ledger(Entity):
 
     def get_frame(self) -> Frame:
         """Create an ephemeral frame for the next pipeline execution."""
-        frame_meta: dict[str, Any] = {}
-        if self.user is not None:
-            frame_meta["user"] = self.user
-        if self.user_id is not None:
-            frame_meta["user_id"] = self.user_id
-        frame_meta["causality_mode"] = self.causality_mode.value
         return Frame(
             self.graph,
             self.cursor,
@@ -206,11 +200,26 @@ class Ledger(Entity):
             self._call_stack(),
             ledger_local_behaviors=self.local_behaviors,
             step_base=self.cursor_steps,
-            meta=frame_meta,
+            meta=self._frame_meta(),
             causality_mode=self.causality_mode,
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
         )
+
+    def _frame_meta(self) -> dict[str, Any]:
+        meta: dict[str, Any] = {"causality_mode": self.causality_mode.value}
+        if self.user is not None:
+            meta["user"] = self.user
+        if self.user_id is not None:
+            meta["user_id"] = self.user_id
+        return meta
+
+    def _local_authorities(self) -> list[BehaviorRegistry]:
+        if not isinstance(self.local_behaviors, BehaviorRegistry):
+            return []
+        if not self.local_behaviors.members:
+            return []
+        return [self.local_behaviors]
 
     def _record_causality_transition(
         self,
@@ -329,14 +338,7 @@ class Ledger(Entity):
 
         from tangl.vm import Resolver
 
-        ctx = PhaseCtx(
-            graph=self.graph,
-            cursor_id=self.cursor_id,
-            step=max(self.cursor_steps, 0),
-            causality_mode=self.causality_mode,
-            mark_soft_dirty_callback=self.mark_soft_dirty,
-            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
-        )
+        ctx = self._make_phase_ctx()
         resolved = Resolver.from_ctx(ctx).resolve_dependency(
             dep,
             allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
@@ -345,37 +347,70 @@ class Ledger(Entity):
         if resolved and dep.successor is not None and edge.successor is None:
             edge.set_successor(dep.successor, _ctx=ctx)
 
-    def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
-        """Resolve a player choice and sync frame results into ledger state."""
+    def _make_phase_ctx(self) -> PhaseCtx:
+        return PhaseCtx(
+            graph=self.graph,
+            cursor_id=self.cursor_id,
+            step=max(self.cursor_steps, 0),
+            causality_mode=self.causality_mode,
+            mark_soft_dirty_callback=self.mark_soft_dirty,
+            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
+            local_authorities=self._local_authorities(),
+        )
+
+    def _require_choice_edge(self, edge_id: UUID) -> TraversableEdge:
         edge = self.graph.get(edge_id)
         if edge is None:
             raise ValueError(f"Choice edge not found: {edge_id}")
+        return edge
 
-        self._provision_selected_destination(edge)
-
-        frame = self.get_frame()
+    def _run_frame_choice(
+        self,
+        *,
+        frame: Frame,
+        edge: TraversableEdge,
+        choice_payload: Any = None,
+    ) -> None:
         if hasattr(frame, "step_observer"):
             frame.step_observer = self._record_step
         frame.resolve_choice(edge, choice_payload=choice_payload)
 
+    @staticmethod
+    def _validate_frame_return_stack(frame: Frame) -> None:
         for call_edge in frame.return_stack:
             if call_edge is None:
                 raise ValueError("Frame return stack contains a null edge")
 
-        self.choice_steps += 1
-        self.cursor_steps += frame.cursor_steps
+    def _sync_reentrant_steps(self, *, frame: Frame) -> None:
         prev_id = self.cursor_history[-1] if self.cursor_history else None
         for node_id in frame.cursor_trace:
             if prev_id is not None and node_id == prev_id:
                 self.reentrant_steps += 1
             prev_id = node_id
+
+    def _sync_from_frame(self, *, frame: Frame) -> None:
+        self.choice_steps += 1
+        self.cursor_steps += frame.cursor_steps
+        self._sync_reentrant_steps(frame=frame)
         self.cursor_id = frame.cursor.uid
         self.cursor_history.extend(frame.cursor_trace)
         self.call_stack_ids = [edge.uid for edge in frame.return_stack]
         self.last_redirect = frame.last_redirect
         self.redirect_trace = list(frame.redirect_trace)
 
+    def _commit_frame_choice(self, *, frame: Frame) -> None:
+        self._validate_frame_return_stack(frame)
+        self._sync_from_frame(frame=frame)
         self.save_snapshot(cadence=self.checkpoint_cadence)
+
+    def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
+        """Resolve a player choice and sync frame results into ledger state."""
+        edge = self._require_choice_edge(edge_id)
+        self._provision_selected_destination(edge)
+
+        frame = self.get_frame()
+        self._run_frame_choice(frame=frame, edge=edge, choice_payload=choice_payload)
+        self._commit_frame_choice(frame=frame)
 
     @staticmethod
     def _coerce_fragment_record(record: Any) -> Fragment | None:

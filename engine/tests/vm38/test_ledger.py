@@ -216,6 +216,17 @@ class TestLedgerGetFrame:
         with pytest.raises(ValueError, match="unresolved edge id"):
             ledger.get_frame()
 
+    def test_make_phase_ctx_includes_populated_local_authorities(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        ledger.local_behaviors.register(
+            task="noop",
+            func=lambda *, caller=None, ctx=None, **_: None,
+        )
+
+        ctx = ledger._make_phase_ctx()
+
+        assert ledger.local_behaviors in ctx.get_authorities()
+
 
 # ============================================================================
 # Choice resolution
