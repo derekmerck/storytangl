@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
+from tangl.journal.media import MediaFragment as JournalMediaFragment
+from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.core.runtime_op import Predicate
 from tangl.story import StoryGraph
 from tangl.story.fragments import ChoiceFragment, ContentFragment, MediaFragment
@@ -231,3 +233,65 @@ def test_render_block_content_includes_graph_locals_from_gather_ns() -> None:
         assert isinstance(fragments, list)
         content = next(fragment for fragment in fragments if isinstance(fragment, ContentFragment))
     assert content.content == "Gold: 10"
+
+
+def test_render_block_media_emits_canonical_formats(tmp_path) -> None:
+    graph = StoryGraph()
+    block = Block(
+        label="start",
+        media=[
+            {"url": "https://example.com/poster.svg", "source_kind": "url"},
+            {"data": "<svg xmlns='http://www.w3.org/2000/svg'></svg>", "source_kind": "data"},
+            {"name": "cover.svg", "source_kind": "inventory"},
+        ],
+    )
+    graph.add(block)
+
+    asset = tmp_path / "cover.svg"
+    asset.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+    rit = MediaRIT(path=asset, label="cover.svg", tags={"scope:world"})
+    graph.add(rit)
+    dep = MediaDep(registry=graph, predecessor_id=block.uid, media_id="cover.svg", scope="world")
+    dep.set_provider(rit)
+    block.media[2]["dependency_id"] = dep.uid
+
+    fragments = render_block_media(caller=block, ctx=_ctx_with_ns())
+
+    assert fragments is not None
+    assert isinstance(fragments[0], JournalMediaFragment)
+    assert fragments[0].fragment_type == "media"
+    assert fragments[0].content_format == "url"
+    assert isinstance(fragments[1], JournalMediaFragment)
+    assert fragments[1].fragment_type == "media"
+    assert fragments[1].content_format == "data"
+    assert isinstance(fragments[2], JournalMediaFragment)
+    assert fragments[2].fragment_type == "media"
+    assert fragments[2].content_format == "rit"
+    assert fragments[2].content == rit
+
+
+def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_fallback() -> None:
+    graph = StoryGraph()
+    block = Block(
+        label="start",
+        media=[{"name": "missing.svg", "source_kind": "inventory", "media_role": "narrative_im"}],
+    )
+    graph.add(block)
+
+    dep = MediaDep(registry=graph, predecessor_id=block.uid, media_id="missing.svg", scope="world")
+    dep.requirement.resolution_reason = "no_offers"
+    dep.requirement.resolution_meta = {"alternatives": []}
+    block.media[0]["dependency_id"] = dep.uid
+
+    fragments = render_block_media(caller=block, ctx=_ctx_with_ns())
+
+    assert fragments is not None
+    assert len(fragments) == 1
+    assert isinstance(fragments[0], JournalMediaFragment)
+    assert fragments[0].fragment_type == "media"
+    assert fragments[0].content_format == "json"
+    assert fragments[0].scope == "world"
+    assert fragments[0].content["name"] == "missing.svg"
+    assert fragments[0].content["source_kind"] == "inventory"
+    assert fragments[0].content["unresolved_reason"] == "no_offers"
+    assert fragments[0].content["resolution_meta"] == {"alternatives": []}

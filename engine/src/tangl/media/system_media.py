@@ -14,6 +14,6 @@ def get_system_resource_manager() -> ResourceManager | None:
     if root is None:
         return None
 
-    manager = ResourceManager(resource_path=root)
+    manager = ResourceManager(resource_path=root, scope="sys", label="system_media")
     manager.index_directory(".")
     return manager

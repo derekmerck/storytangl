@@ -98,8 +98,10 @@ from .replay import Event, Patch
 # Provides:
 # - phase bus hooks
 from .dispatch import (
+    do_get_media_inventories,
     do_get_template_scope_groups,
     do_get_token_catalogs,
+    on_get_media_inventories,
     on_get_template_scope_groups,
     on_get_token_catalogs,
     on_finalize,
@@ -159,6 +161,7 @@ __all__ = [
     "assert_traversal_contracts",
     "on_finalize",
     "on_gather_ns",
+    "on_get_media_inventories",
     "on_get_template_scope_groups",
     "on_get_token_catalogs",
     "on_journal",
@@ -168,6 +171,7 @@ __all__ = [
     "on_resolve",
     "on_update",
     "on_validate",
+    "do_get_media_inventories",
     "do_get_template_scope_groups",
     "do_get_token_catalogs",
     "steps_since_last_visit",

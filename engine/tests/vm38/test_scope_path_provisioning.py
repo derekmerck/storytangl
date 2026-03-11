@@ -36,7 +36,6 @@ def _ctx(*, graph: Graph, cursor: TraversableNode) -> SimpleNamespace:
         cursor_id=cursor.uid,
         step=0,
         get_authorities=lambda: [],
-        get_registries=lambda: [],
         get_inline_behaviors=lambda: [],
     )
 

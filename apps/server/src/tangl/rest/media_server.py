@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
-from tangl.config import settings
+from tangl.config import get_story_media_dir, settings
 from tangl.info import __author__, __author_email__, __desc__, __title__, __url__, __version__
 from tangl.rest.media_mounts import mount_system_media
 from tangl.service.world_registry import WorldRegistry
@@ -61,6 +62,35 @@ def initialize_media_mounts(app: FastAPI, world_registry: WorldRegistry) -> None
 
     for world_id, bundle in world_registry.bundles.items():
         mount_world_media(app, world_id, bundle.media_dir)
+
+
+def _is_within_root(root: Path, candidate: Path) -> bool:
+    return candidate == root or root in candidate.parents
+
+
+def _resolve_safe_story_media_path(story_id: str, filename: str) -> Path:
+    global_root = get_story_media_dir()
+    story_root = get_story_media_dir(story_id)
+    if global_root is None or story_root is None:
+        raise HTTPException(status_code=404, detail="Story media not configured")
+
+    global_root = global_root.resolve()
+    root = story_root.resolve()
+    if not _is_within_root(global_root, root):
+        raise HTTPException(status_code=404, detail="Story media not configured")
+
+    candidate = (root / filename).resolve()
+    if not _is_within_root(root, candidate):
+        raise HTTPException(status_code=404, detail="Media not found")
+    if not candidate.exists() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Media not found")
+    return candidate
+
+
+@app.get("/story/{story_id}/{filename:path}")
+def get_story_media_file(story_id: str, filename: str) -> FileResponse:
+    """Serve story-scoped media files via a path-safe lookup."""
+    return FileResponse(_resolve_safe_story_media_path(story_id, filename))
 
 
 mount_system_media(app, mount_path="/sys")

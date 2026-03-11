@@ -29,6 +29,11 @@ from tangl.core import (
     Token,
     TokenCatalog,
 )
+from tangl.media.media_resource import (
+    MediaInventory,
+    MediaResourceInventoryTag as MediaRIT,
+    MediaResourceRegistry,
+)
 from tangl.vm.provision import (
     Affordance,
     Dependency,
@@ -73,7 +78,7 @@ def _dependency(graph: Graph, **kwargs) -> Dependency:
 def _ctx_with_seed(seed: int) -> SimpleNamespace:
     rng = Random(seed)
     return SimpleNamespace(
-        get_registries=lambda: [],
+        get_authorities=lambda: [],
         get_inline_behaviors=lambda: [],
         get_random=lambda: rng,
     )
@@ -89,7 +94,21 @@ def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> SimpleNamespace:
     return SimpleNamespace(
         cursor=None,
         get_authorities=lambda: [registry],
-        get_registries=lambda: [registry],
+        get_inline_behaviors=lambda: [],
+    )
+
+
+def _ctx_with_media_inventories(*inventories: MediaInventory, graph: Graph | None = None) -> SimpleNamespace:
+    registry = BehaviorRegistry(label="media_inventory_registry")
+
+    def _inventories(*, caller, requirement, ctx, **kw):
+        return list(inventories)
+    registry.register(func=_inventories, task="get_media_inventories")
+
+    return SimpleNamespace(
+        graph=graph,
+        cursor=None,
+        get_authorities=lambda: [registry],
         get_inline_behaviors=lambda: [],
     )
 
@@ -99,6 +118,13 @@ def _template_registry(*templates: EntityTemplate) -> TemplateRegistry:
     for template in templates:
         registry.add(template)
     return registry
+
+
+def _media_inventory(label: str, *records: MediaRIT) -> MediaInventory:
+    registry = MediaResourceRegistry(label=label)
+    for record in records:
+        registry.add(record)
+    return MediaInventory(registry=registry, scope=label, label=label)
 
 
 # ============================================================================
@@ -353,6 +379,67 @@ class TestResolverOfferGathering:
         offers = resolver.gather_offers(req, _ctx=_ctx_with_token_catalogs(catalog))
         assert offers == []
 
+    def test_media_inventory_offers_follow_discovery_order(self, tmp_path) -> None:
+        story_file = tmp_path / "story.svg"
+        world_file = tmp_path / "world.svg"
+        sys_file = tmp_path / "sys.svg"
+        for item in (story_file, world_file, sys_file):
+            item.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+
+        story_inventory = _media_inventory(
+            "story",
+            MediaRIT(path=story_file, label="poster.svg", tags={"scope:story"}),
+        )
+        world_inventory = _media_inventory(
+            "world",
+            MediaRIT(path=world_file, label="poster.svg", tags={"scope:world"}),
+        )
+        sys_inventory = _media_inventory(
+            "sys",
+            MediaRIT(path=sys_file, label="poster.svg", tags={"scope:sys"}),
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(has_kind=MediaRIT, has_identifier="poster.svg")
+
+        offers = resolver.gather_offers(
+            req,
+            _ctx=_ctx_with_media_inventories(story_inventory, world_inventory, sys_inventory),
+        )
+
+        assert offers
+        assert getattr(offers[0].candidate, "path", None) == story_file
+
+    def test_media_inventory_offers_respect_pinned_scope(self, tmp_path) -> None:
+        story_file = tmp_path / "story.svg"
+        sys_file = tmp_path / "sys.svg"
+        for item in (story_file, sys_file):
+            item.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+
+        story_inventory = _media_inventory(
+            "story",
+            MediaRIT(path=story_file, label="badge.svg", tags={"scope:story"}),
+        )
+        sys_inventory = _media_inventory(
+            "sys",
+            MediaRIT(path=sys_file, label="badge.svg", tags={"scope:sys"}),
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        req = Requirement(
+            has_kind=MediaRIT,
+            has_identifier="badge.svg",
+            has_tags={"scope:sys"},
+        )
+
+        offers = resolver.gather_offers(
+            req,
+            _ctx=_ctx_with_media_inventories(story_inventory, sys_inventory),
+        )
+
+        assert offers
+        assert getattr(offers[0].candidate, "path", None) == sys_file
+
     def test_gathers_from_entity_groups(self) -> None:
         e = Entity(label="sword")
         resolver = Resolver(entity_groups=[[e]])
@@ -374,7 +461,7 @@ class TestResolverOfferGathering:
         req = Requirement.from_identifier("missing")
         ctx = SimpleNamespace(
             causality_mode="hard_dirty",
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
         offers = resolver.gather_offers(req, allow_stubs=False, _ctx=ctx)
@@ -801,7 +888,7 @@ class TestResolverRequirementResolution:
 
     def test_from_ctx_requires_provision_context_shape(self) -> None:
         ctx = SimpleNamespace()
-        with pytest.raises(TypeError, match="get_location_entity_groups|get_entity_groups"):
+        with pytest.raises(TypeError, match="get_location_entity_groups"):
             Resolver.from_ctx(ctx)
 
     def test_invalid_resolve_override_sets_override_reason(self) -> None:
@@ -811,7 +898,7 @@ class TestResolverRequirementResolution:
         local_registry = BehaviorRegistry(label="test_resolve_req_registry")
         local_registry.register(func=bad_override, task="resolve_req")
         ctx = SimpleNamespace(
-            get_registries=lambda: [local_registry],
+            get_authorities=lambda: [local_registry],
             get_inline_behaviors=lambda: [],
         )
         resolver = Resolver(entity_groups=[])
@@ -827,9 +914,7 @@ class TestResolverRequirementResolution:
         template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
         ctx = SimpleNamespace(
             get_location_entity_groups=lambda: [[provider]],
-            get_entity_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy entity groups called")),
             get_template_scope_groups=lambda: [_template_registry(template)],
-            get_template_groups=lambda: (_ for _ in ()).throw(AssertionError("legacy template groups called")),
         )
 
         resolver = Resolver.from_ctx(ctx)
@@ -837,27 +922,6 @@ class TestResolverRequirementResolution:
         registry = list(resolver.template_scope_groups)[0]
         assert isinstance(registry, TemplateRegistry)
         assert registry.find_one(Selector(has_identifier="templ")) is template
-
-    def test_from_ctx_legacy_entity_groups_warns(self) -> None:
-        provider = Entity(label="provider")
-        ctx = SimpleNamespace(
-            get_entity_groups=lambda: [[provider]],
-            get_template_scope_groups=lambda: [],
-        )
-        with pytest.deprecated_call(match="get_entity_groups"):
-            resolver = Resolver.from_ctx(ctx)
-        assert resolver.location_entity_groups
-
-    def test_from_ctx_legacy_template_groups_warns(self) -> None:
-        template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
-        ctx = SimpleNamespace(
-            get_location_entity_groups=lambda: [],
-            get_template_groups=lambda: [_template_registry(template)],
-        )
-        with pytest.deprecated_call(match="get_template_groups"):
-            resolver = Resolver.from_ctx(ctx)
-        assert resolver.template_scope_groups
-
 
 class TestResolverDependencyResolution:
     def test_resolve_dependency_links_provider(self) -> None:
@@ -885,7 +949,7 @@ class TestResolverDependencyResolution:
         ctx = SimpleNamespace(
             step=3,
             cursor_id=node.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
 
@@ -917,6 +981,34 @@ class TestResolverDependencyResolution:
         assert success is True
         assert dep.provider is bob
 
+    def test_resolve_dependency_binds_media_inventory_provider_into_graph(self, tmp_path) -> None:
+        asset = tmp_path / "cover.svg"
+        asset.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+
+        inventory = _media_inventory(
+            "world",
+            MediaRIT(path=asset, label="cover.svg", tags={"scope:world"}),
+        )
+        graph = Graph()
+        node = _node(graph, label="start")
+        dep = _dependency(
+            graph,
+            requirement=Requirement(has_kind=MediaRIT, has_identifier="cover.svg"),
+            predecessor_id=node.uid,
+        )
+
+        resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
+        success = resolver.resolve_dependency(
+            dep,
+            _ctx=_ctx_with_media_inventories(inventory, graph=graph),
+        )
+
+        assert success is True
+        assert isinstance(dep.provider, MediaRIT)
+        assert dep.provider is not None
+        assert dep.provider.registry is graph
+        assert dep.provider.path == asset
+
     def test_stub_offer_bypasses_requirement_validation(self) -> None:
         class Person(RegistryAware):
             pass
@@ -936,7 +1028,7 @@ class TestResolverDependencyResolution:
         ctx = SimpleNamespace(
             step=11,
             cursor_id=node.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
         success = resolver.resolve_dependency(dep, allow_stubs=True, _ctx=ctx)
@@ -1006,7 +1098,7 @@ class TestResolverDependencyResolution:
         ctx = SimpleNamespace(
             step=11,
             cursor_id=node.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
             escalate_to_hard_dirty=_escalate,
         )
@@ -1050,7 +1142,7 @@ class TestResolverDependencyResolution:
             graph=g,
             cursor=cursor,
             cursor_id=cursor.uid,
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: [],
         )
 

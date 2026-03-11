@@ -185,11 +185,22 @@ const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => 
         block.uid = String(fragment.uid)
       }
       const payload = isRecord(fragment.payload) ? fragment.payload : {}
-      const rawUrl = payload.url ?? payload.src
+      const rawUrl = fragment.url ?? fragment.src ?? payload.url ?? payload.src
       const url = typeof rawUrl === 'string' ? rawUrl : undefined
-      const role = isMediaRole(payload.media_role) ? payload.media_role : 'narrative_im'
+      const rawData = fragment.data ?? payload.data
+      const roleValue = fragment.media_role ?? payload.media_role
+      const role = isMediaRole(roleValue) ? roleValue : 'narrative_im'
+
+      if (url === undefined && rawData === undefined) {
+        continue
+      }
+
       const media = block.media ? [...block.media] : []
-      media.push({ media_role: role, url })
+      media.push({
+        media_role: role,
+        ...(url ? { url } : {}),
+        ...(rawData !== undefined ? { data: rawData } : {}),
+      })
       block.media = media
       continue
     }
@@ -269,14 +280,14 @@ onMounted(fetchInitialBlocks)
 const doAction = async (
   _block: JournalStoryUpdate,
   actionUid: string,
-  passback?: unknown,
+  payload?: unknown,
 ) => {
   try {
     loading.value = true
     error.value = null
     const response = await $http.value.post<unknown>(`${storyRoutePrefix}/do`, {
-      uid: actionUid,
-      passback,
+      choice_id: actionUid,
+      payload,
     })
     await handleResponse(normalizePayload(response.data))
   } catch (err) {

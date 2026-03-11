@@ -32,7 +32,7 @@ class TestDispatchFunctions:
         app_registry.register(task="init", func=lambda *, caller, ctx=None, **_: events.append("ctx"))
 
         ctx = SimpleNamespace(
-            get_registries=lambda: [app_registry],
+            get_authorities=lambda: [app_registry],
             get_inline_behaviors=lambda: [lambda *, caller, ctx=None, **_: events.append("inline")],
         )
         do_init(caller=Entity(label="x"), ctx=ctx)

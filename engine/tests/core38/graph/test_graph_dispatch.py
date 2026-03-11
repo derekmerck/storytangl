@@ -34,7 +34,7 @@ class TestGraphDispatchHooks:
         app.register(task="link", func=lambda *, caller, node, **_: events.append("ctx"))
 
         ctx = SimpleNamespace(
-            get_registries=lambda: [app],
+            get_authorities=lambda: [app],
             get_inline_behaviors=lambda: [lambda *, caller, node, **_: events.append("inline")],
         )
         on_link(func=lambda *, caller, node, **_: events.append("global"))

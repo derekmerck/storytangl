@@ -43,7 +43,6 @@ Example:
     ...     label="bar",
     ...     _ctx=SimpleNamespace(
     ...         get_authorities=lambda: [],
-    ...         get_registries=lambda: [],  # compatibility alias
     ...         get_inline_behaviors=lambda: [],
     ...     ),
     ... )  # calls global dispatch by default
@@ -55,7 +54,6 @@ Example:
     ...     label="bar",
     ...     _ctx=SimpleNamespace(
     ...         get_authorities=lambda: [q],
-    ...         get_registries=lambda: [q],  # compatibility alias
     ...         get_inline_behaviors=lambda: [],
     ...     ),
     ... )

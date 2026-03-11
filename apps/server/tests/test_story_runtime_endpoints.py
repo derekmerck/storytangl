@@ -123,7 +123,7 @@ def test_story38_rest_envelope_flow(
     payload = {"move": "knight", "to": "b6"}
     do = client.post(
         "story/story38/do",
-        json={"uid": choice_id, "payload": payload},
+        json={"choice_id": choice_id, "payload": payload},
         headers=headers,
     )
     assert do.status_code == 200

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 from uuid import uuid4
 
 from tangl.core.ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
@@ -19,7 +20,6 @@ def test_get_authorities_merges_dispatch_and_explicit_registries_without_duplica
     b = object()
     ctx = Ctx(dispatch=[a, b], registries=(b,))
     assert ctx.get_authorities() == [b, a]
-    assert ctx.get_registries() == [b, a]
 
 
 def test_resolve_ctx_prefers_explicit_then_ambient() -> None:
@@ -29,6 +29,44 @@ def test_resolve_ctx_prefers_explicit_then_ambient() -> None:
         assert get_ctx() is ambient
         assert resolve_ctx(explicit) is explicit
         assert resolve_ctx() is ambient
+
+
+def test_resolve_ctx_appends_authorities_to_explicit_ctx() -> None:
+    a = object()
+    b = object()
+    ctx = Ctx(registries=(a,))
+
+    resolved = resolve_ctx(ctx, authorities=(b, a))
+
+    assert isinstance(resolved, Ctx)
+    assert resolved is not ctx
+    assert resolved.get_authorities() == [a, b]
+
+
+def test_resolve_ctx_creates_ctx_when_only_authorities_are_provided() -> None:
+    a = object()
+
+    resolved = resolve_ctx(authorities=(a,))
+
+    assert isinstance(resolved, Ctx)
+    assert resolved.get_authorities() == [a]
+
+
+def test_resolve_ctx_wraps_custom_ctx_with_extra_authorities() -> None:
+    a = object()
+    b = object()
+    base = SimpleNamespace(
+        get_authorities=lambda: [a],
+        get_inline_behaviors=lambda: ["inline"],
+        correlation_id="corr-1",
+    )
+
+    resolved = resolve_ctx(base, authorities=(b,))
+
+    assert resolved is not base
+    assert resolved.correlation_id == "corr-1"
+    assert resolved.get_authorities() == [a, b]
+    assert resolved.get_inline_behaviors() == ["inline"]
 
 
 def test_with_meta_keeps_other_fields_and_merges_meta() -> None:

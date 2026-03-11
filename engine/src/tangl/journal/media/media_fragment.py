@@ -37,10 +37,11 @@ class MediaFragment(ContentFragment, extra='allow'):
     staging_hints: Optional[StagingHints] = None
     media_role: Optional[str] = None  # fragment's intended use
     scope: Optional[str] = "world"
+    fragment_type: str = "media"
 
     # todo: could also pickle it if creating a dto to a python client
     @field_serializer("content")
-    def _encode_binary_content(self, content):
-        if self.content_format == "data" and isinstance(self.content, bytes):
-            return b64encode(content)
+    def _encode_binary_content(self, content) -> str:
+        if self.content_format == "data" and isinstance(content, bytes):
+            return b64encode(content).decode("utf-8")
         return str(content)

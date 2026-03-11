@@ -145,7 +145,7 @@ class SpecialScene(Scene):
 def null_ctx() -> SimpleNamespace:
     """Minimal context satisfying dispatch's registry/inline behavior contract."""
     return SimpleNamespace(
-        get_registries=lambda: [],
+        get_authorities=lambda: [],
         get_inline_behaviors=lambda: [],
     )
 
@@ -157,7 +157,7 @@ def mock_ctx_with_registry() -> tuple[SimpleNamespace, object]:
 
     registry = BehaviorRegistry()
     ctx = SimpleNamespace(
-        get_registries=lambda: [registry],
+        get_authorities=lambda: [registry],
         get_inline_behaviors=lambda: [],
     )
     return ctx, registry
@@ -169,7 +169,7 @@ def inline_ctx() -> callable:
 
     def _make(*funcs):
         return SimpleNamespace(
-            get_registries=lambda: [],
+            get_authorities=lambda: [],
             get_inline_behaviors=lambda: list(funcs),
         )
 
@@ -194,7 +194,7 @@ def layered_ctx() -> callable:
                 registry.register(func=func, task=task)
             registries.append(registry)
         return SimpleNamespace(
-            get_registries=lambda: registries,
+            get_authorities=lambda: registries,
             get_inline_behaviors=lambda: [],
         )
 

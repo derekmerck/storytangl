@@ -237,12 +237,12 @@ place.
 The dispatch context for one `follow_edge` invocation. Created fresh at each cursor hop;
 discarded when the hop completes.
 
-**Registry assembly at call time.** `get_registries()` always includes `vm_dispatch`.
+**Registry assembly stays explicit at call time.** The `do_*` helpers dispatch through
+`vm_dispatch`; `PhaseCtx.get_authorities()` contributes only *additional* registries.
 If the graph exposes `get_authorities()`, those registries are appended in declaration
-order. This means story_dispatch, world dispatch, and any author-layer registries
-participate automatically — no context configuration required. The assembly cannot use
-dispatch to assemble itself, so it uses `getattr(graph, "get_authorities", None)` rather
-than a hook call.
+order. Frame and Ledger may also inject populated local registries explicitly for one
+call path via `PhaseCtx.local_authorities`. This keeps story/world registries automatic
+while preserving narrow local override seams without ambient per-instance discovery.
 
 **Template scope discovery is dispatch-first.** `PhaseCtx.get_template_scope_groups()`
 calls `do_get_template_scope_groups(caller=cursor, ctx=self)` and uses that merged result
@@ -281,10 +281,13 @@ until the pipeline produces no redirect or the return stack is exhausted.
 produce output into `output_stream`, then discarded. Their output is deterministically
 reproducible from graph state and the chosen edge.
 
-**`follow_edge` is the unit of work.** Each call: (1) updates cursor, (2) builds a
-fresh PhaseCtx, (3) runs the full phase pipeline VALIDATE→POSTREQS, (4) returns any
-redirect edge or `None`. `resolve_choice` loops on returned edges until `None`, then
-checks the return stack.
+**`follow_edge` is the unit of work.** Each call: (1) prepares the hop and validates
+the incoming edge, (2) advances cursor and builds a fresh PhaseCtx, (3) runs the full
+phase pipeline VALIDATE→POSTREQS, and (4) returns any redirect edge or `None`.
+`resolve_choice` remains an explicit loop over returned edges and return-stack unwind;
+the VM keeps this bus concrete rather than hiding it behind a generic phase-spec table
+because redirect capture, tracing, and return-edge resumption are part of the runtime
+contract.
 
 **`output_stream` is an `OrderedRegistry`.** Fragments (JOURNAL) and patches (FINALIZE)
 are appended to a shared `OrderedRegistry`. The registry's append-only, seq-ordered
@@ -308,8 +311,9 @@ duration of a `resolve_choice` call and returns them (mutated) when done. Ledger
 authoritative source of "where are we."
 
 **Ledger creates Frames, not the other way around.** `ledger.resolve_choice(edge)` builds
-a Frame from current ledger state, runs it, and writes back cursor + step count.
-Callers never construct Frames directly.
+a Frame from current ledger state, runs it, validates the resulting return stack, and
+writes back cursor, trace, and step counters through small sync helpers. Callers never
+construct Frames directly.
 
 **Event sourcing via OrderedRegistry.** Ledger's output accumulates in a single
 `OrderedRegistry` across all frames. Replay slices this registry by step range and
@@ -423,11 +427,11 @@ layer. Higher-layer code uses the ergonomic alias; lower-layer code uses the can
 name. Nothing new at the vm layer — vm just consumes `ctx.graph` and
 `graph.get_authorities()`.
 
-**`Frame.get_registries()` is the authority aggregation point.** It calls
-`graph.get_authorities()` once per `resolve_choice` and includes all returned
-registries in `chain_execute`. Authority dispatch is therefore automatic: anything in
-`get_authorities()` participates in every vm dispatch call without any per-handler
-registration step at the vm level.
+**`PhaseCtx.get_authorities()` is the authority aggregation point.** It calls
+`graph.get_authorities()` for environment-level registries and appends any explicit
+local registries supplied by the current Frame or Ledger. Authority dispatch is
+therefore automatic for graph-owned registries, while local experimental or audit
+registries remain opt-in per call path.
 
 **Four world manager types, one authority pattern.** A complete world provides:
 
@@ -488,8 +492,9 @@ descend recursively through normal pipeline execution.
 
 The authority chain (`graph.get_authorities()` → `[story_dispatch, world_registries]`)
 must be assembled before any dispatch call fires. This means the assembly mechanism
-cannot be a dispatch hook. `Frame.get_registries()` uses `getattr(graph, "get_authorities",
-None)` — a plain duck-type check — for exactly this reason.
+cannot be a dispatch hook. `PhaseCtx.get_authorities()` uses
+`getattr(graph, "get_authorities", None)` — a plain duck-type check — for exactly this
+reason.
 
 This is a fundamental structural constraint: **you cannot use dispatch to assemble the
 dispatch chain.** Any future redesign of the authority pattern must respect this.

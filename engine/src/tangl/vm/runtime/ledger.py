@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from tangl.core import BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
+from tangl.core import BaseFragment, BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
 from tangl.vm.traversable import TraversableEdge, TraversableNode
 
@@ -138,9 +138,18 @@ class Ledger(Entity):
     user_id: Optional[UUID] = None
 
     @classmethod
-    def from_graph(cls, graph: Graph, entry_id: UUID) -> Self:
+    def from_graph(
+        cls,
+        graph: Graph,
+        entry_id: UUID,
+        *,
+        uid: UUID | None = None,
+    ) -> Self:
         """Construct and initialize a ledger at a graph entry node."""
-        ledger = cls(graph=graph, cursor_id=entry_id)
+        payload: dict[str, Any] = {"graph": graph, "cursor_id": entry_id}
+        if uid is not None:
+            payload["uid"] = uid
+        ledger = cls(**payload)
         ledger._seed_counters(entry_id=entry_id)
         ledger.initialize_entry()
         return ledger
@@ -184,24 +193,33 @@ class Ledger(Entity):
 
     def get_frame(self) -> Frame:
         """Create an ephemeral frame for the next pipeline execution."""
-        frame_meta: dict[str, Any] = {}
-        if self.user is not None:
-            frame_meta["user"] = self.user
-        if self.user_id is not None:
-            frame_meta["user_id"] = self.user_id
-        frame_meta["causality_mode"] = self.causality_mode.value
         return Frame(
             self.graph,
             self.cursor,
             self.output_stream,
             self._call_stack(),
-            local_behaviors=self.local_behaviors,
+            ledger_local_behaviors=self.local_behaviors,
             step_base=self.cursor_steps,
-            meta=frame_meta,
+            meta=self._frame_meta(),
             causality_mode=self.causality_mode,
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
         )
+
+    def _frame_meta(self) -> dict[str, Any]:
+        meta: dict[str, Any] = {"causality_mode": self.causality_mode.value}
+        if self.user is not None:
+            meta["user"] = self.user
+        if self.user_id is not None:
+            meta["user_id"] = self.user_id
+        return meta
+
+    def _local_authorities(self) -> list[BehaviorRegistry]:
+        if not isinstance(self.local_behaviors, BehaviorRegistry):
+            return []
+        if not self.local_behaviors.members:
+            return []
+        return [self.local_behaviors]
 
     def _record_causality_transition(
         self,
@@ -320,14 +338,7 @@ class Ledger(Entity):
 
         from tangl.vm import Resolver
 
-        ctx = PhaseCtx(
-            graph=self.graph,
-            cursor_id=self.cursor_id,
-            step=max(self.cursor_steps, 0),
-            causality_mode=self.causality_mode,
-            mark_soft_dirty_callback=self.mark_soft_dirty,
-            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
-        )
+        ctx = self._make_phase_ctx()
         resolved = Resolver.from_ctx(ctx).resolve_dependency(
             dep,
             allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
@@ -336,47 +347,81 @@ class Ledger(Entity):
         if resolved and dep.successor is not None and edge.successor is None:
             edge.set_successor(dep.successor, _ctx=ctx)
 
-    def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
-        """Resolve a player choice and sync frame results into ledger state."""
+    def _make_phase_ctx(self) -> PhaseCtx:
+        return PhaseCtx(
+            graph=self.graph,
+            cursor_id=self.cursor_id,
+            step=max(self.cursor_steps, 0),
+            causality_mode=self.causality_mode,
+            mark_soft_dirty_callback=self.mark_soft_dirty,
+            escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
+            local_authorities=self._local_authorities(),
+        )
+
+    def _require_choice_edge(self, edge_id: UUID) -> TraversableEdge:
         edge = self.graph.get(edge_id)
         if edge is None:
             raise ValueError(f"Choice edge not found: {edge_id}")
+        return edge
 
-        self._provision_selected_destination(edge)
-
-        frame = self.get_frame()
+    def _run_frame_choice(
+        self,
+        *,
+        frame: Frame,
+        edge: TraversableEdge,
+        choice_payload: Any = None,
+    ) -> None:
         if hasattr(frame, "step_observer"):
             frame.step_observer = self._record_step
         frame.resolve_choice(edge, choice_payload=choice_payload)
 
+    @staticmethod
+    def _validate_frame_return_stack(frame: Frame) -> None:
         for call_edge in frame.return_stack:
             if call_edge is None:
                 raise ValueError("Frame return stack contains a null edge")
 
-        self.choice_steps += 1
-        self.cursor_steps += frame.cursor_steps
+    def _sync_reentrant_steps(self, *, frame: Frame) -> None:
         prev_id = self.cursor_history[-1] if self.cursor_history else None
         for node_id in frame.cursor_trace:
             if prev_id is not None and node_id == prev_id:
                 self.reentrant_steps += 1
             prev_id = node_id
+
+    def _sync_from_frame(self, *, frame: Frame) -> None:
+        self.choice_steps += 1
+        self.cursor_steps += frame.cursor_steps
+        self._sync_reentrant_steps(frame=frame)
         self.cursor_id = frame.cursor.uid
         self.cursor_history.extend(frame.cursor_trace)
         self.call_stack_ids = [edge.uid for edge in frame.return_stack]
         self.last_redirect = frame.last_redirect
         self.redirect_trace = list(frame.redirect_trace)
 
+    def _commit_frame_choice(self, *, frame: Frame) -> None:
+        self._validate_frame_return_stack(frame)
+        self._sync_from_frame(frame=frame)
         self.save_snapshot(cadence=self.checkpoint_cadence)
 
+    def resolve_choice(self, edge_id: UUID, *, choice_payload: Any = None) -> None:
+        """Resolve a player choice and sync frame results into ledger state."""
+        edge = self._require_choice_edge(edge_id)
+        self._provision_selected_destination(edge)
+
+        frame = self.get_frame()
+        self._run_frame_choice(frame=frame, edge=edge, choice_payload=choice_payload)
+        self._commit_frame_choice(frame=frame)
+
     @staticmethod
-    def _coerce_fragment_record(record: Any) -> Fragment | None:
+    def _coerce_fragment_record(record: Any) -> Fragment | BaseFragment | None:
         """Normalize mixed fragment record shapes into vm38 fragments."""
-        if isinstance(record, Fragment):
+        if isinstance(record, (Fragment, BaseFragment)):
             return record
         fragment_type = getattr(record, "fragment_type", None)
         if fragment_type is None:
             return None
-        step = int(getattr(record, "step", -1) or -1)
+        raw_step = getattr(record, "step", -1)
+        step = -1 if raw_step is None else int(raw_step)
         payload: dict[str, Any] = {
             "fragment_type": str(fragment_type),
             "step": step,
@@ -386,15 +431,17 @@ class Ledger(Entity):
                 payload[key] = getattr(record, key)
         return Fragment(**payload)
 
-    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment]:
+    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment | BaseFragment]:
         """Return output fragments in chronological order, optionally filtered."""
-        fragments: list[Fragment] = []
+        fragments: list[Fragment | BaseFragment] = []
 
         for record in self.output_stream.values():
             fragment = self._coerce_fragment_record(record)
             if fragment is None:
                 continue
-            if fragment.step >= since_step or fragment.step < 0:
+            raw_step = getattr(fragment, "step", -1)
+            step = -1 if raw_step is None else int(raw_step)
+            if step >= since_step or step < 0:
                 fragments.append(fragment)
 
         if limit > 0 and len(fragments) > limit:
@@ -493,10 +540,6 @@ class Ledger(Entity):
 
     def push_snapshot(self) -> Optional[CheckpointRecord]:
         """Legacy alias for forcing a checkpoint save."""
-        return self.save_snapshot(force=True)
-
-    def record_stack_snapshot(self) -> Optional[CheckpointRecord]:
-        """Legacy compatibility alias for stack/snapshot persistence."""
         return self.save_snapshot(force=True)
 
     def _ordered_records(self) -> list[Entity]:

@@ -14,14 +14,18 @@ resolver mechanisms in :mod:`tangl.vm`.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable as IterableABC
 from typing import Any, Iterable
 
-from tangl.core import Priority, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.core import Priority, Record, Selector, TemplateRegistry
+from tangl.media import get_system_resource_manager
+from tangl.media.media_data_type import MediaDataType
+from tangl.media.media_resource import MediaDep
+from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    on_get_media_inventories,
     on_provision,
     on_get_template_scope_groups,
     on_get_token_catalogs,
@@ -30,6 +34,11 @@ from tangl.vm import (
 from .dispatch import on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
+from .provider_collection import (
+    collect_media_inventories,
+    collect_template_registries,
+    collect_token_catalogs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,70 +89,6 @@ def gather_story_template_scope_groups(*, caller, ctx, **_kw):
     return None
 
 
-def _registry_from_values(values: Iterable[Any]) -> TemplateRegistry | None:
-    found: TemplateRegistry | None = None
-    for item in values:
-        registry = getattr(item, "registry", None)
-        if not isinstance(registry, TemplateRegistry):
-            continue
-        if found is None:
-            found = registry
-            continue
-        if found is not registry:
-            return None
-    return found
-
-
-def _coerce_template_registry_item(value: Any) -> TemplateRegistry | None:
-    if isinstance(value, TemplateRegistry):
-        return value
-    nested = getattr(value, "template_registry", None)
-    if isinstance(nested, TemplateRegistry):
-        return nested
-    if isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
-        return None
-    return _registry_from_values(value)
-
-
-def _collect_provider_template_registries(
-    provider: Any,
-    *,
-    caller: Any,
-    graph: Any = None,
-) -> list[TemplateRegistry]:
-    if provider is None:
-        return []
-
-    raw = None
-    get_scope_groups = getattr(provider, "get_template_scope_groups", None)
-    if callable(get_scope_groups):
-        raw = get_scope_groups(caller=caller, graph=graph)
-    else:
-        raw = provider
-
-    if raw is None:
-        return []
-    if isinstance(raw, TemplateRegistry):
-        values = [raw]
-    elif isinstance(raw, (str, bytes, dict)) or not isinstance(raw, IterableABC):
-        values = [raw]
-    else:
-        values = list(raw)
-
-    registries: list[TemplateRegistry] = []
-    seen_ids: set[int] = set()
-    for value in values:
-        registry = _coerce_template_registry_item(value)
-        if registry is None:
-            continue
-        registry_id = id(registry)
-        if registry_id in seen_ids:
-            continue
-        seen_ids.add(registry_id)
-        registries.append(registry)
-    return registries
-
-
 @on_get_template_scope_groups(priority=Priority.LATE)
 def gather_world_template_scope_groups(*, caller, ctx, **_kw):
     """Contribute world-level template registries after story-local sources."""
@@ -161,64 +106,12 @@ def gather_world_template_scope_groups(*, caller, ctx, **_kw):
         getattr(world, "templates", None),
         world,
     ]
-    registries: list[TemplateRegistry] = []
-    seen_ids: set[int] = set()
-    for provider in providers:
-        for registry in _collect_provider_template_registries(
-            provider,
-            caller=caller,
-            graph=graph,
-        ):
-            registry_id = id(registry)
-            if registry_id in seen_ids:
-                continue
-            seen_ids.add(registry_id)
-            registries.append(registry)
+    registries = collect_template_registries(
+        providers,
+        caller=caller,
+        graph=graph,
+    )
     return registries or None
-
-
-def _coerce_token_catalog_item(value: Any) -> TokenCatalog | None:
-    if isinstance(value, TokenCatalog):
-        return value
-    if isinstance(value, type) and issubclass(value, Singleton):
-        return TokenCatalog(wst=value)
-    return None
-
-
-def _collect_provider_token_catalogs(
-    provider: Any,
-    *,
-    caller: Any,
-    requirement: Any = None,
-    graph: Any = None,
-) -> list[TokenCatalog]:
-    if provider is None:
-        return []
-
-    raw = None
-    get_catalogs = getattr(provider, "get_token_catalogs", None)
-    if callable(get_catalogs):
-        raw = get_catalogs(caller=caller, requirement=requirement, graph=graph)
-    else:
-        get_tokenizable = getattr(provider, "get_tokenizable", None)
-        if callable(get_tokenizable):
-            raw = get_tokenizable()
-
-    if raw is None:
-        return []
-    if isinstance(raw, (str, bytes, dict)):
-        return []
-    if isinstance(raw, Iterable):
-        values = list(raw)
-    else:
-        values = [raw]
-
-    catalogs: list[TokenCatalog] = []
-    for value in values:
-        catalog = _coerce_token_catalog_item(value)
-        if catalog is not None:
-            catalogs.append(catalog)
-    return catalogs
 
 
 @on_get_token_catalogs(priority=Priority.LATE)
@@ -239,17 +132,75 @@ def gather_world_token_catalogs(*, caller, requirement=None, ctx, **_kw):
         getattr(world, "domain", None),
         world,
     ]
-    catalogs: list[TokenCatalog] = []
-    for provider in providers:
-        catalogs.extend(
-            _collect_provider_token_catalogs(
-                provider,
-                caller=caller,
-                requirement=requirement,
-                graph=graph,
-            )
-        )
+    catalogs = collect_token_catalogs(
+        providers,
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+    )
     return catalogs or None
+
+
+@on_get_media_inventories(priority=Priority.FIRST)
+def gather_story_media_inventories(*, caller, requirement=None, ctx, **_kw):
+    """Contribute story-local media inventory ahead of world/system scopes."""
+    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
+    if graph is None:
+        return None
+
+    manager = getattr(graph, "story_resources", None)
+    if manager is None and getattr(graph, "story_id", None) is not None:
+        manager = get_story_resource_manager(graph.story_id, create=False)
+        if manager is not None:
+            graph.story_resources = manager
+
+    inventories = collect_media_inventories(
+        [manager],
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+        scope="story",
+    )
+    return inventories or None
+
+
+@on_get_media_inventories(priority=Priority.LATE)
+def gather_world_media_inventories(*, caller, requirement=None, ctx, **_kw):
+    """Contribute world-scoped media inventories after story-local sources."""
+    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
+    if graph is None:
+        return None
+
+    world = getattr(graph, "world", None)
+    if world is None:
+        return None
+
+    providers = [
+        getattr(world, "resources", None),
+        world,
+    ]
+    inventories = collect_media_inventories(
+        providers,
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+        scope="world",
+    )
+    return inventories or None
+
+
+@on_get_media_inventories(priority=Priority.LAST)
+def gather_system_media_inventories(*, caller, requirement=None, ctx, **_kw):
+    """Contribute shared system media inventory last."""
+    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
+    inventories = collect_media_inventories(
+        [get_system_resource_manager()],
+        caller=caller,
+        requirement=requirement,
+        graph=graph,
+        scope="sys",
+    )
+    return inventories or None
 
 
 def _has_tags(value: Any, *tags: str) -> bool:
@@ -446,6 +397,78 @@ def _merge_fragment_batches(*batches: Any) -> list[Record]:
     return merged
 
 
+def _coerce_media_type(value: Any) -> MediaDataType:
+    if isinstance(value, MediaDataType):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return MediaDataType(value)
+        except ValueError:
+            return MediaDataType(value.strip("."))
+    return MediaDataType.MEDIA
+
+
+def _media_type_for_item(item: dict[str, Any]) -> MediaDataType:
+    explicit = item.get("content_type") or item.get("media_type") or item.get("kind")
+    if explicit is not None:
+        return _coerce_media_type(explicit)
+
+    for key in ("url", "name", "src"):
+        value = item.get(key)
+        if isinstance(value, str) and "." in value:
+            return MediaDataType.from_path(value)
+    data = item.get("data")
+    if isinstance(data, str) and data.lstrip().startswith("<svg"):
+        return MediaDataType.VECTOR
+    return MediaDataType.MEDIA
+
+
+def _scope_from_provider(provider: Any, *, default: str = "world") -> str:
+    tags = getattr(provider, "tags", set()) or set()
+    for tag in tags:
+        if isinstance(tag, str) and tag.startswith("scope:"):
+            return tag.split(":", 1)[1]
+    return default
+
+
+def _unresolved_media_placeholder(
+    *,
+    caller: Block,
+    payload: dict[str, Any],
+    dependency: MediaDep | None,
+    source_kind: str,
+) -> MediaFragment:
+    scope = payload.get("scope") or "world"
+    unresolved_reason = "unresolved_media"
+    resolution_meta: dict[str, Any] | None = None
+
+    if isinstance(dependency, MediaDep):
+        scope = dependency.scope or scope
+        unresolved_reason = dependency.requirement.resolution_reason or unresolved_reason
+        if isinstance(dependency.requirement.resolution_meta, dict):
+            resolution_meta = dict(dependency.requirement.resolution_meta)
+    elif source_kind == "potential":
+        unresolved_reason = "unsupported_media_spec"
+
+    placeholder_payload = {
+        "name": payload.get("name") or payload.get("label"),
+        "source_kind": source_kind,
+        "unresolved_reason": unresolved_reason,
+    }
+    if resolution_meta:
+        placeholder_payload["resolution_meta"] = resolution_meta
+
+    return MediaFragment(
+        source_id=caller.uid,
+        media_role=payload.get("media_role"),
+        content=placeholder_payload,
+        content_format="json",
+        content_type=_media_type_for_item(payload),
+        text=payload.get("text"),
+        scope=scope,
+    )
+
+
 @on_journal(priority=Priority.EARLY)
 def render_block_content(*, caller, ctx, **_kw):
     """Render block narrative text into content fragments."""
@@ -464,10 +487,83 @@ def render_block_media(*, caller, ctx, **_kw):
     if not isinstance(caller, Block):
         return None
 
-    fragments: list[MediaFragment] = []
+    graph = getattr(caller, "graph", None)
+    fragments: list[Record] = []
     for media_item in caller.media:
         payload = media_item if isinstance(media_item, dict) else {"value": media_item}
-        fragments.append(MediaFragment(source_id=caller.uid, payload=payload))
+        source_kind = payload.get("source_kind")
+
+        dependency_id = payload.get("dependency_id")
+        dependency = graph.get(dependency_id) if graph is not None and dependency_id is not None else None
+        if isinstance(dependency, MediaDep) and dependency.provider is not None:
+            provider = dependency.provider
+            fragments.append(
+                MediaFragment(
+                    source_id=caller.uid,
+                    media_role=payload.get("media_role"),
+                    content=provider,
+                    content_format="rit",
+                    content_type=getattr(provider, "data_type", MediaDataType.MEDIA),
+                    text=payload.get("text"),
+                    scope=dependency.scope or _scope_from_provider(provider),
+                )
+            )
+            continue
+
+        if source_kind == "url" and payload.get("url") is not None:
+            fragments.append(
+                MediaFragment(
+                    source_id=caller.uid,
+                    media_role=payload.get("media_role"),
+                    content=str(payload.get("url")),
+                    content_format="url",
+                    content_type=_media_type_for_item(payload),
+                    text=payload.get("text"),
+                    scope=payload.get("scope") or "external",
+                )
+            )
+            continue
+
+        if source_kind == "data" and payload.get("data") is not None:
+            fragments.append(
+                MediaFragment(
+                    source_id=caller.uid,
+                    media_role=payload.get("media_role"),
+                    content=payload.get("data"),
+                    content_format="data",
+                    content_type=_media_type_for_item(payload),
+                    text=payload.get("text"),
+                    scope=payload.get("scope"),
+                )
+            )
+            continue
+
+        if source_kind in {"inventory", "potential"}:
+            fallback = payload.get("fallback_text") or payload.get("text")
+            if isinstance(fallback, str) and fallback.strip():
+                fragments.append(ContentFragment(content=fallback, source_id=caller.uid))
+            else:
+                fragments.append(
+                    _unresolved_media_placeholder(
+                        caller=caller,
+                        payload=payload,
+                        dependency=dependency if isinstance(dependency, MediaDep) else None,
+                        source_kind=str(source_kind),
+                    )
+                )
+            continue
+
+        fragments.append(
+            MediaFragment(
+                source_id=caller.uid,
+                media_role=payload.get("media_role"),
+                content=payload,
+                content_format="json",
+                content_type=_media_type_for_item(payload),
+                text=payload.get("text"),
+                scope=payload.get("scope") or "world",
+            )
+        )
 
     return fragments or None
 

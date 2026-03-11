@@ -43,6 +43,21 @@ parse_conf.converters["@path"] = (
 )
 
 
+def _is_within_root(root: Path, candidate: Path) -> bool:
+    """Return whether ``candidate`` is the same as or nested under ``root``."""
+    return candidate == root or root in candidate.parents
+
+
+def _story_media_child_name(story_id: str | os.PathLike[str]) -> str | None:
+    """Return a safe single path component for one story media directory."""
+    story_name = os.fspath(story_id)
+    if not story_name or story_name in {".", ".."}:
+        return None
+    if "/" in story_name or "\\" in story_name:
+        return None
+    return story_name
+
+
 def show_settings() -> None:
     s = settings.as_dict()
     pprint(s)
@@ -67,3 +82,28 @@ def get_sys_media_dir() -> Path | None:
     if not system_media:
         return None
     return Path(system_media)
+
+
+def get_story_media_dir(story_id: str | os.PathLike[str] | None = None) -> Path | None:
+    """Return the configured story-media root or one story-specific directory.
+
+    ``story_id`` is treated as one child directory name only. Values that would
+    escape the configured root return ``None``.
+    """
+
+    story_media = getattr(settings.service.paths, "story_media", None)
+    if not story_media:
+        return None
+
+    root = Path(story_media).expanduser().resolve()
+    if story_id is None:
+        return root
+
+    story_name = _story_media_child_name(story_id)
+    if story_name is None:
+        return None
+
+    candidate = (root / story_name).resolve()
+    if not _is_within_root(root, candidate):
+        return None
+    return candidate

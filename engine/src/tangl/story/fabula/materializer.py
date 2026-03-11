@@ -5,6 +5,8 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.core import GraphItem, Selector, TemplateRegistry
+from tangl.media.media_resource import MediaDep
+from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import (
     Affordance,
     Dependency,
@@ -16,6 +18,7 @@ from tangl.vm import (
     assert_traversal_contracts,
     do_get_template_scope_groups,
 )
+from tangl.vm.provision import MaterializeRole, attach_child, materialize_template_entity
 
 from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, MenuBlock, Scene
@@ -64,10 +67,6 @@ class _PrelinkCtx:
             return list(getter() or [])
         return []
 
-    # Backwards-compatible alias retained during v38 migration.
-    def get_registries(self) -> list[object]:
-        return self.get_authorities()
-
     def get_inline_behaviors(self):
         return []
 
@@ -112,13 +111,6 @@ class _PrelinkCtx:
                 return registries
         return [self.template_registry]
 
-    # Legacy aliases retained for compatibility with old resolver contexts.
-    def get_entity_groups(self):
-        return self.get_location_entity_groups()
-
-    def get_template_groups(self):
-        return self.get_template_scope_groups()
-
 
 class StoryMaterializer:
     """StoryMaterializer()
@@ -161,6 +153,41 @@ class StoryMaterializer:
         provisioning. ``EAGER`` mode materializes the full template registry and
         fails fast on unresolved hard dependencies.
         """
+        state = self._initialize_state(
+            bundle=bundle,
+            story_label=story_label,
+            init_mode=init_mode,
+            freeze_shape=freeze_shape,
+            world=world,
+        )
+        entry_templates = self._require_entry_templates(bundle)
+        self._materialize_templates(
+            state=state,
+            templates=self._materialization_templates(
+                bundle=bundle,
+                entry_templates=entry_templates,
+                init_mode=init_mode,
+            ),
+        )
+        self._run_topology_passes(state=state)
+        self._run_prelink_passes(state=state)
+
+        entry_nodes = self._require_entry_nodes(
+            state=state,
+            entry_templates=entry_templates,
+        )
+        self._set_initial_cursor(state.graph, entry_nodes)
+        return self._build_story_init_result(state=state)
+
+    def _initialize_state(
+        self,
+        *,
+        bundle: StoryTemplateBundle,
+        story_label: str,
+        init_mode: InitMode,
+        freeze_shape: bool,
+        world: object | None,
+    ) -> _MaterializationState:
         script_manager = getattr(world, "script_manager", None) if world is not None else None
         if script_manager is None:
             script_manager = ScriptManager(template_registry=bundle.template_registry)
@@ -173,45 +200,91 @@ class StoryMaterializer:
             script_manager=script_manager,
             world=world,
         )
-        report = InitReport(mode=init_mode)
-        state = _MaterializationState(graph=graph, bundle=bundle, report=report)
+        graph.story_id = graph.uid
+        graph.story_resources = get_story_resource_manager(graph.story_id, create=True)
+        return _MaterializationState(
+            graph=graph,
+            bundle=bundle,
+            report=InitReport(mode=init_mode),
+        )
 
+    def _require_entry_templates(self, bundle: StoryTemplateBundle) -> list[Any]:
         entry_templates = self._resolve_entry_templates(bundle)
         if not entry_templates:
             raise ValueError("No entry templates resolved for story initialization")
+        return entry_templates
 
+    def _materialization_templates(
+        self,
+        *,
+        bundle: StoryTemplateBundle,
+        entry_templates: list[Any],
+        init_mode: InitMode,
+    ) -> list[Any]:
         if init_mode is InitMode.LAZY:
-            for templ in entry_templates:
-                self._materialize_with_ancestors(templ=templ, state=state)
-        elif init_mode is InitMode.EAGER:
-            for templ in sorted(bundle.template_registry.values(), key=self._template_depth):
-                self._materialize_with_ancestors(templ=templ, state=state)
-        else:
-            raise ValueError(f"Unsupported init mode: {init_mode}")
-
-        self._finalize_scene_contracts(state=state)
-        self._wire_materialized_nodes(state=state)
-
+            return list(entry_templates)
         if init_mode is InitMode.EAGER:
-            self._prelink_all_dependencies(state=state)
-            if graph.frozen_shape:
-                self._prelink_all_fanouts(state=state)
-            assert_traversal_contracts(state.graph)
-            if state.report.unresolved_hard:
-                raise GraphInitializationError(state.report)
+            return sorted(bundle.template_registry.values(), key=self._template_depth)
+        raise ValueError(f"Unsupported init mode: {init_mode}")
 
-        entry_nodes: list[TraversableNode] = []
-        for templ in entry_templates:
-            node = state.template_to_entity.get(templ.uid)
-            if isinstance(node, TraversableNode):
-                entry_nodes.append(node)
+    def _materialize_templates(
+        self,
+        *,
+        state: _MaterializationState,
+        templates: list[Any],
+    ) -> None:
+        for templ in templates:
+            self._materialize_with_ancestors(templ=templ, state=state)
 
+    def _run_topology_passes(self, *, state: _MaterializationState) -> None:
+        nodes = self._unwired_traversable_nodes(state=state)
+        self._finalize_scene_contracts(state=state)
+        self._wire_role_and_setting_dependencies(nodes=nodes, state=state)
+        self._wire_menu_fanouts(nodes=nodes, state=state)
+        self._wire_block_actions(nodes=nodes, state=state)
+        self._wire_media_dependencies(nodes=nodes, state=state)
+        self._mark_nodes_wired(nodes=nodes, state=state)
+
+    def _run_prelink_passes(self, *, state: _MaterializationState) -> None:
+        if state.report.mode is not InitMode.EAGER:
+            return
+        dependencies = self._sorted_dependencies(state=state)
+        self._prelink_dependencies(dependencies=dependencies, state=state)
+        self._project_action_successors_from_dependencies(dependencies=dependencies)
+        if state.graph.frozen_shape:
+            fanouts = self._sorted_fanouts(state=state)
+            self._prelink_fanouts(fanouts=fanouts, state=state)
+            self._project_prelinked_menu_actions_for_menus(
+                menus=self._sorted_menu_blocks(state=state),
+                state=state,
+            )
+        self._verify_prelinked_story_graph(state=state)
+        self._raise_on_unresolved_hard_dependencies(state=state)
+
+    def _require_entry_nodes(
+        self,
+        *,
+        state: _MaterializationState,
+        entry_templates: list[Any],
+    ) -> list[TraversableNode]:
+        entry_nodes = [
+            node
+            for templ in entry_templates
+            if isinstance((node := state.template_to_entity.get(templ.uid)), TraversableNode)
+        ]
         if not entry_nodes:
             raise ValueError("Entry templates did not materialize traversable nodes")
+        return entry_nodes
 
+    @staticmethod
+    def _set_initial_cursor(graph: StoryGraph, entry_nodes: list[TraversableNode]) -> None:
         graph.initial_cursor_ids = [node.uid for node in entry_nodes]
         graph.initial_cursor_id = graph.initial_cursor_ids[0]
 
+    @staticmethod
+    def _build_story_init_result(*, state: _MaterializationState) -> StoryInitResult:
+        graph = state.graph
+        bundle = state.bundle
         return StoryInitResult(
             graph=graph,
             report=state.report,
@@ -259,10 +332,10 @@ class StoryMaterializer:
         if templ.uid in state.template_to_entity:
             return state.template_to_entity[templ.uid]
 
-        entity = Resolver._materialize_node(
+        entity = materialize_template_entity(
             templ,
             _ctx=state,
-            role="init",
+            role=MaterializeRole.INIT,
         )
         if not isinstance(entity, GraphItem):
             return None
@@ -286,18 +359,9 @@ class StoryMaterializer:
             parent_entity = state.template_to_entity.get(parent_templ.uid)
             if isinstance(parent_entity, TraversableNode) and isinstance(entity, GraphItem):
                 if hasattr(parent_entity, "add_child"):
-                    self._attach_child(parent_entity, entity)
+                    attach_child(parent_entity, entity)
 
         return entity
-
-    @staticmethod
-    def _attach_child(parent: Any, child: Any) -> None:
-        if parent is None or not hasattr(parent, "add_child"):
-            return
-        parent.add_child(child)
-        finalize = getattr(parent, "finalize_container_contract", None)
-        if callable(finalize):
-            finalize()
 
     @staticmethod
     def _template_lineage_ids(templ: Any) -> list[UUID]:
@@ -315,14 +379,20 @@ class StoryMaterializer:
         for scene in Selector(has_kind=Scene).filter(state.graph.values()):
             scene.finalize_container_contract()
 
-    def _wire_materialized_nodes(self, *, state: _MaterializationState) -> None:
+    def _unwired_traversable_nodes(self, *, state: _MaterializationState) -> list[TraversableNode]:
         nodes = sorted(
             Selector(has_kind=TraversableNode).filter(state.graph.values()),
             key=self._order_key,
         )
+        return [node for node in nodes if node.uid not in state.wired_node_ids]
+
+    def _wire_role_and_setting_dependencies(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
         for node in nodes:
-            if node.uid in state.wired_node_ids:
-                continue
             if isinstance(node, Scene):
                 self._wire_dependencies_for_specs(
                     source=node,
@@ -361,13 +431,86 @@ class StoryMaterializer:
                     templ_ref_key="location_template_ref",
                     state=state,
                 )
-                if isinstance(node, MenuBlock):
-                    self._wire_menu_fanout_for_block(node=node, state=state)
+
+    def _wire_menu_fanouts(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
+            if isinstance(node, MenuBlock):
+                self._wire_menu_fanout_for_block(node=node, state=state)
+
+    def _wire_block_actions(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
+            if isinstance(node, Block):
                 self._wire_actions_for_block(node=node, specs=node.redirects, state=state)
                 self._wire_actions_for_block(node=node, specs=node.continues, state=state)
                 self._wire_actions_for_block(node=node, specs=node.actions, state=state)
 
+    def _wire_media_dependencies(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
+            if isinstance(node, Block):
+                self._wire_media_for_block(node=node, state=state)
+
+    @staticmethod
+    def _mark_nodes_wired(
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        for node in nodes:
             state.wired_node_ids.add(node.uid)
+
+    def _wire_media_for_block(
+        self,
+        *,
+        node: Block,
+        state: _MaterializationState,
+    ) -> None:
+        for index, spec in enumerate(node.media):
+            if not isinstance(spec, dict):
+                continue
+
+            source_kind = self._media_source_kind(spec)
+            spec.setdefault("source_kind", source_kind)
+
+            if source_kind == "potential":
+                spec.setdefault("script_spec", spec.get("spec"))
+                spec.setdefault("realized_spec", None)
+                spec.setdefault("final_spec", None)
+                continue
+
+            if source_kind != "inventory":
+                continue
+
+            media_id = self._coerce_str(spec.get("name"))
+            if not media_id:
+                continue
+
+            dep = MediaDep(
+                registry=state.graph,
+                label=self._coerce_str(spec.get("label")) or f"media_{node.get_label()}_{index}",
+                predecessor_id=node.uid,
+                media_id=media_id,
+                media_role=self._coerce_str(spec.get("media_role")),
+                caption=self._coerce_str(spec.get("text") or spec.get("caption")),
+                scope=self._coerce_str(spec.get("scope")),
+                hard=bool(spec.get("hard", False)),
+            )
+            spec["dependency_id"] = dep.uid
+            spec.setdefault("fallback_text", self._coerce_str(spec.get("text")))
 
     def _wire_actions_for_block(
         self,
@@ -512,28 +655,33 @@ class StoryMaterializer:
                 if isinstance(candidate, provider_kind):
                     dep.set_provider(candidate)
 
-    def _prelink_all_dependencies(self, *, state: _MaterializationState) -> None:
-        dependencies = sorted(
-            Selector(has_kind=Dependency).filter(state.graph.values()),
-            key=self._order_key,
-        )
+    @staticmethod
+    def _media_source_kind(spec: Mapping[str, Any]) -> str:
+        if spec.get("url") is not None:
+            return "url"
+        if spec.get("data") is not None:
+            return "data"
+        if spec.get("name"):
+            return "inventory"
+        if spec.get("spec") is not None:
+            return "potential"
+        return "legacy"
 
+    def _prelink_dependencies(
+        self,
+        *,
+        dependencies: list[Dependency],
+        state: _MaterializationState,
+    ) -> None:
         for dep in dependencies:
-            ctx = _PrelinkCtx(
-                graph=state.graph,
-                template_registry=state.bundle.template_registry,
-                cursor_id=dep.predecessor_id,
-            )
+            ctx = self._make_prelink_ctx(state=state, cursor_id=dep.predecessor_id)
             resolver = Resolver.from_ctx(ctx)
             was_satisfied = dep.satisfied
-            resolved = resolver.resolve_dependency(dep, allow_stubs=False)
+            resolved = resolver.resolve_dependency(dep, allow_stubs=False, _ctx=ctx)
 
             if resolved and dep.satisfied:
                 if not was_satisfied:
                     state.report.bump_prelinked("resolved")
-                predecessor = dep.predecessor
-                if isinstance(predecessor, Action) and isinstance(dep.successor, TraversableNode):
-                    predecessor.set_successor(dep.successor)
             else:
                 state.report.bump_prelinked("unresolved")
                 unresolved = UnresolvedDependency(
@@ -548,28 +696,75 @@ class StoryMaterializer:
                 else:
                     state.report.unresolved_soft.append(unresolved)
 
-    def _prelink_all_fanouts(self, *, state: _MaterializationState) -> None:
-        fanouts = sorted(
-            Selector(has_kind=Fanout).filter(state.graph.values()),
-            key=self._order_key,
-        )
+    def _project_action_successors_from_dependencies(
+        self,
+        *,
+        dependencies: list[Dependency],
+    ) -> None:
+        for dep in dependencies:
+            predecessor = dep.predecessor
+            if isinstance(predecessor, Action) and isinstance(dep.successor, TraversableNode):
+                predecessor.set_successor(dep.successor)
 
+    def _prelink_fanouts(
+        self,
+        *,
+        fanouts: list[Fanout],
+        state: _MaterializationState,
+    ) -> None:
         for fanout in fanouts:
-            ctx = _PrelinkCtx(
-                graph=state.graph,
-                template_registry=state.bundle.template_registry,
-                cursor_id=fanout.predecessor_id,
-            )
+            ctx = self._make_prelink_ctx(state=state, cursor_id=fanout.predecessor_id)
             resolver = Resolver.from_ctx(ctx)
             resolver.resolve_fanout(fanout, _ctx=ctx)
             state.report.bump_prelinked("fanout_resolved")
 
-        menus = sorted(
+    def _project_prelinked_menu_actions_for_menus(
+        self,
+        *,
+        menus: list[MenuBlock],
+        state: _MaterializationState,
+    ) -> None:
+        for menu in menus:
+            self._project_prelinked_menu_actions(menu=menu, state=state)
+
+    @staticmethod
+    def _verify_prelinked_story_graph(*, state: _MaterializationState) -> None:
+        assert_traversal_contracts(state.graph)
+
+    @staticmethod
+    def _raise_on_unresolved_hard_dependencies(*, state: _MaterializationState) -> None:
+        if state.report.unresolved_hard:
+            raise GraphInitializationError(state.report)
+
+    def _sorted_dependencies(self, *, state: _MaterializationState) -> list[Dependency]:
+        return sorted(
+            Selector(has_kind=Dependency).filter(state.graph.values()),
+            key=self._order_key,
+        )
+
+    def _sorted_fanouts(self, *, state: _MaterializationState) -> list[Fanout]:
+        return sorted(
+            Selector(has_kind=Fanout).filter(state.graph.values()),
+            key=self._order_key,
+        )
+
+    def _sorted_menu_blocks(self, *, state: _MaterializationState) -> list[MenuBlock]:
+        return sorted(
             Selector(has_kind=MenuBlock).filter(state.graph.values()),
             key=self._order_key,
         )
-        for menu in menus:
-            self._project_prelinked_menu_actions(menu=menu, state=state)
+
+    @staticmethod
+    def _make_prelink_ctx(
+        *,
+        state: _MaterializationState,
+        cursor_id: UUID | None,
+    ) -> _PrelinkCtx:
+        return _PrelinkCtx(
+            graph=state.graph,
+            template_registry=state.bundle.template_registry,
+            cursor_id=cursor_id,
+        )
 
     def _project_prelinked_menu_actions(
         self,

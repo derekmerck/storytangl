@@ -3,9 +3,16 @@ from typing import Iterable, Type, Any, Callable, ByteString
 from uuid import UUID
 import logging
 
-from pydantic import model_validator
+from pydantic import Field
 
-from tangl.core import Behavior, BehaviorRegistry, CallReceipt, Registry
+from tangl.core import (
+    Behavior,
+    BehaviorRegistry,
+    CallReceipt,
+    DispatchLayer,
+    Registry,
+    resolve_ctx,
+)
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 logger = logging.getLogger(__name__)
@@ -16,22 +23,23 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     A specialized registry for media assets that supports content-aware
     deduplication and flexible indexing strategies.
     """
-    on_index: BehaviorRegistry = None
+    local_behaviors: BehaviorRegistry = Field(
+        default_factory=lambda: BehaviorRegistry(
+            label="media.local.dispatch",
+            default_dispatch_layer=DispatchLayer.LOCAL,
+        ),
+        exclude=True,
+    )
     mrt_cls: Type[MediaRIT] = MediaRIT
 
-    @model_validator(mode="after")
-    def _default_on_index(self):
-        if not self.on_index:
-            self.on_index = BehaviorRegistry(
-                label=f"{self.label}_indexer",
-                # aggregation_strategy="gather"
-        )
-        return self
+    def on_index(self, func: Callable[..., Any] | None = None, **kwargs):
+        """Register an ``index`` handler on this registry's local behaviors."""
+        return self.local_behaviors.register(func=func, task="index", **kwargs)
 
     def index(self,
               items: Iterable,
               mrt_cls: Type[MediaRIT] = None,
-              extra_handlers: list[Behavior] = None) -> list[MediaRIT]:
+              extra_handlers: list[Behavior | Callable[..., Any]] | None = None) -> list[MediaRIT]:
         """
         Index a collection of data resources, deduplicating by content hash
         and running through the indexing pipeline.
@@ -49,12 +57,22 @@ class MediaResourceRegistry(Registry[MediaRIT]):
                 continue
 
             # Run through indexing pipeline
-            receipts = self.on_index.execute_all(
+            receipts = BehaviorRegistry.chain_execute_all(
                 call_args=(record,),
-                ctx=None,
+                ctx=resolve_ctx(
+                    authorities=(self.local_behaviors,) if self.local_behaviors.members else None,
+                ),
+                task="index",
                 inline_behaviors=extra_handlers,
             )
-            CallReceipt.gather_results(*receipts)
+            indexed_record = CallReceipt.last_result(*receipts)
+            if indexed_record is not None:
+                if not isinstance(indexed_record, MediaRIT):
+                    raise TypeError(
+                        "Media index handlers must return MediaRIT or None, "
+                        f"got {type(indexed_record)!r}",
+                    )
+                record = indexed_record
 
             # Add to registry
             logger.debug(f"indexed {record!r}")

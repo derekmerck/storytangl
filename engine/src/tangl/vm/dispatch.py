@@ -39,6 +39,7 @@ from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Recor
 if TYPE_CHECKING:
     from tangl.core import TemplateRegistry
     from tangl.core.token import TokenCatalog
+    from tangl.media.media_resource import MediaInventory
     from .provision import Requirement, ProvisionOffer
     from .traversable import TraversableNode, TraversableEdge, AnyTraversableEdge
 
@@ -70,14 +71,11 @@ vm_dispatch = dispatch
 
 def _validate_dispatch_ctx(ctx: Any) -> None:
     """Raise ``TypeError`` when ctx lacks dispatch protocol methods."""
-    has_authorities = callable(getattr(ctx, "get_authorities", None)) or callable(
-        getattr(ctx, "get_registries", None)
-    )
+    has_authorities = callable(getattr(ctx, "get_authorities", None))
     has_inline = callable(getattr(ctx, "get_inline_behaviors", None))
     if not has_authorities or not has_inline:
         raise TypeError(
-            "Dispatch context must provide get_authorities()/get_registries() "
-            "and get_inline_behaviors()"
+            "Dispatch context must provide get_authorities() and get_inline_behaviors()"
         )
     return None
 
@@ -277,6 +275,13 @@ def on_get_token_catalogs(func=None, **kwargs):
     return dispatch.register(func=func, task="get_token_catalogs", **kwargs)
 
 
+def on_get_media_inventories(func=None, **kwargs):
+    """Register a media-inventory discovery contributor."""
+    if func is None:
+        return lambda f: dispatch.register(func=f, task="get_media_inventories", **kwargs)
+    return dispatch.register(func=func, task="get_media_inventories", **kwargs)
+
+
 def _coerce_ns_layers(value: Any, *, source: str) -> list[Mapping[str, Any]]:
     if value is None:
         return []
@@ -356,6 +361,38 @@ def _coerce_token_catalogs(value: Any, *, source: str) -> list["TokenCatalog"]:
         seen_wrapped.add(wrapped_id)
         catalogs.append(item)
     return catalogs
+
+
+def _coerce_media_inventories(value: Any, *, source: str) -> list["MediaInventory"]:
+    from tangl.media.media_resource import MediaInventory as _MediaInventory
+
+    if value is None:
+        return []
+
+    if isinstance(value, _MediaInventory):
+        raw = [value]
+    elif isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
+        raise TypeError(
+            f"{source} must return MediaInventory | Iterable[MediaInventory] | None, got {type(value)!r}"
+        )
+    else:
+        raw = list(value)
+
+    inventories: list[_MediaInventory] = []
+    seen_registry_ids: set[int] = set()
+    for item in raw:
+        if item is None:
+            continue
+        if not isinstance(item, _MediaInventory):
+            raise TypeError(
+                "get_media_inventories handlers must return MediaInventory entries only"
+            )
+        registry_id = id(item.registry)
+        if registry_id in seen_registry_ids:
+            continue
+        seen_registry_ids.add(registry_id)
+        inventories.append(item)
+    return inventories
 
 
 def _merge_nested_layers(
@@ -453,6 +490,27 @@ def do_get_token_catalogs(
     return _coerce_token_catalogs(merged, source="get_token_catalogs handler")
 
 
+def do_get_media_inventories(
+    caller,
+    *,
+    requirement: "Requirement" | None = None,
+    ctx,
+) -> list["MediaInventory"]:
+    """Execute media-inventory discovery handlers and return deduped inventories."""
+    _validate_dispatch_ctx(ctx)
+
+    selector = Selector(caller_kind=type(caller)) if caller is not None else None
+    with _subdispatch_context(ctx) as subctx:
+        receipts = dispatch.execute_all(
+            task="get_media_inventories",
+            call_kwargs={"caller": caller, "requirement": requirement},
+            ctx=subctx,
+            selector=selector,
+        )
+        merged = CallReceipt.merge_results(*receipts)
+    return _coerce_media_inventories(merged, source="get_media_inventories handler")
+
+
 # ---------------------------------------------------------------------------
 # Provisioning hook (separate — different call signature)
 # ---------------------------------------------------------------------------
@@ -517,5 +575,6 @@ __all__ = [
     "on_gather_ns", "do_gather_ns",
     "on_get_template_scope_groups", "do_get_template_scope_groups",
     "on_get_token_catalogs", "do_get_token_catalogs",
+    "on_get_media_inventories", "do_get_media_inventories",
     "on_resolve", "do_resolve",
 ]

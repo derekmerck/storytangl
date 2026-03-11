@@ -9,7 +9,7 @@ from tangl import config
 
 
 def _make_settings(*, worlds: list[str | Path] | None, system_media: str | Path | None):
-    paths = SimpleNamespace(worlds=worlds, system_media=system_media)
+    paths = SimpleNamespace(worlds=worlds, system_media=system_media, story_media=None)
     service = SimpleNamespace(paths=paths)
     return SimpleNamespace(service=service)
 
@@ -38,3 +38,25 @@ def test_get_sys_media_dir_optional(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     monkeypatch.setattr(config, "settings", _make_settings(worlds=None, system_media=None))
 
     assert config.get_sys_media_dir() is None
+
+
+def test_get_story_media_dir_optional(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    settings = _make_settings(worlds=None, system_media=None)
+    settings.service.paths.story_media = str(tmp_path)
+    monkeypatch.setattr(config, "settings", settings)
+
+    assert config.get_story_media_dir() == tmp_path
+    assert config.get_story_media_dir("story-1") == tmp_path / "story-1"
+
+
+def test_get_story_media_dir_rejects_invalid_story_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    settings = _make_settings(worlds=None, system_media=None)
+    settings.service.paths.story_media = str(tmp_path / "story_media")
+    monkeypatch.setattr(config, "settings", settings)
+
+    assert config.get_story_media_dir("../escape") is None
+    assert config.get_story_media_dir("nested/story") is None
+    assert config.get_story_media_dir(r"nested\\story") is None

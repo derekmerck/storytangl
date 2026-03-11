@@ -238,7 +238,7 @@ def test_multi_world_switching_flow(
 
     first_choice_frag = choices_one[0]
     first_choice = first_choice_frag.get("uid") or first_choice_frag.get("source_id")
-    choose_resp = client.post("story/do", json={"uid": first_choice}, headers=headers)
+    choose_resp = client.post("story/do", json={"choice_id": first_choice}, headers=headers)
     assert choose_resp.status_code == 200
 
     status_after = client.get("story/info", headers=headers)
@@ -281,7 +281,7 @@ def test_multi_world_switching_flow(
     assert len(third_choices) == 1
 
     continue_choice = third_choices[0].get("uid") or third_choices[0].get("source_id")
-    continue_resp = client.post("story/do", json={"uid": continue_choice}, headers=headers)
+    continue_resp = client.post("story/do", json={"choice_id": continue_choice}, headers=headers)
     assert continue_resp.status_code == 200
 
     update_four = client.get("story/update", headers=headers)

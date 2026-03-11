@@ -240,9 +240,6 @@ def process_game_move(
 
     # Context namespaces cache values per cursor; refresh so POSTREQ predicates
     # read the updated game_* flags from :func:`inject_game_context`.
-    frame = _ctx_frame(ctx)
-    if frame is not None and hasattr(frame, "_invalidate_context"):
-        frame._invalidate_context()
     # vm38 caches namespaces per follow-edge hop; clear after UPDATE so
     # POSTREQS sees fresh game_* flags in the same pipeline pass.
     ns_cache = getattr(ctx, "_ns_cache", None)

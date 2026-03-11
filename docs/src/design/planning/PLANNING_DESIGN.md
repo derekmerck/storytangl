@@ -621,7 +621,7 @@ choice.reason_unavailable = "Missing required key"
 ```
 
 **Fix Location:** 
-- Add fields to `engine/src/tangl/vm/frame.py:ChoiceEdge`
+- Add fields to `engine/src/tangl/vm/traversable.py:TraversableEdge`
 - Update `engine/src/tangl/vm/dispatch/planning.py` to populate
 - Update `Frame.get_available_choices()` to mark instead of filter
 

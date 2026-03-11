@@ -63,7 +63,7 @@ def _graph_with_nodes(*labels: str) -> tuple[Graph, list[TraversableNode]]:
 
 def _ctx() -> SimpleNamespace:
     return SimpleNamespace(
-        get_registries=lambda: [],
+        get_authorities=lambda: [],
         get_inline_behaviors=lambda: [],
     )
 

@@ -92,7 +92,6 @@ def null_ctx() -> SimpleNamespace:
     """
     return SimpleNamespace(
         get_authorities=lambda: [],
-        get_registries=lambda: [],
         get_inline_behaviors=lambda: [],
     )
 
@@ -105,7 +104,6 @@ def ctx_with_vm_dispatch() -> SimpleNamespace:
     """
     return SimpleNamespace(
         get_authorities=lambda: [vm_dispatch],
-        get_registries=lambda: [vm_dispatch],
         get_inline_behaviors=lambda: [],
     )
 
@@ -117,7 +115,6 @@ def ctx_factory():
     def _make(registries=None, inline=None):
         return SimpleNamespace(
             get_authorities=lambda: list(registries or []),
-            get_registries=lambda: list(registries or []),
             get_inline_behaviors=lambda: list(inline or []),
         )
 

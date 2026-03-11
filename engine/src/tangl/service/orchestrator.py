@@ -16,7 +16,6 @@ from .api_endpoint import (
     ApiEndpoint,
     EndpointPolicy,
     HasApiEndpoints,
-    LegacyApiEndpoint,
     MethodType,
     PostprocessResult,
     PreprocessResult,
@@ -67,7 +66,7 @@ class _EndpointBinding:
     """Internal endpoint binding for orchestrator dispatch."""
 
     controller: Any
-    endpoint: LegacyApiEndpoint
+    endpoint: ApiEndpoint
     policy: EndpointPolicy
     hydration_bindings: tuple[ResourceBinding, ...]
 
@@ -123,77 +122,125 @@ class Orchestrator:
     ) -> NativeResponse:
         """Execute endpoint with policy semantics."""
 
+        binding = self._resolve_binding(endpoint_name)
+        self._resource_cache = {}
+        policy = self._resolve_execution_policy(binding, exec_options)
+        resolved_params = self._prepare_execution_params(
+            binding=binding,
+            endpoint_name=endpoint_name,
+            user_id=user_id,
+            user_auth=user_auth,
+            params=params,
+        )
+
+        try:
+            result = self._execute_bound_endpoint(binding, resolved_params)
+            self._finalize_execution(
+                binding=binding,
+                policy=policy,
+                result=result,
+            )
+            return result
+
+        except ServiceError as exc:
+            return self._handle_service_error(exc, resolved_params)
+
+    def _resolve_binding(self, endpoint_name: str) -> _EndpointBinding:
         binding = self._endpoints.get(endpoint_name)
         if binding is None:
             raise KeyError(f"Unknown endpoint: {endpoint_name}")
+        return binding
 
-        self._resource_cache = {}
-        endpoint = binding.endpoint
+    @staticmethod
+    def _resolve_execution_policy(
+        binding: _EndpointBinding,
+        exec_options: ExecuteOptions | None,
+    ) -> EndpointPolicy:
         policy_override = exec_options.as_policy() if exec_options is not None else None
-        policy = binding.policy.merged(policy_override)
+        return binding.policy.merged(policy_override)
 
+    def _prepare_execution_params(
+        self,
+        *,
+        binding: _EndpointBinding,
+        endpoint_name: str,
+        user_id: UUID | None,
+        user_auth: "UserAuthInfo | None",
+        params: MutableMapping[str, Any],
+    ) -> dict[str, Any]:
         resolved_params = self._hydrate_resources(
-            endpoint,
+            binding.endpoint,
             binding.hydration_bindings,
             user_id,
             params,
         )
         self._enforce_access(
-            endpoint=endpoint,
+            endpoint=binding.endpoint,
             endpoint_name=endpoint_name,
             user_id=user_id,
             user_auth=user_auth,
             resolved_params=resolved_params,
         )
+        return resolved_params
 
-        try:
-            result = self._invoke_endpoint(binding.controller, endpoint, resolved_params)
-            result = self._normalize_runtime_result(endpoint, result)
-            self._validate_response(endpoint, result)
-            result = self._handle_result_cleanup(result)
+    def _execute_bound_endpoint(
+        self,
+        binding: _EndpointBinding,
+        resolved_params: Mapping[str, Any],
+    ) -> NativeResponse:
+        result = self._invoke_endpoint(binding.controller, binding.endpoint, dict(resolved_params))
+        normalized = self._normalize_result(binding.endpoint, result)
+        self._validate_response(binding.endpoint, normalized)
+        return self._handle_result_cleanup(normalized)
 
-            persisted_keys: set[Any] = set()
+    def _finalize_execution(
+        self,
+        *,
+        binding: _EndpointBinding,
+        policy: EndpointPolicy,
+        result: Any,
+    ) -> None:
+        persisted_keys: set[Any] = set()
 
-            if self._should_write_back(endpoint.method_type, policy.writeback_mode):
-                for entry in self._resource_cache.values():
-                    entry.dirty = True
-                self._write_back_resources(persisted_keys)
-            else:
-                self._resource_cache.clear()
-
-            if policy.persist_paths:
-                self._persist_from_paths(result, policy.persist_paths, persisted_keys)
-
-            return result
-
-        except ServiceError as exc:
-            if isinstance(exc, AccessDeniedError):
-                self._resource_cache.clear()
-                raise
-
-            ledger = resolved_params.get("ledger")
-            cursor_id = getattr(ledger, "cursor_id", None)
-            step = getattr(ledger, "step", None)
+        if self._should_write_back(binding.endpoint.method_type, policy.writeback_mode):
+            for entry in self._resource_cache.values():
+                entry.dirty = True
+            self._write_back_resources(persisted_keys)
+        else:
             self._resource_cache.clear()
-            return RuntimeInfo.error(
-                code=exc.code,
-                message=str(exc),
-                cursor_id=cursor_id,
-                step=step,
-            )
+
+        if policy.persist_paths:
+            self._persist_from_paths(result, policy.persist_paths, persisted_keys)
+
+    def _handle_service_error(
+        self,
+        exc: ServiceError,
+        resolved_params: Mapping[str, Any],
+    ) -> RuntimeInfo:
+        if isinstance(exc, AccessDeniedError):
+            self._resource_cache.clear()
+            raise exc
+
+        ledger = resolved_params.get("ledger")
+        cursor_id = getattr(ledger, "cursor_id", None)
+        step = getattr(ledger, "step", None)
+        self._resource_cache.clear()
+        return RuntimeInfo.error(
+            code=exc.code,
+            message=str(exc),
+            cursor_id=cursor_id,
+            step=step,
+        )
 
     def _enforce_access(
         self,
         *,
-        endpoint: LegacyApiEndpoint,
+        endpoint: ApiEndpoint,
         endpoint_name: str,
         user_id: UUID | None,
         user_auth: "UserAuthInfo | None",
         resolved_params: Mapping[str, Any],
     ) -> None:
-        if not isinstance(endpoint, ApiEndpoint):
-            return
-
         required_level = getattr(endpoint, "access_level", AccessLevel.RESTRICTED) or AccessLevel.RESTRICTED
         caller_level = self._resolve_caller_access_level(
             user_id=user_id,
@@ -237,7 +284,7 @@ class Orchestrator:
 
     def _hydrate_resources(
         self,
-        endpoint: LegacyApiEndpoint,
+        endpoint: ApiEndpoint,
         hydration_bindings: tuple[ResourceBinding, ...],
         user_id: UUID | None,
         params: MutableMapping[str, Any],
@@ -337,7 +384,7 @@ class Orchestrator:
             setattr(ledger, "user_id", user_uid)
 
     @staticmethod
-    def _is_binding_required(endpoint: LegacyApiEndpoint, binding: ResourceBinding) -> bool:
+    def _is_binding_required(endpoint: ApiEndpoint, binding: ResourceBinding) -> bool:
         param_name = {
             ResourceBinding.USER: "user",
             ResourceBinding.LEDGER: "ledger",
@@ -352,7 +399,7 @@ class Orchestrator:
     def _invoke_endpoint(
         self,
         controller: Any,
-        endpoint: LegacyApiEndpoint,
+        endpoint: ApiEndpoint,
         params: dict[str, Any],
     ) -> Any:
         args: tuple[Any, ...] = (controller,)
@@ -488,7 +535,7 @@ class Orchestrator:
         result["persistence_deleted"] = deleted
         return result
 
-    def _validate_response(self, endpoint: LegacyApiEndpoint, result: Any) -> None:
+    def _validate_response(self, endpoint: ApiEndpoint, result: Any) -> None:
         """Ensure controller return type matches declared response type."""
 
         response_type = getattr(endpoint, "response_type", None)
@@ -525,13 +572,20 @@ class Orchestrator:
             return
 
     @staticmethod
-    def _normalize_runtime_result(endpoint: LegacyApiEndpoint, result: Any) -> Any:
-        """Coerce runtime-like payloads onto service38-native ``RuntimeInfo``."""
+    def _normalize_result(endpoint: ApiEndpoint, result: Any) -> Any:
+        """Normalize supported endpoint payloads and fail fast on unsupported runtime values."""
 
-        response_type = getattr(endpoint, "response_type", None)
-        if response_type != ResponseType.RUNTIME:
+        if getattr(endpoint, "response_type", None) != ResponseType.RUNTIME:
             return result
-        return coerce_runtime_info(result) or result
+
+        normalized = coerce_runtime_info(result)
+        if normalized is not None:
+            return normalized
+
+        raise TypeError(
+            f"{endpoint.func.__qualname__} declared ResponseType.RUNTIME "
+            f"but returned {type(result).__name__}, expected RuntimeInfo-compatible data."
+        )
 
     @staticmethod
     def _update_runtime_details(result: RuntimeInfo, **updates: Any) -> None:
@@ -655,7 +709,7 @@ class Orchestrator:
         return key
 
     @staticmethod
-    def _resolve_hydration_bindings(endpoint: LegacyApiEndpoint) -> tuple[ResourceBinding, ...]:
+    def _resolve_hydration_bindings(endpoint: ApiEndpoint) -> tuple[ResourceBinding, ...]:
         raw_binds = getattr(endpoint, "binds", None)
         if raw_binds is not None:
             return tuple(

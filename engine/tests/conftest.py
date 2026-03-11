@@ -33,6 +33,20 @@ logging.basicConfig(level=logging.WARNING)
 logging.getLogger("markdown_it").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
+
+def _quiet_test_loggers(*names: str, level: int = logging.WARNING) -> None:
+    """Clamp especially noisy module loggers during normal pytest runs."""
+    for name in names:
+        logging.getLogger(name).setLevel(level)
+
+
+_quiet_test_loggers(
+    "tangl.core.behavior",
+    "tangl.core.entity.match",
+    "tangl.vm.system_handlers",
+    "tangl.mechanics.games.handlers",
+)
+
 from tangl.type_hints import StringMap
 from tangl.core import Graph, Node, Subgraph
 

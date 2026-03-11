@@ -392,7 +392,7 @@ class RegistryAware(Entity):
 
     @property
     def registry(self) -> Registry[RegistryAware] | None:
-        return self._registry
+        return self.__dict__.get("_registry", None)
 
     def __init__(self, registry=None, graph=None, **kwargs) -> None:
         if registry is None and graph is not None:
@@ -404,12 +404,19 @@ class RegistryAware(Entity):
 
     def bind_registry(self, registry: Registry | None) -> None:
         """Bind to a registry pointer or clear binding with ``None``."""
+        current = self.__dict__.get("_registry", None)
         if registry is None:
-            self._registry = None
+            self.__dict__["_registry"] = None
             return
-        if self._registry is not None and (self._registry is not registry):
-            raise ValueError(f"Registry is already set {self._registry!r} != {registry!r}")
-        self._registry = registry
+        if current is not None and current is not registry:
+            raise ValueError(f"Registry is already set {current!r} != {registry!r}")
+        self.__dict__["_registry"] = registry
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose registry binding even when Pydantic private attrs are not hydrated."""
+        if name == "_registry":
+            return self.__dict__.get("_registry", None)
+        return super().__getattr__(name)
 
     @cached_property
     def parent(self) -> Optional[RegistryAware]:

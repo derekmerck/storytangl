@@ -1,5 +1,7 @@
 # pytest.skip("deprecated", allow_module_level=True)
 
+from base64 import b64encode
+
 from tangl.journal.media import MediaFragment, StagingHints
 
 def test_media_fragment_with_url():
@@ -34,4 +36,4 @@ def test_media_fragment_with_binary_data():
     serialized = fragment.model_dump()
     # Binary should be properly encoded
     assert serialized["content"] != binary_data
-
+    assert serialized["content"] == b64encode(binary_data).decode("utf-8")

@@ -14,6 +14,8 @@ from uuid import uuid4
 import pytest
 
 from tangl.core import Graph, Selector, Snapshot
+from tangl.journal.media import MediaFragment as JournalMediaFragment
+from tangl.media.media_data_type import MediaDataType
 from tangl.vm.dispatch import on_prereqs
 from tangl.vm.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
 from tangl.vm.resolution_phase import ResolutionPhase
@@ -216,6 +218,17 @@ class TestLedgerGetFrame:
         with pytest.raises(ValueError, match="unresolved edge id"):
             ledger.get_frame()
 
+    def test_make_phase_ctx_includes_populated_local_authorities(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        ledger.local_behaviors.register(
+            task="noop",
+            func=lambda *, caller=None, ctx=None, **_: None,
+        )
+
+        ctx = ledger._make_phase_ctx()
+
+        assert ledger.local_behaviors in ctx.get_authorities()
+
 
 # ============================================================================
 # Choice resolution
@@ -281,6 +294,19 @@ class TestLedgerResolveChoice:
         assert ledger.cursor_history == [a.uid, b.uid, c.uid]
         assert ledger.cursor_id == c.uid
         assert get_visit_count(b.uid, ledger.cursor_history) == 1
+
+    def test_ledger_local_behaviors_participate_in_frame_phase_dispatch(self) -> None:
+        ledger, [a, b] = _make_ledger("a", "b")
+        b.locals = {}
+        edge = list(a.edges_out())[0]
+
+        ledger.local_behaviors.register(
+            task="apply_update",
+            func=lambda *, caller, ctx, **_: caller.locals.__setitem__("ledger_local", True),
+        )
+
+        ledger.resolve_choice(edge.uid)
+        assert b.locals["ledger_local"] is True
 
     def test_resolve_choice_copies_redirect_observability(self) -> None:
         g = Graph()
@@ -400,6 +426,18 @@ class TestLedgerJournal:
 
         assert ledger.get_journal(since_step=2) == [f2, f3]
         assert ledger.get_journal(limit=2) == [f2, f3]
+
+    def test_get_journal_preserves_base_media_fragments(self) -> None:
+        ledger, _ = _make_ledger("a", "b")
+        media = JournalMediaFragment(
+            content="https://example.com/cover.svg",
+            content_type=MediaDataType.IMAGE,
+            content_format="url",
+            step=1,
+        )
+        ledger.output_stream.append(media)
+
+        assert ledger.get_journal() == [media]
 
 
 class TestLedgerReplayRollback:
