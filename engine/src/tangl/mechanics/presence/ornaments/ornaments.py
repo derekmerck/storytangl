@@ -10,13 +10,12 @@ to each actor's body.
 # todo: refactor using outfit_manager/credential_manager paradigm
 
 from __future__ import annotations
-from typing import *
 from collections import defaultdict
-from enum import auto, Flag
+from typing import Any
 
 from pydantic import Field
 
-from tangl.core import Entity, Graph, Node
+from tangl.core import Entity, Node
 # from tangl.core import Renderable, on_render
 # from tangl.story.story_node import StoryNode
 from tangl.lang.helpers import oxford_join
@@ -32,34 +31,51 @@ class Ornament(Entity):
     text: str
 
     @classmethod
-    def marks_on_her(cls, ornament_type: OrnamentType, texts: List[str], body_part: BodyPart):
-        desc = oxford_join( texts )
+    def describe_mark(
+        cls,
+        ornament_type: OrnamentType,
+        texts: list[str],
+        body_part: BodyPart,
+        *,
+        possessive: str = "their",
+    ) -> str:
+        desc = oxford_join(texts)
+        body_text = body_part.lower().replace("_", " ")
         s = None
         match ornament_type:
             case OrnamentType.SCAR:
-                s = f"scars on her { body_part.lower() }"
+                s = f"scars on {possessive} {body_text}"
             case OrnamentType.TATTOO:
-                s = f"{desc} tattoo on her {body_part.lower() }"
+                s = f"{desc} tattoo on {possessive} {body_text}"
             case OrnamentType.PIERCING:
-                s = f"{desc} her pierced {body_part.lower()}"
+                s = f"{desc} {possessive} pierced {body_text}"
             case OrnamentType.BRAND:
-                s = f"{desc} brand is burned into the flesh of her {body_part.lower()}"
+                s = f"{desc} brand is burned into the flesh of {possessive} {body_text}"
             case OrnamentType.MARKER:
-                s = f"someone has written {desc} on her {body_part.lower()} in permanent ink"
+                s = f"someone has written {desc} on {possessive} {body_text} in permanent ink"
             case OrnamentType.BURN:
-                s = f"burns covering her { body_part.lower() }"
+                s = f"burns covering {possessive} {body_text}"
         return s
 
+    @classmethod
+    def marks_on_her(
+        cls,
+        ornament_type: OrnamentType,
+        texts: list[str],
+        body_part: BodyPart,
+    ) -> str:
+        return cls.describe_mark(ornament_type, texts, body_part, possessive="her")
+
     def describe(self):
-        return self.marks_on_her( self.ornament_type, [self.text], self.body_part)
+        return self.marks_on_her(self.ornament_type, [self.text], self.body_part)
 
 
 # todo: should implement this like outfit manager/credential manager
 class Ornamentation(Node):
 
-    collection: List[Ornament] = Field(default_factory=list)
+    collection: list[Ornament] = Field(default_factory=list)
 
-    def by_part_type(self, covered_regions: list = None):
+    def by_part_type(self, covered_regions: list[Any] = None) -> dict[tuple[OrnamentType, BodyPart], list[Ornament]]:
         # todo: filter covered regions
         covered_regions = covered_regions or []
         res = defaultdict(list)
@@ -67,10 +83,10 @@ class Ornamentation(Node):
             res[ornament.ornament_type, ornament.body_part].append(ornament)
         return dict(res)
 
-    def add_ornament(self, ornament: Ornament ):
+    def add_ornament(self, ornament: Ornament) -> None:
         self.collection.append(ornament)
 
-    def remove_ornament(self, ornament: Ornament ):
+    def remove_ornament(self, ornament: Ornament) -> None:
         # todo: add a convenience accessor
         if ornament in self.collection:
             self.collection.remove(ornament)
@@ -78,25 +94,36 @@ class Ornamentation(Node):
     # def __bool__(self):
     #     return len(self.ornaments) > 0
 
+    def describe_items(self, *, possessive: str = "their") -> list[str]:
+        """Return concise ornament phrases suitable for appearance summaries."""
+        covered_regions: list[Any] = []
+        grouped = self.by_part_type(covered_regions)
+
+        items: list[str] = []
+        for (ornament_type, body_part), ornaments in sorted(
+            grouped.items(),
+            key=lambda item: (item[0][0].name, item[0][1].name),
+        ):
+            items.append(
+                Ornament.describe_mark(
+                    ornament_type,
+                    [ornament.text for ornament in ornaments],
+                    body_part,
+                    possessive=possessive,
+                )
+            )
+        return items
+
+    def describe_summary(self, *, possessive: str = "their") -> str:
+        """Return a compact joined ornament summary without sentence framing."""
+        return oxford_join(self.describe_items(possessive=possessive))
+
     # @on_render.register()
-    def describe(self):
+    def describe(self) -> dict[str, str]:
+        summary = self.describe_summary(possessive="her")
+        if not summary:
+            return {"ornaments": ""}
+        return {"ornaments": f"She has {summary}."}
 
-        covered_regions = []
-        # if hasattr(self.parent, "outfit"):
-        #     covered_regions = self.parent.outfit.get_uncovered_regions()
-
-        # todo: determine if by part or by type is more concise
-        #       arm has tattoo and scar vs. scars on her arms and face
-
-        ot = self.by_part_type(covered_regions)
-        items = []
-        for (pt, ty), orns in ot.items():
-            items.append(Ornament.marks_on_her(pt, [x.text for x in orns], ty))
-        s = "She has " + oxford_join(items) + "."
-
-        return {'ornaments': s}
-
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return len(self.collection) > 0
-
-

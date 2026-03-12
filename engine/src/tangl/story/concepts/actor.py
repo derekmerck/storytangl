@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from tangl.core import Node, contribute_ns
+from .narrator_knowledge import HasNarratorKnowledge
 
 
-class Actor(Node):
+class Actor(HasNarratorKnowledge, Node):
     """Actor()
 
     Named character provider published into the story namespace.
@@ -19,6 +20,7 @@ class Actor(Node):
     Key Features
     ------------
     * Stores a human-friendly ``name`` alongside the graph label.
+    * Carries narrator-facing epistemic annotations on the actor itself.
     * Publishes actor metadata into local namespace composition via
       :meth:`provide_actor_symbols`.
 

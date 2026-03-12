@@ -8,9 +8,10 @@ from tangl.vm import Dependency
 
 from ..dispatch import on_gather_ns
 from .actor import Actor
+from .narrator_knowledge import HasNarratorKnowledge
 
 
-class Role(Dependency[Actor]):
+class Role(HasNarratorKnowledge, Dependency[Actor]):
     """Role()
 
     Story-specific dependency edge that binds an actor provider into local scope.
@@ -27,6 +28,9 @@ class Role(Dependency[Actor]):
       participate in standard provisioning and frontier resolution.
     * Publishes the resolved actor under the role label plus derived metadata
       keys such as ``guide_name``.
+    * Publishes additive aliases such as ``guide_role`` and ``role_edges`` so
+      templates and filters can address role-level epistemic state separately
+      from provider-level knowledge.
     * Contributes a merged ``roles`` mapping during namespace gathering.
 
     API
@@ -87,9 +91,10 @@ def contribute_roles(*, caller, ctx, **_kw):
 
     contributions: dict[str, Any] = {}
     roles: dict[str, Any] = {}
+    role_edges: dict[str, Role] = {}
     for scope in reversed(scope_nodes):
-        role_edges = sorted(scope.edges_out(Selector(has_kind=Role)), key=_role_sort_key)
-        for role in role_edges:
+        scope_roles = sorted(scope.edges_out(Selector(has_kind=Role)), key=_role_sort_key)
+        for role in scope_roles:
             role_payload = role.provide_role_symbols()
             if role_payload:
                 contributions.update(role_payload)
@@ -97,8 +102,13 @@ def contribute_roles(*, caller, ctx, **_kw):
             label = role.get_label()
             if provider is not None and label:
                 roles[label] = provider
+            if label:
+                contributions[f"{label}_role"] = role
+                role_edges[label] = role
 
     if roles:
         contributions["roles"] = roles
+    if role_edges:
+        contributions["role_edges"] = role_edges
 
     return contributions or None

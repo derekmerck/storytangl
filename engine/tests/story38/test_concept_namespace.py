@@ -48,14 +48,44 @@ def test_role_and_setting_publish_provider_symbols_into_namespace() -> None:
     ns = ctx.get_ns(block)
 
     assert ns["host"] is actor
+    assert ns["host_role"] is role
     assert ns["host_name"] == "Joe"
     assert ns["host_label"] == "guard"
     assert ns["roles"]["host"] is actor
+    assert ns["role_edges"]["host"] is role
 
     assert ns["place"] is location
+    assert ns["place_setting"] is setting
     assert ns["place_name"] == "Castle"
     assert ns["place_label"] == "castle"
     assert ns["settings"]["place"] is location
+    assert ns["setting_edges"]["place"] is setting
+
+
+def test_role_and_provider_keep_distinct_narrator_knowledge() -> None:
+    graph, scene, block = _build_scene_with_block()
+
+    actor = Actor(label="katya", name="Katya")
+    graph.add(actor)
+
+    role = Role(
+        label="villain",
+        predecessor_id=scene.uid,
+        requirement=Requirement(has_kind=Actor, hard_requirement=False),
+    )
+    graph.add(role)
+    role.set_provider(actor)
+
+    actor.get_knowledge("player").state = "IDENTIFIED"
+    role.get_knowledge("player").state = "FAMILIAR"
+
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+    ns = ctx.get_ns(block)
+
+    assert ns["villain"] is actor
+    assert ns["villain_role"] is role
+    assert ns["villain"].get_knowledge("player").state == "IDENTIFIED"
+    assert ns["villain_role"].get_knowledge("player").state == "FAMILIAR"
 
 
 def test_role_publication_order_is_deterministic() -> None:
@@ -85,6 +115,7 @@ def test_role_publication_order_is_deterministic() -> None:
     ns = ctx.get_ns(block)
 
     assert list(ns["roles"].keys()) == ["alpha", "beta"]
+    assert list(ns["role_edges"].keys()) == ["alpha", "beta"]
 
 
 def test_nearer_scope_role_symbols_override_parent_scope() -> None:

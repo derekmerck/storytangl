@@ -1,11 +1,19 @@
 import logging
+import random
 
 import pytest
+from pydantic import BaseModel
 
-from tangl.mechanics.demographics import DemographicData, DemographicSampler
+from tangl.mechanics.demographics import (
+    DemographicData,
+    DemographicSampler,
+    HasDemographic,
+    HasDemographics,
+)
 from tangl.mechanics.demographics.data_models import Region, Country, Subtype, NameBank
 from tangl.lang.gens import Gens as Gender
 from tangl.lang.age_range import AgeRange
+from tangl.story.concepts import Actor as StoryActor
 
 @pytest.fixture(autouse=True)
 def clear_singletons():
@@ -119,16 +127,44 @@ def test_demographic_data_inheritance():
     assert demo_data.name() == "John"
     assert demo_data.full_name() == "John Doe"
 
-from pydantic import BaseModel
-from tangl.mechanics.demographics.demographic import HasDemographic
-class TestEntity(HasDemographic, BaseModel):
+
+class DemoEntity(HasDemographics, BaseModel):
     pass
 
-def test_has_demographic():
+
+def test_has_demographics():
     demo_data = DemographicData(given_name="Jane", family_name="Smith")
-    entity = TestEntity(demographic=demo_data)
+    entity = DemoEntity(demographic=demo_data)
     assert entity.name == "Jane"
     assert entity.full_name == "Jane Smith"
+    assert entity.get_ns()["full_name"] == "Jane Smith"
+
+
+def test_has_demographic_alias():
+    assert HasDemographic is HasDemographics
+
+
+class DemoActor(StoryActor, HasDemographics):
+    pass
+
+
+def test_story_actor_demographics_namespace_prefers_explicit_name():
+    demo_data = DemographicData(given_name="Jane", family_name="Smith")
+    actor = DemoActor(label="guide", name="The Guide", demographic=demo_data)
+
+    namespace = actor.get_ns()
+    assert namespace["name"] == "The Guide"
+    assert namespace["full_name"] == "Jane Smith"
+    assert namespace["given_name"] == "Jane"
+
+
+def test_story_actor_demographics_namespace_uses_demographic_name_by_default():
+    demo_data = DemographicData(given_name="Jane", family_name="Smith")
+    actor = DemoActor(label="guide", demographic=demo_data)
+
+    namespace = actor.get_ns()
+    assert namespace["name"] == "Jane"
+    assert namespace["full_name"] == "Jane Smith"
 
 def test_age_range_sampling():
     age_range = DemographicSampler.sample_age_range()
@@ -215,3 +251,16 @@ def test_full_demographic_sampling(test_data):
     assert demo.subtype is not None
     assert demo.gender is not None
     assert demo.age_range is not None
+
+
+def test_demographic_sampling_with_explicit_rng_is_reproducible(test_data):
+    left = DemographicSampler.sample_demographic(rng=random.Random(7))
+    right = DemographicSampler.sample_demographic(rng=random.Random(7))
+
+    assert left.given_name == right.given_name
+    assert left.family_name == right.family_name
+    assert left.region.label == right.region.label
+    assert left.country.label == right.country.label
+    assert left.subtype.label == right.subtype.label
+    assert left.gender == right.gender
+    assert left.age_range == right.age_range

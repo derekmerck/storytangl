@@ -29,6 +29,8 @@ Conceptual layers
      render namespaces.
    - :class:`Role` and :class:`Setting` are story-specific dependency edges
      that bind those providers into scene and block scopes.
+   - :class:`EntityKnowledge` and :class:`HasNarratorKnowledge` carry
+     narrator-facing epistemic bookkeeping directly on story concept carriers.
 
 4. Runtime graph and journal output
 
@@ -51,7 +53,15 @@ script-to-template compilation, and JOURNAL rendering. Traversal and
 provisioning mechanisms remain in :mod:`tangl.vm`.
 """
 
-from .concepts import Actor, Location, Role, Setting
+from .concepts import (
+    Actor,
+    EntityKnowledge,
+    HasNarratorKnowledge,
+    Location,
+    Role,
+    Setting,
+    get_narrator_key,
+)
 from .episode import Action, Block, MenuBlock, Scene
 from .fabula import (
     GraphInitializationError,
@@ -85,8 +95,10 @@ __all__ = [
     "Block",
     "ChoiceFragment",
     "ContentFragment",
+    "EntityKnowledge",
     "Fragment",
     "GraphInitializationError",
+    "HasNarratorKnowledge",
     "InitMode",
     "InitReport",
     "Location",
@@ -109,6 +121,7 @@ __all__ = [
     "WorldResourcesFacet",
     "WorldTemplatesFacet",
     "World",
+    "get_narrator_key",
     "on_journal",
     "story_dispatch",
     "MediaFragment",
