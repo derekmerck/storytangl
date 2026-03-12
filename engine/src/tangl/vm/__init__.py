@@ -137,7 +137,6 @@ __all__ = [
     "Provisioner",
     "ProvisionOffer",
     "ProvisionPolicy",
-    "ProvisioningPolicy",
     "Requirement",
     "ResolutionPhase",
     "Resolver",
@@ -151,8 +150,6 @@ __all__ = [
     "Patch",
     "Event",
     "BuildReceipt",
-    "ChoiceEdge",
-    "Context",
     "PlanningReceipt",
     "count_turns",
     "get_call_depth",
@@ -185,8 +182,10 @@ __all__ = [
     "VmResolverCtx",
 ]
 
-
-# Compatibility aliases retained during namespace cutover.
+# Compatibility aliases — importable but not in __all__.
+# ChoiceEdge: used by tangl.mechanics.games.has_game and several test files
+# Context: was used by apps/server/tests (now migrated)
+# ProvisioningPolicy: legacy spelling of ProvisionPolicy
 ChoiceEdge = TraversableEdge
 Context = VmPhaseCtx
 ProvisioningPolicy = ProvisionPolicy

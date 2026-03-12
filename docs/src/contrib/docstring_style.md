@@ -185,7 +185,7 @@ Each subpackage summary RST mirrors **Conceptual layers**. For each layer:
 Artifacts
 ---------
 .. autoclass:: tangl.core.Record
-.. autoclass:: tangl.core.StreamRegistry
+.. autoclass:: tangl.core.OrderedRegistry
 .. autoclass:: tangl.core.Snapshot
 .. autoclass:: tangl.core.BaseFragment
 ```
@@ -430,7 +430,7 @@ autodoc_default_options = {
 
 ## P. Quick examples from our codebase (as reference)
 
-- **Entity / Registry / Graph / Node / Edge / Subgraph / Record / StreamRegistry / Snapshot / BaseFragment / Handler / DispatchRegistry / JobReceipt / Singleton / InheritingSingleton / Token** all follow the template above.
+- **Entity / Registry / Graph / Node / Edge / Subgraph / Record / OrderedRegistry / Snapshot / BaseFragment / Handler / DispatchRegistry / JobReceipt / Singleton / InheritingSingleton / Token** all follow the template above.
 - **Subpackage `tangl.core.__init__`** shows “Conceptual layers” and “Design intent”—copy that pattern for other subpackages (`tangl.lang`, `tangl.resolution`, etc.).
 - **Subpackage summary RST** (`tangl.core.rst`) mirrors those layers with labeled sections and `.. autoclass::` lists—treat it as the canonical *map*.
 
@@ -439,4 +439,3 @@ autodoc_default_options = {
 ## Q. Related Guides
 
 - [Coding Style & Architecture](coding_style.md) — layering, patterns, anti-patterns
-

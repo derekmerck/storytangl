@@ -3,7 +3,7 @@ from __future__ import annotations
 from tangl.core import BehaviorRegistry, DispatchLayer
 
 story_dispatch = BehaviorRegistry(
-    label="story38_dispatch",
+    label="story_dispatch",
     default_dispatch_layer=DispatchLayer.APPLICATION,
 )
 
@@ -48,7 +48,10 @@ def on_gather_ns(func=None, **kwargs):
         return lambda f: story_dispatch.register(func=f, task="gather_ns", **kwargs)
     return story_dispatch.register(func=func, task="gather_ns", **kwargs)
 
-
+# on_gather_content is the first sub-hook of a planned collect/enrich/compose
+# journal decomposition.  on_post_process_content and on_get_choices were
+# removed (zero consumers); restore them when the full pattern is needed.
+# See scratch/legacy for the v37 three-stage journal pipeline.
 def on_gather_content(func=None, **kwargs):
     """Legacy compatibility hook for gather-content author handlers."""
     kwargs = _normalize_legacy_register_kwargs(kwargs)
@@ -57,28 +60,10 @@ def on_gather_content(func=None, **kwargs):
     return story_dispatch.register(func=func, task="gather_content", **kwargs)
 
 
-def on_post_process_content(func=None, **kwargs):
-    """Legacy compatibility hook for content post-processing handlers."""
-    kwargs = _normalize_legacy_register_kwargs(kwargs)
-    if func is None:
-        return lambda f: story_dispatch.register(func=f, task="post_process_content", **kwargs)
-    return story_dispatch.register(func=func, task="post_process_content", **kwargs)
-
-
-def on_get_choices(func=None, **kwargs):
-    """Legacy compatibility hook for choice-gathering handlers."""
-    kwargs = _normalize_legacy_register_kwargs(kwargs)
-    if func is None:
-        return lambda f: story_dispatch.register(func=f, task="get_choices", **kwargs)
-    return story_dispatch.register(func=func, task="get_choices", **kwargs)
-
-
 __all__ = [
     "on_compose_journal",
     "story_dispatch",
     "on_gather_content",
     "on_gather_ns",
-    "on_get_choices",
     "on_journal",
-    "on_post_process_content",
 ]

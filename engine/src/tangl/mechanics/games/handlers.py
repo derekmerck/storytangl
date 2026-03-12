@@ -24,7 +24,7 @@ from tangl.vm.dispatch import dispatch as vm38_dispatch
 from .has_game import HasGame
 
 if TYPE_CHECKING:
-    from tangl.vm import Context
+    from tangl.vm import VmPhaseCtx as Context
 
 logger = logging.getLogger(__name__)
 

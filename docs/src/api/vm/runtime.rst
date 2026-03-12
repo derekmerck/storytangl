@@ -21,4 +21,4 @@ Core runtime types
 .. autoclass:: tangl.vm.ResolutionPhase
 .. autoclass:: tangl.vm.runtime.frame.Frame
 .. autoclass:: tangl.vm.runtime.ledger.Ledger
-.. autoclass:: tangl.vm.Context
+.. autoclass:: tangl.vm.VmPhaseCtx

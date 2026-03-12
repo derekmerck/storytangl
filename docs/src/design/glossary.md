@@ -25,7 +25,7 @@ use these terms, they mean *exactly* what's defined here.
 |------|----------|------------|----------------|
 | **Fabula** | possibility space | The complete graph of events, characters, and relationships — all possible stories | `StoryGraph` after compilation |
 | **Episodic process** | execution | Cursor-driven traversal that collapses fabula into a specific story | `Frame.follow_edge()` pipeline |
-| **Syuzhet** | output trace | The linear journal of content fragments as experienced by the reader | `Journal` / `StreamRegistry` |
+| **Syuzhet** | output trace | The linear journal of content fragments as experienced by the reader | `Journal` / `OrderedRegistry` |
 | **Block** | instruction | Traversable structural node that generates content when visited | `story.episode.Block` |
 | **Scene** | function | Structural subgraph containing blocks, with local roles and settings | `story.episode.Scene` |
 | **Action** | branch | Traversable edge representing a player choice between blocks | `story.episode.Action` |
@@ -80,7 +80,7 @@ use these terms, they mean *exactly* what's defined here.
 | **Content fragment** | prose block | Text content rendered from a structural node | `ContentFragment` |
 | **Choice fragment** | menu item | Available action with caption, availability status, and blocker diagnostics | `ChoiceFragment` |
 | **Media fragment** | asset reference | Pointer to media content (image, audio) with staging hints | `MediaFragment` |
-| **Journal** | narrative log | Ordered sequence of fragments constituting the syuzhet so far | `StreamRegistry` |
+| **Journal** | narrative log | Ordered sequence of fragments constituting the syuzhet so far | `OrderedRegistry` |
 | **RIT** | inventory tag | Resource Inventory Tag — content-addressed reference to a media asset | `MediaRIT` |
 | **Render profile** | Accept header | Client capability declaration guiding fragment → presentation transformation | Service-layer configuration |
 | **Staging hints** | CSS-like metadata | Rendering suggestions (orientation, placement, z-index) for media fragments | `StagingHints` |

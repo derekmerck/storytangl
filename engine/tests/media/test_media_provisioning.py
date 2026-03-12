@@ -4,7 +4,7 @@ from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource.media_provisioning import MediaProvisioner
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag
-from tangl.vm.provision import ProvisioningPolicy, Requirement
+from tangl.vm.provision import ProvisionPolicy, Requirement
 
 
 class _GraphStub:
@@ -24,7 +24,7 @@ class _StubContext:
 
 def test_media_provisioner_creates_media_from_template() -> None:
     registry = MediaResourceRegistry(label="test_media")
-    requirement = Requirement(template={"data": b"sample"}, policy=ProvisioningPolicy.CREATE)
+    requirement = Requirement(template={"data": b"sample"}, policy=ProvisionPolicy.CREATE)
     provisioner = MediaProvisioner(requirement=requirement, registries=[registry])
 
     offers = provisioner.generate_offers(ctx=_StubContext())
@@ -43,7 +43,7 @@ def test_media_provisioner_returns_existing_provider() -> None:
         data_type=MediaDataType.OTHER,
     )
     registry.add(existing)
-    requirement = Requirement(identifier="alias", policy=ProvisioningPolicy.EXISTING)
+    requirement = Requirement(identifier="alias", policy=ProvisionPolicy.EXISTING)
     provisioner = MediaProvisioner(requirement=requirement, registries=[registry])
 
     offers = provisioner.generate_offers(ctx=_StubContext())

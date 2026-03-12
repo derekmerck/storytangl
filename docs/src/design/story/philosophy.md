@@ -99,7 +99,7 @@ roles (narrative content, dialog, choices, media) but not rendering instructions
 The service layer translates fragments into a specific presentation format based
 on client capabilities.
 
-**Implementation:** `Journal` / `StreamRegistry` of `BaseFragment` subclasses
+**Implementation:** `Journal` / `OrderedRegistry` of `BaseFragment` subclasses
 (`ContentFragment`, `ChoiceFragment`, `MediaFragment`); service-layer render
 profiles transform fragments for specific clients.
 

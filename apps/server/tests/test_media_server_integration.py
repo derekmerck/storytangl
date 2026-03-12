@@ -11,9 +11,7 @@ from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.world_registry import WorldRegistry
 from tangl.story.episode.block import Block
 from tangl.story.fabula.world import World
-from tangl.vm import ResolutionPhase as P
-from tangl.vm.context import Context
-from tangl.vm.frame import Frame
+from tangl.vm import VmPhaseCtx as Context, Frame, ResolutionPhase as P
 
 
 WORLD_ROOT = Path(__file__).resolve().parents[3] / "engine" / "tests" / "resources" / "worlds"

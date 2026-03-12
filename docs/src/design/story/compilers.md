@@ -1,3 +1,6 @@
+> **⚠️ Stale document.** This predates the current compiler/materializer split.
+> See `engine/src/tangl/story/fabula/__init__.py` for the current pipeline overview.
+
 Story Compilers
 ===============
 

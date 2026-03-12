@@ -10,7 +10,7 @@ from tangl.media.media_resource.media_dependency import MediaDep
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Block
-from tangl.vm import Context, Frame, ResolutionPhase as P
+from tangl.vm import VmPhaseCtx as Context, Frame, ResolutionPhase as P
 
 pytestmark = pytest.mark.skip(
     reason=(

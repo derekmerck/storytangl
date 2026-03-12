@@ -20,7 +20,7 @@ Artifacts
 .. automodule:: tangl.core.record
 
 .. autoclass:: tangl.core.Record
-.. autoclass:: tangl.core.StreamRegistry
+.. autoclass:: tangl.core.OrderedRegistry
 .. autoclass:: tangl.core.Snapshot
 .. autoclass:: tangl.core.BaseFragment
 .. autoclass:: tangl.core.EntityTemplate

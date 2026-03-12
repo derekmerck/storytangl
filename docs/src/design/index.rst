@@ -23,12 +23,8 @@ See also
    story/PRESENCE_PROSE_CONTRACT
    story/CONDITIONAL_NARR
    story/ASSET_TYPE_DESIGN
-   story/ASSET_COLLECTION_DESIGN
    story/CONCEPT_PROV_DESIGN
-   story/CREDENTIALS_INTERACTION
    story/HUB_FANOUT
-   story/MU_AFFORDANCES
-   story/SANDBOX_FANOUT_DESIGN
    story/menu_block
    story/compilers
    story/notes-create_world

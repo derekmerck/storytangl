@@ -1,7 +1,7 @@
 # Scope Matching & Structural Provisioning Design
 
 **Status:** Design reference (v3, Phase C implemented)
-**Scope:** vm38/provision, core38/template, story38 prereq handlers
+**Scope:** vm/provision, core/template, story prereq handlers
 **Date:** 2026-03-01
 
 ---
