@@ -1,9 +1,11 @@
 Presence/Prose Contract Spike
 =============================
 
-**Status:** 🟡 CONTRACT SPIKE / PARTIAL STORY-RUNTIME SCAFFOLD  
+**Status:** 🟡 CONTRACT SPIKE / PARTIAL STORY-RUNTIME + JOURNAL SEAM SCAFFOLD  
 **Last Updated:** March 2026  
-**Scope:** story concept scaffolding plus contract tests; active block rendering remains unchanged
+**Scope:** story concept scaffolding plus contract tests; active block rendering
+remains `format_map`-based, with a small opt-in JOURNAL composition consumer
+for explicit dialog markup
 
 ## Why This Spike Exists
 
@@ -31,6 +33,16 @@ subsystem yet.
 - `render_block_content()` currently renders block text through namespace
   gathering plus `str.format_map`, not Jinja or concept-driven prose filters.
 - There is no active `tangl.prose` package yet.
+- Raw JOURNAL emission and post-merge composition are now distinct seams:
+  - `render_journal` emits raw fragments,
+  - `compose_journal` can replace the merged fragment batch afterward.
+- The first concrete `compose_journal` consumer is deliberately narrow:
+  explicit dialog micro-block syntax can be rewritten into attributed discourse
+  fragments, while ordinary block prose still flows through the existing
+  content handler unchanged.
+- That dialog rewrite can now bind speakers through the gathered namespace and
+  attach speaker-facing presentation hints plus optional `dialog_im` media
+  payloads sourced from presence-aware actors.
 
 That split still matters, but the current direction is now more specific:
 narrator-facing epistemic bookkeeping lives on the story concepts it is about,
@@ -101,6 +113,10 @@ Presence is an enrichment layer, not the prose engine itself.
 
 - `Look`, `OutfitManager`, and `Ornamentation` remain data-facing mechanics
   surfaces.
+- Direct visual facets such as `HasSimpleLook`, `HasOutfit`, and
+  `HasOrnamentation` should remain usable independently.
+- `HasLook` is the visual bundle over those direct facets, not the future
+  all-up presence bundle.
 - A future `HasPresence` facade delegates to prose and media adapters.
 - `Look` should not own narrative policy, focalization, or media backend logic.
 - Prose and media consume presence data through adapter seams such as
@@ -119,15 +135,23 @@ The migration path should stay parallel and opt-in first.
 - `get_ns()` remains the compatibility bridge.
   Concepts and facets continue to publish symbols into render scope through the
   namespace system.
+- Presence facets are exposed to JOURNAL in two explicit opt-in ways:
+  - prose via namespace symbols consumed by the current `format_map` path,
+  - media via explicit `block.media` entries with `source_kind="facet"`.
 - Role and setting namespace publication remain backward-compatible.
   `villain` still resolves to the provider actor, while additive aliases such
   as `villain_role`, `place_setting`, `role_edges`, and `setting_edges`
   expose role/setting carriers for separate epistemic state.
 - The current `format_map` path remains the live renderer.
+- Future voice/discourse behavior should target the post-merge
+  `compose_journal` seam rather than making mechanics objects own prose policy.
 - A future Jinja-based prose renderer should sit beside it first, prove itself,
   and only replace it once it is a clear superset.
 - `PhaseCtx` metadata already provides the first-pass narrator selection bridge
   through `narrator_key`; no ledger schema change is required.
+- Richer chapter or section labeling is deferred; when revived it should build
+  on existing stream markers and `since_step` retrieval rather than introducing
+  a second journal-segmentation system.
 
 ## Toy Spike Proof
 
@@ -160,10 +184,23 @@ The current first pass now includes:
    role-level and setting-level knowledge.
 3. Contract tests prove narrator-key selection through context metadata, while
    active block rendering remains unchanged.
+4. The raw JOURNAL path can now be followed by a minimal post-merge
+   `compose_journal` seam for future voice/grouping work.
+5. That compose seam now has one concrete story-level consumer:
+   syntax-opt-in dialog micro-block composition that rewrites authored dialog
+   markup into attributed discourse fragments without changing the underlying
+   block-content renderer.
+6. Those attributed dialog fragments can now carry resolved speaker identity,
+   style hints, and optional look-derived `dialog_im` payloads when the speaker
+   object exposes the relevant hooks.
 
 If this grows beyond concept-local bookkeeping later, the next phase should
-add a real prose renderer entry point in parallel with the current block
-content handler before considering broader session-level narrative state.
+decide whether to build:
+
+1. a real prose renderer entry point in parallel with the current block
+   content handler, or
+2. author/world-level composition handlers over the new `compose_journal`
+   seam for lighter-weight voice and grouping work.
 
 Until then, the engine should keep treating this as a design target proven by
 tests, not as an active published runtime subsystem.

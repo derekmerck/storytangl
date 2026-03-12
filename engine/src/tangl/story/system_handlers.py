@@ -17,6 +17,7 @@ import logging
 from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector, TemplateRegistry
+from tangl.discourse import DialogHandler
 from tangl.media import get_system_resource_manager
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
@@ -25,13 +26,14 @@ from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
+    do_compose_journal,
     on_get_media_inventories,
     on_provision,
     on_get_template_scope_groups,
     on_get_token_catalogs,
 )
 
-from .dispatch import on_gather_ns, on_journal
+from .dispatch import on_compose_journal, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 from .provider_collection import (
@@ -437,24 +439,29 @@ def _unresolved_media_placeholder(
     payload: dict[str, Any],
     dependency: MediaDep | None,
     source_kind: str,
+    unresolved_reason: str | None = None,
 ) -> MediaFragment:
     scope = payload.get("scope") or "world"
-    unresolved_reason = "unresolved_media"
+    reason = unresolved_reason or "unresolved_media"
     resolution_meta: dict[str, Any] | None = None
 
-    if isinstance(dependency, MediaDep):
+    if isinstance(dependency, MediaDep) and unresolved_reason is None:
         scope = dependency.scope or scope
-        unresolved_reason = dependency.requirement.resolution_reason or unresolved_reason
+        reason = dependency.requirement.resolution_reason or reason
         if isinstance(dependency.requirement.resolution_meta, dict):
             resolution_meta = dict(dependency.requirement.resolution_meta)
-    elif source_kind == "potential":
-        unresolved_reason = "unsupported_media_spec"
+    elif source_kind == "potential" and unresolved_reason is None:
+        reason = "unsupported_media_spec"
 
     placeholder_payload = {
         "name": payload.get("name") or payload.get("label"),
         "source_kind": source_kind,
-        "unresolved_reason": unresolved_reason,
+        "unresolved_reason": reason,
     }
+    if payload.get("facet") is not None:
+        placeholder_payload["facet"] = payload.get("facet")
+    if payload.get("subject") is not None:
+        placeholder_payload["subject"] = payload.get("subject")
     if resolution_meta:
         placeholder_payload["resolution_meta"] = resolution_meta
 
@@ -466,6 +473,130 @@ def _unresolved_media_placeholder(
         content_type=_media_type_for_item(payload),
         text=payload.get("text"),
         scope=scope,
+    )
+
+
+def _maybe_compose_fragments(*, caller: Block, ctx, fragments: list[Record]) -> list[Record]:
+    """Run optional post-merge journal composition when ctx supports dispatch."""
+    if not fragments:
+        return fragments
+
+    has_authorities = callable(getattr(ctx, "get_authorities", None))
+    has_inline = callable(getattr(ctx, "get_inline_behaviors", None))
+    if not has_authorities or not has_inline:
+        return fragments
+
+    composed = do_compose_journal(caller, ctx=ctx, fragments=list(fragments))
+    if composed is None:
+        return fragments
+    if isinstance(composed, Record):
+        return [composed]
+    return list(composed)
+
+
+def _json_media_payload(value: Any) -> Any:
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return model_dump(mode="python")
+    if isinstance(value, dict):
+        return dict(value)
+    return value
+
+
+def _is_empty_media_payload(value: Any) -> bool:
+    if value is None:
+        return True
+    payload = _json_media_payload(value)
+    if isinstance(payload, dict):
+        return not any(bool(item) for item in payload.values())
+    return False
+
+
+def _render_facet_media(
+    *,
+    caller: Block,
+    payload: dict[str, Any],
+    ctx,
+    ns: dict[str, Any],
+) -> Record:
+    subject_key = payload.get("subject")
+    subject = ns.get(subject_key) if isinstance(subject_key, str) else subject_key
+    facet = str(payload.get("facet") or "").strip().lower()
+
+    if subject is None:
+        fallback = payload.get("fallback_text") or payload.get("text")
+        if isinstance(fallback, str) and fallback.strip():
+            return ContentFragment(content=fallback, source_id=caller.uid)
+        unresolved_payload = dict(payload)
+        unresolved_payload.setdefault("name", f"{subject_key or 'unknown'}:{facet or 'facet'}")
+        return _unresolved_media_placeholder(
+            caller=caller,
+            payload=unresolved_payload,
+            dependency=None,
+            source_kind="facet",
+            unresolved_reason="missing_facet_subject",
+        )
+
+    adapter_name = {
+        "look": "adapt_look_media_spec",
+        "outfit": "adapt_outfit_media_spec",
+        "ornamentation": "adapt_ornament_media_spec",
+    }.get(facet)
+    adapter = getattr(subject, adapter_name, None) if adapter_name is not None else None
+    if not callable(adapter):
+        fallback = payload.get("fallback_text") or payload.get("text")
+        if isinstance(fallback, str) and fallback.strip():
+            return ContentFragment(content=fallback, source_id=caller.uid)
+        unresolved_payload = dict(payload)
+        unresolved_payload.setdefault(
+            "name",
+            f"{subject_key or getattr(subject, 'label', 'subject')}:{facet or 'facet'}",
+        )
+        return _unresolved_media_placeholder(
+            caller=caller,
+            payload=unresolved_payload,
+            dependency=None,
+            source_kind="facet",
+            unresolved_reason="unsupported_facet",
+        )
+
+    adapter_kwargs: dict[str, Any] = {"ctx": ctx}
+    if payload.get("media_role") is not None:
+        adapter_kwargs["media_role"] = payload.get("media_role")
+    if facet == "look":
+        if payload.get("attitude") is not None:
+            adapter_kwargs["attitude"] = payload.get("attitude")
+        if payload.get("pose") is not None:
+            adapter_kwargs["pose"] = payload.get("pose")
+
+    facet_payload = adapter(**adapter_kwargs)
+    if _is_empty_media_payload(facet_payload):
+        fallback = payload.get("fallback_text") or payload.get("text")
+        if isinstance(fallback, str) and fallback.strip():
+            return ContentFragment(content=fallback, source_id=caller.uid)
+        unresolved_payload = dict(payload)
+        unresolved_payload.setdefault(
+            "name",
+            f"{subject_key or getattr(subject, 'label', 'subject')}:{facet or 'facet'}",
+        )
+        return _unresolved_media_placeholder(
+            caller=caller,
+            payload=unresolved_payload,
+            dependency=None,
+            source_kind="facet",
+            unresolved_reason="empty_facet_payload",
+        )
+
+    content = _json_media_payload(facet_payload)
+    content_media_role = content.get("media_role") if isinstance(content, dict) else None
+    return MediaFragment(
+        source_id=caller.uid,
+        media_role=content_media_role or payload.get("media_role"),
+        content=content,
+        content_format="json",
+        content_type=_media_type_for_item(payload),
+        text=payload.get("text"),
+        scope=payload.get("scope") or "world",
     )
 
 
@@ -489,6 +620,7 @@ def render_block_media(*, caller, ctx, **_kw):
 
     graph = getattr(caller, "graph", None)
     fragments: list[Record] = []
+    facet_ns: dict[str, Any] | None = None
     for media_item in caller.media:
         payload = media_item if isinstance(media_item, dict) else {"value": media_item}
         source_kind = payload.get("source_kind")
@@ -534,6 +666,22 @@ def render_block_media(*, caller, ctx, **_kw):
                     content_type=_media_type_for_item(payload),
                     text=payload.get("text"),
                     scope=payload.get("scope"),
+                )
+            )
+            continue
+
+        if source_kind == "facet":
+            if facet_ns is None:
+                if ctx is None or not hasattr(ctx, "get_ns"):
+                    facet_ns = {}
+                else:
+                    facet_ns = dict(ctx.get_ns(caller))
+            fragments.append(
+                _render_facet_media(
+                    caller=caller,
+                    payload=payload,
+                    ctx=ctx,
+                    ns=facet_ns,
                 )
             )
             continue
@@ -600,7 +748,9 @@ def render_block(*, caller, ctx, **_kw):
 
     This wrapper preserves direct-call behavior while journal rendering is split
     into composable handlers (`render_block_content`, `render_block_media`,
-    `render_block_choices`) registered through dispatch.
+    `render_block_choices`) registered through dispatch, then optionally passed
+    through the post-merge ``compose_journal`` seam when the context supports
+    dispatch authorities.
     """
     if not isinstance(caller, Block):
         return None
@@ -610,4 +760,52 @@ def render_block(*, caller, ctx, **_kw):
         render_block_media(caller=caller, ctx=ctx),
         render_block_choices(caller=caller, ctx=ctx),
     )
+    fragments = _maybe_compose_fragments(caller=caller, ctx=ctx, fragments=fragments)
     return fragments or None
+
+
+@on_compose_journal(priority=Priority.EARLY)
+def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
+    """Promote explicit dialog micro-block syntax into attributed fragments."""
+    if not isinstance(caller, Block):
+        return None
+
+    ns: dict[str, Any] | None = None
+    if ctx is not None and hasattr(ctx, "get_ns"):
+        ns = dict(ctx.get_ns(caller))
+
+    composed: list[Record] = []
+    changed = False
+    for fragment in fragments:
+        if (
+            isinstance(fragment, ContentFragment)
+            and getattr(fragment, "fragment_type", "content") == "content"
+            and isinstance(fragment.content, str)
+            and DialogHandler.has_mu_blocks(fragment.content)
+        ):
+            mu_blocks = DialogHandler.parse(
+                fragment.content,
+                source_id=getattr(fragment, "source_id", None),
+                ns=ns,
+                ctx=ctx,
+            )
+            rendered = DialogHandler.render(mu_blocks)
+            for rendered_fragment in rendered:
+                updated_tags = set(rendered_fragment.tags or set())
+                if getattr(fragment, "tags", None):
+                    updated_tags |= set(fragment.tags)
+
+                update: dict[str, Any] = {
+                    "step": fragment.step,
+                    "tags": updated_tags,
+                }
+                if getattr(fragment, "origin_id", None) is not None:
+                    update["origin_id"] = fragment.origin_id
+
+                composed.append(rendered_fragment.model_copy(update=update))
+            changed = True
+            continue
+
+        composed.append(fragment)
+
+    return composed if changed else None

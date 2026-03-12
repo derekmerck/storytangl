@@ -44,7 +44,8 @@ Conceptual layers
 5. Dispatch
 
    - :obj:`story_dispatch` is the shared story behavior registry.
-   - :func:`on_journal` registers JOURNAL-phase handlers.
+   - :func:`on_journal` registers raw JOURNAL-phase handlers.
+   - :func:`on_compose_journal` registers post-merge JOURNAL composition handlers.
 
 Design intent
 -------------
@@ -82,7 +83,7 @@ from .fabula import (
     World,
 )
 from .story_graph import StoryGraph
-from .dispatch import on_journal, story_dispatch
+from .dispatch import on_compose_journal, on_journal, story_dispatch
 from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
 from .ctx import StoryRuntimeCtx
 
@@ -122,6 +123,7 @@ __all__ = [
     "WorldTemplatesFacet",
     "World",
     "get_narrator_key",
+    "on_compose_journal",
     "on_journal",
     "story_dispatch",
     "MediaFragment",

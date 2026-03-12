@@ -29,6 +29,14 @@ def on_journal(func=None, **kwargs):
     return story_dispatch.register(func=func, task="render_journal", **kwargs)
 
 
+def on_compose_journal(func=None, **kwargs):
+    """Register a story-level post-merge JOURNAL composition handler."""
+    kwargs = _normalize_legacy_register_kwargs(kwargs)
+    if func is None:
+        return lambda f: story_dispatch.register(func=f, task="compose_journal", **kwargs)
+    return story_dispatch.register(func=func, task="compose_journal", **kwargs)
+
+
 def on_gather_ns(func=None, **kwargs):
     """Register a story-level namespace contributor."""
     kwargs = _normalize_legacy_register_kwargs(kwargs)
@@ -66,6 +74,7 @@ def on_get_choices(func=None, **kwargs):
 
 
 __all__ = [
+    "on_compose_journal",
     "story_dispatch",
     "on_gather_content",
     "on_gather_ns",

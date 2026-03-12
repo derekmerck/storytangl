@@ -1,11 +1,12 @@
 """Appearance profile and author-facing facet surfaces for presence mechanics.
 
-This module gives the ``presence/look`` family a first explicit contract:
+This module gives the ``presence/look`` family an explicit layered contract:
 
 - ``Look`` stores body-trait state and produces deterministic appearance summaries.
-- ``LookMediaPayload`` is a structured adapter artifact for downstream media hooks.
-- ``HasLook`` is the thin author-facing facade that binds look, outfit, and
-  ornaments into namespace-friendly story surfaces.
+- ``LookMediaPayload`` / related payloads are structured adapter artifacts.
+- ``HasSimpleLook``, ``HasOutfit``, and ``HasOrnamentation`` are direct facet
+  surfaces for partial adoption.
+- ``HasLook`` is the visual bundle that composes those direct facets.
 """
 
 from __future__ import annotations
@@ -79,6 +80,22 @@ class LookMediaPayload(BaseModelPlus):
     ornament_tokens: list[str] = Field(default_factory=list)
     pose: str | None = None
     attitude: str | None = None
+    media_role: str | None = None
+
+
+class OutfitMediaPayload(BaseModelPlus):
+    """Structured outfit payload for media adaptation."""
+
+    description: str = ""
+    items: list[str] = Field(default_factory=list)
+    media_role: str | None = None
+
+
+class OrnamentMediaPayload(BaseModelPlus):
+    """Structured ornament payload for media adaptation."""
+
+    description: str = ""
+    items: list[str] = Field(default_factory=list)
     media_role: str | None = None
 
 
@@ -290,27 +307,146 @@ class Look(Entity):
         )
 
 
-class HasLook(Entity):
-    """HasLook()
-
-    Thin facade exposing look, outfit, and ornaments on story-capable entities.
-
-    Why
-    ----
-    ``HasLook`` is the author-facing surface for the ``presence/look`` family.
-    It keeps attachment points explicit by contributing appearance symbols to the
-    local namespace and by exposing deterministic description/media helpers.
-    """
+class HasSimpleLook(Entity):
+    """Direct facet exposing body-trait look data and look-driven adapters."""
 
     look: Look = Field(default_factory=Look)
+
+    def describe_look(
+        self,
+        *,
+        ctx: Any = None,
+        subject: str | None = None,
+        attitude: Any = None,
+        pose: Any = None,
+    ) -> str:
+        """Return a deterministic appearance phrase for this entity."""
+        return self.look.describe(
+            ctx=ctx,
+            subject=subject,
+            attitude=attitude,
+            pose=pose,
+        )
+
+    def adapt_look_media_spec(
+        self,
+        *,
+        ctx: Any = None,
+        media_role: Any = None,
+        attitude: Any = None,
+        pose: Any = None,
+    ) -> LookMediaPayload:
+        """Return the structured appearance payload for media adapters."""
+        return self.look.adapt_media_spec(
+            ctx=ctx,
+            media_role=media_role,
+            attitude=attitude,
+            pose=pose,
+        )
+
+    @contribute_ns
+    def provide_simple_look_symbols(self) -> dict[str, Any]:
+        """Publish direct look symbols into the entity-local namespace."""
+        payload: dict[str, Any] = {
+            "look": self.look,
+            "look_description": self.describe_look(),
+            "look_media_payload": self.adapt_look_media_spec(),
+            "apparent_gender": self.look.apparent_gender,
+        }
+
+        if self.look.apparent_age is not None:
+            payload["apparent_age"] = self.look.apparent_age
+
+        return payload
+
+
+class HasOutfit(Entity):
+    """Direct facet exposing outfit state and outfit-driven adapters."""
+
     outfit: OutfitManager = Field(default_factory=OutfitManager)
-    ornamentation: Ornamentation = Field(default_factory=Ornamentation)
 
     @model_validator(mode="after")
-    def _bind_presence_owner(self) -> "HasLook":
+    def _bind_outfit_owner(self) -> "HasOutfit":
         if self.outfit.owner is None:
             self.outfit.owner = self
         return self
+
+    def describe_outfit(self) -> str:
+        """Return a compact phrase describing the current outfit."""
+        return self.outfit.describe()
+
+    def adapt_outfit_media_spec(
+        self,
+        *,
+        ctx: Any = None,
+        media_role: Any = None,
+    ) -> OutfitMediaPayload:
+        """Return the structured outfit payload for media adapters."""
+        _ = ctx
+        return OutfitMediaPayload(
+            description=self.describe_outfit(),
+            items=self.outfit.describe_items(),
+            media_role=_raw_value_text(media_role),
+        )
+
+    @contribute_ns
+    def provide_outfit_symbols(self) -> dict[str, Any]:
+        """Publish direct outfit symbols into the entity-local namespace."""
+        media_payload = self.adapt_outfit_media_spec()
+        return {
+            "outfit": self.outfit,
+            "outfit_description": media_payload.description,
+            "outfit_tokens": list(media_payload.items),
+            "outfit_media_payload": media_payload,
+        }
+
+
+class HasOrnamentation(Entity):
+    """Direct facet exposing ornament state and ornament-driven adapters."""
+
+    ornamentation: Ornamentation = Field(default_factory=Ornamentation)
+
+    def describe_ornamentation(self, *, possessive: str = "their") -> str:
+        """Return a compact phrase describing current ornamentation."""
+        return self.ornamentation.describe_summary(possessive=possessive)
+
+    def adapt_ornament_media_spec(
+        self,
+        *,
+        ctx: Any = None,
+        media_role: Any = None,
+    ) -> OrnamentMediaPayload:
+        """Return the structured ornament payload for media adapters."""
+        _ = ctx
+        return OrnamentMediaPayload(
+            description=self.describe_ornamentation(possessive="their"),
+            items=self.ornamentation.describe_items(possessive="their"),
+            media_role=_raw_value_text(media_role),
+        )
+
+    @contribute_ns
+    def provide_ornamentation_symbols(self) -> dict[str, Any]:
+        """Publish direct ornament symbols into the entity-local namespace."""
+        media_payload = self.adapt_ornament_media_spec()
+        return {
+            "ornamentation": self.ornamentation,
+            "ornament_description": media_payload.description,
+            "ornament_tokens": list(media_payload.items),
+            "ornament_media_payload": media_payload,
+        }
+
+
+class HasLook(HasSimpleLook, HasOutfit, HasOrnamentation):
+    """HasLook()
+
+    Visual bundle exposing look, outfit, and ornaments on story-capable entities.
+
+    Why
+    ----
+    ``HasLook`` is the author-facing bundle for the ``presence/look`` family.
+    It keeps the richer visual contract ergonomic while still allowing worlds to
+    opt into the direct subfacets independently.
+    """
 
     def describe_look(
         self,
@@ -349,28 +485,12 @@ class HasLook(Entity):
         )
 
     @contribute_ns
-    def provide_look_symbols(self) -> dict[str, Any]:
-        """Publish appearance symbols into the entity-local namespace."""
+    def provide_visual_look_symbols(self) -> dict[str, Any]:
+        """Publish bundle-level visual symbols into the entity-local namespace."""
         payload: dict[str, Any] = {
-            "look": self.look,
             "look_description": self.describe_look(),
             "look_media_payload": self.adapt_look_media_spec(),
-            "outfit": self.outfit,
-            "ornamentation": self.ornamentation,
-            "apparent_gender": self.look.apparent_gender,
         }
-
-        outfit_description = self.outfit.describe()
-        if outfit_description:
-            payload["outfit_description"] = outfit_description
-
-        ornament_description = self.ornamentation.describe_summary(possessive="their")
-        if ornament_description:
-            payload["ornament_description"] = ornament_description
-
-        if self.look.apparent_age is not None:
-            payload["apparent_age"] = self.look.apparent_age
-
         return payload
 
     def _provide_look_desc(self) -> dict[str, str]:
@@ -380,3 +500,15 @@ class HasLook(Entity):
     def _provide_media_spec(self) -> LookMediaPayload:
         """Compatibility helper returning the structured look media payload."""
         return self.adapt_look_media_spec()
+
+
+__all__ = [
+    "HasLook",
+    "HasOrnamentation",
+    "HasOutfit",
+    "HasSimpleLook",
+    "Look",
+    "LookMediaPayload",
+    "OrnamentMediaPayload",
+    "OutfitMediaPayload",
+]

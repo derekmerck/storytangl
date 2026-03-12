@@ -17,6 +17,7 @@ from tangl.core import Graph, Record, Selector, Singleton, TemplateRegistry, Tok
 from tangl.media.media_resource import MediaInventory, MediaResourceRegistry
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
+    do_compose_journal,
     do_finalize,
     do_gather_ns,
     do_get_media_inventories,
@@ -28,6 +29,7 @@ from tangl.vm.dispatch import (
     do_provision,
     do_update,
     do_validate,
+    on_compose_journal,
     on_finalize,
     on_gather_ns,
     on_get_media_inventories,
@@ -77,6 +79,16 @@ class TestHookRegistration:
         behaviors = list(vm_dispatch.find_all(Selector(task="render_journal")))
         assert len(behaviors) >= 1
 
+    def test_on_compose_journal_registers(self) -> None:
+        fragment = Record()
+
+        @on_compose_journal
+        def my_compose(*, caller, ctx, fragments, **kw):
+            return fragment
+
+        behaviors = list(vm_dispatch.find_all(Selector(task="compose_journal")))
+        assert len(behaviors) >= 1
+
     def test_on_hook_works_as_decorator_with_kwargs(self) -> None:
         @on_update(priority=0)
         def early_update(*, caller, ctx, **kw):
@@ -93,6 +105,7 @@ class TestHookRegistration:
             (on_prereqs, "get_prereqs"),
             (on_update, "apply_update"),
             (on_journal, "render_journal"),
+            (on_compose_journal, "compose_journal"),
             (on_finalize, "finalize_step"),
             (on_postreqs, "get_postreqs"),
             (on_gather_ns, "gather_ns"),
@@ -205,6 +218,57 @@ class TestDoJournal:
         node = _node(g, label="n")
         with pytest.raises(TypeError, match="render_journal"):
             do_journal(node, ctx=null_ctx)
+
+    def test_compose_handler_receives_merged_fragments_and_can_replace_output(self, null_ctx) -> None:
+        first = Record(label="first")
+        second = Record(label="second")
+        seen: dict[str, list[Record]] = {}
+
+        on_journal(lambda *, caller, ctx, **kw: first)
+        on_journal(lambda *, caller, ctx, **kw: second)
+
+        @on_compose_journal
+        def _compose(*, caller, ctx, fragments, **kw):
+            seen["fragments"] = list(fragments)
+            return [Record(label="composed")]
+
+        g = Graph()
+        node = _node(g, label="n")
+        result = do_journal(node, ctx=null_ctx)
+
+        assert seen["fragments"] == [first, second]
+        assert isinstance(result, Record)
+        assert result.label == "composed"
+
+
+class TestDoComposeJournal:
+    """do_compose_journal uses last non-None replacement semantics."""
+
+    def test_no_handlers_returns_none(self, null_ctx) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+        assert do_compose_journal(node, ctx=null_ctx, fragments=[Record(label="raw")]) is None
+
+    def test_last_non_none_result_wins(self, null_ctx) -> None:
+        first = Record(label="first")
+        second = Record(label="second")
+
+        on_compose_journal(lambda *, caller, ctx, fragments, **kw: [first])
+        on_compose_journal(lambda *, caller, ctx, fragments, **kw: None)
+        on_compose_journal(lambda *, caller, ctx, fragments, **kw: [second])
+
+        g = Graph()
+        node = _node(g, label="n")
+        result = do_compose_journal(node, ctx=null_ctx, fragments=[Record(label="raw")])
+
+        assert result == [second]
+
+    def test_invalid_compose_payload_raises(self, null_ctx) -> None:
+        on_compose_journal(lambda *, caller, ctx, fragments, **kw: "bad")
+        g = Graph()
+        node = _node(g, label="n")
+        with pytest.raises(TypeError, match="compose_journal"):
+            do_compose_journal(node, ctx=null_ctx, fragments=[Record(label="raw")])
 
 
 class TestDoProvision:

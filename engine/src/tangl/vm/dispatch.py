@@ -121,7 +121,7 @@ def _assert_redirect_result(value, *, task: str):
     raise TypeError(f"{task} must return a traversable edge or None, got {type(value)!r}")
 
 
-def _assert_journal_result(value):
+def _assert_fragment_result(value, *, task: str):
     from .fragments import Fragment
 
     def _coerce_fragment(item):
@@ -149,12 +149,12 @@ def _assert_journal_result(value):
             normalized_fragment = _coerce_fragment(fragment)
             if normalized_fragment is None:
                 raise TypeError(
-                    "render_journal iterable entries must be Record-compatible fragment values"
+                    f"{task} iterable entries must be Record-compatible fragment values"
                 )
             fragments.append(normalized_fragment)
         return fragments
     raise TypeError(
-        "render_journal must return Record | Iterable[Record] | None"
+        f"{task} must return Record | Iterable[Record] | None"
     )
 
 
@@ -174,6 +174,7 @@ on_provision = _make_on_hook("provision_node")
 on_prereqs   = _make_on_hook("get_prereqs")
 on_update    = _make_on_hook("apply_update")
 on_journal   = _make_on_hook("render_journal")
+on_compose_journal = _make_on_hook("compose_journal")
 on_finalize  = _make_on_hook("finalize_step")
 on_postreqs  = _make_on_hook("get_postreqs")
 
@@ -216,7 +217,7 @@ def do_journal(caller, *, ctx, **kwargs):
 
     merged: list[Record] = []
     for value in results:
-        normalized = _assert_journal_result(value)
+        normalized = _assert_fragment_result(value, task="render_journal")
         if normalized is None:
             continue
         if isinstance(normalized, Record):
@@ -226,9 +227,30 @@ def do_journal(caller, *, ctx, **kwargs):
 
     if not merged:
         return None
+    composed = do_compose_journal(caller, ctx=ctx, fragments=list(merged), **kwargs)
+    if composed is not None:
+        merged = [composed] if isinstance(composed, Record) else list(composed)
     if len(merged) == 1:
         return merged[0]
     return merged
+
+
+def do_compose_journal(caller, *, fragments: list[Record], ctx, **kwargs):
+    """Run optional post-merge journal composition handlers."""
+    receipts = _run_task(
+        "compose_journal",
+        caller=caller,
+        ctx=ctx,
+        fragments=list(fragments),
+        **kwargs,
+    )
+    result = CallReceipt.last_result(*receipts)
+    normalized = _assert_fragment_result(result, task="compose_journal")
+    if normalized is None:
+        return None
+    if isinstance(normalized, Record):
+        return normalized
+    return list(normalized)
 
 
 def do_finalize(caller, *, ctx, **kwargs):

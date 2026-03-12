@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from tangl.mechanics.presence.look.look import HasLook
+from tangl.mechanics.presence.look.look import HasLook, HasOutfit, HasSimpleLook
 from tangl.mechanics.presence.outfit import OutfitManager
 
 
@@ -13,6 +13,8 @@ MECHANICS_SRC = REPO_ROOT / "engine" / "src" / "tangl" / "mechanics"
 
 def test_look_uses_promoted_outfit_surface() -> None:
     assert HasLook.model_fields["outfit"].annotation is OutfitManager
+    assert HasOutfit.model_fields["outfit"].annotation is OutfitManager
+    assert "look" in HasSimpleLook.model_fields
 
 
 def test_active_mechanics_do_not_import_scratch_or_examples() -> None:
