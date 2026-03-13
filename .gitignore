@@ -4,6 +4,7 @@
 !hash_secret.py
 !test_hash_secret.py
 *.local*
+/codex-skills/
 
 # temporary
 dump*

@@ -1,4 +1,0 @@
-interface:
-  display_name: "ast-grep"
-  short_description: "Syntax-aware code search with ast-grep"
-  default_prompt: "Use ast-grep for structural code search, rewrites, and rule authoring."
