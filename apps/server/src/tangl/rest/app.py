@@ -1,7 +1,5 @@
 """
-FastAPI_ api, media, and docs server for StoryTangl narrative engine.
-
-_fastapi: https://fastapi.tiangolo.com/
+FastAPI API, media, and docs server for StoryTangl narrative engine.
 
 ```bash
 $ tangl-serve
@@ -20,7 +18,7 @@ $ uvicorn tangl.rest.app:app
 
 Default mounts:
 - api:   `/api/v2`
-- spec:  `/api/v2/openapi`
+- spec:  `/api/v2/openapi.json`
 - docs:  `/docs`
 - media: `/media`
 
