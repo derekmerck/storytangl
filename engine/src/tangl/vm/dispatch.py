@@ -3,7 +3,8 @@
 
 This module provides the registration (``on_*``) and execution (``do_*``) surface
 for every phase in the resolution pipeline, plus the namespace gathering hook
-that composes scoped context from the hierarchy.
+that assembles scoped context from entity-local publication plus dispatch
+contributors.
 
 Design Principle — Explicit Names, DRY Bodies
 ----------------------------------------------
@@ -15,7 +16,8 @@ The ``on_resolve`` / ``do_resolve`` hook is separate because it has a different 
 signature (takes ``requirement`` + ``offers``, not ``caller``).
 
 The ``on_gather_ns`` / ``do_gather_ns`` hook family is separate because it
-composes per-entity namespace maps with dispatch contributions.
+assembles scoped namespaces from per-entity ``get_ns()`` publication plus
+immediate dispatch contributions.
 
 See Also
 --------
@@ -282,7 +284,7 @@ def do_postreqs(caller, *, ctx, **kwargs):
 # ---------------------------------------------------------------------------
 
 def on_gather_ns(func=None, **kwargs):
-    """Register a namespace contributor for the ``gather_ns`` task.
+    """Register a contributor to assembled scoped namespaces.
 
     Use ``wants_caller_kind=Type`` to filter by caller type and
     ``wants_exact_kind=False`` to allow subclass matches.
@@ -449,10 +451,13 @@ def _merge_nested_layers(
 
 
 def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
-    """Build a scoped namespace in two phases.
+    """Assemble the scoped namespace for ``node`` in two phases.
 
-    Phase 1: collect ``get_ns()`` from caller and its ancestor chain.
-    Phase 2: execute immediate-caller ``gather_ns`` dispatch handlers.
+    Phase 1 calls entity-local ``get_ns()`` on ``node`` and its ancestor chain.
+    Phase 2 merges immediate-caller ``gather_ns`` dispatch contributions.
+
+    The resulting ``ChainMap`` is the assembled scoped view consumed by
+    ``PhaseCtx.get_ns(node)`` and availability/render helpers.
     """
     _validate_dispatch_ctx(ctx)
 

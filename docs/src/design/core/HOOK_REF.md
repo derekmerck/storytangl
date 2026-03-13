@@ -9,6 +9,8 @@ Hookable Dispatch Tasks
 
 core/global hooks
 -----------------
+- ``get_ns()`` is an entity facet, not a dispatch hook: it returns only that
+  entity's local namespace publication maps.
 - on_create:   cls, attrs -> new cls, attrs   # create story, node (world not loaded yet)
 - on_init:     obj        -> in place         # init story, node (world not init'd yet)
 - on_un/link:  Edge       -> in place         # un/link nodes
@@ -17,7 +19,7 @@ core/global hooks
 vm/system hooks
 ---------------
 New tasks:
-- on_get_ns:     anchor     -> map            # gather ns from structural domains
+- on_gather_ns:  anchor     -> map            # contribute to assembled scoped namespace
 - on_validate:   anchor     -> bool           # check conditions
 - on_pre/postreq: anchor    -> Edge           # check for redirects
 - on_planning:   anchor     -> in place       # provision graph

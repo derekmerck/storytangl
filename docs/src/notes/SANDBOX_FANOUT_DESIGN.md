@@ -90,15 +90,17 @@ Actors move between locations on a schedule. Their conversation/event
 blocks are only discoverable when the actor is "present" at the current
 hub. In v38, this is a two-part mechanism:
 
-**Part A - Actor presence** is a namespace value. The actor's schedule
-determines their current location, published via `on_get_ns`:
+**Part A - Actor presence** is a local namespace publication. The actor's
+current location can be derived from its own stored schedule state and then
+gathered into scoped runtime views:
 
 ```python
-@on_get_ns()
-def _publish_location(self, *, ctx, **_):
-    schedule = self.locals.get("schedule") or []
-    world_time = ctx.get_ns_value("world_time")
-    return {"current_location": resolve_schedule(schedule, world_time)}
+from tangl.core import contribute_ns
+
+
+@contribute_ns
+def provide_location_symbols(self):
+    return {"current_location": self.locals.get("current_location")}
 ```
 
 **Part B - Conversation fanout** uses the presence value as a condition.
@@ -139,13 +141,16 @@ during the ENTER phase if its conditions are met.
 ## World Time as Namespace
 
 The v3.0 system had `WorldTime` as a dedicated model with period/day/
-month/season/year. In v38, this is a namespace provider on the story
-graph or world:
+month/season/year. In v38, this can be published locally on the story
+graph or world and then gathered into scope:
 
 ```python
-@on_get_ns()
-def _publish_world_time(self, *, ctx, **_):
-    turn = ctx.get_ns_value("world_turn") or 0
+from tangl.core import contribute_ns
+
+
+@contribute_ns
+def provide_world_time_symbols(self):
+    turn = self.locals.get("world_turn", 0)
     return {
         "world_time": WorldTime.from_turn(turn),
         "world_turn": turn,
@@ -255,7 +260,7 @@ cleaner for activities that multiple hubs might share.
 | `SandboxLocation` | `Location` concept with conditional admission |
 | `SandboxRole` / `MobileActor` | `Actor` concept with schedule in locals |
 | `SandboxSchedule` | Namespace provider + condition expressions |
-| `WorldTime` | Derived dataclass, published via `on_get_ns` |
+| `WorldTime` | Derived dataclass, published locally via `get_ns()` / `@contribute_ns` |
 | `SandboxConnection` | `Action` edge with travel-time effects |
 | `SandboxGrid` | Grid codec producing standard hub + action topology |
 
@@ -275,4 +280,3 @@ The v38 fanout interpretation is better because it:
 
 This is not just a cleanup. It makes sandbox mechanics composable with
 all the other systems already in the engine.
-

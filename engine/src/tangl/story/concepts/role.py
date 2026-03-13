@@ -14,7 +14,7 @@ from .narrator_knowledge import HasNarratorKnowledge
 class Role(HasNarratorKnowledge, Dependency[Actor]):
     """Role()
 
-    Story-specific dependency edge that binds an actor provider into local scope.
+    Story-specific dependency edge that binds an actor provider into gathered scope.
 
     Why
     ----
@@ -35,8 +35,8 @@ class Role(HasNarratorKnowledge, Dependency[Actor]):
 
     API
     ---
-    - :meth:`provide_role_symbols` returns the namespace payload contributed by
-      the resolved actor.
+    - :meth:`provide_role_symbols` returns the local symbol payload reused by
+      gather-time assembly.
 
     See also
     --------
@@ -64,7 +64,7 @@ class Role(HasNarratorKnowledge, Dependency[Actor]):
         return {key: item for key, item in payload.items() if item is not provider}
 
     def provide_role_symbols(self) -> dict[str, Any]:
-        """Publish role/provider symbols for namespace composition."""
+        """Publish role/provider symbols for gather-time namespace assembly."""
         provider = self.provider
         label = self.get_label()
         if provider is None or not label:
@@ -83,7 +83,7 @@ def _role_sort_key(role: Role) -> tuple[str, str]:
 
 @on_gather_ns
 def contribute_roles(*, caller, ctx, **_kw):
-    """Inject role providers and role metadata into scoped namespaces."""
+    """Inject role providers and role metadata into assembled scoped namespaces."""
     if not hasattr(caller, "edges_out"):
         return None
 

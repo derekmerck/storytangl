@@ -122,11 +122,11 @@ class PhaseCtx:
 
     Namespace
     ---------
-    ``get_ns(node)`` delegates to ``do_gather_ns`` which composes namespace
-    data in two phases: caller/ancestor ``get_ns()`` maps, then immediate-
-    caller dispatch contributors. Results are cached per node UID for the
-    lifetime of this context — the namespace is stable within a single
-    pipeline pass.
+    ``get_ns(node)`` delegates to ``do_gather_ns`` which assembles a scoped
+    namespace in two phases: caller/ancestor entity-local ``get_ns()`` maps,
+    then immediate-caller dispatch contributors. Results are cached per node
+    UID for the lifetime of this context — the assembled view is stable within
+    a single pipeline pass.
 
     The cache is keyed by node UID, so different nodes (cursor vs. frontier
     nodes during PLANNING, different ancestors during condition evaluation)
@@ -138,7 +138,7 @@ class PhaseCtx:
     ---
     - ``get_authorities()`` — authority registries for dispatch expansion.
     - ``get_inline_behaviors()`` — inline behaviors (empty for now).
-    - ``get_ns(node)`` — cached scoped namespace from local + dispatch contributors.
+    - ``get_ns(node)`` — cached assembled scoped namespace for a node.
     - ``get_random()`` — deterministic RNG for this frame.
     - ``cursor`` — the current node (resolved from ``cursor_id``).
 
@@ -252,10 +252,10 @@ class PhaseCtx:
         return self.graph.get(self.cursor_id)
 
     def get_ns(self, node: Node = None) -> ChainMap[str, Any]:
-        """Build or retrieve the cached scoped namespace for a node.
+        """Build or retrieve the cached assembled scoped namespace for a node.
 
-        Delegates to ``do_gather_ns`` on cache miss. The result is cached per
-        node UID for the lifetime of this context.
+        Delegates to ``do_gather_ns`` on cache miss. The assembled result is
+        cached per node UID for the lifetime of this context.
 
         Parameters
         ----------
@@ -265,7 +265,7 @@ class PhaseCtx:
         Returns
         -------
         ChainMap[str, Any]
-            Scoped namespace with closest ancestor first.
+            Assembled scoped namespace with closest scope first.
 
         Notes
         -----

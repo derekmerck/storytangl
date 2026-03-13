@@ -13,7 +13,7 @@ from .narrator_knowledge import HasNarratorKnowledge
 class Setting(HasNarratorKnowledge, Dependency):
     """Setting()
 
-    Story-specific dependency edge that binds a location provider into local scope.
+    Story-specific dependency edge that binds a location provider into gathered scope.
 
     Why
     ----
@@ -34,8 +34,8 @@ class Setting(HasNarratorKnowledge, Dependency):
 
     API
     ---
-    - :meth:`provide_setting_symbols` returns the namespace payload contributed
-      by the resolved provider.
+    - :meth:`provide_setting_symbols` returns the local symbol payload reused
+      by gather-time assembly.
     """
 
     @staticmethod
@@ -56,7 +56,7 @@ class Setting(HasNarratorKnowledge, Dependency):
         return {key: item for key, item in payload.items() if item is not provider}
 
     def provide_setting_symbols(self) -> dict[str, Any]:
-        """Publish setting/provider symbols for namespace composition."""
+        """Publish setting/provider symbols for gather-time namespace assembly."""
         provider = self.provider
         label = self.get_label()
         if provider is None or not label:
@@ -75,7 +75,7 @@ def _setting_sort_key(setting: Setting) -> tuple[str, str]:
 
 @on_gather_ns
 def contribute_settings(*, caller, ctx, **_kw):
-    """Inject setting providers and setting metadata into scoped namespaces."""
+    """Inject setting providers and setting metadata into assembled scoped namespaces."""
     if not hasattr(caller, "edges_out"):
         return None
 

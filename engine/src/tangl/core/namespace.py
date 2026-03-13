@@ -4,10 +4,10 @@ This module defines a small, explicit contract for entity-local namespace
 publication:
 
 - mark fields or methods with ``contribute_ns`` metadata;
-- call ``get_ns()`` to collect this entity's local namespace maps.
+- call ``get_ns()`` to collect only this entity's local namespace maps.
 
 The contract is intentionally instance-bound and dispatch-free. Runtime layers
-compose multiple entity namespaces (for example caller + ancestors + world) via
+assemble scoped namespaces later (for example caller + ancestors + world) via
 their own dispatch hooks.
 """
 
@@ -29,7 +29,7 @@ def contribute_ns(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 class HasNamespace(BaseModelPlus):
-    """Mixin providing instance-local namespace assembly."""
+    """Mixin providing instance-local namespace publication."""
 
     @staticmethod
     def _as_mapping(name: str, value: Any) -> Mapping[str, Any]:
@@ -62,7 +62,12 @@ class HasNamespace(BaseModelPlus):
         return payload
 
     def get_ns(self) -> ChainMap[str, Any]:
-        """Return this entity's local namespace contribution maps."""
+        """Return only this entity's local namespace contribution maps.
+
+        Runtime layers assemble scoped views later via ``do_gather_ns`` /
+        ``ctx.get_ns(node)``; this method does not walk ancestors or consult
+        dispatch handlers.
+        """
         maps: list[Mapping[str, Any]] = []
 
         for name in type(self)._match_fields(contribute_ns=True):

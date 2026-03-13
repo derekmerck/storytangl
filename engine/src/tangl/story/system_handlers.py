@@ -2,7 +2,7 @@
 
 This module registers the story-layer handlers that:
 
-* expose story and world locals into render namespaces,
+* contribute story and world locals during gathered namespace assembly,
 * contribute template scopes and token catalogs for runtime provisioning, and
 * turn a :class:`~tangl.story.episode.block.Block` cursor into journal
   fragments during the JOURNAL phase.
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 @on_gather_ns
 def gather_story_graph_locals(*, caller, ctx, **_kw):
-    """Inject story-graph locals for current runtime scope."""
+    """Inject story-graph locals into the assembled runtime namespace."""
     graph = getattr(caller, "graph", None)
     locals_ = getattr(graph, "locals", None) if graph is not None else None
     if isinstance(locals_, dict) and locals_:
@@ -57,7 +57,7 @@ def gather_story_graph_locals(*, caller, ctx, **_kw):
 
 @on_gather_ns(priority=Priority.EARLY)
 def gather_story_world_locals(*, caller, ctx, **_kw):
-    """Inject world locals when present on attached world.
+    """Inject world locals into the assembled runtime namespace.
 
     World locals intentionally run before story-graph locals so graph values
     can override world defaults when keys overlap.

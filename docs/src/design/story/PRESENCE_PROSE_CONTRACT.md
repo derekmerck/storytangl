@@ -27,11 +27,11 @@ The live engine already has some of the right seams, but not the full prose
 subsystem yet.
 
 - Story JOURNAL handlers receive a real `PhaseCtx`.
-- `PhaseCtx` is ephemeral and primarily used for scoped namespace gathering via
-  `ctx.get_ns(node)`.
+- `PhaseCtx` is ephemeral and primarily used for assembled scoped namespace
+  access via `ctx.get_ns(node)`.
 - Persistent session state lives on `Ledger`.
 - `render_block_content()` currently renders block text through namespace
-  gathering plus `str.format_map`, not Jinja or concept-driven prose filters.
+  assembly plus `str.format_map`, not Jinja or concept-driven prose filters.
 - There is no active `tangl.prose` package yet.
 - Raw JOURNAL emission and post-merge composition are now distinct seams:
   - `render_journal` emits raw fragments,
@@ -132,9 +132,10 @@ This keeps imports one-way:
 
 The migration path should stay parallel and opt-in first.
 
-- `get_ns()` remains the compatibility bridge.
-  Concepts and facets continue to publish symbols into render scope through the
-  namespace system.
+- `get_ns()` is the entity-local publication seam.
+  Concepts and facets publish their own local symbol maps there.
+- `ctx.get_ns(node)` remains the assembled scope accessor.
+  Runtime code renders against the gathered view built by `do_gather_ns`.
 - Presence facets are exposed to JOURNAL in two explicit opt-in ways:
   - prose via namespace symbols consumed by the current `format_map` path,
   - media via explicit `block.media` entries with `source_kind="facet"`.
@@ -169,7 +170,7 @@ The proof should demonstrate:
 - additive role/setting aliases preserving actor-versus-role knowledge
   distinction,
 - and the current engine truth that live story rendering is still
-  `PhaseCtx.get_ns()` plus `format_map`.
+  `PhaseCtx.get_ns(node)` plus `format_map`.
 
 These tests are intentionally self-contained. They prove the contract shape
 without claiming that the full prose subsystem already exists.
