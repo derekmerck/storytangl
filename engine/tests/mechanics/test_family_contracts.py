@@ -1,3 +1,10 @@
+"""Family-contract tests for promoted mechanics surfaces.
+
+This module checks a few high-value package-shape promises for the active
+mechanics families, especially the promoted presence/look surfaces:
+``HasLook``, ``HasOutfit``, ``HasSimpleLook``, and ``OutfitManager``.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -42,4 +49,4 @@ def test_active_mechanics_do_not_import_scratch_or_examples() -> None:
                 if "examples" in parts:
                     violations.append(f"{path}: imports example module {module_name}")
 
-    assert violations == []
+    assert violations == [], f"Expected no violations but found: {violations}"

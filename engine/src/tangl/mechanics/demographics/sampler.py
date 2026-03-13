@@ -54,7 +54,10 @@ class DemographicSampler:
     def sample_country(cls, region: Region = None, weighted: bool = True, rng: Any = None) -> Country:
         region = cls._normalize_region(region, weighted=weighted, rng=rng)
 
-        countries = list(region.countries)  # it's a set, so order it
+        countries = sorted(
+            region.countries,
+            key=lambda country: getattr(country, "label", "") or getattr(country, "name", ""),
+        )
 
         if not countries:
             raise IndexError('No countries found')
@@ -141,6 +144,19 @@ class DemographicSampler:
         return gender
 
     @classmethod
+    def _normalize_age_range(
+        cls,
+        age_range: AgeRange = None,
+        weighted: bool = True,
+        rng: Any = None,
+    ) -> AgeRange:
+        if age_range is None:
+            age_range = cls.sample_age_range(weighted=weighted, rng=rng)
+        elif not isinstance(age_range, AgeRange):
+            age_range = AgeRange(age_range)
+        return age_range
+
+    @classmethod
     def _normalize_nb(cls, namebank: NameBank | str) -> NameBank:
         if namebank is None:
             raise KeyError(f'No NameBank provided')
@@ -196,11 +212,25 @@ class DemographicSampler:
         rng: Any = None,
     ) -> DemographicData:
 
-        region = region or cls.sample_region(weighted=weighted, rng=rng)
-        country = country or cls.sample_country(region=region, weighted=weighted, rng=rng)
-        subtype = subtype or cls.sample_subtype(country=country, weighted=weighted, rng=rng)
-        gender = gender or cls.sample_gender(weighted=weighted, rng=rng)
-        age_range = age_range or cls.sample_age_range(weighted=weighted, rng=rng)
+        country = (
+            cls._normalize_country(country, region=region, weighted=weighted, rng=rng)
+            if country is not None
+            else None
+        )
+
+        if region is None and country is not None:
+            region = country.region
+        region = cls._normalize_region(region, weighted=weighted, rng=rng)
+        country = cls._normalize_country(country, region=region, weighted=weighted, rng=rng)
+        subtype = cls._normalize_subtype(
+            subtype,
+            country=country,
+            region=region,
+            weighted=weighted,
+            rng=rng,
+        )
+        gender = cls._normalize_gender(gender, weighted=weighted, rng=rng)
+        age_range = cls._normalize_age_range(age_range, weighted=weighted, rng=rng)
 
         nb = country.namebank(subtype)
         given_name, family_name = cls.sample_namebank(nb, gender=gender, rng=rng)

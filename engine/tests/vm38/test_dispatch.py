@@ -44,6 +44,7 @@ from tangl.vm.dispatch import (
 )
 import tangl.vm as vm38_api
 import tangl.vm.dispatch as vm38_dispatch_api
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import AnonymousEdge, TraversableNode
 
 
@@ -240,6 +241,28 @@ class TestDoJournal:
         assert isinstance(result, Record)
         assert result.label == "composed"
 
+    def test_compose_handler_can_inspect_prior_render_results_on_ctx_pipe(self) -> None:
+        first = Record(label="first")
+        second = Record(label="second")
+        seen: dict[str, list[object]] = {}
+
+        on_journal(lambda *, caller, ctx, **kw: first)
+        on_journal(lambda *, caller, ctx, **kw: second)
+
+        @on_compose_journal
+        def _compose(*, caller, ctx, fragments, **kw):
+            seen["results"] = list(ctx.results)
+            return None
+
+        g = Graph()
+        node = _node(g, label="n")
+        ctx = PhaseCtx(graph=g, cursor_id=node.uid)
+
+        result = do_journal(node, ctx=ctx)
+
+        assert seen["results"] == [first, second]
+        assert result == [first, second]
+
 
 class TestDoComposeJournal:
     """do_compose_journal uses last non-None replacement semantics."""
@@ -261,6 +284,29 @@ class TestDoComposeJournal:
         node = _node(g, label="n")
         result = do_compose_journal(node, ctx=null_ctx, fragments=[Record(label="raw")])
 
+        assert result == [second]
+
+    def test_later_handlers_can_inspect_prior_compose_results_on_ctx_pipe(self) -> None:
+        first = Record(label="first")
+        second = Record(label="second")
+        seen: dict[str, list[object]] = {}
+
+        @on_compose_journal
+        def _first(*, caller, ctx, fragments, **kw):
+            return [first]
+
+        @on_compose_journal
+        def _second(*, caller, ctx, fragments, **kw):
+            seen["results"] = list(ctx.results)
+            return [second]
+
+        g = Graph()
+        node = _node(g, label="n")
+        ctx = PhaseCtx(graph=g, cursor_id=node.uid)
+
+        result = do_compose_journal(node, ctx=ctx, fragments=[Record(label="raw")])
+
+        assert seen["results"] == [[first]]
         assert result == [second]
 
     def test_invalid_compose_payload_raises(self, null_ctx) -> None:
@@ -315,6 +361,26 @@ class TestDiscoveryHooks:
         node = _node(g, label="n")
         registries = do_get_template_scope_groups(node, ctx=null_ctx)
         assert registries == [first_registry, second_registry]
+
+    def test_discovery_subdispatch_uses_fresh_ctx_result_pipe(self) -> None:
+        first_registry = TemplateRegistry(label="first")
+        seen: dict[str, list[object]] = {}
+
+        @on_get_template_scope_groups
+        def first(*, caller, ctx, **kw):
+            seen["during"] = list(ctx.results)
+            return [first_registry]
+
+        g = Graph()
+        node = _node(g, label="n")
+        ctx = PhaseCtx(graph=g, cursor_id=node.uid)
+        ctx.push_result("outer")
+
+        registries = do_get_template_scope_groups(node, ctx=ctx)
+
+        assert seen["during"] == []
+        assert ctx.results == ["outer"]
+        assert registries == [first_registry]
 
     def test_template_scope_groups_invalid_shape_raises(self, null_ctx) -> None:
         @on_get_template_scope_groups

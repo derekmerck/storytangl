@@ -8,6 +8,7 @@ import pytest
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core.runtime_op import Predicate
+from tangl.discourse.dialog import DialogMuBlock
 from tangl.journal.discourse import AttributedFragment
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.lang.body_parts import BodyPart, BodyRegion
@@ -424,6 +425,33 @@ def test_dispatch_journal_dialog_composition_enriches_speaker_formatting() -> No
     assert fragment.media_payload["attitude"] == "annoyed"
 
 
+def test_dialog_mu_block_rebinding_resets_stale_speaker_state_and_sanitizes_tags() -> None:
+    _graph, _block, guide = _presence_story()
+    mu_block = DialogMuBlock(
+        text="Welcome.",
+        label="Guide Actor",
+        dialog_class="NPC.annoyed",
+    )
+
+    mu_block.bind(ns={"Guide Actor": guide}, ctx=None)
+
+    assert "dialog_class:npc_annoyed" in mu_block.presentation_hints.style_tags
+    assert "speaker_key:guide_actor" in mu_block.presentation_hints.style_tags
+    assert mu_block.speaker_id == str(guide.uid)
+    assert mu_block.media_payload is not None
+
+    mu_block.label = "Unknown Person"
+    mu_block.bind(ns={}, ctx=None)
+    fragment = mu_block.to_fragment()
+
+    assert mu_block.speaker_id is None
+    assert mu_block.speaker_key is None
+    assert mu_block.speaker_label is None
+    assert mu_block.media_payload is None
+    assert "speaker:unknown_person" in mu_block.presentation_hints.style_tags
+    assert "speaker:unknown_person" in fragment.tags
+
+
 def test_render_block_facade_uses_compose_journal_with_phase_ctx() -> None:
     graph, block, _guide = _presence_story(
         content="> [!spoken] {guide_name}\n> Welcome.",
@@ -593,6 +621,30 @@ def test_render_block_media_facet_empty_payload_emits_placeholder() -> None:
     assert isinstance(fragments[0], JournalMediaFragment)
     assert fragments[0].content["source_kind"] == "facet"
     assert fragments[0].content["unresolved_reason"] == "empty_facet_payload"
+
+
+def test_render_block_media_facet_metadata_only_payload_uses_fallback_text() -> None:
+    graph = StoryGraph()
+    block = Block(
+        label="start",
+        media=[
+            {
+                "source_kind": "facet",
+                "subject": "guide",
+                "facet": "look",
+                "fallback_text": "No portrait available.",
+            }
+        ],
+    )
+    graph.add(block)
+
+    subject = SimpleNamespace(adapt_look_media_spec=lambda **_kw: {"media_role": "avatar_im"})
+    fragments = render_block_media(caller=block, ctx=_ctx_with_ns({"guide": subject}))
+
+    assert fragments is not None
+    assert len(fragments) == 1
+    assert isinstance(fragments[0], ContentFragment)
+    assert fragments[0].content == "No portrait available."
 
 
 def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_fallback() -> None:

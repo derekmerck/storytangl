@@ -94,6 +94,20 @@ def _make_on_hook(task: str) -> Callable:
     return on_hook
 
 
+def _push_ctx_result(ctx: Any, value: Any) -> None:
+    push_result = getattr(ctx, "push_result", None)
+    if callable(push_result):
+        push_result(value)
+
+
+def _materialize_receipts(receipts: Iterable[CallReceipt], *, ctx: Any) -> list[CallReceipt]:
+    materialized: list[CallReceipt] = []
+    for receipt in receipts:
+        materialized.append(receipt)
+        _push_ctx_result(ctx, receipt.result)
+    return materialized
+
+
 def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
     _validate_dispatch_ctx(ctx)
     receipts = dispatch.execute_all(
@@ -102,7 +116,7 @@ def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
         ctx=ctx,
         selector=Selector(caller_kind=type(caller)),
     )
-    return list(receipts)
+    return _materialize_receipts(receipts, ctx=ctx)
 
 
 def _subdispatch_context(ctx: Any):
@@ -458,11 +472,14 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
             _coerce_ns_layers(get_ns(), source=f"{type(ancestor).__name__}.get_ns"),
         )
 
-    receipts = dispatch.execute_all(
+    receipts = _materialize_receipts(
+        dispatch.execute_all(
         task="gather_ns",
         call_kwargs={"caller": node},
         ctx=ctx,
         selector=Selector(caller_kind=type(node)),
+        ),
+        ctx=ctx,
     )
     dispatch_result = CallReceipt.merge_results(*receipts)
     layers.extend(_coerce_ns_layers(dispatch_result, source="gather_ns handler"))
@@ -478,11 +495,14 @@ def do_get_template_scope_groups(caller, *, ctx) -> list["TemplateRegistry"]:
     """Execute template-scope discovery handlers and return merged registries."""
     _validate_dispatch_ctx(ctx)
     with _subdispatch_context(ctx) as subctx:
-        receipts = dispatch.execute_all(
-            task="get_template_scope_groups",
-            call_kwargs={"caller": caller},
+        receipts = _materialize_receipts(
+            dispatch.execute_all(
+                task="get_template_scope_groups",
+                call_kwargs={"caller": caller},
+                ctx=subctx,
+                selector=Selector(caller_kind=type(caller)),
+            ),
             ctx=subctx,
-            selector=Selector(caller_kind=type(caller)),
         )
         merged = CallReceipt.merge_results(*receipts)
     return _coerce_template_registries(
@@ -502,11 +522,14 @@ def do_get_token_catalogs(
 
     selector = Selector(caller_kind=type(caller)) if caller is not None else None
     with _subdispatch_context(ctx) as subctx:
-        receipts = dispatch.execute_all(
-            task="get_token_catalogs",
-            call_kwargs={"caller": caller, "requirement": requirement},
+        receipts = _materialize_receipts(
+            dispatch.execute_all(
+                task="get_token_catalogs",
+                call_kwargs={"caller": caller, "requirement": requirement},
+                ctx=subctx,
+                selector=selector,
+            ),
             ctx=subctx,
-            selector=selector,
         )
         merged = CallReceipt.merge_results(*receipts)
     return _coerce_token_catalogs(merged, source="get_token_catalogs handler")
@@ -523,11 +546,14 @@ def do_get_media_inventories(
 
     selector = Selector(caller_kind=type(caller)) if caller is not None else None
     with _subdispatch_context(ctx) as subctx:
-        receipts = dispatch.execute_all(
-            task="get_media_inventories",
-            call_kwargs={"caller": caller, "requirement": requirement},
+        receipts = _materialize_receipts(
+            dispatch.execute_all(
+                task="get_media_inventories",
+                call_kwargs={"caller": caller, "requirement": requirement},
+                ctx=subctx,
+                selector=selector,
+            ),
             ctx=subctx,
-            selector=selector,
         )
         merged = CallReceipt.merge_results(*receipts)
     return _coerce_media_inventories(merged, source="get_media_inventories handler")
@@ -552,9 +578,12 @@ def do_resolve(requirement: Requirement, *, offers: Iterable[ProvisionOffer], ct
     - handler returns ``Iterable[ProvisionOffer]`` to contribute overrides
     """
     _validate_dispatch_ctx(ctx)
-    receipts = dispatch.execute_all(
-        task="resolve_req",
-        call_kwargs={"caller": requirement, "offers": offers},
+    receipts = _materialize_receipts(
+        dispatch.execute_all(
+            task="resolve_req",
+            call_kwargs={"caller": requirement, "offers": offers},
+            ctx=ctx,
+        ),
         ctx=ctx,
     )
     results = CallReceipt.gather_results(*receipts)
@@ -591,6 +620,7 @@ __all__ = [
     "on_prereqs", "do_prereqs",
     "on_update", "do_update",
     "on_journal", "do_journal",
+    "on_compose_journal", "do_compose_journal",
     "on_finalize", "do_finalize",
     "on_postreqs", "do_postreqs",
     # helper decos and invocation

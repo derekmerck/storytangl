@@ -3,6 +3,7 @@ from __future__ import annotations
 """VM phase handlers for game mechanics integration."""
 
 import logging
+from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 from tangl.core import CallReceipt, Selector
@@ -369,15 +370,9 @@ def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
     if game is None:
         return None
 
-    fresh_call_receipts = getattr(ctx, "_fresh_call_receipts", None)
-    if callable(fresh_call_receipts):
-        with fresh_call_receipts():
-            game_receipts = vm_dispatch.dispatch(
-                caller=game,
-                task="generate_journal",
-                ctx=ctx,
-            )
-    else:
+    with_subdispatch = getattr(ctx, "with_subdispatch", None)
+    subdispatch = with_subdispatch() if callable(with_subdispatch) else nullcontext(ctx)
+    with subdispatch:
         game_receipts = vm_dispatch.dispatch(
             caller=game,
             task="generate_journal",

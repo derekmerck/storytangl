@@ -95,7 +95,8 @@ Thin author-facing surfaces that expose the family ergonomically.
 
 - `HasGame`
 - `HasDemographics`
-- future `HasLook`, `HasOutfit`, `HasCredentials`, etc.
+- `HasLook`
+- future `HasOutfit`, `HasCredentials`, etc.
 
 The facade should stay thin. The real logic belongs in kernel, runtime, render,
 and writeback layers.

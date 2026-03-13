@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Narrator-facing epistemic bookkeeping for story concept carriers.
 
 This module keeps narrator knowledge in the story-domain layer as explicit,
@@ -7,6 +5,8 @@ typed annotation state on the concepts it is knowledge of. The live render
 environment remains ephemeral; only the per-concept bookkeeping persists with
 the graph.
 """
+
+from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any

@@ -18,6 +18,7 @@ from uuid import UUID
 
 from tangl.journal.discourse import AttributedFragment
 from tangl.journal.content import ContentFragment, PresentationHints
+from tangl.utils.sanitize_str import sanitize_str
 
 from .mu_block import MuBlock, MuBlockHandler
 
@@ -32,6 +33,13 @@ class DialogSpeakerBinding:
 
 def _normalized_text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _tag_value(value: Any) -> str | None:
+    text = _normalized_text(value)
+    if not text:
+        return None
+    return sanitize_str(text).casefold()
 
 
 def _model_payload(value: Any) -> Any:
@@ -156,6 +164,13 @@ class DialogMuBlock(MuBlock):
 
     def bind(self, *, ns: Mapping[str, Any] | None = None, ctx: Any = None) -> "DialogMuBlock":
         """Resolve speaker metadata against the current render namespace."""
+        self.speaker_key = None
+        self.speaker_id = None
+        self.speaker_label = None
+        self.speaker_name = None
+        self.presentation_hints = None
+        self.media_payload = None
+
         dialog_mode, attitude = _split_dialog_class(self.dialog_class)
         self.dialog_mode = dialog_mode
         self.attitude = attitude
@@ -188,19 +203,17 @@ class DialogMuBlock(MuBlock):
         if not self.speaker_name:
             self.speaker_name = _normalized_text(self.label) or "narrator"
 
-        style_tags = [
-            "dialog",
-            f"dialog_class:{self.dialog_class}",
-            f"dialog_mode:{(self.dialog_mode or 'narration').lower()}",
-        ]
-        if self.speaker_label:
-            style_tags.append(f"speaker:{self.speaker_label}")
-        elif self.label:
-            style_tags.append(f"speaker:{self.label}")
-        if self.speaker_key:
-            style_tags.append(f"speaker_key:{self.speaker_key}")
-        if self.attitude:
-            style_tags.append(f"attitude:{self.attitude}")
+        style_tags = ["dialog"]
+        if dialog_class_tag := _tag_value(self.dialog_class):
+            style_tags.append(f"dialog_class:{dialog_class_tag}")
+        if dialog_mode_tag := _tag_value(self.dialog_mode or "narration"):
+            style_tags.append(f"dialog_mode:{dialog_mode_tag}")
+        if speaker_tag := _tag_value(self.speaker_label or self.label):
+            style_tags.append(f"speaker:{speaker_tag}")
+        if speaker_key_tag := _tag_value(self.speaker_key):
+            style_tags.append(f"speaker_key:{speaker_key_tag}")
+        if attitude_tag := _tag_value(self.attitude):
+            style_tags.append(f"attitude:{attitude_tag}")
 
         self.presentation_hints = PresentationHints(
             style_name=(self.dialog_mode or "narration").lower(),
@@ -210,17 +223,17 @@ class DialogMuBlock(MuBlock):
         return self
 
     def to_fragment(self) -> AttributedFragment:
-        tags: set[str] = {f"dialog_class:{self.dialog_class}"}
-        dialog_mode = (self.dialog_mode or "narration").lower()
-        tags.add(f"dialog_mode:{dialog_mode}")
-        if self.speaker_label:
-            tags.add(f"speaker:{self.speaker_label}")
-        elif self.label:
-            tags.add(f"speaker:{self.label}")
-        if self.speaker_key:
-            tags.add(f"speaker_key:{self.speaker_key}")
-        if self.attitude:
-            tags.add(f"attitude:{self.attitude}")
+        tags: set[str] = set()
+        if dialog_class_tag := _tag_value(self.dialog_class):
+            tags.add(f"dialog_class:{dialog_class_tag}")
+        if dialog_mode_tag := _tag_value(self.dialog_mode or "narration"):
+            tags.add(f"dialog_mode:{dialog_mode_tag}")
+        if speaker_tag := _tag_value(self.speaker_label or self.label):
+            tags.add(f"speaker:{speaker_tag}")
+        if speaker_key_tag := _tag_value(self.speaker_key):
+            tags.add(f"speaker_key:{speaker_key_tag}")
+        if attitude_tag := _tag_value(self.attitude):
+            tags.add(f"attitude:{attitude_tag}")
 
         return AttributedFragment(
             content=self.text,

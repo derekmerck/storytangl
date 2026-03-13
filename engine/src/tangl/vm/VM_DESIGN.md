@@ -218,8 +218,9 @@ story-layer offer manipulation — not for generating new offer sources.
 
 **Nested discovery uses a subdispatch boundary.** Discovery helpers (`do_get_template_scope_groups`
 and `do_get_token_catalogs`) run inside `ctx.with_subdispatch()` when available. In vm38
-today this is a no-op seam, but it establishes the stable contract for future receipt
-buffer isolation in nested dispatch calls.
+today this pushes a fresh per-subdispatch result pipe on `PhaseCtx`, so nested dispatch
+can inspect prior handler outputs through `ctx.results` without smearing those results
+into the parent pipeline pass.
 
 **Aggregation modes match phase semantics.** PREREQS and POSTREQS use `first_result`
 (first redirect wins, subsequent handlers skipped). VALIDATE uses `all_true` (all

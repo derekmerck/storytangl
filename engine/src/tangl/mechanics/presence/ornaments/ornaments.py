@@ -19,7 +19,7 @@ from tangl.core import Entity, Node
 # from tangl.core import Renderable, on_render
 # from tangl.story.story_node import StoryNode
 from tangl.lang.helpers import oxford_join
-from tangl.lang.body_parts import BodyPart
+from tangl.lang.body_parts import BodyPart, BodyRegion
 from .enums import OrnamentType
 
 
@@ -58,16 +58,32 @@ class Ornament(Entity):
         return s
 
     @classmethod
+    def marks_on(
+        cls,
+        ornament_type: OrnamentType,
+        texts: list[str],
+        body_part: BodyPart,
+        *,
+        possessive: str = "their",
+    ) -> str:
+        return cls.describe_mark(ornament_type, texts, body_part, possessive=possessive)
+
+    @classmethod
     def marks_on_her(
         cls,
         ornament_type: OrnamentType,
         texts: list[str],
         body_part: BodyPart,
     ) -> str:
-        return cls.describe_mark(ornament_type, texts, body_part, possessive="her")
+        return cls.marks_on(ornament_type, texts, body_part, possessive="her")
 
     def describe(self):
-        return self.marks_on_her(self.ornament_type, [self.text], self.body_part)
+        return self.marks_on(
+            self.ornament_type,
+            [self.text],
+            self.body_part,
+            possessive="their",
+        )
 
 
 # todo: should implement this like outfit manager/credential manager
@@ -76,10 +92,26 @@ class Ornamentation(Node):
     collection: list[Ornament] = Field(default_factory=list)
 
     def by_part_type(self, covered_regions: list[Any] = None) -> dict[tuple[OrnamentType, BodyPart], list[Ornament]]:
-        # todo: filter covered regions
         covered_regions = covered_regions or []
+        covered_mask = BodyPart.NONE
+        for region in covered_regions:
+            if isinstance(region, BodyRegion):
+                covered_mask |= region.to_part_mask()
+            elif isinstance(region, BodyPart):
+                covered_mask |= region
+            elif isinstance(region, str):
+                resolved_region = BodyRegion._missing_(region)
+                if isinstance(resolved_region, BodyRegion):
+                    covered_mask |= resolved_region.to_part_mask()
+                    continue
+                resolved_part = BodyPart._missing_(region)
+                if isinstance(resolved_part, BodyPart):
+                    covered_mask |= resolved_part
+
         res = defaultdict(list)
         for ornament in self.collection:
+            if covered_mask and bool(ornament.body_part & covered_mask):
+                continue
             res[ornament.ornament_type, ornament.body_part].append(ornament)
         return dict(res)
 
@@ -120,10 +152,10 @@ class Ornamentation(Node):
 
     # @on_render.register()
     def describe(self) -> dict[str, str]:
-        summary = self.describe_summary(possessive="her")
+        summary = self.describe_summary(possessive="their")
         if not summary:
             return {"ornaments": ""}
-        return {"ornaments": f"She has {summary}."}
+        return {"ornaments": f"They have {summary}."}
 
     def __bool__(self) -> bool:
         return len(self.collection) > 0

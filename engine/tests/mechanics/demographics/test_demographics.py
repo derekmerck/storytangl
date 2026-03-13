@@ -181,6 +181,21 @@ def test_country_sampling(test_data):
     assert country in region.countries
 
 
+def test_country_sampling_orders_region_countries_deterministically(test_data):
+    region = test_data["regions"][0]  # Europe
+    captured: dict[str, list[str]] = {}
+
+    class SpyRandom:
+        def choice(self, options):
+            captured["labels"] = [country.label for country in options]
+            return options[0]
+
+    country = DemographicSampler.sample_country(region, weighted=False, rng=SpyRandom())
+
+    assert captured["labels"] == sorted(country.label for country in region.countries)
+    assert country.label == captured["labels"][0]
+
+
 def test_subtype_sampling(test_data):
     country = test_data["countries"][0]  # France
     subtype = DemographicSampler.sample_subtype(country)
@@ -223,6 +238,27 @@ def test_demographic_sampling_with_params(test_data):
     assert demo_data.country == country
     # assert demo_data.subtype == subtype
     assert demo_data.gender == gender
+
+
+def test_demographic_sampling_normalizes_string_inputs(test_data):
+    demo_data = DemographicSampler.sample_demographic(
+        country="france",
+        subtype="european",
+        gender="XX",
+        age_range="ADULT",
+        rng=random.Random(7),
+    )
+
+    assert isinstance(demo_data.region, Region)
+    assert demo_data.region.label == "europe"
+    assert isinstance(demo_data.country, Country)
+    assert demo_data.country.label == "france"
+    assert isinstance(demo_data.subtype, Subtype)
+    assert demo_data.subtype.label == "european"
+    assert isinstance(demo_data.gender, Gender)
+    assert demo_data.gender is Gender.XX
+    assert isinstance(demo_data.age_range, AgeRange)
+    assert demo_data.age_range is AgeRange.ADULT
 
 
 def test_demonym_property():

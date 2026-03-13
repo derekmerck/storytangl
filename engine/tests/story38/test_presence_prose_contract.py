@@ -207,7 +207,7 @@ class ToyConcept:
         template = env.from_string(self.content, template_class=RecursiveTemplate)
         scope = dict(ns or {})
         scope.setdefault("self", self)
-        return template.render(**scope).strip()
+        return template.render(scope).strip()
 
 
 @dataclass(slots=True)
@@ -259,11 +259,12 @@ class ToyProseAdapter:
             return ToyActor.describe(entity, ns=ns, ctx=ctx)
 
         scope = dict(ns or {})
+        scope.setdefault("self", entity)
         scope.setdefault("look_description", entity.look.description)
         if entity.content:
             env = _build_env(ctx or DiscourseContext())
             template = env.from_string(entity.content, template_class=RecursiveTemplate)
-            return template.render(**scope).strip()
+            return template.render(scope).strip()
         return entity.look.description
 
 

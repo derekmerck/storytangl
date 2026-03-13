@@ -508,7 +508,21 @@ def _is_empty_media_payload(value: Any) -> bool:
         return True
     payload = _json_media_payload(value)
     if isinstance(payload, dict):
-        return not any(bool(item) for item in payload.values())
+        metadata_only_keys = {
+            "attitude",
+            "content_type",
+            "media_role",
+            "pose",
+            "role",
+            "scope",
+            "source",
+            "source_kind",
+        }
+        content_values = [
+            item for key, item in payload.items()
+            if key not in metadata_only_keys
+        ]
+        return not any(bool(item) for item in content_values)
     return False
 
 
