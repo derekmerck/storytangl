@@ -1,11 +1,16 @@
 Media Subsystem Design
 ======================
 
-**Last Updated:** November 2025  
+**Last Updated:** March 2026  
 **Status:** ⚠️ IN PROGRESS **target architecture** for media integration with v3.7
 **Location:** `engine/src/tangl/media/` and `engine/src/tangl/journal/media/`
 
 ---
+
+See also
+--------
+- [`GENERATIVE_MEDIA_DESIGN.md`](GENERATIVE_MEDIA_DESIGN.md) for the sync-first inline
+  spec implementation and the staged async lifecycle design that extends this document.
 
 ## Executive Summary
 
@@ -1398,4 +1403,3 @@ def test_block_emits_media_fragment():
 - Comprehensive test coverage
 - Actual forge implementations (SD, TTS, SVG)
 - Media-specific provisioning tests
-

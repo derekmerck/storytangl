@@ -13,7 +13,7 @@ from .media_resource_registry import MediaResourceRegistry
 class MediaInventory:
     """Provisioner-facing adapter over one media registry."""
 
-    registry: MediaResourceRegistry
+    registry: Any
     scope: str = "world"
     label: str = "media_inventory"
 
@@ -34,13 +34,17 @@ class MediaInventory:
         if isinstance(value, cls):
             return value
 
-        registry: MediaResourceRegistry | None = None
+        registry: Any = None
         if isinstance(value, MediaResourceRegistry):
             registry = value
         else:
             nested = getattr(value, "registry", None)
             if isinstance(nested, MediaResourceRegistry):
                 registry = nested
+            elif callable(getattr(value, "find_all", None)):
+                registry = value
+        if registry is None and callable(getattr(value, "find_all", None)):
+            registry = value
 
         if registry is None:
             return None
@@ -77,9 +81,5 @@ class MediaInventory:
         selector: Selector | None = None,
         sort_key: Callable[[MediaRIT], Any] | None = None,
     ) -> Iterator[MediaRIT]:
-        registries = [inventory.registry for inventory in inventories]
-        return MediaResourceRegistry.chain_find_all(
-            *registries,
-            selector=selector,
-            sort_key=sort_key,
-        )
+        for inventory in inventories:
+            yield from inventory.find_all(selector=selector, sort_key=sort_key)

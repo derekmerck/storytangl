@@ -102,7 +102,8 @@ class Requirement(Selector, Generic[PT]):
             return False
 
         criteria = dict(self.__pydantic_extra__ or {})
-        criteria.pop("has_identifier", None)
+        for key in ("has_identifier", "authored_path", "is_qualified", "is_absolute"):
+            criteria.pop(key, None)
         return Selector(predicate=self.predicate, **criteria).matches(entity)
 
     def _validate_satisfied_by(self, entity: PT) -> bool:
@@ -124,6 +125,9 @@ class Requirement(Selector, Generic[PT]):
     # in provider matching criteria.
     reference_selector: Optional[Selector] = None
     update_template_selector: Optional[Selector] = None
+    media_spec: Any = None
+    media_ref_id: Optional[UUID] = None
+    media_basename: Optional[str] = None
 
 
 class HasRequirement(RegistryAware, Generic[PT]):

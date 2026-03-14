@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar, Optional, Self
+from uuid import UUID
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
@@ -45,6 +46,10 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
     data: Optional[Any] = None
     # Must have one or the other if no pre-computed content hash
     preset_content_hash: bytes | None = Field(default=None, alias="content_hash")
+    spec_fingerprint: str | None = None
+    derivation_spec: dict[str, Any] | None = None
+    execution_spec: dict[str, Any] | None = None
+    source_step_id: UUID | None = None
 
     req_hash: ClassVar[bool] = True
 
@@ -115,6 +120,10 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
     @is_identifier
     def get_content_hash(self) -> Hash:
         return self._resolve_content_hash()
+
+    @is_identifier
+    def get_spec_fingerprint(self) -> str | None:
+        return self.spec_fingerprint
 
     inventory_time: datetime = Field(init=False, default_factory=datetime.now)
     expiry: Optional[datetime | timedelta] = None

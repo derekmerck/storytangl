@@ -13,21 +13,22 @@ Re-establish `tangl.media` as a first-class end-to-end pipeline that covers:
 ## Status
 
 - March 9, 2026: Milestone 1 static-media plumbing is now wired through the v38 resolver path on `codex/v38-media`.
-- Implemented: authority-chain media inventory discovery, resolver offer generation for static media, story/world/sys inventory layering, canonical journal media fragments, shared service-layer dereference, `/media/story/{story_id}/...` serving, and story-media cleanup on drop.
-- Deferred: creator-backed `spec` realization and broader client capability negotiation beyond the first static-profile safeguards.
+- March 14, 2026: Milestone 2 sync inline-spec generation is now wired through story materialization and the resolver path for story-scoped generated media.
+- Implemented: authority-chain media inventory discovery, resolver offer generation for static media, story/world/sys inventory layering, canonical journal media fragments, shared service-layer dereference, `/media/story/{story_id}/...` serving, story-media cleanup on drop, inline `media.spec` loading for sync generation, story-scoped generated `MediaRIT` provenance, and spec-fingerprint dedupe for repeated inline specs.
+- Deferred: pending/failed async lifecycle states, worker dispatch hooks, named `MediaSpecRegistry` templates, and broader client capability negotiation beyond the first static-profile safeguards.
 
 ## Current hooks and what they already provide
 
 ### Script and compile surfaces
 
 - `MediaItemScript` already supports exactly-one-of declarations (`url`, `data`, `name`, `spec`) and a `media_role`. This is a strong contract to keep.  
-- `StoryCompiler` currently normalizes raw `media` lists onto blocks without translating them into typed dependencies.
+- `StoryCompiler` still normalizes raw `media` lists onto blocks, while `StoryMaterializer` now translates static `name` media and supported inline `spec` media into `MediaDep` edges.
 - `MediaCompiler` can index `world/media/**` into a `ResourceManager` and supports organization hints.
 
 ### Runtime and journal surfaces
 
 - `Block.media` is currently `list[dict[str, Any]]` and remains payload-oriented.
-- `render_block_media` emits `MediaFragment` instances with the block payload attached, but without deterministic canonical fields (`content_format`, `scope`, typed references).
+- `render_block_media` now emits canonical `MediaFragment` payloads for resolved static and sync-generated deps (`content_format="rit"`, typed `MediaRIT` content, deterministic scope), while unresolved potential specs still use the placeholder/fallback path.
 
 ### Service and transport surfaces
 

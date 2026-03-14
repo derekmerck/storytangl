@@ -157,7 +157,7 @@ def gather_story_media_inventories(*, caller, requirement=None, ctx, **_kw):
             graph.story_resources = manager
 
     inventories = collect_media_inventories(
-        [manager],
+        [graph, manager],
         caller=caller,
         requirement=requirement,
         graph=graph,

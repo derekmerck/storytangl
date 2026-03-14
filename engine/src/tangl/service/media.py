@@ -52,6 +52,49 @@ def _url_prefix(*, scope: str, world_id: str | None, story_id: str | None) -> st
     return f"/media/world/{world_id}"
 
 
+def _media_root_for_scope(
+    *,
+    scope: str,
+    world_media_root: Path | None = None,
+    story_media_root: Path | None = None,
+    system_media_root: Path | None = None,
+) -> Path | None:
+    if scope == "sys":
+        return system_media_root
+    if scope == "story":
+        return story_media_root
+    return world_media_root
+
+
+def _resolved_rit_payload(
+    rit: MediaRIT,
+    *,
+    payload: dict[str, Any],
+    scope: str,
+    world_id: str | None = None,
+    story_id: str | None = None,
+    world_media_root: Path | None = None,
+    story_media_root: Path | None = None,
+    system_media_root: Path | None = None,
+) -> dict[str, Any]:
+    content_type = getattr(rit, "data_type", None)
+    payload["media_type"] = content_type.value if content_type is not None else None
+    if content_type in _UNSUPPORTED_MEDIA_TYPES:
+        payload["unsupported_reason"] = "unsupported_media_type"
+        return payload
+
+    prefix = _url_prefix(scope=scope, world_id=world_id, story_id=story_id)
+    media_root = _media_root_for_scope(
+        scope=scope,
+        world_media_root=world_media_root,
+        story_media_root=story_media_root,
+        system_media_root=system_media_root,
+    )
+    if prefix is not None:
+        payload["url"] = f"{prefix}/{_relative_url_path_for_rit(rit, media_root=media_root)}"
+    return payload
+
+
 def media_fragment_to_payload(
     fragment: Any,
     *,
@@ -79,24 +122,16 @@ def media_fragment_to_payload(
             rit = fragment.content
             if not isinstance(rit, MediaRIT):
                 raise TypeError(f"Expected MediaRIT in MediaFragment.content, got {type(rit)}")
-
-            content_type = getattr(rit, "data_type", None)
-            payload["media_type"] = content_type.value if content_type is not None else None
-            if content_type in _UNSUPPORTED_MEDIA_TYPES:
-                payload["unsupported_reason"] = "unsupported_media_type"
-                return payload
-
-            prefix = _url_prefix(scope=scope, world_id=world_id, story_id=story_id)
-            media_root = None
-            if scope == "sys":
-                media_root = system_media_root
-            elif scope == "story":
-                media_root = story_media_root
-            else:
-                media_root = world_media_root
-            if prefix is not None:
-                payload["url"] = f"{prefix}/{_relative_url_path_for_rit(rit, media_root=media_root)}"
-            return payload
+            return _resolved_rit_payload(
+                rit,
+                payload=payload,
+                scope=scope,
+                world_id=world_id,
+                story_id=story_id,
+                world_media_root=world_media_root,
+                story_media_root=story_media_root,
+                system_media_root=system_media_root,
+            )
 
         if fragment.content_format == "url":
             payload["url"] = str(fragment.content)

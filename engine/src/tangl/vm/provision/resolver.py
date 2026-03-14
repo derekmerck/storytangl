@@ -291,6 +291,25 @@ class Resolver:
 
         return list(MediaInventoryProvisioner(inventories=inventories).get_dependency_offers(requirement))
 
+    def _media_spec_offers_for_requirement(
+        self,
+        requirement: Requirement[PT],
+        *,
+        _ctx: Any = None,
+    ) -> list[ProvisionOffer]:
+        _ctx = resolve_ctx(_ctx)
+        if _ctx is None:
+            return []
+
+        from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
+
+        return list(
+            MediaSpecProvisioner(graph=getattr(_ctx, "graph", None)).get_dependency_offers(
+                requirement,
+                _ctx=_ctx,
+            )
+        )
+
     def inspect_template_dependency_offers(
         self,
         requirement: Requirement[PT],
@@ -355,6 +374,7 @@ class Resolver:
         offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._token_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._media_inventory_offers_for_requirement(requirement, _ctx=_ctx))
+        offers.extend(self._media_spec_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(self._inline_template_offers_for_requirement(requirement, _ctx=_ctx))
         offers.extend(UpdateCloneProvisioner.get_dependency_offers(requirement=requirement, offers=offers))
         return offers
