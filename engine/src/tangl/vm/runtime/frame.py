@@ -63,12 +63,10 @@ from uuid import UUID
 from tangl.core import (
     Behavior,
     BehaviorRegistry,
-    CallReceipt,
     Graph,
     Node,
     OrderedRegistry,
     Record,
-    Selector,
     TemplateRegistry,
 )
 from tangl.utils.hashing import hashing_func
@@ -124,11 +122,11 @@ class PhaseCtx:
 
     Namespace
     ---------
-    ``get_ns(node)`` delegates to ``do_gather_ns`` which composes namespace
-    data in two phases: caller/ancestor ``get_ns()`` maps, then immediate-
-    caller dispatch contributors. Results are cached per node UID for the
-    lifetime of this context — the namespace is stable within a single
-    pipeline pass.
+    ``get_ns(node)`` delegates to ``do_gather_ns`` which assembles a scoped
+    namespace in two phases: caller/ancestor entity-local ``get_ns()`` maps,
+    then immediate-caller dispatch contributors. Results are cached per node
+    UID for the lifetime of this context — the assembled view is stable within
+    a single pipeline pass.
 
     The cache is keyed by node UID, so different nodes (cursor vs. frontier
     nodes during PLANNING, different ancestors during condition evaluation)
@@ -140,7 +138,7 @@ class PhaseCtx:
     ---
     - ``get_authorities()`` — authority registries for dispatch expansion.
     - ``get_inline_behaviors()`` — inline behaviors (empty for now).
-    - ``get_ns(node)`` — cached scoped namespace from local + dispatch contributors.
+    - ``get_ns(node)`` — cached assembled scoped namespace for a node.
     - ``get_random()`` — deterministic RNG for this frame.
     - ``cursor`` — the current node (resolved from ``cursor_id``).
 
@@ -169,6 +167,7 @@ class PhaseCtx:
 
     _ns_cache: dict[UUID, ChainMap[str, Any]] = field(default_factory=dict)
     _ns_inflight: set[UUID] = field(default_factory=set)
+    _result_pipe_stack: list[list[Any]] = field(default_factory=lambda: [[]], repr=False)
 
     # -- Dispatch protocol --------------------------------------------------
 
@@ -194,6 +193,16 @@ class PhaseCtx:
     def get_meta(self) -> Mapping[str, Any]:
         return dict(self.meta or {})
 
+    @property
+    def results(self) -> list[Any]:
+        """Ordered results emitted during the current dispatch pipe."""
+        return self._result_pipe_stack[-1]
+
+    def push_result(self, value: Any) -> Any:
+        """Append a handler result to the current dispatch pipe."""
+        self.results.append(value)
+        return value
+
     def mark_soft_dirty(self, reason: str, *, step_id: str | None = None) -> bool:
         callback = self.mark_soft_dirty_callback
         if not callable(callback):
@@ -215,7 +224,11 @@ class PhaseCtx:
     @contextmanager
     def with_subdispatch(self):
         """Isolate nested dispatch calls from the parent phase invocation."""
-        yield self
+        self._result_pipe_stack.append([])
+        try:
+            yield self
+        finally:
+            self._result_pipe_stack.pop()
 
     @property
     def selected_edge(self) -> Any | None:
@@ -239,10 +252,10 @@ class PhaseCtx:
         return self.graph.get(self.cursor_id)
 
     def get_ns(self, node: Node = None) -> ChainMap[str, Any]:
-        """Build or retrieve the cached scoped namespace for a node.
+        """Build or retrieve the cached assembled scoped namespace for a node.
 
-        Delegates to ``do_gather_ns`` on cache miss. The result is cached per
-        node UID for the lifetime of this context.
+        Delegates to ``do_gather_ns`` on cache miss. The assembled result is
+        cached per node UID for the lifetime of this context.
 
         Parameters
         ----------
@@ -252,7 +265,7 @@ class PhaseCtx:
         Returns
         -------
         ChainMap[str, Any]
-            Scoped namespace with closest ancestor first.
+            Assembled scoped namespace with closest scope first.
 
         Notes
         -----

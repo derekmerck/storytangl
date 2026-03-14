@@ -2,6 +2,8 @@
 
 > Architectural intent, design decisions, and rationale for the canonical vm package
 > of the StoryTangl narrative engine (v3.8 framework).
+> This document describes the current v3.8 framework. The source packages are
+> `tangl.core`, `tangl.vm`, and `tangl.story` (no version suffix).
 
 ---
 
@@ -43,11 +45,13 @@ tangl.vm
 │                  → traversal.py         (history queries: visit_count, call_depth, etc.)
 ├── Runtime        → runtime/frame.py     (Frame: one resolve_choice driver)
 │                  → runtime/ledger.py    (Ledger: state across player actions)
+│                  → runtime/causality.py (CausalityMode: clean/soft_dirty/hard_dirty)
 │                  → ctx.py              (VmPhaseCtx, VmDispatchCtx, VmResolverCtx protocols)
 ├── Provisioning   → provision/           (Requirement, Dependency, Resolver, Provisioners)
 ├── Dispatch       → dispatch.py          (on_*/do_* hook pairs for the phase pipeline)
 │                  → system_handlers.py   (SYSTEM-layer behavior registrations)
-└── Fragments      → fragments.py         (Fragment records emitted by JOURNAL)
+├── Fragments      → fragments.py         (Fragment records emitted by JOURNAL)
+└── Replay         → replay/              (Event, Patch, StepRecord, DiffReplayEngine)
 ```
 
 ---
@@ -84,8 +88,8 @@ system handler for FINALIZE fires effects tagged FINALIZE. Same mechanism, decla
 intent at the data level.
 
 **Phase is VM vocabulary; core knows nothing about it.** `ResolutionPhase` must not be
-imported into `core38`. This is why `HasAvailability`, `HasEffects`, and
-`TraversableEffect` live in `vm38.traversable` rather than `core38.bases`, even though
+imported into `core`. This is why `HasAvailability`, `HasEffects`, and
+`TraversableEffect` live in `vm.traversable` rather than `core.bases`, even though
 they wrap core primitives (`Predicate`, `Effect`). See *Traversal Traits* below.
 
 **Atomic pipeline, no split around input.** FINALIZE and POSTREQS run immediately after
@@ -150,10 +154,10 @@ never branches on edge type.
 
 #### Traversal Traits (`HasAvailability`, `HasEffects`, `TraversableEffect`)
 
-These live in `vm38.traversable` rather than `core38.bases` because they depend on
+These live in `vm.traversable` rather than `core.bases` because they depend on
 `ResolutionPhase`, which is VM vocabulary. The migration from core is deliberate:
 
-**`HasAvailability`** — list of `core38.Predicate` instances evaluated against a
+**`HasAvailability`** — list of `core.Predicate` instances evaluated against a
 namespace. `available(ns, ctx, rand)` tests own conditions. `available_for(other, ctx)`
 tests against another entity's namespace, used by resolvers evaluating whether a
 candidate satisfies a requirement and by `on_link` / `on_unlink` hooks on dependency
@@ -166,7 +170,7 @@ dependency link/unlink hooks. `_sync_locals(ns)` writes changed namespace values
 to `self.locals` — this is a node concern, not a `RuntimeOp` concern: `RuntimeOp`
 knows only about the namespace dict.
 
-**`TraversableEffect`** — wraps `core38.Effect` with a `trigger_phase` field (default
+**`TraversableEffect`** — wraps `core.Effect` with a `trigger_phase` field (default
 `UPDATE`). The wrapper pattern follows the established ladder:
 `Effect → TraversableEffect → StoryEffect` at successive layers. A single `effects`
 list with phase annotation replaces v37's separate `entry_effects` / `final_effects`
@@ -214,8 +218,9 @@ story-layer offer manipulation — not for generating new offer sources.
 
 **Nested discovery uses a subdispatch boundary.** Discovery helpers (`do_get_template_scope_groups`
 and `do_get_token_catalogs`) run inside `ctx.with_subdispatch()` when available. In vm38
-today this is a no-op seam, but it establishes the stable contract for future receipt
-buffer isolation in nested dispatch calls.
+today this pushes a fresh per-subdispatch result pipe on `PhaseCtx`, so nested dispatch
+can inspect prior handler outputs through `ctx.results` without smearing those results
+into the parent pipeline pass.
 
 **Aggregation modes match phase semantics.** PREREQS and POSTREQS use `first_result`
 (first redirect wins, subsequent handlers skipped). VALIDATE uses `all_true` (all
@@ -227,7 +232,7 @@ follow from what each phase does.
 hardcodes its own fold call. The intent is to replace this copy-paste with a table of
 `(task_name, agg_mode)` pairs driving a single `_make_do_hook(task, agg_mode)` factory.
 `CallReceipt.aggregate(mode, *receipts)` is the bridge; `AggregationMode` in
-`core38.behavior` is the vocabulary. This refactor reduces ~15 near-identical function
+`core.behavior` is the vocabulary. This refactor reduces ~15 near-identical function
 bodies to a declaration table. It is deferred past MVP but the vocabulary is already in
 place.
 
@@ -525,16 +530,16 @@ be explicit about their randomness.
 Every vm-layer concept wraps a core primitive rather than modifying it:
 
 ```
-core38.Edge           topology endpoints
-  vm38.TraversableEdge    + entry_phase, return_phase
-    story38.Choice          + narrative metadata, label, availability label
+core.Edge           topology endpoints
+  vm.TraversableEdge    + entry_phase, return_phase
+    story.Choice          + narrative metadata, label, availability label
 
-core38.Effect         serializable expression
-  vm38.TraversableEffect  + trigger_phase
-    story38.StoryEffect     + narrative context helpers (future)
+core.Effect         serializable expression
+  vm.TraversableEffect  + trigger_phase
+    story.StoryEffect     + narrative context helpers (future)
 
-core38.Predicate      serializable boolean expression
-  (used directly in vm38.HasAvailability — no phase annotation needed)
+core.Predicate      serializable boolean expression
+  (used directly in vm.HasAvailability — no phase annotation needed)
 ```
 
 This pattern keeps each layer's additions local, prevents upward imports, and gives
@@ -576,8 +581,8 @@ and passes the annotated list to the renderer. The renderer decides presentation
 | Aspect | v37 | v38 | Rationale |
 |--------|-----|-----|-----------|
 | Effect lists | `entry_effects` / `final_effects` (two fields) | `effects: list[TraversableEffect]` + `trigger_phase` | Single list, phase declared on the effect |
-| Availability/Effects location | `core.bases.HasAvailability`, `HasEffects` | `vm38.traversable.HasAvailability`, `HasEffects` | Phase vocabulary is VM, not core |
-| Token provisioning | `TokenFactory` in core38 | `TokenProvisioner` in vm38 | Provisioning is context-aware; core is timeless |
+| Availability/Effects location | `core.bases.HasAvailability`, `HasEffects` | `vm.traversable.HasAvailability`, `HasEffects` | Phase vocabulary is VM, not core |
+| Token provisioning | `TokenFactory` in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
 | Template discovery | Graph/facet call-chain wiring | `do_get_template_scope_groups` dispatch task | VM no longer knows world internals |
 | Catalog discovery | Explicit wiring / polling APIs | `do_get_token_catalogs` dispatch task | Unified discovery contract across search spaces |
 | System handlers | Self-registering mixins via `@on_update` on class body | Module-level `@on_update` with `hasattr` duck-type | No import side effects on dispatch registry |

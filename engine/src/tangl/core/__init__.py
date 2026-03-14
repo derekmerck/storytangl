@@ -1,4 +1,4 @@
-# tangl/core/bases.py
+# tangl/core/__init__.py
 # language=markdown
 from __future__ import annotations
 
@@ -98,9 +98,10 @@ from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
 
 
 # Legacy-compatible aliases retained during namespace cutover.
+# ContentAddressable: used by tangl.media.media_resource.media_resource_inv_tag
+# LayeredDispatch: used by tangl.ir.dispatch
 ContentAddressable = HasContent
 LayeredDispatch = BehaviorRegistry
-StreamRegistry = OrderedRegistry
 
 
 def _alias_legacy_module(alias: str, target: str) -> None:
@@ -112,7 +113,8 @@ def _alias_legacy_module(alias: str, target: str) -> None:
     if parent is not None and not hasattr(parent, child_name):
         setattr(parent, child_name, module)
 
-
+# Map legacy deep-import module paths so pickled objects referencing old paths
+# can still be deserialized. Do not remove without a persistence migration.
 for _alias, _target in (
     # Legacy graph package paths.
     ("tangl.core.graph.graph", "tangl.core.graph"),

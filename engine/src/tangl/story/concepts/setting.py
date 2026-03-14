@@ -7,12 +7,13 @@ from tangl.core import Selector
 from tangl.vm import Dependency
 
 from ..dispatch import on_gather_ns
+from .narrator_knowledge import HasNarratorKnowledge
 
 
-class Setting(Dependency):
+class Setting(HasNarratorKnowledge, Dependency):
     """Setting()
 
-    Story-specific dependency edge that binds a location provider into local scope.
+    Story-specific dependency edge that binds a location provider into gathered scope.
 
     Why
     ----
@@ -26,12 +27,15 @@ class Setting(Dependency):
       use the same provisioning mechanics as other frontier edges.
     * Publishes the resolved provider under the setting label plus derived
       metadata keys during namespace gathering.
+    * Publishes additive aliases such as ``place_setting`` and
+      ``setting_edges`` so setting-level epistemic state remains distinct from
+      provider-level knowledge.
     * Contributes a merged ``settings`` mapping for render/provision helpers.
 
     API
     ---
-    - :meth:`provide_setting_symbols` returns the namespace payload contributed
-      by the resolved provider.
+    - :meth:`provide_setting_symbols` returns the local symbol payload reused
+      by gather-time assembly.
     """
 
     @staticmethod
@@ -52,7 +56,7 @@ class Setting(Dependency):
         return {key: item for key, item in payload.items() if item is not provider}
 
     def provide_setting_symbols(self) -> dict[str, Any]:
-        """Publish setting/provider symbols for namespace composition."""
+        """Publish setting/provider symbols for gather-time namespace assembly."""
         provider = self.provider
         label = self.get_label()
         if provider is None or not label:
@@ -71,7 +75,7 @@ def _setting_sort_key(setting: Setting) -> tuple[str, str]:
 
 @on_gather_ns
 def contribute_settings(*, caller, ctx, **_kw):
-    """Inject setting providers and setting metadata into scoped namespaces."""
+    """Inject setting providers and setting metadata into assembled scoped namespaces."""
     if not hasattr(caller, "edges_out"):
         return None
 
@@ -79,9 +83,10 @@ def contribute_settings(*, caller, ctx, **_kw):
 
     contributions: dict[str, Any] = {}
     settings: dict[str, Any] = {}
+    setting_edges: dict[str, Setting] = {}
     for scope in reversed(scope_nodes):
-        setting_edges = sorted(scope.edges_out(Selector(has_kind=Setting)), key=_setting_sort_key)
-        for setting in setting_edges:
+        scope_settings = sorted(scope.edges_out(Selector(has_kind=Setting)), key=_setting_sort_key)
+        for setting in scope_settings:
             setting_payload = setting.provide_setting_symbols()
             if setting_payload:
                 contributions.update(setting_payload)
@@ -89,8 +94,13 @@ def contribute_settings(*, caller, ctx, **_kw):
             label = setting.get_label()
             if provider is not None and label:
                 settings[label] = provider
+            if label:
+                contributions[f"{label}_setting"] = setting
+                setting_edges[label] = setting
 
     if settings:
         contributions["settings"] = settings
+    if setting_edges:
+        contributions["setting_edges"] = setting_edges
 
     return contributions or None

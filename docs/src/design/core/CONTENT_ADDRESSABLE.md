@@ -1,3 +1,10 @@
+> **⚠️ Stale document.** This doc predates the v38 rename of
+> `ContentAddressable` to `HasContent` and references module paths that no
+> longer exist. The authoritative treatment of content-addressed identity is
+> in `engine/src/tangl/core/CORE_DESIGN.md` (Trait Axes and Identity Model
+> sections). This file is retained for historical context only and should not
+> be used as a reference for current API usage.
+
 # Content-Addressable Records
 
 ## Overview

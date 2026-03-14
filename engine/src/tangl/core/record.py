@@ -263,7 +263,3 @@ class OrderedRegistry(Registry[OrderedEntity]):
     def remove(self, *_args: Any, **_kwargs: Any) -> None:
         """Disallow removal to preserve append-only history semantics."""
         raise NotImplementedError("Cannot remove records from an OrderedRegistry.")
-
-
-# Legacy compatibility alias retained during namespace cutover.
-StreamRegistry = OrderedRegistry

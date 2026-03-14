@@ -1,3 +1,8 @@
+> Historical vm38 migration note. This file is not the current authority for
+> namespace architecture. Today, entity `get_ns()` publishes local symbols,
+> `do_gather_ns` assembles the scoped runtime namespace, and `PhaseCtx.get_ns(node)`
+> returns the cached assembled view.
+
 # Story38 / VM38 Action And Testing Plan
 
 Status: In Progress (updated 2026-02-21)
@@ -13,7 +18,9 @@ Status: In Progress (updated 2026-02-21)
 ## Decision Locks
 
 - Feature parity with legacy is required; syntax parity is not required.
-- `on_get_ns` stays as a temporary bridge until scoped-dispatch returns.
+- Historical note: this plan originally treated namespace publication hooks as
+  transitional. The settled model is local `get_ns()` publication plus
+  `do_gather_ns` scoped assembly; no separate scoped-dispatch return is assumed here.
 - Renderer is pluggable; Jinja2 is the default implementation.
 - `core.ctx` and `vm.ctx` protocol contracts are firmed up together.
 - Runtime audit detail should prefer structured logging sinks over many new record types.
@@ -52,8 +59,10 @@ Tests:
 
 ### Phase 2 - Namespace Publication
 
-- [x] Add concept namespace publishers (`Actor`, `Location`, `Role`, `Setting`) through `on_get_ns`.
-- [x] Document temporary nature of `on_get_ns` in code and docs.
+- [x] Add concept namespace publishers (`Actor`, `Location`, `Role`, `Setting`) via
+  local `get_ns()` publication and gather-time assembly hooks.
+- [x] Document the settled split: entity `get_ns()` publishes locally and
+  `do_gather_ns` assembles scoped runtime views.
 - [x] Enforce deterministic ancestor merge order and cache behavior.
 
 Target code:
@@ -174,13 +183,15 @@ Validation snapshot (2026-02-21):
 
 - [ ] No legacy response primitive imports from v38 service/story code paths.
 - [x] Context protocol contracts documented and used in VM/story runtime surfaces.
-- [x] `on_get_ns` behavior documented as temporary and covered by tests.
+- [x] Namespace semantics documented with the settled split (`get_ns()` local,
+  `do_gather_ns` assembled scope) and covered by tests.
 - [x] Journal composition is modular and externally extensible.
 - [x] World facets are available through `World` and loader path.
 - [x] End-to-end CLI + REST story flows green on the full regression gate.
 
 ## Later Track (Deferred)
 
-- [ ] Scoped-dispatch resurrection to replace temporary `on_get_ns` pattern.
+- [ ] Continue cleaning historical namespace notes that still narrate
+  `do_gather_ns` as transitional rather than the settled scoped assembly mechanism.
 - [ ] Extended provisioners (token/asset/update/clone variants) as workload needs harden.
 - [ ] Adapter tooling for legacy-script migration where operationally needed.

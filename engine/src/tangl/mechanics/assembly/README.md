@@ -11,4 +11,8 @@ Key pieces:
 - `HasSlottedContainer`: mixin for embedding a container on an entity (facet-style).
 - `BudgetTracker`: helper for tracking resource usage (power, weight, etc.).
 
-See `examples/vehicle.py` and `examples/outfit.py` for usage patterns.
+See `examples/vehicle.py` for usage patterns.
+
+`OutfitManager` has been promoted out of `assembly.examples` into
+`tangl.mechanics.presence.outfit` because active presence mechanics depend on it
+as a real family surface rather than a demo.

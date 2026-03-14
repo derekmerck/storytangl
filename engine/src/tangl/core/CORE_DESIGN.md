@@ -2,6 +2,8 @@
 
 > Architectural intent, design decisions, and rationale for the canonical core package
 > of the StoryTangl narrative engine (v3.8 framework).
+> This document describes the current v3.8 framework. The source packages are
+> `tangl.core`, `tangl.vm`, and `tangl.story` (no version suffix).
 
 ---
 
@@ -61,6 +63,8 @@ tangl.core
 │                  → token.py      (Token[X] — wrapper class factory)
 │                  → record.py     (Record, OrderedRegistry)
 │                  → template.py   (EntityTemplate, Snapshot, TemplateGroup, TemplateRegistry)
+│                  → namespace.py  (HasNamespace, contribute_ns — entity-local ns publication)
+│                  → base_fragment.py (BaseFragment — record envelope for journal/response payloads)
 ├── Behavior       → behavior.py   (Behavior, CallReceipt, BehaviorRegistry, AggregationMode)
 │                  → dispatch.py   (on_*/do_* hook pairs, global dispatch registry)
 ├── Selection      → selector.py   (Selector: pure query predicate)
@@ -76,9 +80,9 @@ not itself define:
 - Requirements, satisfaction, provisioning, scope visibility (VM)
 - Traversal, cursor, steps, epochs, ledgers (VM)
 - Availability predicates and phased effects on traversable nodes (VM — see
-  `vm38.traversable.HasAvailability`, `HasEffects`, `TraversableEffect`)
+  `vm.traversable.HasAvailability`, `HasEffects`, `TraversableEffect`)
 - Token provisioning and singleton catalog discovery (VM — see
-  `vm38.provision.TokenProvisioner`)
+  `vm.provision.TokenProvisioner`)
 - Narrative semantics or syntax (Story)
 - Persistence policies, transactions, access control (Service)
 
@@ -105,7 +109,7 @@ Records restore `__hash__` explicitly.
 
 **Availability predicates and executable effects are NOT in this table.** They require
 `ResolutionPhase` vocabulary from the VM layer. `HasAvailability`, `HasEffects`, and
-`TraversableEffect` live in `vm38.traversable` as VM-layer traits that happen to wrap
+`TraversableEffect` live in `vm.traversable` as VM-layer traits that happen to wrap
 core `Predicate` and `Effect` primitives. See `VM_DESIGN.md — Traversal Traits`.
 
 **Key design decisions:**
@@ -366,7 +370,7 @@ find tokens.
 
 **Core exposes token adapters; VM owns provisioning policy.** `TokenFactory` and
 `TokenCatalog` in core are thin adapters around token materialization and singleton
-instance lookup. `vm38.provision.TokenProvisioner` consumes these adapters inside the
+instance lookup. `vm.provision.TokenProvisioner` consumes these adapters inside the
 offer pipeline and applies runtime policy (`ProvisionPolicy`, ranking, resolution).
 Token itself remains provisioning-agnostic; it only defines wrapper semantics and
 instance behavior.
@@ -396,7 +400,7 @@ without any graph context.
 **Effects and predicates are not phased.** `ResolutionPhase` is VM vocabulary.
 `RuntimeOp` has no trigger timing — it is simply a serializable expression. Phase
 annotation (`TraversableEffect.trigger_phase`) lives on the VM-layer wrapper class in
-`vm38.traversable`, following the same wrapper-inheritance pattern as `TraversableEdge`
+`vm.traversable`, following the same wrapper-inheritance pattern as `TraversableEdge`
 wrapping `Edge`.
 
 
@@ -475,7 +479,7 @@ are sorted by `sort_key = (dispatch_layer, priority, wants_exact_kind, seq)`.
 strategies that `do_*` functions apply to receipt lists. It lives in `behavior.py`
 alongside `CallReceipt` because the intent is for `_make_do_hook(task, agg_mode)` in
 the VM's dispatch factory to read the mode and wire the correct fold — eliminating
-the near-identical boilerplate currently copy-pasted across `vm38/dispatch.py`'s
+the near-identical boilerplate currently copy-pasted across `vm/dispatch.py`'s
 `do_*` function bodies. The `CallReceipt.aggregate(mode, *receipts)` adapter is the
 bridge. See `VM_DESIGN.md — Dispatch Hook Factory`.
 
@@ -534,12 +538,12 @@ rather than modifying them. The chain is consistent throughout:
 
 | Layer | Wraps | Adds |
 |-------|-------|------|
-| `core38.Edge` | — | topology endpoints |
-| `vm38.TraversableEdge` | `Edge` | `trigger_phase`, `entry_phase`, `return_phase` |
-| `story38.Choice` | `TraversableEdge` | narrative presentation metadata |
-| `core38.Effect` | — | serializable expression |
-| `vm38.TraversableEffect` | `Effect` | `trigger_phase` for pipeline timing |
-| `story38.StoryEffect` | `TraversableEffect` | narrative context helpers |
+| `core.Edge` | — | topology endpoints |
+| `vm.TraversableEdge` | `Edge` | `trigger_phase`, `entry_phase`, `return_phase` |
+| `story.Choice` | `TraversableEdge` | narrative presentation metadata |
+| `core.Effect` | — | serializable expression |
+| `vm.TraversableEffect` | `Effect` | `trigger_phase` for pipeline timing |
+| `story.StoryEffect` | `TraversableEffect` | narrative context helpers |
 
 This pattern keeps each layer's additions local, prevents upward imports, and gives
 authors a consistent inheritance ladder to extend.

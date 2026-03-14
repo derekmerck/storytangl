@@ -1,3 +1,7 @@
+> **⚠️ Stale document.** Uses v37 vocabulary (`obj_cls`, affordance-based actor
+> creation). The current world creation pipeline is documented in
+> `engine/src/tangl/story/fabula/world.py` and the materializer module.
+
 How create world _should_ work
 ==============================
 

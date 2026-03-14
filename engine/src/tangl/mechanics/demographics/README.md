@@ -1,29 +1,46 @@
-# International Demographics Generator  
+# Mechanics: Demographics
 
-This library provides a "Demographic" dataclass and factory for sampling romanized world names by region, country, and ethnic subtype.
+`tangl.mechanics.demographics` is a **profile/domain facet** rather than a full
+resolution mechanic family.
 
-It also includes a provider wrapper for use with Faker in `demographics.faker`
+It provides:
 
-## Features
+- resource-backed regional, country, subtype, and name-bank catalogs
+- a `DemographicSampler` for sampling identity profiles
+- a `HasDemographics` facet for story entities that want demographic identity in
+  their local namespace
 
-- Romanized foreign names by gender, country, region, race
-- Follows statistical country and race population distributions
-- Does NOT follow statistical name distributions within a country name bank
-- Does NOT respect localized name order, i.e., surname precedes given name
+## Layer Coverage
 
-The name lists in resources/world_names.yaml are indexed by country code
-and sub-categorized by gender and first/last.
+- **Kernel**: light sampling rules and normalization helpers
+- **Domain**: the primary strength of this family today
+- **Runtime**: `DemographicData`
+- **Render**: limited for now; mainly naming and namespace publication
+- **Writeback**: not a focus of this family
+- **Facade**: `HasDemographics`
 
-Some mixed-origin name types are very broad and require additional specification,
-specifically usa_(european|asian|black|latinx) and zaf_(european|black).
+## Review Lens
 
-Some surnames include enumerated masculine variants keyed as "male_surnames" 
-(e.g. isl, ukr, etc.).
+- **Shape**: demographic profiles, regions, countries, subtypes, and name banks
+- **Behavior**: controlled profile sampling and normalization
+- **Attachment points**: actor composition and namespace publication
+- **Appearance**: identity and naming metadata today, richer prose/media later
+
+## Notes
+
+- Sampling now accepts an optional RNG so callers can make the behavior explicit
+  and reproducible without changing existing defaults.
+- This family is the first modernization spike because it is useful, small, and
+  low-risk while still exercising the new facet contract.
+
+## Data Notes
+
+- The authoritative datasets live in YAML resources and may be large enough to
+  sit behind git-lfs.
+- Lightweight fallbacks remain available so tests can run without the full
+  dataset.
 
 ## Credits
 
-The name bank was primarily compiled from the FreeCities Twine game.  Someone put a lot of work into it.  Other demographic data, such as populations and demonyms were scraped from the web.
-
-## StoryTangl Dependencies
-
-Demographics is independent of the StoryTangl code base other than convenience functions.
+The name bank was primarily compiled from the FreeCities Twine game. Additional
+demographic data such as populations and demonyms were scraped from the web.

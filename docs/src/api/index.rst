@@ -10,3 +10,4 @@ Curated API reference grouped by subsystem rather than a single flat package pag
    vm/index
    story/index
    service/index
+   server/index

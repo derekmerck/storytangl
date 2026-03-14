@@ -1,3 +1,6 @@
+> **⚠️ Superseded.** This document defers to `HUB_FANOUT.md` in its own header.
+> See that document for the current generalized design direction.
+
 # MenuBlock: Dynamic Choice Hubs
 
 **Status:** Early concrete consumer of the broader hub-fanout pattern. See

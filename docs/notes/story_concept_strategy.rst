@@ -1,6 +1,10 @@
 Story Graph Concepts and VM Strategy
 ====================================
 
+Historical note: namespace terminology below should be read in current terms:
+entity ``get_ns()`` publishes local symbols, while ``on_gather_ns`` /
+``do_gather_ns`` assemble the scoped runtime view.
+
 This note distills the useful ideas from the existing ``tangl.story`` modules and the
 legacy implementations under ``scratch/legacy_src/story`` to clarify how episodic
 narrative structures should be represented on top of the modern ``core`` runtime and
@@ -34,7 +38,7 @@ Legacy Insights Worth Preserving
   overrides. This pattern keeps traversal-local resources addressable by logic and
   presentation code.【F:scratch/legacy_src/story/scene.py†L1-L58】
 * **Actor demographic context** – ``NamespaceHandler`` strategies injected actor names
-  (and potentially other demographic fields) into the scoped namespace, hinting at how
+  (and potentially other demographic fields) into the assembled runtime namespace, hinting at how
   resource nodes can publish facts to the VM without bespoke plumbing.【F:scratch/legacy_src/story/actor.py†L1-L37】
 * **Casting and replication flows** – The legacy ``CastingHandler`` explored cloning and
   evolving actors when a role needed a fresh body, suggesting that dynamic edges should
@@ -55,9 +59,10 @@ Strategy for the Core/VM Runtime
    characters, locations, items, concepts, and relationships: placeholder nodes inherit
    script-friendly fields (refs, templates, criteria) while concrete resources enforce
    uniqueness and push context into namespaces.【F:engine/src/tangl/story/concepts/actor/role.py†L37-L120】【F:engine/src/tangl/story/concepts/location/setting.py†L12-L78】【F:engine/src/tangl/story/concepts/actor/actor.py†L10-L89】
-4. **Publish namespaces through behavior hooks.** Scenes, blocks, and resources register
-   ``on_get_ns`` handlers so actors, locations, and other affordances are discoverable by
-   downstream renderers without hand-rolled context plumbing.【F:engine/src/tangl/story/episode/scene.py†L63-L105】【F:engine/src/tangl/vm/dispatch.py†L1-L580】【F:scratch/legacy_src/story/scene.py†L28-L43】
+4. **Split publication from scope assembly.** Entities publish local symbols via
+   ``get_ns()`` / ``@contribute_ns``. VM/story ``on_gather_ns`` handlers then assemble
+   the scoped runtime view so actors, locations, and other affordances are
+   discoverable by downstream renderers without hand-rolled context plumbing.【F:engine/src/tangl/core/namespace.py†L1-L81】【F:engine/src/tangl/vm/dispatch.py†L1-L627】【F:engine/src/tangl/story/concepts/role.py†L1-L103】
 5. **Embed casting/scouting hooks in handler pipelines.** Roles and settings can expose
    explicit behaviors (availability checks, provisioning) invoked during planning, letting
    the VM ensure prerequisites are resolved before traversal continues. Plugging the

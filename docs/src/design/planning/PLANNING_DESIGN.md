@@ -1,3 +1,10 @@
+> **⚠️ Stale document.** This doc references `engine/src/tangl/vm/dispatch/planning.py`,
+> which no longer exists. Planning dispatch is now in `tangl.vm.dispatch` and resolution
+> logic is in `tangl.vm.provision.resolver`. The authoritative architecture docs are
+> `engine/src/tangl/vm/VM_DESIGN.md` (provisioning section) and
+> `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md` (scope matching). This file
+> is retained for historical context only.
+
 # Planning & Provisioning System Design (v3.7)
 
 **Status:** This document reflects the **actual current implementation** as of v3.7.  

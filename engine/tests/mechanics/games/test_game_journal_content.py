@@ -43,7 +43,7 @@ def test_game_content_wins_over_block_content() -> None:
 
     frame = Frame(graph=graph, cursor_id=block.uid)
 
-    with frame.context._fresh_call_receipts():
+    with frame.context.with_subdispatch():
         receipts = story_dispatch.dispatch(block, task="gather_content", ctx=frame.context)
         content = None
         for receipt in receipts:
@@ -62,7 +62,7 @@ def test_block_content_used_when_no_game() -> None:
 
     frame = Frame(graph=graph, cursor_id=block.uid)
 
-    with frame.context._fresh_call_receipts():
+    with frame.context.with_subdispatch():
         receipts = story_dispatch.dispatch(block, task="gather_content", ctx=frame.context)
         content = None
         for receipt in receipts:
@@ -81,7 +81,7 @@ def test_empty_block_returns_none() -> None:
 
     frame = Frame(graph=graph, cursor_id=block.uid)
 
-    with frame.context._fresh_call_receipts():
+    with frame.context.with_subdispatch():
         receipts = story_dispatch.dispatch(block, task="gather_content", ctx=frame.context)
         content = None
         for receipt in receipts:

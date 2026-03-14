@@ -16,7 +16,7 @@ why single-phase patches are sufficient for MVP.
 
 ## Existing Infrastructure
 
-### Patch (vm38/replay/patch.py)
+### Patch (vm/replay/patch.py)
 
 `Patch(Record)` already captures:
 
@@ -29,7 +29,7 @@ why single-phase patches are sufficient for MVP.
 validates the final hash.  This provides built-in determinism verification:
 if the hash doesn't match, something went wrong.
 
-### RegistryObserver (vm38/replay/observer.py)
+### RegistryObserver (vm/replay/observer.py)
 
 `RegistryObserver` captures `initial_value_hash` at construction, collects
 events via `submit_event()`, and builds a `Patch` at `get_patch()` time
@@ -228,7 +228,7 @@ If dual-phase patches are implemented:
 
 ## Implementation Status (MVP)
 
-- [x] Patch with initial/final hash guards (vm38/replay/patch.py)
+- [x] Patch with initial/final hash guards (vm/replay/patch.py)
 - [x] Event CRUD operations with registry application
 - [x] Frame has dual mutation windows (UPDATE before JOURNAL, FINALIZE after)
 - [x] Pipeline is deterministic (seeded RNG on PhaseCtx)
@@ -248,7 +248,7 @@ If dual-phase patches are implemented:
 The following legacy components are replaced by the birth-hash + graph-diff
 approach and can be removed:
 
-- `vm38/replay/observer.py` — `RegistryObserver` (replaced by `diff_graphs`)
+- `vm/replay/observer.py` — `RegistryObserver` (replaced by `diff_graphs`)
 - `WatchedRegistry` concept — no longer needed, no mutation interception
 - `ObservedEntity` concept — no longer needed, no proxy wrappers
 
@@ -323,5 +323,5 @@ approach and can be removed:
   the copy becomes canonical and the diff produces the patch.
 
   **Replaces**: `WatchedRegistry`, `ObservedEntity`, and most of the
-  proxy machinery in `vm38/replay/observer.py`.  Total implementation is
+  proxy machinery in `vm/replay/observer.py`.  Total implementation is
   ~80 lines + a deepdiff dependency.

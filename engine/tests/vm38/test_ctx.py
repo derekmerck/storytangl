@@ -54,3 +54,20 @@ def test_phase_ctx_exposes_with_subdispatch_context_manager() -> None:
 
     with ctx.with_subdispatch() as nested:
         assert nested is ctx
+
+
+def test_phase_ctx_isolates_result_pipe_for_subdispatch() -> None:
+    graph = Graph()
+    node = TraversableNode(label="n")
+    graph.add(node)
+    ctx = PhaseCtx(graph=graph, cursor_id=node.uid)
+
+    ctx.push_result("outer")
+    assert ctx.results == ["outer"]
+
+    with ctx.with_subdispatch() as nested:
+        assert nested.results == []
+        nested.push_result("inner")
+        assert nested.results == ["inner"]
+
+    assert ctx.results == ["outer"]

@@ -1,3 +1,9 @@
+> Historical vm38 audit note. This file captures transition-era findings and is
+> not the current authority for namespace architecture. In the live `tangl.vm`
+> package, entity `get_ns()` publishes local symbols, `do_gather_ns` assembles
+> the scoped runtime namespace, and `PhaseCtx.get_ns(node)` returns the cached
+> assembled view.
+
 # VM38 Docstring Drift Audit
 
 ## Scope
@@ -85,7 +91,9 @@ Legacy-vs-vm38 contrast (selected):
 - Current contract: prose says walk ancestor chain "from root to node".
 - Actual behavior: iterates `node.ancestors` in native order `[node, parent, ..., root]`, then builds `ChainMap(*layers)` so closest scope wins.
 - Intended contract: explicitly document node-to-root walk and closest-scope precedence.
-- Legacy inspiration: scoped namespace semantics in `engine/src/tangl/vm/context.py` (`ChainMap` layering and cache semantics).
+- Historical note: this audit used transition-era "scoped namespace" language.
+  The settled `tangl.vm` model uses `do_gather_ns` as the scoped assembly
+  mechanism and `PhaseCtx.get_ns(node)` as the assembled-view accessor.
 - Status: fixed in this pass.
 
 #### F-P1-003: vm38 package-level conceptual map regressed vs legacy vm

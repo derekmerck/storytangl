@@ -29,6 +29,8 @@ Conceptual layers
      render namespaces.
    - :class:`Role` and :class:`Setting` are story-specific dependency edges
      that bind those providers into scene and block scopes.
+   - :class:`EntityKnowledge` and :class:`HasNarratorKnowledge` carry
+     narrator-facing epistemic bookkeeping directly on story concept carriers.
 
 4. Runtime graph and journal output
 
@@ -42,7 +44,9 @@ Conceptual layers
 5. Dispatch
 
    - :obj:`story_dispatch` is the shared story behavior registry.
-   - :func:`on_journal` registers JOURNAL-phase handlers.
+   - :func:`on_gather_ns` registers story-level namespace contribution handlers.
+   - :func:`on_journal` registers raw JOURNAL-phase handlers.
+   - :func:`on_compose_journal` registers post-merge JOURNAL composition handlers.
 
 Design intent
 -------------
@@ -51,7 +55,15 @@ script-to-template compilation, and JOURNAL rendering. Traversal and
 provisioning mechanisms remain in :mod:`tangl.vm`.
 """
 
-from .concepts import Actor, Location, Role, Setting
+from .concepts import (
+    Actor,
+    EntityKnowledge,
+    HasNarratorKnowledge,
+    Location,
+    Role,
+    Setting,
+    get_narrator_key,
+)
 from .episode import Action, Block, MenuBlock, Scene
 from .fabula import (
     GraphInitializationError,
@@ -72,7 +84,7 @@ from .fabula import (
     World,
 )
 from .story_graph import StoryGraph
-from .dispatch import on_journal, story_dispatch
+from .dispatch import on_compose_journal, on_gather_ns, on_journal, story_dispatch
 from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
 from .ctx import StoryRuntimeCtx
 
@@ -85,8 +97,10 @@ __all__ = [
     "Block",
     "ChoiceFragment",
     "ContentFragment",
+    "EntityKnowledge",
     "Fragment",
     "GraphInitializationError",
+    "HasNarratorKnowledge",
     "InitMode",
     "InitReport",
     "Location",
@@ -109,6 +123,9 @@ __all__ = [
     "WorldResourcesFacet",
     "WorldTemplatesFacet",
     "World",
+    "get_narrator_key",
+    "on_compose_journal",
+    "on_gather_ns",
     "on_journal",
     "story_dispatch",
     "MediaFragment",

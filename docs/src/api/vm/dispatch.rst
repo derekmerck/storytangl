@@ -44,6 +44,9 @@ Phase runners
 Namespace and scope hooks
 -------------------------
 
+``on_gather_ns`` / ``do_gather_ns`` assemble the scoped runtime namespace.
+Entity ``get_ns()`` remains the lower-level local publication seam.
+
 .. autofunction:: tangl.vm.dispatch.on_gather_ns
 .. autofunction:: tangl.vm.dispatch.do_gather_ns
 .. autofunction:: tangl.vm.dispatch.on_get_template_scope_groups

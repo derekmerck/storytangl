@@ -12,12 +12,12 @@ from tangl.core import TemplateRegistry
 
 @runtime_checkable
 class VmDispatchCtx(DispatchCtx, Protocol):
-    """Minimal context contract required by vm38 dispatch hooks."""
+    """Minimal context contract required by vm phase dispatch hooks."""
 
 
 @runtime_checkable
 class VmResolverCtx(VmDispatchCtx, CoreCtx, Protocol):
-    """Context contract required by vm38 provision resolver."""
+    """Context contract required by vm provision resolver."""
 
     def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
     def get_template_scope_groups(self) -> Iterable[TemplateRegistry]: ...
@@ -37,7 +37,10 @@ class VmPhaseCtx(VmResolverCtx, Protocol):
     @property
     def cursor(self) -> Any: ...
 
-    def get_ns(self, node: Any = None) -> Mapping[str, Any]: ...
+    def get_ns(self, node: Any = None) -> Mapping[str, Any]:
+        """Return the assembled scoped namespace for a node."""
+        ...
+
     def get_random(self) -> Random: ...
 
 

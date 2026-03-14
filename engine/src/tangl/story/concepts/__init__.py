@@ -10,6 +10,8 @@ Conceptual layers
    symbols into render namespaces.
 2. :class:`Role` and :class:`Setting` are dependency edges that bind those
    providers into scene and block scopes.
+3. :class:`EntityKnowledge` and :class:`HasNarratorKnowledge` provide explicit
+   narrator-facing epistemic bookkeeping on concept carriers.
 
 Design intent
 -------------
@@ -19,7 +21,16 @@ mechanism-level provisioning rules in :mod:`tangl.vm`.
 
 from .actor import Actor
 from .location import Location
+from .narrator_knowledge import EntityKnowledge, HasNarratorKnowledge, get_narrator_key
 from .role import Role
 from .setting import Setting
 
-__all__ = ["Actor", "Location", "Role", "Setting"]
+__all__ = [
+    "Actor",
+    "EntityKnowledge",
+    "HasNarratorKnowledge",
+    "Location",
+    "Role",
+    "Setting",
+    "get_narrator_key",
+]

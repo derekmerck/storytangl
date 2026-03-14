@@ -1,3 +1,8 @@
+> **⚠️ Stale document.** This is a YAML-example quickstart that predates the
+> current `RuntimeOp`/`Predicate`/`Effect` system. See `CORE_DESIGN.md`
+> (RuntimeOp section) and `VM_DESIGN.md` (Traversal Traits) for the current
+> architecture.
+
 # Conditional Narratives in StoryTangl
 
 ## State Variables

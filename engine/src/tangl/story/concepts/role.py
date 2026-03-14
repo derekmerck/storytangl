@@ -8,12 +8,13 @@ from tangl.vm import Dependency
 
 from ..dispatch import on_gather_ns
 from .actor import Actor
+from .narrator_knowledge import HasNarratorKnowledge
 
 
-class Role(Dependency[Actor]):
+class Role(HasNarratorKnowledge, Dependency[Actor]):
     """Role()
 
-    Story-specific dependency edge that binds an actor provider into local scope.
+    Story-specific dependency edge that binds an actor provider into gathered scope.
 
     Why
     ----
@@ -27,12 +28,15 @@ class Role(Dependency[Actor]):
       participate in standard provisioning and frontier resolution.
     * Publishes the resolved actor under the role label plus derived metadata
       keys such as ``guide_name``.
+    * Publishes additive aliases such as ``guide_role`` and ``role_edges`` so
+      templates and filters can address role-level epistemic state separately
+      from provider-level knowledge.
     * Contributes a merged ``roles`` mapping during namespace gathering.
 
     API
     ---
-    - :meth:`provide_role_symbols` returns the namespace payload contributed by
-      the resolved actor.
+    - :meth:`provide_role_symbols` returns the local symbol payload reused by
+      gather-time assembly.
 
     See also
     --------
@@ -60,7 +64,7 @@ class Role(Dependency[Actor]):
         return {key: item for key, item in payload.items() if item is not provider}
 
     def provide_role_symbols(self) -> dict[str, Any]:
-        """Publish role/provider symbols for namespace composition."""
+        """Publish role/provider symbols for gather-time namespace assembly."""
         provider = self.provider
         label = self.get_label()
         if provider is None or not label:
@@ -79,7 +83,7 @@ def _role_sort_key(role: Role) -> tuple[str, str]:
 
 @on_gather_ns
 def contribute_roles(*, caller, ctx, **_kw):
-    """Inject role providers and role metadata into scoped namespaces."""
+    """Inject role providers and role metadata into assembled scoped namespaces."""
     if not hasattr(caller, "edges_out"):
         return None
 
@@ -87,9 +91,10 @@ def contribute_roles(*, caller, ctx, **_kw):
 
     contributions: dict[str, Any] = {}
     roles: dict[str, Any] = {}
+    role_edges: dict[str, Role] = {}
     for scope in reversed(scope_nodes):
-        role_edges = sorted(scope.edges_out(Selector(has_kind=Role)), key=_role_sort_key)
-        for role in role_edges:
+        scope_roles = sorted(scope.edges_out(Selector(has_kind=Role)), key=_role_sort_key)
+        for role in scope_roles:
             role_payload = role.provide_role_symbols()
             if role_payload:
                 contributions.update(role_payload)
@@ -97,8 +102,13 @@ def contribute_roles(*, caller, ctx, **_kw):
             label = role.get_label()
             if provider is not None and label:
                 roles[label] = provider
+            if label:
+                contributions[f"{label}_role"] = role
+                role_edges[label] = role
 
     if roles:
         contributions["roles"] = roles
+    if role_edges:
+        contributions["role_edges"] = role_edges
 
     return contributions or None

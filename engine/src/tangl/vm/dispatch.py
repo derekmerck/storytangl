@@ -3,7 +3,8 @@
 
 This module provides the registration (``on_*``) and execution (``do_*``) surface
 for every phase in the resolution pipeline, plus the namespace gathering hook
-that composes scoped context from the hierarchy.
+that assembles scoped context from entity-local publication plus dispatch
+contributors.
 
 Design Principle — Explicit Names, DRY Bodies
 ----------------------------------------------
@@ -15,7 +16,8 @@ The ``on_resolve`` / ``do_resolve`` hook is separate because it has a different 
 signature (takes ``requirement`` + ``offers``, not ``caller``).
 
 The ``on_gather_ns`` / ``do_gather_ns`` hook family is separate because it
-composes per-entity namespace maps with dispatch contributions.
+assembles scoped namespaces from per-entity ``get_ns()`` publication plus
+immediate dispatch contributions.
 
 See Also
 --------
@@ -94,6 +96,20 @@ def _make_on_hook(task: str) -> Callable:
     return on_hook
 
 
+def _push_ctx_result(ctx: Any, value: Any) -> None:
+    push_result = getattr(ctx, "push_result", None)
+    if callable(push_result):
+        push_result(value)
+
+
+def _materialize_receipts(receipts: Iterable[CallReceipt], *, ctx: Any) -> list[CallReceipt]:
+    materialized: list[CallReceipt] = []
+    for receipt in receipts:
+        materialized.append(receipt)
+        _push_ctx_result(ctx, receipt.result)
+    return materialized
+
+
 def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
     _validate_dispatch_ctx(ctx)
     receipts = dispatch.execute_all(
@@ -102,7 +118,7 @@ def _run_task(task: str, *, caller, ctx, **kwargs) -> list[CallReceipt]:
         ctx=ctx,
         selector=Selector(caller_kind=type(caller)),
     )
-    return list(receipts)
+    return _materialize_receipts(receipts, ctx=ctx)
 
 
 def _subdispatch_context(ctx: Any):
@@ -121,7 +137,7 @@ def _assert_redirect_result(value, *, task: str):
     raise TypeError(f"{task} must return a traversable edge or None, got {type(value)!r}")
 
 
-def _assert_journal_result(value):
+def _assert_fragment_result(value, *, task: str):
     from .fragments import Fragment
 
     def _coerce_fragment(item):
@@ -149,12 +165,12 @@ def _assert_journal_result(value):
             normalized_fragment = _coerce_fragment(fragment)
             if normalized_fragment is None:
                 raise TypeError(
-                    "render_journal iterable entries must be Record-compatible fragment values"
+                    f"{task} iterable entries must be Record-compatible fragment values"
                 )
             fragments.append(normalized_fragment)
         return fragments
     raise TypeError(
-        "render_journal must return Record | Iterable[Record] | None"
+        f"{task} must return Record | Iterable[Record] | None"
     )
 
 
@@ -174,6 +190,7 @@ on_provision = _make_on_hook("provision_node")
 on_prereqs   = _make_on_hook("get_prereqs")
 on_update    = _make_on_hook("apply_update")
 on_journal   = _make_on_hook("render_journal")
+on_compose_journal = _make_on_hook("compose_journal")
 on_finalize  = _make_on_hook("finalize_step")
 on_postreqs  = _make_on_hook("get_postreqs")
 
@@ -216,7 +233,7 @@ def do_journal(caller, *, ctx, **kwargs):
 
     merged: list[Record] = []
     for value in results:
-        normalized = _assert_journal_result(value)
+        normalized = _assert_fragment_result(value, task="render_journal")
         if normalized is None:
             continue
         if isinstance(normalized, Record):
@@ -226,9 +243,30 @@ def do_journal(caller, *, ctx, **kwargs):
 
     if not merged:
         return None
+    composed = do_compose_journal(caller, ctx=ctx, fragments=list(merged), **kwargs)
+    if composed is not None:
+        merged = [composed] if isinstance(composed, Record) else list(composed)
     if len(merged) == 1:
         return merged[0]
     return merged
+
+
+def do_compose_journal(caller, *, fragments: list[Record], ctx, **kwargs):
+    """Run optional post-merge journal composition handlers."""
+    receipts = _run_task(
+        "compose_journal",
+        caller=caller,
+        ctx=ctx,
+        fragments=list(fragments),
+        **kwargs,
+    )
+    result = CallReceipt.last_result(*receipts)
+    normalized = _assert_fragment_result(result, task="compose_journal")
+    if normalized is None:
+        return None
+    if isinstance(normalized, Record):
+        return normalized
+    return list(normalized)
 
 
 def do_finalize(caller, *, ctx, **kwargs):
@@ -246,7 +284,7 @@ def do_postreqs(caller, *, ctx, **kwargs):
 # ---------------------------------------------------------------------------
 
 def on_gather_ns(func=None, **kwargs):
-    """Register a namespace contributor for the ``gather_ns`` task.
+    """Register a contributor to assembled scoped namespaces.
 
     Use ``wants_caller_kind=Type`` to filter by caller type and
     ``wants_exact_kind=False`` to allow subclass matches.
@@ -413,10 +451,13 @@ def _merge_nested_layers(
 
 
 def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
-    """Build a scoped namespace in two phases.
+    """Assemble the scoped namespace for ``node`` in two phases.
 
-    Phase 1: collect ``get_ns()`` from caller and its ancestor chain.
-    Phase 2: execute immediate-caller ``gather_ns`` dispatch handlers.
+    Phase 1 calls entity-local ``get_ns()`` on ``node`` and its ancestor chain.
+    Phase 2 merges immediate-caller ``gather_ns`` dispatch contributions.
+
+    The resulting ``ChainMap`` is the assembled scoped view consumed by
+    ``PhaseCtx.get_ns(node)`` and availability/render helpers.
     """
     _validate_dispatch_ctx(ctx)
 
@@ -436,11 +477,14 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
             _coerce_ns_layers(get_ns(), source=f"{type(ancestor).__name__}.get_ns"),
         )
 
-    receipts = dispatch.execute_all(
+    receipts = _materialize_receipts(
+        dispatch.execute_all(
         task="gather_ns",
         call_kwargs={"caller": node},
         ctx=ctx,
         selector=Selector(caller_kind=type(node)),
+        ),
+        ctx=ctx,
     )
     dispatch_result = CallReceipt.merge_results(*receipts)
     layers.extend(_coerce_ns_layers(dispatch_result, source="gather_ns handler"))
@@ -456,11 +500,14 @@ def do_get_template_scope_groups(caller, *, ctx) -> list["TemplateRegistry"]:
     """Execute template-scope discovery handlers and return merged registries."""
     _validate_dispatch_ctx(ctx)
     with _subdispatch_context(ctx) as subctx:
-        receipts = dispatch.execute_all(
-            task="get_template_scope_groups",
-            call_kwargs={"caller": caller},
+        receipts = _materialize_receipts(
+            dispatch.execute_all(
+                task="get_template_scope_groups",
+                call_kwargs={"caller": caller},
+                ctx=subctx,
+                selector=Selector(caller_kind=type(caller)),
+            ),
             ctx=subctx,
-            selector=Selector(caller_kind=type(caller)),
         )
         merged = CallReceipt.merge_results(*receipts)
     return _coerce_template_registries(
@@ -480,11 +527,14 @@ def do_get_token_catalogs(
 
     selector = Selector(caller_kind=type(caller)) if caller is not None else None
     with _subdispatch_context(ctx) as subctx:
-        receipts = dispatch.execute_all(
-            task="get_token_catalogs",
-            call_kwargs={"caller": caller, "requirement": requirement},
+        receipts = _materialize_receipts(
+            dispatch.execute_all(
+                task="get_token_catalogs",
+                call_kwargs={"caller": caller, "requirement": requirement},
+                ctx=subctx,
+                selector=selector,
+            ),
             ctx=subctx,
-            selector=selector,
         )
         merged = CallReceipt.merge_results(*receipts)
     return _coerce_token_catalogs(merged, source="get_token_catalogs handler")
@@ -501,11 +551,14 @@ def do_get_media_inventories(
 
     selector = Selector(caller_kind=type(caller)) if caller is not None else None
     with _subdispatch_context(ctx) as subctx:
-        receipts = dispatch.execute_all(
-            task="get_media_inventories",
-            call_kwargs={"caller": caller, "requirement": requirement},
+        receipts = _materialize_receipts(
+            dispatch.execute_all(
+                task="get_media_inventories",
+                call_kwargs={"caller": caller, "requirement": requirement},
+                ctx=subctx,
+                selector=selector,
+            ),
             ctx=subctx,
-            selector=selector,
         )
         merged = CallReceipt.merge_results(*receipts)
     return _coerce_media_inventories(merged, source="get_media_inventories handler")
@@ -530,9 +583,12 @@ def do_resolve(requirement: Requirement, *, offers: Iterable[ProvisionOffer], ct
     - handler returns ``Iterable[ProvisionOffer]`` to contribute overrides
     """
     _validate_dispatch_ctx(ctx)
-    receipts = dispatch.execute_all(
-        task="resolve_req",
-        call_kwargs={"caller": requirement, "offers": offers},
+    receipts = _materialize_receipts(
+        dispatch.execute_all(
+            task="resolve_req",
+            call_kwargs={"caller": requirement, "offers": offers},
+            ctx=ctx,
+        ),
         ctx=ctx,
     )
     results = CallReceipt.gather_results(*receipts)
@@ -569,6 +625,7 @@ __all__ = [
     "on_prereqs", "do_prereqs",
     "on_update", "do_update",
     "on_journal", "do_journal",
+    "on_compose_journal", "do_compose_journal",
     "on_finalize", "do_finalize",
     "on_postreqs", "do_postreqs",
     # helper decos and invocation

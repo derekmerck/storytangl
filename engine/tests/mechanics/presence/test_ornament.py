@@ -1,5 +1,5 @@
 
-from tangl.lang.body_parts import BodyPart
+from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.presence.ornaments import Ornamentation, Ornament, OrnamentType
 
 import pytest
@@ -47,6 +47,28 @@ def test_ornaments():
     assert "dragon" in s
     assert "navel" in s
     assert not "brand" in s
+
+
+def test_ornament_descriptions_are_neutral_and_filter_covered_regions():
+    face_scar = Ornament(
+        body_part=BodyPart.FACE,
+        ornament_type=OrnamentType.SCAR,
+        text="a grim scar",
+    )
+    arm_tattoo = Ornament(
+        body_part=BodyPart.RIGHT_ARM,
+        ornament_type=OrnamentType.TATTOO,
+        text="a dragon",
+    )
+
+    assert "their" in arm_tattoo.describe()
+
+    orn = Ornamentation(collection=[face_scar, arm_tattoo])
+    visible = orn.by_part_type([BodyRegion.TOP])
+
+    assert (OrnamentType.TATTOO, BodyPart.RIGHT_ARM) not in visible
+    assert (OrnamentType.SCAR, BodyPart.FACE) in visible
+    assert orn.describe()["ornaments"].startswith("They have ")
 
 
 @pytest.mark.xfail(reason="Need to write", raises=NotImplementedError)

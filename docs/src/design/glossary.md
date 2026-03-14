@@ -25,7 +25,7 @@ use these terms, they mean *exactly* what's defined here.
 |------|----------|------------|----------------|
 | **Fabula** | possibility space | The complete graph of events, characters, and relationships — all possible stories | `StoryGraph` after compilation |
 | **Episodic process** | execution | Cursor-driven traversal that collapses fabula into a specific story | `Frame.follow_edge()` pipeline |
-| **Syuzhet** | output trace | The linear journal of content fragments as experienced by the reader | `Journal` / `StreamRegistry` |
+| **Syuzhet** | output trace | The linear journal of content fragments as experienced by the reader | `Journal` / `OrderedRegistry` |
 | **Block** | instruction | Traversable structural node that generates content when visited | `story.episode.Block` |
 | **Scene** | function | Structural subgraph containing blocks, with local roles and settings | `story.episode.Scene` |
 | **Action** | branch | Traversable edge representing a player choice between blocks | `story.episode.Action` |
@@ -42,7 +42,7 @@ use these terms, they mean *exactly* what's defined here.
 | **Phase** | compiler pass | One stage of the resolution pipeline; pure contract on inputs/outputs | `ResolutionPhase` enum |
 | **Cursor** | program counter | Current position in the structural graph | `Frame.cursor_id` |
 | **Frontier** | enabled set | Available outgoing edges from the current cursor position | Computed by `do_validate` |
-| **Namespace** | symbol table | Scoped mapping of identifiers, layered local → ancestor → domain → global | `Frame.gather_ns()` → `ChainMap` |
+| **Namespace** | symbol table | Scoped mapping of identifiers, layered local → ancestor → domain → global | `PhaseCtx.get_ns(node)` / `do_gather_ns()` → `ChainMap` |
 | **Ledger** | event log | Append-only record of patches (state changes) per story instance | `vm.Ledger` |
 | **Patch** | diff hunk | Single atomic state change: `(step, target, op, before, after)` | Ledger entries |
 | **Snapshot** | checkpoint | Serialized graph state at a point in time; replayable with patch log | `persistence.Snapshot` |
@@ -80,7 +80,7 @@ use these terms, they mean *exactly* what's defined here.
 | **Content fragment** | prose block | Text content rendered from a structural node | `ContentFragment` |
 | **Choice fragment** | menu item | Available action with caption, availability status, and blocker diagnostics | `ChoiceFragment` |
 | **Media fragment** | asset reference | Pointer to media content (image, audio) with staging hints | `MediaFragment` |
-| **Journal** | narrative log | Ordered sequence of fragments constituting the syuzhet so far | `StreamRegistry` |
+| **Journal** | narrative log | Ordered sequence of fragments constituting the syuzhet so far | `OrderedRegistry` |
 | **RIT** | inventory tag | Resource Inventory Tag — content-addressed reference to a media asset | `MediaRIT` |
 | **Render profile** | Accept header | Client capability declaration guiding fragment → presentation transformation | Service-layer configuration |
 | **Staging hints** | CSS-like metadata | Rendering suggestions (orientation, placement, z-index) for media fragments | `StagingHints` |
@@ -103,7 +103,7 @@ use these terms, they mean *exactly* what's defined here.
 | **Singleton** | immutable constant | Named, immutable entity serializable by reference | `core.singleton.Singleton` |
 | **Token** | wrapped constant | Graph-attachable wrapper adding mutable instance state to a singleton | `core.singleton.Token` |
 | **Domain** | library / plugin | Named scope contributing variables, handlers, and templates | `core.domain.Domain` |
-| **Scope layer** | stack frame | `(locals, behaviors, templates)` tuple contributed by a domain or subgraph | Namespace assembly during `gather_ns` |
+| **Scope layer** | stack frame | Local `get_ns()` maps plus gather-time overlays contributed by a domain or subgraph | Namespace assembly during `do_gather_ns` |
 | **Source / Sink** | entry / exit | Dominator and post-dominator nodes of a subgraph scope | Subgraph structural properties |
 
 ---

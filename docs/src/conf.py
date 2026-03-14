@@ -5,9 +5,14 @@ from pathlib import Path
 import sys
 
 
+DOCS_SRC = Path(__file__).resolve().parent
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENGINE_SRC = PROJECT_ROOT / "engine" / "src"
+APPS_SERVER_SRC = PROJECT_ROOT / "apps" / "server" / "src"
+DOCS_EXT = DOCS_SRC / "_ext"
 sys.path.insert(0, str(ENGINE_SRC))
+sys.path.insert(0, str(APPS_SERVER_SRC))
+sys.path.insert(0, str(DOCS_EXT))
 
 project = 'StoryTangl'
 copyright = '2025, tangldev'
@@ -23,6 +28,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx_markdown_builder',
     'myst_parser',
+    'service_api_docs',
 ]
 
 OFFLINE_MODE = os.environ.get("STORYTANGL_OFFLINE", "").lower() in {"1", "true", "yes"}
