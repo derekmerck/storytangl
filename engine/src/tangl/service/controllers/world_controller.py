@@ -1,4 +1,4 @@
-"""World metadata and lifecycle endpoints for story38 worlds."""
+"""World metadata and lifecycle endpoints."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def resolve_world(world_id: str) -> World:
     world = registry.get_world(world_id, runtime_version="38")
 
     if not isinstance(world, World):
-        raise TypeError(f"Expected story38 world for '{world_id}', got {type(world)!r}")
+        raise TypeError(f"Expected Story world for '{world_id}', got {type(world)!r}")
     return world
 
 
@@ -62,7 +62,7 @@ def _dereference_world_id(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tupl
 
 
 class WorldController(HasApiEndpoints):
-    """World metadata and lifecycle endpoints for story38 worlds."""
+    """World metadata and lifecycle endpoints."""
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,

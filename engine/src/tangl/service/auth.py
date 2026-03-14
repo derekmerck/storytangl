@@ -1,4 +1,4 @@
-"""Authentication helpers for service38 transports."""
+"""Authentication helpers for service transports."""
 
 from __future__ import annotations
 

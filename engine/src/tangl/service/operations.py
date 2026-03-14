@@ -6,7 +6,14 @@ from enum import Enum
 
 
 class ServiceOperation(str, Enum):
-    """Stable external operation ids mapped to internal controller endpoints."""
+    """Stable external operation ids mapped to internal controller endpoints.
+
+    The ``STORY38_`` member names and ``"story38."`` string values are a legacy
+    version prefix baked into the wire protocol. Renaming the string values
+    would break existing API consumers. Member name cleanup (``STORY38_CREATE``
+    -> ``STORY_CREATE``) is deferred to a coordinated API versioning pass that
+    also updates ``apps/server``, ``apps/cli``, and the test suite.
+    """
 
     STORY38_CREATE = "story38.create"
     STORY38_UPDATE = "story38.update"

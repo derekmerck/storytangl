@@ -1,4 +1,4 @@
-"""Service38 user controller endpoints."""
+"""User controller endpoints."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ class ApiKeyInfo(InfoModel):
 
 
 class UserController(HasApiEndpoints):
-    """Service38 user controller with explicit v38 semantics."""
+    """User controller with explicit service semantics."""
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,

@@ -45,7 +45,7 @@ class _CacheEntry:
 
 @dataclass(frozen=True)
 class ExecuteOptions:
-    """Per-call execution options for service38 orchestration."""
+    """Per-call execution options for service orchestration."""
 
     writeback_mode: WritebackMode | None = None
     persist_paths: tuple[str, ...] | None = None

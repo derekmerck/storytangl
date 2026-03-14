@@ -1,3 +1,14 @@
+> **⚠️ Stale document.** This doc is frozen at v3.7 (November 2025) and predates
+> Waves 1–6 of the simplification effort. It does not cover the gateway tier
+> (`ServiceGateway`, `GatewayHooks`, `GatewayRestAdapter`), the operation token
+> system (`ServiceOperation`), the exception hierarchy (`ServiceError` and
+> subclasses), response standardization (`RuntimeEnvelope`, `NativeResponse`),
+> `WorldRegistry`, `build_service_gateway`, or the `EndpointPolicy`/`ResourceBinding`/
+> `WritebackMode` types. Several items in the "What's Missing" section have since
+> been implemented. The authoritative overview is currently the `tangl.service`
+> package docstring; a co-located `SERVICE_DESIGN.md` is planned. Tutorial examples
+> in this document remain directionally useful.
+
 # Service Layer Architecture (v3.7)
 
 **Status:** This document reflects the **actual current implementation** as of v3.7.  
