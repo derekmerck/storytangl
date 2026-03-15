@@ -2,7 +2,7 @@ Media Subsystem Design
 ======================
 
 **Last Updated:** March 2026  
-**Status:** ⚠️ IN PROGRESS **target architecture** for media integration with v3.7
+**Status:** ⚠️ PARTIALLY IMPLEMENTED media architecture for v3.7+; static flow, inline sync generation, and server-side async lifecycle are landed, while concrete worker backends and richer authoring remain in progress
 **Location:** `engine/src/tangl/media/` and `engine/src/tangl/journal/media/`
 
 ---
@@ -1386,20 +1386,22 @@ def test_block_emits_media_fragment():
 
 ---
 
-## Implementation Status (Dec 2025)
+## Implementation Status (March 2026)
 
-### ✅ Core Infrastructure Complete
-- MediaRIT abstraction (path, data, spec variants)
-- MediaFragment journal emission
-- Content/spec hashing
-- Basic registry operations
+### Landed
+- MediaRIT abstraction across path/data/content-hash identities
+- PLANNING-time media provisioning through the inventory authority chain
+- Canonical `MediaFragment` emission and shared service dereference
+- Story/world/sys media URL serving, including story-scoped generated media
+- Inline `media.spec` loading, sync generation, deterministic story filenames, provenance, and dedupe
+- Server-side async lifecycle records and hooks: `PENDING | RUNNING | RESOLVED | FAILED`, `WorkerDispatcher` protocol, and fallback-first service handling
 
-### ⚠️ In Progress
-- MediaProvisioner v3.7 integration (uses legacy base class)
-- Service layer dereferencing (RuntimeController)
-- PLANNING phase media resolution
+### Active Next Steps
+- Concrete async worker backends (`StableForgeDispatcher`, `ComfyDispatcher`, TTS adapters)
+- Named `MediaSpecRegistry` templates and richer authoring surfaces such as `GenerationHints`
+- `get_media_registries` / dispatch-generalized resolver extraction once the current path is fully proven
+- Anticipatory affordance quotas and an optional client `POLL` contract if/when a client needs it
 
-### 📋 Not Started
-- Comprehensive test coverage
-- Actual forge implementations (SD, TTS, SVG)
-- Media-specific provisioning tests
+### Residual Gaps
+- Broader client capability negotiation beyond current render-profile compatibility tokens
+- Replay and canonicality policy for `STORY_CANONICAL` generated assets

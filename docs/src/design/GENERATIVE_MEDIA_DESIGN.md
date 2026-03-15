@@ -6,7 +6,7 @@ and [`media_resurrection_plan.md`](../../notes/media_resurrection_plan.md)
 phase-bus integration, and service-layer response profiles.  
 **Prerequisite:** Media resurrection plan Phase 1–2 (static RIT plumbing) must be complete.  
 **Implementation order:** Sync-first (§3.5–3.6 prove the architecture without workers),
-then async pending RITs, then worker dispatch hooks, then anticipatory affordances.
+then server-side async lifecycle, then concrete worker backends, then anticipatory affordances.
 
 ---
 
@@ -17,9 +17,15 @@ then async pending RITs, then worker dispatch hooks, then anticipatory affordanc
   specs, sync generation writes deterministic story-scoped files, generated `MediaRIT`s
   carry provenance plus a spec fingerprint for dedupe, and the existing journal/service
   path now emits canonical story media URLs for those generated resources.
-- **Still deferred:** pending-RIT lifecycle states, worker dispatch hooks, named
-  `MediaSpecRegistry` templates, render-profile pending policies, and anticipatory
-  affordance quotas.
+- **March 14, 2026:** The server-side async lifecycle is now implemented on the same
+  inline-spec path. Story-scoped generated `MediaRIT`s can be `PENDING | RUNNING |
+  RESOLVED | FAILED`, guarded `@on_provision` hooks reconcile and dispatch worker jobs
+  once per planning pass, deterministic adapted-spec hashing commits seeds for dedupe,
+  and service dereference now applies fallback-first handling with typed resolve
+  results.
+- **Still deferred:** concrete worker backends, named `MediaSpecRegistry` templates,
+  `GenerationHints`, `get_media_registries` / dispatch-generalized media resolution,
+  and anticipatory affordance quotas.
 
 ---
 
@@ -45,17 +51,18 @@ provisioning model, with no special-case logic in the fabula, VM, or journal lay
 The central insight is: **a pending RIT is topologically satisfying**. Once a dep's `provider_id`
 is set, that dep is claimed — no reprovisioning, no re-dispatch. Whether the RIT holds resolved
 data or is still waiting on a remote job is a render-time concern, not a graph concern. The only
-code that needs to care is the `resolve_media_data` dispatch at the service boundary.
+code that needs to care is service-layer media resolution at the boundary.
 
 Supporting structures:
 
 - `MediaRITStatus` enum — `PENDING | RUNNING | RESOLVED | FAILED` (four states; `job_id` is evidence, not state)
 - `MediaPersistencePolicy` enum — `EPHEMERAL | CACHEABLE | STORY_CANONICAL | EXTERNAL_REFERENCE`
 - `MediaResolutionClass` enum — `INLINE | FAST_SYNC | ASYNC | EXTERNAL` (replaces `sync_ok: bool`)
-- `MediaSpecRegistry` — named `MediaSpec` templates (world config, serializes by value)
-- `MediaSpecProvisioner` — CREATE-side provisioner reading spec templates
-- Two thin phase-bus hooks — pre-PLANNING reconciliation pass, post-PLANNING dispatch
-- `MediaRenderProfile` + typed result objects at the service boundary
+- Three-phase RIT identity — `adapted_spec_hash` (planning-time dedupe key), `execution_spec_hash` (post-completion reproduction key), and `content_hash` (output bytes)
+- Deterministic `adapt_spec()` / `spec_fingerprint()` behavior — normalized payloads omit transient identity fields and commit a seed before hashing when the spec supports one
+- `MediaSpecProvisioner` — implemented today for dependency-carried inline specs; named `MediaSpecRegistry` templates remain the next authoring-layer extension
+- Two thin phase-bus hooks — implemented as guarded `@on_provision` reconciliation and dispatch passes that run once per `PhaseCtx`
+- `MediaRenderProfile` + typed resolve-result objects at the service boundary; extracting a formal `resolve_media_data` dispatch task is still future work
 
 ---
 
@@ -68,7 +75,7 @@ dissolves under the final model. `provider_id` stays UUID throughout, no type ch
 
 **Catalog RITs** (indexed from disk into world/sys `MediaResourceRegistry`): these are not
 story graph nodes. The dep's `has_identifier` carries the *content hash* — the durable
-cross-session key. The provisioner's EXISTING search through `get_media_registries` finds
+cross-session key. The provisioner's EXISTING search through `get_media_inventories` finds
 the freshly-indexed RIT by content hash each session. UUID only matters at runtime within
 one session; content hash is the durable identity.
 
@@ -134,10 +141,26 @@ Default is `CACHEABLE`. Authors mark portrait slots `STORY_CANONICAL` when the s
 generated result is part of the narrative record (e.g. a character's appearance is now
 established for this story).
 
-### 1.4 Provenance Fields on MediaRIT
+### 1.4 Three-Phase RIT Identity
 
-For story-canonical and cacheable RITs, provenance must be complete enough to reproduce
-or audit the result:
+A story-scoped RIT acquires identifiers progressively over its lifecycle. They answer
+different questions and coexist on the same record:
+
+| Phase | Field | Hash of | Answers |
+|---|---|---|---|
+| PLANNING | `adapted_spec_hash` | Adapted spec (fully rendered, seed committed) | "Would this namespace state produce this asset?" |
+| RESOLVED | `execution_spec_hash` | Executed spec (worker's accounting of what ran) | "Can I exactly reproduce this output?" |
+| RESOLVED | `content_hash` | Output file bytes | "Do I already have this file?" |
+
+`adapted_spec_hash` is set when the RIT is created, including for `PENDING` RITs. It is the
+dedup key for EXISTING searches and the compatibility successor to `spec_fingerprint`.
+`execution_spec_hash` is set when the worker returns and captures the exact realized run.
+`content_hash` remains the output-identity hash already provided by `ContentAddressable`.
+
+### 1.5 Provenance Fields on MediaRIT
+
+For cacheable and story-canonical generated media, provenance needs to preserve author
+intent, the rendered request, and the worker's final accounting separately:
 
 ```python
 class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
@@ -146,37 +169,62 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
     job_id: str | None = None
     persistence_policy: MediaPersistencePolicy = MediaPersistencePolicy.CACHEABLE
 
-    # Provenance — stored on RESOLVED story-scoped RITs
-    derivation_spec: dict | None = None      # authored template spec (what was requested)
-    execution_spec: dict | None = None       # realized execution spec: model, seed, prompt, LoRA, dims
-    worker_id: str | None = None             # which worker/adapter produced this
-    generated_at: datetime | None = None     # execution timestamp
-    source_step_id: UUID | None = None       # which story step triggered generation
+    # Set at creation / dispatch time
+    adapted_spec: dict | None = None
+    adapted_spec_hash: str | None = None
+
+    # Set at completion
+    execution_spec: dict | None = None
+    execution_spec_hash: str | None = None
+
+    # Audit fields
+    derivation_spec: dict | None = None
+    worker_id: str | None = None
+    generated_at: datetime | None = None
+    source_step_id: UUID | None = None
 ```
 
-`derivation_spec` is the authored template — "Cassie neutral portrait."
-`execution_spec` is the realized execution — "SDXL model X, seed 4172, prompt Y, 1024×1024."
-These must stay distinct. Flattening them loses the ability to re-run with updated styles
-while preserving the original intent.
+`derivation_spec` is the authored template or inline authored payload. `adapted_spec` is the
+fully rendered request that gets sent to the worker. `execution_spec` is what the worker
+actually used. Flattening those three layers would lose either author intent or reproducibility.
 
-### 1.5 Spec Hash as Cache Key
+### 1.6 Seed Assignment During Adaptation — Determinism Contract
 
-A spec in a `MediaDep` maps to a unique RIT via the normalized spec hash. The hash is computed
-from the *realized* spec (after `adapt_spec()` has been applied) — this is `realized_spec` on
-`MediaDep`, already present. It becomes the `has_identifier` on the requirement, so
-`MediaInventoryProvisioner`'s existing EXISTING search finds previously-generated (or
-previously-pending) RITs without any changes.
+`adapt_spec()` remains pure and deterministic. It renders against the namespace, resolves
+references, and does not call workers. The apparent random element — seed selection — is
+resolved inside the normalized fingerprinting path:
 
 ```python
-# In MediaDep._pre_resolve, when media_spec is provided:
-realized_hash = media_spec.adapt_spec(ref=parent).content_hash().hex()
-requirement_kwargs["has_identifier"] = realized_hash
+adapted = media_spec.adapt_spec(ref=parent, ctx=ctx.get_ns(parent))
+adapted.commit_deterministic_seed()
+adapted_hash = adapted.spec_fingerprint()
 ```
 
-Same spec + same context → same hash → same RIT found as EXISTING, regardless of whether
-it was produced sync or async, this session or a prior one.
+`spec_fingerprint()` normalizes the spec payload, excludes transient identity fields such as
+`uid` and `templ_hash`, and commits a deterministic seed when the spec supports one and no
+seed has been authored. Two planning passes over the same namespace state therefore produce
+the same seed and the same `adapted_spec_hash`.
 
-### 1.6 render_ready Property on MediaDep
+If a worker cannot honor that exact seed, the worker reports the actual seed and other runtime
+details back in `execution_spec`. The planning-time identity still stays stable because it is
+derived before dispatch.
+
+### 1.7 Spec Hash as EXISTING Search Key
+
+`MediaDep` requirements use the adapted spec fingerprint as their identifier:
+
+```python
+adapted = media_spec.model_copy(deep=True).adapt_spec(ref=parent, ctx=ctx.get_ns(parent))
+adapted_hash = adapted.spec_fingerprint()
+payload["adapted_spec"] = adapted.normalized_spec_payload()
+payload["adapted_spec_hash"] = adapted_hash
+requirement_kwargs["has_identifier"] = adapted_hash
+```
+
+Same namespace state → same adapted spec → same committed seed → same `adapted_spec_hash`.
+That is the core dedupe invariant for both sync-generated and async-pending story media.
+
+### 1.8 render_ready Property on MediaDep
 
 Journal handlers should not interpret `status` directly. Expose a single predicate:
 
@@ -188,7 +236,8 @@ class MediaDep(Dependency[MediaRIT]):
         if not self.satisfied:
             return False
         rit = self.provider
-        return rit is not None and getattr(rit, 'status', MediaRITStatus.RESOLVED) == MediaRITStatus.RESOLVED
+        return (rit is not None and
+                getattr(rit, 'status', MediaRITStatus.RESOLVED) == MediaRITStatus.RESOLVED)
 ```
 
 Journal handlers use `dep.render_ready` only if they need to decide whether to suppress a
@@ -204,23 +253,30 @@ When the provisioner asks "is there an EXISTING RIT matching this requirement?",
 the response manager asks "how do I resolve this RIT to bytes or a URL?", both questions go
 through dispatch hooks — not a fixed authority chain baked into the provisioner or service layer.
 
-Two dispatch tasks govern the media pipeline:
+Two resolver seams govern the current media pipeline:
 
-- **`get_media_registries`** — returns the ordered list of `Registry[MediaRIT]` to search
-  for EXISTING offers. Handlers registered at different priorities compose the chain.
-- **`resolve_media_data`** — given a `MediaRIT`, returns a typed result object (see §2.5).
+- **`get_media_inventories`** — the live hook today, returning ordered `MediaInventory`
+  adapters for EXISTING-offer search across story, world, and sys scope.
+- **Typed service-side resolution helpers** — `media_fragment_to_payload()` now routes
+  through typed `PendingMediaResult`, `ResolvedMediaResult`, and `FailedMediaResult`
+  objects behind one internal helper.
 
 This means the authority chain is a *policy* evaluated at dispatch time, not a static list.
 Swapping a style registry, adding a story-arc-specific asset set, or routing to a different
 backend for a user preference are all handler registrations, not architectural changes.
 
-**Staging note:** The current code uses `get_media_inventories` returning `MediaInventory`
-adapter objects. `get_media_registries` is the intended long-term name, but do not rename
-the dispatch task until `GraphMediaInventory` (or direct graph search) is proven working
-alongside the existing `MediaInventory` chain. Keep `MediaInventory` as a compatibility
-adapter during the transition; only generalize the abstraction once both paths are verified.
+**Staging note:** `get_media_registries` plus dispatch-based `resolve_media_data` remain the
+intended long-term generalization, but do not rename or split these surfaces yet. The current
+Phase 2 slice deliberately keeps `get_media_inventories`, `graph.story_resources`, and the
+internal service helper path until graph-backed story search and inventory-backed world/sys
+search have both been proven together.
 
 ### 2.2 Story Scope: Graph Is the Registry
+
+Current implementation note: story scope still stages file writing, re-indexing, and serving
+through `graph.story_resources` and the story media directory. The graph remains the provider
+authority for story-scoped generated `MediaRIT` nodes; `story_resources` is the filesystem and
+index facade that keeps `/media/story/{story_id}/...` stable.
 
 For story-scoped RITs, the graph *is* the registry. `MediaRIT` nodes are full graph
 entities. `content_hash` is already `@is_identifier`. `graph.find_all(Selector(has_kind=MediaRIT, **criteria))` is the complete story-scope EXISTING search — no adapter, no wrapper.
@@ -364,6 +420,11 @@ objects rebuilt from filesystem every session. The `on_index` hook, bulk dedup, 
 Author-defined named spec templates — recipes declared in world config that any dep can
 reference by label. Plain `Registry[MediaSpec]`, serializes by value in the world bundle.
 
+Current implementation note: Phase 2 does **not** require this registry yet. The shipped path
+still treats dependency-carried inline `media.spec` payloads as the only source of truth.
+`MediaSpecRegistry` remains the next authoring-layer extension once the inline lifecycle is
+fully proven.
+
 ```python
 class MediaSpecRegistry(Registry[MediaSpec]):
     """Named spec template registry.
@@ -407,37 +468,52 @@ lookup key; the `ResourceManager` / `from_source` / `@shelved` machinery indexes
 hash without requiring hash-based filenames. Served at `/media/story/{story_id}/...`.
 Cleaned up by `remove_story_media` when the story is dropped.
 
+Current implementation note: Phase 1–2 filenames are deterministic and readable but still
+simple: `<base-label>-<fingerprint[:12]>.<ext>`. `uid_template`-style filename authoring
+remains deferred with the larger template-registry pass.
+
 ### 3.5 materialize_rit_from_spec
 
 ```python
 def materialize_rit_from_spec(
     spec: MediaSpec,
     *,
-    story_id: str,
+    requirement: Requirement,
+    derivation_spec: MediaSpec | None = None,
     _ctx: Any = None,
 ) -> MediaRIT:
-    """Produce a RIT from a spec and add it to the story graph.
+    """Produce a story-scoped RIT from one already-adapted spec.
 
     INLINE / FAST_SYNC → create_media() inline → RESOLVED RIT with path
-    ASYNC / EXTERNAL   → PENDING RIT with derivation_spec; job dispatched post-PLANNING
+    ASYNC / EXTERNAL   → PENDING RIT with adapted_spec; job dispatched post-PLANNING
     """
+    parent = _resolve_media_parent(requirement, _ctx=_ctx)
+    ctx_ns = _resolve_media_namespace(parent, _ctx=_ctx)
+    story_manager = _story_media_manager(_ctx=_ctx)
+    fingerprint = requirement.has_identifier or spec.spec_fingerprint()
+
     if spec.resolution_class in (MediaResolutionClass.INLINE, MediaResolutionClass.FAST_SYNC):
-        media_data, realized_spec = spec.create_media(_ctx=_ctx)
-        path = _write_to_story_media(media_data, story_id, realized_spec)
+        media_data, realized_spec = spec.create_media(ref=parent, ctx=ctx_ns)
+        path = _write_to_story_media(media_data, story_manager, realized_spec)
         return MediaRIT(
             path=path,
             data_type=realized_spec.media_type,
             status=MediaRITStatus.RESOLVED,
             persistence_policy=spec.persistence_policy,
-            derivation_spec=spec.model_dump(),
-            execution_spec=realized_spec.model_dump(),
+            derivation_spec=_spec_payload(derivation_spec),
+            adapted_spec=_spec_payload(spec),
+            adapted_spec_hash=fingerprint,
+            execution_spec=_spec_payload(realized_spec),
+            execution_spec_hash=realized_spec.spec_fingerprint(),
         )
     return MediaRIT(
         status=MediaRITStatus.PENDING,
         data_type=spec.media_type,
         persistence_policy=spec.persistence_policy,
-        derivation_spec=spec.model_dump(),
-        # execution_spec and worker_id set by post-PLANNING dispatch hook on completion
+        derivation_spec=_spec_payload(derivation_spec),
+        adapted_spec=_spec_payload(spec),
+        adapted_spec_hash=fingerprint,
+        # execution_spec and execution_spec_hash are set by the reconcile hook on completion
     )
 ```
 
@@ -449,30 +525,56 @@ findable by future EXISTING searches without any extra wiring.
 ### 3.6 MediaSpecProvisioner
 
 The CREATE-side provisioner. `MediaInventoryProvisioner` handles EXISTING offers via the
-`get_media_registries` dispatch chain. `MediaSpecProvisioner` handles CREATE offers from
-named spec templates.
+`get_media_inventories` authority chain. The shipped `MediaSpecProvisioner` currently reads
+dependency-carried inline specs, adapts them during PLANNING, and emits either an EXISTING
+offer for a matching story RIT or a CREATE offer for sync/async materialization. Registry-
+backed named templates remain future work.
 
 ```python
 @dataclass
 class MediaSpecProvisioner:
-    spec_registries: Iterable[MediaSpecRegistry]
-    story_id: str
+    graph: Any | None = None
 
-    def get_dependency_offers(self, requirement: Requirement) -> Iterator[ProvisionOffer]:
-        selector = Selector(predicate=requirement.satisfied_by)
-        for spec in MediaSpecRegistry.chain_find_all(*self.spec_registries, selector=selector):
-            is_fast = spec.resolution_class in (
+    def get_dependency_offers(
+        self,
+        requirement: Requirement,
+        *,
+        _ctx: Any = None,
+    ) -> Iterator[ProvisionOffer]:
+        base_spec = requirement.media_spec
+        parent = _resolve_media_parent(requirement, _ctx=_ctx)
+        ctx_ns = _resolve_media_namespace(parent, _ctx=_ctx)
+        adapted_spec = base_spec.model_copy(deep=True).adapt_spec(ref=parent, ctx=ctx_ns)
+        fingerprint = adapted_spec.spec_fingerprint()
+
+        existing = _graph_media_by_identifier(self.graph or _ctx.graph, fingerprint)
+        if existing is not None:
+            yield ProvisionOffer(
+                origin_id="MediaSpecProvisioner",
+                policy=ProvisionPolicy.EXISTING,
+                priority=Priority.NORMAL,
+                distance_from_caller=0,
+                candidate=existing,
+                callback=lambda *_, _existing=existing, **__: _existing,
+            )
+            return
+
+        if self._requirement_policy(requirement) & ProvisionPolicy.CREATE:
+            is_fast = adapted_spec.resolution_class in (
                 MediaResolutionClass.INLINE, MediaResolutionClass.FAST_SYNC
             )
             priority = Priority.NORMAL if is_fast else Priority.LATE
             yield ProvisionOffer(
-                origin_id=f"MediaSpecProvisioner:{spec.get_label()}",
+                origin_id="MediaSpecProvisioner",
                 policy=ProvisionPolicy.CREATE,
                 priority=priority,
                 distance_from_caller=1 if is_fast else 2,
-                candidate=spec,
-                callback=lambda *_, _s=spec, **kw: materialize_rit_from_spec(
-                    _s, story_id=self.story_id, _ctx=kw.get('_ctx'),
+                candidate=adapted_spec,
+                callback=lambda *_, _spec=adapted_spec, _base=base_spec, _req=requirement, **kw: materialize_rit_from_spec(
+                    _spec,
+                    requirement=_req,
+                    derivation_spec=_base,
+                    _ctx=kw.get("_ctx"),
                 ),
             )
 ```
@@ -496,7 +598,9 @@ dispatching jobs are different concerns — they happen to sit on the same PLANN
 infrastructure for convenience, but they should be understood and organized as a named
 reconciliation policy module that could generalize to any async resource, not just media.
 
-Two hooks, both side-effect-only (return None per PLANNING contract).
+Two hooks, both side-effect-only (return `None` per the provision hook contract). In the
+current VM, PLANNING/provision work runs for the cursor plus frontier nodes, so these hooks
+must guard themselves to execute once per `PhaseCtx`.
 
 ### 4.1 Pre-PLANNING: Reconcile Completed Jobs
 
@@ -504,10 +608,14 @@ Runs at `Priority.EARLY` — before the resolver gathers offers. Upgrades RUNNIN
 that have completed so they appear as EXISTING (cheaper) in this turn's provisioning pass.
 
 ```python
-@on_planning.register(task="planning", priority=Priority.EARLY)
-def reconcile_media_jobs(*, ctx: VmPhaseCtx, **_) -> None:
+@on_provision(priority=Priority.EARLY)
+def reconcile_media_jobs(caller: Any, *, ctx: Any, **_) -> None:
     """Check running jobs and upgrade completed RITs before provisioning runs."""
-    dispatcher: WorkerDispatcher | None = getattr(ctx, 'worker_dispatcher', None)
+    _ = caller
+    if not _run_once(ctx, "reconcile_media_jobs"):
+        return
+
+    dispatcher: WorkerDispatcher | None = ctx.meta.get("worker_dispatcher")
     if dispatcher is None:
         return
 
@@ -519,7 +627,8 @@ def reconcile_media_jobs(*, ctx: VmPhaseCtx, **_) -> None:
             continue  # still running
         if result.success:
             rit.path = result.path
-            rit.execution_spec = result.execution_spec  # model, seed, etc.
+            rit.execution_spec = result.execution_spec
+            rit.execution_spec_hash = _hash_spec_dict(result.execution_spec)
             rit.worker_id = result.worker_id
             rit.generated_at = result.generated_at
             rit.status = MediaRITStatus.RESOLVED
@@ -534,35 +643,34 @@ def reconcile_media_jobs(*, ctx: VmPhaseCtx, **_) -> None:
 Runs at `Priority.LATE` — after the resolver has settled all offers.
 
 ```python
-@on_planning.register(task="planning", priority=Priority.LATE)
-def dispatch_pending_media(*, ctx: VmPhaseCtx, **_) -> None:
+@on_provision(priority=Priority.LATE)
+def dispatch_pending_media(caller: Any, *, ctx: Any, **_) -> None:
     """Kick off worker jobs for RITs that were just created as PENDING.
 
-    Walks deps (and affordance edges) on the current node and frontier that have
-    a PENDING provider with no job_id yet. Submits each to the WorkerDispatcher
-    and stores the returned job_id on the RIT.
-
-    This fires after provisioning, so deps are already claimed. The dispatcher
-    call is non-blocking: it submits and returns a job_id immediately.
-    Transitions status PENDING → RUNNING on successful submission.
+    The hook walks the graph for PENDING story RITs with no job_id yet, submits the
+    fully rendered adapted spec to the WorkerDispatcher, and stores the returned job_id.
     """
-    dispatcher: WorkerDispatcher | None = getattr(ctx, 'worker_dispatcher', None)
+    _ = caller
+    if not _run_once(ctx, "dispatch_media_jobs"):
+        return
+
+    dispatcher: WorkerDispatcher | None = ctx.meta.get("worker_dispatcher")
     if dispatcher is None:
         return
 
     for rit in ctx.graph.find_all(Selector(has_kind=MediaRIT)):
         if rit.status != MediaRITStatus.PENDING or rit.job_id:
             continue
-        if rit.derivation_spec is None:
+        if rit.adapted_spec is None:
             continue
-        job_id = dispatcher.submit(rit.derivation_spec)
+        job_id = dispatcher.submit(rit.adapted_spec)
         rit.job_id = job_id
         rit.status = MediaRITStatus.RUNNING
 ```
 
-The `WorkerDispatcher` is injected into `VmPhaseCtx` from the service layer at story-creation
+The `WorkerDispatcher` is injected into phase metadata from the service layer at story-creation
 time. The media and vm packages never import from service. Worker selection, load balancing,
-and the `auto111_workers` / `comfy_workers` config are entirely `WorkerDispatcher` concerns.
+and backend-specific configuration remain entirely `WorkerDispatcher` concerns.
 
 ### 4.3 No New Phases Required
 
@@ -600,7 +708,7 @@ affordances for those states:
 for state in actor.probable_states(ctx):
     spec = actor.portrait_spec(state)
     realized_spec = spec.adapt_spec(ref=actor, ctx=ctx.get_ns(actor))
-    spec_hash = realized_spec.content_hash().hex()
+    spec_hash = realized_spec.spec_fingerprint()
 
     # Only create affordance if RIT doesn't already exist
     existing = ctx.graph.find_one(Selector(has_kind=MediaRIT, has_identifier=spec_hash))
@@ -610,7 +718,9 @@ for state in actor.probable_states(ctx):
     rit = MediaRIT(
         status=MediaRITStatus.PENDING,
         persistence_policy=spec.persistence_policy,
-        derivation_spec=realized_spec.model_dump(),
+        derivation_spec=spec.normalized_spec_payload(),
+        adapted_spec=realized_spec.normalized_spec_payload(),
+        adapted_spec_hash=spec_hash,
     )
     ctx.graph.add(rit)
 
@@ -621,13 +731,10 @@ for state in actor.probable_states(ctx):
     ))
     affordance.set_provider(rit)
     ctx.graph.add_edge(actor, affordance)
-    
-    affordance.set_provider(rit)
-    graph.add_edge(actor, affordance)
 ```
 
 The post-PLANNING dispatch hook finds these new PENDING RITs (no `job_id` yet) and submits
-their derivation specs to the dispatcher — exactly the same hook that handles dep-created
+their adapted specs to the dispatcher — exactly the same hook that handles dep-created
 pending RITs. No affordance-specific logic.
 
 **Affordances vs deps:** A dep must be satisfied for the node to be render-ready (if hard)
@@ -651,11 +758,10 @@ class MediaPendingPolicy(str, Enum):
     FALLBACK  = "fallback"          # resolve fallback_ref from catalog; show placeholder
 ```
 
-`FALLBACK` requires the response manager to have access to the `MediaSpecRegistry` — specifically
-the `fallback_ref` on the spec that produced the pending RIT. This is available via
-`rit.derivation_spec` (which contains the serialized spec, including `fallback_ref`). The
-fallback is resolved synchronously: it is either a named static RIT (looked up in
-`MediaResourceRegistry`) or a direct file path — never itself async.
+`FALLBACK` is the shipped default. The service layer reads `fallback_ref` from the stored
+derivation/adapted spec payloads, resolves a matching static media record from the available
+world/sys inventories when possible, then falls back to authored fragment text, and finally
+discards the slot if neither is available. `POLL` remains a non-default client contract.
 
 ### 6.2 Content Profile
 
@@ -677,15 +783,15 @@ with `INLINE_DATA` profile → serialize `content.data` as a UTF-8 string, not b
 ```python
 @dataclass
 class MediaRenderProfile:
-    pending_policy: MediaPendingPolicy = MediaPendingPolicy.DISCARD
+    pending_policy: MediaPendingPolicy = MediaPendingPolicy.FALLBACK
     content_profile: MediaContentProfile = MediaContentProfile.MEDIA_SERVER
     # Required for FALLBACK pending policy:
-    static_inventory: MediaInventory | None = None  # searched for fallback_ref targets
+    static_inventories: tuple[MediaInventory, ...] = ()
 ```
 
 The profile is a per-connection or per-render-target config object. The REST adapter
-constructs it from the request context (client capabilities header, connection config, or
-world config defaults) and passes it into `media_fragment_to_payload`.
+constructs it internally from the request context and existing compatibility render-profile
+tokens, then passes it into `media_fragment_to_payload` without changing the external API.
 
 ### 6.4 Updated media_fragment_to_payload
 
@@ -707,8 +813,12 @@ def media_fragment_to_payload(
 
     rit = fragment.content if fragment.content_format == "rit" else None
 
-    # ── Gate 1: pending check ──────────────────────────────────────────────────
-    if rit is not None and getattr(rit, 'status', MediaRITStatus.RESOLVED) == MediaRITStatus.PENDING:
+    # ── Gate 1: unresolved lifecycle check ─────────────────────────────────────
+    if rit is not None and getattr(rit, 'status', MediaRITStatus.RESOLVED) in {
+        MediaRITStatus.PENDING,
+        MediaRITStatus.RUNNING,
+        MediaRITStatus.FAILED,
+    }:
         policy = render_profile.pending_policy
 
         if policy == MediaPendingPolicy.DISCARD:
@@ -725,17 +835,17 @@ def media_fragment_to_payload(
             }
 
         if policy == MediaPendingPolicy.FALLBACK:
-            rit = _resolve_fallback(rit, render_profile.catalog)
+            rit = _resolve_fallback(rit, render_profile.static_inventories)
             if rit is None:
-                return None     # no fallback available; discard
+                fallback_text = _fallback_text(fragment)
+                return (
+                    _content_payload_from_text(fragment, fallback_text)
+                    if fallback_text is not None
+                    else None
+                )
             # fall through with the fallback RIT
 
-    # ── Gate 2: FAILED check ──────────────────────────────────────────────────
-    if rit is not None and getattr(rit, 'status', None) == MediaRITStatus.FAILED:
-        # Always discard failed RITs (fallback was the author's responsibility)
-        return None
-
-    # ── Gate 3: content profile dispatch (existing logic, now parameterized) ──
+    # ── Gate 2: content profile dispatch (existing logic, now parameterized) ──
     return _deref_rit(
         rit, fragment,
         profile=render_profile.content_profile,
@@ -799,23 +909,30 @@ The media package defines the interface. The service layer provides the implemen
 ```python
 # tangl/media/worker_dispatcher.py
 
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
+@dataclass
 class WorkerResult:
     success: bool
-    path: Path | None = None      # if worker wrote a file
-    data: bytes | None = None     # if worker returned inline data
+    path: Path | None = None
+    data: bytes | str | None = None
+    data_type: MediaDataType | None = None
     error: str | None = None
+    execution_spec: dict | None = None
+    worker_id: str | None = None
+    generated_at: datetime | None = None
 
 
 class WorkerDispatcher(Protocol):
     """Submit and poll async media generation jobs.
 
-    Injected into VmPhaseCtx at the service layer. Never imported by vm or media packages.
+    Injected into phase metadata at the service layer. Never imported by vm or media packages.
     """
 
-    def submit(self, spec: dict) -> str:
-        """Submit a generation job. Returns job_id immediately (non-blocking)."""
+    def submit(self, spec: dict[str, Any]) -> str:
+        """Submit the fully rendered adapted spec and return a job id."""
         ...
 
     def poll(self, job_id: str) -> WorkerResult | None:
@@ -829,114 +946,131 @@ class WorkerDispatcher(Protocol):
 
 The concrete implementation (`StableForgeDispatcher`, `ComfyDispatcher`, etc.) lives in
 the service layer and is responsible for worker selection, queuing, load balancing, and the
-`auto111_workers` / `comfy_workers` config. None of that leaks into the engine.
-
-`WorkerResult` also carries provenance fields stored on the RIT at completion:
-
-```python
-@dataclass
-class WorkerResult:
-    success: bool
-    path: Path | None = None
-    data: bytes | None = None
-    error: str | None = None
-    execution_spec: dict | None = None  # model, seed, prompt, LoRA, dims, etc.
-    worker_id: str | None = None
-    generated_at: datetime | None = None
-```
+backend-specific configuration. None of that leaks into the engine.
 
 ---
 
 ## Part 8: Scope of Changes (Implementation Checklist)
 
-Recommended order: implement sync-generated RITs first (§3.3–3.6), prove end-to-end,
-then add async PENDING state, then worker dispatch hooks, then anticipatory affordances
-(only after quota policy is designed).
+This section now distinguishes what is already landed from the next actionable work that
+still remains after the server-side Phase 2 slice.
 
 ### `tangl/media/media_resource/media_resource_inv_tag.py`
-- [ ] Add `MediaRITStatus` enum (4 states: PENDING, RUNNING, RESOLVED, FAILED)
-- [ ] Add `MediaPersistencePolicy` enum
-- [ ] Add `status`, `job_id`, `persistence_policy`, `derivation_spec`, `execution_spec`,
-  `worker_id`, `generated_at`, `source_step_id` fields to `MediaResourceInventoryTag`
-- [ ] Guard `_validate_required_source`: require path/data/hash only when `status == RESOLVED`
+- [x] Add `MediaRITStatus` enum (4 states: PENDING, RUNNING, RESOLVED, FAILED)
+- [x] Add `MediaPersistencePolicy` enum
+- [x] Add `status`, `job_id`, `persistence_policy`, `adapted_spec`, `adapted_spec_hash`,
+  `execution_spec`, `execution_spec_hash`, `derivation_spec`, `worker_id`, `generated_at`,
+  and `source_step_id` fields to `MediaResourceInventoryTag`
+- [x] Guard source validation so only `RESOLVED` RITs require path/data/content data
 
 ### `tangl/media/media_creators/media_spec.py`
-- [ ] Add `MediaResolutionClass` enum (INLINE, FAST_SYNC, ASYNC, EXTERNAL)
-- [ ] Replace `sync_ok: bool` with `resolution_class: MediaResolutionClass`
-- [ ] Add `persistence_policy: MediaPersistencePolicy` and `fallback_ref: str | None`
+- [x] Add `MediaResolutionClass` enum (INLINE, FAST_SYNC, ASYNC, EXTERNAL)
+- [x] Replace `sync_ok: bool` with `resolution_class: MediaResolutionClass`
+- [x] Add `persistence_policy: MediaPersistencePolicy` and `fallback_ref: str | None`
+- [x] Add normalized fingerprinting that excludes transient identity fields and commits
+  deterministic seeds before hashing
+- [ ] Add named-template authoring surfaces such as `GenerationHints` and richer prompt /
+  uid templating only after the inline lifecycle is stable
 
 ### `tangl/media/media_resource/media_dependency.py`
-- [ ] Add `render_ready` property
-- [ ] Wire realized spec hash as `has_identifier` in `_pre_resolve` when `media_spec` present
+- [x] Add `render_ready` property
+- [x] Wire adapted spec fingerprint as `has_identifier` when inline `media_spec` is present
 
-### `tangl/media/dispatch.py`
-- [ ] Add `get_media_registries` dispatch task (staged: keep `get_media_inventories` working
-  in parallel until graph-as-registry path is proven alongside existing inventory chain)
-- [ ] Add `resolve_media_data` dispatch task
-- [ ] Add typed result classes: `ResolvedMediaResult`, `PendingMediaResult`, `FailedMediaResult`
-- [ ] Default handlers: story graph (EARLY), world registry (NORMAL), sys registry (LATE)
+### `tangl/media/media_resource/media_provisioning.py`
+- [x] Keep `get_media_inventories` as the live EXISTING-offer authority chain
+- [x] Extend `MediaSpecProvisioner` so dependency-carried inline specs can produce either
+  resolved sync RITs or pending async RITs
+- [x] Reuse existing story RITs by `adapted_spec_hash` instead of creating duplicate jobs
+- [ ] Generalize the authority chain to `get_media_registries` only after graph-backed
+  story search and inventory-backed world/sys search are both proven on the same path
 
-### `tangl/media/media_resource/media_spec_registry.py` (new)
-- [ ] `MediaSpecRegistry(Registry[MediaSpec])`
-- [ ] `materialize_rit_from_spec()` — dispatches on `resolution_class`
-- [ ] `MediaSpecProvisioner` — CREATE offers from spec templates
+### `tangl/media/media_resource/media_spec_registry.py` (future)
+- [ ] Introduce `MediaSpecRegistry(Registry[MediaSpec])` for named templates after the
+  inline lifecycle is stable
+- [ ] Add registry-backed CREATE offers without regressing the dependency-carried path
 
 ### `tangl/media/worker_dispatcher.py` (new)
-- [ ] `WorkerResult` dataclass (with provenance fields)
-- [ ] `WorkerDispatcher` Protocol
+- [x] `WorkerResult` dataclass (with provenance fields)
+- [x] `WorkerDispatcher` Protocol
+- [ ] Concrete worker implementations (`StableForgeDispatcher`, `ComfyDispatcher`, etc.)
 
 ### `tangl/media/phase_hooks.py` (new)
-- [ ] `reconcile_media_jobs` — `Priority.EARLY` PLANNING; polls RUNNING RITs
-- [ ] `dispatch_media_jobs` — `Priority.LATE` PLANNING; dispatches PENDING→RUNNING
+- [x] `reconcile_media_jobs` — `Priority.EARLY` `@on_provision`; polls RUNNING RITs
+- [x] `dispatch_media_jobs` — `Priority.LATE` `@on_provision`; dispatches PENDING→RUNNING
+- [x] Guard both hooks so they run once per `PhaseCtx`
 
 ### `tangl/service/media.py`
-- [ ] `MediaPendingPolicy`, `MediaContentProfile`, `MediaRenderProfile`
-- [ ] Refactor `media_fragment_to_payload` to dispatch through `resolve_media_data`
-- [ ] `resolve_media_data` default handlers using typed result objects
+- [x] `MediaPendingPolicy`, `MediaContentProfile`, `MediaRenderProfile`
+- [x] Refactor `media_fragment_to_payload` behind typed resolve-result objects and one
+  internal resolved-RIT helper
+- [x] Keep the external request/gateway `render_profile` string surface compatible
+- [ ] Extract `resolve_media_data` into a formal dispatch task only if a second resolver
+  implementation actually needs that extension point
 
 ### `tangl/service/` (REST adapter / runtime controller)
-- [ ] Construct `MediaRenderProfile` from request context / connection config
-- [ ] Inject `WorkerDispatcher` into `VmPhaseCtx` at story creation
+- [x] Construct `MediaRenderProfile` from request context / connection config
+- [x] Inject `WorkerDispatcher` into phase metadata at story creation
+- [x] Apply fallback-first handling for pending/failed story media via static fallback
+  media, fallback text, or discard
 
 ### Deferred
 - [ ] `StableForgeDispatcher` — async wrapper over `StableForge.create_media`
 - [ ] `ComfyDispatcher` — stub / future
+- [ ] `GenerationHints` and richer namespace-driven prompt assembly
+- [ ] `MediaSpecRegistry` named template authoring
+- [ ] `get_media_registries` / dispatch-generalized media resolution
 - [ ] Anticipatory affordance quota policy (must be designed before shipping)
 
 ---
 
 ## Invariants
 
+**Three-phase identity; each hash answers a different question.**
+`adapted_spec_hash` answers "would this namespace state produce this asset?" and is the
+planning-time dedupe key. `execution_spec_hash` answers "can I exactly reproduce what the
+worker ran?" `content_hash` answers "do I already have these bytes?"
+
+**`adapt_spec()` is deterministic; seed commitment is part of fingerprinting.**
+No worker call, no external availability check, no ambient RNG. The same namespace state
+must yield the same committed seed and the same `adapted_spec_hash`.
+
+**`derivation_spec`, `adapted_spec`, and `execution_spec` are distinct on purpose.**
+Author intent, rendered request, and worker accounting answer different debugging and replay
+questions. Do not collapse them.
+
 **Four-state lifecycle; `job_id` is evidence, not state.**
 PENDING = accepted, not dispatched. RUNNING = dispatched, acknowledged. RESOLVED = content
-available. FAILED = terminal. State carries meaning; `job_id` is an artifact of RUNNING.
+available. FAILED = terminal.
 
 **Story-scope media lives in the graph.**
-Story RITs are full graph entities. The graph is the story-scope registry. No separate story
-`MediaResourceRegistry` needed at runtime.
+Story RITs are full graph entities. The graph is the story-scope authority, while
+`graph.story_resources` remains the filesystem/index facade for writing and serving files.
 
 **Authority chain is a dispatch policy.**
-`get_media_registries` handlers compose the chain at dispatch time. Style registries,
-arc overrides, CMS integration — all handler registrations, not architectural changes.
+Today that policy is expressed through `get_media_inventories`. Rename or split it only after
+the graph-backed and inventory-backed paths are both proven on the same code path.
 
 **`provider_id` is always UUID; disk resolution is lazy.**
 Rebind happens only at serve time, only when a path is stale. `@shelved` makes it cheap.
 
-**Files stay human-readable; content hash is the lookup key.**
-`ResourceManager` / `from_source` / `@shelved` indexes files by hash without hash-based filenames.
+**Files stay human-readable.**
+Current generated filenames use a readable base label plus a fingerprint slice. Content hash
+and spec hashes do the dedupe work; filenames stay legible.
 
 **RIT is topologically inert once claimed.**
 A pending RIT satisfies its dep. The resolver never revisits it.
 
 **Spec hash is the deduplication key.**
-Same realized spec + same context → same hash → same RIT as EXISTING. No duplicate jobs.
+Same adapted spec + same context → same committed seed → same `adapted_spec_hash` →
+same RIT as EXISTING. No duplicate jobs.
 
 **Journal is unaware of pending state.**
 Journal emits `MediaFragment(content=rit, content_format="rit")` unconditionally.
-`resolve_media_data` at serve time is the only place `status` matters.
+Service-layer media resolution is the only place `status` matters.
 
 **WorkerDispatcher is service-layer-only.**
-Nothing below `tangl/service/` imports `WorkerDispatcher`. Phase-bus hooks receive it via `ctx`.
+Nothing below `tangl/service/` imports a concrete worker backend. Phase hooks receive a
+`WorkerDispatcher` via phase metadata.
 
 **Affordances and deps are symmetric.**
 `dispatch_media_jobs` walks `ctx.graph` for all PENDING RITs with no `job_id`. Does not
@@ -1009,7 +1143,7 @@ instances are working.
 
 - **[`MEDIA_DESIGN.md`](MEDIA_DESIGN.md)** — Authoritative for layers, roles, static lifecycle, fragment
   contract. This document extends it for the generative pipeline.
-- **[`media_resurrection_plan.md`](../../notes/media_resurrection_plan.md)** — This design covers Phase 3 and parts of Phase 5.
-  Phase 1–2 must be complete first.
+- **[`media_resurrection_plan.md`](../../notes/media_resurrection_plan.md)** — This design
+  now documents the landed inline Phase 1–2 work plus the server-side async lifecycle.
 - **[`PLANNING_DESIGN.md`](planning/PLANNING_DESIGN.md)** — `MediaSpecProvisioner` follows the same offer/accept protocol
   as `TokenProvisioner` and `TemplateProvisioner`.

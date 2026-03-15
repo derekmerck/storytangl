@@ -14,10 +14,14 @@ from tangl.utils.sanitize_str import sanitize_str
 from tangl.vm.provision.provisioner import ProvisionOffer, ProvisionPolicy
 from tangl.vm.provision.requirement import Requirement
 
-from ..media_creators.media_spec import MediaSpec
+from ..media_creators.media_spec import MediaResolutionClass, MediaSpec
 from ..media_data_type import MediaDataType
 from ..story_media import get_story_resource_manager
-from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+from .media_resource_inv_tag import (
+    MediaPersistencePolicy,
+    MediaRITStatus,
+    MediaResourceInventoryTag as MediaRIT,
+)
 from .media_inventory import MediaInventory
 from .media_resource_registry import MediaResourceRegistry
 
@@ -60,6 +64,27 @@ def _infer_generated_media_type(media: Any, spec: MediaSpec) -> MediaDataType:
     raise TypeError(f"Unsupported generated media payload type {type(media)!r}")
 
 
+def _media_resolution_class(spec: MediaSpec) -> MediaResolutionClass:
+    value = getattr(spec, "resolution_class", MediaResolutionClass.ASYNC)
+    if isinstance(value, MediaResolutionClass):
+        return value
+    try:
+        return MediaResolutionClass(str(value))
+    except ValueError:
+        return MediaResolutionClass.ASYNC
+
+
+def _spec_payload(spec: MediaSpec | dict[str, Any] | None) -> dict[str, Any] | None:
+    if spec is None:
+        return None
+    if isinstance(spec, MediaSpec):
+        spec.commit_deterministic_seed()
+        return spec.normalized_spec_payload()
+    if isinstance(spec, dict):
+        return dict(spec)
+    return None
+
+
 def _generated_extension(media: Any, *, data_type: MediaDataType) -> str:
     try:
         return data_type.ext
@@ -84,6 +109,36 @@ def _write_generated_media(media: Any, *, output_path: Path) -> None:
         output_path.write_bytes(bytes(media))
         return
     raise TypeError(f"Unsupported generated media payload type {type(media)!r}")
+
+
+def _story_media_base_name(
+    *,
+    spec: MediaSpec | None,
+    requirement: Requirement,
+) -> str:
+    extra = _requirement_extra(requirement)
+    base_name = str(
+        getattr(spec, "label", None)
+        or getattr(requirement, "media_basename", None)
+        or extra.get("media_basename")
+        or "media"
+    )
+    return sanitize_str(base_name).strip("_") or "media"
+
+
+def _write_story_media(
+    media: Any,
+    *,
+    manager: Any,
+    base_name: str,
+    fingerprint: str,
+    data_type: MediaDataType,
+) -> Path:
+    extension = _generated_extension(media, data_type=data_type)
+    output_path = manager.resource_path / f"{base_name}-{fingerprint[:12]}.{extension}"
+    _write_generated_media(media, output_path=output_path)
+    manager.register_file(output_path)
+    return output_path
 
 
 def _resolve_media_parent(requirement: Requirement, *, _ctx: Any = None) -> Any | None:
@@ -127,9 +182,10 @@ def materialize_rit_from_spec(
     spec: MediaSpec,
     *,
     requirement: Requirement,
+    derivation_spec: MediaSpec | None = None,
     _ctx: Any = None,
 ) -> MediaRIT:
-    """Generate story-scoped media synchronously and return a graph-local ``MediaRIT``."""
+    """Materialize a story-scoped ``MediaRIT`` from one already-adapted spec."""
     graph = getattr(_ctx, "graph", None)
     if graph is None:
         raise RuntimeError("Media spec materialization requires graph context")
@@ -144,51 +200,84 @@ def materialize_rit_from_spec(
     if existing is not None:
         return existing
 
+    parent = _resolve_media_parent(requirement, _ctx=_ctx)
+    ctx_ns = _resolve_media_namespace(parent, _ctx=_ctx)
+    derivation_payload = _spec_payload(derivation_spec) or _spec_payload(spec)
+    adapted_payload = _spec_payload(spec)
+    source_step_id = getattr(_ctx, "cursor_id", None)
+    scope_tag = "story"
     manager = _story_media_manager(_ctx=_ctx)
+    if manager is not None:
+        scope_tag = getattr(manager, "scope", scope_tag) or scope_tag
+
+    if _media_resolution_class(spec) not in (
+        MediaResolutionClass.INLINE,
+        MediaResolutionClass.FAST_SYNC,
+    ):
+        data_type = _coerce_media_type(getattr(spec, "data_type", None) or getattr(spec, "media_type", None))
+        return MediaRIT(
+            label=_story_media_base_name(spec=spec, requirement=requirement),
+            data_type=data_type,
+            tags={f"scope:{scope_tag}"},
+            status=MediaRITStatus.PENDING,
+            persistence_policy=getattr(
+                spec,
+                "persistence_policy",
+                MediaPersistencePolicy.CACHEABLE,
+            ),
+            derivation_spec=derivation_payload,
+            adapted_spec=adapted_payload,
+            adapted_spec_hash=fingerprint,
+            source_step_id=source_step_id,
+        )
+
     if manager is None:
         raise RuntimeError("Story media manager is not available")
 
     media, realized_spec = spec.create_media(
-        ref=_resolve_media_parent(requirement, _ctx=_ctx),
-        ctx=_resolve_media_namespace(_resolve_media_parent(requirement, _ctx=_ctx), _ctx=_ctx),
+        ref=parent,
+        ctx=ctx_ns,
     )
     realized_spec = realized_spec or spec
-    if isinstance(realized_spec, MediaSpec):
-        fingerprint = realized_spec.spec_fingerprint()
-        extra["has_identifier"] = fingerprint
 
     existing = _graph_media_by_identifier(graph, fingerprint)
     if existing is not None:
         return existing
 
     data_type = _infer_generated_media_type(media, realized_spec)
-    base_name = str(
-        getattr(realized_spec, "label", None)
-        or getattr(requirement, "media_basename", None)
-        or extra.get("media_basename")
-        or "media"
+    safe_base = _story_media_base_name(spec=realized_spec, requirement=requirement)
+    output_path = _write_story_media(
+        media,
+        manager=manager,
+        base_name=safe_base,
+        fingerprint=fingerprint,
+        data_type=data_type,
     )
-    safe_base = sanitize_str(base_name).strip("_") or "media"
-    extension = _generated_extension(media, data_type=data_type)
-    output_path = manager.resource_path / f"{safe_base}-{fingerprint[:12]}.{extension}"
-    _write_generated_media(media, output_path=output_path)
-    manager.register_file(output_path)
 
-    provider = MediaRIT(
+    execution_payload = _spec_payload(realized_spec) if isinstance(realized_spec, MediaSpec) else None
+    execution_hash = (
+        realized_spec.spec_fingerprint()
+        if isinstance(realized_spec, MediaSpec)
+        else None
+    )
+    return MediaRIT(
         path=output_path,
         data_type=data_type,
         label=output_path.name,
         tags={f"scope:{manager.scope}"},
-        spec_fingerprint=fingerprint,
-        derivation_spec=spec.normalized_spec_payload(),
-        execution_spec=(
-            realized_spec.normalized_spec_payload()
-            if isinstance(realized_spec, MediaSpec)
-            else None
+        status=MediaRITStatus.RESOLVED,
+        persistence_policy=getattr(
+            spec,
+            "persistence_policy",
+            MediaPersistencePolicy.CACHEABLE,
         ),
-        source_step_id=getattr(_ctx, "cursor_id", None),
+        adapted_spec=adapted_payload,
+        adapted_spec_hash=fingerprint,
+        derivation_spec=derivation_payload,
+        execution_spec=execution_payload,
+        execution_spec_hash=execution_hash,
+        source_step_id=source_step_id,
     )
-    return provider
 
 
 class MediaDependencyOffer(ProvisionOffer):
@@ -366,6 +455,7 @@ class MediaSpecProvisioner:
         fingerprint = adapted_spec.spec_fingerprint()
         extra["has_identifier"] = fingerprint
         extra.setdefault("authored_path", fingerprint)
+        extra["adapted_spec"] = adapted_spec.normalized_spec_payload()
 
         graph = self.graph or getattr(_ctx, "graph", None)
         existing = _graph_media_by_identifier(graph, fingerprint)
@@ -381,15 +471,23 @@ class MediaSpecProvisioner:
             return
 
         if policy & ProvisionPolicy.CREATE:
+            resolution_class = _media_resolution_class(adapted_spec)
             yield ProvisionOffer(
                 origin_id="MediaSpecProvisioner",
                 policy=ProvisionPolicy.CREATE,
-                priority=Priority.NORMAL,
-                distance_from_caller=1,
+                priority=Priority.NORMAL if resolution_class in {
+                    MediaResolutionClass.INLINE,
+                    MediaResolutionClass.FAST_SYNC,
+                } else Priority.LATE,
+                distance_from_caller=1 if resolution_class in {
+                    MediaResolutionClass.INLINE,
+                    MediaResolutionClass.FAST_SYNC,
+                } else 2,
                 candidate=adapted_spec,
-                callback=lambda *_, _spec=adapted_spec, _requirement=requirement, **kw: materialize_rit_from_spec(
+                callback=lambda *_, _spec=adapted_spec, _base_spec=base_spec, _requirement=requirement, **kw: materialize_rit_from_spec(
                     _spec,
                     requirement=_requirement,
+                    derivation_spec=_base_spec,
                     _ctx=kw.get("_ctx"),
                 ),
             )

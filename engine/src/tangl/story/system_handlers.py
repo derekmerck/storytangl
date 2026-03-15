@@ -651,6 +651,7 @@ def render_block_media(*, caller, ctx, **_kw):
                     content_format="rit",
                     content_type=getattr(provider, "data_type", MediaDataType.MEDIA),
                     text=payload.get("text"),
+                    fallback_text=payload.get("fallback_text") or payload.get("text"),
                     scope=dependency.scope or _scope_from_provider(provider),
                 )
             )

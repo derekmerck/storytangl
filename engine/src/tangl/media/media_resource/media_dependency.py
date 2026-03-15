@@ -7,7 +7,7 @@ from tangl.type_hints import Identifier
 from tangl.vm import Dependency, ProvisionPolicy, Requirement
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
-from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+from .media_resource_inv_tag import MediaRITStatus, MediaResourceInventoryTag as MediaRIT
 
 # todo: probably want a media requirement subclass, then use that in a dependency and affordance subclass, media affordances are pre-decided media objects that can be attached as appropriate, first time you see a char etc.
 
@@ -102,4 +102,7 @@ class MediaDep(Dependency[MediaRIT]):
         """Return ``True`` when the dependency is satisfied by a resolved provider."""
         if not self.satisfied:
             return False
-        return self.provider is not None
+        return (
+            self.provider is not None
+            and getattr(self.provider, "status", MediaRITStatus.RESOLVED) == MediaRITStatus.RESOLVED
+        )

@@ -14,8 +14,9 @@ Re-establish `tangl.media` as a first-class end-to-end pipeline that covers:
 
 - March 9, 2026: Milestone 1 static-media plumbing is now wired through the v38 resolver path on `codex/v38-media`.
 - March 14, 2026: Milestone 2 sync inline-spec generation is now wired through story materialization and the resolver path for story-scoped generated media.
-- Implemented: authority-chain media inventory discovery, resolver offer generation for static media, story/world/sys inventory layering, canonical journal media fragments, shared service-layer dereference, `/media/story/{story_id}/...` serving, story-media cleanup on drop, inline `media.spec` loading for sync generation, story-scoped generated `MediaRIT` provenance, and spec-fingerprint dedupe for repeated inline specs.
-- Deferred: pending/failed async lifecycle states, worker dispatch hooks, named `MediaSpecRegistry` templates, and broader client capability negotiation beyond the first static-profile safeguards.
+- March 14, 2026: Milestone 3 server-side async lifecycle is now wired through story-scoped `MediaRIT` status transitions, guarded `@on_provision` reconcile/dispatch hooks, a `WorkerDispatcher` protocol, and fallback-first service rendering for pending or failed generated media.
+- Implemented: authority-chain media inventory discovery, resolver offer generation for static media, story/world/sys inventory layering, canonical journal media fragments, shared service-layer dereference, `/media/story/{story_id}/...` serving, story-media cleanup on drop, inline `media.spec` loading for sync and async generation, story-scoped generated `MediaRIT` provenance, deterministic adapted-spec hashing and dedupe, typed render profiles, and server-side pending/fallback handling.
+- Deferred: concrete worker backends, named `MediaSpecRegistry` templates, `GenerationHints` and richer authoring surfaces, the `get_media_registries` rename / dispatch-generalized media resolution, anticipatory affordance quota policy, and broader client capability negotiation beyond the current compatibility profiles.
 
 ## Current hooks and what they already provide
 
@@ -28,12 +29,12 @@ Re-establish `tangl.media` as a first-class end-to-end pipeline that covers:
 ### Runtime and journal surfaces
 
 - `Block.media` is currently `list[dict[str, Any]]` and remains payload-oriented.
-- `render_block_media` now emits canonical `MediaFragment` payloads for resolved static and sync-generated deps (`content_format="rit"`, typed `MediaRIT` content, deterministic scope), while unresolved potential specs still use the placeholder/fallback path.
+- `render_block_media` now emits canonical `MediaFragment` payloads for resolved static media, sync-generated media, and bound async-generated providers (`content_format="rit"`, typed `MediaRIT` content, deterministic scope). Fallback text for pending/failed generated media is carried through to the service layer; malformed or unsupported specs still use the placeholder/fallback path.
 
 ### Service and transport surfaces
 
-- Runtime controller compatibility path can dereference `MediaRIT` content into stable URLs (`/media/world/{world_id}/...`, `/media/sys/...`).
-- Gateway hooks can append URL placeholders for media fragments under a `media_url` render profile, but this path is intentionally generic and should become the final compatibility fallback, not the primary resolver.
+- Runtime controller compatibility path can dereference `MediaRIT` content into stable URLs (`/media/world/{world_id}/...`, `/media/sys/...`, `/media/story/{story_id}/...`) and now applies fallback-first behavior for pending or failed story-scoped generated media.
+- Gateway hooks can still append URL placeholders for media fragments under a `media_url` render profile, but this path is intentionally generic and should remain the final compatibility fallback, not the primary resolver.
 
 ## Design principles for the resurrection
 
@@ -192,18 +193,21 @@ Persist recipe metadata (adapter id, model/version, seed, prompt/context hash) s
 
 ### Phase 2 — Provisioning integration
 
+- Status: landed for static media plus inline `media.spec` sync generation and server-side async lifecycle records.
 - Route typed declarations through `MediaProvisioner` policies.
 - Bind static requirements and emit unresolved diagnostics for missing aliases.
-- Add audit records for creation vs reuse of media resources.
+- Record reuse vs creation via spec-hash-based dedupe and generated-media provenance.
 
 ### Phase 3 — Adapter recipe pipeline
 
+- Status: protocol/orchestration slice landed; concrete workers remain next.
 - Define adapter interface for potential media generation.
-- Implement reference adapters (avatar image recipe, voice-over recipe).
+- Implement reference adapters (avatar image recipe, voice-over recipe) behind `WorkerDispatcher`.
 - Add lazy/eager generation policies and deterministic seed strategy.
 
 ### Phase 4 — Service resource unification
 
+- Status: largely landed for the runtime controller path; compatibility gateway path remains.
 - Consolidate media dereference logic behind one service helper used by runtime controller and gateway hook path.
 - Deprecate URL placeholder transform except as explicit fallback mode.
 

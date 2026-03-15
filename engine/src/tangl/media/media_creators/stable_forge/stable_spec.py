@@ -1,6 +1,7 @@
 from tangl.type_hints import StringMap
 from tangl.core import Priority
 from tangl.media import MediaResourceInventoryTag as MediaRIT, MediaSpec, on_adapt_media_spec
+from tangl.media.media_creators.media_spec import MediaResolutionClass
 
 
 def _render_str(template: str | None, ctx: StringMap | None) -> str | None:
@@ -12,6 +13,8 @@ def _render_str(template: str | None, ctx: StringMap | None) -> str | None:
         return template
 
 class StableSpec(MediaSpec):
+    resolution_class: MediaResolutionClass = MediaResolutionClass.ASYNC
+
     # txt2im
     prompt: str = None
     n_prompt: str = None
@@ -37,3 +40,6 @@ class StableSpec(MediaSpec):
     def render_prompts(self, ctx: StringMap):
         self.prompt = _render_str(self.prompt, ctx)
         self.n_prompt = _render_str(self.n_prompt, ctx)
+
+
+StableSpec.render_prompts._behavior.wants_caller_kind = StableSpec

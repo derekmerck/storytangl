@@ -136,6 +136,7 @@ class Ledger(Entity):
 
     user: Optional[Entity] = Field(None, exclude=True)
     user_id: Optional[UUID] = None
+    worker_dispatcher: Any = Field(default=None, exclude=True)
 
     @classmethod
     def from_graph(
@@ -212,6 +213,8 @@ class Ledger(Entity):
             meta["user"] = self.user
         if self.user_id is not None:
             meta["user_id"] = self.user_id
+        if self.worker_dispatcher is not None:
+            meta["worker_dispatcher"] = self.worker_dispatcher
         return meta
 
     def _local_authorities(self) -> list[BehaviorRegistry]:
