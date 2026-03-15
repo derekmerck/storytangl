@@ -23,6 +23,10 @@ then server-side async lifecycle, then concrete worker backends, then anticipato
   once per planning pass, deterministic adapted-spec hashing commits seeds for dedupe,
   and service dereference now applies fallback-first handling with typed resolve
   results.
+- **March 15, 2026:** A deterministic in-process `checker` media creator now exists as a
+  Phase 3 harness. It exercises both `FAST_SYNC` and `ASYNC` generation paths on the
+  shipped `MediaSpec` / `WorkerDispatcher` interfaces without requiring an external
+  worker backend.
 - **Still deferred:** concrete worker backends, named `MediaSpecRegistry` templates,
   `GenerationHints`, `get_media_registries` / dispatch-generalized media resolution,
   and anticipatory affordance quotas.
