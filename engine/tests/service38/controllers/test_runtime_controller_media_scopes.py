@@ -7,6 +7,8 @@ from uuid import uuid4
 from tangl.journal.media import MediaFragment
 from tangl.media import story_media as story_media_mod
 from tangl.media.media_data_type import MediaDataType
+from tangl.media.media_resource.resource_manager import ResourceManager
+from tangl.media.media_resource import MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.service.controllers import runtime_controller as runtime_controller_mod
 from tangl.service.controllers.runtime_controller import RuntimeController
@@ -135,6 +137,44 @@ def test_get_story_update_serializes_media_journal_entries_with_nested_world_pat
     assert isinstance(fragments, list)
     assert fragments[0]["fragment_type"] == "media"
     assert fragments[0]["url"] == "/media/world/w1/book1/scene1/cover.svg"
+
+
+def test_get_journal_entries_applies_static_fallback_profile(tmp_path: Path) -> None:
+    media_root = tmp_path / "world_media"
+    resources = ResourceManager(resource_path=media_root, scope="world")
+    fallback_rit = _rit_from_svg(media_root, "placeholder.svg")
+    resources.registry.add(fallback_rit)
+
+    graph = StoryGraph(
+        label="story",
+        world=SimpleNamespace(
+            label="w1",
+            resources=resources,
+        ),
+    )
+    node = TraversableNode(label="start")
+    graph.add(node)
+    ledger = Ledger(graph=graph, cursor_id=node.uid)
+    ledger.output_stream.append(
+        MediaFragment(
+            content=MediaRIT(
+                status=MediaRITStatus.PENDING,
+                adapted_spec_hash="pending-1",
+                derivation_spec={"fallback_ref": "placeholder.svg"},
+                data_type=MediaDataType.IMAGE,
+            ),
+            content_format="rit",
+            content_type=MediaDataType.IMAGE,
+            source_id=node.uid,
+            scope="world",
+        )
+    )
+
+    fragments = RuntimeController().get_journal_entries(ledger=ledger)
+
+    assert len(fragments) == 1
+    assert fragments[0].fragment_type == "media"
+    assert fragments[0].url == "/media/world/w1/placeholder.svg"
 
 
 def test_drop_story_removes_story_media_when_not_archived(monkeypatch, tmp_path: Path) -> None:

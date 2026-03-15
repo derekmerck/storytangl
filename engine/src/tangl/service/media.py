@@ -166,7 +166,7 @@ def _resolve_media_data(rit: MediaRIT) -> PendingMediaResult | ResolvedMediaResu
         )
 
     path = getattr(rit, "path", None)
-    if isinstance(path, Path):
+    if isinstance(path, Path) and path.is_file():
         return ResolvedMediaResult(path=path, data_type=getattr(rit, "data_type", None))
 
     data = getattr(rit, "data", None)

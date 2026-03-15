@@ -135,6 +135,32 @@ class TestAsyncMediaRitModel:
         with pytest.raises(ValueError):
             MediaRIT(status=MediaRITStatus.RESOLVED, data_type=MediaDataType.IMAGE)
 
+    def test_missing_path_falls_through_to_inline_data(self, tmp_path: Path) -> None:
+        fragment = MediaFragment(
+            content=MediaRIT(
+                status=MediaRITStatus.RESOLVED,
+                path=tmp_path / "missing.svg",
+                data=(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
+                    '<circle cx="16" cy="16" r="14" fill="red"/></svg>'
+                ),
+                data_type=MediaDataType.VECTOR,
+            ),
+            content_format="rit",
+            content_type=MediaDataType.VECTOR,
+            source_id=uuid4(),
+            scope="story",
+        )
+
+        payload = media_fragment_to_payload(
+            fragment,
+            render_profile="inline_data",
+            story_id="story-1",
+        )
+
+        assert payload is not None
+        assert payload["content_format"] == "xml"
+
 
 class TestAsyncInlineLifecycle:
     """Lifecycle tests for inline async media specs."""

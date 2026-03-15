@@ -32,7 +32,7 @@ class StableSpec(MediaSpec):
     dims: tuple[int, int] = None
 
     @classmethod
-    def get_creator_service(cls):
+    def get_creation_service(cls):
         from .stable_forge import StableForge
         return StableForge()
 

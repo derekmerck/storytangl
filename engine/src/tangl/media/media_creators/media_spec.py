@@ -59,7 +59,10 @@ class MediaSpec(Entity):
         fqn = _SPEC_ALIAS_MAP.get(token.casefold(), token)
         if "." in fqn:
             module_name, class_name = fqn.rsplit(".", 1)
-            resolved = getattr(import_module(module_name), class_name, None)
+            try:
+                resolved = getattr(import_module(module_name), class_name, None)
+            except (ImportError, ModuleNotFoundError):
+                return None
             if isinstance(resolved, type) and issubclass(resolved, cls):
                 return resolved
         return cls.dereference_cls_name(fqn)
@@ -150,9 +153,7 @@ class MediaSpec(Entity):
         )
         media_result = CallReceipt.first_result(*receipts)
         if media_result is None:
-            creator_factory = getattr(type(adapted_spec), "get_creator_service", None)
-            if not callable(creator_factory):
-                creator_factory = getattr(type(adapted_spec), "get_creation_service", None)
+            creator_factory = getattr(type(adapted_spec), "get_creation_service", None)
             if callable(creator_factory):
                 creator = creator_factory()
                 media_result = creator.create_media(adapted_spec)

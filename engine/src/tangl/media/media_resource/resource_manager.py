@@ -94,10 +94,13 @@ class ResourceManager:
         index_handlers: Iterable[IndexHandler] = (),
     ) -> MediaRIT:
         """Index one file and apply the same default label/tag policy."""
+        resolved_path = path if path.is_absolute() else (self.resource_path / path).resolve()
+        if not resolved_path.is_file():
+            raise FileNotFoundError(f"Cannot register missing media file: {resolved_path}")
         handlers = [*self.index_handlers, *list(index_handlers)]
-        record = self.registry.index([path], extra_handlers=handlers or None)[0]
+        record = self.registry.index([resolved_path], extra_handlers=handlers or None)[0]
         if not record.label:
-            record.label = path.name
+            record.label = resolved_path.name
         record.tags = set(record.tags or set()) | self.default_tags | set(tags)
         return record
 

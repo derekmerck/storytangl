@@ -29,6 +29,7 @@ from tangl.core import (
     Token,
     TokenCatalog,
 )
+from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
 from tangl.media.media_resource import (
     MediaInventory,
     MediaResourceInventoryTag as MediaRIT,
@@ -571,6 +572,19 @@ class TestResolverOfferGathering:
         assert provider is source
         assert source.label == "patched"
         assert req.selected_offer_policy == ProvisionPolicy.UPDATE
+
+    def test_gather_offers_includes_media_spec_create_offer_without_ctx(self) -> None:
+        resolver = Resolver()
+        req = Requirement(
+            has_kind=MediaRIT,
+            media_spec=VectorSpec(label="preview_banner"),
+            provision_policy=ProvisionPolicy.ANY,
+        )
+
+        offers = resolver.gather_offers(req)
+
+        assert len(offers) == 1
+        assert offers[0].policy == ProvisionPolicy.CREATE
 
     def test_clone_offer_uses_selected_reference_and_template(self) -> None:
         source = Entity(label="source")

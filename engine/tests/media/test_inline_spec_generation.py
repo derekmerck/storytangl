@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from tangl.journal.media import MediaFragment
+from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_creators.svg_forge.vector_spec import VectorSpec
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
 from tangl.service.media import media_fragment_to_payload
@@ -104,6 +105,9 @@ class TestSpecFingerprinting:
 
         assert first.uid != second.uid
         assert first.spec_fingerprint() == second.spec_fingerprint()
+
+    def test_resolve_spec_class_returns_none_for_missing_module(self) -> None:
+        assert MediaSpec.resolve_spec_class("missing.module.Spec") is None
 
 
 # ============================================================================

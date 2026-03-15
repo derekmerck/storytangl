@@ -1357,7 +1357,8 @@ def test_block_emits_media_fragment():
   - `media_resource_inv_tag.py` - MediaRIT entity
   - `media_resource_registry.py` - Registry
   - `media_dependency.py` - DependencyEdge
-  - `media_provisioning.py` - Provisioner (needs modernization)
+  - `media_provisioning.py` - Current resolver/provisioning path for static media,
+    inline `media.spec`, and story-scoped async lifecycle
 
 - **Media Creators:** `engine/src/tangl/media/media_creators/`
   - `media_spec.py` - Spec base class and dispatch

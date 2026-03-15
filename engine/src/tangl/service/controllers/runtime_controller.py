@@ -9,6 +9,7 @@ from uuid import UUID
 from tangl import core as tangl_core
 from tangl.config import get_story_media_dir, get_sys_media_dir
 from tangl.core import Selector
+from tangl.journal.media import MediaFragment
 from tangl.media import get_system_resource_manager
 from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaDep
@@ -188,20 +189,21 @@ class RuntimeController(HasApiEndpoints):
         system_media_root: Path | None = None,
     ) -> BaseFragment:
         """Convert vm38 journal records into legacy-compatible BaseFragment payloads."""
+        if isinstance(fragment, MediaFragment):
+            media_payload = media_fragment_to_payload(
+                fragment,
+                render_profile=render_profile,
+                world_id=world_id,
+                story_id=story_id,
+                world_media_root=world_media_root,
+                story_media_root=story_media_root,
+                system_media_root=system_media_root,
+            )
+            if media_payload is not None:
+                return BaseFragment(**media_payload)
+
         if isinstance(fragment, BaseFragment):
             return fragment
-
-        media_payload = media_fragment_to_payload(
-            fragment,
-            render_profile=render_profile,
-            world_id=world_id,
-            story_id=story_id,
-            world_media_root=world_media_root,
-            story_media_root=story_media_root,
-            system_media_root=system_media_root,
-        )
-        if media_payload is not None:
-            return BaseFragment(**media_payload)
 
         if hasattr(fragment, "model_dump"):
             data = fragment.model_dump(mode="python")
@@ -588,9 +590,16 @@ class RuntimeController(HasApiEndpoints):
             world_id=world_id,
             story_id=story_id,
         )
+        render_profile = MediaRenderProfile(
+            static_inventories=self._resolve_static_inventories(
+                ledger=ledger,
+                world_id=world_id,
+            ),
+        )
         return [
             self._to_compat_fragment(
                 fragment,
+                render_profile=render_profile,
                 world_id=world_id,
                 story_id=story_id,
                 world_media_root=media_roots["world"],

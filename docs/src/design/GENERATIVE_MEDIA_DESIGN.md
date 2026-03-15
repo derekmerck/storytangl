@@ -271,6 +271,9 @@ Phase 2 slice deliberately keeps `get_media_inventories`, `graph.story_resources
 internal service helper path until graph-backed story search and inventory-backed world/sys
 search have both been proven together.
 
+The examples in the rest of Part 2 use those generalized future names on purpose. Read them
+as target-shape pseudocode, not as the literal symbols shipped in the current slice.
+
 ### 2.2 Story Scope: Graph Is the Registry
 
 Current implementation note: story scope still stages file writing, re-indexing, and serving
@@ -405,8 +408,8 @@ No `_init_media` on the Ledger. No startup disk scan. No `story_resource_manager
 
 | Kind | Object | Serialization | Authority |
 |---|---|---|---|
-| Static world/sys | `MediaRIT` in `MediaResourceRegistry` | Not serialized — rebuilt at world load | `get_media_registries` handler |
-| Story-generated | `MediaRIT` in story graph | Full graph node | `get_media_registries` handler (graph) |
+| Static world/sys | `MediaRIT` in `MediaResourceRegistry` | Not serialized — rebuilt at world load | Target: `get_media_registries` handler; current: `get_media_inventories` |
+| Story-generated | `MediaRIT` in story graph | Full graph node | Target: graph-backed registry search; current: graph + `story_resources` through `get_media_inventories` |
 | Spec template | `MediaSpec` in `MediaSpecRegistry` | By value, world config | `MediaSpecProvisioner` |
 
 ### 3.2 Static Catalog = MediaResourceRegistry (Already Exists)

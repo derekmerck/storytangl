@@ -1018,6 +1018,8 @@ def test_ledger_survives_orchestrator_restart():
 
 ---
 
-**Document Status:** ✅ **CURRENT AND ACCURATE**
+**Document Status:** ⚠️ **FROZEN AT V3.7**
 
-This document reflects the actual state of the service layer as of November 2025. All claims about implementation status have been verified against source code.
+This document remains useful for the original v3.7 service shape, but it is no longer the
+authoritative status source for the current service layer. Prefer the package docstrings and
+adjacent updated design notes when they disagree with this snapshot.

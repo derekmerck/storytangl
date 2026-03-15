@@ -298,8 +298,6 @@ class Resolver:
         _ctx: Any = None,
     ) -> list[ProvisionOffer]:
         _ctx = resolve_ctx(_ctx)
-        if _ctx is None:
-            return []
 
         from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
 

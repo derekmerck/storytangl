@@ -19,6 +19,6 @@ class TtsSpec(MediaSpec):
     speaker_model: str = None  # character voice in api namespace
 
     @classmethod
-    def get_creator_service(cls):
+    def get_creation_service(cls):
         from .tts_forge import TtsForge
         return TtsForge()
