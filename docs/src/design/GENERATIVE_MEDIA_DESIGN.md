@@ -1,7 +1,7 @@
 # Generative Media Design
 
 **Status:** DESIGN + PARTIAL IMPLEMENTATION — extends [`MEDIA_DESIGN.md`](MEDIA_DESIGN.md)
-and [`media_resurrection_plan.md`](../../notes/media_resurrection_plan.md)  
+and [`media_resurrection_plan.md`](../notes/media_resurrection_plan.md)  
 **Scope:** Async generative pipeline, pending-RIT lifecycle, spec registry and provisioner,
 phase-bus integration, and service-layer response profiles.  
 **Prerequisite:** Media resurrection plan Phase 1–2 (static RIT plumbing) must be complete.  
@@ -1143,7 +1143,7 @@ instances are working.
 
 - **[`MEDIA_DESIGN.md`](MEDIA_DESIGN.md)** — Authoritative for layers, roles, static lifecycle, fragment
   contract. This document extends it for the generative pipeline.
-- **[`media_resurrection_plan.md`](../../notes/media_resurrection_plan.md)** — This design
+- **[`media_resurrection_plan.md`](../notes/media_resurrection_plan.md)** — This design
   now documents the landed inline Phase 1–2 work plus the server-side async lifecycle.
 - **[`PLANNING_DESIGN.md`](planning/PLANNING_DESIGN.md)** — `MediaSpecProvisioner` follows the same offer/accept protocol
   as `TokenProvisioner` and `TemplateProvisioner`.
