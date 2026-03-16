@@ -73,9 +73,8 @@ class StoryCompiler:
     * Builds scene and block template hierarchy used by runtime scope matching.
     * Canonicalizes action references so authored shorthand and qualified
       references resolve into a stable form.
-    * Attempts to resolve authored ``kind`` references during compilation and
-      still tolerates legacy ``obj_cls`` input when an override cannot be
-      imported.
+    * Attempts to resolve authored ``kind`` references during compilation when
+      an override cannot be imported.
 
     API
     ---
@@ -147,7 +146,7 @@ class StoryCompiler:
         for scene_label, scene_data in scenes:
             scene_payload = self._build_payload(
                 kind=self._resolve_kind(
-                    scene_data.get("kind") or scene_data.get("obj_cls"),
+                    scene_data.get("kind"),
                     fallback=Scene,
                 ),
                 payload={
@@ -201,7 +200,6 @@ class StoryCompiler:
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
                         block_data.get("kind")
-                        or block_data.get("obj_cls")
                         or block_data.get("block_cls"),
                         fallback=Block,
                     ),
@@ -258,7 +256,7 @@ class StoryCompiler:
             )
             payload = self._build_payload(
                 kind=self._resolve_kind(
-                    item_data.get("kind") or item_data.get("obj_cls"),
+                    item_data.get("kind"),
                     fallback=fallback_kind,
                 ),
                 payload={**item_data, "label": item_data.get("label") or label},

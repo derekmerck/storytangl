@@ -43,13 +43,13 @@ def _base_script() -> dict:
         "actors": {
             "guard": {
                 "name": "Joe",
-                "obj_cls": "tangl.story.concepts.actor.actor.Actor",
+                "kind": "tangl.story.concepts.actor.actor.Actor",
             }
         },
         "locations": {
             "castle": {
                 "name": "Castle",
-                "obj_cls": "tangl.story.concepts.location.location.Location",
+                "kind": "tangl.story.concepts.location.location.Location",
             }
         },
         "scenes": {

@@ -525,11 +525,12 @@ version-control-friendly.
 
 ### The `kind` Vocabulary
 
-v37 used `obj_cls`. v38 uses `kind` throughout — in unstructured data dicts, in Selector
-criteria (`has_kind`), in creation helpers (`add_node(kind=X)`), and in template matching
-(`has_payload_kind`). The rename clarifies that this is a type discriminator, not a
-Python class reference (even though at the core level it IS a class reference — higher
-layers may use string-based kind resolution through the service layer).
+v37 used a legacy class-key field. v38 uses `kind` throughout — in unstructured data
+dicts, in Selector criteria (`has_kind`), in creation helpers (`add_node(kind=X)`),
+and in template matching (`has_payload_kind`). The rename clarifies that this is a
+type discriminator, not a Python class reference (even though at the core level it IS
+a class reference — higher layers may use string-based kind resolution through the
+service layer).
 
 ### Wrapper Inheritance as a Layering Pattern
 
@@ -557,7 +558,7 @@ authors a consistent inheritance ladder to extend.
 | Edge endpoints | `source` / `destination` | `predecessor` / `successor` | Graph theory convention; avoid domain collision |
 | Matching direction | `entity.matches(**kw)` | `Selector(**kw).matches(entity)` | Selectors are first-class, composable |
 | Find API | `find_all(**criteria)` | `find_all(selector=S)` | Typed, storable, composable queries |
-| Kind field | `obj_cls` | `kind` | Clearer semantics |
+| Kind field | legacy class-key field | `kind` | Clearer semantics |
 | Graph storage | `graph.data` | `registry.members` | Graph IS a Registry now |
 | Registry awareness | Implicit | `RegistryAware` mixin | Explicit binding with rebind protection |
 | Template payload | Flattened fields | Separate `payload: Entity` | Clean separation of wrapper and content |

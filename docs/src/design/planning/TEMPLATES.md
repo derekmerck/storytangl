@@ -19,7 +19,7 @@ template.get_content_identifier()  # 16-char hex string for logs and receipts
 ```
 
 Use the hash when emitting receipts or proving which template created an entity. Fields
-like ``obj_cls``, ``archetype``, ``conditions``, and ``effects`` influence the hash,
+like ``kind``, ``archetype``, ``conditions``, and ``effects`` influence the hash,
 while metadata fields (``label``, ``scope``, ``template_names``) do not.
 
 ## Declaration Levels
@@ -34,7 +34,7 @@ metadata:
   author: StoryTangl
 templates:
   generic_guard:
-    obj_cls: tangl.story.concepts.actor.actor.Actor
+    kind: tangl.story.concepts.actor.actor.Actor
     archetype: guard
 ```
 
@@ -46,7 +46,7 @@ scenes:
     blocks: {}
     templates:
       village_elder:
-        obj_cls: tangl.story.concepts.actor.actor.Actor
+        kind: tangl.story.concepts.actor.actor.Actor
 ```
 
 ### Block Level (Source Scope)
@@ -59,7 +59,7 @@ scenes:
         label: village.smithy
         templates:
           apprentice:
-            obj_cls: tangl.story.concepts.actor.actor.Actor
+            kind: tangl.story.concepts.actor.actor.Actor
 ```
 
 ### Explicit Scope Overrides
@@ -73,7 +73,7 @@ scenes:
     blocks: {}
     templates:
       traveling_merchant:
-        obj_cls: tangl.story.concepts.actor.actor.Actor
+        kind: tangl.story.concepts.actor.actor.Actor
         scope: null  # remains global instead of inheriting parent_label
 ```
 

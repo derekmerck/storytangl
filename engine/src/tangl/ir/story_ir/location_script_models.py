@@ -14,7 +14,7 @@ from .asset_script_models import AssetsScript
 class LocationScript(BaseScriptItem):
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story import Location
         return Location
@@ -27,7 +27,7 @@ class LocationScript(BaseScriptItem):
 class SettingScript(BaseScriptItem):
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story import Setting
         return Setting

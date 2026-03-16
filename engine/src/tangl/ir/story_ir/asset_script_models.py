@@ -7,5 +7,5 @@ class AssetScriptItem(BaseScriptItem, extra="allow"):
     from_ref: UniqueLabel = Field(None, description="Label of reference asset to inherit traits from")
 
 class AssetsScript(BaseScriptItem):
-    obj_cls: ClassName = Field(..., alias="asset_cls")
+    asset_kind: ClassName = Field(..., alias="asset_kind")
     assets: list[AssetScriptItem] | dict[UniqueLabel, AssetScriptItem] = None

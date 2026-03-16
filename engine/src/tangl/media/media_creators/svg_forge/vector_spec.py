@@ -25,7 +25,7 @@ class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
 
     ```yaml
     media:
-      - obj_cls: SvgSpec
+      - kind: SvgSpec
         label: scene1/block1
         shapes: xxx
         style_dict: { override_style_info: foo }

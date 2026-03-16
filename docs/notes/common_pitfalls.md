@@ -151,14 +151,14 @@ record = Record(type="event", tags={channel_tag("journal")})
 
 ---
 
-## Serialization: `obj_cls` String vs Type
+## Serialization: `kind` String vs Type
 
-**Problem**: `unstructure()` emits `obj_cls` as a type, but some serializers expect strings.
+**Problem**: `unstructure()` emits `kind` as a type, but some serializers expect strings.
 
 ```python
 # Serialization may fail
 data = entity.unstructure()
-# data['obj_cls'] = <class 'MyEntity'>
+# data['kind'] = <class 'MyEntity'>
 json.dumps(data)  # TypeError: not JSON serializable
 ```
 

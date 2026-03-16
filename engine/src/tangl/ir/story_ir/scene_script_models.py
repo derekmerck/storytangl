@@ -135,7 +135,7 @@ class ActionScript(BaseScriptItem):
     """
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         from tangl.story import Action
         return Action
 
@@ -207,7 +207,7 @@ class ActionScript(BaseScriptItem):
 class BlockScript(BaseScriptItem):
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story import Block
         return Block
@@ -265,7 +265,7 @@ class MenuBlockScript(BlockScript):
 class SceneScript(BaseScriptItem):
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story import Scene
         return Scene

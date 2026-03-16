@@ -98,8 +98,8 @@ def test_yaml_core_script_roundtrips():
     # Can compare with eq
     assert script == reparsed_script
 
-# todo: scripts not hydrating/dehydrating obj_cls_ properly
-@pytest.mark.xfail(reason="Scripts not hydrating obj_cls_ fields properly?")
+# todo: scripts not hydrating/dehydrating kind_ properly
+@pytest.mark.xfail(reason="Scripts not hydrating kind_ fields properly?")
 def test_yaml_story_script_roundtrips():
     """Full StoryScript with scenes/blocks/actors should round-trip."""
 
@@ -110,7 +110,7 @@ def test_yaml_story_script_roundtrips():
       author: Tdv
     templates:
       global_guard:
-        obj_cls: tangl.story.concepts.actor.actor.Actor
+        kind: tangl.story.concepts.actor.actor.Actor
         archetype: guard
         hp: 50
     scenes:
@@ -118,7 +118,7 @@ def test_yaml_story_script_roundtrips():
         label: intro
         actors:
           village_guard:
-            obj_cls: tangl.story.concepts.actor.actor.Actor
+            kind: tangl.story.concepts.actor.actor.Actor
             archetype: guard
             hp: 75
         blocks:
@@ -133,7 +133,7 @@ def test_yaml_story_script_roundtrips():
             text: You see a guard.
             templates:
               local_item:
-                obj_cls: tangl.story.concepts.asset.asset.Asset
+                kind: tangl.story.concepts.asset.asset.Asset
                 label: sword
     """
 
@@ -143,16 +143,16 @@ def test_yaml_story_script_roundtrips():
     assert script.scenes['intro'].label == "intro"
     assert isinstance(script.scenes['intro'], SceneScript)
     from tangl.story import Scene
-    assert script.scenes['intro'].obj_cls_ is None
-    assert script.scenes['intro'].obj_cls == Scene
+    assert script.scenes['intro'].kind_ is None
+    assert script.scenes['intro'].kind == Scene
     assert isinstance(script.templates['global_guard'], BaseScriptItem)
     from tangl.story import Actor
-    assert script.templates['global_guard'].obj_cls_ == Actor
+    assert script.templates['global_guard'].kind_ == Actor
 
     exported_dict = script.unstructure_as_template()
     assert isinstance(exported_dict['scenes']['intro'], dict)
     assert isinstance(exported_dict['templates']['global_guard'], dict)
-    assert isinstance(exported_dict['templates']['global_guard']["obj_cls"], str)
+    assert isinstance(exported_dict['templates']['global_guard']["kind"], str)
 
     # Should be identical
     assert dict_compare(original_dict, exported_dict) is None

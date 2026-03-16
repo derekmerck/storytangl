@@ -22,7 +22,7 @@ class StructuringHandlerProtocol(Protocol):
     @classmethod
     def structure(cls,
                   unstructured: UnstructuredData,
-                  obj_cls_map: Mapping[str, Type[HasUid]] = None) -> HasUid: ...
+                  kind_map: Mapping[str, Type[HasUid]] = None) -> HasUid: ...
     @classmethod
     def unstructure(cls, structured: HasUid) -> UnstructuredData: ...
 
@@ -33,25 +33,23 @@ class StructuringHandler:
     determine which class to instantiate.
 
     Methods:
-      - `structure(data, obj_cls_map)`: Initializes an instance of the
-        declared class using `kind` (preferred) or `obj_cls` (legacy alias).
+      - `structure(data, kind_map)`: Initializes an instance of the
+        declared class using `kind`.
       - `unstructure(entity)`: Extracts data from an entity instance into a
-        dictionary and writes both `kind` and `obj_cls` for compatibility.
+        dictionary and writes `kind`.
     """
 
     @classmethod
     def structure(cls,
                   unstructured: UnstructuredData,
-                  obj_cls_map: Mapping[str, Type[HasUid]] = None) -> HasUid:
+                  kind_map: Mapping[str, Type[HasUid]] = None) -> HasUid:
         unstructured = dict(unstructured)
-        obj_cls = unstructured.pop("kind", None)
-        if obj_cls is None:
-            obj_cls = unstructured.pop("obj_cls")
-        if isinstance(obj_cls, str) and obj_cls_map is not None:
-            obj_cls = obj_cls_map[ obj_cls ]
-        if hasattr(obj_cls, 'structure'):
-            return obj_cls.structure(unstructured)
-        return obj_cls( **unstructured )
+        kind = unstructured.pop("kind")
+        if isinstance(kind, str) and kind_map is not None:
+            kind = kind_map[kind]
+        if hasattr(kind, "structure"):
+            return kind.structure(unstructured)
+        return kind(**unstructured)
 
     @classmethod
     def unstructure(cls, structured: HasUid) -> UnstructuredData:
@@ -69,10 +67,5 @@ class StructuringHandler:
             # Trivial fallback for feral classes
             unstructured = {**structured.__dict__}
         if "kind" not in unstructured:
-            if "obj_cls" in unstructured:
-                unstructured["kind"] = unstructured["obj_cls"]
-            else:
-                unstructured["kind"] = structured.__class__
-        if "obj_cls" not in unstructured:
-            unstructured["obj_cls"] = unstructured["kind"]
+            unstructured["kind"] = structured.__class__
         return unstructured

@@ -11,17 +11,17 @@ globals:
 
 items:
   crystal:
-    obj_cls: tangl.story.concepts.item.Item
+    kind: tangl.story.concepts.item.Item
     name: "Ancient Crystal"
     description: "A shard that hums with latent power."
   map:
-    obj_cls: tangl.story.concepts.item.Item
+    kind: tangl.story.concepts.item.Item
     name: "Treasure Map"
     description: "A weathered chart marking the shrine."
 
 actors:
   companion:
-    obj_cls: tangl.story.concepts.actor.actor.Actor
+    kind: tangl.story.concepts.actor.actor.Actor
     name: "Aria the Ranger"
     tags: [npc, ally]
 
@@ -29,7 +29,7 @@ scenes:
   village:
     roles:
       companion:
-        obj_cls: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.actor.role.Role
         actor_ref: companion
     blocks:
       start:
@@ -63,7 +63,7 @@ scenes:
   wilds:
     roles:
       companion:
-        obj_cls: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.actor.role.Role
         actor_ref: companion
     blocks:
       trail:
@@ -83,7 +83,7 @@ scenes:
   shrine:
     roles:
       companion:
-        obj_cls: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.actor.role.Role
         actor_ref: companion
     blocks:
       entrance:

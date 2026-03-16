@@ -104,6 +104,10 @@ This experiment is now the active migration recipe:
   - `tangl.core.record.base_fragment.BaseFragment` now derives from `tangl.core.Record` while keeping alias/serialization compatibility (`fragment_type`, `content`, `has_channel`).
 
 ## Vocabulary Migration Snapshot (2026-03-04 pass 3)
+- Historical snapshot only. A later 2026-03-15 cleanup removed the remaining
+  active `obj_cls` compatibility paths, fixtures, and authored data from the
+  live repo, so the bullets below describe the intermediate migration state
+  rather than current engine behavior.
 - `obj_cls -> kind` migration is now mechanically adopted in non-retiring mechanics/media callsites via compat wrappers (`kind` first, fallback to `obj_cls` where needed for mixed lanes).
 - Persistence structuring now accepts `kind` (preferred) and legacy `obj_cls`, and emits both keys for cross-lane compatibility.
 - Coverage added: `engine/tests/persistence/test_structuring_handler.py` validates `kind`/`obj_cls` dual support.

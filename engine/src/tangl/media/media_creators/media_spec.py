@@ -78,12 +78,11 @@ class MediaSpec(Entity):
 
         payload = dict(value)
         spec_cls = cls.resolve_spec_class(
-            payload.pop("obj_cls", None)
-            or payload.pop("kind", None)
+            payload.pop("kind", None)
             or payload.pop("spec_type", None)
         )
         if spec_cls is None:
-            raise ValueError("Inline media spec requires one of: obj_cls, kind, spec_type")
+            raise ValueError("Inline media spec requires one of: kind, spec_type")
         return spec_cls.model_validate(payload)
 
     def normalized_spec_payload(

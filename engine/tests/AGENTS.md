@@ -393,7 +393,7 @@ def test_entity_unstructure_structure_roundtrip(self):
     # Unstructure to dict
     data = original.unstructure()
     assert isinstance(data, dict)
-    assert "obj_cls" in data
+    assert "kind" in data
 
     # Structure back
     restored = Entity.structure(data)

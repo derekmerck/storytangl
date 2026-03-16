@@ -15,7 +15,7 @@ script_dispatch = LayeredDispatch(label="script.dispatch", handler_layer=L.APPLI
 on_materialize = partial(script_dispatch.register, task="materialize")
 
 @on_materialize(priority=Prio.EARLY)
-def _update_obj_cls(caller, *, ctx, **_):
+def _update_kind(caller, *, ctx, **_):
     ...
 
 @on_materialize(priority=Prio.EARLY)

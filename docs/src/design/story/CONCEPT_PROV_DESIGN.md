@@ -125,7 +125,7 @@ Templates are `BaseScriptItem` subclasses (which inherit from `Record`):
 class ActorScript(BaseScriptItem):  # BaseScriptItem extends Record
     uid: UUID  # From Record
     label: UniqueLabel  # From Record
-    obj_cls: str = "Actor"
+    kind: str = "Actor"
     name: Optional[str] = None
     archetype: Optional[str] = None
     tags: Optional[set[str]] = None
@@ -149,7 +149,7 @@ class ScopeSelector(BaseModel):
 # World-level templates (no scope constraint)
 templates:
   generic_guard:
-    obj_cls: Actor
+    kind: Actor
     archetype: "guard"
     hp: 50
     tags: ["npc"]
@@ -160,7 +160,7 @@ scenes:
     # Scene-level templates (parent scope)
     templates:
       village_elder:
-        obj_cls: Actor
+        kind: Actor
         name: "Village Elder"
         archetype: "elder"
       # Inferred: scope.parent_label = "village"
@@ -170,7 +170,7 @@ scenes:
         # Block-level templates (source scope)
         templates:
           forge_apprentice:
-            obj_cls: Actor
+            kind: Actor
             name: "Apprentice"
             profession: "blacksmith"
         # Inferred: scope.source_label = "village.smithy"
@@ -183,13 +183,13 @@ scenes:
     templates:
       # Override inferred scope - make globally available
       wandering_merchant:
-        obj_cls: Actor
+        kind: Actor
         archetype: "merchant"
         scope: null  # Explicit: available everywhere
       
       # Override with custom scope
       secret_contact:
-        obj_cls: Actor
+        kind: Actor
         scope:
           ancestor_tags: ["conspiracy", "hidden"]
 ```
@@ -499,7 +499,7 @@ roles:
 ```yaml
 templates:
   village_guard:
-    obj_cls: Actor
+    kind: Actor
     scope: {parent_label: "village"}
 
 scenes:
@@ -986,7 +986,7 @@ class TemplateProvisioner(Provisioner):
         world = ctx.graph.world
         
         # Resolve class
-        cls = world.domain_manager.resolve_class(template.obj_cls)
+        cls = world.domain_manager.resolve_class(template.kind)
         
         # Prepare payload (handles defaults, validation, graph injection)
         payload = world._prepare_payload(
@@ -1131,7 +1131,7 @@ scenes:
 templates:
   # World-level generic
   generic_guard:
-    obj_cls: Actor
+    kind: Actor
     archetype: "guard"
     hp: 50
 
@@ -1140,7 +1140,7 @@ scenes:
     templates:
       # Village-specific variant
       village_guard:
-        obj_cls: Actor
+        kind: Actor
         archetype: "guard"
         hp: 40
         faction: "village_militia"
@@ -1155,7 +1155,7 @@ scenes:
     templates:
       # Palace-specific variant
       palace_guard:
-        obj_cls: Actor
+        kind: Actor
         archetype: "guard"
         hp: 80
         faction: "royal_guard"
@@ -1223,7 +1223,7 @@ scenes:
         # Block-scoped template
         templates:
           containment_specialist:
-            obj_cls: Actor
+            kind: Actor
             name: "Dr. Chen"
             specialty: "containment"
           # Inferred: scope.source_label = "lab.containment"

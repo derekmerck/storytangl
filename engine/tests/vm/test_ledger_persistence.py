@@ -16,10 +16,10 @@ from tangl.vm.runtime.ledger import Ledger
 
 
 @pytest.fixture(autouse=True)
-def clear_obj_cls_map() -> None:
-    PersistenceManager.obj_cls_map.clear()
+def clear_kind_map() -> None:
+    PersistenceManager.kind_map.clear()
     yield
-    PersistenceManager.obj_cls_map.clear()
+    PersistenceManager.kind_map.clear()
 
 
 def test_ledger38_json_round_trip_keeps_user_id_and_excludes_runtime_user() -> None:

@@ -70,11 +70,11 @@ class Entity(Unstructurable, HasIdentity, HasNamespace):
     templ_hash: str | None = None
     """Optional provenance hash of the template used to materialize this entity."""
 
-    def is_instance(self, obj_cls: type | tuple[type, ...]) -> bool:
+    def is_instance(self, kind: type | tuple[type, ...]) -> bool:
         """Legacy alias for ``has_kind``."""
-        if isinstance(obj_cls, tuple):
-            return all(isinstance(c, type) for c in obj_cls) and isinstance(self, obj_cls)
-        return isinstance(obj_cls, type) and isinstance(self, obj_cls)
+        if isinstance(kind, tuple):
+            return all(isinstance(c, type) for c in kind) and isinstance(self, kind)
+        return isinstance(kind, type) and isinstance(self, kind)
 
     def get_tag_kv(self, prefix: str | None = None, enum_type: type | None = None) -> set[Any]:
         """Legacy tag parser for ``key:value`` tags with optional typed coercion."""
