@@ -100,6 +100,12 @@ traversable edges** rather than a fundamentally separate mechanism. The current
 PLANNING implementation is still appropriate, but this interpretation is useful
 for future unification with provisioning and frozen-shape graph modes.
 
+It is also one concrete instance of the broader **re-entrant provider** pattern
+used by hubs and repeatable activities: the cursor repeatedly re-enters a
+recognizable continuation point until terminal conditions route it onward. See
+`docs/src/design/story/HUB_FANOUT.md` and
+`docs/src/notes/SANDBOX_FANOUT_DESIGN.md` for the more general traversal view.
+
 ## Creating New Games
 
 1. Subclass ``Game`` and implement scoring/round resolution.

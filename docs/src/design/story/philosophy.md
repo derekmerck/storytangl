@@ -271,6 +271,15 @@ The **multi-lane** extension (planned) allows multiple navigators to traverse
 the same fabula simultaneously from different perspectives, producing
 interleaved syuzhets that can be cross-referenced.
 
+The important conceptual move is that **navigation is an orthogonal role**.
+The navigator is not necessarily the presenter, and is not necessarily the
+creator. A human reader may pick choices directly, but so may a scheduler, a
+test harness, an AI policy, or a replay driver. Multi-lane stories extend that
+same idea rather than introducing a new ontology: several navigators operate on
+the same underlying fabula, each with its own visibility, perspective, and
+decision policy, while the service/presentation layer remains free to surface
+one lane, several lanes, or a stitched cross-reference view.
+
 **Implementation:** Creator → `StoryCompiler` + `Materializer`;
 Navigator → `Frame` + `Ledger` (user choices drive `follow_edge`);
 Presenter → `GatewayHooks` + render profiles in the service layer.

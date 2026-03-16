@@ -248,6 +248,25 @@ the VM pushes a return frame and the activity block doesn't need to
 know which hub invoked it. This is the call-stack pattern and it's
 cleaner for activities that multiple hubs might share.
 
+This same pattern is broader than sandbox travel loops. It also covers
+repeatable activity kernels and game-like interactions:
+
+- a tavern hub can call into a reusable "play cards" block and return
+- a workshop hub can invoke a short crafting loop and return
+- a game block can project a self-fanout of move edges until a terminal result
+  is reached
+
+The shared design question is whether a revisit means:
+
+- returning to the same provider instance,
+- calling into a provider and then returning to the invoking hub, or
+- materializing a fresh per-visit instance so replay and journal lineage stay
+  more explicit
+
+For sandbox-oriented hubs, the default should usually be "call and return" or
+"reuse the same provider" unless a concrete story need justifies per-visit
+instancing.
+
 ---
 
 ## What This Replaces

@@ -271,6 +271,44 @@ This enables more reader-friendly behavior such as:
 
 ---
 
+## Re-entrant Providers and Cycle Instances
+
+Hub fanout becomes especially useful when the gathered providers are
+**re-entrant** rather than one-shot destinations.
+
+Examples:
+
+- repeatable activities at a location hub
+- minigame or challenge blocks that loop until terminal conditions resolve
+- reusable interaction scenes that may be invoked from several hubs
+- short subgraph patterns that compress a recurring "do thing -> resolve ->
+  return" structure
+
+The important design question is not merely "can this be revisited?" but **what
+kind of revisit it is**:
+
+- **Reuse the same provider instance**
+  Appropriate when the provider's local state is itself the thing being
+  revisited, as with a persistent challenge block or a stable location
+  activity.
+
+- **Call into a provider and return**
+  Appropriate when the provider behaves like a subroutine and should not need to
+  know which hub invoked it. In that case the hub projects a call/return-style
+  affordance and the VM return stack carries the re-entry semantics.
+
+- **Instantiate a fresh cycle instance**
+  Appropriate when each visit should leave an auditable, separately identified
+  trail in the journal or replay history rather than folding all visits into one
+  provider node. This is the more expensive but more explicit option.
+
+This should be understood as a general traversal principle, not a sandbox-only
+quirk. Hubs, activity loops, and game blocks are all consumers of the same
+underlying pattern: a node projects one or more re-entrant affordances whose
+result eventually returns the cursor to a recognizable continuation point.
+
+---
+
 ## Minimal Data Shape
 
 The first-pass runtime payload for a hub should preserve data roughly like:
@@ -352,3 +390,4 @@ runtime still needs to be built.
 - `tangl.story.fabula.StoryCompiler`
 - `tangl.vm.provision.Requirement`
 - `tangl.vm.provision.Affordance`
+- `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`
