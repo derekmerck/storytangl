@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 from uuid import UUID
 
-from tangl.journal.discourse import AttributedFragment
+from tangl.journal.prose import AttributedFragment
 from tangl.journal.content import ContentFragment, PresentationHints
 from tangl.utils.sanitize_str import sanitize_str
 

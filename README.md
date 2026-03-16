@@ -113,6 +113,8 @@ storytangl/
 │   │   ├── core/               # Timeless primitives: entity, graph, dispatch
 │   │   ├── vm/                 # Temporal evolution: frame, phases, provisioning
 │   │   ├── story/              # Narrative semantics: episodes, concepts, journal
+│   │   ├── prose/              # Text-facing parsing and voice helpers
+│   │   ├── media/              # Asset generation, inventory, and delivery
 │   │   ├── service/            # Lifecycle: gateway, orchestrator, controllers
 │   │   ├── persistence/        # Storage abstraction across backends
 │   │   └── design/             # Project-wide design documentation

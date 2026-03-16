@@ -1,4 +1,4 @@
-from tangl.journal.discourse import ChoiceFragment
+from tangl.journal.prose import ChoiceFragment
 
 
 def test_choice_fragment_with_unavailable_reason() -> None:

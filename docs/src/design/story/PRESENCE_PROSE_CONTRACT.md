@@ -32,7 +32,8 @@ subsystem yet.
 - Persistent session state lives on `Ledger`.
 - `render_block_content()` currently renders block text through namespace
   assembly plus `str.format_map`, not Jinja or concept-driven prose filters.
-- There is no active `tangl.prose` package yet.
+- A lightweight `tangl.prose` package now hosts dialog and micro-block parsing
+  helpers, while the broader prose subsystem remains future work.
 - Raw JOURNAL emission and post-merge composition are now distinct seams:
   - `render_journal` emits raw fragments,
   - `compose_journal` can replace the merged fragment batch afterward.

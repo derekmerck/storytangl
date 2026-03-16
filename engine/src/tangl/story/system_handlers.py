@@ -17,7 +17,7 @@ import logging
 from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector, TemplateRegistry
-from tangl.discourse import DialogHandler
+from tangl.prose import DialogHandler
 from tangl.media import get_system_resource_manager
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep

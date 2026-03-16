@@ -3,9 +3,9 @@
 **Document Version:** 0.1  
 **Status:** DESIGN NOTE - vocabulary and implementation direction only  
 **Prior art:** issue `#113`, issue `#141`, `scratch/mechanics/badge/badge.py`,
-`engine/src/tangl/discourse/mu_block.py`, `engine/src/tangl/discourse/dialog.py`  
+`engine/src/tangl/prose/mu_block.py`, `engine/src/tangl/prose/dialog.py`  
 **Relevant layers:** `tangl.core`, `tangl.vm.provision`, `tangl.story.concepts`,
-`tangl.story.episode`, `tangl.discourse`
+`tangl.story.episode`, `tangl.prose`
 
 ---
 
@@ -94,7 +94,7 @@ engine design. "Microconcept" is the clearer story-facing umbrella.
 
 ### 1. MuBlock in discourse parsing
 
-`MuBlock` in `engine/src/tangl/discourse/mu_block.py` already expresses the
+`MuBlock` in `engine/src/tangl/prose/mu_block.py` already expresses the
 basic pattern well:
 
 - smaller than a block
@@ -102,7 +102,7 @@ basic pattern well:
 - carries just enough metadata to behave meaningfully
 - promoted into a real output artifact through `to_fragment()`
 
-`DialogMuBlock` in `engine/src/tangl/discourse/dialog.py` shows the same pattern
+`DialogMuBlock` in `engine/src/tangl/prose/dialog.py` shows the same pattern
 applied to speaker attribution and dialog styling.
 
 This is the clearest proof that StoryTangl already benefits from managed
