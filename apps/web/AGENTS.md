@@ -127,7 +127,7 @@ describe('MyComponent', () => {
 - **JournalStoryUpdate**: narrative block with text, media, and actions
 - **JournalAction**: clickable action button with uid and optional payload
 - **MediaRole**: semantic role for media (narrative_im, avatar_im, etc.)
-- **StoryStatus**: key-value pairs for sidebar status display
+- **StoryStatus**: runtime info or key-value status items for sidebar display
 - **useGlobal()**: composable providing $http, remapURL, makeMediaDict utilities
 
 ## Component architecture
@@ -152,7 +152,7 @@ App.vue (root)
 3. StoryBlock passes event up
 4. StoryFlow catches event
 5. StoryFlow calls API via axios
-6. Server returns JournalStoryUpdate[]
+6. Server returns a runtime envelope whose `fragments` become `JournalStoryUpdate[]`
 7. StoryFlow processes media URLs
 8. StoryFlow appends blocks to reactive array
 9. Vue reactivity updates DOM
