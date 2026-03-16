@@ -443,7 +443,12 @@ class StoryCompiler:
 
     def _resolve_kind(self, raw_kind: Any, *, fallback: type[Entity]) -> type[Entity]:
         if isinstance(raw_kind, type):
-            return self._map_external_kind(raw_kind.__name__, fallback=fallback)
+            mapped = self._map_external_kind(raw_kind.__name__, fallback=fallback)
+            if mapped is not fallback or raw_kind is fallback:
+                return mapped
+            if issubclass(raw_kind, Entity):
+                return raw_kind
+            return fallback
 
         if isinstance(raw_kind, str):
             mapped = self._map_external_kind(raw_kind.split(".")[-1], fallback=fallback)
@@ -453,7 +458,11 @@ class StoryCompiler:
                 module_name, class_name = raw_kind.rsplit(".", 1)
                 cls = getattr(import_module(module_name), class_name)
                 if isinstance(cls, type):
-                    return self._map_external_kind(cls.__name__, fallback=fallback)
+                    mapped = self._map_external_kind(cls.__name__, fallback=fallback)
+                    if mapped is not fallback:
+                        return mapped
+                    if issubclass(cls, Entity):
+                        return cls
             except Exception:
                 return fallback
 

@@ -148,15 +148,28 @@ def provision_game_moves(
     if not isinstance(cursor, HasGame):
         return []
 
+    runtime_planning = getattr(ctx, "current_phase", None) == P.PLANNING
+
     if cursor.game.phase != GamePhase.READY:
-        logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
-        return []
+        if runtime_planning:
+            logger.debug(
+                "Planning reached %s before game setup; initializing inline",
+                cursor.get_label(),
+            )
+            cursor.game_handler.setup(cursor.game)
+            cursor.locals["game_initialized"] = True
+        else:
+            logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
+            return []
+
+    if cursor.game.phase != GamePhase.READY:
+        return None if runtime_planning else []
 
     moves = cursor.game_handler.get_available_moves(cursor.game)
 
     if not moves:
         logger.warning("No available moves at %s despite READY phase", cursor.get_label())
-        return []
+        return None if runtime_planning else []
 
     actions: list[Action] = []
     for move in moves:
@@ -173,8 +186,8 @@ def provision_game_moves(
     logger.debug("Provisioned %s move actions at %s", len(actions), cursor.get_label())
     # VM PLANNING handlers are side-effect-only: returning non-None results
     # causes do_provision() to raise. Keep list-return behavior for direct calls
-    # used by legacy-style tests/helpers.
-    if getattr(ctx, "current_phase", None) == P.PLANNING and hasattr(ctx, "incoming_edge"):
+    # used by tests and helper utilities outside the live frame pipeline.
+    if runtime_planning:
         return None
     return actions
 

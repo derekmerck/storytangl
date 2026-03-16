@@ -113,6 +113,16 @@ stories:
       - content/book2_part2.yaml
 ```
 
+### Twine / Twee 3 Manifest
+
+```yaml
+label: twine_reference
+codec: twee3_1_0
+metadata:
+  author: "StoryTangl Team"
+scripts: story.twee
+```
+
 ### Codec contract (first pass)
 
 StoryTangl now treats the runtime representation as canonical and delegates
@@ -123,9 +133,15 @@ on-disk translation to codecs.
 
 Current status:
 1. Built-in near-native YAML codec is included.
-2. Source mapping is file-level only (`__source_files__`) in MVP.
-3. Per-node/per-span mapping is intentionally deferred.
-4. Unknown codecs can still be bridged by custom script compilers that expose
+2. Built-in Twine / Twee 3 import is available as `twine`, `twee`, `twee3`,
+   and `twee3_1_0`.
+3. The Twine codec currently supports passage headers, `StoryTitle`,
+   `StoryData`, plain prose, basic `[[...]]` link forms, simple `<<set>>`
+   assignments, and link-only `<<if>>` / `<<elseif>>` / `<<else>>` gating with
+   optional simple link setters.
+4. Source mapping is file-level only (`__source_files__`) in MVP.
+5. Per-node/per-span mapping is intentionally deferred.
+6. Unknown codecs can still be bridged by custom script compilers that expose
    `load_from_path` (migration shortcut, not long-term architecture).
 
 ### Script (script.yaml)

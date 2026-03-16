@@ -578,6 +578,7 @@ class StoryMaterializer:
                 or "",
                 successor_ref=successor_ref,
                 activation=activation,
+                predicate=self._coerce_str(spec.get("predicate")),
                 payload=spec.get("payload"),
                 accepts=spec.get("accepts") or spec.get("payload_schema"),
                 ui_hints=(

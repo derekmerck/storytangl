@@ -1,0 +1,5 @@
+label: twine_reference
+codec: twee3_1_0
+metadata:
+  author: "StoryTangl Team"
+scripts: story.twee

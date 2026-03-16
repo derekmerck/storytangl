@@ -46,7 +46,7 @@ class RuntimeController(HasApiEndpoints):
         world_media_root: Path | None = None,
         story_media_root: Path | None = None,
         system_media_root: Path | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         media_payload = media_fragment_to_payload(
             fragment,
             render_profile=render_profile,
@@ -58,6 +58,8 @@ class RuntimeController(HasApiEndpoints):
         )
         if media_payload is not None:
             return media_payload
+        if isinstance(fragment, MediaFragment):
+            return None
         if hasattr(fragment, "model_dump"):
             return fragment.model_dump(mode="json")
         if hasattr(fragment, "unstructure"):
@@ -187,7 +189,7 @@ class RuntimeController(HasApiEndpoints):
         world_media_root: Path | None = None,
         story_media_root: Path | None = None,
         system_media_root: Path | None = None,
-    ) -> BaseFragment:
+    ) -> BaseFragment | None:
         """Convert runtime journal records into legacy-compatible BaseFragment payloads."""
         if isinstance(fragment, MediaFragment):
             media_payload = media_fragment_to_payload(
@@ -201,6 +203,7 @@ class RuntimeController(HasApiEndpoints):
             )
             if media_payload is not None:
                 return BaseFragment(**media_payload)
+            return None
 
         if isinstance(fragment, BaseFragment):
             return fragment
@@ -367,16 +370,20 @@ class RuntimeController(HasApiEndpoints):
             ),
         )
         serialized_fragments = [
-            self._serialize_fragment(
-                fragment,
-                render_profile=render_profile,
-                world_id=world_id,
-                story_id=story_id,
-                world_media_root=media_roots["world"],
-                story_media_root=media_roots["story"],
-                system_media_root=media_roots["sys"],
-            )
+            payload
             for fragment in fragments
+            if (
+                payload := self._serialize_fragment(
+                    fragment,
+                    render_profile=render_profile,
+                    world_id=world_id,
+                    story_id=story_id,
+                    world_media_root=media_roots["world"],
+                    story_media_root=media_roots["story"],
+                    system_media_root=media_roots["sys"],
+                )
+            )
+            is not None
         ]
         merged_metadata = dict(metadata or {})
         if world_id is not None:
@@ -597,16 +604,20 @@ class RuntimeController(HasApiEndpoints):
             ),
         )
         return [
-            self._to_compat_fragment(
-                fragment,
-                render_profile=render_profile,
-                world_id=world_id,
-                story_id=story_id,
-                world_media_root=media_roots["world"],
-                story_media_root=media_roots["story"],
-                system_media_root=media_roots["sys"],
-            )
+            compat
             for fragment in fragments
+            if (
+                compat := self._to_compat_fragment(
+                    fragment,
+                    render_profile=render_profile,
+                    world_id=world_id,
+                    story_id=story_id,
+                    world_media_root=media_roots["world"],
+                    story_media_root=media_roots["story"],
+                    system_media_root=media_roots["sys"],
+                )
+            )
+            is not None
         ]
 
     @ApiEndpoint.annotate(

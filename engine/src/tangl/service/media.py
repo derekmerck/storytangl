@@ -212,7 +212,7 @@ def _fallback_ref_from_rit(rit: MediaRIT) -> str | None:
 def _resolve_fallback_rit(
     rit: MediaRIT,
     inventories: Iterable[MediaInventory],
-) -> MediaRIT | None:
+) -> tuple[MediaRIT, str] | None:
     fallback_ref = _fallback_ref_from_rit(rit)
     if not fallback_ref:
         return None
@@ -228,7 +228,7 @@ def _resolve_fallback_rit(
         ):
             found = registry.find_one(**criteria)
             if isinstance(found, MediaRIT):
-                return found
+                return found, inventory.scope
     return None
 
 
@@ -387,14 +387,15 @@ def _pending_or_failed_payload(
     if profile.pending_policy == MediaPendingPolicy.DISCARD:
         return None
 
-    fallback_rit = _resolve_fallback_rit(rit, profile.static_inventories)
-    if fallback_rit is not None:
+    fallback = _resolve_fallback_rit(rit, profile.static_inventories)
+    if fallback is not None:
+        fallback_rit, fallback_scope = fallback
         fallback_result = _resolve_media_data(fallback_rit)
         if isinstance(fallback_result, ResolvedMediaResult):
             return _resolved_rit_payload(
                 fallback_rit,
                 fragment=fragment,
-                scope=scope,
+                scope=fallback_scope,
                 result=fallback_result,
                 profile=profile,
                 world_id=world_id,

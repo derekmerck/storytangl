@@ -345,6 +345,36 @@ class TestAsyncServiceFallbacks:
         assert payload["content_format"] == "rit"
         assert payload["url"] == "/media/world/demo/placeholder.svg"
 
+    def test_story_scoped_pending_media_uses_fallback_asset_scope(self, tmp_path: Path) -> None:
+        inventory, fallback_path = _fallback_inventory(tmp_path)
+        fragment = MediaFragment(
+            content=MediaRIT(
+                status=MediaRITStatus.PENDING,
+                adapted_spec_hash="pending-3",
+                derivation_spec={"fallback_ref": fallback_path.name},
+                data_type=MediaDataType.VECTOR,
+            ),
+            content_format="rit",
+            content_type=MediaDataType.VECTOR,
+            media_role="avatar_im",
+            source_id=uuid4(),
+            scope="story",
+            fallback_text="Portrait pending.",
+        )
+
+        payload = media_fragment_to_payload(
+            fragment,
+            render_profile=MediaRenderProfile(static_inventories=(inventory,)),
+            world_id="demo",
+            story_id="story-1",
+            world_media_root=tmp_path,
+            story_media_root=tmp_path / "story_media" / "story-1",
+        )
+
+        assert payload is not None
+        assert payload["scope"] == "world"
+        assert payload["url"] == "/media/world/demo/placeholder.svg"
+
     def test_pending_media_falls_back_to_text_when_no_static_fallback(self) -> None:
         fragment = MediaFragment(
             content=MediaRIT(

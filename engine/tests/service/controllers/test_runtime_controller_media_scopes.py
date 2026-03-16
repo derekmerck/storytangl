@@ -177,6 +177,69 @@ def test_get_journal_entries_applies_static_fallback_profile(tmp_path: Path) -> 
     assert fragments[0].url == "/media/world/w1/placeholder.svg"
 
 
+def test_get_journal_entries_omits_failed_media_without_fallback() -> None:
+    graph = StoryGraph(
+        label="story",
+        world=SimpleNamespace(
+            label="w1",
+            resources=SimpleNamespace(resource_path=None),
+        ),
+    )
+    node = TraversableNode(label="start")
+    graph.add(node)
+    ledger = Ledger(graph=graph, cursor_id=node.uid)
+    ledger.output_stream.append(
+        MediaFragment(
+            content=MediaRIT(
+                status=MediaRITStatus.FAILED,
+                adapted_spec_hash="failed-1",
+                data_type=MediaDataType.IMAGE,
+            ),
+            content_format="rit",
+            content_type=MediaDataType.IMAGE,
+            source_id=node.uid,
+            scope="story",
+        )
+    )
+
+    fragments = RuntimeController().get_journal_entries(ledger=ledger)
+
+    assert fragments == []
+
+
+def test_get_story_update_omits_failed_media_without_fallback() -> None:
+    graph = StoryGraph(
+        label="story",
+        world=SimpleNamespace(
+            label="w1",
+            resources=SimpleNamespace(resource_path=None),
+        ),
+    )
+    node = TraversableNode(label="start")
+    graph.add(node)
+    ledger = Ledger(graph=graph, cursor_id=node.uid)
+    ledger.output_stream.append(
+        MediaFragment(
+            content=MediaRIT(
+                status=MediaRITStatus.FAILED,
+                adapted_spec_hash="failed-2",
+                data_type=MediaDataType.IMAGE,
+            ),
+            content_format="rit",
+            content_type=MediaDataType.IMAGE,
+            source_id=node.uid,
+            scope="story",
+        )
+    )
+
+    info = RuntimeController().get_story_update(ledger=ledger)
+    details = dict(info.details or {})
+    envelope = details.get("envelope")
+
+    assert isinstance(envelope, dict)
+    assert envelope.get("fragments") == []
+
+
 def test_drop_story_removes_story_media_when_not_archived(monkeypatch, tmp_path: Path) -> None:
     root = tmp_path / "story_media"
     story_dir = root / "story-1"

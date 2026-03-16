@@ -83,6 +83,7 @@ class WorldCompiler:
         base_metadata = bundle.manifest.metadata.copy()
 
         decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+        self._propagate_loss_records(decode_result)
         script_data = decode_result.story_data
         codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
 
@@ -135,6 +136,7 @@ class WorldCompiler:
         worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
             decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
+            self._propagate_loss_records(decode_result)
             script_data = decode_result.story_data
             codec_id = str(decode_result.codec_state.get("codec_id") or bundle.get_story_codec(story_key))
 
@@ -253,6 +255,30 @@ class WorldCompiler:
             raise
 
         return codec.decode(bundle=bundle, script_paths=script_paths, story_key=story_key)
+
+    @staticmethod
+    def _propagate_loss_records(decode_result: DecodeResult) -> None:
+        """Persist structured codec loss records into codec_state."""
+        if not decode_result.loss_records:
+            return
+
+        decode_result.codec_state.setdefault(
+            "loss_records",
+            [
+                {
+                    "kind": record.kind.value,
+                    "feature": record.feature,
+                    "passage": record.passage,
+                    "excerpt": record.excerpt,
+                    "note": record.note,
+                }
+                for record in decode_result.loss_records
+            ],
+        )
+        decode_result.codec_state.setdefault(
+            "loss_record_count",
+            len(decode_result.loss_records),
+        )
 
     def _get_domain_module(self, bundle: WorldBundle) -> str | None:
         if bundle.manifest.domain_module is not None:
