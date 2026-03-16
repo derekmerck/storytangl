@@ -6,13 +6,17 @@ from enum import Enum
 
 
 class ServiceOperation(str, Enum):
-    """Stable external operation ids mapped to internal controller endpoints."""
+    """Stable external operation ids mapped to internal controller endpoints.
 
-    STORY38_CREATE = "story38.create"
-    STORY38_UPDATE = "story38.update"
-    STORY38_DO = "story38.do"
-    STORY38_STATUS = "story38.status"
-    STORY38_DROP = "story38.drop"
+    Operation ids are part of the service wire contract and should remain stable
+    within the canonical, unsuffixed namespace.
+    """
+
+    STORY_CREATE = "story.create"
+    STORY_UPDATE = "story.update"
+    STORY_DO = "story.do"
+    STORY_INFO = "story.info"
+    STORY_DROP = "story.drop"
 
     USER_INFO = "user.info"
     USER_CREATE = "user.create"
@@ -31,11 +35,11 @@ class ServiceOperation(str, Enum):
 
 
 _OPERATION_ENDPOINTS: dict[ServiceOperation, str] = {
-    ServiceOperation.STORY38_CREATE: "RuntimeController.create_story",
-    ServiceOperation.STORY38_UPDATE: "RuntimeController.get_story_update",
-    ServiceOperation.STORY38_DO: "RuntimeController.resolve_choice",
-    ServiceOperation.STORY38_STATUS: "RuntimeController.get_story_info",
-    ServiceOperation.STORY38_DROP: "RuntimeController.drop_story",
+    ServiceOperation.STORY_CREATE: "RuntimeController.create_story",
+    ServiceOperation.STORY_UPDATE: "RuntimeController.get_story_update",
+    ServiceOperation.STORY_DO: "RuntimeController.resolve_choice",
+    ServiceOperation.STORY_INFO: "RuntimeController.get_story_info",
+    ServiceOperation.STORY_DROP: "RuntimeController.drop_story",
 
     ServiceOperation.USER_INFO: "UserController.get_user_info",
     ServiceOperation.USER_CREATE: "UserController.create_user",

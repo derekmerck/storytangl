@@ -8,4 +8,3 @@ canonical public architecture.
    :maxdepth: 1
 
    code_adjacent_design_docs
-   obj_cls_inventory

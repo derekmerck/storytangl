@@ -22,11 +22,19 @@ type UserSecretRequest = { secret?: string }
 
 export const handlers = [
   http.get(`${apiBase}/story/update`, () => {
-    return HttpResponse.json([mockBlock1, mockBlock2])
+    return HttpResponse.json({
+      cursor_id: 'cursor-1',
+      step: 1,
+      fragments: [mockBlock1, mockBlock2],
+    })
   }),
 
   http.post(`${apiBase}/story/do`, async () => {
-    return HttpResponse.json([mockBlock1])
+    return HttpResponse.json({
+      cursor_id: 'cursor-1',
+      step: 2,
+      fragments: [mockBlock1],
+    })
   }),
 
   http.get(`${apiBase}/story/actions`, () => {

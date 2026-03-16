@@ -8,7 +8,7 @@ from tangl.ir.story_ir import StoryScript
 pytestmark = pytest.mark.skip(
     reason=(
         "Legacy-only StoryScript front-end tree conversion/path inference; "
-        "v38 parity is owned by codec/compiler plus core38 template group tests."
+        "v38 parity is owned by codec/compiler plus core template group tests."
     )
 )
 
@@ -25,7 +25,7 @@ def test_templates_convert_to_basescriptitem():
                 "templates": {
                     "guard": {
                         "label": "guard",
-                        "obj_cls": "tangl.story.concepts.actor.actor.Actor",
+                        "kind": "tangl.story.concepts.actor.actor.Actor",
                         "custom_field": "preserved",
                     }
                 },

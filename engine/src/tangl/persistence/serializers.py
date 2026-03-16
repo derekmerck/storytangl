@@ -152,8 +152,8 @@ class BsonSerializationHandler:
             raise ImportError
         # Need to include key at encoding for pymongo
         unstructured['_id'] = unstructured['uid']
-        # if 'obj_cls' in unstructured:
-        #     unstructured['obj_cls'] = unstructured['obj_cls'].__name__
+        # if 'kind' in unstructured:
+        #     unstructured['kind'] = unstructured['kind'].__name__
         return BSON.encode(unstructured, codec_options=cls.bson_codec_options)
 
     @classmethod

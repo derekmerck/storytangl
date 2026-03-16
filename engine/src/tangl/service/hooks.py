@@ -1,4 +1,4 @@
-"""Gateway-level inbound/outbound hook registries for service38."""
+"""Gateway-level inbound/outbound hook registries."""
 
 from __future__ import annotations
 
@@ -131,21 +131,21 @@ class GatewayHooks:
         return current
 
     def install_default_hooks(self) -> None:
-        """Install built-in inbound/outbound hooks for service38.
+        """Install built-in inbound/outbound hooks.
 
-        Registers ``_normalize_story38_init_mode`` on inbound normal phase and
+        Registers ``_normalize_init_mode`` on inbound normal phase and
         outbound transforms ``_html_transform``, ``_media_url_transform``, and
         ``_cli_ascii_transform`` on their respective phases.
         """
 
         @self.register_inbound(HookPhase.NORMAL, priority=Priority.NORMAL)
-        def _normalize_story38_init_mode(
+        def _normalize_init_mode(
             params: dict[str, Any],
             *,
             operation: ServiceOperation,
             **_: Any,
         ) -> dict[str, Any]:
-            if operation != ServiceOperation.STORY38_CREATE:
+            if operation != ServiceOperation.STORY_CREATE:
                 return params
             init_mode = params.get("init_mode")
             if isinstance(init_mode, str):

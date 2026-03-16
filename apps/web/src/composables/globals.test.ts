@@ -95,6 +95,7 @@ describe('axios configuration', () => {
     const { $http } = useGlobal()
     const response = await $http.value.get('/story/update')
     expect(response.status).toBe(200)
-    expect(Array.isArray(response.data)).toBe(true)
+    expect(response.data).toHaveProperty('fragments')
+    expect(Array.isArray(response.data.fragments)).toBe(true)
   })
 })

@@ -20,7 +20,7 @@ from tangl.vm import (
 from tangl.vm.dispatch import vm_dispatch
 from tangl.core.behavior import HandlerPriority as Prio
 from tangl.story.dispatch import on_gather_content
-from tangl.vm.dispatch import dispatch as vm38_dispatch
+from tangl.vm.dispatch import dispatch as vm_dispatch
 
 from .has_game import HasGame
 
@@ -45,7 +45,7 @@ def _ctx_cursor_history(ctx: Any) -> list[Any] | None:
 
 
 def _ctx_selected_payload(ctx: Any) -> Any:
-    """Extract selected payload from vm38/legacy context + frame bridges."""
+    """Extract selected payload from VM/legacy context and frame bridges."""
     payload = getattr(ctx, "selected_payload", None)
     if payload is not None:
         return payload
@@ -105,7 +105,7 @@ def setup_game_on_first_visit(
         if not is_first_visit(cursor.uid, cursor_history):
             return None
     elif cursor.game.phase == GamePhase.READY:
-        # vm38 contexts do not expose frame history directly; phase is enough
+        # VM contexts do not expose frame history directly; phase is enough
         # to prevent repeated setup in steady-state traversal.
         return None
 
@@ -148,15 +148,28 @@ def provision_game_moves(
     if not isinstance(cursor, HasGame):
         return []
 
+    runtime_planning = getattr(ctx, "current_phase", None) == P.PLANNING
+
     if cursor.game.phase != GamePhase.READY:
-        logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
-        return []
+        if runtime_planning:
+            logger.debug(
+                "Planning reached %s before game setup; initializing inline",
+                cursor.get_label(),
+            )
+            cursor.game_handler.setup(cursor.game)
+            cursor.locals["game_initialized"] = True
+        else:
+            logger.debug("Game not ready at %s; skipping move provisioning", cursor.get_label())
+            return []
+
+    if cursor.game.phase != GamePhase.READY:
+        return None if runtime_planning else []
 
     moves = cursor.game_handler.get_available_moves(cursor.game)
 
     if not moves:
         logger.warning("No available moves at %s despite READY phase", cursor.get_label())
-        return []
+        return None if runtime_planning else []
 
     actions: list[Action] = []
     for move in moves:
@@ -171,10 +184,10 @@ def provision_game_moves(
         )
 
     logger.debug("Provisioned %s move actions at %s", len(actions), cursor.get_label())
-    # vm38 PLANNING handlers are side-effect-only: returning non-None results
+    # VM PLANNING handlers are side-effect-only: returning non-None results
     # causes do_provision() to raise. Keep list-return behavior for direct calls
-    # used by legacy-style tests/helpers.
-    if getattr(ctx, "current_phase", None) == P.PLANNING and hasattr(ctx, "incoming_edge"):
+    # used by tests and helper utilities outside the live frame pipeline.
+    if runtime_planning:
         return None
     return actions
 
@@ -241,7 +254,7 @@ def process_game_move(
 
     # Context namespaces cache values per cursor; refresh so POSTREQ predicates
     # read the updated game_* flags from :func:`inject_game_context`.
-    # vm38 caches namespaces per follow-edge hop; clear after UPDATE so
+    # The VM caches namespaces per follow-edge hop; clear after UPDATE so
     # POSTREQS sees fresh game_* flags in the same pipeline pass.
     ns_cache = getattr(ctx, "_ns_cache", None)
     if isinstance(ns_cache, dict):
@@ -384,15 +397,15 @@ def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
     if content:
         return content
 
-    # vm38 fallback: custom game journal handlers may register on the vm38
+    # Fallback: custom game journal handlers may register on the VM
     # phase bus during migration away from legacy vm_dispatch tasks.
-    vm38_receipts = list(
-        vm38_dispatch.execute_all(
+    vm_receipts = list(
+        vm_dispatch.execute_all(
             task="generate_journal",
             call_kwargs={"caller": game},
             ctx=ctx,
             selector=Selector(caller_kind=type(game)),
         )
     )
-    vm38_content = CallReceipt.first_result(*vm38_receipts)
-    return vm38_content if vm38_content else None
+    vm_content = CallReceipt.first_result(*vm_receipts)
+    return vm_content if vm_content else None

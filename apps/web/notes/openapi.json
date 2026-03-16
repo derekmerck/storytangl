@@ -1,1 +1,1487 @@
-{"openapi": "3.1.0", "info": {"title": "StoryTangl", "description": "RESTful endpoints for StoryTangl", "version": "3.7.2"}, "paths": {"/story/story/create": {"post": {"tags": ["Story"], "summary": "Create Story", "description": "Create a new story instance for the authenticated user (legacy path).", "operationId": "create_story_story_story_create_post", "parameters": [{"name": "world_id", "in": "query", "required": true, "schema": {"type": "string", "description": "World template to instantiate", "title": "World Id"}, "description": "World template to instantiate"}, {"name": "story_label", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Optional story label", "title": "Story Label"}, "description": "Optional story label"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/update": {"get": {"tags": ["Story"], "summary": "Get Story Update", "description": "Return journal fragments for legacy story sessions.", "operationId": "get_story_update_story_update_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Limit"}}, {"name": "marker", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Return journal fragments for a specific journal marker/step.", "title": "Marker"}, "description": "Return journal fragments for a specific journal marker/step."}, {"name": "start_marker", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Inclusive starting marker when requesting a range of steps.", "title": "Start Marker"}, "description": "Inclusive starting marker when requesting a range of steps."}, {"name": "end_marker", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Exclusive end marker for a marker range.", "title": "End Marker"}, "description": "Exclusive end marker for a marker range."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Response Get Story Update Story Update Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/do": {"post": {"tags": ["Story"], "summary": "Do Story Action", "description": "Resolve a player choice and return resulting legacy journal fragments.", "operationId": "do_story_action_story_do_post", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ChoiceRequest"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/story38/create": {"post": {"tags": ["Story"], "summary": "Create Story38", "description": "Create a vm38/story38 session and return the initial envelope.", "operationId": "create_story38_story_story38_create_post", "parameters": [{"name": "world_id", "in": "query", "required": true, "schema": {"type": "string", "description": "World template to instantiate", "title": "World Id"}, "description": "World template to instantiate"}, {"name": "story_label", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Optional story label", "title": "Story Label"}, "description": "Optional story label"}, {"name": "init_mode", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Initialization mode: LAZY or EAGER", "title": "Init Mode"}, "description": "Initialization mode: LAZY or EAGER"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Response Create Story38 Story Story38 Create Post"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/story38/update": {"get": {"tags": ["Story"], "summary": "Get Story Update38", "description": "Return vm38 envelope with ordered fragments.", "operationId": "get_story_update38_story_story38_update_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "since_step", "in": "query", "required": false, "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}], "description": "Inclusive starting step; defaults to 0 (full history).", "title": "Since Step"}, "description": "Inclusive starting step; defaults to 0 (full history)."}, {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Limit"}}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Response Get Story Update38 Story Story38 Update Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/story38/do": {"post": {"tags": ["Story"], "summary": "Do Story Action38", "description": "Resolve a choice and return the vm38 envelope.", "operationId": "do_story_action38_story_story38_do_post", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ChoiceRequest"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Response Do Story Action38 Story Story38 Do Post"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/story38/status": {"get": {"tags": ["Story"], "summary": "Get Story Status38", "description": "Return vm38 runtime status details.", "operationId": "get_story_status38_story_story38_status_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Response Get Story Status38 Story Story38 Status Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/info": {"get": {"tags": ["Story"], "summary": "Get Story Info", "description": "Return a lightweight summary of the current story state (legacy path).", "operationId": "get_story_info_story_info_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/status": {"get": {"tags": ["Story"], "summary": "Get Story Status Alias", "description": "Deprecated alias for :route:`GET /story/info`.", "operationId": "get_story_status_alias_story_status_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/drop": {"delete": {"tags": ["Story"], "summary": "Reset Story", "description": "End the user's active story and optionally archive the ledger (legacy path).", "operationId": "reset_story_story_drop_delete", "parameters": [{"name": "archive", "in": "query", "required": false, "schema": {"type": "boolean", "description": "Retain the ledger if true.", "default": false, "title": "Archive"}, "description": "Retain the ledger if true."}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/story38/drop": {"delete": {"tags": ["Story"], "summary": "Reset Story38", "description": "End the active vm38 story and optionally archive the ledger.", "operationId": "reset_story38_story_story38_drop_delete", "parameters": [{"name": "archive", "in": "query", "required": false, "schema": {"type": "boolean", "description": "Retain the ledger if true.", "default": false, "title": "Archive"}, "description": "Retain the ledger if true."}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": true, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Response Reset Story38 Story Story38 Drop Delete"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/go": {"put": {"tags": ["Story", "Restricted"], "summary": "Goto Story Block", "description": "Jump the active frame to ``block_id`` via the legacy orchestrator path.", "operationId": "goto_story_block_story_go_put", "parameters": [{"name": "block_id", "in": "query", "required": true, "schema": {"type": "string", "title": "Block Id"}, "example": "scene_1/block_1"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": false, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/inspect": {"get": {"tags": ["Story", "Restricted"], "summary": "Inspect Story Node", "description": "Return debug inspection info for the active node (or a specific node).", "operationId": "inspect_story_node_story_inspect_get", "parameters": [{"name": "node_id", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "Optional node identifier; defaults to current cursor node.", "title": "Node Id"}, "description": "Optional node identifier; defaults to current cursor node."}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": false, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/check": {"post": {"tags": ["Story", "Restricted"], "summary": "Check Expression", "description": "Evaluate a debug expression in the active story context.", "operationId": "check_expression_story_check_post", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": false, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DebugExprRequest"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/story/apply": {"post": {"tags": ["Story", "Restricted"], "summary": "Apply Effect Post", "description": "Apply a debug expression in the active story context.", "operationId": "apply_effect_post_story_apply_post", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": false, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DebugExprRequest"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}, "put": {"tags": ["Story", "Restricted"], "summary": "Apply Effect Put", "description": "Compatibility alias for :route:`POST /story/apply`.", "operationId": "apply_effect_put_story_apply_put", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "X-API-Key", "in": "header", "required": false, "schema": {"type": "string", "title": "X-Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DebugExprRequest"}}}}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/user/info": {"get": {"tags": ["User"], "summary": "Get User Info", "description": "Return profile information for the authenticated user.", "operationId": "get_user_info_user_info_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "api-key", "in": "header", "required": false, "schema": {"type": "string", "title": "Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/user/create": {"post": {"tags": ["User"], "summary": "Create User", "description": "Create a user and return the secret metadata for clients.", "operationId": "create_user_user_create_post", "parameters": [{"name": "secret", "in": "query", "required": false, "schema": {"type": "string", "title": "Secret"}, "example": "None"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/user/world": {"put": {"tags": ["User"], "summary": "Set User World", "description": "Linking users to worlds is not yet implemented in the orchestrated REST API.", "operationId": "set_user_world_user_world_put", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}}}}, "/user/secret": {"put": {"tags": ["User"], "summary": "Update User Secret", "description": "Update the secret for the authenticated user and surface the new API key.", "operationId": "update_user_secret_user_secret_put", "parameters": [{"name": "secret", "in": "query", "required": false, "schema": {"type": "string", "title": "Secret"}, "example": "None"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "api-key", "in": "header", "required": false, "schema": {"type": "string", "title": "Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/user/drop": {"delete": {"tags": ["User"], "summary": "Drop User", "description": "Remove the authenticated user and purge persisted resources.", "operationId": "drop_user_user_drop_delete", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}, {"name": "api-key", "in": "header", "required": false, "schema": {"type": "string", "title": "Api-Key"}, "example": "AXxngZiGzAqUJqMqzbMmtQ=="}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/world/{world_id}/info": {"get": {"tags": ["World"], "summary": "Get World Info", "description": "Return metadata describing ``world_id``.", "operationId": "get_world_info_world__world_id__info_get", "parameters": [{"name": "world_id", "in": "path", "required": true, "schema": {"type": "string", "title": "World Id"}, "example": "my_world"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WorldInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/world/{world_id}/scenes": {"get": {"tags": ["World", "Restricted"], "summary": "Get Scene List", "description": "Scene listing is not yet exposed through the orchestrated REST API.", "operationId": "get_scene_list_world__world_id__scenes_get", "parameters": [{"name": "world_id", "in": "path", "required": true, "schema": {"type": "string", "title": "World Id"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/system/info": {"get": {"tags": ["System"], "summary": "Get System Info", "description": "Return high-level information about the running service.", "operationId": "get_system_info_system_info_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SystemInfo"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/system/worlds": {"get": {"tags": ["System"], "summary": "Get Worlds", "description": "List the available worlds registered with the service.", "operationId": "get_worlds_system_worlds_get", "parameters": [{"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "additionalProperties": true}, "title": "Response Get Worlds System Worlds Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/system/secret": {"get": {"tags": ["System"], "summary": "Get Key For Secret", "description": "Encode ``secret`` as an API key for clients.", "operationId": "get_key_for_secret_system_secret_get", "parameters": [{"name": "secret", "in": "query", "required": false, "schema": {"type": "string", "title": "Secret"}, "example": "None"}, {"name": "render_profile", "in": "query", "required": false, "schema": {"type": "string", "description": "Response rendering profile.", "default": "raw", "title": "Render Profile"}, "description": "Response rendering profile."}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserSecret"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/system/reset": {"put": {"tags": ["System", "Restricted"], "summary": "Reset System", "description": "System resets are not wired through the orchestrator yet.", "operationId": "reset_system_system_reset_put", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}}}}}, "components": {"schemas": {"ChoiceRequest": {"properties": {"choice_id": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "Choice Id"}, "uid": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "Uid"}, "payload": {"title": "Payload"}}, "type": "object", "title": "ChoiceRequest", "description": "Request payload for resolving a player choice."}, "DebugExprRequest": {"properties": {"expr": {"type": "string", "title": "Expr"}, "node_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Node Id"}}, "type": "object", "required": ["expr"], "title": "DebugExprRequest"}, "HTTPValidationError": {"properties": {"detail": {"items": {"$ref": "#/components/schemas/ValidationError"}, "type": "array", "title": "Detail"}}, "type": "object", "title": "HTTPValidationError"}, "RuntimeInfo": {"properties": {"status": {"type": "string", "enum": ["ok", "error"], "title": "Status"}, "code": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Code"}, "message": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Message"}, "cursor_id": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}], "title": "Cursor Id"}, "step": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Step"}, "details": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Details"}}, "type": "object", "required": ["status"], "title": "RuntimeInfo", "description": "Native acknowledgment for state-mutating operations."}, "SystemInfo": {"properties": {"engine": {"type": "string", "title": "Engine"}, "version": {"type": "string", "title": "Version"}, "uptime": {"type": "string", "title": "Uptime"}, "worlds": {"anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "integer"}], "title": "Worlds"}, "num_users": {"type": "integer", "title": "Num Users"}, "homepage_url": {"type": "string", "minLength": 1, "format": "uri", "title": "Homepage Url", "default": "https://github.com/derekmerck/storytangl"}}, "type": "object", "required": ["engine", "version", "uptime", "worlds", "num_users"], "title": "SystemInfo"}, "UiConfig": {"properties": {"brand_color": {"type": "string", "title": "Brand Color"}, "brand_font": {"type": "string", "title": "Brand Font"}}, "type": "object", "title": "UiConfig"}, "UserInfo": {"properties": {"user_id": {"type": "string", "format": "uuid", "title": "User Id"}, "user_secret": {"type": "string", "title": "User Secret"}, "created_dt": {"type": "string", "format": "date-time", "title": "Created Dt"}, "last_played_dt": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Last Played Dt"}, "worlds_played": {"items": {"type": "string"}, "type": "array", "uniqueItems": true, "title": "Worlds Played"}, "stories_finished": {"type": "integer", "title": "Stories Finished", "default": 0}, "turns_played": {"type": "integer", "title": "Turns Played", "default": 0}, "achievements": {"anyOf": [{"items": {"type": "string"}, "type": "array", "uniqueItems": true}, {"type": "null"}], "title": "Achievements"}}, "type": "object", "required": ["user_id", "user_secret", "created_dt", "worlds_played"], "title": "UserInfo"}, "UserSecret": {"prefixItems": [{"title": "Api Key"}, {"title": "User Secret"}], "type": "array", "maxItems": 2, "minItems": 2}, "ValidationError": {"properties": {"loc": {"items": {"anyOf": [{"type": "string"}, {"type": "integer"}]}, "type": "array", "title": "Location"}, "msg": {"type": "string", "title": "Message"}, "type": {"type": "string", "title": "Error Type"}}, "type": "object", "required": ["loc", "msg", "type"], "title": "ValidationError"}, "WorldInfo": {"properties": {"title": {"type": "string", "title": "Title"}, "author": {"anyOf": [{"type": "string"}, {"items": {"type": "string"}, "type": "array"}], "title": "Author"}, "date": {"anyOf": [{"type": "string"}, {"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Date"}, "version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Version"}, "illustrator": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Illustrator"}, "license": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "License"}, "summary": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Summary"}, "url": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Url"}, "publisher": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Publisher"}, "comments": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Comments"}, "start_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Start At"}, "ui_config": {"anyOf": [{"$ref": "#/components/schemas/UiConfig"}, {"type": "null"}]}, "label": {"type": "string", "title": "Label"}}, "type": "object", "required": ["title", "author", "label"], "title": "WorldInfo"}}}}
+{
+  "components": {
+    "schemas": {
+      "ChoiceRequest": {
+        "additionalProperties": false,
+        "description": "Request payload for resolving a player choice.",
+        "properties": {
+          "choice_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice Id"
+          },
+          "payload": {
+            "title": "Payload"
+          }
+        },
+        "title": "ChoiceRequest",
+        "type": "object"
+      },
+      "DebugExprRequest": {
+        "properties": {
+          "expr": {
+            "title": "Expr",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "title": "DebugExprRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "SystemInfo": {
+        "properties": {
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "homepage_url": {
+            "default": "https://github.com/derekmerck/storytangl",
+            "format": "uri",
+            "minLength": 1,
+            "title": "Homepage Url",
+            "type": "string"
+          },
+          "num_users": {
+            "title": "Num Users",
+            "type": "integer"
+          },
+          "uptime": {
+            "title": "Uptime",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "worlds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Worlds"
+          }
+        },
+        "required": [
+          "engine",
+          "version",
+          "uptime",
+          "worlds",
+          "num_users"
+        ],
+        "title": "SystemInfo",
+        "type": "object"
+      },
+      "UserInfo": {
+        "properties": {
+          "achievements": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Achievements"
+          },
+          "created_dt": {
+            "format": "date-time",
+            "title": "Created Dt",
+            "type": "string"
+          },
+          "last_played_dt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Played Dt"
+          },
+          "stories_finished": {
+            "default": 0,
+            "title": "Stories Finished",
+            "type": "integer"
+          },
+          "turns_played": {
+            "default": 0,
+            "title": "Turns Played",
+            "type": "integer"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          },
+          "user_secret": {
+            "title": "User Secret",
+            "type": "string"
+          },
+          "worlds_played": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Worlds Played",
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "user_id",
+          "user_secret",
+          "created_dt",
+          "worlds_played"
+        ],
+        "title": "UserInfo",
+        "type": "object"
+      },
+      "UserSecret": {
+        "maxItems": 3,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "title": "Api Key"
+          },
+          {
+            "title": "User Secret"
+          },
+          {
+            "title": "User Id"
+          }
+        ],
+        "type": "array"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "email": "tangldev@storytan.gl",
+      "name": "TanglDev",
+      "url": "https://github.com/derekmerck/storytangl"
+    },
+    "description": "RESTful endpoints for StoryTangl",
+    "title": "StoryTangl",
+    "version": "3.7.2"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/story/apply": {
+      "post": {
+        "description": "Apply a debug expression in the active story context.",
+        "operationId": "apply_effect_post_story_apply_post",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebugExprRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Apply Effect Post Story Apply Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Effect Post",
+        "tags": [
+          "Story",
+          "Restricted"
+        ]
+      },
+      "put": {
+        "description": "Compatibility alias for :route:`POST /story/apply`.",
+        "operationId": "apply_effect_put_story_apply_put",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebugExprRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Apply Effect Put Story Apply Put"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Effect Put",
+        "tags": [
+          "Story",
+          "Restricted"
+        ]
+      }
+    },
+    "/story/check": {
+      "post": {
+        "description": "Evaluate a debug expression in the active story context.",
+        "operationId": "check_expression_story_check_post",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebugExprRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Check Expression Story Check Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Expression",
+        "tags": [
+          "Story",
+          "Restricted"
+        ]
+      }
+    },
+    "/story/do": {
+      "post": {
+        "description": "Resolve a player choice and return the updated runtime envelope.",
+        "operationId": "do_story_action_story_do_post",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": true,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChoiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Do Story Action",
+        "tags": [
+          "Story"
+        ]
+      }
+    },
+    "/story/drop": {
+      "delete": {
+        "description": "End the user's active story and optionally archive the ledger.",
+        "operationId": "reset_story_story_drop_delete",
+        "parameters": [
+          {
+            "description": "Retain the ledger if true.",
+            "in": "query",
+            "name": "archive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Retain the ledger if true.",
+              "title": "Archive",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": true,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Story",
+        "tags": [
+          "Story"
+        ]
+      }
+    },
+    "/story/go": {
+      "put": {
+        "description": "Jump the active frame to ``block_id``.",
+        "operationId": "goto_story_block_story_go_put",
+        "parameters": [
+          {
+            "example": "scene_1/block_1",
+            "in": "query",
+            "name": "block_id",
+            "required": true,
+            "schema": {
+              "title": "Block Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Goto Story Block",
+        "tags": [
+          "Story",
+          "Restricted"
+        ]
+      }
+    },
+    "/story/info": {
+      "get": {
+        "description": "Return runtime status details for the active story.",
+        "operationId": "get_story_info_story_info_get",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": true,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Story Info",
+        "tags": [
+          "Story"
+        ]
+      }
+    },
+    "/story/inspect": {
+      "get": {
+        "description": "Return debug inspection info for the active node (or a specific node).",
+        "operationId": "inspect_story_node_story_inspect_get",
+        "parameters": [
+          {
+            "description": "Optional node identifier; defaults to current cursor node.",
+            "in": "query",
+            "name": "node_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional node identifier; defaults to current cursor node.",
+              "title": "Node Id"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": false,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Inspect Story Node Story Inspect Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Story Node",
+        "tags": [
+          "Story",
+          "Restricted"
+        ]
+      }
+    },
+    "/story/story/create": {
+      "post": {
+        "description": "Create a story session and return the initial runtime envelope.",
+        "operationId": "create_story_story_story_create_post",
+        "parameters": [
+          {
+            "description": "World template to instantiate",
+            "in": "query",
+            "name": "world_id",
+            "required": true,
+            "schema": {
+              "description": "World template to instantiate",
+              "title": "World Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional story label",
+            "in": "query",
+            "name": "story_label",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional story label",
+              "title": "Story Label"
+            }
+          },
+          {
+            "description": "Initialization mode: LAZY or EAGER",
+            "in": "query",
+            "name": "init_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Initialization mode: LAZY or EAGER",
+              "title": "Init Mode"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-API-Key",
+            "required": true,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Story",
+        "tags": [
+          "Story"
+        ]
+      }
+    },
+    "/story/update": {
+      "get": {
+        "description": "Return the runtime envelope with ordered fragments.",
+        "operationId": "get_story_update_story_update_get",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Inclusive starting step; defaults to 0 (full history).",
+            "in": "query",
+            "name": "since_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive starting step; defaults to 0 (full history).",
+              "title": "Since Step"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "X-API-Key",
+            "required": true,
+            "schema": {
+              "title": "X-Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Story Update Story Update Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Story Update",
+        "tags": [
+          "Story"
+        ]
+      }
+    },
+    "/system/info": {
+      "get": {
+        "description": "Return high-level information about the running service.",
+        "operationId": "get_system_info_system_info_get",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get System Info",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/system/reset": {
+      "put": {
+        "description": "System resets are not wired through the orchestrator yet.",
+        "operationId": "reset_system_system_reset_put",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset System",
+        "tags": [
+          "System",
+          "Restricted"
+        ]
+      }
+    },
+    "/system/secret": {
+      "get": {
+        "description": "Encode ``secret`` as an API key for clients.",
+        "operationId": "get_key_for_secret_system_secret_get",
+        "parameters": [
+          {
+            "example": "None",
+            "in": "query",
+            "name": "secret",
+            "required": false,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSecret"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Key For Secret",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/system/worlds": {
+      "get": {
+        "description": "List the available worlds registered with the service.",
+        "operationId": "get_worlds_system_worlds_get",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Get Worlds System Worlds Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Worlds",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/user/create": {
+      "post": {
+        "description": "Create a user and return the secret metadata for clients.",
+        "operationId": "create_user_user_create_post",
+        "parameters": [
+          {
+            "example": "None",
+            "in": "query",
+            "name": "secret",
+            "required": false,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/drop": {
+      "delete": {
+        "description": "Remove the authenticated user and purge persisted resources.",
+        "operationId": "drop_user_user_drop_delete",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "api-key",
+            "required": false,
+            "schema": {
+              "title": "Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drop User",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/info": {
+      "get": {
+        "description": "Return profile information for the authenticated user.",
+        "operationId": "get_user_info_user_info_get",
+        "parameters": [
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "api-key",
+            "required": false,
+            "schema": {
+              "title": "Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Info",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/secret": {
+      "put": {
+        "description": "Update the secret for the authenticated user and surface the new API key.",
+        "operationId": "update_user_secret_user_secret_put",
+        "parameters": [
+          {
+            "example": "None",
+            "in": "query",
+            "name": "secret",
+            "required": false,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          },
+          {
+            "example": "AXxngZiGzAqUJqMqzbMmtQ==",
+            "in": "header",
+            "name": "api-key",
+            "required": false,
+            "schema": {
+              "title": "Api-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update User Secret",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/user/world": {
+      "put": {
+        "description": "Linking users to worlds is not yet implemented in the orchestrated REST API.",
+        "operationId": "set_user_world_user_world_put",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Set User World",
+        "tags": [
+          "User"
+        ]
+      }
+    },
+    "/world/{world_id}/info": {
+      "get": {
+        "description": "Return metadata describing ``world_id``.",
+        "operationId": "get_world_info_world__world_id__info_get",
+        "parameters": [
+          {
+            "example": "my_world",
+            "in": "path",
+            "name": "world_id",
+            "required": true,
+            "schema": {
+              "title": "World Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Response rendering profile.",
+            "in": "query",
+            "name": "render_profile",
+            "required": false,
+            "schema": {
+              "default": "raw",
+              "description": "Response rendering profile.",
+              "title": "Render Profile",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get World Info World  World Id  Info Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get World Info",
+        "tags": [
+          "World"
+        ]
+      }
+    },
+    "/world/{world_id}/scenes": {
+      "get": {
+        "description": "Scene listing is not yet exposed through the orchestrated REST API.",
+        "operationId": "get_scene_list_world__world_id__scenes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "world_id",
+            "required": true,
+            "schema": {
+              "title": "World Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Scene List",
+        "tags": [
+          "World",
+          "Restricted"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "Reference API",
+      "url": "https://localhost:8000/api/v2"
+    }
+  ]
+}

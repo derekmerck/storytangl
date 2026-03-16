@@ -33,7 +33,7 @@ Template provisioning is the most common path for casting roles and populating s
    (`template.get_content_identifier()`). No additional hashing is necessary because
    :class:`~tangl.core.content_addressable.ContentAddressable` handles it.
 5. **Build step:** When selected, the offer is converted into a concrete entity. The provisioner
-   resolves `obj_cls`, hydrates the payload from the template, applies requirement overrides, and
+   resolves `kind`, hydrates the payload from the template, applies requirement overrides, and
    writes a build receipt including the template reference and hash for provenance.
 
 If any step fails—missing template, scope rejection, or unresolved class—the provisioner simply

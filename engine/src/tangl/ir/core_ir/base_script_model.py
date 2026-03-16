@@ -11,7 +11,7 @@ from tangl.type_hints import Expr, Label, StringMap, Tag, Typelike, Unstructured
 class BaseScriptItem(Record):
     """Record-based IR script model with local traversal/scope helpers."""
 
-    obj_cls_: Typelike = Field(None, alias="obj_cls", exclude_if=lambda value: value is None)
+    kind_: Typelike = Field(None, alias="kind", exclude_if=lambda value: value is None)
     req_ancestor_tags: set[Tag] = Field(default_factory=set, alias="ancestor_tags")
     forbid_ancestor_tags: set[Tag] = Field(default_factory=set, alias="forbid_ancestor_tags")
     req_path_pattern: str | None = Field(None, alias="path_pattern")
@@ -37,12 +37,16 @@ class BaseScriptItem(Record):
     icon: Optional[str] = None
 
     @property
-    def obj_cls(self):
-        return self.obj_cls_
+    def kind(self):
+        return self.kind_ or self.get_default_kind()
 
-    @field_validator("obj_cls_", mode="after")
     @classmethod
-    def _hydrate_obj_cls(cls, value: Typelike) -> Typelike:
+    def get_default_kind(cls) -> Typelike:
+        return None
+
+    @field_validator("kind_", mode="after")
+    @classmethod
+    def _hydrate_kind(cls, value: Typelike) -> Typelike:
         if value is None or isinstance(value, type):
             return value
         if isinstance(value, str):
@@ -218,7 +222,7 @@ class BaseScriptItem(Record):
             exclude_none=True,
             exclude=visit_fields | {"parent"},
         )
-        data["obj_cls"] = self.obj_cls
+        data["kind"] = self.kind
         return data
 
     def unstructure_as_template(self) -> UnstructuredData:
@@ -229,8 +233,8 @@ class BaseScriptItem(Record):
             exclude_none=True,
             exclude={"uid", "seq", "parent"},
         )
-        if "obj_cls_" not in self.model_fields_set:
-            data.pop("obj_cls", None)
+        if "kind_" not in self.model_fields_set:
+            data.pop("kind", None)
         return data
 
     def model_dump(self, **kwargs) -> UnstructuredData:

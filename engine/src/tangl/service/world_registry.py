@@ -66,25 +66,19 @@ class WorldRegistry:
             for bundle in self.bundles.values()
         ]
 
-    def get_world(self, label: UniqueLabel, *, runtime_version: str = "38") -> World:
-        if runtime_version != "38":
-            raise ValueError("Only runtime_version='38' is supported.")
+    def get_world(self, label: UniqueLabel) -> World:
         if label not in self.worlds:
             bundle = self.bundles.get(label)
             if not bundle:
                 msg = f"Unknown world: {label}"
                 raise ValueError(msg)
-            self.worlds[label] = self.compiler.compile(bundle, runtime_version=runtime_version)
+            self.worlds[label] = self.compiler.compile(bundle)
         return self.worlds[label]
 
     def get_anthology(
         self,
         label: UniqueLabel,
-        *,
-        runtime_version: str = "38",
     ) -> dict[str, World]:
-        if runtime_version != "38":
-            raise ValueError("Only runtime_version='38' is supported.")
         bundle = self.bundles.get(label)
         if not bundle:
             msg = f"Unknown world: {label}"
@@ -94,4 +88,4 @@ class WorldRegistry:
             msg = f"World {label} is not an anthology"
             raise ValueError(msg)
 
-        return self.compiler.compile_anthology(bundle, runtime_version=runtime_version)
+        return self.compiler.compile_anthology(bundle)

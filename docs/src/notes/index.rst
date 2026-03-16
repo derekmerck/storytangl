@@ -11,6 +11,7 @@ state of the codebase without defining the canonical architecture.
    CREDENTIALS_INTERACTION
    MU_AFFORDANCES
    SANDBOX_FANOUT_DESIGN
+   media_resurrection_plan
    migration/index
    audits/index
    reference/index

@@ -29,9 +29,9 @@ Step: TypeAlias = int           # Graph traversal or resolution step counter/epo
 # Used by storage and serializers
 UnstructuredData: TypeAlias = StringMap
 # todo: rename HasUid to "StructuredModel" or fold into BaseModelPlus?
-# A string map of kwargs suitable for structuring a HasUid instance, includes an 'obj_cls' and 'uid' key
+# A string map of kwargs suitable for structuring a HasUid instance, includes a 'kind' and 'uid' key
 class HasUid(Protocol):
-    obj_cls: Typelike
+    kind: Typelike
     uid: UUID
     @classmethod
     def structure(cls, data: UnstructuredData) -> Self: ...  # factory func

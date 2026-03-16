@@ -186,8 +186,6 @@ class Graph(Registry[GraphItem]):
 
     def add_node(self, *, kind=None, **attrs) -> Node:
         """Create and add a node-like graph item."""
-        if kind is None and "obj_cls" in attrs:
-            kind = attrs.pop("obj_cls")
         kind = kind or Node
         node = kind(**attrs)
         self.add(node)
@@ -202,8 +200,6 @@ class Graph(Registry[GraphItem]):
         **attrs,
     ) -> Edge:
         """Create and add an edge between predecessor and successor items."""
-        if kind is None and "obj_cls" in attrs:
-            kind = attrs.pop("obj_cls")
         # Legacy arg aliases.
         if predecessor is None and "source" in attrs:
             predecessor = attrs.pop("source")
@@ -233,8 +229,6 @@ class Graph(Registry[GraphItem]):
 
     def add_subgraph(self, *, kind=None, members: Iterable[GraphItem] = None, **attrs) -> Subgraph:
         """Create and add a subgraph, then optionally add members."""
-        if kind is None and "obj_cls" in attrs:
-            kind = attrs.pop("obj_cls")
         kind = kind or Subgraph
         subgraph = kind(**attrs)
         self.add(subgraph)

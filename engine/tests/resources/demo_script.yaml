@@ -16,7 +16,7 @@ scenes:
     title: "The Crossroads"
     roles:
       guide:
-        obj_cls: tangl.story.concepts.actor.role.Role
+        kind: tangl.story.concepts.actor.role.Role
         actor_ref: guide
     blocks:
       start:
@@ -88,7 +88,7 @@ scenes:
 
 actors:
   guide:
-    obj_cls: tangl.story.concepts.actor.actor.Actor
+    kind: tangl.story.concepts.actor.actor.Actor
     name: "The Guide"
     content: "A mysterious figure who appears at crossroads."
     tags: [npc, helpful]

@@ -11,7 +11,7 @@ Templates without scope constraints are available everywhere.
 ```yaml
 templates:
   generic_guard:
-    obj_cls: Actor
+    kind: Actor
     # No scope = global
 ```
 
@@ -23,7 +23,7 @@ scenes:
   village:
     templates:
       village_elder:
-        obj_cls: Actor
+        kind: Actor
         # Inferred: scope.parent_label = "village"
     
     blocks:
@@ -48,7 +48,7 @@ scenes:
       containment:
         templates:
           specialist:
-            obj_cls: Actor
+            kind: Actor
             # Inferred: scope.source_label = "lab.containment"
         
         roles:
@@ -68,11 +68,11 @@ scenes:
   village:
     templates:
       wandering_merchant:
-        obj_cls: Actor
+        kind: Actor
         scope: null  # Override to global (available everywhere)
       
       secret_contact:
-        obj_cls: Actor
+        kind: Actor
         scope:
           ancestor_tags: ["conspiracy"]  # Only in blocks with conspiracy tag
 ```

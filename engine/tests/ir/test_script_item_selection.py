@@ -6,7 +6,7 @@ from tangl.ir.core_ir.base_script_model import BaseScriptItem
 pytestmark = pytest.mark.skip(
     reason=(
         "Legacy-only selection criteria shape (`has_path`/`has_ancestor_tags`); "
-        "v38 scope matching is validated via core38 Template admission_scope tests."
+        "v38 scope matching is validated via core Template admission_scope tests."
     )
 )
 

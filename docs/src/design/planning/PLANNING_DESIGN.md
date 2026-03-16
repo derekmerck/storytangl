@@ -562,14 +562,14 @@ for role_data in scene_data.get("roles", []):
 ```python
 # Current (WORKS):
 Requirement(
-    template={"obj_cls": "Node", "label": "key", ...}  # Inline template
+    template={"kind": "Node", "label": "key", ...}  # Inline template
 )
 
 # Not connected (DOESN'T WORK):
 # In script:
 templates:
   golden_key:
-    obj_cls: "Item"
+    kind: "Item"
     label: "golden_key"
     tags: ["key", "item"]
 
@@ -687,7 +687,7 @@ key_requirement = Requirement(
     identifier="golden_key",
     criteria={"has_tags": {"key", "item"}},
     template={
-        "obj_cls": "tangl.story.concepts.item.Item",
+        "kind": "tangl.story.concepts.item.Item",
         "label": "golden_key",
         "name": "Golden Key",
         "tags": {"key", "item"}

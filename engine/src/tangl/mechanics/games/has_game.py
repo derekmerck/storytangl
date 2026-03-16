@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Facet mixin for blocks hosting game instances."""
 
-from inspect import signature
 from typing import Any, ClassVar, Optional, TYPE_CHECKING
 from uuid import UUID
 
@@ -11,21 +10,9 @@ from tangl.mechanics.games import Game, GameHandler
 if TYPE_CHECKING:
     from tangl.core import Graph, Node
 
-
-def _graph_accepts_kind(graph: Graph) -> bool:
-    """Return ``True`` when ``graph.add_node`` exposes a ``kind=`` parameter."""
-
-    try:
-        return "kind" in signature(graph.add_node).parameters
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        return False
-
-
 def _add_node_compat(graph: Graph, *, kind: type, label: str | None, **kwargs: Any):
-    """Prefer v38 ``kind`` vocabulary while tolerating legacy ``obj_cls`` APIs."""
-    if _graph_accepts_kind(graph):
-        return graph.add_node(kind=kind, label=label, **kwargs)
-    return graph.add_node(obj_cls=kind, label=label, **kwargs)
+    """Create a node using the canonical ``kind=`` graph API."""
+    return graph.add_node(kind=kind, label=label, **kwargs)
 
 
 class HasGame:

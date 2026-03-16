@@ -5,8 +5,10 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.core import GraphItem, Selector, TemplateRegistry
+from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
 from tangl.media.story_media import get_story_resource_manager
+from tangl.vm.dispatch import do_gather_ns
 from tangl.vm import (
     Affordance,
     Dependency,
@@ -75,6 +77,12 @@ class _PrelinkCtx:
 
     def get_story_locals(self) -> Mapping[str, Any]:
         return self.graph.get_story_locals()
+
+    def get_ns(self, node: Any = None) -> Mapping[str, Any]:
+        target = node or self.cursor
+        if target is None:
+            return self.graph.get_story_locals()
+        return do_gather_ns(target, ctx=self)
 
     def get_location_entity_groups(self):
         cursor = self.cursor
@@ -487,9 +495,32 @@ class StoryMaterializer:
             spec.setdefault("source_kind", source_kind)
 
             if source_kind == "potential":
-                spec.setdefault("script_spec", spec.get("spec"))
+                raw_spec = spec.get("spec")
+                spec.setdefault("script_spec", raw_spec)
                 spec.setdefault("realized_spec", None)
                 spec.setdefault("final_spec", None)
+                spec.setdefault("fallback_text", self._coerce_str(spec.get("text")))
+                try:
+                    media_spec = MediaSpec.from_authoring(raw_spec)
+                except (TypeError, ValueError) as exc:
+                    spec["spec_error"] = str(exc)
+                    state.report.warnings.append(
+                        f"Skipped inline media spec on block {node.get_label()!r}: {exc}"
+                    )
+                    continue
+
+                dep = MediaDep(
+                    registry=state.graph,
+                    label=self._coerce_str(spec.get("label")) or f"media_{node.get_label()}_{index}",
+                    predecessor_id=node.uid,
+                    media_spec=media_spec,
+                    media_role=self._coerce_str(spec.get("media_role")),
+                    caption=self._coerce_str(spec.get("text") or spec.get("caption")),
+                    scope=self._coerce_str(spec.get("scope")) or "story",
+                    hard=bool(spec.get("hard", False)),
+                    script_spec=dict(raw_spec) if isinstance(raw_spec, dict) else None,
+                )
+                spec["dependency_id"] = dep.uid
                 continue
 
             if source_kind != "inventory":
@@ -547,6 +578,7 @@ class StoryMaterializer:
                 or "",
                 successor_ref=successor_ref,
                 activation=activation,
+                predicate=self._coerce_str(spec.get("predicate")),
                 payload=spec.get("payload"),
                 accepts=spec.get("accepts") or spec.get("payload_schema"),
                 ui_hints=(

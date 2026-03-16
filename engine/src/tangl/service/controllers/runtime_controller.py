@@ -9,6 +9,9 @@ from uuid import UUID
 from tangl import core as tangl_core
 from tangl.config import get_story_media_dir, get_sys_media_dir
 from tangl.core import Selector
+from tangl.journal.media import MediaFragment
+from tangl.media import get_system_resource_manager
+from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaDep
 from tangl.media.story_media import remove_story_media
 from tangl.story.fabula import InitMode
@@ -22,7 +25,7 @@ from ..api_endpoint import (
     ResourceBinding,
     ResponseType,
 )
-from ..media import media_fragment_to_payload
+from ..media import MediaRenderProfile, media_fragment_to_payload
 from ..response import RuntimeEnvelope, RuntimeInfo
 from ..user import User
 from .world_controller import resolve_world
@@ -37,14 +40,16 @@ class RuntimeController(HasApiEndpoints):
     def _serialize_fragment(
         fragment: Any,
         *,
+        render_profile: MediaRenderProfile | None = None,
         world_id: str | None = None,
         story_id: str | None = None,
         world_media_root: Path | None = None,
         story_media_root: Path | None = None,
         system_media_root: Path | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         media_payload = media_fragment_to_payload(
             fragment,
+            render_profile=render_profile,
             world_id=world_id,
             story_id=story_id,
             world_media_root=world_media_root,
@@ -53,6 +58,8 @@ class RuntimeController(HasApiEndpoints):
         )
         if media_payload is not None:
             return media_payload
+        if isinstance(fragment, MediaFragment):
+            return None
         if hasattr(fragment, "model_dump"):
             return fragment.model_dump(mode="json")
         if hasattr(fragment, "unstructure"):
@@ -107,6 +114,35 @@ class RuntimeController(HasApiEndpoints):
         }
 
     @staticmethod
+    def _resolve_static_inventories(
+        *,
+        ledger: Ledger | None = None,
+        world_id: str | None = None,
+    ) -> tuple[MediaInventory, ...]:
+        graph = getattr(ledger, "graph", None)
+        inventories: list[MediaInventory] = []
+
+        world_resources = getattr(getattr(graph, "world", None), "resources", None)
+        if world_resources is None and world_id is not None:
+            try:
+                world = resolve_world(world_id)
+            except Exception:
+                world = None
+            world_resources = getattr(world, "resources", None)
+
+        for provider, scope in (
+            (world_resources, "world"),
+            (get_system_resource_manager(), "sys"),
+        ):
+            inventory = MediaInventory.from_provider(provider, scope=scope)
+            if inventory is not None and inventory.identity not in {
+                existing.identity for existing in inventories
+            }:
+                inventories.append(inventory)
+
+        return tuple(inventories)
+
+    @staticmethod
     def _resolve_world_id(
         ledger: Ledger,
         metadata: dict[str, Any] | None = None,
@@ -147,26 +183,30 @@ class RuntimeController(HasApiEndpoints):
     def _to_compat_fragment(
         fragment: Any,
         *,
+        render_profile: MediaRenderProfile | None = None,
         world_id: str | None = None,
         story_id: str | None = None,
         world_media_root: Path | None = None,
         story_media_root: Path | None = None,
         system_media_root: Path | None = None,
-    ) -> BaseFragment:
-        """Convert vm38 journal records into legacy-compatible BaseFragment payloads."""
+    ) -> BaseFragment | None:
+        """Convert runtime journal records into legacy-compatible BaseFragment payloads."""
+        if isinstance(fragment, MediaFragment):
+            media_payload = media_fragment_to_payload(
+                fragment,
+                render_profile=render_profile,
+                world_id=world_id,
+                story_id=story_id,
+                world_media_root=world_media_root,
+                story_media_root=story_media_root,
+                system_media_root=system_media_root,
+            )
+            if media_payload is not None:
+                return BaseFragment(**media_payload)
+            return None
+
         if isinstance(fragment, BaseFragment):
             return fragment
-
-        media_payload = media_fragment_to_payload(
-            fragment,
-            world_id=world_id,
-            story_id=story_id,
-            world_media_root=world_media_root,
-            story_media_root=story_media_root,
-            system_media_root=system_media_root,
-        )
-        if media_payload is not None:
-            return BaseFragment(**media_payload)
 
         if hasattr(fragment, "model_dump"):
             data = fragment.model_dump(mode="python")
@@ -200,8 +240,12 @@ class RuntimeController(HasApiEndpoints):
             world_id=world_id,
             story_id=story_id,
         )
+        render_profile = MediaRenderProfile(
+            static_inventories=self._resolve_static_inventories(world_id=world_id),
+        )
         payload = media_fragment_to_payload(
             fragment,
+            render_profile=render_profile,
             world_id=world_id,
             story_id=story_id,
             world_media_root=media_roots["world"],
@@ -236,15 +280,30 @@ class RuntimeController(HasApiEndpoints):
 
             dependency_id = media_item.get("dependency_id")
             dependency = graph.get(dependency_id) if graph is not None and dependency_id is not None else None
-            if isinstance(dependency, MediaDep) and dependency.provider is None:
-                diagnostics.append(
-                    {
-                        "reason": dependency.requirement.resolution_reason or "unresolved_media",
-                        "scope": dependency.scope or media_item.get("scope") or "world",
-                        "fallback": media_item.get("fallback_text") or media_item.get("text"),
-                        "label": media_item.get("name") or media_item.get("label"),
-                    }
-                )
+            if isinstance(dependency, MediaDep):
+                if dependency.provider is None:
+                    diagnostics.append(
+                        {
+                            "reason": dependency.requirement.resolution_reason or "unresolved_media",
+                            "scope": dependency.scope or media_item.get("scope") or "world",
+                            "fallback": media_item.get("fallback_text") or media_item.get("text"),
+                            "label": media_item.get("name") or media_item.get("label"),
+                        }
+                    )
+                elif not dependency.render_ready:
+                    status = getattr(dependency.provider, "status", None)
+                    diagnostics.append(
+                        {
+                            "reason": (
+                                f"media_{status.value}"
+                                if status is not None and hasattr(status, "value")
+                                else "media_pending"
+                            ),
+                            "scope": dependency.scope or media_item.get("scope") or "story",
+                            "fallback": media_item.get("fallback_text") or media_item.get("text"),
+                            "label": media_item.get("name") or media_item.get("label"),
+                        }
+                    )
         return diagnostics
 
     @staticmethod
@@ -304,16 +363,27 @@ class RuntimeController(HasApiEndpoints):
             world_id=world_id,
             story_id=story_id,
         )
-        serialized_fragments = [
-            self._serialize_fragment(
-                fragment,
+        render_profile = MediaRenderProfile(
+            static_inventories=self._resolve_static_inventories(
+                ledger=ledger,
                 world_id=world_id,
-                story_id=story_id,
-                world_media_root=media_roots["world"],
-                story_media_root=media_roots["story"],
-                system_media_root=media_roots["sys"],
-            )
+            ),
+        )
+        serialized_fragments = [
+            payload
             for fragment in fragments
+            if (
+                payload := self._serialize_fragment(
+                    fragment,
+                    render_profile=render_profile,
+                    world_id=world_id,
+                    story_id=story_id,
+                    world_media_root=media_roots["world"],
+                    story_media_root=media_roots["story"],
+                    system_media_root=media_roots["sys"],
+                )
+            )
+            is not None
         ]
         merged_metadata = dict(metadata or {})
         if world_id is not None:
@@ -366,7 +436,7 @@ class RuntimeController(HasApiEndpoints):
     )
     def create_story(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
         """Create a story graph and bootstrap a runtime ledger for ``user``."""
-        import tangl.story  # noqa: F401  # ensure story-level vm38 hooks are registered
+        import tangl.story  # noqa: F401  # ensure story-level hooks are registered
 
         world = kwargs.pop("world", None)
         if world is None:
@@ -380,6 +450,7 @@ class RuntimeController(HasApiEndpoints):
             mode = InitMode(mode_raw)
 
         freeze_shape = bool(kwargs.get("freeze_shape", False))
+        worker_dispatcher = kwargs.pop("worker_dispatcher", None)
         init_result = world.create_story(
             story_label,
             init_mode=mode,
@@ -396,6 +467,7 @@ class RuntimeController(HasApiEndpoints):
         )
         ledger.user = user
         ledger.user_id = user.uid
+        ledger.worker_dispatcher = worker_dispatcher
         self._prime_initial_update(ledger)
         user.current_ledger_id = ledger.uid  # type: ignore[attr-defined]
 
@@ -493,7 +565,7 @@ class RuntimeController(HasApiEndpoints):
         start_marker: str | None = None,
         end_marker: str | None = None,
     ) -> list[BaseFragment]:
-        """Legacy endpoint shape that returns the latest vm38 fragments as BaseFragment items."""
+        """Legacy endpoint shape that returns the latest runtime fragments as BaseFragment items."""
         _ = (marker, marker_type, start_marker, end_marker)
         if current_only:
             fragments = list(ledger.get_journal())
@@ -525,16 +597,27 @@ class RuntimeController(HasApiEndpoints):
             world_id=world_id,
             story_id=story_id,
         )
-        return [
-            self._to_compat_fragment(
-                fragment,
+        render_profile = MediaRenderProfile(
+            static_inventories=self._resolve_static_inventories(
+                ledger=ledger,
                 world_id=world_id,
-                story_id=story_id,
-                world_media_root=media_roots["world"],
-                story_media_root=media_roots["story"],
-                system_media_root=media_roots["sys"],
-            )
+            ),
+        )
+        return [
+            compat
             for fragment in fragments
+            if (
+                compat := self._to_compat_fragment(
+                    fragment,
+                    render_profile=render_profile,
+                    world_id=world_id,
+                    story_id=story_id,
+                    world_media_root=media_roots["world"],
+                    story_media_root=media_roots["story"],
+                    system_media_root=media_roots["sys"],
+                )
+            )
+            is not None
         ]
 
     @ApiEndpoint.annotate(

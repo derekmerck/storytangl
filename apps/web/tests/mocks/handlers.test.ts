@@ -13,20 +13,22 @@ afterEach(() => {
 })
 
 describe('MSW Handlers', () => {
-  it('returns story blocks on /story/update', async () => {
+  it('returns a runtime envelope on /story/update', async () => {
     const response = await axios.get('/story/update')
-    expect(Array.isArray(response.data)).toBe(true)
-    expect(response.data[0]).toHaveProperty('uid')
-    expect(response.data[0]).toHaveProperty('text')
+    expect(response.data).toHaveProperty('fragments')
+    expect(Array.isArray(response.data.fragments)).toBe(true)
+    expect(response.data.fragments[0]).toHaveProperty('uid')
+    expect(response.data.fragments[0]).toHaveProperty('text')
   })
 
-  it('returns blocks on /story/do', async () => {
+  it('returns a runtime envelope on /story/do', async () => {
     const response = await axios.post('/story/do', {
       uid: 'action_uid',
       passback: null,
     })
-    expect(Array.isArray(response.data)).toBe(true)
-    expect(response.data[0]).toHaveProperty('uid')
+    expect(response.data).toHaveProperty('fragments')
+    expect(Array.isArray(response.data.fragments)).toBe(true)
+    expect(response.data.fragments[0]).toHaveProperty('uid')
   })
 
   it('returns world list on /system/worlds', async () => {
@@ -35,11 +37,10 @@ describe('MSW Handlers', () => {
     expect(response.data[0]).toHaveProperty('key')
   })
 
-  it('returns status entries on /story/info', async () => {
+  it('returns runtime info on /story/info', async () => {
     const response = await axios.get('/story/info')
-    expect(Array.isArray(response.data)).toBe(true)
-    expect(response.data[0]).toHaveProperty('key')
-    expect(response.data[0]).toHaveProperty('value')
+    expect(response.data).toHaveProperty('status')
+    expect(response.data).toHaveProperty('cursor_label')
   })
 
   it('returns system info on /system/info', async () => {

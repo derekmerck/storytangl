@@ -64,7 +64,7 @@ presentation (renderers, web/UI)
   - Faster operations: comparing `bytes`/`UUID` beats parsing strings.
   - Stronger type safety: mistakes surface at boundaries.
   - Lower overhead: avoid repeated `.hex()`/`str()` conversions in hot paths.
-  - Clearer semantics: `obj_cls: Type[Entity]` expresses intent better than a string FQN.
+  - Clearer semantics: `kind: Type[Entity]` expresses intent better than a string FQN.
   - Type objects are the native representation in Python; FQNs serve only as serialized forms.
   - Serialization is a boundary concern; runtime behavior should never pay for it.
 

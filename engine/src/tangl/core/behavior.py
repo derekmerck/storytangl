@@ -1,5 +1,5 @@
 # tangl/core/behavior.py
-"""Behavior dispatch primitives and receipt aggregation for core38.
+"""Behavior dispatch primitives and receipt aggregation for core.
 
 This module provides:
 

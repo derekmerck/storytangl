@@ -126,3 +126,15 @@ def test_resource_manager_indexes_nested_paths_recursively(tmp_path: Path) -> No
     rit = resource_manager.get_rit("book1/scene1/cover.svg")
     assert rit is not None
     assert rit.path == nested_path
+
+
+def test_register_file_resolves_relative_paths_against_resource_root(tmp_path: Path) -> None:
+    resource_root = tmp_path / "media"
+    nested_path = resource_root / "book1" / "scene1" / "cover.svg"
+    _write_svg(nested_path)
+
+    resource_manager = ResourceManager(resource_path=resource_root, scope="world")
+    rit = resource_manager.register_file(Path("book1/scene1/cover.svg"))
+
+    assert rit.path == nested_path.resolve()
+    assert resource_manager.get_rit("book1/scene1/cover.svg") is rit

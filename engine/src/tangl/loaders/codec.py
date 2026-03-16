@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -19,6 +20,25 @@ class SourceRef:
     note: str | None = None
 
 
+class LossKind(str, Enum):
+    """Classification for structured codec decode loss records."""
+
+    UNSUPPORTED_FEATURE = "unsupported_feature"
+    SOURCE_INTEGRITY = "source_integrity"
+    AUTHORING_DEBT = "authoring_debt"
+
+
+@dataclass(slots=True, frozen=True)
+class LossRecord:
+    """Structured description of source content a codec could not map cleanly."""
+
+    kind: LossKind
+    feature: str
+    passage: str
+    excerpt: str
+    note: str | None = None
+
+
 @dataclass(slots=True)
 class DecodeResult:
     """Result from decoding story content into runtime-ready script data.
@@ -34,13 +54,17 @@ class DecodeResult:
     source_map: dict[str, list[SourceRef]] = field(default_factory=dict)
     codec_state: dict[str, Any] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    loss_records: list[LossRecord] = field(default_factory=list)
 
 
 class StoryCodec(Protocol):
     """Protocol for world format codecs.
 
-    A codec defines a reversible path:
-    on-disk source -> runtime-ready story data -> on-disk source.
+    A codec defines a serialization contract between on-disk source and
+    runtime-ready story data.
+
+    Decode and encode are related but not required to be symmetric. Some codecs
+    intentionally support import-only workflows.
     """
 
     codec_id: str
@@ -78,7 +102,7 @@ class NearNativeYamlCodec:
     ---
     Near-native YAML is already very close to runtime schema, so this codec is
     intentionally minimal: it merges script files and carries file-level source
-    references. This keeps the path easy to reason about while story38 contracts
+    references. This keeps the path easy to reason about while story contracts
     are still evolving.
     """
 
@@ -157,6 +181,9 @@ class CodecRegistry:
         default_codec = NearNativeYamlCodec()
         for alias in ("near_native", "near_native_yaml", "yaml"):
             self.register(alias, default_codec)
+        from .codecs import register_bundled_codecs
+
+        register_bundled_codecs(self)
 
     def register(self, key: str, codec: StoryCodec) -> None:
         self._codecs[str(key)] = codec

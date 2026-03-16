@@ -1,4 +1,4 @@
-# tangl/vm38/traversable.py
+# tangl/vm/traversable.py
 """Traversal primitives for the VM phase pipeline.
 
 This module defines the node and edge types that participate in cursor-driven

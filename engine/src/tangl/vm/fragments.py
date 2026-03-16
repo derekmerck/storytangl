@@ -1,4 +1,4 @@
-# tangl/vm38/fragments.py
+# tangl/vm/fragments.py
 """Minimal fragment types for the VM journal phase.
 
 The phase pipeline's JOURNAL step produces fragments — small records that

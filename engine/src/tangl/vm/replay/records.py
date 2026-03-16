@@ -1,4 +1,4 @@
-"""Replay records emitted into the vm38 output stream."""
+"""Replay records emitted into the vm output stream."""
 
 from __future__ import annotations
 

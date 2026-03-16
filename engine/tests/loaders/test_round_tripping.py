@@ -7,8 +7,8 @@ from tangl.ir.story_ir import BlockScript
 
 pytestmark = pytest.mark.skip(
     reason=(
-        "Retired from v38 parity gate: this asserts legacy ScriptManager template-shape internals "
-        "that do not map 1:1 to story38 template bundle/runtime representation."
+        "Retired from the cutover parity gate: this asserts legacy ScriptManager template-shape "
+        "internals that do not map 1:1 to story template bundle/runtime representation."
     )
 )
 
@@ -16,7 +16,7 @@ def test_registry_has_blocks_for_export(media_mvp_path: Path):
     """Minimal check: can we export block templates?"""
 
     registry = WorldRegistry([media_mvp_path.parent])
-    world = registry.get_world("media_mvp", runtime_version="38")
+    world = registry.get_world("media_mvp")
 
     # Must have blocks
     blocks = [template for template in world.find_templates() if isinstance(template, BlockScript)]

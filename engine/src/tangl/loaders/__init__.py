@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from .bundle import WorldBundle
-from .codec import CodecRegistry, DecodeResult, NearNativeYamlCodec, SourceRef, StoryCodec
+from .codec import (
+    CodecRegistry,
+    DecodeResult,
+    LossKind,
+    LossRecord,
+    NearNativeYamlCodec,
+    SourceRef,
+    StoryCodec,
+)
 from .compiler import WorldCompiler, ScriptCompiler
 from .manifest import StorySourceSpec, UniqueLabel, WorldManifest
 
@@ -11,6 +19,8 @@ __all__ = [
     "WorldBundle",
     "SourceRef",
     "DecodeResult",
+    "LossKind",
+    "LossRecord",
     "StoryCodec",
     "NearNativeYamlCodec",
     "CodecRegistry",

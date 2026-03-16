@@ -67,24 +67,28 @@ def test_branching_story_left_path_rest(branching_story_client: tuple[TestClient
     assert update.status_code == 200
     payload = update.json()
     fragments = payload["fragments"]
+    initial_step = payload["step"]
 
     assert _fragment_contains(fragments, "You stand at a crossroads in the forest.")
 
-    choices = payload["choices"]
-    assert choices == extract_choices_from_fragments(fragments)
+    choices = extract_choices_from_fragments(fragments)
     assert len(choices) == 3
 
     left_choice = _find_choice(choices, "left")
     resolve_left = client.post("story/do", json={"choice_id": left_choice["uid"]}, headers=headers)
     assert resolve_left.status_code == 200
 
-    update_two = client.get("story/update", headers=headers)
+    update_two = client.get(
+        "story/update",
+        params={"since_step": initial_step + 1},
+        headers=headers,
+    )
     assert update_two.status_code == 200
     payload_two = update_two.json()
 
     fragments_two = payload_two["fragments"]
     assert _fragment_contains(fragments_two, "peaceful garden")
-    assert payload_two["choices"] == []
+    assert extract_choices_from_fragments(fragments_two) == []
 
 
 def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
@@ -95,20 +99,24 @@ def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClien
     first_update = client.get("story/update", headers=headers)
     payload = first_update.json()
     fragments = payload["fragments"]
+    initial_step = payload["step"]
 
-    choices = payload["choices"]
-    assert choices == extract_choices_from_fragments(fragments)
+    choices = extract_choices_from_fragments(fragments)
     right_choice = _find_choice(choices, "right")
     resolve_right = client.post("story/do", json={"choice_id": right_choice["uid"]}, headers=headers)
     assert resolve_right.status_code == 200
 
-    second_update = client.get("story/update", headers=headers)
+    second_update = client.get(
+        "story/update",
+        params={"since_step": initial_step + 1},
+        headers=headers,
+    )
     payload_two = second_update.json()
     fragments_two = payload_two["fragments"]
+    cave_step = payload_two["step"]
 
     assert _fragment_contains(fragments_two, "dark cave")
-    choices_two = payload_two["choices"]
-    assert choices_two == extract_choices_from_fragments(fragments_two)
+    choices_two = extract_choices_from_fragments(fragments_two)
     assert len(choices_two) == 2
     assert _find_choice(choices_two, "enter")
     assert _find_choice(choices_two, "back")
@@ -117,12 +125,16 @@ def test_branching_story_enter_cave_rest(branching_story_client: tuple[TestClien
     resolve_enter = client.post("story/do", json={"choice_id": enter_choice["uid"]}, headers=headers)
     assert resolve_enter.status_code == 200
 
-    third_update = client.get("story/update", headers=headers)
+    third_update = client.get(
+        "story/update",
+        params={"since_step": cave_step + 1},
+        headers=headers,
+    )
     payload_three = third_update.json()
 
     fragments_three = payload_three["fragments"]
     assert _fragment_contains(fragments_three, "deeper than you thought")
-    assert payload_three["choices"] == []
+    assert extract_choices_from_fragments(fragments_three) == []
 
 
 def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient, dict[str, str]]) -> None:
@@ -131,17 +143,28 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
     client.post("story/story/create", params={"world_id": "the_crossroads"}, headers=headers)
 
     first_update = client.get("story/update", headers=headers).json()
-    first_choices = first_update["choices"]
+    first_choices = extract_choices_from_fragments(first_update["fragments"])
     right_choice = _find_choice(first_choices, "right")
-    client.post("story/do", json={"choice_id": right_choice["uid"]}, headers=headers)
+    first_resolve = client.post("story/do", json={"choice_id": right_choice["uid"]}, headers=headers)
+    assert first_resolve.status_code == 200
+    first_step = first_resolve.json()["step"]
 
-    second_update = client.get("story/update", headers=headers).json()
-    second_choices = second_update["choices"]
+    second_update = client.get(
+        "story/update",
+        params={"since_step": first_step},
+        headers=headers,
+    ).json()
+    second_choices = extract_choices_from_fragments(second_update["fragments"])
     back_choice = _find_choice(second_choices, "back")
     resolve_back = client.post("story/do", json={"choice_id": back_choice["uid"]}, headers=headers)
     assert resolve_back.status_code == 200
+    back_step = resolve_back.json()["step"]
 
-    third_update = client.get("story/update", headers=headers)
+    third_update = client.get(
+        "story/update",
+        params={"since_step": back_step},
+        headers=headers,
+    )
     assert third_update.status_code == 200
     payload_three = third_update.json()
 
@@ -150,7 +173,7 @@ def test_branching_story_backtrack_rest(branching_story_client: tuple[TestClient
         fragments_three,
         "You stand at a crossroads in the forest.",
     )
-    choices_three = payload_three["choices"]
+    choices_three = extract_choices_from_fragments(fragments_three)
     assert len(choices_three) == 3
     assert _find_choice(choices_three, "guide")
     assert _find_choice(choices_three, "left")

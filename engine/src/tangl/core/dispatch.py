@@ -1,7 +1,7 @@
 # tangl/core/dispatch.py
 # language=markdown
 """
-Default global dispatch registry and explicit hook pairs for core38 lifecycle events.
+Default global dispatch registry and explicit hook pairs for core lifecycle events.
 
 Hook pairs are exposed as explicit decorators and runners:
 

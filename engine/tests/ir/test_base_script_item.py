@@ -16,7 +16,7 @@ def test_base_script_item_is_record() -> None:
 def test_base_script_item_defaults_and_extras() -> None:
     """Instantiation should set defaults and allow Record features."""
 
-    item = BaseScriptItem(obj_cls="Node", template_names="demo", extra_field=3)
+    item = BaseScriptItem(kind="Node", template_names="demo", extra_field=3)
 
     assert item.uid is not None
     assert item.template_names == "demo"
@@ -28,12 +28,12 @@ def test_base_script_item_defaults_and_extras() -> None:
 def test_model_dump_emits_string_class_without_entity_fields() -> None:
     """Serialized scripts should match legacy export semantics."""
 
-    item = BaseScriptItem(obj_cls="tangl.core.graph.node.Node", label="demo")
-    assert item.obj_cls is Node
+    item = BaseScriptItem(kind="tangl.core.graph.node.Node", label="demo")
+    assert item.kind is Node
 
     payload = item.unstructure_as_template()
 
-    assert payload["obj_cls"] is Node
+    assert payload["kind"] is Node
     assert payload["label"] == "demo"
     assert "uid" not in payload
     assert "seq" not in payload

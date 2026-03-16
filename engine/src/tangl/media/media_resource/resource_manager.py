@@ -86,6 +86,24 @@ class ResourceManager:
             record.tags = set(record.tags or set()) | self.default_tags | set(tags)
         return records
 
+    def register_file(
+        self,
+        path: Path,
+        *,
+        tags: Iterable[str] = (),
+        index_handlers: Iterable[IndexHandler] = (),
+    ) -> MediaRIT:
+        """Index one file and apply the same default label/tag policy."""
+        resolved_path = path if path.is_absolute() else (self.resource_path / path).resolve()
+        if not resolved_path.is_file():
+            raise FileNotFoundError(f"Cannot register missing media file: {resolved_path}")
+        handlers = [*self.index_handlers, *list(index_handlers)]
+        record = self.registry.index([resolved_path], extra_handlers=handlers or None)[0]
+        if not record.label:
+            record.label = resolved_path.name
+        record.tags = set(record.tags or set()) | self.default_tags | set(tags)
+        return record
+
     def get_rit(self, alias: str) -> Optional[MediaRIT]:
         """Return the resource tagged by ``alias`` or ``None`` if missing."""
         rit = self.registry.find_one(label=alias)

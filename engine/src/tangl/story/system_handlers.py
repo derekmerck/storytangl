@@ -17,7 +17,7 @@ import logging
 from typing import Any, Iterable
 
 from tangl.core import Priority, Record, Selector, TemplateRegistry
-from tangl.discourse import DialogHandler
+from tangl.prose import DialogHandler
 from tangl.media import get_system_resource_manager
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
@@ -157,7 +157,7 @@ def gather_story_media_inventories(*, caller, requirement=None, ctx, **_kw):
             graph.story_resources = manager
 
     inventories = collect_media_inventories(
-        [manager],
+        [graph, manager],
         caller=caller,
         requirement=requirement,
         graph=graph,
@@ -651,6 +651,7 @@ def render_block_media(*, caller, ctx, **_kw):
                     content_format="rit",
                     content_type=getattr(provider, "data_type", MediaDataType.MEDIA),
                     text=payload.get("text"),
+                    fallback_text=payload.get("fallback_text") or payload.get("text"),
                     scope=dependency.scope or _scope_from_provider(provider),
                 )
             )

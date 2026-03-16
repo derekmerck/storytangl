@@ -18,7 +18,7 @@ class ResolutionPhase(IntEnum):
 
     Why
     ----
-    Defines the ordered pipeline for one frame and the vm38 phase-bus
+    Defines the ordered pipeline for one frame and the vm phase-bus
     aggregation contracts used by :mod:`tangl.vm.dispatch`.
 
     Key Features
@@ -29,7 +29,7 @@ class ResolutionPhase(IntEnum):
 
     Notes
     -----
-    * ``PLANNING`` in vm38 is side-effect-only provisioning; handlers must
+    * ``PLANNING`` in vm is side-effect-only provisioning; handlers must
       return ``None`` (non-``None`` raises ``TypeError`` in ``do_provision``).
     * ``JOURNAL`` returns ``Record | Iterable[Record] | None``.
     * ``FINALIZE`` returns ``Record | None``.

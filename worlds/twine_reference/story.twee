@@ -1,0 +1,35 @@
+:: StoryTitle
+The Ruined Tower
+
+:: StoryData
+{
+  "start": "Start",
+  "format": "Twine 2",
+  "format-version": "2.0"
+}
+
+:: Start [entry]
+You stand before a ruined tower. The door hangs open on rusted hinges.
+
+[[Enter the tower->Inside]]
+[[Walk away->Meadow]]
+
+:: Inside
+The tower interior smells of damp stone and old ash.
+
+[[Climb the stairs->Stairs]]
+[[Leave->Start]]
+
+:: Stairs
+The stairs creak beneath your feet. At the top, a locked chest catches your eye.
+
+[[Try the chest->Chest]]
+[[Return below->Inside]]
+
+:: Chest
+The chest is locked fast. Whatever is inside will stay there.
+
+[[Go back->Stairs]]
+
+:: Meadow
+The meadow is wide and peaceful. You leave the tower behind without regret.

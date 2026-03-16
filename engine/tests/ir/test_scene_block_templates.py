@@ -59,14 +59,14 @@ def test_block_script_template_map_round_trips() -> None:
         {
             "label": "village.intro",
             "templates": {
-                "local_only": {"obj_cls": "tangl.core.graph.node.Node"},
+                "local_only": {"kind": "tangl.core.graph.node.Node"},
             },
         }
     )
 
     assert block.templates is not None
-    assert block.templates["local_only"].obj_cls_ == Node
+    assert block.templates["local_only"].kind_ == Node
     dumped = block.model_dump()
 
     assert dumped["templates"]["local_only"]["label"] == "local_only"
-    assert dumped["templates"]["local_only"]["obj_cls"] == "tangl.core.graph.node.Node"
+    assert dumped["templates"]["local_only"]["kind"] == "tangl.core.graph.node.Node"

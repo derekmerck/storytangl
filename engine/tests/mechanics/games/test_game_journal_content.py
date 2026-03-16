@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tangl.vm import Frame, ResolutionPhase as P
-from tangl.vm.dispatch import dispatch as vm38_dispatch
+from tangl.vm.dispatch import dispatch as vm_dispatch
 from tangl.story.dispatch import story_dispatch
 from tangl.story import Block, StoryGraph as StoryGraph
 from tangl.mechanics.games import Game, HasGame
@@ -28,7 +28,7 @@ class TestGameBlock(Block, HasGame):
     """Block embedding a test game."""
 
 
-@vm38_dispatch.register(task="generate_journal", wants_caller_kind=TestGame, wants_exact_kind=False)
+@vm_dispatch.register(task="generate_journal", wants_caller_kind=TestGame, wants_exact_kind=False)
 def generate_test_game_journal(*, caller: TestGame, ctx, **kwargs):
     return "Game content"
 

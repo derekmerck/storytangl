@@ -14,7 +14,7 @@ from .svg_source_manager import SvgSourceManager
 from .svg_group import SvgGroup
 from .svg_transform import SvgTransform
 
-from tangl.media.media_creators.media_spec import MediaSpec
+from tangl.media.media_creators.media_spec import MediaResolutionClass, MediaSpec
 from tangl.journal.media import StagingHints
 
 class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
@@ -25,7 +25,7 @@ class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
 
     ```yaml
     media:
-      - obj_cls: SvgSpec
+      - kind: SvgSpec
         label: scene1/block1
         shapes: xxx
         style_dict: { override_style_info: foo }
@@ -51,6 +51,7 @@ class VectorScriptItem(BaseModel, extra="allow", arbitrary_types_allowed=True):
 
 
 class VectorSpec(MediaSpec, arbitrary_types_allowed=True):
+    resolution_class: MediaResolutionClass = MediaResolutionClass.FAST_SYNC
 
     #: registry of shapes and styles
     source_manager: SvgSourceManager = None

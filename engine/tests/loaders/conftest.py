@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag
 from tangl.story import World
 
 
@@ -13,6 +14,16 @@ def clear_world_instances() -> None:
     yield
     if callable(clear_instances):
         clear_instances()
+
+
+@pytest.fixture(autouse=True)
+def clear_media_inventory_cache() -> None:
+    clear_cache = getattr(MediaResourceInventoryTag, "clear_from_source_cache", None)
+    if callable(clear_cache):
+        clear_cache()
+    yield
+    if callable(clear_cache):
+        clear_cache()
 
 
 @pytest.fixture

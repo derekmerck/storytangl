@@ -60,10 +60,10 @@ def test_loader_discovers_bundles(tmp_path: Path) -> None:
     assert "world2" in bundles
 
 
-def test_loader_creates_runtime38_world_with_media_registry(media_mvp_path: Path) -> None:
+def test_loader_creates_runtime_world_with_media_registry(media_mvp_path: Path) -> None:
     registry = WorldRegistry([media_mvp_path.parent])
 
-    world = registry.get_world("media_mvp", runtime_version="38")
+    world = registry.get_world("media_mvp")
 
     assert world.label == "media_mvp"
     assert world.bundle is not None
@@ -100,7 +100,7 @@ def test_manifest_metadata_inheritance(tmp_path: Path) -> None:
 
     registry = WorldRegistry([tmp_path], compiler=WorldCompiler())
 
-    world = registry.get_world("my_world", runtime_version="38")
+    world = registry.get_world("my_world")
 
     assert world.metadata.get("author") == "TanglDev"
 
@@ -219,7 +219,6 @@ def test_custom_script_loader_bridge_used_when_codec_not_explicit(tmp_path: Path
     bundle = WorldBundle.load(bundle_root)
     world = WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(
         bundle,
-        runtime_version="38",
     )
 
     assert world.label == "bridge_world"
@@ -245,7 +244,6 @@ def test_explicit_codec_disables_custom_script_loader_bridge(tmp_path: Path) -> 
     with pytest.raises(Exception):
         WorldCompiler(script_compiler=_BridgeScriptCompiler()).compile(
             bundle,
-            runtime_version="38",
         )
 
 
@@ -295,9 +293,9 @@ def test_codec_merge_collisions_are_reported(tmp_path: Path) -> None:
 
 @pytest.mark.skip(
     reason=(
-        "Retired from v38 parity gate: validates runtime37 world internals "
-        "(domain_manager/resource_manager wiring). Runtime38 equivalent coverage is "
-        "provided by test_compile_anthology_runtime38_shares_world_facets."
+        "Retired from the cutover parity gate: validates runtime37 world internals "
+        "(domain_manager/resource_manager wiring). Runtime equivalent coverage is "
+        "provided by test_compile_anthology_shares_world_facets."
     )
 )
 def test_compile_anthology_shares_domain_and_media(tmp_path: Path) -> None:
@@ -378,8 +376,8 @@ class DomainCharacter(Entity):
     assert world_two.metadata["title"] == "book2"
 
 
-def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None:
-    bundle_root = tmp_path / "anthology38"
+def test_compile_anthology_shares_world_facets(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "anthology"
     scripts_dir = bundle_root / "scripts"
     media_dir = bundle_root / "media"
     scripts_dir.mkdir(parents=True)
@@ -391,7 +389,7 @@ def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None
 
     (bundle_root / "world.yaml").write_text(
         """
-        label: anthology38
+        label: anthology
         scripts:
           book1: scripts/book1.yaml
           book2: scripts/book2.yaml
@@ -419,7 +417,7 @@ def test_compile_anthology_runtime38_shares_world_facets(tmp_path: Path) -> None
     )
 
     (bundle_root / "domain").mkdir()
-    domain_pkg = bundle_root / "anthology38"
+    domain_pkg = bundle_root / "anthology"
     domain_pkg.mkdir(parents=True)
     (domain_pkg / "__init__.py").write_text("", encoding="utf-8")
     (domain_pkg / "domain.py").write_text(
@@ -435,7 +433,7 @@ class DomainCharacter(Entity):
 
     bundle = WorldBundle.load(bundle_root)
     compiler = WorldCompiler()
-    anthology = compiler.compile_anthology(bundle, runtime_version="38")
+    anthology = compiler.compile_anthology(bundle)
 
     world_one = anthology["book1"]
     world_two = anthology["book2"]
@@ -495,7 +493,7 @@ scenes: {}
 
     original_sys_path = list(sys.path)
     try:
-        world = compiler.compile(bundle, runtime_version="38")
+        world = compiler.compile(bundle)
 
         assert isinstance(world, World)
         assert world.domain is not None

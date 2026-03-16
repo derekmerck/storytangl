@@ -217,7 +217,7 @@ existing offers unchanged, or `Iterable[ProvisionOffer]` to replace them. Provis
 story-layer offer manipulation — not for generating new offer sources.
 
 **Nested discovery uses a subdispatch boundary.** Discovery helpers (`do_get_template_scope_groups`
-and `do_get_token_catalogs`) run inside `ctx.with_subdispatch()` when available. In vm38
+and `do_get_token_catalogs`) run inside `ctx.with_subdispatch()` when available. In vm
 today this pushes a fresh per-subdispatch result pipe on `PhaseCtx`, so nested dispatch
 can inspect prior handler outputs through `ctx.results` without smearing those results
 into the parent pipeline pass.
@@ -630,5 +630,5 @@ deferred until profiling identifies actual bottlenecks.
 
 ---
 
-*See also `CORE_DESIGN.md` for the timeless primitives vm38 builds on. Companion design
+*See also `CORE_DESIGN.md` for the timeless primitives vm builds on. Companion design
 notes for `tangl.story` and `tangl.service` will follow the same pattern.*

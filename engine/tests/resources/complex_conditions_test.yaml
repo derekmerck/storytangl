@@ -9,7 +9,7 @@ globals:
   door_hint: locked
 items:
   ancient_key:
-    obj_cls: tangl.story.concepts.item.Item
+    kind: tangl.story.concepts.item.Item
     name: Ancient Key
     description: A heavy iron key coated in verdigris.
 scenes:

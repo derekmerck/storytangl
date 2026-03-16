@@ -1,4 +1,4 @@
-"""Service38 user package."""
+"""Service user package."""
 
 from __future__ import annotations
 

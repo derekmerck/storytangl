@@ -1,4 +1,4 @@
-"""Replay engine implementations for vm38."""
+"""Replay engine implementations for vm."""
 
 from __future__ import annotations
 

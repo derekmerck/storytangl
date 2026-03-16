@@ -38,10 +38,7 @@ class _SystemMediaWorld:
 
 
 def _add_node(story: StoryGraph, *, kind, **attrs):
-    try:
-        return story.add_node(kind=kind, **attrs)
-    except TypeError:
-        return story.add_node(obj_cls=kind, **attrs)
+    return story.add_node(kind=kind, **attrs)
 
 
 def build_world_with_logo_media_block(world_media_dir: Path | None = None) -> MediaWorld:

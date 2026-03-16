@@ -1,0 +1,43 @@
+label: rps_tavern
+
+metadata:
+  title: "RPS Tavern"
+  description: "Challenge the bartender to Rock Paper Scissors."
+  start_at: tavern.entrance
+
+scenes:
+  tavern:
+    title: "RPS Tavern"
+    blocks:
+      entrance:
+        content: |
+          You enter a smoky tavern. The bartender eyes you suspiciously.
+        actions:
+          - text: "Challenge the bartender"
+            successor: challenge
+
+      challenge:
+        kind: "rps_tavern.domain.RpsBlock"
+        content: |
+          The bartender cracks his knuckles. "Best two out of three?"
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          The bartender grumbles and slides you a free ale.
+        actions:
+          - text: "Play again"
+            successor: entrance
+
+      defeat:
+        content: |
+          "You owe me 5 gold," the bartender smirks.
+        actions:
+          - text: "Try again"
+            successor: entrance

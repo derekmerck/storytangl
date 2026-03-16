@@ -22,7 +22,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
       - a flat-data _storage_ backend that implements `read` and `write` for str|bytes, like in-mem, files, redis, mongodb
     """
 
-    obj_cls_map: ClassVar[dict[ClassName, Type[HasUid]]] = dict()
+    kind_map: ClassVar[dict[ClassName, Type[HasUid]]] = dict()
 
     def __init__(self,
                  structuring: StructuringHandlerProtocol = None,
@@ -51,7 +51,7 @@ class PersistenceManager(Mapping[UUID, HasUid]):
             unstructured = flat
 
         if self.structuring:
-            structured = self.structuring.structure( unstructured, self.obj_cls_map )
+            structured = self.structuring.structure(unstructured, self.kind_map)
         else:
             structured = unstructured
 
@@ -59,8 +59,8 @@ class PersistenceManager(Mapping[UUID, HasUid]):
 
     def save(self, structured: HasUid):
         # stash the incoming classes
-        if structured.__class__.__name__ not in self.obj_cls_map:
-            self.obj_cls_map[structured.__class__.__name__] = structured.__class__
+        if structured.__class__.__name__ not in self.kind_map:
+            self.kind_map[structured.__class__.__name__] = structured.__class__
 
         if self.structuring:
             unstructured = self.structuring.unstructure( structured )

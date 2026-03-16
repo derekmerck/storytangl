@@ -15,7 +15,7 @@ MediaItemScript = BaseScriptItem
 class ActorScript(BaseScriptItem):
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story import Actor
         return Actor
@@ -41,7 +41,7 @@ class ActorScript(BaseScriptItem):
 class RoleScript(BaseScriptItem):
 
     @classmethod
-    def get_default_obj_cls(cls) -> Type[Entity]:
+    def get_default_kind(cls) -> Type[Entity]:
         # Keep this import out of the main scope
         from tangl.story import Role
         return Role

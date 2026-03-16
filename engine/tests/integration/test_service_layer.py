@@ -32,11 +32,11 @@ class _InMemoryPersistence:
         return self._store.get(key, default)
 
 
-def _story38_script() -> dict[str, Any]:
+def _story_script() -> dict[str, Any]:
     return {
-        "label": "integration_world38",
+        "label": "integration_world",
         "metadata": {
-            "title": "Integration Story38",
+            "title": "Integration Story",
             "author": "tests",
             "start_at": "intro.start",
         },
@@ -73,14 +73,14 @@ def _create_story_session() -> tuple[Orchestrator, _InMemoryPersistence, User, L
         persist_paths=("details.ledger",),
     )
 
-    world = World.from_script_data(script_data=_story38_script())
+    world = World.from_script_data(script_data=_story_script())
     created = orchestrator.execute(
         "RuntimeController.create_story",
         user_id=user.uid,
         world_id=world.label,
         world=world,
         init_mode=InitMode.EAGER.value,
-        story_label="integration_story38",
+        story_label="integration_story",
     )
 
     created_ledger = (created.details or {}).get("ledger")
@@ -90,7 +90,7 @@ def _create_story_session() -> tuple[Orchestrator, _InMemoryPersistence, User, L
     return orchestrator, persistence, user, persisted_ledger
 
 
-def test_story38_choice_resolution_flow() -> None:
+def test_story_choice_resolution_flow() -> None:
     orchestrator, persistence, user, ledger = _create_story_session()
 
     old_cursor = ledger.cursor_id
@@ -126,7 +126,7 @@ def test_story38_choice_resolution_flow() -> None:
     assert media_fragments
 
 
-def test_story38_read_endpoint_does_not_persist() -> None:
+def test_story_read_endpoint_does_not_persist() -> None:
     orchestrator, persistence, user, _ = _create_story_session()
     saves_before = len(persistence.saved_payloads)
 

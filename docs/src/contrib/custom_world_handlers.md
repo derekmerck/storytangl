@@ -1,6 +1,6 @@
 # Custom World Runtime Hooks
 
-StoryTangl story38 no longer exposes the old ``fabula.materialize`` phase bus.
+StoryTangl story no longer exposes the old ``fabula.materialize`` phase bus.
 World-specific behavior now plugs in through explicit world and runtime hooks,
 which keeps materialization passes deterministic and makes extension points
 easier to see in code review.
@@ -83,5 +83,5 @@ world = World.from_script_data(
 3. Use ``frame.local_behaviors`` or ``ledger.local_behaviors`` for short-lived
    experiments and test overrides rather than adding new global handlers.
 4. Treat the old materialize-task docs and ``MaterializationContext`` examples as
-   retired. The current story38 materializer is organized as explicit passes, not
+   retired. The current story materializer is organized as explicit passes, not
    a public per-phase dispatch bus.

@@ -1,10 +1,13 @@
 
 from tangl.media import MediaSpec
+from tangl.media.media_creators.media_spec import MediaResolutionClass
 
 class TtsSpec(MediaSpec):
     """
     Spec for voice-over dialog and narration
     """
+
+    resolution_class: MediaResolutionClass = MediaResolutionClass.ASYNC
 
     text: str = None           # text to read
     voice_kws: str = None      # baseline enthusiasm etc.
@@ -16,6 +19,6 @@ class TtsSpec(MediaSpec):
     speaker_model: str = None  # character voice in api namespace
 
     @classmethod
-    def get_creator_service(cls):
+    def get_creation_service(cls):
         from .tts_forge import TtsForge
         return TtsForge()

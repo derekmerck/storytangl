@@ -4,10 +4,12 @@ from typing import Any, ClassVar
 from pydantic import ConfigDict, model_validator, Field
 
 from tangl.type_hints import Identifier
+from tangl.core import EntityTemplate
 from tangl.vm import Dependency, ProvisionPolicy, Requirement
 from tangl.media.type_hints import Media
 from tangl.media.media_creators.media_spec import MediaSpec
-from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
+from tangl.utils.sanitize_str import sanitize_str
+from .media_resource_inv_tag import MediaRITStatus, MediaResourceInventoryTag as MediaRIT
 
 # todo: probably want a media requirement subclass, then use that in a dependency and affordance subclass, media affordances are pre-decided media objects that can be attached as appropriate, first time you see a char etc.
 
@@ -41,8 +43,14 @@ class MediaDep(Dependency[MediaRIT]):
         media_scope = payload.get("scope")
         media_data = payload.get("media_data")
         media_spec = payload.get("media_spec")
+        explicit_policy = "provision_policy" in payload or "policy" in payload
         hard = bool(payload.pop("hard_requirement", payload.pop("hard", False)))
-        policy_value = payload.pop("provision_policy", payload.pop("policy", ProvisionPolicy.EXISTING))
+        default_policy = (
+            ProvisionPolicy.ANY
+            if media_spec is not None or media_data is not None
+            else ProvisionPolicy.EXISTING
+        )
+        policy_value = payload.pop("provision_policy", payload.pop("policy", default_policy))
 
         requirement_kwargs: dict[str, Any] = {
             "has_kind": MediaRIT,
@@ -63,15 +71,28 @@ class MediaDep(Dependency[MediaRIT]):
             requirement_kwargs["has_tags"] = {f"scope:{media_scope}"}
 
         if media_data is not None:
-            requirement_kwargs["fallback_templ"] = MediaRIT(
-                data=media_data,
-                data_type=payload.get("data_type"),
+            requirement_kwargs["fallback_templ"] = EntityTemplate(
+                payload={
+                    "kind": MediaRIT,
+                    "data": media_data,
+                    "data_type": payload.get("data_type"),
+                    "label": payload.get("label") or payload.get("media_role") or "media",
+                },
             )
 
         if media_spec is not None:
-            payload.setdefault("script_spec", media_spec)
+            if not isinstance(media_spec, MediaSpec):
+                media_spec = MediaSpec.from_authoring(media_spec)
+                payload["media_spec"] = media_spec
+            requirement_kwargs["media_spec"] = media_spec
+            requirement_kwargs["media_ref_id"] = payload.get("predecessor_id")
+            basename = payload.get("label") or payload.get("media_role") or "media"
+            requirement_kwargs["media_basename"] = sanitize_str(str(basename)).strip("_") or "media"
+            if not explicit_policy:
+                requirement_kwargs["provision_policy"] = ProvisionPolicy.ANY
             payload.setdefault("realized_spec", None)
             payload.setdefault("final_spec", None)
+            payload.setdefault("script_spec", media_spec.normalized_spec_payload())
 
         payload["requirement"] = Requirement(**requirement_kwargs)
         return payload
@@ -86,3 +107,13 @@ class MediaDep(Dependency[MediaRIT]):
     script_spec: dict[str, Any] | None = None
     realized_spec: dict[str, Any] | None = None
     final_spec: dict[str, Any] | None = None
+
+    @property
+    def render_ready(self) -> bool:
+        """Return ``True`` when the dependency is satisfied by a resolved provider."""
+        if not self.satisfied:
+            return False
+        return (
+            self.provider is not None
+            and getattr(self.provider, "status", MediaRITStatus.RESOLVED) == MediaRITStatus.RESOLVED
+        )
