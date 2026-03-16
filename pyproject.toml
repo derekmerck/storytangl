@@ -70,7 +70,7 @@ linkify-it-py = {version="^2.0.3", optional=true}
 # These are what pip install storytangl[extras] uses
 server = ["fastapi", "uvicorn", "cmd2", "redis", "pymongo"]
 cli = ["cmd2"]
-docs = ["sphinx", "myst-parser", "furo", "sphinx-markdown-builder", "linkify-it-py"]
+docs = ["sphinx", "myst-parser", "furo", "sphinx-markdown-builder", "linkify-it-py", "fastapi"]
 
 [tool.poetry.group.dev.dependencies]
 # parsing
