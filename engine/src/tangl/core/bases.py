@@ -79,13 +79,13 @@ Core only defines step (1).
 
 ## Where to look next
 
-- `core38.selector` for matching.
-- `vm38.provision.requirement` for satisfaction and provisioning contracts.
-- `core38.registry` for registry ownership and grouping.
-- `core38.template` for the authoring loop (compile/decompile + materialize).
-- `core38.entity.Entity` for the default composition (`Unstructurable + HasIdentity`).
-- `core38.behavior`, `core38.dispatch` for hookable behaviors and receipts.
-- `vm38.traversable` for VM-specific `HasAvailability` and `HasEffects` traits.
+- `core.selector` for matching.
+- `vm.provision.requirement` for satisfaction and provisioning contracts.
+- `core.registry` for registry ownership and grouping.
+- `core.template` for the authoring loop (compile/decompile + materialize).
+- `core.entity.Entity` for the default composition (`Unstructurable + HasIdentity`).
+- `core.behavior`, `core.dispatch` for hookable behaviors and receipts.
+- `vm.traversable` for VM-specific `HasAvailability` and `HasEffects` traits.
 
 The :func:`is_identifier` symbol in this module is a decorator utility, not a trait.
 

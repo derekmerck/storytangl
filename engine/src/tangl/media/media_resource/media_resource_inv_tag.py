@@ -120,8 +120,9 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
 
     @model_validator(mode="after")
     def _validate_required_source(self):
+        status = getattr(self, "status", MediaRITStatus.RESOLVED)
         if (
-            self.status == MediaRITStatus.RESOLVED
+            status == MediaRITStatus.RESOLVED
             and self.data is None
             and self.path is None
             and self.preset_content_hash is None
@@ -131,7 +132,8 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
 
     @model_validator(mode="after")
     def _set_data_type(self):
-        if self.status != MediaRITStatus.RESOLVED and self.data_type is None:
+        status = getattr(self, "status", MediaRITStatus.RESOLVED)
+        if status != MediaRITStatus.RESOLVED and self.data_type is None:
             return self
         if not self.data_type:
             if self.path:
@@ -147,7 +149,8 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
         preset_hash = getattr(self, "preset_content_hash", None)
         if preset_hash is not None:
             return preset_hash
-        if self.status != MediaRITStatus.RESOLVED:
+        status = getattr(self, "status", MediaRITStatus.RESOLVED)
+        if status != MediaRITStatus.RESOLVED:
             raise ValueError("Pending media does not have a content hash yet")
         return super().content_hash()
 
@@ -167,20 +170,20 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
 
     @is_identifier
     def get_adapted_spec_hash(self) -> str | None:
-        return self.adapted_spec_hash
+        return getattr(self, "adapted_spec_hash", None)
 
     @is_identifier
     def get_spec_fingerprint(self) -> str | None:
-        return self.adapted_spec_hash
+        return getattr(self, "adapted_spec_hash", None)
 
     @is_identifier
     def get_execution_spec_hash(self) -> str | None:
-        return self.execution_spec_hash
+        return getattr(self, "execution_spec_hash", None)
 
     @property
     def spec_fingerprint(self) -> str | None:
         """Compatibility alias for the old Phase 1 fingerprint field."""
-        return self.adapted_spec_hash
+        return getattr(self, "adapted_spec_hash", None)
 
     @spec_fingerprint.setter
     def spec_fingerprint(self, value: str | None) -> None:
@@ -197,7 +200,8 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
 
     def has_expired(self, *args, **kwargs) -> bool:
         # for matching `find(expired=True)`
-        return self.expiry < datetime.now()
+        expiry = getattr(self, "expiry", None)
+        return expiry is not None and expiry < datetime.now()
 
     # this is to avoid recomputing hash values for static inventories
     # todo: should change it to cache the value keyed on (fn, mdate, size)

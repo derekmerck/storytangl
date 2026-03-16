@@ -17,13 +17,13 @@ from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 from tangl.vm.runtime.ledger import Ledger
 
 
-def _write_story38_bundle(root: Path) -> str:
-    world_dir = root / "story38_demo"
+def _write_story_bundle(root: Path) -> str:
+    world_dir = root / "story_demo"
     world_dir.mkdir()
     (world_dir / "world.yaml").write_text(
         "\n".join(
             [
-                "label: story38_demo",
+                "label: story_demo",
                 "scripts: script.yaml",
             ]
         ),
@@ -32,9 +32,9 @@ def _write_story38_bundle(root: Path) -> str:
     (world_dir / "script.yaml").write_text(
         "\n".join(
             [
-                "label: story38_demo",
+                "label: story_demo",
                 "metadata:",
-                "  title: Story38 Demo",
+                "  title: Story Demo",
                 "  author: Tests",
                 "  start_at: intro.start",
                 "scenes:",
@@ -51,12 +51,12 @@ def _write_story38_bundle(root: Path) -> str:
         ),
         encoding="utf-8",
     )
-    return "story38_demo"
+    return "story_demo"
 
 
 @pytest.fixture()
-def story38_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str], str]:
-    world_label = _write_story38_bundle(tmp_path)
+def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str], str]:
+    world_label = _write_story_bundle(tmp_path)
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
     reset_orchestrator_for_testing()
@@ -76,14 +76,14 @@ def story38_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, s
         reset_orchestrator_for_testing()
 
 
-def test_story38_rest_envelope_flow(
-    story38_client: tuple[TestClient, dict[str, str], str],
+def test_story_rest_envelope_flow(
+    story_client: tuple[TestClient, dict[str, str], str],
     monkeypatch,
 ) -> None:
-    client, headers, world_label = story38_client
+    client, headers, world_label = story_client
 
     create = client.post(
-        "story/story38/create",
+        "story/story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -105,7 +105,7 @@ def test_story38_rest_envelope_flow(
     choice = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
     choice_id = str(choice.uid)
 
-    update = client.get("story/story38/update", headers=headers)
+    update = client.get("story/update", headers=headers)
     assert update.status_code == 200
     envelope = update.json()
     assert isinstance(envelope.get("fragments"), list)
@@ -122,7 +122,7 @@ def test_story38_rest_envelope_flow(
 
     payload = {"move": "knight", "to": "b6"}
     do = client.post(
-        "story/story38/do",
+        "story/do",
         json={"choice_id": choice_id, "payload": payload},
         headers=headers,
     )
@@ -133,25 +133,25 @@ def test_story38_rest_envelope_flow(
     assert captured.get("edge_id") == choice.uid
     assert captured.get("choice_payload") == payload
 
-    status = client.get("story/story38/status", headers=headers)
+    status = client.get("story/info", headers=headers)
     assert status.status_code == 200
     status_payload = status.json()
     assert status_payload.get("status") == "ok"
     assert status_payload.get("choice_steps", 0) >= 1
 
-    drop = client.delete("story/story38/drop", headers=headers)
+    drop = client.delete("story/drop", headers=headers)
     assert drop.status_code == 200
     dropped = drop.json()
     assert dropped.get("status") == "ok"
     assert dropped.get("dropped_ledger_id")
 
 
-def test_story38_status_returns_403_when_endpoint_is_restricted_for_non_privileged_user(
-    story38_client: tuple[TestClient, dict[str, str], str],
+def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(
+    story_client: tuple[TestClient, dict[str, str], str],
 ) -> None:
-    client, headers, world_label = story38_client
+    client, headers, world_label = story_client
     create = client.post(
-        "story/story38/create",
+        "story/story/create",
         params={"world_id": world_label, "init_mode": "EAGER"},
         headers=headers,
     )
@@ -162,7 +162,7 @@ def test_story38_status_returns_403_when_endpoint_is_restricted_for_non_privileg
     previous_level = binding.endpoint.access_level
     binding.endpoint.access_level = AccessLevel.RESTRICTED
     try:
-        response = client.get("story/story38/status", headers=headers)
+        response = client.get("story/info", headers=headers)
         assert response.status_code == 403
         detail = response.json().get("detail", "")
         assert "Access denied" in detail

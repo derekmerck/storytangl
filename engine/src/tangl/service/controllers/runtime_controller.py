@@ -188,7 +188,7 @@ class RuntimeController(HasApiEndpoints):
         story_media_root: Path | None = None,
         system_media_root: Path | None = None,
     ) -> BaseFragment:
-        """Convert vm38 journal records into legacy-compatible BaseFragment payloads."""
+        """Convert runtime journal records into legacy-compatible BaseFragment payloads."""
         if isinstance(fragment, MediaFragment):
             media_payload = media_fragment_to_payload(
                 fragment,
@@ -429,7 +429,7 @@ class RuntimeController(HasApiEndpoints):
     )
     def create_story(self, user: User, world_id: str, **kwargs: Any) -> RuntimeInfo:
         """Create a story graph and bootstrap a runtime ledger for ``user``."""
-        import tangl.story  # noqa: F401  # ensure story-level vm38 hooks are registered
+        import tangl.story  # noqa: F401  # ensure story-level hooks are registered
 
         world = kwargs.pop("world", None)
         if world is None:
@@ -558,7 +558,7 @@ class RuntimeController(HasApiEndpoints):
         start_marker: str | None = None,
         end_marker: str | None = None,
     ) -> list[BaseFragment]:
-        """Legacy endpoint shape that returns the latest vm38 fragments as BaseFragment items."""
+        """Legacy endpoint shape that returns the latest runtime fragments as BaseFragment items."""
         _ = (marker, marker_type, start_marker, end_marker)
         if current_only:
             fragments = list(ledger.get_journal())

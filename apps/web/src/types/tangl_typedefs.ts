@@ -45,12 +45,16 @@ export type JournalMediaItems = JournalMediaItem[]
 export type JournalMediaDict = Partial<Record<MediaRole, JournalMediaItem>>
 
 /**
- * Summary of runtime evaluations returned by diagnostics endpoints.
+ * Runtime acknowledgement and story-session summary payloads returned by the API.
  */
 export interface RuntimeInfo {
-  expr: string
-  result: string
-  errors?: string
+  status: string
+  code?: string | null
+  message?: string | null
+  cursor_id?: string | null
+  step?: number | null
+  details?: Record<string, unknown> | null
+  [key: string]: unknown
 }
 
 /**
@@ -183,6 +187,6 @@ export interface JournalKVItem {
 }
 
 export type JournalEntry = JournalStoryUpdate[]
-export type StoryStatus = JournalKVItem[]
+export type StoryStatus = JournalKVItem[] | RuntimeInfo
 export type WorldSceneList = JournalKVItem[]
 export type WorldList = JournalKVItem[]

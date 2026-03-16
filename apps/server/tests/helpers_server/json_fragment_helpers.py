@@ -6,7 +6,9 @@ def extract_choices_from_fragments(fragments: list[dict]) -> list[dict]:
 
     def _normalize(choice: dict) -> dict:
         normalized = dict(choice)
-        if "source_id" in normalized:
+        if "edge_id" in normalized:
+            normalized["uid"] = normalized["edge_id"]
+        elif "source_id" in normalized:
             normalized["uid"] = normalized["source_id"]
         elif "uid" in normalized:
             normalized["uid"] = normalized["uid"]
@@ -22,4 +24,3 @@ def extract_choices_from_fragments(fragments: list[dict]) -> list[dict]:
             choices.append(_normalize(fragment))
 
     return choices
-

@@ -12,7 +12,7 @@ from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompi
 
 
 class _WorldDomainFacet:
-    """Lightweight world-domain facet for runtime-38 world assembly."""
+    """Lightweight world-domain facet for world assembly."""
 
     def __init__(self) -> None:
         from tangl.core import BehaviorRegistry
@@ -50,7 +50,7 @@ class _WorldDomainFacet:
 
 
 class _WorldAssetsFacet:
-    """Lightweight assets facet placeholder for runtime-38 world assembly."""
+    """Lightweight assets facet placeholder for world assembly."""
 
     def __init__(self) -> None:
         self.values: dict[str, Any] = {}
@@ -75,21 +75,11 @@ class WorldCompiler:
         self.story_compiler = story_compiler or StoryCompiler()
         self.codec_registry = codec_registry or CodecRegistry()
 
-    @staticmethod
-    def _require_runtime38(runtime_version: str) -> None:
-        if runtime_version != "38":
-            raise ValueError(
-                "Only runtime_version='38' is supported after legacy runtime retirement."
-            )
-
     def compile(
         self,
         bundle: WorldBundle,
         story_key: str | None = None,
-        *,
-        runtime_version: str = "38",
     ) -> World:
-        self._require_runtime38(runtime_version)
         base_metadata = bundle.manifest.metadata.copy()
 
         decode_result = self._decode_story_data(bundle=bundle, story_key=story_key)
@@ -109,7 +99,7 @@ class WorldCompiler:
             default_title = bundle.manifest.story_label(story_key)
         script_metadata.setdefault("title", default_title)
 
-        domain_facet, assets_facet, resources_facet = self._build_world38_facets(bundle)
+        domain_facet, assets_facet, resources_facet = self._build_world_facets(bundle)
         story_bundle = self.story_compiler.compile(
             script_data,
             source_map=decode_result.source_map,
@@ -129,10 +119,7 @@ class WorldCompiler:
     def compile_anthology(
         self,
         bundle: WorldBundle,
-        *,
-        runtime_version: str = "38",
     ) -> dict[str, World]:
-        self._require_runtime38(runtime_version)
         if not bundle.manifest.is_anthology:
             msg = f"{bundle.manifest.label} is not an anthology"
             raise ValueError(msg)
@@ -140,10 +127,10 @@ class WorldCompiler:
         base_metadata = bundle.manifest.metadata.copy()
 
         (
-            world38_domain_facet,
-            world38_assets_facet,
-            world38_resources_facet,
-        ) = self._build_world38_facets(bundle)
+            world_domain_facet,
+            world_assets_facet,
+            world_resources_facet,
+        ) = self._build_world_facets(bundle)
 
         worlds: dict[str, World] = {}
         for story_key in bundle.manifest.story_keys():
@@ -173,16 +160,16 @@ class WorldCompiler:
             world = World(
                 label=bundle.manifest.story_label(story_key),
                 bundle=story_bundle,
-                domain=world38_domain_facet,
+                domain=world_domain_facet,
                 templates=story_bundle.template_registry,
-                assets=world38_assets_facet,
-                resources=world38_resources_facet,
+                assets=world_assets_facet,
+                resources=world_resources_facet,
             )
             worlds[story_key] = world
 
         return worlds
 
-    def _build_world38_facets(
+    def _build_world_facets(
         self,
         bundle: WorldBundle,
     ) -> tuple[Any | None, Any | None, Any]:

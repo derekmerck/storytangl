@@ -1,4 +1,4 @@
-# tangl/vm38/runtime/frame.py
+# tangl/vm/runtime/frame.py
 """Ephemeral traversal driver for the VM phase pipeline.
 
 A Frame drives one ``resolve_choice`` call: a sequence of ``follow_edge`` steps
@@ -36,7 +36,7 @@ If PREREQS or POSTREQS returns an edge, ``follow_edge`` returns it and
 JOURNAL Mutation Policy
 -----------------------
 JOURNAL handlers are expected to primarily emit records. UPDATE/FINALIZE remain
-the canonical mutation phases. If JOURNAL mutates graph state, vm38 logs a
+the canonical mutation phases. If JOURNAL mutates graph state, vm logs a
 debug diagnostic so authors can audit and decide whether to move that logic or
 emit explicit annotation records.
 
@@ -145,7 +145,7 @@ class PhaseCtx:
     Implements
     ----------
     :class:`tangl.vm.ctx.VmPhaseCtx`
-        Protocol consumed by vm38 phase handlers and resolver helpers.
+        Protocol consumed by vm phase handlers and resolver helpers.
     """
 
     graph: Graph

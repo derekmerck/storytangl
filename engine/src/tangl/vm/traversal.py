@@ -1,4 +1,4 @@
-# tangl/vm38/traversal.py
+# tangl/vm/traversal.py
 """Pure traversal queries over cursor history and call stack.
 
 All functions are pure — they take immutable data (lists of UUIDs) and

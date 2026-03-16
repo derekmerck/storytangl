@@ -110,10 +110,10 @@ For a deeper treatment of the conceptual foundations, see
 storytangl/
 ├── engine/
 │   ├── src/tangl/              # Core engine package
-│   │   ├── core38/             # Timeless primitives: entity, graph, dispatch
-│   │   ├── vm38/               # Temporal evolution: frame, phases, provisioning
-│   │   ├── story38/            # Narrative semantics: episodes, concepts, journal
-│   │   ├── service38/          # Lifecycle: gateway, orchestrator, controllers
+│   │   ├── core/               # Timeless primitives: entity, graph, dispatch
+│   │   ├── vm/                 # Temporal evolution: frame, phases, provisioning
+│   │   ├── story/              # Narrative semantics: episodes, concepts, journal
+│   │   ├── service/            # Lifecycle: gateway, orchestrator, controllers
 │   │   ├── persistence/        # Storage abstraction across backends
 │   │   └── design/             # Project-wide design documentation
 │   └── tests/                  # Test suite mirroring src/ structure
@@ -132,10 +132,10 @@ These are the authoritative references for how each layer works:
 
 | Layer | Design Docs | Scope |
 |-------|-------------|-------|
-| **core38** | `CORE_DESIGN.md` | Entity, graph, dispatch, templates, serialization |
-| **vm38** | `VM_DESIGN.md` | Phases, provisioning, namespace, traversal, replay |
-| **story38** | `design/` | Fabula compilation, journal, concepts, choices |
-| **service38** | `design/` | Gateway, orchestrator, response envelopes |
+| **core** | `CORE_DESIGN.md` | Entity, graph, dispatch, templates, serialization |
+| **vm** | `VM_DESIGN.md` | Phases, provisioning, namespace, traversal, replay |
+| **story** | `design/` | Fabula compilation, journal, concepts, choices |
+| **service** | `design/` | Gateway, orchestrator, response envelopes |
 
 ---
 
@@ -170,8 +170,8 @@ poetry run pytest
 
 # Individual layers
 poetry run pytest engine/tests/core
-poetry run pytest engine/tests/vm38
-poetry run pytest engine/tests/story38
+poetry run pytest engine/tests/vm
+poetry run pytest engine/tests/story
 
 # With coverage
 poetry run pytest --cov=tangl --cov-report=html

@@ -145,7 +145,7 @@ class GatewayHooks:
             operation: ServiceOperation,
             **_: Any,
         ) -> dict[str, Any]:
-            if operation != ServiceOperation.STORY38_CREATE:
+            if operation != ServiceOperation.STORY_CREATE:
                 return params
             init_mode = params.get("init_mode")
             if isinstance(init_mode, str):

@@ -15,7 +15,7 @@ from tangl.vm import VmPhaseCtx as Context, Frame, ResolutionPhase as P
 pytestmark = pytest.mark.skip(
     reason=(
         "Retired from v38 parity gate: this integration depends on legacy v37 "
-        "phase-runner/media-dependency mechanics rather than vm38 contract behavior."
+        "phase-runner/media-dependency mechanics rather than vm contract behavior."
     )
 )
 

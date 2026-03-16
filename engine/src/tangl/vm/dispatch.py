@@ -1,4 +1,4 @@
-# tangl/vm38/dispatch.py
+# tangl/vm/dispatch.py
 """Phase bus hooks for the VM pipeline.
 
 This module provides the registration (``on_*``) and execution (``do_*``) surface
@@ -206,7 +206,7 @@ def do_provision(caller, *, ctx, **kwargs) -> None:
     results = CallReceipt.gather_results(*_run_task("provision_node", caller=caller, ctx=ctx, **kwargs))
     if results:
         raise TypeError(
-            "provision_node handlers must return None; non-None planning receipts are not supported in vm38"
+            "provision_node handlers must return None; non-None planning receipts are not supported in vm"
         )
     return None
 

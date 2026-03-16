@@ -1,4 +1,4 @@
-"""Interactive StoryTangl CLI wired through the service38 gateway."""
+"""Interactive StoryTangl CLI wired through the service gateway."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from tangl.service.operations import endpoint_for_operation
 
 
 class StoryTanglCLI(cmd2.Cmd):
-    """Cmd2 shell that delegates operations to service38."""
+    """Cmd2 shell that delegates operations to the service gateway."""
 
     prompt = "⅁$ "
 

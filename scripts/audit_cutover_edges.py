@@ -44,14 +44,6 @@ LEGACY_IMPORT_PREFIXES = (
     "tangl.service.service_manager_abc",
 )
 
-NAMESPACE38_PREFIXES = (
-    "tangl.core38",
-    "tangl.vm38",
-    "tangl.story38",
-    "tangl.service38",
-)
-
-
 @dataclass(frozen=True)
 class ImportEdge:
     path: str
@@ -143,10 +135,6 @@ def _is_legacy_import(module: str) -> bool:
     return _has_prefix(module, LEGACY_IMPORT_PREFIXES)
 
 
-def _is_38_namespace(module: str) -> bool:
-    return _has_prefix(module, NAMESPACE38_PREFIXES)
-
-
 def _is_ir_bridge(edge: ImportEdge) -> bool:
     if edge.module == "tangl.core.factory" or edge.module.startswith("tangl.core.factory."):
         return True
@@ -208,16 +196,12 @@ def main() -> int:
     bypass_imports: list[ImportEdge] = []
     intentional_bridges: list[ImportEdge] = []
     postswap_legacy_imports: list[ImportEdge] = []
-    postswap_38_imports: list[ImportEdge] = []
 
     for edge in all_edges:
         source_is_transitional = _is_transitional_source(edge.path)
 
         if _is_ir_bridge(edge) and not source_is_transitional:
             ir_bridge.append(edge)
-
-        if _is_38_namespace(edge.module):
-            postswap_38_imports.append(edge)
 
         if source_is_transitional:
             continue
@@ -241,7 +225,6 @@ def main() -> int:
         _report_block("Intentional bridges", intentional_bridges)
     if args.mode == "post-swap":
         _report_block("Post-swap disallowed legacy imports", postswap_legacy_imports)
-        _report_block("Post-swap disallowed *38 imports", postswap_38_imports)
 
     report = {
         "mode": args.mode,
@@ -249,7 +232,6 @@ def main() -> int:
         "bypass_imports": [asdict(edge) for edge in bypass_imports],
         "intentional_bridges": [asdict(edge) for edge in intentional_bridges],
         "postswap_legacy_imports": [asdict(edge) for edge in postswap_legacy_imports],
-        "postswap_38_imports": [asdict(edge) for edge in postswap_38_imports],
     }
 
     if args.json_out:
@@ -271,9 +253,9 @@ def main() -> int:
             f"Post-swap legacy imports present: {len(postswap_legacy_imports)}"
         )
     if args.mode == "post-swap" and intentional_bridges:
-        violations.append(f"Intentional bridge allowlist entries still active: {len(intentional_bridges)}")
-    if args.mode == "post-swap" and postswap_38_imports:
-        violations.append(f"Post-swap *38 imports present: {len(postswap_38_imports)}")
+        violations.append(
+            f"Intentional bridge allowlist entries still active: {len(intentional_bridges)}"
+        )
 
     if violations:
         print("\nCutover audit failed:")

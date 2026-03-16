@@ -14,7 +14,7 @@ import random
 from pydantic import Field
 
 from tangl.journal.content import ContentFragment
-from tangl.vm.dispatch import dispatch as vm38_dispatch
+from tangl.vm.dispatch import dispatch as vm_dispatch
 
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord
@@ -326,7 +326,7 @@ def _round_journal_fragments(
     return fragments
 
 
-@vm38_dispatch.register(
+@vm_dispatch.register(
     task="generate_journal",
     wants_caller_kind=RpsGame,
     wants_exact_kind=False,
@@ -347,7 +347,7 @@ def rps_generate_journal(
     return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
 
 
-@vm38_dispatch.register(
+@vm_dispatch.register(
     task="generate_journal",
     wants_caller_kind=RpslsGame,
     wants_exact_kind=False,

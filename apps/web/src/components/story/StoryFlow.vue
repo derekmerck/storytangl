@@ -119,7 +119,7 @@ const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => 
     if (current === null) {
       counter += 1
       current = {
-        uid: `vm38-${counter}`,
+        uid: `story-${counter}`,
         text: '',
         actions: [],
         media: [],

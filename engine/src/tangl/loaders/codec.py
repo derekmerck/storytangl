@@ -78,7 +78,7 @@ class NearNativeYamlCodec:
     ---
     Near-native YAML is already very close to runtime schema, so this codec is
     intentionally minimal: it merges script files and carries file-level source
-    references. This keeps the path easy to reason about while story38 contracts
+    references. This keeps the path easy to reason about while story contracts
     are still evolving.
     """
 

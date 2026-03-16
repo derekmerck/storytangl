@@ -1,4 +1,4 @@
-# tangl/vm38/system_handlers.py
+# tangl/vm/system_handlers.py
 """Default system-layer handlers for the VM phase pipeline.
 
 This module registers the baseline behaviors that make the pipeline functional

@@ -563,8 +563,8 @@ authors a consistent inheritance ladder to extend.
 | Template payload | Flattened fields | Separate `payload: Entity` | Clean separation of wrapper and content |
 | Ordered slicing | Seq-specific markers | Sort-key-generic `get_slice` | Composable with arbitrary orderings |
 | Token reference | `label` (overloaded) | `token_from` (separate) | Distinct identity vs. reference |
-| Token provisioner | `TokenFactory` in core | `TokenProvisioner` in vm38 | Provisioning is context-aware; core is timeless |
-| Availability/Effects | `HasAvailability`, `HasEffects` in core | `HasAvailability`, `HasEffects`, `TraversableEffect` in vm38 | Phase vocabulary belongs at VM layer |
+| Token provisioner | `TokenFactory` in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
+| Availability/Effects | `HasAvailability`, `HasEffects` in core | `HasAvailability`, `HasEffects`, `TraversableEffect` in vm | Phase vocabulary belongs at VM layer |
 | Behavior API | `add_behavior` / `dispatch` | `register` / `execute_all` | Clearer verbs; ctx-aware chaining |
 | Dispatch layers | `HandlerPriority` / `HandlerLayer` | `Priority` / `DispatchLayer` | Simplified naming |
 | Duplicate guard | Registry.add raises | Silent overwrite | Fewer add-paths reduce double-add risk |

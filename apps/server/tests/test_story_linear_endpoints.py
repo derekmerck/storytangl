@@ -66,15 +66,19 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
     fragments = payload["fragments"]
     assert _fragment_contains(fragments, "You begin your journey at dawn.")
 
-    choices = payload["choices"]
-    assert choices == extract_choices_from_fragments(fragments)
+    choices = extract_choices_from_fragments(fragments)
     assert choices, "Expected an initial choice to be available"
 
     first_choice = choices[0].get("uid") or choices[0].get("source_id")
     resolve_first = client.post("story/do", json={"choice_id": first_choice}, headers=headers)
     assert resolve_first.status_code == 200
+    first_step = resolve_first.json()["step"]
 
-    update_two = client.get("story/update", headers=headers)
+    update_two = client.get(
+        "story/update",
+        params={"since_step": first_step},
+        headers=headers,
+    )
     assert update_two.status_code == 200
     payload_two = update_two.json()
     fragments_two = payload_two["fragments"]
@@ -83,20 +87,24 @@ def test_linear_story_rest_flow(linear_story_client: tuple[TestClient, dict[str,
         "The path winds through ancient woods.",
     )
 
-    choices_two = payload_two["choices"]
-    assert choices_two == extract_choices_from_fragments(fragments_two)
+    choices_two = extract_choices_from_fragments(fragments_two)
     assert choices_two, "Expected a continuation choice after the middle block"
 
     second_choice = choices_two[0].get("uid") or choices_two[0].get("source_id")
     resolve_second = client.post("story/do", json={"choice_id": second_choice}, headers=headers)
     assert resolve_second.status_code == 200
+    second_step = resolve_second.json()["step"]
 
-    update_three = client.get("story/update", headers=headers)
+    update_three = client.get(
+        "story/update",
+        params={"since_step": second_step},
+        headers=headers,
+    )
     assert update_three.status_code == 200
     payload_three = update_three.json()
     fragments_three = payload_three["fragments"]
     assert _fragment_contains(fragments_three, "You arrive at the village.")
-    assert payload_three["choices"] == []
+    assert extract_choices_from_fragments(fragments_three) == []
 
 
 def test_linear_story_update_supports_html_render_profile(
@@ -127,7 +135,7 @@ def test_linear_story_do_supports_html_render_profile(
 
     update = client.get("story/update", headers=headers)
     assert update.status_code == 200
-    first_choice = update.json()["choices"][0].get("uid")
+    first_choice = extract_choices_from_fragments(update.json()["fragments"])[0].get("uid")
     assert first_choice is not None
 
     resolve = client.post(

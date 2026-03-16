@@ -11,7 +11,7 @@ from tangl.ir.core_ir.base_script_model import BaseScriptItem
 pytestmark = pytest.mark.skip(
     reason=(
         "Legacy-only HierarchicalTemplate parent/path semantics; v38 parity is covered by "
-        "core38 template admission_scope tests."
+        "core template admission_scope tests."
     )
 )
 

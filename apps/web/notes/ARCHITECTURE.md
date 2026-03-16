@@ -49,9 +49,9 @@
 │  └────────────────┘             └────────────────┘              │
 │                                                                 │
 │  API Endpoints:                                                 │
-│  - GET  /story/update     → [JournalStoryUpdate[]]              │
-│  - POST /story/do         → [JournalStoryUpdate[]]              │
-│  - GET  /story/status     → StoryStatus[]                       │
+│  - GET  /story/update     → RuntimeEnvelope                     │
+│  - POST /story/do         → RuntimeEnvelope                     │
+│  - GET  /story/info       → RuntimeInfo                         │
 │  - GET  /system/info      → SystemStatus                        │
 │  - GET  /world/:id/info   → WorldInfo                           │
 └─────────────────────────────────────────────────────────────────┘

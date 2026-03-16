@@ -114,7 +114,7 @@ describe('StoryFlow', () => {
     expect(blocks.length).toBeGreaterThan(0)
   })
 
-  it('normalizes story38 envelope fragments into display blocks', async () => {
+  it('normalizes runtime envelope fragments into display blocks', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
         HttpResponse.json({

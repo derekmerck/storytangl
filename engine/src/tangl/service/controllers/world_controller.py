@@ -47,7 +47,7 @@ def resolve_world(world_id: str) -> World:
         return _MANUAL_WORLDS[world_id]
 
     registry = WorldRegistry()
-    world = registry.get_world(world_id, runtime_version="38")
+    world = registry.get_world(world_id)
 
     if not isinstance(world, World):
         raise TypeError(f"Expected Story world for '{world_id}', got {type(world)!r}")

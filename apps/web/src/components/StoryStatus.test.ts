@@ -39,7 +39,7 @@ describe('StoryStatus', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('status')
-    expect(wrapper.text()).toContain('working')
+    expect(wrapper.text()).toContain('ok')
   })
 
   it('applies custom styles when provided', async () => {
@@ -54,7 +54,7 @@ describe('StoryStatus', () => {
     const wrapper = mountStatus()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('unstyled')
+    expect(wrapper.text()).toContain('Dark Forest')
   })
 
   it('displays icon when provided', async () => {
@@ -65,9 +65,9 @@ describe('StoryStatus', () => {
     expect(icons.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('handles empty status array', async () => {
+  it('handles empty status payload', async () => {
     server.use(
-      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json([])),
+      http.get(`${DEFAULT_API_URL}/story/info`, () => HttpResponse.json({})),
     )
 
     const wrapper = mountStatus()

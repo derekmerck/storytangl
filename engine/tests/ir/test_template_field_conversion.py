@@ -8,7 +8,7 @@ from tangl.ir.story_ir import StoryScript
 pytestmark = pytest.mark.skip(
     reason=(
         "Legacy-only StoryScript front-end tree conversion/path inference; "
-        "v38 parity is owned by codec/compiler plus core38 template group tests."
+        "v38 parity is owned by codec/compiler plus core template group tests."
     )
 )
 

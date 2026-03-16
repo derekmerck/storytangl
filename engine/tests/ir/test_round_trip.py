@@ -9,7 +9,7 @@ from tangl.ir.story_ir import StoryScript, SceneScript
 
 pytestmark = pytest.mark.skip(
     reason=(
-        "Legacy-only IR/YAML round-trip shape; v38 parity is validated in core38 template "
+        "Legacy-only IR/YAML round-trip shape; v38 parity is validated in core template "
         "compile/decompile and template-registry roundtrip tests."
     )
 )

@@ -101,28 +101,17 @@ export const mockUpdatedSecretResponse = {
   api_key: 'updated-api-key-456',
 }
 
-export const mockStatus = [
-  {
-    key: 'status',
-    value: 'working',
-    style: { color: 'red' },
-  },
-  {
-    key: 'health',
-    value: '100/100',
-    style: { color: 'green' },
-    icon: 'heart',
-  },
-  {
-    key: 'location',
-    value: 'Dark Forest',
-    icon: 'map-marker',
-  },
-  {
-    key: 'unstyled',
-    value: 'plain text',
-  },
-]
+export const mockStatus = {
+  status: 'ok',
+  message: 'Story info',
+  cursor_label: 'Dark Forest',
+  turn: 3,
+  step: 7,
+  choice_steps: 2,
+  cursor_steps: 4,
+  journal_size: 5,
+  redirect_trace: ['intro.start', 'intro.branch'],
+}
 
 export const mockSystemInfo = {
   version: '3.7.0',

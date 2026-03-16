@@ -166,10 +166,10 @@ JournalMediaItem {
 
 ```
 // Story
-GET  /story/update           → JournalStoryUpdate[]
-POST /story/do               → JournalStoryUpdate[]
-GET  /story/status           → StoryStatus[]
-POST /story/story/create     → { story_id: string }
+GET  /story/update           → RuntimeEnvelope
+POST /story/do               → RuntimeEnvelope
+GET  /story/info             → RuntimeInfo
+POST /story/story/create     → RuntimeInfo + envelope
 
 // System
 GET  /system/info            → SystemStatus

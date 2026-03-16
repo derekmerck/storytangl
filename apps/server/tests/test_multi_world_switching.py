@@ -89,7 +89,7 @@ def test_drop_story_with_invalid_api_key_returns_401(
     assert "invalid api key" in response.json()["detail"].lower()
 
 
-def test_story_status_alias_sets_deprecation_headers(
+def test_story_info_returns_runtime_summary(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:
     client, headers, _ = multi_world_client
@@ -101,10 +101,11 @@ def test_story_status_alias_sets_deprecation_headers(
     )
     assert create_resp.status_code == 200
 
-    response = client.get("story/status", headers=headers)
+    response = client.get("story/info", headers=headers)
     assert response.status_code == 200
-    assert response.headers.get("Deprecation") == "true"
-    assert "/story/info" in response.headers.get("Warning", "")
+    payload = response.json()
+    assert payload.get("status") == "ok"
+    assert "cursor_label" in payload
 
 
 @pytest.mark.skip(reason="Deferred during v38 cutover: debug endpoints kept but not yet reimplemented.")
@@ -228,8 +229,7 @@ def test_multi_world_switching_flow(
     payload_one = update_one.json()
     fragments_one = payload_one["fragments"]
     assert _fragment_contains(fragments_one, "crossroads")
-    choices_one = payload_one["choices"]
-    assert choices_one == extract_choices_from_fragments(fragments_one)
+    choices_one = extract_choices_from_fragments(fragments_one)
     assert len(choices_one) >= 2
 
     status_before = client.get("story/info", headers=headers)
@@ -240,16 +240,21 @@ def test_multi_world_switching_flow(
     first_choice = first_choice_frag.get("uid") or first_choice_frag.get("source_id")
     choose_resp = client.post("story/do", json={"choice_id": first_choice}, headers=headers)
     assert choose_resp.status_code == 200
+    choice_step = choose_resp.json()["step"]
 
     status_after = client.get("story/info", headers=headers)
     assert status_after.status_code == 200
     assert status_after.json()["step"] > step_before
 
-    update_two = client.get("story/update", headers=headers)
+    update_two = client.get(
+        "story/update",
+        params={"since_step": choice_step},
+        headers=headers,
+    )
     assert update_two.status_code == 200
     payload_two = update_two.json()
     assert payload_two["fragments"]
-    assert payload_two["choices"] == extract_choices_from_fragments(payload_two["fragments"])
+    assert extract_choices_from_fragments(payload_two["fragments"]) == []
 
     drop_demo = client.delete(
         "story/drop",
@@ -276,8 +281,7 @@ def test_multi_world_switching_flow(
     payload_three = update_three.json()
     fragments_three = payload_three["fragments"]
     assert _fragment_contains(fragments_three, "journey at dawn")
-    third_choices = payload_three["choices"]
-    assert third_choices == extract_choices_from_fragments(fragments_three)
+    third_choices = extract_choices_from_fragments(fragments_three)
     assert len(third_choices) == 1
 
     continue_choice = third_choices[0].get("uid") or third_choices[0].get("source_id")

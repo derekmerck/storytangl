@@ -1,4 +1,4 @@
-"""Replay engine contracts for vm38.
+"""Replay engine contracts for vm.
 
 These protocols keep :class:`~tangl.vm.runtime.ledger.Ledger` algorithm-agnostic.
 Diff-based replay is one implementation; future event-sourced variants should

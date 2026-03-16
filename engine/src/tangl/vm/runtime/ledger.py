@@ -1,4 +1,4 @@
-# tangl/vm38/runtime/ledger.py
+# tangl/vm/runtime/ledger.py
 """Persistent session state for a single traversal.
 
 The Ledger owns long-lived state that persists across player actions:
@@ -417,7 +417,7 @@ class Ledger(Entity):
 
     @staticmethod
     def _coerce_fragment_record(record: Any) -> Fragment | BaseFragment | None:
-        """Normalize mixed fragment record shapes into vm38 fragments."""
+        """Normalize mixed fragment record shapes into vm fragments."""
         if isinstance(record, (Fragment, BaseFragment)):
             return record
         fragment_type = getattr(record, "fragment_type", None)

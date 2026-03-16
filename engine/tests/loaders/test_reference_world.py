@@ -39,7 +39,7 @@ def reference_bundle(reference_root: Path) -> WorldBundle:
 
 @pytest.fixture()
 def reference_world(reference_bundle: WorldBundle) -> World:
-    return WorldCompiler().compile(reference_bundle, runtime_version="38")
+    return WorldCompiler().compile(reference_bundle)
 
 
 @pytest.fixture(scope="module")
@@ -225,7 +225,7 @@ class TestWorldCompilerCodecIntegration:
     """Tests for bundle loading through the codec and world registry path."""
 
     def test_near_native_codec_produces_world(self, reference_bundle: WorldBundle) -> None:
-        world = WorldCompiler().compile(reference_bundle, runtime_version="38")
+        world = WorldCompiler().compile(reference_bundle)
 
         assert isinstance(world, World)
         assert world.bundle.codec_id == "near_native_yaml"
@@ -235,7 +235,7 @@ class TestWorldCompilerCodecIntegration:
         self,
         reference_bundle: WorldBundle,
     ) -> None:
-        world = WorldCompiler().compile(reference_bundle, runtime_version="38")
+        world = WorldCompiler().compile(reference_bundle)
         state = world.bundle.codec_state
 
         assert "script_paths" in state
@@ -244,7 +244,7 @@ class TestWorldCompilerCodecIntegration:
 
     def test_world_registry_loads_reference(self, reference_root: Path) -> None:
         registry = WorldRegistry([reference_root.parent])
-        world = registry.get_world("reference", runtime_version="38")
+        world = registry.get_world("reference")
 
         assert world.label == "reference"
         assert world.metadata["title"] == "The Crossroads Inn"
