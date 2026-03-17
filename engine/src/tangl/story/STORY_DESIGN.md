@@ -404,8 +404,63 @@ operates in five explicit passes:
 template registry, prelinks dependencies, and raises `GraphInitializationError`
 on unsatisfied hard requirements. `LAZY` materializes only entry templates and
 defers deeper graph expansion and dependency resolution to runtime planning.
-EAGER is the default. The exact LAZY boundary between materialization-time and
-runtime resolution is still subject to refinement.
+EAGER is the default.
+
+**Runtime materialization contract (`InitMode.LAZY`, phase 1).** The supported
+LAZY behavior is now explicit and is defined in applicability, postconditions,
+and observational-parity terms rather than "did a node get created."
+
+Applicability
+
+- A lazy realization step is applicable only when resolver has a concrete
+  selected path (`target_ctx` plus any structural `build_plan`) and the hard
+  blockers required for that selected path are satisfiable.
+- Preview evaluates the same selected-path contract non-mutatingly. It may
+  report blockers for missing containers or leaves, but it must not add nodes,
+  edges, provenance, or wiring markers.
+
+Postconditions: place graph
+
+- A lazily created entity is attached at the same parent/path location that an
+  eager realization would imply for that selected frontier.
+- Template provenance is stamped immediately onto `StoryGraph` via
+  `template_by_entity_id` and `template_lineage_by_entity_id` so later scoped
+  provisioning uses the same nearest-first lineage groups as eager mode.
+- Lazy-created containers satisfy entry behavior immediately. Phase 1 uses an
+  entry-only rule: materialize the designated entry child, attach it, and set
+  `source_id = sink_id = entry.uid`.
+- Additional authored descendants of a lazy-created container may remain
+  unresolved until later traversal reaches them. LAZY is not required to match
+  EAGER's total graph breadth at creation time.
+- The resulting placement must preserve immediate descent behavior and LCA-based
+  scoping coherence for the realized frontier.
+
+Postconditions: link graph
+
+- Once a lazy-created node is attached, authored topology needed immediately for
+  normal execution is wired before the frame follows into it: actions,
+  role/setting dependencies, menu fanout, media deps, and other authored
+  crosslinks represented by those edges.
+- For selected-path container creation, immediate ancestor-visible hard deps
+  needed for eager-equivalent arrival, traversal, or journaling must be
+  resolved before arrival when traversal skips directly to a descendant leaf.
+- Wiring is idempotent. Revisit, re-choice, and restore flows must not duplicate
+  authored topology. Runtime wiring state is graph-adjacent (`wired_node_ids`)
+  and reconstructible from existing graph evidence.
+
+Observational parity with EAGER
+
+- Parity is defined at the realized frontier, not by whole-graph identity.
+- For the selected destination and any selected-path containers, LAZY and EAGER
+  should expose the same offered actions, arrival namespace or rendered content
+  where relevant, reachable entry behavior, hard blockers, and authored topology
+  multiplicity.
+- LAZY is allowed to differ from EAGER by leaving non-frontier siblings or
+  deeper descendants unmaterialized until later traversal demands them.
+
+**Focused contract tests.** The supported phase-1 contract is pinned by
+`engine/tests/story/test_lazy_runtime_materialization.py`, with surrounding
+path, availability, and traversal coverage in the existing story/vm tests.
 
 #### World
 

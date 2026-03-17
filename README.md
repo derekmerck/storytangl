@@ -100,7 +100,7 @@ INSTANCE → INLINE) lets world authors override engine defaults without
 modifying core code.
 
 For a deeper treatment of the conceptual foundations, see
-`engine/src/tangl/design/philosophy.md`.
+[`docs/src/design/story/philosophy.md`](docs/src/design/story/philosophy.md).
 
 ---
 
@@ -117,27 +117,27 @@ storytangl/
 │   │   ├── media/              # Asset generation, inventory, and delivery
 │   │   ├── service/            # Lifecycle: gateway, orchestrator, controllers
 │   │   ├── persistence/        # Storage abstraction across backends
-│   │   └── design/             # Project-wide design documentation
 │   └── tests/                  # Test suite mirroring src/ structure
 ├── apps/
 │   ├── cli/                    # cmd2-based command-line interface
 │   ├── server/                 # FastAPI REST API
 │   └── web/                    # Vue 3 + TypeScript web client
-├── docs/                       # Sphinx documentation (RST + MyST)
+├── docs/                       # Sphinx docs, published design notes, API reference
 ├── worlds/                     # Reference story bundles
 └── scripts/                    # Utility and analysis scripts
 ```
 
-Each engine subpackage contains its own `*_DESIGN.md` (or `design/`
-folder) with architectural intent, design decisions, and contracts.
-These are the authoritative references for how each layer works:
+Key engine subpackages carry code-adjacent `*_DESIGN.md` notes with
+architectural intent, design decisions, and contracts. These are the
+authoritative package-level references for how each layer works:
 
 | Layer | Design Docs | Scope |
 |-------|-------------|-------|
-| **core** | `CORE_DESIGN.md` | Entity, graph, dispatch, templates, serialization |
-| **vm** | `VM_DESIGN.md` | Phases, provisioning, namespace, traversal, replay |
-| **story** | `design/` | Fabula compilation, journal, concepts, choices |
-| **service** | `design/` | Gateway, orchestrator, response envelopes |
+| **core** | [`CORE_DESIGN.md`](engine/src/tangl/core/CORE_DESIGN.md) | Entity, graph, dispatch, templates, serialization |
+| **vm** | [`VM_DESIGN.md`](engine/src/tangl/vm/VM_DESIGN.md) | Phases, provisioning, namespace, traversal, replay |
+| **story** | [`STORY_DESIGN.md`](engine/src/tangl/story/STORY_DESIGN.md) | Fabula compilation, journal, concepts, choices |
+| **service** | [`SERVICE_DESIGN.md`](engine/src/tangl/service/SERVICE_DESIGN.md) | Gateway, orchestrator, response envelopes |
+| **media** | [`MEDIA_DESIGN.md`](engine/src/tangl/media/MEDIA_DESIGN.md) | Inventory, media deps, creator pipeline, service dereference boundary |
 
 ---
 
@@ -217,16 +217,16 @@ Start here, in this order:
 
 1. **`AGENTS.md`** — Coding conventions, layer boundaries, testing
    patterns, core abstractions
-2. **`docs/source/contrib/`** — Coding style guide, docstring conventions,
+2. **`docs/src/contrib/`** — Coding style guide, docstring conventions,
    exception policy
 3. **`*_DESIGN.md`** files in each subpackage — Architectural intent and
    contracts for the layer you're working in
 
 ### For Researchers
 
-- **`engine/src/tangl/design/philosophy.md`** — Conceptual foundations:
+- **[`docs/src/design/story/philosophy.md`](docs/src/design/story/philosophy.md)** — Conceptual foundations:
   fabula/syuzhet separation, narrative debt, parametric story space
-- **`engine/src/tangl/design/glossary.md`** — Canonical vocabulary mapping
+- **[`docs/src/design/glossary.md`](docs/src/design/glossary.md)** — Canonical vocabulary mapping
   narratological concepts to implementation
 - **`storytangl-research-agenda.md`** — Open problems and exploration
   directions
@@ -245,7 +245,7 @@ covers the conventions that matter most:
   layers never import from higher ones.
 - **Small, explicit functions** over metaprogramming or implicit behavior.
 - **RST docstrings** for Sphinx compatibility, following the conventions in
-  `docs/source/contrib/docstring_style.md`.
+  `docs/src/contrib/docstring_style.md`.
 - **Tests validate behavior**, not implementation.  Use `xfail(strict=True)`
   for intended-but-unimplemented features.
 
