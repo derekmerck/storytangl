@@ -2,21 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from tangl.core import contribute_ns
-from tangl.vm import TraversableNode
+from tangl.core import Node, contribute_ns
 from .narrator_knowledge import HasNarratorKnowledge
 
 
-class Location(HasNarratorKnowledge, TraversableNode):
+class Location(HasNarratorKnowledge, Node):
     """Location()
 
     Named place provider with local namespace publication.
 
     Why
     ----
-    ``Location`` provides a concrete traversable node that settings and runtime
-    namespace gathering can reference when a story needs a place-oriented
-    provider.
+    ``Location`` gives story templates a lightweight provider node for places.
+    Settings and runtime namespace gathering can reference these nodes without
+    making places part of the cursor-traversal fabric.
 
     Key Features
     ------------

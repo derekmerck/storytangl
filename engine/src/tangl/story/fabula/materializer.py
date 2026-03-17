@@ -653,7 +653,7 @@ class StoryMaterializer:
         source: TraversableNode,
         specs: list[dict[str, Any]],
         dependency_kind: type[Dependency],
-        provider_kind: type[TraversableNode],
+        provider_kind: type[GraphItem],
         ref_key: str,
         templ_ref_key: str,
         state: _MaterializationState,

@@ -271,16 +271,12 @@ primary traversal fabric themselves.
 **Actor** is a pure concept provider. It extends `Node`, not `TraversableNode`,
 because actors are entities referenced by structural scope, not cursor destinations.
 
-**Location** currently extends `TraversableNode`. This is primarily a compatibility
-and future-capability choice, not a statement that locations are ordinary cursor
-destinations in the current story model. Today, locations function as concept-layer
-providers bound through Setting edges into structural scope. The cursor traverses
-blocks and scenes, not locations directly. A future sandbox or simulation-oriented
-mode may allow location nodes to become directly traversable runtime places. Until
-then, locations should be understood as named place concepts published into
-namespace and narrator-knowledge systems. The inheritance may be revised to
-`Location(Node)` with targeted traversal traits added when sandbox semantics
-arrive.
+**Location** is also a pure concept provider. It extends `Node`, not
+`TraversableNode`, because locations describe where episodes happen rather than
+forming part of the episodic traversal fabric themselves. If sandbox-oriented
+place traversal arrives later, it should be introduced through a dedicated
+runtime node type or a targeted wrapper rather than by making all locations
+cursor destinations by default.
 
 #### Role and Setting
 
@@ -447,8 +443,7 @@ choices.
 
 **Concept vocabulary** — actors and locations are the named entities that inhabit
 the story world. They carry identity, knowledge state, and namespace payload, but
-they are not themselves waypoints the cursor visits (with the noted exception that
-Location currently inherits traversal traits for future sandbox use).
+they are not themselves waypoints the cursor visits.
 
 **Binding vocabulary** — roles and settings are the edges that connect structural
 nodes to concept nodes. They are the mechanism by which "this scene needs a
@@ -470,10 +465,11 @@ Story types wrap VM types, which wrap core types:
 
 ```
 core.Node               → topology
+  story.Actor           → + name, narrator knowledge
+  story.Location        → + name, narrator knowledge
   vm.TraversableNode    → + source_id, sink_id, availability, effects
     story.Block         → + content, authored declarations (roles, media, etc.)
     story.Scene         → + title, scene-level declarations
-    story.Location      → + name, narrator knowledge (traversal traits noted above)
 
 core.Edge               → topology endpoints
   vm.TraversableEdge    → + entry_phase, return_phase

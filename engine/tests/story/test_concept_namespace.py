@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import pytest
 
+from tangl.core import Node
 from tangl.story.concepts import Actor, Location, Role, Setting
 from tangl.story.episode import Block, Scene
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import Requirement
 from tangl.vm.runtime.frame import PhaseCtx
+from tangl.vm.traversable import TraversableNode
 
 
 def _build_scene_with_block() -> tuple[StoryGraph, Scene, Block]:
@@ -60,6 +62,13 @@ def test_role_and_setting_publish_provider_symbols_into_namespace() -> None:
     assert ns["place_label"] == "castle"
     assert ns["settings"]["place"] is location
     assert ns["setting_edges"]["place"] is setting
+
+
+def test_location_is_a_concept_node_not_a_traversable_node() -> None:
+    location = Location(label="castle", name="Castle")
+
+    assert isinstance(location, Node)
+    assert not isinstance(location, TraversableNode)
 
 
 def test_role_and_provider_keep_distinct_narrator_knowledge() -> None:
