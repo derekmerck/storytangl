@@ -5,6 +5,11 @@ Media Subsystem Design
 **Status:** ⚠️ PARTIALLY IMPLEMENTED media architecture for v3.7+; static flow, inline sync generation, and server-side async lifecycle are landed, while concrete worker backends and richer authoring remain in progress
 **Location:** `engine/src/tangl/media/` and `engine/src/tangl/journal/media/`
 
+> Package-level architecture now lives in `engine/src/tangl/media/MEDIA_DESIGN.md`.
+> This page remains useful as the broader subsystem design note, but some
+> sections below preserve historical terminology from earlier iterations,
+> including `MediaRequirement`, `MediaDependency`, and `MediaForge`.
+
 ---
 
 See also
