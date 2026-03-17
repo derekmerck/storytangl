@@ -14,6 +14,7 @@ story graphs.
 
 .. rubric:: Related notes
 
+- :doc:`../../notes/reference/code_adjacent_design_docs`
 - :doc:`../../notes/audits/vm38-doc-audit`
 - :doc:`../../notes/migration/script_manager_facade_migration`
 

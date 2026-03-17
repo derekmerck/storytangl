@@ -7,12 +7,13 @@ design section over time.
 
 ## Status
 
-- Last reviewed: March 6, 2026
+- Last reviewed: March 16, 2026
 - Migration status: active
 
 ## Current inventory
 
 - `engine/src/tangl/core/CORE_DESIGN.md`
+- `engine/src/tangl/story/STORY_DESIGN.md`
 - `engine/src/tangl/vm/VM_DESIGN.md`
 - `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md`
 

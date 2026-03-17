@@ -1,6 +1,9 @@
 # Conceptual Foundations
 
 > Why the system works the way it does, and the metaphors that keep it honest.
+> Package-level runtime architecture now lives in
+> `engine/src/tangl/story/STORY_DESIGN.md`; this page remains the higher-level
+> conceptual rationale.
 
 StoryTangl models interactive narrative as a **graph of interdependent possibilities**
 that **collapses into a specific story** through traversal.  This document explains
@@ -57,17 +60,17 @@ relationships — everything that *could* be narrated.  It is the "tangled" stat
 a castle exists, a dragon exists, a knight exists, and there are dependency
 edges encoding that the dragon guards the treasure and the knight needs a sword.
 
-In the engine, the fabula is the **story graph** after compilation: a set of
-structural nodes (scenes, blocks, actions), resource nodes (actors, locations,
-assets), and dependency edges connecting them.  The fabula is authored — it comes
-from YAML scripts, compiled by the story compiler and materialized into a
-navigable graph.
+In the engine, authored fabula first lives as a compiled
+`StoryTemplateBundle`: a set of structural templates (scenes, blocks, actions),
+concept templates (actors, locations, assets), and dependency declarations
+capturing what could be instantiated.  Materialization then turns that compiled
+possibility space into one navigable runtime `StoryGraph`.
 
 The fabula contains more stories than any single traversal will realize, just as
 a chessboard contains more games than any single match will play.
 
-**Implementation:** `StoryCompiler` / `Materializer` → `StoryGraph`; the graph
-and its registries encode all structural and conceptual possibilities.
+**Implementation:** `StoryCompiler` → `StoryTemplateBundle`;
+`StoryMaterializer` → `StoryGraph`.
 
 ### Episodic Process — the Traversal
 
@@ -126,7 +129,7 @@ The fabula/episodic/syuzhet separation maps directly to a compiler pipeline:
 ```
 Front-end:  Scripts (YAML, Twee, Ink...)
                ↓ parse + compile
-IR:         Story Graph (the fabula)
+IR:         StoryTemplateBundle / compiled template graph (the fabula)
                ↓ traverse + resolve
 Back-end:   Journal Fragments (the syuzhet)
                ↓ render
@@ -146,8 +149,9 @@ over the IR.  Each phase has a defined contract (what it reads, what it may
 mutate, what it returns).  The pipeline is auditable because every phase
 produces receipts.
 
-**Implementation:** `StoryCompiler.compile()` (front-end) → `StoryGraph`
-(IR) → `Frame.follow_edge()` phases (back-end passes) → `Journal` (output).
+**Implementation:** `StoryCompiler.compile()` (front-end) →
+`StoryTemplateBundle` (IR) → `StoryMaterializer.create_story()` +
+`Frame.follow_edge()` phases (back-end passes) → `Journal` (output).
 
 ---
 
