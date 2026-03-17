@@ -37,7 +37,9 @@
 
 ## ResponseType.RUNTIME
 
-**Use when:** Endpoint performs state mutation or control operation.
+**Use when:** Endpoint returns a runtime/status envelope rather than plain
+metadata or raw fragment lists. This includes state mutations, control
+operations, and cursor/step-scoped session status reads.
 
 **Return type:** `RuntimeInfo`
 
@@ -45,10 +47,11 @@
 - `resolve_choice()` - player took action
 - `create_story()` - new ledger created
 - `drop_story()` - ledger deleted
-- `jump_to_node()` - cursor moved
+- `get_story_update()` - runtime envelope wrapped in `RuntimeInfo`
+- `get_story_info()` - cursor/step-scoped session summary
 
 **Characteristics:**
-- Write operations (CREATE/UPDATE/DELETE)
+- Common for write operations, but not limited to them
 - Returns acknowledgment + cursor position
 - May succeed (status="ok") or fail (status="error")
 
@@ -68,8 +71,8 @@
 **Return type:** `MediaFragment` (at native layer)
 
 **Examples:**
-- `get_asset()` - retrieve image/audio file
-- `get_world_cover()` - world banner image
+- `get_world_media()` - retrieve world-scoped media payloads
+- future asset/media fetch endpoints with native media payloads
 
 **Characteristics:**
 - Read-only (MethodType.READ)
@@ -77,7 +80,8 @@
 - Service layer dereferences RIT → backend-specific format
 - Transport layer converts to URL/base64/file path
 
-**Status:** Media endpoints not yet implemented in MVP.
+**Status:** Active. Current service surfaces already include world-media
+responses, and gateway/transport layers may further adapt those payloads.
 
 ---
 

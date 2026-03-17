@@ -5,9 +5,9 @@
 > subclasses), response standardization (`RuntimeEnvelope`, `NativeResponse`),
 > `WorldRegistry`, `build_service_gateway`, or the `EndpointPolicy`/`ResourceBinding`/
 > `WritebackMode` types. Several items in the "What's Missing" section have since
-> been implemented. The authoritative overview is currently the `tangl.service`
-> package docstring; a co-located `SERVICE_DESIGN.md` is planned. Tutorial examples
-> in this document remain directionally useful.
+> been implemented. The authoritative overview now lives in
+> `engine/src/tangl/service/SERVICE_DESIGN.md`. Tutorial examples in this
+> document remain directionally useful as historical background.
 
 # Service Layer Architecture (v3.7)
 

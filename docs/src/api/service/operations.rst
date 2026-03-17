@@ -21,6 +21,10 @@ policy overrides in :mod:`tangl.service.bootstrap`.
 - :doc:`orchestration`
 - :doc:`../server/rest`
 
+.. rubric:: Related notes
+
+- :doc:`../../notes/reference/code_adjacent_design_docs`
+
 Catalog
 -------
 

@@ -15,6 +15,7 @@ their :class:`tangl.service.ApiEndpoint` metadata.
 
 .. rubric:: Related notes
 
+- :doc:`../../notes/reference/code_adjacent_design_docs`
 - :doc:`../../notes/migration/cutover-log`
 
 Controllers

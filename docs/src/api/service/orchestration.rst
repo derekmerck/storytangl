@@ -16,6 +16,7 @@ that catalog.
 
 .. rubric:: Related notes
 
+- :doc:`../../notes/reference/code_adjacent_design_docs`
 - :doc:`../../notes/migration/v38-phase1-review`
 
 Orchestration
