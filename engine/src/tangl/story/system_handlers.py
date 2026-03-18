@@ -782,7 +782,12 @@ def render_block(*, caller, ctx, **_kw):
 
 @on_compose_journal(priority=Priority.EARLY)
 def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
-    """Promote explicit dialog micro-block syntax into attributed fragments."""
+    """Promote explicit dialog micro-block syntax into attributed fragments.
+
+    This is the canonical reference ``compose_journal`` transform. It preserves
+    stream order except for the local replacement of eligible content
+    fragments.
+    """
     if not isinstance(caller, Block):
         return None
 

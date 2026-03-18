@@ -13,6 +13,15 @@ Key pieces:
 
 See `examples/vehicle.py` for usage patterns.
 
+Aggregate helpers operate over the container's current `all_components()`
+result exactly as-is.
+
+```python
+defense_total = vehicle.vehicle_loadout.get_aggregate("defense_bonus")
+carried_weight = vehicle.vehicle_loadout.get_aggregate_cost("weight")
+capabilities = vehicle.vehicle_loadout.get_aggregate_tags("capabilities")
+```
+
 `OutfitManager` has been promoted out of `assembly.examples` into
 `tangl.mechanics.presence.outfit` because active presence mechanics depend on it
 as a real family surface rather than a demo.

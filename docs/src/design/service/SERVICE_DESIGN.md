@@ -8,6 +8,8 @@
 > been implemented. The authoritative overview now lives in
 > `engine/src/tangl/service/SERVICE_DESIGN.md`. Tutorial examples in this
 > document remain directionally useful as historical background.
+>
+> Current contract: see `engine/src/tangl/service/SERVICE_DESIGN.md` for service architecture and `engine/src/tangl/service/response.py` for the shipped response and projected-state models.
 
 # Service Layer Architecture (v3.7)
 

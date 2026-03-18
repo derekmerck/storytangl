@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from numbers import Real
 from typing import Any, ClassVar, Generic, Optional, Protocol, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
@@ -74,6 +75,73 @@ class SlottedContainer(BaseModel, Generic[CT]):
         for components in self.assignments.values():
             result.extend(components)
         return result
+
+    def get_aggregate(self, name: str, default: float = 0.0) -> float:
+        """Sum one direct numeric attribute across assigned components.
+
+        Aggregates operate over :meth:`all_components` exactly as returned by
+        the container. Missing or ``None`` values contribute nothing.
+        """
+
+        total = float(default)
+        for component in self.all_components():
+            value = getattr(component, name, None)
+            if value is None:
+                continue
+            if not isinstance(value, Real) or isinstance(value, bool):
+                raise TypeError(
+                    f"Aggregate '{name}' expected numeric values, got {type(value).__name__}"
+                )
+            total += float(value)
+        return total
+
+    def get_aggregate_cost(self, name: str, default: float = 0.0) -> float:
+        """Sum one named resource cost across assigned components.
+
+        Aggregates operate over :meth:`all_components` exactly as returned by
+        the container. Components without ``get_cost`` contribute nothing.
+        """
+
+        total = float(default)
+        for component in self.all_components():
+            if not hasattr(component, "get_cost"):
+                continue
+            value = getattr(component, "get_cost")(name)
+            if value is None:
+                continue
+            if not isinstance(value, Real) or isinstance(value, bool):
+                raise TypeError(
+                    f"Aggregate cost '{name}' expected numeric values, got {type(value).__name__}"
+                )
+            total += float(value)
+        return total
+
+    def get_aggregate_tags(self, name: str = "tags") -> set[str]:
+        """Union one string collection attribute across assigned components.
+
+        Aggregates operate over :meth:`all_components` exactly as returned by
+        the container. Missing or ``None`` values contribute nothing.
+        """
+
+        tags: set[str] = set()
+        for component in self.all_components():
+            value = getattr(component, name, None)
+            if value is None:
+                continue
+            if isinstance(value, str):
+                tags.add(value)
+                continue
+            if not isinstance(value, (list, tuple, set, frozenset)):
+                raise TypeError(
+                    f"Aggregate tags '{name}' expected a string collection, got {type(value).__name__}"
+                )
+            for item in value:
+                if not isinstance(item, str):
+                    raise TypeError(
+                        f"Aggregate tags '{name}' expected string entries, got {type(item).__name__}"
+                    )
+                tags.add(item)
+        return tags
 
     def can_assign(self, slot_name: str, component: CT) -> tuple[bool, str]:
         if slot_name not in self.slots:

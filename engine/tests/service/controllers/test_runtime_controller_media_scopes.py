@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+from tangl.journal.fragments import ContentFragment, GroupFragment
 from tangl.journal.media import MediaFragment
 from tangl.media import story_media as story_media_mod
 from tangl.media.media_data_type import MediaDataType
@@ -137,6 +138,35 @@ def test_get_story_update_serializes_media_journal_entries_with_nested_world_pat
     assert isinstance(fragments, list)
     assert fragments[0]["fragment_type"] == "media"
     assert fragments[0]["url"] == "/media/world/w1/book1/scene1/cover.svg"
+
+
+def test_get_story_update_preserves_richer_peer_fragments_without_service_rewrite() -> None:
+    graph = StoryGraph(
+        label="story",
+        world=SimpleNamespace(
+            label="w1",
+            resources=SimpleNamespace(resource_path=None),
+        ),
+    )
+    node = TraversableNode(label="start")
+    graph.add(node)
+    ledger = Ledger(graph=graph, cursor_id=node.uid)
+
+    content = ContentFragment(content="Hello there", source_id=node.uid, step=0)
+    overlay = GroupFragment(member_ids=[content.uid], group_type="summary", step=0)
+    ledger.output_stream.append(content)
+    ledger.output_stream.append(overlay)
+
+    info = RuntimeController().get_story_update(ledger=ledger)
+    details = dict(info.details or {})
+    envelope = details.get("envelope")
+
+    assert isinstance(envelope, dict)
+    fragments = envelope.get("fragments")
+    assert isinstance(fragments, list)
+    assert [fragment["fragment_type"] for fragment in fragments] == ["content", "group"]
+    assert fragments[1]["group_type"] == "summary"
+    assert fragments[1]["member_ids"] == [str(content.uid)]
 
 
 def test_get_journal_entries_applies_static_fallback_profile(tmp_path: Path) -> None:

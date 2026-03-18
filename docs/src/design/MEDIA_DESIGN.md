@@ -9,6 +9,8 @@ Media Subsystem Design
 > This page remains useful as the broader subsystem design note, but some
 > sections below preserve historical terminology from earlier iterations,
 > including `MediaRequirement`, `MediaDependency`, and `MediaForge`.
+>
+> Current contract: see `engine/src/tangl/media/MEDIA_DESIGN.md` for the code-adjacent package architecture and `tangl.service.media` for the live service dereference boundary.
 
 ---
 

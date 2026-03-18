@@ -381,6 +381,17 @@ def test_dispatch_journal_composes_explicit_dialog_markup_into_attributed_fragme
     assert fragments[1].content == "A hush fell over the room."
 
 
+def test_dispatch_journal_dialog_composition_leaves_plain_content_unchanged() -> None:
+    graph = StoryGraph()
+    block = Block(label="start", content="Hello there.")
+    graph.add(block)
+    ctx = PhaseCtx(graph=graph, cursor_id=block.uid)
+
+    fragments = do_journal(block, ctx=ctx)
+    assert isinstance(fragments, ContentFragment)
+    assert fragments.content == "Hello there."
+
+
 def test_dispatch_journal_dialog_composition_preserves_media_and_choice_order() -> None:
     graph, block, _guide = _presence_story(
         content="> [!spoken] {guide_name}\n> Welcome.",
