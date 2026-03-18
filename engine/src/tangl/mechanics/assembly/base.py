@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from enum import Enum
 from numbers import Real
 from typing import Any, ClassVar, Generic, Optional, Protocol, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
 from tangl.core import Entity
+from tangl.type_hints import Tag
 from .budget import BudgetTracker
 from .slot import Slot, SlotGroup
 
@@ -116,29 +118,33 @@ class SlottedContainer(BaseModel, Generic[CT]):
             total += float(value)
         return total
 
-    def get_aggregate_tags(self, name: str = "tags") -> set[str]:
-        """Union one string collection attribute across assigned components.
+    @staticmethod
+    def _is_tag_value(value: object) -> bool:
+        return isinstance(value, (Enum, str, int))
+
+    def get_aggregate_tags(self, name: str = "tags") -> set[Tag]:
+        """Union one tag or tag collection attribute across assigned components.
 
         Aggregates operate over :meth:`all_components` exactly as returned by
         the container. Missing or ``None`` values contribute nothing.
         """
 
-        tags: set[str] = set()
+        tags: set[Tag] = set()
         for component in self.all_components():
             value = getattr(component, name, None)
             if value is None:
                 continue
-            if isinstance(value, str):
+            if self._is_tag_value(value):
                 tags.add(value)
                 continue
             if not isinstance(value, (list, tuple, set, frozenset)):
                 raise TypeError(
-                    f"Aggregate tags '{name}' expected a string collection, got {type(value).__name__}"
+                    f"Aggregate tags '{name}' expected a tag or tag collection, got {type(value).__name__}"
                 )
             for item in value:
-                if not isinstance(item, str):
+                if not self._is_tag_value(item):
                     raise TypeError(
-                        f"Aggregate tags '{name}' expected string entries, got {type(item).__name__}"
+                        f"Aggregate tags '{name}' expected Tag entries, got {type(item).__name__}"
                     )
                 tags.add(item)
         return tags

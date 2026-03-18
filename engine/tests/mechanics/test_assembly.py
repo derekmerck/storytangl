@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from enum import Enum
+
 import pytest
 from pydantic import Field
 
 from tangl.core import Entity
 from tangl.mechanics.assembly import HasSlottedContainer, Slot, SlotGroup, SlottedContainer
+
+
+class LoadoutTag(Enum):
+    SCOUT = "scout"
+    ARCANE = "arcane"
 
 
 class TestComponent(Entity):
@@ -149,6 +156,33 @@ def test_get_aggregate_tags_unions_string_collections() -> None:
     )
 
     assert container.get_aggregate_tags("capabilities") == {"mapping", "targeting", "vision"}
+
+
+def test_get_aggregate_tags_accepts_mixed_tag_values() -> None:
+    container = TestContainer(owner=TestHost(label="owner"))
+    container.assign(
+        "alpha",
+        TestComponent(
+            label="visor",
+            tags={"alpha", 7, LoadoutTag.SCOUT},
+        ),
+    )
+    container.assign(
+        "beta",
+        TestComponent(
+            label="scanner",
+            tags={"beta", 11, LoadoutTag.ARCANE},
+        ),
+    )
+
+    assert container.get_aggregate_tags() == {
+        "alpha",
+        "beta",
+        7,
+        11,
+        LoadoutTag.SCOUT,
+        LoadoutTag.ARCANE,
+    }
 
 
 def test_get_aggregate_defaults_for_empty_container() -> None:
