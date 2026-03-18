@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tangl.journal.fragments import PresentationHints
 from tangl.service.response import (
     BadgeListValue,
@@ -130,3 +132,11 @@ def test_webish_adapter_produces_json_ready_section_blocks() -> None:
     assert payload[1]["hints"]["style_name"] == "sidebar"
     assert payload[2]["value"]["value_type"] == "table"
     assert payload[4]["kind"] == "custom_metrics"
+
+
+def test_table_value_rejects_rows_with_wrong_width() -> None:
+    with pytest.raises(ValueError, match="table row 1 has 1 values but expected 2"):
+        TableValue(
+            columns=["Quest", "Status"],
+            rows=[["Find the key", "active"], ["locked"]],
+        )

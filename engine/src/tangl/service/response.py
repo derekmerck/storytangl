@@ -7,7 +7,15 @@ from datetime import datetime
 from typing import Annotated, Any, Literal, Mapping, Optional, Self, TypeAlias
 from uuid import UUID
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, ValidationError, field_serializer
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_serializer,
+    model_validator,
+)
 
 from tangl.core import BaseFragment
 from tangl.info import __url__
@@ -185,6 +193,18 @@ class TableValue(BaseModel):
     value_type: Literal["table"] = "table"
     columns: list[str]
     rows: list[list[PrimitiveValue]]
+
+    @model_validator(mode="after")
+    def _validate_row_lengths(self) -> Self:
+        expected_width = len(self.columns)
+        for index, row in enumerate(self.rows):
+            if len(row) != expected_width:
+                raise ValueError(
+                    "table row "
+                    f"{index} has {len(row)} values but expected {expected_width} "
+                    "to match the declared columns"
+                )
+        return self
 
 
 class BadgeListValue(BaseModel):

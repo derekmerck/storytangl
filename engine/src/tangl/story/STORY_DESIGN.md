@@ -2,12 +2,12 @@
 
 > Status: Current contract
 > Authority: Journal fragment types are defined in `tangl.journal.fragments`; `compose_journal` behavior is defined by `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`.
-
+>
 > Architectural intent, design decisions, and rationale for the canonical story
 > package of the StoryTangl narrative engine.
 > This document describes the current v3.8 framework. The source packages are
 > `tangl.core`, `tangl.vm`, and `tangl.story` (no version suffix).
-
+>
 > Some story concepts described here are architectural commitments rather than
 > fully closed feature surfaces. Where implementation remains partial, this note
 > describes intended semantics first and current scope second.
