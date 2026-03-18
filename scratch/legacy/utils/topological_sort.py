@@ -1,3 +1,5 @@
+# Legacy note: Demoted from tangl.utils as reference-only dependency ordering code.
+# Used by scratch/mechanics/badge as an old condition-evaluation ordering helper.
 from collections import deque
 
 def topological_sort(graph):

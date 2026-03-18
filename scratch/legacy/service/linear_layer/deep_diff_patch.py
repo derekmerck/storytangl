@@ -2,7 +2,7 @@
 from deepdiff import DeepDiff, Delta
 
 from tangl.type_hints import UnstructuredData
-from tangl.utils.bookmarked_list import BName, BType
+from legacy.utils.bookmarked_list import BName, BType
 from tangl.core.graph import Node, Graph
 from tangl.journal import ContentFragment
 from .has_linear_layer import HasLinearLayer

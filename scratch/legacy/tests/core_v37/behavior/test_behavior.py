@@ -29,7 +29,7 @@ from tangl.core.behavior.behavior import (
 )
 from tangl.core.behavior.behavior_registry import BehaviorRegistry
 
-from tangl.utils.func_info import FuncInfo
+from legacy.utils.func_info import FuncInfo
 
 
 # ============================================================================

@@ -1,10 +1,12 @@
+# Legacy note: Demoted with legacy.utils.func_info as reference-only coverage.
+# Covers the old behavior/dispatch introspection helper kept for legacy reference.
 import logging
 from typing import Self
 
 import pytest
 
 from tangl.core import Entity
-from tangl.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerType
+from legacy.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerType
 
 
 # Test fixtures

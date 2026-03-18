@@ -12,7 +12,7 @@ import shortuuid
 
 from tangl.type_hints import StringMap, Tag, Predicate, Identifier, UnstructuredData
 from tangl.utils.hashing import hashing_func
-from tangl.utils.base_model_plus import BaseModelPlus
+from legacy.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitize_str
 
 logger = logging.getLogger(__name__)

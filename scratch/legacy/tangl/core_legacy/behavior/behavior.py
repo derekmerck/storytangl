@@ -54,8 +54,8 @@ from pydantic import field_validator, model_validator, ConfigDict, Field
 
 from tangl.type_hints import StringMap, Tag as Task
 from tangl.utils.enum_plus import EnumPlusMixin
-from tangl.utils.base_model_plus import HasSeq
-from tangl.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerFunc
+from legacy.utils.base_model_plus import HasSeq
+from legacy.utils.func_info import BehaviorExplicitHints, FuncInfo, HandlerFunc
 from tangl.core import Entity, Registry
 from tangl.core.entity import Selectable, is_identifier
 from .call_receipt import CallReceipt

@@ -8,8 +8,8 @@ import logging
 
 from pydantic import ConfigDict
 
-from tangl.utils.func_info import HandlerFunc
-from tangl.utils.base_model_plus import HasSeq
+from legacy.utils.func_info import HandlerFunc
+from legacy.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity, Selectable, is_identifier
 from .call_receipt import CallReceipt
 from .behavior import HandlerPriority

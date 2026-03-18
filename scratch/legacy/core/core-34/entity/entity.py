@@ -7,7 +7,7 @@ from functools import wraps
 import shortuuid
 from pydantic import Field, field_validator, ValidationInfo
 
-from tangl.utils.base_model_plus import BaseModelPlus
+from legacy.utils.base_model_plus import BaseModelPlus
 from tangl.utils.sanitize_str import sanitise_str
 from tangl.type_hints import UnstructuredData, Tag, Identifier
 

@@ -5,7 +5,7 @@ import logging
 from pydantic import Field
 
 from tangl.type_hints import UnstructuredData
-from tangl.utils.base_model_plus import HasSeq
+from legacy.utils.base_model_plus import HasSeq
 from tangl.core.registry import Registry
 from .record import Record
 

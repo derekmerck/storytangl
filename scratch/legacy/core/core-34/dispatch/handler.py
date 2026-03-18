@@ -11,7 +11,7 @@ from pydantic import field_validator, ValidationInfo, Field, PrivateAttr
 
 from tangl.type_hints import StringMap, Typelike
 from tangl.utils.dereference_obj_cls import dereference_obj_cls
-from tangl.utils.summary_repr import summary_repr
+from legacy.utils.summary_repr import summary_repr
 from tangl.core import Entity, Registry, Singleton
 from tangl.core.entity import is_identifier
 from .enums import HandlerPriority

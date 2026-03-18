@@ -12,7 +12,7 @@ from copy import deepcopy, copy
 import logging
 
 from pydantic import field_validator
-from tangl.utils.base_model_plus import BaseModelPlus
+from legacy.utils.base_model_plus import BaseModelPlus
 from tangl.type_hints import Step
 from tangl.core import StreamRegistry, Graph, Edge, Node, BaseFragment
 from tangl.core.behavior import CallReceipt, BehaviorRegistry, HandlerLayer

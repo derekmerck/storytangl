@@ -1,4 +1,6 @@
-# tangl/utils/base_model_plus.py
+# Legacy note: Demoted from tangl.utils as the pre-v38 BaseModelPlus/HasSeq implementation.
+# Used by legacy entity, behavior, record, and VM reference code under scratch/legacy.
+# scratch/legacy/utils/base_model_plus.py
 from functools import total_ordering
 from typing import Any, Self, Type, Iterator, ClassVar, TypeVar, get_args, get_origin, Union
 import logging

@@ -1,5 +1,7 @@
+# Legacy note: Demoted with legacy.utils.bookmarked_list as reference-only coverage.
+# Covers the old bookmark slicing helper previously used by linear-layer style content code.
 import pytest
-from tangl.utils.bookmarked_list import BookmarkedList, Bookmark
+from legacy.utils.bookmarked_list import BookmarkedList, Bookmark
 
 
 class TestBookmarkedList:

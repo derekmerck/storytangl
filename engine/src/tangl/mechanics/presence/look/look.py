@@ -20,7 +20,7 @@ from tangl.lang.age_range import AgeRange
 from tangl.core import Entity, contribute_ns
 from tangl.lang.gens import Gens
 from tangl.lang.helpers import oxford_join
-from tangl.utils.base_model_plus import BaseModelPlus
+from tangl.core.bases import BaseModelPlus
 
 from .enums import HairColor, HairStyle, BodyPhenotype, SkinTone, EyeColor
 from ..ornaments import Ornamentation

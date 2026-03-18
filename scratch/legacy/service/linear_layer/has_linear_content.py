@@ -1,6 +1,6 @@
 import functools
 
-from tangl.utils.bookmarked_list import BookmarkedList, BName, BType
+from legacy.utils.bookmarked_list import BookmarkedList, BName, BType
 from tangl.journal import ContentFragment
 
 class HasLinearContent():
