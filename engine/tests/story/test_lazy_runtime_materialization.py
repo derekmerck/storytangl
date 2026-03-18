@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
+import pytest
+
+import tangl.story.story_graph as story_graph_module
 from tangl.core import Selector
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.resource_manager import ResourceManager
@@ -324,3 +328,55 @@ def test_rebuild_runtime_materialization_state_prevents_duplicate_post_materiali
 
     assert middle.uid in graph.wired_node_ids
     assert _edge_inventory(middle) == counts_before
+
+
+def test_runtime_wiring_import_errors_propagate(monkeypatch) -> None:
+    world = World.from_script_data(script_data=_entry_only_container_script())
+    result = world.create_story("entry_only_container_import_failure", init_mode=InitMode.LAZY)
+    graph = result.graph
+    start = _block(graph, "start")
+    graph.wired_node_ids.clear()
+
+    def _boom():
+        raise ImportError("runtime wiring imports failed")
+
+    monkeypatch.setattr(story_graph_module, "_runtime_wiring_symbols", _boom)
+
+    with pytest.raises(ImportError, match="runtime wiring imports failed"):
+        graph.is_runtime_wired_node(start)
+
+    with pytest.raises(ImportError, match="runtime wiring imports failed"):
+        graph.rebuild_runtime_materialization_state()
+
+
+def test_rebuild_runtime_materialization_state_warns_and_skips_malformed_node(
+    monkeypatch,
+    caplog,
+) -> None:
+    world = World.from_script_data(script_data=_entry_only_container_script())
+    result = world.create_story("entry_only_container_rebuild_warning", init_mode=InitMode.LAZY)
+    ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
+
+    ledger.resolve_choice(_choice_action(ledger, "Go").uid)
+
+    graph = ledger.graph
+    scene2 = _scene(graph, "scene2")
+    graph.wired_node_ids.clear()
+    original_has_member = type(scene2).has_member
+
+    def _broken_has_member(self, item):
+        if self.uid == scene2.uid:
+            raise AttributeError("broken membership cache")
+        return original_has_member(self, item)
+
+    monkeypatch.setattr(type(scene2), "has_member", _broken_has_member)
+    caplog.set_level(logging.WARNING, logger=story_graph_module.__name__)
+
+    graph.rebuild_runtime_materialization_state()
+
+    assert scene2.uid not in graph.wired_node_ids
+    assert any(
+        "Skipping runtime wiring rebuild" in record.message
+        and str(scene2.uid) in record.message
+        for record in caplog.records
+    )

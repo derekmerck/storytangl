@@ -60,6 +60,8 @@ from random import Random
 from typing import Any, Callable, Iterable, Mapping, Optional, TypeAlias
 from uuid import UUID
 
+from pydantic import ValidationError
+
 from tangl.core import (
     Behavior,
     BehaviorRegistry,
@@ -567,7 +569,14 @@ class Frame:
         if hasattr(record, "evolve"):
             try:
                 return record.evolve(step=step)
-            except Exception:
+            except (ValidationError, TypeError, ValueError, AttributeError) as exc:
+                logger.debug(
+                    "Unable to stamp step=%s on record uid=%s type=%s: %s",
+                    step,
+                    getattr(record, "uid", None),
+                    type(record).__name__,
+                    exc,
+                )
                 return record
         return record
 

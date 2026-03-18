@@ -2,13 +2,13 @@
 
 > Status: Current contract
 > Authority: Canonical journal fragment types live in `tangl.journal.fragments`; `tangl.journal.media` remains a compatibility re-export surface.
-
+>
 > Architectural intent, design decisions, and rationale for the canonical media
 > package of the StoryTangl narrative engine.
 > This document describes the current v3.8 framework. The source packages are
 > `tangl.core`, `tangl.vm`, `tangl.story`, `tangl.service`, and `tangl.media`
 > (no version suffix).
-
+>
 > The static media pipeline (file-based assets through to service-layer payload
 > resolution) is wired and tested. The generative creator pipeline now has real
 > sync/async lifecycle infrastructure plus a deterministic in-process checker
@@ -28,7 +28,7 @@ Media is a satellite package that provides resource inventory, provisioning, and
 creator infrastructure for non-textual narrative content, images, audio, video,
 vectors. It sits alongside the core→vm→story→service stack rather than inside it:
 
-```
+```text
 Service  → Dereferences MediaRIT → client-facing URLs/data  (service/media.py)
 Story    → Declares media deps, emits MediaFragment in journal  (story/system_handlers.py)
 VM       → Resolves MediaDep edges during PLANNING  (vm provisioning)
@@ -66,7 +66,7 @@ itself never decides how content reaches the client.
 
 ## Media Module Map
 
-```
+```text
 tangl.media
 ├── Types          → media_data_type.py    (MediaDataType enum: IMAGE, VECTOR, AUDIO, etc.)
 │                  → media_role.py         (MediaRole enum: narrative_im, dialog_im, etc.)

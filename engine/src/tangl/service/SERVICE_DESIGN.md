@@ -2,7 +2,7 @@
 
 > Status: Current contract
 > Authority: The service-native response contract lives in `engine/src/tangl/service/response.py`; projected runtime state is defined there as `ProjectedState`.
-
+>
 > Architectural intent, design decisions, and rationale for the canonical service
 > package of the StoryTangl narrative engine.
 > This document describes the current v3.8 framework. The source packages are

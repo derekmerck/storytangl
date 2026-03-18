@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -8,6 +9,19 @@ from pydantic import Field
 from tangl.core import Graph, Selector, TemplateRegistry
 
 from .dispatch import story_dispatch
+
+logger = logging.getLogger(__name__)
+
+
+def _runtime_wiring_symbols():
+    """Return runtime wiring types required by ``StoryGraph``."""
+    from tangl.media.media_resource import MediaDep
+    from tangl.vm import Fanout, TraversableNode
+
+    from .concepts import Role, Setting
+    from .episode import Action
+
+    return TraversableNode, (Action, Role, Setting, MediaDep, Fanout)
 
 
 class StoryGraph(Graph):
@@ -139,32 +153,21 @@ class StoryGraph(Graph):
         if isinstance(node_uid, UUID) and node_uid in self.wired_node_ids:
             return True
 
-        try:
-            from tangl.media.media_resource import MediaDep
-            from tangl.vm import Fanout, TraversableNode
-
-            from .concepts import Role, Setting
-            from .episode import Action
-        except ImportError:
-            return False
+        _traversable_node, edge_kinds = _runtime_wiring_symbols()
 
         edges_out = getattr(node, "edges_out", None)
         if callable(edges_out):
-            for edge_kind in (Action, Role, Setting, MediaDep, Fanout):
+            for edge_kind in edge_kinds:
                 if next(edges_out(Selector(has_kind=edge_kind)), None) is not None:
                     return True
         return False
 
     def rebuild_runtime_materialization_state(self) -> None:
         """Reconstruct runtime-only wiring markers from the current graph."""
-        try:
-            from tangl.vm import TraversableNode
-        except ImportError:
-            self.wired_node_ids = set()
-            return
+        traversable_node_kind, _edge_kinds = _runtime_wiring_symbols()
 
         rebuilt: set[UUID] = set()
-        for node in Selector(has_kind=TraversableNode).filter(self.values()):
+        for node in Selector(has_kind=traversable_node_kind).filter(self.values()):
             if self.is_runtime_wired_node(node):
                 rebuilt.add(node.uid)
                 continue
@@ -176,6 +179,10 @@ class StoryGraph(Graph):
                 try:
                     if has_member(source) and has_member(sink):
                         rebuilt.add(node.uid)
-                except Exception:
-                    continue
+                except (AttributeError, KeyError) as exc:
+                    logger.warning(
+                        "Skipping runtime wiring rebuild for node_id=%s due to malformed membership state: %s",
+                        getattr(node, "uid", None),
+                        exc,
+                    )
         self.wired_node_ids = rebuilt

@@ -46,6 +46,7 @@ def test_service_package_exports_include_response_and_gateway_contracts() -> Non
 
     expected = {
         "ApiEndpoint",
+        "BadgeListValue",
         "EndpointPolicy",
         "ExecuteOptions",
         "FragmentStream",
