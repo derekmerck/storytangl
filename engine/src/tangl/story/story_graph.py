@@ -145,7 +145,7 @@ class StoryGraph(Graph):
 
             from .concepts import Role, Setting
             from .episode import Action
-        except Exception:
+        except ImportError:
             return False
 
         edges_out = getattr(node, "edges_out", None)
@@ -159,7 +159,7 @@ class StoryGraph(Graph):
         """Reconstruct runtime-only wiring markers from the current graph."""
         try:
             from tangl.vm import TraversableNode
-        except Exception:
+        except ImportError:
             self.wired_node_ids = set()
             return
 
