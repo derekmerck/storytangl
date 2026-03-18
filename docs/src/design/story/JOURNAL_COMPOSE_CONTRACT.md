@@ -11,12 +11,26 @@ rendering begins.
 
 - `render_journal` handlers produce ordered raw fragments.
 - `compose_journal` receives the merged fragment list in stream order.
+- `compose_journal` operates on normalized fragment values only; raw textlike
+  inputs belong in `render_journal`, not this seam.
 - A compose handler may return:
   - `None`
   - one `Record` or `BaseFragment`
   - an iterable of `Record` or `BaseFragment`
 - Invalid replacement shapes raise `TypeError`.
 - Later compose handlers may inspect earlier compose results on `ctx.results`.
+
+## Reference Transform
+
+- The canonical reference implementation is
+  `tangl.story.system_handlers.compose_dialog_markup`.
+- It rewrites only eligible `ContentFragment` values containing explicit dialog
+  micro-block markup.
+- It is order-preserving except for the local replacement of those eligible
+  fragments.
+- Non-eligible fragments pass through unchanged.
+- Richer peer fragments may continue to later service and client layers, which
+  remain responsible for capability-specific handling.
 
 ## Allowed Transformations
 

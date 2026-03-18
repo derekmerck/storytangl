@@ -1,5 +1,6 @@
 > Status: Historical / not authoritative
 > Authority: Current fragment contracts live in `tangl.journal.fragments` and `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`.
+> Current contract: use `tangl.journal.fragments` for fragment and hint models, `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md` for post-merge composition, and `tangl.service.response` for service-native runtime payloads.
 
 This should be called journal repr or stream repr or something fr = fabula/input/script, sr = syuzhet/output/fragment stream?
 

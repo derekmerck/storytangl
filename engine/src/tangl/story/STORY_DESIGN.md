@@ -130,7 +130,8 @@ to the VM's dispatch chain.
 `on_journal` and `on_compose_journal` are the two stages of journal production.
 `on_journal` handlers emit raw fragments (content, media, choices) at different
 priorities. `on_compose_journal` handlers receive the merged fragment list and can
-replace it. The first concrete consumer is dialog micro-block rewriting.
+replace it. The first concrete consumer and reference transform is dialog
+micro-block rewriting.
 
 `on_gather_ns` is the most widely used story hook. Role and setting modules each
 register namespace contributors that expose resolved providers under their labels.
