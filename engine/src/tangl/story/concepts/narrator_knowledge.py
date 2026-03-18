@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import Field
 
-from tangl.utils.base_model_plus import BaseModelPlus
+from tangl.core.bases import BaseModelPlus
 
 __all__ = ["EntityKnowledge", "HasNarratorKnowledge", "get_narrator_key"]
 

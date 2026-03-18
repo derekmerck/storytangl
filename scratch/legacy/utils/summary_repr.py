@@ -1,3 +1,5 @@
+# Legacy note: Demoted from tangl.utils as reference-only debug code.
+# Used by legacy dispatch handler debugging in scratch/legacy/core/core-34 and dispatch-v37.
 from typing import Any, Mapping
 
 
@@ -58,4 +60,3 @@ def summary_repr(value: Any, max_len=40, max_items=3) -> str:
 
     # 8. Fallback: type name
     return f"<{type(value).__name__}>"
-

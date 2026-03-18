@@ -1,10 +1,5 @@
-from .block_fragment import BlockFragment
-from .choice_fragment import ChoiceFragment
-from .dialog_fragment import AttributedFragment, DialogFragment
+"""Compatibility re-exports for legacy ``tangl.journal.prose`` imports."""
 
-__all__ = [
-    "BlockFragment",
-    "ChoiceFragment",
-    "AttributedFragment",
-    "DialogFragment",
-]
+from ..fragments import AttributedFragment, BlockFragment, ChoiceFragment, DialogFragment
+
+__all__ = ["AttributedFragment", "BlockFragment", "ChoiceFragment", "DialogFragment"]

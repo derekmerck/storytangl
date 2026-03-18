@@ -290,7 +290,7 @@ def generate_game_journal(
         round has been recorded in this step.
     """
 
-    from tangl.journal.content import ContentFragment
+    from tangl.journal.fragments import ContentFragment
 
     cursor = cursor if isinstance(cursor, HasGame) else caller
     if not isinstance(cursor, HasGame):

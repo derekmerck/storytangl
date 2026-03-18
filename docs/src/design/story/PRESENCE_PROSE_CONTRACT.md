@@ -1,7 +1,9 @@
 Presence/Prose Contract Spike
 =============================
 
-**Status:** 🟡 CONTRACT SPIKE / PARTIAL STORY-RUNTIME + JOURNAL SEAM SCAFFOLD  
+> Status: Partially landed
+> Authority: Current `compose_journal` rules live in `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`; this note remains the spike record for presence/prose integration.
+
 **Last Updated:** March 2026  
 **Scope:** story concept scaffolding plus contract tests; active block rendering
 remains `format_map`-based, with a small opt-in JOURNAL composition consumer

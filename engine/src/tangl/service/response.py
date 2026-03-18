@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from collections import namedtuple
 from datetime import datetime
-from typing import Any, Literal, Mapping, Optional, Self, TypeAlias
+from typing import Annotated, Any, Literal, Mapping, Optional, Self, TypeAlias
 from uuid import UUID
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, ValidationError, field_serializer
 
 from tangl.core import BaseFragment
 from tangl.info import __url__
-from tangl.journal.content import KvFragment
-from tangl.journal.media import MediaFragment
+from tangl.journal.fragments import KvFragment, MediaFragment, PresentationHints
 from tangl.service.user.user import User
 
 
@@ -141,6 +140,82 @@ class WorldSceneList(KvFragment):
     ...
 
 
+PrimitiveValue: TypeAlias = str | int | float | bool
+
+
+class ScalarValue(BaseModel):
+    """Single scalar projected-state payload."""
+
+    value_type: Literal["scalar"] = "scalar"
+    value: PrimitiveValue
+
+
+class ProjectedKVItem(BaseModel):
+    """One projected key-value pair."""
+
+    key: str
+    value: PrimitiveValue
+
+
+class KvListValue(BaseModel):
+    """Ordered key-value payload."""
+
+    value_type: Literal["kv_list"] = "kv_list"
+    items: list[ProjectedKVItem]
+
+
+class ProjectedItem(BaseModel):
+    """One projected list entry."""
+
+    label: str
+    detail: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class ItemListValue(BaseModel):
+    """Ordered projected item list."""
+
+    value_type: Literal["item_list"] = "item_list"
+    items: list[ProjectedItem]
+
+
+class TableValue(BaseModel):
+    """Tabular projected-state payload."""
+
+    value_type: Literal["table"] = "table"
+    columns: list[str]
+    rows: list[list[PrimitiveValue]]
+
+
+class BadgeListValue(BaseModel):
+    """Badge or label collection payload."""
+
+    value_type: Literal["badges"] = "badges"
+    items: list[str]
+
+
+SectionValue: TypeAlias = Annotated[
+    ScalarValue | KvListValue | ItemListValue | TableValue | BadgeListValue,
+    Field(discriminator="value_type"),
+]
+
+
+class ProjectedSection(BaseModel):
+    """One ordered projected runtime-state section."""
+
+    section_id: str
+    title: str
+    kind: str | None = None
+    value: SectionValue
+    hints: PresentationHints | None = None
+
+
+class ProjectedState(InfoModel):
+    """Canonical ordered projected-state payload for runtime surfaces."""
+
+    sections: list[ProjectedSection] = Field(default_factory=list)
+
+
 def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
     """Best-effort coercion from runtime-like payloads to ``RuntimeInfo``."""
 
@@ -190,13 +265,24 @@ MediaNative: TypeAlias = MediaFragment
 NativeResponse: TypeAlias = FragmentStream | InfoModel | RuntimeInfo | MediaNative
 
 __all__ = [
+    "BadgeListValue",
     "FragmentStream",
     "InfoModel",
+    "ItemListValue",
+    "KvListValue",
     "MediaNative",
     "NativeResponse",
+    "PrimitiveValue",
+    "ProjectedItem",
+    "ProjectedKVItem",
+    "ProjectedSection",
+    "ProjectedState",
     "RuntimeEnvelope",
     "RuntimeInfo",
+    "ScalarValue",
+    "SectionValue",
     "SystemInfo",
+    "TableValue",
     "UserInfo",
     "UserSecret",
     "WorldInfo",

@@ -1,3 +1,5 @@
+# Legacy note: Demoted from tangl.utils as reference-only bookmark slicing code.
+# Used by old linear-layer and stream-style content helpers under scratch/legacy/service.
 from typing import Generic, TypeVar, Optional, List, Union, Dict, Iterator
 from dataclasses import dataclass
 import logging

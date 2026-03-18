@@ -8,6 +8,10 @@ phase-bus integration, and service-layer response profiles.
 **Implementation order:** Sync-first (§3.5–3.6 prove the architecture without workers),
 then server-side async lifecycle, then concrete worker backends, then anticipatory affordances.
 
+> Package-level architecture now lives in `engine/src/tangl/media/MEDIA_DESIGN.md`.
+> This document extends that inline note for the generative slice: pending-RIT
+> lifecycle, sync/async creation flow, and the worker-backed roadmap.
+
 ---
 
 ## Implementation Status
@@ -1148,8 +1152,11 @@ instances are working.
 
 ## Relationship to Existing Design Documents
 
-- **[`MEDIA_DESIGN.md`](MEDIA_DESIGN.md)** — Authoritative for layers, roles, static lifecycle, fragment
-  contract. This document extends it for the generative pipeline.
+- **`engine/src/tangl/media/MEDIA_DESIGN.md`** — Authoritative for package layers, roles,
+  static lifecycle, and fragment contract. This document extends it for the
+  generative pipeline.
+- **[`MEDIA_DESIGN.md`](MEDIA_DESIGN.md)** — Broader published subsystem design note;
+  some older terminology there is historical.
 - **[`media_resurrection_plan.md`](../notes/media_resurrection_plan.md)** — This design
   now documents the landed inline Phase 1–2 work plus the server-side async lifecycle.
 - **[`PLANNING_DESIGN.md`](planning/PLANNING_DESIGN.md)** — `MediaSpecProvisioner` follows the same offer/accept protocol

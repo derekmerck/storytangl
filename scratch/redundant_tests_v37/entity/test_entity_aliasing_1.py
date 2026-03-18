@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4, UUID
 from pydantic import Field
-from tangl.utils.base_model_plus import BaseModelPlus
+from legacy.utils.base_model_plus import BaseModelPlus
 from tangl.type_hints import Tag
 
 from tangl.core.entity import Entity

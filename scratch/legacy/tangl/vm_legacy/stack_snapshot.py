@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.core import Record
-from tangl.utils.base_model_plus import BaseModelPlus
+from legacy.utils.base_model_plus import BaseModelPlus
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle protection
     from tangl.vm.frame import StackFrame

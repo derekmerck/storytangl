@@ -1,3 +1,5 @@
+# Legacy note: Demoted from tangl.utils as reference-only behavior introspection code.
+# Used by legacy dispatch/behavior experiments under scratch/legacy/core and tangl/core_legacy.
 """
 Function-introspection utilities for StoryTangl handler registration.
 

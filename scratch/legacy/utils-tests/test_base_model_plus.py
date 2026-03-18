@@ -1,5 +1,7 @@
+# Legacy note: Demoted with legacy.utils.base_model_plus as reference-only coverage.
+# Covers the pre-v38 BaseModelPlus set-casting behavior retained for legacy comparison.
 import pytest
-from tangl.utils.base_model_plus import BaseModelPlus
+from legacy.utils.base_model_plus import BaseModelPlus
 
 class DemoModel(BaseModelPlus):
     tags: set[str]

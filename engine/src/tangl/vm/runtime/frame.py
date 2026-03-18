@@ -561,13 +561,14 @@ class Frame:
     @staticmethod
     def _with_step(record: Record, *, step: int) -> Record:
         """Return a step-annotated record, preserving immutability."""
-        if not hasattr(record, "step"):
-            return record
         current = getattr(record, "step", None)
         if isinstance(current, int) and current >= 0:
             return record
         if hasattr(record, "evolve"):
-            return record.evolve(step=step)
+            try:
+                return record.evolve(step=step)
+            except Exception:
+                return record
         return record
 
     def _record_redirect(self, *, phase: ResolutionPhase, edge: AnyTraversableEdge) -> None:

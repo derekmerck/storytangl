@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import ConfigDict
 
-from tangl.utils.base_model_plus import HasSeq
+from legacy.utils.base_model_plus import HasSeq
 from tangl.core.entity import Entity
 from tangl.core.registry import Registry
 

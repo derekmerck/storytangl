@@ -6,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable
 
-from tangl.journal.media import MediaFragment
+from tangl.journal.fragments import MediaFragment
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaRITStatus

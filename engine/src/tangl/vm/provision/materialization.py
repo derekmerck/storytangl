@@ -29,6 +29,53 @@ def resolve_story_materialize_hook(
         meta_hook = meta.get("story_materialize")
         if callable(meta_hook):
             return meta_hook
+
+    graph = getattr(_ctx, "graph", None)
+    graph_hook = getattr(graph, "story_materialize", None)
+    if callable(graph_hook):
+        return graph_hook
+    return None
+
+
+def resolve_story_post_materialize_hook(
+    _ctx: Any,
+) -> Callable[..., Any] | None:
+    """Return an optional story post-materialization hook from ``_ctx``."""
+    hook = getattr(_ctx, "story_post_materialize", None)
+    if callable(hook):
+        return hook
+
+    meta = getattr(_ctx, "meta", None)
+    if isinstance(meta, dict):
+        meta_hook = meta.get("story_post_materialize")
+        if callable(meta_hook):
+            return meta_hook
+
+    graph = getattr(_ctx, "graph", None)
+    graph_hook = getattr(graph, "story_post_materialize", None)
+    if callable(graph_hook):
+        return graph_hook
+    return None
+
+
+def resolve_story_preview_requirement_hook(
+    _ctx: Any,
+) -> Callable[..., Any] | None:
+    """Return an optional story preview hook from ``_ctx``."""
+    hook = getattr(_ctx, "story_preview_requirement", None)
+    if callable(hook):
+        return hook
+
+    meta = getattr(_ctx, "meta", None)
+    if isinstance(meta, dict):
+        meta_hook = meta.get("story_preview_requirement")
+        if callable(meta_hook):
+            return meta_hook
+
+    graph = getattr(_ctx, "graph", None)
+    graph_hook = getattr(graph, "story_preview_requirement", None)
+    if callable(graph_hook):
+        return graph_hook
     return None
 
 

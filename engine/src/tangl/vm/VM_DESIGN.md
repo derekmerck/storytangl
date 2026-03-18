@@ -398,6 +398,22 @@ entity), `CREATE` (clone/mint a new one), `STUB` (debug/preview fallback, only w
 stubs are allowed), `TOKEN` (specifically a singleton token). Requirements can restrict
 which policies are acceptable.
 
+**Selected-path runtime materialization.** When a CREATE or CLONE offer is
+accepted for a traversable requirement, resolver may need to build missing
+structural prefix segments before binding the final provider. The supported
+contract is selected-path-safe rather than a general recursive planning system:
+
+- missing intermediate segments are materialized, attached, post-materialized,
+  and validated one by one before the final provider is bound
+- newly created providers are post-materialized and validated before dependency
+  binding completes
+- preview checks the same selected-path contract through story-provided preview
+  hooks, but remains pure and must not mutate graph state
+
+Story owns the domain-specific postconditions for authored topology and
+container-entry behavior; VM owns the offer-selection, chain execution, and
+validation order that makes those postconditions hold at commit time.
+
 #### Causality Modes (Debug/Preview Traversal)
 
 Runtime context carries a monotonic causality mode:

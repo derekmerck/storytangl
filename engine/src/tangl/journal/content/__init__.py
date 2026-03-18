@@ -1,4 +1,10 @@
-from .content_fragment import ContentFragment
-from .group_fragment import GroupFragment
-from .kv_fragment import KvFragment
-from .presentation_hints import PresentationHints
+"""Compatibility re-exports for legacy ``tangl.journal.content`` imports."""
+
+from ..fragments import ContentFragment, GroupFragment, KvFragment, PresentationHints
+
+__all__ = [
+    "ContentFragment",
+    "GroupFragment",
+    "KvFragment",
+    "PresentationHints",
+]

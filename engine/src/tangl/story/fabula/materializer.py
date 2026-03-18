@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any, Mapping
 from uuid import UUID
 
-from tangl.core import GraphItem, Selector, TemplateRegistry
+from tangl.core import EntityTemplate, GraphItem, Selector, TemplateRegistry
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
 from tangl.media.story_media import get_story_resource_manager
 from tangl.vm.dispatch import do_gather_ns
 from tangl.vm import (
     Affordance,
+    Blocker,
     Dependency,
     Fanout,
     ProvisionPolicy,
@@ -21,6 +23,7 @@ from tangl.vm import (
     do_get_template_scope_groups,
 )
 from tangl.vm.provision import MaterializeRole, attach_child, materialize_template_entity
+from tangl.vm.provision.provisioner import _next_provision_uid
 
 from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, MenuBlock, Scene
@@ -45,7 +48,6 @@ class _MaterializationState:
     report: InitReport
     template_to_entity: dict[UUID, GraphItem] = field(default_factory=dict)
     id_to_entity: dict[str, GraphItem] = field(default_factory=dict)
-    wired_node_ids: set[UUID] = field(default_factory=set)
 
 
 @dataclass(slots=True)
@@ -146,6 +148,98 @@ class StoryMaterializer:
     - :meth:`create_story` materializes one story graph from a compiled bundle.
     """
 
+    def story_materialize_template(
+        self,
+        template: EntityTemplate,
+        _ctx: Any = None,
+    ) -> GraphItem:
+        """Materialize one story template payload with resolver-stable uid rules."""
+        return template.materialize(uid=_next_provision_uid(_ctx=_ctx))
+
+    def story_post_materialize(
+        self,
+        *,
+        template: EntityTemplate | None,
+        entity: Any,
+        role: MaterializeRole | str = MaterializeRole.PROVISION_LEAF,
+        _ctx: Any = None,
+    ) -> None:
+        """Finalize runtime story contracts for one newly attached entity."""
+        if isinstance(role, str):
+            role = MaterializeRole(role)
+
+        graph = getattr(entity, "graph", None) or getattr(_ctx, "graph", None)
+        if not isinstance(graph, StoryGraph):
+            return
+
+        if isinstance(template, EntityTemplate) and isinstance(entity, GraphItem):
+            graph.record_runtime_template(entity, template)
+
+        if not isinstance(entity, TraversableNode):
+            return
+
+        if graph.is_runtime_wired_node(entity):
+            graph.wired_node_ids.add(entity.uid)
+            return
+
+        if isinstance(template, EntityTemplate) and self._template_is_container(template):
+            self._ensure_runtime_container_entry(
+                graph=graph,
+                template=template,
+                container=entity,
+                _ctx=_ctx,
+            )
+
+        state = self._runtime_state(graph=graph)
+        self._run_runtime_topology_passes(nodes=[entity], state=state)
+
+    def preview_requirement_contract(
+        self,
+        *,
+        requirement: Requirement,
+        offer: Any,
+        graph: Any,
+        _ctx: Any = None,
+    ) -> list[Blocker]:
+        """Return story-level selected-path blockers for one preview offer."""
+        if not isinstance(graph, StoryGraph):
+            return []
+
+        template = getattr(offer, "candidate", None)
+        target_ctx = getattr(offer, "target_ctx", None)
+        if not isinstance(template, EntityTemplate) or not isinstance(target_ctx, str) or not target_ctx:
+            return []
+
+        blockers: list[Blocker] = []
+        build_segments = list(getattr(offer, "build_plan", None) or ())
+        parent_paths = self._parent_prefix_paths(target_ctx)
+        missing_paths = parent_paths[-len(build_segments) :] if build_segments else []
+
+        for segment_path in missing_paths:
+            segment_template = self._find_template_for_path(graph=graph, reference=segment_path)
+            if not isinstance(segment_template, EntityTemplate):
+                continue
+            blockers.extend(
+                self._preview_immediate_hard_dependencies(
+                    graph=graph,
+                    template=segment_template,
+                    request_ctx_path=segment_path,
+                    _ctx=_ctx,
+                )
+            )
+            if blockers:
+                return blockers
+
+        blockers.extend(
+            self._preview_immediate_hard_dependencies(
+                graph=graph,
+                template=template,
+                request_ctx_path=target_ctx,
+                _ctx=_ctx,
+            )
+        )
+        return blockers
+
     def create_story(
         self,
         *,
@@ -210,6 +304,9 @@ class StoryMaterializer:
         )
         graph.story_id = graph.uid
         graph.story_resources = get_story_resource_manager(graph.story_id, create=True)
+        graph.story_materialize = self.story_materialize_template
+        graph.story_post_materialize = self.story_post_materialize
+        graph.story_preview_requirement = self.preview_requirement_contract
         return _MaterializationState(
             graph=graph,
             bundle=bundle,
@@ -303,6 +400,350 @@ class StoryMaterializer:
         )
 
     @staticmethod
+    def _template_registry_for_graph(graph: StoryGraph) -> TemplateRegistry:
+        registry = getattr(graph, "factory", None)
+        if isinstance(registry, TemplateRegistry):
+            return registry
+
+        script_manager = getattr(graph, "script_manager", None)
+        registry = getattr(script_manager, "template_registry", None)
+        if isinstance(registry, TemplateRegistry):
+            return registry
+        return TemplateRegistry(label="story_runtime_templates")
+
+    def _runtime_state(self, *, graph: StoryGraph) -> _MaterializationState:
+        bundle = getattr(getattr(graph, "world", None), "bundle", None)
+        if bundle is None:
+            bundle = SimpleNamespace(
+                template_registry=self._template_registry_for_graph(graph),
+                source_map={},
+                codec_state={},
+                codec_id=None,
+            )
+        state = _MaterializationState(
+            graph=graph,
+            bundle=bundle,
+            report=InitReport(mode=InitMode.LAZY),
+        )
+        self._index_graph_entities(state=state)
+        return state
+
+    def _index_graph_entities(self, *, state: _MaterializationState) -> None:
+        for entity in state.graph.values():
+            if isinstance(entity, GraphItem):
+                self._index_entity(state=state, entity=entity)
+
+    def _index_entity(
+        self,
+        *,
+        state: _MaterializationState,
+        entity: GraphItem,
+        template: EntityTemplate | None = None,
+    ) -> None:
+        template_label = template.get_label() if isinstance(template, EntityTemplate) else None
+        if template_label:
+            state.id_to_entity[template_label] = entity
+
+        entity_label = entity.get_label() if hasattr(entity, "get_label") else None
+        if isinstance(entity_label, str) and entity_label:
+            state.id_to_entity.setdefault(entity_label, entity)
+
+        for identifier in entity.get_identifiers():
+            key = str(identifier)
+            state.id_to_entity.setdefault(key, entity)
+
+    def _run_runtime_topology_passes(
+        self,
+        *,
+        nodes: list[TraversableNode],
+        state: _MaterializationState,
+    ) -> None:
+        unwired: list[TraversableNode] = []
+        for node in nodes:
+            if state.graph.is_runtime_wired_node(node):
+                state.graph.wired_node_ids.add(node.uid)
+                continue
+            unwired.append(node)
+        if not unwired:
+            return
+
+        self._wire_role_and_setting_dependencies(nodes=unwired, state=state)
+        self._wire_menu_fanouts(nodes=unwired, state=state)
+        self._wire_block_actions(nodes=unwired, state=state)
+        self._wire_media_dependencies(nodes=unwired, state=state)
+        self._mark_nodes_wired(nodes=unwired, state=state)
+
+    def _template_child_templates(self, template: EntityTemplate) -> list[EntityTemplate]:
+        members = getattr(template, "members", None)
+        if not callable(members):
+            return []
+
+        children = [
+            member
+            for member in members()
+            if isinstance(member, EntityTemplate)
+            and getattr(member, "parent", None) is template
+            and member.has_payload_kind(TraversableNode)
+        ]
+        return sorted(children, key=self._template_depth)
+
+    def _template_is_container(self, template: EntityTemplate) -> bool:
+        return bool(self._template_child_templates(template))
+
+    def _entry_template_for_container(self, template: EntityTemplate) -> EntityTemplate | None:
+        children = self._template_child_templates(template)
+        if not children:
+            return None
+
+        for tag_name in ("start", "entry"):
+            for child in children:
+                if child.has_tags({tag_name}):
+                    return child
+
+        for child in children:
+            payload = getattr(child, "payload", None)
+            child_locals = getattr(payload, "locals", None) or {}
+            if isinstance(child_locals, dict) and (
+                child_locals.get("is_start") or child_locals.get("start_at")
+            ):
+                return child
+
+        for child in children:
+            label = child.get_label()
+            short_label = label.rsplit(".", 1)[-1] if "." in label else label
+            if short_label.lower() == "start":
+                return child
+
+        return children[0]
+
+    @staticmethod
+    def _parent_prefix_paths(path: str) -> list[str]:
+        parts = [segment for segment in path.split(".") if segment]
+        return [".".join(parts[: idx + 1]) for idx in range(len(parts) - 1)]
+
+    def _find_template_for_path(
+        self,
+        *,
+        graph: StoryGraph,
+        reference: str,
+    ) -> EntityTemplate | None:
+        script_manager = getattr(graph, "script_manager", None)
+        finder = getattr(script_manager, "find_template", None)
+        if callable(finder):
+            found = finder(reference)
+            if isinstance(found, EntityTemplate):
+                return found
+
+        registry = self._template_registry_for_graph(graph)
+        found = registry.find_one(Selector(has_identifier=reference))
+        if isinstance(found, EntityTemplate):
+            return found
+        found = registry.find_one(Selector(label=reference))
+        if isinstance(found, EntityTemplate):
+            return found
+        return None
+
+    def _find_existing_child_for_template(
+        self,
+        *,
+        graph: StoryGraph,
+        container: TraversableNode,
+        template: EntityTemplate,
+    ) -> TraversableNode | None:
+        children = getattr(container, "children", None)
+        if not callable(children):
+            return None
+
+        for child in children():
+            if not isinstance(child, TraversableNode):
+                continue
+            template_uid = graph.template_by_entity_id.get(child.uid)
+            if template_uid == getattr(template, "uid", None):
+                return child
+            path = getattr(child, "path", None)
+            if isinstance(path, str) and path == template.get_label():
+                return child
+        return None
+
+    def _ensure_runtime_container_entry(
+        self,
+        *,
+        graph: StoryGraph,
+        template: EntityTemplate,
+        container: TraversableNode,
+        _ctx: Any = None,
+    ) -> TraversableNode | None:
+        entry_template = self._entry_template_for_container(template)
+        if entry_template is None:
+            return None
+
+        entry_node = self._find_existing_child_for_template(
+            graph=graph,
+            container=container,
+            template=entry_template,
+        )
+        if entry_node is None:
+            story_materialize = getattr(graph, "story_materialize", None)
+            entry_node = materialize_template_entity(
+                entry_template,
+                _ctx=_ctx,
+                role=MaterializeRole.PROVISION_LEAF,
+                story_materialize=story_materialize if callable(story_materialize) else None,
+            )
+            if not isinstance(entry_node, TraversableNode):
+                return None
+            graph.add(entry_node, _ctx=_ctx)
+            attach_child(container, entry_node)
+            graph.record_runtime_template(entry_node, entry_template)
+
+        container.finalize_container_contract()
+        self.story_post_materialize(
+            template=entry_template,
+            entity=entry_node,
+            role=MaterializeRole.PROVISION_LEAF,
+            _ctx=_ctx,
+        )
+        return entry_node
+
+    def _make_preview_requirement_ctx(
+        self,
+        *,
+        graph: StoryGraph,
+        request_ctx_path: str,
+        _ctx: Any = None,
+    ) -> _PrelinkCtx:
+        return _PrelinkCtx(
+            graph=graph,
+            template_registry=self._template_registry_for_graph(graph),
+            cursor_id=None,
+            correlation_id=getattr(_ctx, "correlation_id", None),
+            logger=getattr(_ctx, "logger", None),
+            meta={"request_ctx_path": request_ctx_path},
+        )
+
+    def _preview_immediate_hard_dependencies(
+        self,
+        *,
+        graph: StoryGraph,
+        template: EntityTemplate,
+        request_ctx_path: str,
+        _ctx: Any = None,
+    ) -> list[Blocker]:
+        payload = getattr(template, "payload", None)
+        if not isinstance(payload, TraversableNode):
+            return []
+
+        ctx = self._make_preview_requirement_ctx(
+            graph=graph,
+            request_ctx_path=request_ctx_path,
+            _ctx=_ctx,
+        )
+        resolver = Resolver.from_ctx(ctx)
+        blockers: list[Blocker] = []
+        for label, dep_requirement in self._iter_immediate_hard_requirements(payload):
+            preview = resolver.preview_requirement(dep_requirement, _ctx=ctx)
+            if preview.viable:
+                continue
+            blockers.append(
+                Blocker(
+                    reason="immediate_dependency_unresolvable",
+                    context={
+                        "target_ctx": request_ctx_path,
+                        "template": template.get_label(),
+                        "dependency_label": label,
+                        "dependency": self._serialize_selector(dep_requirement),
+                        "blockers": [
+                            {"reason": blocker.reason, "context": dict(blocker.context or {})}
+                            for blocker in preview.blockers
+                        ],
+                    },
+                )
+            )
+        return blockers
+
+    def _iter_immediate_hard_requirements(
+        self,
+        node: TraversableNode,
+    ) -> list[tuple[str, Requirement]]:
+        requirements: list[tuple[str, Requirement]] = []
+        if isinstance(node, (Scene, Block)):
+            requirements.extend(
+                self._requirements_from_specs(
+                    specs=node.roles,
+                    provider_kind=Actor,
+                    ref_key="actor_ref",
+                    templ_ref_key="actor_template_ref",
+                )
+            )
+            requirements.extend(
+                self._requirements_from_specs(
+                    specs=node.settings,
+                    provider_kind=Location,
+                    ref_key="location_ref",
+                    templ_ref_key="location_template_ref",
+                )
+            )
+        if isinstance(node, Block):
+            requirements.extend(self._media_requirements_from_specs(node=node))
+        return requirements
+
+    def _requirements_from_specs(
+        self,
+        *,
+        specs: list[dict[str, Any]],
+        provider_kind: type[GraphItem],
+        ref_key: str,
+        templ_ref_key: str,
+    ) -> list[tuple[str, Requirement]]:
+        requirements: list[tuple[str, Requirement]] = []
+        for index, spec in enumerate(specs):
+            if not isinstance(spec, dict) or not bool(spec.get("hard", True)):
+                continue
+
+            label = self._coerce_str(spec.get("label")) or f"dep_{index}"
+            identifier = self._coerce_str(spec.get(ref_key) or spec.get(templ_ref_key))
+            requirement_kwargs: dict[str, Any] = {
+                "has_kind": provider_kind,
+                "provision_policy": self._resolve_policy(
+                    spec.get("policy") or spec.get("requirement_policy")
+                ),
+                "hard_requirement": True,
+            }
+            if identifier is not None:
+                requirement_kwargs["has_identifier"] = identifier
+                requirement_kwargs["authored_path"] = identifier
+                requirement_kwargs["is_qualified"] = self._is_qualified_path(identifier)
+
+            requirements.append((label, Requirement(**requirement_kwargs)))
+        return requirements
+
+    def _media_requirements_from_specs(self, *, node: Block) -> list[tuple[str, Requirement]]:
+        requirements: list[tuple[str, Requirement]] = []
+        for index, spec in enumerate(node.media):
+            if not isinstance(spec, dict) or not bool(spec.get("hard", False)):
+                continue
+
+            source_kind = self._media_source_kind(spec)
+            label = self._coerce_str(spec.get("label")) or f"media_{node.get_label()}_{index}"
+            payload: dict[str, Any] = {
+                "label": label,
+                "hard": True,
+                "scope": self._coerce_str(spec.get("scope")),
+                "media_role": self._coerce_str(spec.get("media_role")),
+            }
+            if source_kind == "inventory":
+                payload["media_id"] = self._coerce_str(spec.get("name"))
+            elif source_kind == "potential":
+                payload["media_spec"] = spec.get("spec")
+            else:
+                continue
+
+            requirement = MediaDep._pre_resolve(payload).get("requirement")
+            if isinstance(requirement, Requirement):
+                requirements.append((label, requirement))
+        return requirements
+
+    @staticmethod
     def _template_depth(templ: Any) -> tuple[int, int, str]:
         depth = 0
         current = getattr(templ, "parent", None)
@@ -350,17 +791,10 @@ class StoryMaterializer:
 
         state.graph.add(entity)
         state.template_to_entity[templ.uid] = entity
-        state.graph.template_by_entity_id[entity.uid] = templ.uid
-        state.graph.template_lineage_by_entity_id[entity.uid] = self._template_lineage_ids(templ)
+        state.graph.record_runtime_template(entity, templ)
         state.report.bump_materialized(entity.__class__.__name__)
 
-        templ_label = templ.get_label() if hasattr(templ, "get_label") else None
-        if templ_label:
-            state.id_to_entity[templ_label] = entity
-
-        for identifier in entity.get_identifiers():
-            key = str(identifier)
-            state.id_to_entity.setdefault(key, entity)
+        self._index_entity(state=state, entity=entity, template=templ)
 
         parent_templ = getattr(templ, "parent", None)
         if parent_templ is not None:
@@ -371,18 +805,6 @@ class StoryMaterializer:
 
         return entity
 
-    @staticmethod
-    def _template_lineage_ids(templ: Any) -> list[UUID]:
-        """Return template lineage from nearest scope outward."""
-        lineage: list[UUID] = []
-        current = templ
-        while current is not None:
-            uid = getattr(current, "uid", None)
-            if isinstance(uid, UUID):
-                lineage.append(uid)
-            current = getattr(current, "parent", None)
-        return lineage
-
     def _finalize_scene_contracts(self, *, state: _MaterializationState) -> None:
         for scene in Selector(has_kind=Scene).filter(state.graph.values()):
             scene.finalize_container_contract()
@@ -392,7 +814,7 @@ class StoryMaterializer:
             Selector(has_kind=TraversableNode).filter(state.graph.values()),
             key=self._order_key,
         )
-        return [node for node in nodes if node.uid not in state.wired_node_ids]
+        return [node for node in nodes if node.uid not in state.graph.wired_node_ids]
 
     def _wire_role_and_setting_dependencies(
         self,
@@ -479,7 +901,7 @@ class StoryMaterializer:
         state: _MaterializationState,
     ) -> None:
         for node in nodes:
-            state.wired_node_ids.add(node.uid)
+            state.graph.wired_node_ids.add(node.uid)
 
     def _wire_media_for_block(
         self,

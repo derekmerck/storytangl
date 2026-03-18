@@ -18,7 +18,7 @@ core ideas you should understand before contributing.
   collection types (`set[str]`, `list[int]`, etc.) and reuse shared aliases from
   `tangl.type_hints` when available.
 - Engine models generally inherit from **`BaseModelPlus`** (see
-  `tangl.utils.base_model_plus`) or other Pydantic models. Extending
+  `tangl.core.bases`) or other Pydantic models. Extending
   `BaseModelPlus` gives you uniform identifier handling, comparison, and reset
   semantics—use it for new persistent entities unless you have a strong reason not to.
 - Keep imports explicit and grouped: standard library, third-party, then local.

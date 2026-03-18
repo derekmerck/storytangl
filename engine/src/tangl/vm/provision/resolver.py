@@ -23,6 +23,8 @@ from .materialization import (
     attach_child,
     materialize_template_entity,
     resolve_story_materialize_hook,
+    resolve_story_post_materialize_hook,
+    resolve_story_preview_requirement_hook,
 )
 from .matching import annotate_offer_specificity, summarize_offer
 from .preview import Blocker, ViabilityResult
@@ -162,6 +164,12 @@ class Resolver:
         _ctx = resolve_ctx(_ctx)
         if _ctx is None:
             return ""
+
+        meta = getattr(_ctx, "meta", None)
+        if isinstance(meta, dict):
+            request_ctx_path = meta.get("request_ctx_path")
+            if isinstance(request_ctx_path, str) and request_ctx_path:
+                return request_ctx_path
 
         cursor = getattr(_ctx, "cursor", None)
         if cursor is None:
@@ -703,12 +711,14 @@ class Resolver:
             _ctx=_ctx,
         )
 
-        if provider.registry is not graph:
-            graph.add(provider, _ctx=_ctx)
-            if getattr(provider, "parent", None) is not parent:
-                attach_child(parent, provider)
-        elif parent is not None and getattr(provider, "parent", None) is not parent:
-            attach_child(parent, provider)
+        provider = self._attach_and_finalize_provider(
+            requirement=requirement,
+            offer=offer,
+            provider=provider,
+            graph=graph,
+            parent=parent,
+            _ctx=_ctx,
+        )
 
         requirement._validate_satisfied_by(provider)
         return provider
@@ -1032,7 +1042,7 @@ class Resolver:
         target_ctx: str,
         graph: Any,
         _ctx: Any = None,
-    ) -> RegistryAware:
+    ) -> tuple[RegistryAware, EntityTemplate]:
         template = self._find_structural_template(
             identifier=segment_path,
             target_ctx=target_ctx,
@@ -1049,7 +1059,184 @@ class Resolver:
             raise TypeError("Structural template materialization must yield RegistryAware nodes")
         if created.registry is not graph:
             graph.add(created, _ctx=_ctx)
-        return created
+        return created, template
+
+    @staticmethod
+    def _offer_materializes_runtime_entity(offer: ProvisionOffer) -> bool:
+        return bool(
+            offer.policy & (ProvisionPolicy.CREATE | ProvisionPolicy.CLONE)
+        ) or isinstance(getattr(offer, "candidate", None), EntityTemplate)
+
+    @staticmethod
+    def _offer_template(offer: ProvisionOffer) -> EntityTemplate | None:
+        candidate = getattr(offer, "candidate", None)
+        if isinstance(candidate, EntityTemplate):
+            return candidate
+        return None
+
+    @staticmethod
+    def _request_ctx_for_node(node: Any, fallback: str | None = None) -> str | None:
+        path = getattr(node, "path", None)
+        if isinstance(path, str) and path:
+            return path
+        label = getattr(node, "label", None)
+        if isinstance(label, str) and label:
+            return label
+        if isinstance(fallback, str) and fallback:
+            return fallback
+        return None
+
+    def _make_node_ctx(
+        self,
+        *,
+        graph: Any,
+        node: RegistryAware,
+        _ctx: Any = None,
+        request_ctx_path: str | None = None,
+    ) -> Any:
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        meta = dict(getattr(_ctx, "meta", None) or {})
+        if isinstance(request_ctx_path, str) and request_ctx_path:
+            meta["request_ctx_path"] = request_ctx_path
+
+        kwargs: dict[str, Any] = {
+            "graph": graph,
+            "cursor_id": node.uid,
+            "step": int(getattr(_ctx, "step", 0) or 0),
+            "correlation_id": getattr(_ctx, "correlation_id", None),
+            "logger": getattr(_ctx, "logger", None),
+            "meta": meta,
+            "mark_soft_dirty_callback": getattr(_ctx, "mark_soft_dirty_callback", None),
+            "escalate_to_hard_dirty_callback": getattr(
+                _ctx,
+                "escalate_to_hard_dirty_callback",
+                None,
+            ),
+            "inline_behaviors": list(getattr(_ctx, "inline_behaviors", None) or []),
+            "local_authorities": list(getattr(_ctx, "local_authorities", None) or []),
+            "incoming_edge": getattr(_ctx, "incoming_edge", None),
+            "incoming_payload": getattr(_ctx, "incoming_payload", None),
+        }
+        causality_mode = self._ctx_causality_mode(_ctx)
+        if causality_mode is not None:
+            kwargs["causality_mode"] = causality_mode
+
+        node_ctx = PhaseCtx(**kwargs)
+        random = getattr(_ctx, "random", None)
+        if random is not None:
+            node_ctx.random = random
+        return node_ctx
+
+    def _post_materialize_entity(
+        self,
+        *,
+        entity: RegistryAware,
+        template: EntityTemplate | None,
+        role: MaterializeRole,
+        _ctx: Any = None,
+    ) -> None:
+        story_post_materialize = resolve_story_post_materialize_hook(_ctx)
+        if callable(story_post_materialize):
+            story_post_materialize(
+                template=template,
+                entity=entity,
+                role=role,
+                _ctx=_ctx,
+            )
+
+    def _validate_runtime_entity(
+        self,
+        *,
+        entity: RegistryAware,
+        graph: Any,
+        _ctx: Any = None,
+        request_ctx_path: str | None = None,
+    ) -> bool:
+        if not isinstance(entity, TraversableNode):
+            return True
+
+        node_ctx = self._make_node_ctx(
+            graph=graph,
+            node=entity,
+            _ctx=_ctx,
+            request_ctx_path=self._request_ctx_for_node(entity, fallback=request_ctx_path),
+        )
+        return Resolver.from_ctx(node_ctx).resolve_frontier_node(
+            entity,
+            allow_stubs=self._stubs_allowed(allow_stubs=False, _ctx=_ctx),
+            _ctx=node_ctx,
+        )
+
+    def _existing_target_provider(
+        self,
+        *,
+        requirement: Requirement,
+        offer: ProvisionOffer,
+        graph: Any,
+    ) -> PT | None:
+        target_ctx = getattr(offer, "target_ctx", None)
+        if not isinstance(target_ctx, str) or not target_ctx:
+            return None
+
+        existing = self._find_existing_path_node(graph, target_ctx)
+        if not isinstance(existing, RegistryAware):
+            return None
+        try:
+            if requirement.satisfied_by(existing):
+                return existing
+        except Exception as exc:
+            logger.debug(
+                "existing target reuse failed for requirement=%s target_ctx=%s",
+                requirement,
+                target_ctx,
+                exc_info=exc,
+            )
+        return None
+
+    def _attach_and_finalize_provider(
+        self,
+        *,
+        requirement: Requirement[PT],
+        offer: ProvisionOffer,
+        provider: PT,
+        graph: Any,
+        parent: Any | None,
+        _ctx: Any = None,
+    ) -> PT:
+        reused = self._existing_target_provider(
+            requirement=requirement,
+            offer=offer,
+            graph=graph,
+        )
+        if reused is not None:
+            provider = reused
+
+        if not isinstance(provider, RegistryAware):
+            raise TypeError("Provisioned providers must be RegistryAware")
+
+        if provider.registry is not graph:
+            graph.add(provider, _ctx=_ctx)
+
+        if getattr(provider, "parent", None) is not parent:
+            attach_child(parent, provider)
+
+        if self._offer_materializes_runtime_entity(offer):
+            self._post_materialize_entity(
+                entity=provider,
+                template=self._offer_template(offer),
+                role=MaterializeRole.PROVISION_LEAF,
+                _ctx=_ctx,
+            )
+            if not self._validate_runtime_entity(
+                entity=provider,
+                graph=graph,
+                _ctx=_ctx,
+                request_ctx_path=getattr(offer, "target_ctx", None),
+            ):
+                raise RuntimeError("Provisioned provider failed runtime validation")
+
+        return provider
 
     def _execute_build_chain(
         self,
@@ -1083,34 +1270,47 @@ class Resolver:
                 current = existing
                 continue
 
-            created = self._materialize_structural_segment(
+            created, template = self._materialize_structural_segment(
                 segment_path=".".join(segments[: index + 1]),
                 target_ctx=plan.target_ctx,
                 graph=graph,
                 _ctx=_ctx,
             )
             attach_child(current, created)
+            self._post_materialize_entity(
+                entity=created,
+                template=template,
+                role=MaterializeRole.PROVISION_INTERMEDIATE,
+                _ctx=_ctx,
+            )
+            if not self._validate_runtime_entity(
+                entity=created,
+                graph=graph,
+                _ctx=_ctx,
+                request_ctx_path=".".join(segments[: index + 1]),
+            ):
+                raise RuntimeError("Structural chain segment failed runtime validation")
             current = created
 
         return current
 
-    @staticmethod
     def _bind_dependency_provider(
+        self,
         *,
         dependency: Dependency,
         provider: PT,
+        offer: ProvisionOffer,
         parent: Any | None = None,
         _ctx: Any = None,
     ) -> bool:
-        if not isinstance(provider, RegistryAware):
-            raise TypeError("Dependency providers must be RegistryAware")
-
-        created = provider.registry is not dependency.registry
-        if created:
-            dependency.registry.add(provider, _ctx=_ctx)
-            if getattr(provider, "parent", None) is not parent:
-                attach_child(parent, provider)
-
+        provider = self._attach_and_finalize_provider(
+            requirement=dependency.requirement,
+            offer=offer,
+            provider=provider,
+            graph=dependency.registry,
+            parent=parent,
+            _ctx=_ctx,
+        )
         dependency.set_provider(provider, _ctx=_ctx)
         return True
 
@@ -1154,15 +1354,34 @@ class Resolver:
         graph: Any,
         _ctx: Any = None,
     ) -> ViabilityResult | None:
+        story_blockers: list[Blocker] = []
+        preview_requirement = resolve_story_preview_requirement_hook(_ctx)
         for offer in offers:
             plan = self._chain_plan_for_offer(requirement, offer=offer, _ctx=_ctx)
             if not self._chain_plan_is_resolvable(plan, graph=graph):
                 continue
+            if callable(preview_requirement):
+                blockers = preview_requirement(
+                    requirement=requirement,
+                    offer=offer,
+                    graph=graph,
+                    _ctx=_ctx,
+                )
+                if blockers:
+                    story_blockers.extend(list(blockers))
+                    continue
             return ViabilityResult(
                 viable=True,
                 chain=list(plan.build_segments),
                 scope_distance=int(getattr(offer, "scope_distance", 0) or 0),
                 blockers=[],
+            )
+        if story_blockers:
+            return ViabilityResult(
+                viable=False,
+                chain=[],
+                scope_distance=0,
+                blockers=story_blockers,
             )
         return None
 
@@ -1467,6 +1686,7 @@ class Resolver:
             self._bind_dependency_provider(
                 dependency=dependency,
                 provider=provider,
+                offer=selected_offer,
                 parent=parent,
                 _ctx=_ctx,
             )

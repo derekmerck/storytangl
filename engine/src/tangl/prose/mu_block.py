@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
-from tangl.journal.content import ContentFragment
+from tangl.journal.fragments import ContentFragment
 
 
 @dataclass(slots=True)

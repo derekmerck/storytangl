@@ -9,7 +9,7 @@ from uuid import UUID
 from tangl import core as tangl_core
 from tangl.config import get_story_media_dir, get_sys_media_dir
 from tangl.core import Selector
-from tangl.journal.media import MediaFragment
+from tangl.journal.fragments import MediaFragment
 from tangl.media import get_system_resource_manager
 from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaDep
@@ -205,9 +205,6 @@ class RuntimeController(HasApiEndpoints):
                 return BaseFragment(**media_payload)
             return None
 
-        if isinstance(fragment, BaseFragment):
-            return fragment
-
         if hasattr(fragment, "model_dump"):
             data = fragment.model_dump(mode="python")
         elif hasattr(fragment, "unstructure"):
@@ -222,8 +219,11 @@ class RuntimeController(HasApiEndpoints):
             source_id = data.get("source_id") or data.get("edge_id")
             if source_id is not None:
                 data["source_id"] = source_id
+                data["uid"] = source_id
             if "label" not in data and isinstance(data.get("text"), str):
                 data["label"] = data["text"]
+            if "content" not in data and isinstance(data.get("text"), str):
+                data["content"] = data["text"]
             if "active" not in data and "available" in data:
                 data["active"] = bool(data["available"])
         elif fragment_type == "content":
