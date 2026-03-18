@@ -13,7 +13,7 @@ import random
 
 from pydantic import Field
 
-from tangl.journal.content import ContentFragment
+from tangl.journal.fragments import ContentFragment
 from tangl.vm.dispatch import dispatch as vm_dispatch
 
 from .enums import GamePhase, GameResult, RoundResult

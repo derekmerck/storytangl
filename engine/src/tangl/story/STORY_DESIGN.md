@@ -1,5 +1,8 @@
 # tangl.story — Design Notes
 
+> Status: Current contract
+> Authority: Journal fragment types are defined in `tangl.journal.fragments`; `compose_journal` behavior is defined by `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`.
+
 > Architectural intent, design decisions, and rationale for the canonical story
 > package of the StoryTangl narrative engine.
 > This document describes the current v3.8 framework. The source packages are
@@ -84,7 +87,7 @@ tangl.story
 ├── Dispatch       → dispatch.py             (story_dispatch registry, on_journal, on_gather_ns, etc.)
 ├── Graph          → story_graph.py          (StoryGraph: runtime graph with story locals and authorities)
 ├── Context        → ctx.py                  (StoryRuntimeCtx protocol)
-├── Fragments      → fragments.py            (ContentFragment, ChoiceFragment; re-exports MediaFragment)
+├── Fragments      → fragments.py            (compatibility re-exports from `tangl.journal.fragments`)
 ├── Providers      → provider_collection.py  (collect_template_registries, collect_token_catalogs, etc.)
 ├── Handlers       → system_handlers.py      (APPLICATION-layer namespace, provisioning, and journal handlers)
 ├── Concepts       → concepts/
@@ -190,10 +193,7 @@ defines what it minimally expects. The runtime `PhaseCtx` satisfies all layers.
 
 ### Fragments (`fragments.py`)
 
-Story-level journal output records emitted by JOURNAL handlers.
-
-**`Fragment`** extends `Record` with `fragment_type` and `step` fields. It is the
-story-layer base for all journal output.
+Compatibility imports for journal output types emitted by story JOURNAL handlers.
 
 **`ContentFragment`** carries rendered prose (`content: str`) plus `source_id`
 tracing it back to the block that produced it.
@@ -201,9 +201,9 @@ tracing it back to the block that produced it.
 **`ChoiceFragment`** carries one available or unavailable choice: the edge UUID,
 display text, availability flag, blocker reasons, and optional UI hints.
 
-**`MediaFragment`** is re-exported from `tangl.journal.media`, not defined here.
-Story fragments and journal fragments share one type so media rendering and
-serialization paths don't need to distinguish.
+**`MediaFragment`** is re-exported from `tangl.journal.fragments` through the
+story compatibility surface. Story owns composition policy, not fragment model
+definitions.
 
 **Fragments are the observable discourse surface.** In narratological terms, the
 runtime graph and ledger are the fabula, everything that happened. The journal

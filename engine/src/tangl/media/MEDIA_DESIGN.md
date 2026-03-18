@@ -1,5 +1,8 @@
 # tangl.media — Design Notes
 
+> Status: Current contract
+> Authority: Canonical journal fragment types live in `tangl.journal.fragments`; `tangl.journal.media` remains a compatibility re-export surface.
+
 > Architectural intent, design decisions, and rationale for the canonical media
 > package of the StoryTangl narrative engine.
 > This document describes the current v3.8 framework. The source packages are
@@ -35,8 +38,9 @@ Core     → Entity, Registry, Record primitives used by media types
 
 Media types are imported by story (for dependency wiring) and by service (for
 dereferencing). Media does not import from story or service. The
-`tangl.journal.media` subpackage defines `MediaFragment` and `StagingHints` as
-cross-cutting output types that both story and service consume.
+`tangl.journal.fragments` module defines `MediaFragment` and `StagingHints` as
+cross-cutting output types that both story and service consume; the
+`tangl.journal.media` package remains a compatibility re-export.
 
 ### Litmus Test
 
@@ -254,11 +258,11 @@ World-scoped managers are created by loader/compiler infrastructure during world
 loading and attached to world facets.
 
 
-### MediaFragment and StagingHints (`tangl.journal.media/`)
+### MediaFragment and StagingHints (`tangl.journal.fragments`)
 
-These live in `tangl.journal.media`, not in `tangl.media`, because they are
+These live in `tangl.journal.fragments`, not in `tangl.media`, because they are
 cross-cutting output types consumed by both story (emission) and service
-(dereferencing).
+(dereferencing). `tangl.journal.media` remains a compatibility import path.
 
 **`MediaFragment(ContentFragment)`** carries:
 

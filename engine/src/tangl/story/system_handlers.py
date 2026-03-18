@@ -33,9 +33,10 @@ from tangl.vm import (
     on_get_token_catalogs,
 )
 
+from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
+
 from .dispatch import on_compose_journal, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
-from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 from .provider_collection import (
     collect_media_inventories,
     collect_template_registries,
@@ -810,10 +811,9 @@ def compose_dialog_markup(*, caller, ctx, fragments, **_kw):
                 if getattr(fragment, "tags", None):
                     updated_tags |= set(fragment.tags)
 
-                update: dict[str, Any] = {
-                    "step": fragment.step,
-                    "tags": updated_tags,
-                }
+                update: dict[str, Any] = {"tags": updated_tags}
+                if getattr(fragment, "step", None) is not None:
+                    update["step"] = fragment.step
                 if getattr(fragment, "origin_id", None) is not None:
                     update["origin_id"] = fragment.origin_id
 

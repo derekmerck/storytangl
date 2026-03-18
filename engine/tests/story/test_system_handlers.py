@@ -9,7 +9,7 @@ import pytest
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
 from tangl.core.runtime_op import Predicate
 from tangl.prose.dialog import DialogMuBlock
-from tangl.journal.prose import AttributedFragment
+from tangl.journal.fragments import AttributedFragment, GroupFragment, PresentationHints
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.lang.body_parts import BodyPart, BodyRegion
 from tangl.mechanics.presence.look import BodyPhenotype, EyeColor, HairColor, HairStyle, Look, SkinTone
@@ -463,6 +463,89 @@ def test_render_block_facade_uses_compose_journal_with_phase_ctx() -> None:
     assert isinstance(fragments[0], AttributedFragment)
     assert fragments[0].who == "Guide"
     assert fragments[0].how == "spoken"
+
+
+def test_compose_journal_rewrite_preserves_fragment_metadata() -> None:
+    graph = StoryGraph()
+    start = Block(label="start")
+    graph.add(start)
+
+    original = ContentFragment(
+        content="Hello there",
+        source_id=start.uid,
+        origin_id=start.uid,
+        step=7,
+        tags={"speaker:guide"},
+        hints=PresentationHints(style_name="narration"),
+    )
+    custom_registry = BehaviorRegistry(
+        label="custom.story.metadata",
+        default_dispatch_layer=DispatchLayer.AUTHOR,
+    )
+
+    def _compose(*, caller, ctx, fragments, **_kw):
+        fragment = fragments[0]
+        return [
+            AttributedFragment(
+                content=fragment.content,
+                who="Guide",
+                how="spoken",
+                media="dialog_im",
+                source_id=fragment.source_id,
+                origin_id=fragment.origin_id,
+                step=fragment.step,
+                tags=set(fragment.tags),
+                hints=fragment.presentation_hints,
+            )
+        ]
+
+    custom_registry.register(_compose, task="compose_journal", priority=0)
+    graph.world = SimpleNamespace(get_authorities=lambda: [custom_registry])
+    ctx = PhaseCtx(graph=graph, cursor_id=start.uid)
+
+    from tangl.vm.dispatch import do_compose_journal
+
+    fragments = do_compose_journal(start, ctx=ctx, fragments=[original])
+    assert isinstance(fragments, list)
+    rewritten = fragments[0]
+
+    assert isinstance(rewritten, AttributedFragment)
+    assert rewritten.step == 7
+    assert rewritten.source_id == start.uid
+    assert rewritten.origin_id == start.uid
+    assert rewritten.tags == {"speaker:guide"}
+    assert rewritten.presentation_hints.style_name == "narration"
+
+
+def test_compose_journal_additive_enrichment_keeps_text_and_choices_intact() -> None:
+    graph = StoryGraph()
+    start = Block(label="start", content="Hello {name}")
+    end = Block(label="end")
+    graph.add(start)
+    graph.add(end)
+    graph.add(Action(predecessor_id=start.uid, successor_id=end.uid, text="Continue"))
+
+    custom_registry = BehaviorRegistry(
+        label="custom.story.enrichment",
+        default_dispatch_layer=DispatchLayer.AUTHOR,
+    )
+
+    def _compose(*, caller, ctx, fragments, **_kw):
+        base_content = next(fragment for fragment in fragments if isinstance(fragment, ContentFragment))
+        base_choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
+        overlay = GroupFragment(member_ids=[base_content.uid, base_choice.uid], group_type="summary")
+        return [*fragments, overlay]
+
+    custom_registry.register(_compose, task="compose_journal", priority=0)
+    graph.world = SimpleNamespace(get_authorities=lambda: [custom_registry])
+    ctx = PhaseCtx(graph=graph, cursor_id=start.uid)
+    ctx._ns_cache[start.uid] = {"name": "Joe"}
+
+    fragments = do_journal(start, ctx=ctx)
+    assert isinstance(fragments, list)
+    assert any(isinstance(fragment, ContentFragment) and fragment.content == "Hello Joe" for fragment in fragments)
+    assert any(isinstance(fragment, ChoiceFragment) and fragment.text == "Continue" for fragment in fragments)
+    assert any(isinstance(fragment, GroupFragment) and fragment.group_type == "summary" for fragment in fragments)
 
 
 def test_render_block_content_includes_graph_locals_from_gather_ns() -> None:

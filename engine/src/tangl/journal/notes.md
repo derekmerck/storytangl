@@ -1,3 +1,6 @@
+> Status: Historical / not authoritative
+> Authority: Current fragment contracts live in `tangl.journal.fragments` and `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`.
+
 This should be called journal repr or stream repr or something fr = fabula/input/script, sr = syuzhet/output/fragment stream?
 
 journal fragment stream:

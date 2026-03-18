@@ -1,3 +1,5 @@
+"""Compatibility re-exports for legacy ``tangl.journal.ux`` imports."""
 
-from .control_fragment import ControlFragment
-from .user_event_fragment import UserEventFragment
+from ..fragments import ControlFragment, ControlFragmentType, UserEventFragment
+
+__all__ = ["ControlFragment", "ControlFragmentType", "UserEventFragment"]

@@ -38,8 +38,8 @@ Conceptual layers
      references for runtime resolution.
    - :class:`StoryRuntimeCtx` defines the context accessors expected by story
      runtime helpers.
-   - :class:`Fragment`, :class:`ContentFragment`, :class:`ChoiceFragment`, and
-     :class:`MediaFragment` represent journal output.
+   - :class:`ContentFragment`, :class:`ChoiceFragment`, and
+     :class:`MediaFragment` are re-exported journal output types.
 
 5. Dispatch
 
@@ -85,7 +85,7 @@ from .fabula import (
 )
 from .story_graph import StoryGraph
 from .dispatch import on_compose_journal, on_gather_ns, on_journal, story_dispatch
-from .fragments import ChoiceFragment, ContentFragment, Fragment, MediaFragment
+from .fragments import ChoiceFragment, ContentFragment, MediaFragment
 from .ctx import StoryRuntimeCtx
 
 # Register story-level journal handlers.
@@ -98,7 +98,6 @@ __all__ = [
     "ChoiceFragment",
     "ContentFragment",
     "EntityKnowledge",
-    "Fragment",
     "GraphInitializationError",
     "HasNarratorKnowledge",
     "InitMode",

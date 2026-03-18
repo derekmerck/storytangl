@@ -1,5 +1,8 @@
 # tangl.service — Design Notes
 
+> Status: Current contract
+> Authority: The service-native response contract lives in `engine/src/tangl/service/response.py`; projected runtime state is defined there as `ProjectedState`.
+
 > Architectural intent, design decisions, and rationale for the canonical service
 > package of the StoryTangl narrative engine.
 > This document describes the current v3.8 framework. The source packages are
@@ -368,7 +371,9 @@ embed it inside `RuntimeInfo.details` when an operation needs an acknowledgment
 wrapper and a transport-ready runtime snapshot together.
 
 **`InfoModel`** is the base for typed metadata payloads: `SystemInfo`, `UserInfo`,
-`WorldInfo`. These are Pydantic models that serialize cleanly for any transport.
+`WorldInfo`, and `ProjectedState`. `ProjectedState` is the canonical ordered
+section model for runtime-state surfaces; it is service-native data, not a
+journal fragment. These models serialize cleanly for any transport.
 
 **Response type decision flowchart:**
 

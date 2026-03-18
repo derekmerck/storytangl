@@ -14,6 +14,7 @@ from contextlib import contextmanager
 import pytest
 
 from tangl.core import Graph, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.journal.fragments import ContentFragment
 from tangl.media.media_resource import MediaInventory, MediaResourceRegistry
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
@@ -219,6 +220,16 @@ class TestDoJournal:
         node = _node(g, label="n")
         with pytest.raises(TypeError, match="render_journal"):
             do_journal(node, ctx=null_ctx)
+
+    def test_base_fragment_payload_passes_through(self, null_ctx) -> None:
+        fragment = ContentFragment(content="hello")
+        on_journal(lambda *, caller, ctx, **kw: fragment)
+        g = Graph()
+        node = _node(g, label="n")
+
+        result = do_journal(node, ctx=null_ctx)
+
+        assert result is fragment
 
     def test_compose_handler_receives_merged_fragments_and_can_replace_output(self, null_ctx) -> None:
         first = Record(label="first")

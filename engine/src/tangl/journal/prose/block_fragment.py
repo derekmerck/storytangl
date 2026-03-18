@@ -1,11 +1,5 @@
-from typing import Optional, Literal
+"""Compatibility shim for canonical journal block fragments."""
 
-from tangl.journal.content import ContentFragment
+from ..fragments import BlockFragment
 
-from pydantic import Field
-
-from .choice_fragment import ChoiceFragment
-
-class BlockFragment(ContentFragment):
-    fragment_type: Literal['block'] = Field('block')
-    choices: Optional[list[ChoiceFragment]] = Field(default_factory=list)
+__all__ = ["BlockFragment"]

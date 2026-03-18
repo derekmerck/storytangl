@@ -138,10 +138,11 @@ def _assert_redirect_result(value, *, task: str):
 
 
 def _assert_fragment_result(value, *, task: str):
+    from tangl.core import BaseFragment
     from .fragments import Fragment
 
     def _coerce_fragment(item):
-        if isinstance(item, Record):
+        if isinstance(item, (Record, BaseFragment)):
             return item
         if hasattr(item, "fragment_type"):
             payload = {
@@ -170,7 +171,7 @@ def _assert_fragment_result(value, *, task: str):
             fragments.append(normalized_fragment)
         return fragments
     raise TypeError(
-        f"{task} must return Record | Iterable[Record] | None"
+        f"{task} must return Record | BaseFragment | Iterable[Record | BaseFragment] | None"
     )
 
 
