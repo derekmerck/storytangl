@@ -263,6 +263,13 @@ evaluation) each get their own cached namespace. The cache dies with the PhaseCt
 UPDATE mutations are visible in the *next* pipeline pass via a fresh PhaseCtx — they do
 not retroactively affect cached namespaces within the current pass.
 
+**Child runtime contexts come from `PhaseCtx.derive()`.** Provisioning and
+post-materialization validation sometimes need a `PhaseCtx` scoped to a different cursor
+without losing tracing, RNG, dirty callbacks, or local authorities. The supported path is
+`ctx.derive(cursor_id=..., graph=..., meta_overrides=...)`, which carries forward shared
+runtime identity/config state while intentionally resetting per-pass caches and nested
+dispatch result buffers. Manual field-plucking is not part of the contract.
+
 **Namespace handlers must not call `get_ns` for the node they're building.** That
 would cause infinite recursion. Use handler priority ordering instead — a handler that
 needs a partial namespace can register at a later priority and rely on earlier handlers

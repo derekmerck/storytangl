@@ -190,6 +190,10 @@ implementation.
 seeded randomness. Story extends further with `get_story_locals()`,
 `get_location_entity_groups()`, and `get_template_scope_groups()`. Each layer
 defines what it minimally expects. The runtime `PhaseCtx` satisfies all layers.
+Story's `_PrelinkCtx` intentionally stays smaller and story-specific, but it can
+explicitly derive a child `PhaseCtx` when resolver-driven nested validation needs
+the full runtime surface. Story code should use that explicit derivation seam
+rather than manually copying context fields.
 
 
 ### Fragments (`fragments.py`)

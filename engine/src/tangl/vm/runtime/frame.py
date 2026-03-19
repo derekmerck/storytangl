@@ -195,6 +195,38 @@ class PhaseCtx:
     def get_meta(self) -> Mapping[str, Any]:
         return dict(self.meta or {})
 
+    def derive(
+        self,
+        *,
+        cursor_id: UUID | None = None,
+        graph: Graph | None = None,
+        meta_overrides: Mapping[str, Any] | None = None,
+        **field_overrides: Any,
+    ) -> "PhaseCtx":
+        """Create a child context with shared runtime identity and fresh caches."""
+        meta = dict(self.meta or {})
+        if meta_overrides:
+            meta.update(meta_overrides)
+
+        kwargs: dict[str, Any] = {
+            "graph": self.graph if graph is None else graph,
+            "cursor_id": self.cursor_id if cursor_id is None else cursor_id,
+            "step": self.step,
+            "correlation_id": self.correlation_id,
+            "logger": self.logger,
+            "meta": meta,
+            "causality_mode": self.causality_mode,
+            "mark_soft_dirty_callback": self.mark_soft_dirty_callback,
+            "escalate_to_hard_dirty_callback": self.escalate_to_hard_dirty_callback,
+            "random": self.random,
+            "inline_behaviors": list(self.inline_behaviors),
+            "local_authorities": list(self.local_authorities),
+            "incoming_edge": self.incoming_edge,
+            "incoming_payload": self.incoming_payload,
+        }
+        kwargs.update(field_overrides)
+        return PhaseCtx(**kwargs)
+
     @property
     def results(self) -> list[Any]:
         """Ordered results emitted during the current dispatch pipe."""

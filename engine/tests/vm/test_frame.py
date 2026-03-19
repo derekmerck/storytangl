@@ -10,7 +10,6 @@ Organized by concept:
 from __future__ import annotations
 
 import logging
-from types import SimpleNamespace
 
 import pytest
 
@@ -109,6 +108,60 @@ class TestPhaseCtx:
         a = _node(g, label="a")
         ctx = PhaseCtx(graph=g, cursor_id=a.uid, step=9)
         assert ctx.step == 9
+
+    def test_derive_copies_runtime_state_and_resets_per_pass_fields(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        authority = BehaviorRegistry(label="local")
+        inline_behavior = lambda **_: None
+        logger = logging.getLogger("phase-ctx-derive")
+        transitions: list[tuple[str, str | None]] = []
+
+        def _escalate(reason: str, step_id: str | None = None) -> bool:
+            transitions.append((reason, step_id))
+            return True
+
+        ctx = PhaseCtx(
+            graph=g,
+            cursor_id=a.uid,
+            step=9,
+            current_phase=ResolutionPhase.UPDATE,
+            correlation_id="corr-1",
+            logger=logger,
+            meta={"base": "meta"},
+            inline_behaviors=[inline_behavior],
+            local_authorities=[authority],
+            incoming_payload={"kind": "payload"},
+            escalate_to_hard_dirty_callback=_escalate,
+        )
+        ctx.push_result("parent-result")
+        ctx._ns_cache[a.uid] = {}
+
+        derived = ctx.derive(
+            meta_overrides={"request_ctx_path": "scene.entry"},
+        )
+
+        assert derived is not ctx
+        assert derived.graph is g
+        assert derived.cursor_id == a.uid
+        assert derived.step == 9
+        assert derived.current_phase is ResolutionPhase.INIT
+        assert derived.correlation_id == "corr-1"
+        assert derived.logger is logger
+        assert derived.meta == {
+            "base": "meta",
+            "request_ctx_path": "scene.entry",
+        }
+        assert derived.random is ctx.random
+        assert derived.inline_behaviors == [inline_behavior]
+        assert derived.inline_behaviors is not ctx.inline_behaviors
+        assert derived.local_authorities == [authority]
+        assert derived.local_authorities is not ctx.local_authorities
+        assert derived.incoming_payload == {"kind": "payload"}
+        assert derived.results == []
+        assert derived._ns_cache == {}
+        assert derived._result_pipe_stack == [[]]
+        assert ctx.results == ["parent-result"]
 
     def test_authorities_include_graph_authorities_when_available(self) -> None:
         authority = BehaviorRegistry(
