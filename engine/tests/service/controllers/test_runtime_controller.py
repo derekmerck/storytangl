@@ -23,13 +23,14 @@ from tangl.core import Graph, Selector
 from tangl.service.api_endpoint import (
     AccessLevel,
     ApiEndpoint,
+    ResponseType,
     ResourceBinding,
 )
 from tangl.service.controllers.runtime_controller import RuntimeController
 from tangl.service.gateway import ServiceGateway
 from tangl.service.operations import ServiceOperation, endpoint_for_operation
 from tangl.service.orchestrator import Orchestrator
-from tangl.service.response import RuntimeInfo
+from tangl.service.response import KvListValue, ProjectedState, RuntimeInfo
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
 from tangl.story.episode import Action
@@ -139,6 +140,7 @@ class TestRuntimeControllerBindingMetadata:
     def test_get_story_info_binds_ledger(self) -> None:
         ep = self._ep("get_story_info")
         assert ep.binds == (ResourceBinding.LEDGER,)
+        assert ep.response_type is ResponseType.INFO
 
     def test_drop_story_binds_user_and_ledger(self) -> None:
         ep = self._ep("drop_story")
@@ -235,7 +237,7 @@ def test_resolve_choice_via_orchestrator_updates_cursor_and_step(
     assert persisted_ledger.cursor_id != old_cursor
 
 
-def test_gateway_story_info_and_update_return_runtime_info(
+def test_gateway_story_info_and_update_return_projected_state_and_runtime_info(
     orchestrator: Orchestrator,
     gateway: ServiceGateway,
     world: World,
@@ -255,9 +257,9 @@ def test_gateway_story_info_and_update_return_runtime_info(
     )
 
     info = gateway.execute(ServiceOperation.STORY_INFO, user_id=existing_user.uid)
-    assert isinstance(info, RuntimeInfo)
-    assert info.status == "ok"
-    assert info.details is not None
+    assert isinstance(info, ProjectedState)
+    assert info.sections
+    assert info.sections[0].section_id == "session"
 
     update = gateway.execute(
         ServiceOperation.STORY_UPDATE,
@@ -281,8 +283,11 @@ def test_get_story_info_handles_ledger_without_graph_binding() -> None:
 
     info = RuntimeController().get_story_info(ledger)
 
-    assert isinstance(info, RuntimeInfo)
-    assert (info.details or {}).get("cursor_label") is None
+    assert isinstance(info, ProjectedState)
+    assert info.sections
+    value = info.sections[0].value
+    assert isinstance(value, KvListValue)
+    assert [item.key for item in value.items] == ["Step", "Turn", "Journal size"]
 
 
 def test_resolve_choice_rejects_legacy_passback_param(

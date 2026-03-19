@@ -21,10 +21,10 @@
 
 **Use when:** Endpoint queries metadata without side effects.
 
-**Return type:** Subclass of `InfoModel` (UserInfo, StoryInfo, WorldInfo, SystemInfo)
+**Return type:** Subclass of `InfoModel` (ProjectedState, UserInfo, WorldInfo, SystemInfo)
 
 **Examples:**
-- `get_story_info()` - ledger metadata (title, step, cursor)
+- `get_story_info()` - projected current-state sections
 - `get_user_info()` - account details, achievements
 - `list_worlds()` - available world templates
 
@@ -39,7 +39,7 @@
 
 **Use when:** Endpoint returns a runtime/status envelope rather than plain
 metadata or raw fragment lists. This includes state mutations, control
-operations, and cursor/step-scoped session status reads.
+operations and control/status envelopes that need acknowledgment metadata.
 
 **Return type:** `RuntimeInfo`
 
@@ -48,7 +48,6 @@ operations, and cursor/step-scoped session status reads.
 - `create_story()` - new ledger created
 - `drop_story()` - ledger deleted
 - `get_story_update()` - runtime envelope wrapped in `RuntimeInfo`
-- `get_story_info()` - cursor/step-scoped session summary
 
 **Characteristics:**
 - Common for write operations, but not limited to them

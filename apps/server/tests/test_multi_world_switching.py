@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from tangl.config import settings
 from tangl.rest.app import app
 from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
+from tangl.rest.dependencies_gateway import reset_service_gateway_for_testing
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
@@ -38,6 +39,7 @@ LINEAR_SCRIPT = (
 @pytest.fixture()
 def multi_world_client() -> tuple[TestClient, dict[str, str], UUID]:
     reset_orchestrator_for_testing()
+    reset_service_gateway_for_testing()
     World.clear_instances()
 
     orchestrator = get_orchestrator()
@@ -62,11 +64,34 @@ def multi_world_client() -> tuple[TestClient, dict[str, str], UUID]:
     finally:
         client.close()
         World.clear_instances()
+        reset_service_gateway_for_testing()
         reset_orchestrator_for_testing()
 
 
 def _fragment_contains(fragments: list[dict[str, object]], text: str) -> bool:
     return any(text in str(fragment.get("content", "")) for fragment in fragments)
+
+
+def _session_value(payload: dict[str, object], key: str) -> object | None:
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        return None
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        if section.get("section_id") != "session":
+            continue
+        value = section.get("value")
+        if not isinstance(value, dict) or value.get("value_type") != "kv_list":
+            continue
+        items = value.get("items")
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict) and item.get("key") == key:
+                return item.get("value")
+    return None
 
 
 def test_drop_story_without_active_story_returns_400(
@@ -89,7 +114,7 @@ def test_drop_story_with_invalid_api_key_returns_401(
     assert "invalid api key" in response.json()["detail"].lower()
 
 
-def test_story_info_returns_runtime_summary(
+def test_story_info_returns_projected_state(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:
     client, headers, _ = multi_world_client
@@ -104,8 +129,8 @@ def test_story_info_returns_runtime_summary(
     response = client.get("story/info", headers=headers)
     assert response.status_code == 200
     payload = response.json()
-    assert payload.get("status") == "ok"
-    assert "cursor_label" in payload
+    assert payload.get("sections")
+    assert _session_value(payload, "Cursor") is not None
 
 
 @pytest.mark.skip(reason="Deferred during v38 cutover: debug endpoints kept but not yet reimplemented.")
@@ -234,7 +259,8 @@ def test_multi_world_switching_flow(
 
     status_before = client.get("story/info", headers=headers)
     assert status_before.status_code == 200
-    step_before = status_before.json()["step"]
+    step_before = _session_value(status_before.json(), "Step")
+    assert isinstance(step_before, int)
 
     first_choice_frag = choices_one[0]
     first_choice = first_choice_frag.get("uid") or first_choice_frag.get("source_id")
@@ -244,7 +270,9 @@ def test_multi_world_switching_flow(
 
     status_after = client.get("story/info", headers=headers)
     assert status_after.status_code == 200
-    assert status_after.json()["step"] > step_before
+    step_after = _session_value(status_after.json(), "Step")
+    assert isinstance(step_after, int)
+    assert step_after > step_before
 
     update_two = client.get(
         "story/update",

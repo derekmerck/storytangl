@@ -265,16 +265,12 @@ def resolve_choice(self, ledger: Ledger, frame: Frame, choice_id: UUID):
 ```python
 class RuntimeController(HasApiEndpoints):
     
-    @ApiEndpoint.annotate(method_type=MethodType.READ)
-    def get_story_info(self, ledger: Ledger) -> dict:
+    @ApiEndpoint.annotate(method_type=MethodType.READ, response_type=ResponseType.INFO)
+    def get_story_info(self, ledger: Ledger) -> ProjectedState:
         # Orchestrator sees 'ledger: Ledger' in signature
         # → loads ledger from persistence
         # → passes it to method
-        return {
-            "cursor_id": ledger.cursor_id,
-            "step": ledger.step,
-            "title": ledger.graph.label
-        }
+        return projector.project(ledger=ledger)
 ```
 
 **Supported type hints:**
@@ -379,7 +375,7 @@ def some_method(self, frame: Frame):
 | Endpoint | Method Type | Description |
 |----------|-------------|-------------|
 | `create_story` | CREATE | Initialize new story session |
-| `get_story_info` | READ | Get ledger metadata |
+| `get_story_info` | READ | Get projected current-state sections |
 | `get_available_choices` | READ | List choices from cursor |
 | `resolve_choice` | UPDATE | Advance story via choice |
 | `get_journal_entries` | READ | Fetch recent fragments |

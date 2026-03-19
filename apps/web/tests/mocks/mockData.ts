@@ -1,6 +1,7 @@
 import type {
   JournalAction,
   JournalStoryUpdate,
+  ProjectedState,
   WorldInfo,
   WorldList,
 } from '@/types'
@@ -101,16 +102,32 @@ export const mockUpdatedSecretResponse = {
   api_key: 'updated-api-key-456',
 }
 
-export const mockStatus = {
-  status: 'ok',
-  message: 'Story info',
-  cursor_label: 'Dark Forest',
-  turn: 3,
-  step: 7,
-  choice_steps: 2,
-  cursor_steps: 4,
-  journal_size: 5,
-  redirect_trace: ['intro.start', 'intro.branch'],
+export const mockStatus: ProjectedState = {
+  sections: [
+    {
+      section_id: 'session',
+      title: 'Session',
+      kind: 'stats',
+      value: {
+        value_type: 'kv_list',
+        items: [
+          { key: 'Cursor', value: 'Dark Forest' },
+          { key: 'Turn', value: 3 },
+          { key: 'Step', value: 7 },
+          { key: 'Journal size', value: 5 },
+        ],
+      },
+    },
+    {
+      section_id: 'flags',
+      title: 'Flags',
+      kind: 'custom_metrics',
+      value: {
+        value_type: 'badges',
+        items: ['torch_lit', 'met_guide'],
+      },
+    },
+  ],
 }
 
 export const mockSystemInfo = {

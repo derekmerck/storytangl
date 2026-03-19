@@ -26,6 +26,7 @@ def test_service_response_types_importable() -> None:
         ScalarValue,
         coerce_runtime_info,
     )
+    from tangl.service.story_info import DefaultStoryInfoProjector, StoryInfoProjector
 
     assert BadgeListValue is not None
     assert FragmentStream is not None
@@ -39,6 +40,8 @@ def test_service_response_types_importable() -> None:
     assert RuntimeInfo is not None
     assert ScalarValue is not None
     assert coerce_runtime_info is not None
+    assert DefaultStoryInfoProjector is not None
+    assert StoryInfoProjector is not None
 
 
 def test_service_package_exports_include_response_and_gateway_contracts() -> None:
@@ -66,6 +69,8 @@ def test_service_package_exports_include_response_and_gateway_contracts() -> Non
         "ScalarValue",
         "ServiceGateway",
         "ServiceOperation",
+        "DefaultStoryInfoProjector",
+        "StoryInfoProjector",
         "UserAuthInfo",
         "WritebackMode",
         "build_service_gateway",

@@ -26,7 +26,8 @@ from ..api_endpoint import (
     ResponseType,
 )
 from ..media import MediaRenderProfile, media_fragment_to_payload
-from ..response import RuntimeEnvelope, RuntimeInfo
+from ..response import ProjectedState, RuntimeEnvelope, RuntimeInfo
+from ..story_info import resolve_story_info_projector
 from ..user import User
 from .world_controller import resolve_world
 
@@ -623,29 +624,13 @@ class RuntimeController(HasApiEndpoints):
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,
         method_type=MethodType.READ,
-        response_type=ResponseType.RUNTIME,
+        response_type=ResponseType.INFO,
         binds=(ResourceBinding.LEDGER,),
     )
-    def get_story_info(self, ledger: Ledger) -> RuntimeInfo:
-        """Return session summary with no legacy marker assumptions."""
-        graph = getattr(ledger, "graph", None)
-        cursor_node = (
-            graph.get(ledger.cursor_id)
-            if graph is not None and ledger.cursor_id is not None
-            else None
-        )
-        return RuntimeInfo.ok(
-            cursor_id=ledger.cursor_id,
-            step=ledger.step,
-            message="Story info",
-            cursor_label=cursor_node.label if cursor_node is not None else None,
-            turn=ledger.turn,
-            choice_steps=ledger.choice_steps,
-            cursor_steps=ledger.cursor_steps,
-            journal_size=len(ledger.get_journal()),
-            last_redirect=ledger.last_redirect,
-            redirect_trace=ledger.redirect_trace,
-        )
+    def get_story_info(self, ledger: Ledger) -> ProjectedState:
+        """Return projected current-state sections for the active story."""
+        projector = resolve_story_info_projector(ledger)
+        return projector.project(ledger=ledger)
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,

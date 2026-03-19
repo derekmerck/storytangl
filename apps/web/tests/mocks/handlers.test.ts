@@ -37,10 +37,11 @@ describe('MSW Handlers', () => {
     expect(response.data[0]).toHaveProperty('key')
   })
 
-  it('returns runtime info on /story/info', async () => {
+  it('returns projected state on /story/info', async () => {
     const response = await axios.get('/story/info')
-    expect(response.data).toHaveProperty('status')
-    expect(response.data).toHaveProperty('cursor_label')
+    expect(response.data).toHaveProperty('sections')
+    expect(Array.isArray(response.data.sections)).toBe(true)
+    expect(response.data.sections[0]).toHaveProperty('title')
   })
 
   it('returns system info on /system/info', async () => {
