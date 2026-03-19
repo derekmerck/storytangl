@@ -42,6 +42,8 @@ describe('MSW Handlers', () => {
     expect(response.data).toHaveProperty('sections')
     expect(Array.isArray(response.data.sections)).toBe(true)
     expect(response.data.sections[0]).toHaveProperty('title')
+    expect(response.data.sections[0]).toHaveProperty('value')
+    expect(response.data.sections[0]).toHaveProperty('value.value_type')
   })
 
   it('returns system info on /system/info', async () => {

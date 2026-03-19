@@ -232,7 +232,7 @@ export interface ProjectedSection {
   title: string
   kind?: string | null
   value: SectionValue
-  hints?: StyleHints
+  hints?: StyleHints | null
 }
 
 export interface ProjectedState {

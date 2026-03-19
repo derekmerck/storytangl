@@ -29,10 +29,7 @@ class DefaultStoryInfoProjector:
         _append_kv_item(items, key="Step", value=getattr(ledger, "step", None))
         _append_kv_item(items, key="Turn", value=getattr(ledger, "turn", None))
 
-        try:
-            journal_size = len(ledger.get_journal())
-        except Exception:  # pragma: no cover - defensive fallback
-            journal_size = None
+        journal_size = len(ledger.get_journal())
         _append_kv_item(items, key="Journal size", value=journal_size)
 
         return ProjectedState(

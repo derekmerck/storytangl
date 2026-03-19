@@ -15,6 +15,7 @@ from tangl.rest.dependencies_gateway import (
 )
 from tangl.service.user.user import User
 from tangl.service.api_endpoint import AccessLevel
+from tangl.story.fabula.world import World
 from tangl.story.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 from tangl.vm.runtime.ledger import Ledger
@@ -120,6 +121,7 @@ def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str
 
     reset_orchestrator_for_testing()
     reset_service_gateway_for_testing()
+    World.clear_instances()
     orchestrator = get_orchestrator()
     secret = settings.client.secret
     user_id = uuid_for_secret(secret)
@@ -133,6 +135,7 @@ def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str
         yield client, headers, world_label
     finally:
         client.close()
+        World.clear_instances()
         reset_service_gateway_for_testing()
         reset_orchestrator_for_testing()
 
@@ -242,6 +245,7 @@ def test_story_info_returns_world_authored_projected_sections(
 
     reset_orchestrator_for_testing()
     reset_service_gateway_for_testing()
+    World.clear_instances()
     secret = settings.client.secret
     user_id = uuid_for_secret(secret)
     orchestrator = get_orchestrator()
@@ -270,5 +274,6 @@ def test_story_info_returns_world_authored_projected_sections(
         assert sections[0]["value"]["items"][0]["value"] == "tense"
     finally:
         client.close()
+        World.clear_instances()
         reset_service_gateway_for_testing()
         reset_orchestrator_for_testing()

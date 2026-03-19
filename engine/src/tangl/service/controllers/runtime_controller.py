@@ -630,7 +630,14 @@ class RuntimeController(HasApiEndpoints):
     def get_story_info(self, ledger: Ledger) -> ProjectedState:
         """Return projected current-state sections for the active story."""
         projector = resolve_story_info_projector(ledger)
-        return projector.project(ledger=ledger)
+        state = projector.project(ledger=ledger)
+        if not isinstance(state, ProjectedState):
+            raise TypeError(
+                "Story info projector "
+                f"{type(projector).__name__} must return ProjectedState for "
+                f"{ResponseType.INFO.value} responses"
+            )
+        return state
 
     @ApiEndpoint.annotate(
         access_level=AccessLevel.PUBLIC,

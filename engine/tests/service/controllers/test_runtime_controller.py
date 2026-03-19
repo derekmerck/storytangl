@@ -14,6 +14,7 @@ These tests assert the service-specific contracts:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -288,6 +289,25 @@ def test_get_story_info_handles_ledger_without_graph_binding() -> None:
     value = info.sections[0].value
     assert isinstance(value, KvListValue)
     assert [item.key for item in value.items] == ["Step", "Turn", "Journal size"]
+
+
+def test_get_story_info_rejects_projector_results_with_wrong_shape() -> None:
+    graph = Graph()
+    start = graph.add_node(label="start")
+    ledger = Ledger.from_graph(graph, start.uid)
+
+    class _BadProjector:
+        def project(self, *, ledger: Ledger) -> object:
+            return RuntimeInfo.ok(message="wrong-shape")
+
+    world = World.from_script_data(
+        script_data=_story_script(),
+        story_info_projector=_BadProjector(),
+    )
+    ledger.graph = SimpleNamespace(world=world)
+
+    with pytest.raises(TypeError, match="Projector.*ProjectedState|projector.*ProjectedState"):
+        RuntimeController().get_story_info(ledger)
 
 
 def test_resolve_choice_rejects_legacy_passback_param(
