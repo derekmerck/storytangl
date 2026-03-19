@@ -41,6 +41,9 @@ from .compiler import StoryCompiler, StoryTemplateBundle
 from .materializer import StoryMaterializer
 from .script_manager import ScriptManager
 from .types import (
+    AuthoredRef,
+    CompileIssue,
+    CompileSeverity,
     GraphInitializationError,
     InitMode,
     InitReport,
@@ -56,6 +59,9 @@ from .types import (
 from .world import World
 
 __all__ = [
+    "AuthoredRef",
+    "CompileIssue",
+    "CompileSeverity",
     "GraphInitializationError",
     "InitMode",
     "InitReport",

@@ -370,7 +370,8 @@ runtime story graphs.
 
 The compiler accepts raw dicts or validated IR models and produces a
 `StoryTemplateBundle` containing a validated `TemplateRegistry` tree, metadata,
-locals, entry points, and provenance.
+locals, entry points, provenance, and structured compile diagnostics for
+bundle-local authoring problems.
 
 **Compilation is intentionally separate from materialization.** One compiled bundle
 can produce many independent story graphs. This separation enables resetting a

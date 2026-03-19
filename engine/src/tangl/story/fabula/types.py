@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable, Protocol, runtime_checkable
+from typing import Any, Iterable, Literal, Protocol, TypeAlias, runtime_checkable
 from uuid import UUID
+
+
+JsonPrimitive: TypeAlias = str | int | float | bool | None
+JsonValue: TypeAlias = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
 
 
 class InitMode(str, Enum):
@@ -11,6 +15,57 @@ class InitMode(str, Enum):
 
     LAZY = "lazy"
     EAGER = "eager"
+
+
+@dataclass(slots=True)
+class AuthoredRef:
+    """Best-effort authored provenance for compile diagnostics.
+
+    Notes
+    -----
+    This surface intentionally stays coarse in v1. File-level provenance plus
+    compiler-known authored paths are sufficient for bundle preflight without
+    blocking on line/column mapping.
+    """
+
+    path: str | None = None
+    story_key: str | None = None
+    authored_path: str | None = None
+    label: str | None = None
+    note: str | None = None
+
+
+class CompileSeverity(str, Enum):
+    """Severity for compile diagnostics.
+
+    Notes
+    -----
+    v1 of compiler diagnostics emits only ``error`` issues. ``warning`` exists
+    so the surface can align with later authoring-integrity diagnostics work.
+    """
+
+    ERROR = "error"
+    WARNING = "warning"
+
+
+@dataclass(slots=True)
+class CompileIssue:
+    """Structured compiler diagnostic stored on a compiled story bundle.
+
+    Notes
+    -----
+    ``details`` is reserved for JSON-like payloads only. The compiler module
+    documents allowed keys per issue code near its diagnostics helpers.
+    """
+
+    code: str
+    severity: CompileSeverity
+    message: str
+    phase: Literal["compile"] = "compile"
+    subject_label: str | None = None
+    source_ref: AuthoredRef | None = None
+    related_identifiers: list[str] = field(default_factory=list)
+    details: dict[str, JsonValue] = field(default_factory=dict)
 
 
 @runtime_checkable

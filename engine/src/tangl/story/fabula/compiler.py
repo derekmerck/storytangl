@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
 
@@ -12,6 +11,309 @@ from tangl.vm import TraversableNode
 
 from ..concepts import Actor, Location
 from ..episode import Action, Block, MenuBlock, Scene
+from .types import AuthoredRef, CompileIssue, CompileSeverity, JsonValue
+
+
+ISSUE_DUPLICATE_LABEL = "compile:duplicate_label"
+ISSUE_DANGLING_SUCCESSOR_REF = "compile:dangling_successor_ref"
+ISSUE_DANGLING_ACTOR_REF = "compile:dangling_actor_ref"
+ISSUE_DANGLING_LOCATION_REF = "compile:dangling_location_ref"
+ISSUE_EMPTY_ENTRY_RESOLUTION = "compile:empty_entry_resolution"
+
+# Allowed ``details`` keys per issue code. Keep this close to the compiler
+# helpers so the JSON-like payload shape stays explicit and testable.
+_COMPILE_ISSUE_DETAIL_KEYS: dict[str, tuple[str, ...]] = {
+    ISSUE_DUPLICATE_LABEL: ("normalized_label", "occurrences"),
+    ISSUE_DANGLING_SUCCESSOR_REF: ("field", "authored_ref", "canonical_ref"),
+    ISSUE_DANGLING_ACTOR_REF: ("reference_key", "missing_ref"),
+    ISSUE_DANGLING_LOCATION_REF: ("reference_key", "missing_ref"),
+    ISSUE_EMPTY_ENTRY_RESOLUTION: ("requested_entry_ids", "resolution_strategy"),
+}
+
+
+@dataclass(slots=True)
+class _DeclaredTemplate:
+    template_label: str
+    payload_label: str | None
+    payload_kind: type[Entity]
+    source_ref: AuthoredRef | None
+
+
+@dataclass(slots=True)
+class _PendingDiagnostic:
+    code: str
+    subject_label: str | None
+    source_ref: AuthoredRef | None
+    related_identifiers: list[str] = field(default_factory=list)
+    details: dict[str, JsonValue] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _CompileCollector:
+    """Compiler-internal declaration and reference tracker.
+
+    This collector is intentionally ephemeral. It exists only during
+    compilation so validation can reason about normalized labels before lookup
+    behavior hides collisions. Only ``CompileIssue`` records persist on the
+    returned bundle.
+    """
+
+    default_source_path: str | None = None
+    default_story_key: str | None = None
+    declarations: list[_DeclaredTemplate] = field(default_factory=list)
+    declarations_by_template_label: dict[str, list[_DeclaredTemplate]] = field(default_factory=dict)
+    pending: list[_PendingDiagnostic] = field(default_factory=list)
+
+    @classmethod
+    def from_source_map(cls, source_map: dict[str, Any] | None) -> "_CompileCollector":
+        if not isinstance(source_map, dict):
+            return cls()
+        refs = source_map.get("__source_files__")
+        if not isinstance(refs, list) or not refs:
+            return cls()
+        first = refs[0]
+        if isinstance(first, dict):
+            return cls(
+                default_source_path=_coerce_text(first.get("path")),
+                default_story_key=_coerce_text(first.get("story_key")),
+            )
+        return cls(
+            default_source_path=_coerce_text(getattr(first, "path", None)),
+            default_story_key=_coerce_text(getattr(first, "story_key", None)),
+        )
+
+    def build_source_ref(
+        self,
+        *,
+        authored_path: str | None,
+        label: str | None,
+        note: str | None = None,
+    ) -> AuthoredRef | None:
+        source_ref = AuthoredRef(
+            path=self.default_source_path,
+            story_key=self.default_story_key,
+            authored_path=authored_path,
+            label=label,
+            note=note,
+        )
+        if any(
+            (
+                source_ref.path,
+                source_ref.story_key,
+                source_ref.authored_path,
+                source_ref.label,
+                source_ref.note,
+            )
+        ):
+            return source_ref
+        return None
+
+    def add_declaration(
+        self,
+        *,
+        template_label: str,
+        payload: Entity,
+        authored_path: str,
+    ) -> None:
+        declared = _DeclaredTemplate(
+            template_label=template_label,
+            payload_label=_coerce_text(payload.get_label() if hasattr(payload, "get_label") else None),
+            payload_kind=payload.__class__,
+            source_ref=self.build_source_ref(
+                authored_path=authored_path,
+                label=template_label,
+            ),
+        )
+        self.declarations.append(declared)
+        self.declarations_by_template_label.setdefault(template_label, []).append(declared)
+
+    def add_pending(
+        self,
+        *,
+        code: str,
+        subject_label: str | None,
+        authored_path: str,
+        related_identifiers: list[str] | None = None,
+        details: dict[str, JsonValue] | None = None,
+    ) -> None:
+        self.pending.append(
+            _PendingDiagnostic(
+                code=code,
+                subject_label=subject_label,
+                source_ref=self.build_source_ref(
+                    authored_path=authored_path,
+                    label=subject_label,
+                ),
+                related_identifiers=list(related_identifiers or []),
+                details=_sanitize_issue_details(code, details or {}),
+            )
+        )
+
+    def has_candidate(self, identifier: str, *, kind: type[Entity]) -> bool:
+        for declaration in self.declarations:
+            if not issubclass(declaration.payload_kind, kind):
+                continue
+            if identifier == declaration.template_label:
+                return True
+            if declaration.payload_label and identifier == declaration.payload_label:
+                return True
+        return False
+
+    def build_issues(
+        self,
+        *,
+        story_label: str,
+        entry_template_ids: list[str],
+        resolution_strategy: str,
+    ) -> list[CompileIssue]:
+        issues: list[CompileIssue] = []
+        issues.extend(self._build_duplicate_issues())
+        issues.extend(self._build_pending_issues())
+        entry_issue = self._build_entry_issue(
+            story_label=story_label,
+            entry_template_ids=entry_template_ids,
+            resolution_strategy=resolution_strategy,
+        )
+        if entry_issue is not None:
+            issues.append(entry_issue)
+        return sorted(issues, key=_compile_issue_sort_key)
+
+    def _build_duplicate_issues(self) -> list[CompileIssue]:
+        issues: list[CompileIssue] = []
+        for template_label, declarations in self.declarations_by_template_label.items():
+            if len(declarations) < 2:
+                continue
+            occurrences = [
+                source_ref.authored_path
+                for declaration in declarations
+                if (source_ref := declaration.source_ref) is not None and source_ref.authored_path
+            ]
+            issue = CompileIssue(
+                code=ISSUE_DUPLICATE_LABEL,
+                severity=CompileSeverity.ERROR,
+                message=(
+                    f"Compile label {template_label!r} was declared more than once "
+                    "in the compiled bundle namespace."
+                ),
+                subject_label=template_label,
+                source_ref=declarations[0].source_ref,
+                details=_sanitize_issue_details(
+                    ISSUE_DUPLICATE_LABEL,
+                    {
+                    "normalized_label": template_label,
+                    "occurrences": occurrences,
+                    },
+                ),
+            )
+            issues.append(issue)
+        return issues
+
+    def _build_pending_issues(self) -> list[CompileIssue]:
+        issues: list[CompileIssue] = []
+        for pending in self.pending:
+            missing_identifier = next(iter(pending.related_identifiers), None)
+            if missing_identifier is None:
+                continue
+            required_kind = _required_kind_for_issue_code(pending.code)
+            if self.has_candidate(missing_identifier, kind=required_kind):
+                continue
+            issues.append(
+                CompileIssue(
+                    code=pending.code,
+                    severity=CompileSeverity.ERROR,
+                    message=_message_for_pending_issue(
+                        code=pending.code,
+                        subject_label=pending.subject_label,
+                        identifier=missing_identifier,
+                    ),
+                    subject_label=pending.subject_label,
+                    source_ref=pending.source_ref,
+                    related_identifiers=list(pending.related_identifiers),
+                    details=dict(pending.details),
+                )
+            )
+        return issues
+
+    def _build_entry_issue(
+        self,
+        *,
+        story_label: str,
+        entry_template_ids: list[str],
+        resolution_strategy: str,
+    ) -> CompileIssue | None:
+        if entry_template_ids and any(
+            self.has_candidate(identifier, kind=TraversableNode)
+            for identifier in entry_template_ids
+        ):
+            return None
+
+        authored_path = "metadata.start_at" if resolution_strategy == "metadata.start_at" else "metadata"
+        return CompileIssue(
+            code=ISSUE_EMPTY_ENTRY_RESOLUTION,
+            severity=CompileSeverity.ERROR,
+            message=(
+                f"Story {story_label!r} resolved no usable entry templates during compile "
+                "normalization."
+            ),
+            subject_label=story_label,
+            source_ref=self.build_source_ref(
+                authored_path=authored_path,
+                label=story_label,
+            ),
+            details=_sanitize_issue_details(
+                ISSUE_EMPTY_ENTRY_RESOLUTION,
+                {
+                    "requested_entry_ids": list(entry_template_ids),
+                    "resolution_strategy": resolution_strategy,
+                },
+            ),
+        )
+
+
+def _compile_issue_sort_key(issue: CompileIssue) -> tuple[str, str, str, str, str]:
+    source_ref = issue.source_ref
+    return (
+        _coerce_text(source_ref.path if source_ref is not None else None) or "",
+        _coerce_text(source_ref.authored_path if source_ref is not None else None) or "",
+        issue.subject_label or "",
+        issue.code,
+        issue.message,
+    )
+
+
+def _message_for_pending_issue(*, code: str, subject_label: str | None, identifier: str) -> str:
+    subject = subject_label or "unknown"
+    if code == ISSUE_DANGLING_SUCCESSOR_REF:
+        return f"Successor reference {identifier!r} from {subject!r} does not resolve in this bundle."
+    if code == ISSUE_DANGLING_ACTOR_REF:
+        return f"Actor reference {identifier!r} from {subject!r} does not resolve in this bundle."
+    if code == ISSUE_DANGLING_LOCATION_REF:
+        return f"Location reference {identifier!r} from {subject!r} does not resolve in this bundle."
+    return f"Compile diagnostic {code!r} for {subject!r} references {identifier!r}."
+
+
+def _required_kind_for_issue_code(code: str) -> type[Entity]:
+    if code == ISSUE_DANGLING_SUCCESSOR_REF:
+        return TraversableNode
+    if code == ISSUE_DANGLING_ACTOR_REF:
+        return Actor
+    if code == ISSUE_DANGLING_LOCATION_REF:
+        return Location
+    return Entity
+
+
+def _sanitize_issue_details(code: str, details: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    allowed_keys = _COMPILE_ISSUE_DETAIL_KEYS.get(code)
+    if not allowed_keys:
+        return dict(details)
+    return {key: details[key] for key in allowed_keys if key in details}
+
+
+def _coerce_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text or None
 
 
 @dataclass(slots=True)
@@ -33,6 +335,8 @@ class StoryTemplateBundle:
       alongside the template hierarchy.
     * Records ``entry_template_ids`` so materialization can resolve the graph's
       initial cursor positions deterministically.
+    * Stores structured compiler diagnostics for cheap bundle-local integrity
+      problems without forcing materialization first.
 
     API
     ---
@@ -41,6 +345,7 @@ class StoryTemplateBundle:
     - :attr:`template_registry` contains the validated template hierarchy.
     - :attr:`entry_template_ids` lists the template ids used for initial cursor
       resolution.
+    - :attr:`issues` stores structured compile diagnostics for later inspection.
     - :attr:`source_map`, :attr:`codec_state`, and :attr:`codec_id` preserve
       compile-time provenance and codec context.
     """
@@ -52,6 +357,7 @@ class StoryTemplateBundle:
     source_map: dict[str, Any]
     codec_state: dict[str, Any]
     codec_id: str | None
+    issues: list[CompileIssue] = field(default_factory=list)
 
 
 class StoryCompiler:
@@ -116,6 +422,7 @@ class StoryCompiler:
 
         metadata = dict(data.get("metadata") or {})
         locals_ns = dict(data.get("globals") or data.get("locals") or {})
+        collector = _CompileCollector.from_source_map(source_map)
 
         registry = TemplateRegistry(label=f"{label}_templates")
         root = TemplateGroup(
@@ -128,22 +435,28 @@ class StoryCompiler:
             parent=root,
             items=data.get("templates"),
             fallback_kind=TraversableNode,
+            collector=collector,
+            authored_path_prefix="templates",
         )
         self._compile_section(
             parent=root,
             items=data.get("actors"),
             fallback_kind=Actor,
+            collector=collector,
+            authored_path_prefix="actors",
         )
         self._compile_section(
             parent=root,
             items=data.get("locations"),
             fallback_kind=Location,
+            collector=collector,
+            authored_path_prefix="locations",
         )
 
         scenes = self._normalize_mapping(data.get("scenes"))
-        self._validate_unique_root_scene_labels(scenes)
         root_scene_labels = {scene_label for scene_label, _ in scenes}
         for scene_label, scene_data in scenes:
+            scene_authored_path = f"scenes.{scene_label}"
             scene_payload = self._build_payload(
                 kind=self._resolve_kind(
                     scene_data.get("kind"),
@@ -158,21 +471,47 @@ class StoryCompiler:
                 },
                 default_label=scene_label,
             )
+            collector.add_declaration(
+                template_label=scene_label,
+                payload=scene_payload,
+                authored_path=scene_authored_path,
+            )
             scene_templ = TemplateGroup(
                 label=scene_label,
                 payload=scene_payload,
                 registry=registry,
             )
             root.add_child(scene_templ)
+            self._collect_provider_ref_issues(
+                collector=collector,
+                specs=scene_payload.roles,
+                source_label=scene_label,
+                authored_path_prefix=f"{scene_authored_path}.roles",
+                field_name="roles",
+                issue_code=ISSUE_DANGLING_ACTOR_REF,
+                reference_keys=("actor_ref", "actor_template_ref"),
+            )
+            self._collect_provider_ref_issues(
+                collector=collector,
+                specs=scene_payload.settings,
+                source_label=scene_label,
+                authored_path_prefix=f"{scene_authored_path}.settings",
+                field_name="settings",
+                issue_code=ISSUE_DANGLING_LOCATION_REF,
+                reference_keys=("location_ref", "location_template_ref"),
+            )
 
             self._compile_section(
                 parent=scene_templ,
                 items=scene_data.get("templates"),
                 fallback_kind=TraversableNode,
+                collector=collector,
+                authored_path_prefix=f"{scene_authored_path}.templates",
             )
 
             blocks = self._normalize_mapping(scene_data.get("blocks"))
             for block_index, (block_label, block_data) in enumerate(blocks):
+                block_authored_path = f"{scene_authored_path}.blocks.{block_label}"
                 qualified_label = f"{scene_label}.{block_label}"
                 actions = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("actions")),
@@ -196,6 +535,27 @@ class StoryCompiler:
                             spec["successor_ref"] = next_qualified
                             spec["successor_is_absolute"] = False
                             spec["successor_is_inferred"] = True
+                self._collect_successor_issues(
+                    collector=collector,
+                    specs=actions,
+                    source_label=qualified_label,
+                    authored_path_prefix=f"{block_authored_path}.actions",
+                    field_name="actions",
+                )
+                self._collect_successor_issues(
+                    collector=collector,
+                    specs=continues,
+                    source_label=qualified_label,
+                    authored_path_prefix=f"{block_authored_path}.continues",
+                    field_name="continues",
+                )
+                self._collect_successor_issues(
+                    collector=collector,
+                    specs=redirects,
+                    source_label=qualified_label,
+                    authored_path_prefix=f"{block_authored_path}.redirects",
+                    field_name="redirects",
+                )
 
                 block_payload = self._build_payload(
                     kind=self._resolve_kind(
@@ -215,26 +575,60 @@ class StoryCompiler:
                     },
                     default_label=block_label,
                 )
+                collector.add_declaration(
+                    template_label=qualified_label,
+                    payload=block_payload,
+                    authored_path=block_authored_path,
+                )
                 block_templ = TemplateGroup(
                     label=qualified_label,
                     payload=block_payload,
                     registry=registry,
                 )
                 scene_templ.add_child(block_templ)
+                self._collect_provider_ref_issues(
+                    collector=collector,
+                    specs=block_payload.roles,
+                    source_label=qualified_label,
+                    authored_path_prefix=f"{block_authored_path}.roles",
+                    field_name="roles",
+                    issue_code=ISSUE_DANGLING_ACTOR_REF,
+                    reference_keys=("actor_ref", "actor_template_ref"),
+                )
+                self._collect_provider_ref_issues(
+                    collector=collector,
+                    specs=block_payload.settings,
+                    source_label=qualified_label,
+                    authored_path_prefix=f"{block_authored_path}.settings",
+                    field_name="settings",
+                    issue_code=ISSUE_DANGLING_LOCATION_REF,
+                    reference_keys=("location_ref", "location_template_ref"),
+                )
 
                 self._compile_section(
                     parent=block_templ,
                     items=block_data.get("templates"),
                     fallback_kind=TraversableNode,
+                    collector=collector,
+                    authored_path_prefix=f"{block_authored_path}.templates",
                 )
 
-        entry_template_ids = self._resolve_entry_template_ids(metadata=metadata, registry=registry)
+        entry_template_ids, resolution_strategy = self._resolve_entry_template_ids(
+            metadata=metadata,
+            registry=registry,
+        )
+        issues = collector.build_issues(
+            story_label=label,
+            entry_template_ids=entry_template_ids,
+            resolution_strategy=resolution_strategy,
+        )
 
         return StoryTemplateBundle(
             metadata=metadata,
             locals=locals_ns,
             template_registry=registry,
             entry_template_ids=entry_template_ids,
+            issues=issues,
             source_map=source_map or {},
             codec_state=codec_state or {},
             codec_id=codec_id,
@@ -246,6 +640,8 @@ class StoryCompiler:
         parent: TemplateGroup,
         items: Any,
         fallback_kind: type[Entity],
+        collector: _CompileCollector,
+        authored_path_prefix: str,
     ) -> None:
         for label, item_data in self._normalize_mapping(items):
             parent_label = parent.get_label()
@@ -262,6 +658,11 @@ class StoryCompiler:
                 payload={**item_data, "label": item_data.get("label") or label},
                 default_label=label,
             )
+            collector.add_declaration(
+                template_label=scoped_label,
+                payload=payload,
+                authored_path=f"{authored_path_prefix}.{label}",
+            )
             templ = TemplateGroup(
                 label=scoped_label,
                 payload=payload,
@@ -272,6 +673,8 @@ class StoryCompiler:
                 parent=templ,
                 items=item_data.get("templates"),
                 fallback_kind=fallback_kind,
+                collector=collector,
+                authored_path_prefix=f"{authored_path_prefix}.{label}.templates",
             )
 
     @staticmethod
@@ -371,31 +774,104 @@ class StoryCompiler:
         return normalized
 
     @staticmethod
-    def _validate_unique_root_scene_labels(scenes: list[tuple[str, dict[str, Any]]]) -> None:
-        labels = [label for label, _ in scenes]
-        duplicates = sorted(
-            label
-            for label, count in Counter(labels).items()
-            if count > 1
-        )
-        if duplicates:
-            joined = ", ".join(duplicates)
-            raise ValueError(f"Duplicate root scene labels declared: {joined}")
+    def _collect_successor_issues(
+        *,
+        collector: _CompileCollector,
+        specs: list[dict[str, Any]],
+        source_label: str,
+        authored_path_prefix: str,
+        field_name: str,
+    ) -> None:
+        for index, spec in enumerate(specs):
+            canonical_ref = _coerce_text(spec.get("successor_ref"))
+            if not canonical_ref:
+                continue
+            authored_ref = _coerce_text(spec.get("authored_successor_ref")) or canonical_ref
+            subject_label = StoryCompiler._diagnostic_subject_label(
+                source_label=source_label,
+                spec=spec,
+                field_name=field_name,
+                index=index,
+            )
+            collector.add_pending(
+                code=ISSUE_DANGLING_SUCCESSOR_REF,
+                subject_label=subject_label,
+                authored_path=f"{authored_path_prefix}[{index}]",
+                related_identifiers=[canonical_ref],
+                details={
+                    "field": field_name,
+                    "authored_ref": authored_ref,
+                    "canonical_ref": canonical_ref,
+                },
+            )
+
+    @staticmethod
+    def _collect_provider_ref_issues(
+        *,
+        collector: _CompileCollector,
+        specs: list[dict[str, Any]],
+        source_label: str,
+        authored_path_prefix: str,
+        field_name: str,
+        issue_code: str,
+        reference_keys: tuple[str, str],
+    ) -> None:
+        for index, spec in enumerate(specs):
+            reference_key, identifier = StoryCompiler._first_reference(spec, *reference_keys)
+            if not identifier:
+                continue
+            subject_label = StoryCompiler._diagnostic_subject_label(
+                source_label=source_label,
+                spec=spec,
+                field_name=field_name,
+                index=index,
+            )
+            collector.add_pending(
+                code=issue_code,
+                subject_label=subject_label,
+                authored_path=f"{authored_path_prefix}[{index}]",
+                related_identifiers=[identifier],
+                details={
+                    "reference_key": reference_key,
+                    "missing_ref": identifier,
+                },
+            )
+
+    @staticmethod
+    def _first_reference(spec: dict[str, Any], *keys: str) -> tuple[str, str | None]:
+        for key in keys:
+            value = _coerce_text(spec.get(key))
+            if value:
+                return key, value
+        return keys[0], None
+
+    @staticmethod
+    def _diagnostic_subject_label(
+        *,
+        source_label: str,
+        spec: dict[str, Any],
+        field_name: str,
+        index: int,
+    ) -> str:
+        explicit_label = _coerce_text(spec.get("label"))
+        if explicit_label:
+            return f"{source_label}.{explicit_label}"
+        return f"{source_label}.{field_name}[{index}]"
 
     @staticmethod
     def _resolve_entry_template_ids(
         *,
         metadata: dict[str, Any],
         registry: TemplateRegistry,
-    ) -> list[str]:
+    ) -> tuple[list[str], str]:
         """Resolve compile-time entry template ids using authored priority rules."""
         start_at = metadata.get("start_at")
         if isinstance(start_at, str) and start_at:
-            return [start_at]
+            return [start_at], "metadata.start_at"
         if isinstance(start_at, list):
             values = [str(v) for v in start_at if str(v)]
             if values:
-                return values
+                return values, "metadata.start_at"
 
         block_templates = [
             template
@@ -406,7 +882,7 @@ class StoryCompiler:
         for tag_name in ("start", "entry"):
             for template in block_templates:
                 if template.has_tags({tag_name}):
-                    return [template.get_label()]
+                    return [template.get_label()], f"tag:{tag_name}"
 
         for template in block_templates:
             payload = getattr(template, "payload", None)
@@ -416,19 +892,19 @@ class StoryCompiler:
             if isinstance(block_locals, dict) and (
                 block_locals.get("is_start") or block_locals.get("start_at")
             ):
-                return [template.get_label()]
+                return [template.get_label()], "locals:start"
 
         for template in block_templates:
             label = template.get_label()
             short_label = label.rsplit(".", 1)[-1] if "." in label else label
             if short_label.lower() == "start":
-                return [label]
+                return [label], "label:start"
 
         first_block = registry.find_one(Selector(has_payload_kind=Block))
         if first_block is not None:
-            return [first_block.get_label()]
+            return [first_block.get_label()], "first_block"
 
-        return []
+        return [], "none"
 
     @staticmethod
     def _next_block_label(
