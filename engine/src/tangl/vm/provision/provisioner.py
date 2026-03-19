@@ -515,7 +515,7 @@ class UpdateCloneProvisioner:
 
     @staticmethod
     def _offer_matches_selector(offer: ProvisionOffer, selector: Selector) -> bool:
-        candidate = getattr(offer, "candidate", None)
+        candidate = offer.candidate
         if candidate is None:
             return False
         try:
@@ -554,7 +554,7 @@ class UpdateCloneProvisioner:
         if isinstance(created, Mapping):
             return cls._sanitize_updates(created)
 
-        candidate = getattr(offer, "candidate", None)
+        candidate = offer.candidate
         if isinstance(candidate, EntityTemplate):
             return cls._sanitize_updates(candidate.payload.unstructure())
         return {}
@@ -573,19 +573,16 @@ class UpdateCloneProvisioner:
 
     @staticmethod
     def _clone_with_updates(
-        reference: Any,
+        reference: Entity,
         updates: Mapping[str, Any],
         *,
         _ctx: Any = None,
-    ) -> Any:
-        if not hasattr(reference, "evolve"):
-            raise TypeError(f"{type(reference).__name__} is not cloneable (missing evolve)")
+    ) -> Entity:
         clone = reference.evolve(
             uid=_next_provision_uid(_ctx=_ctx),
             **dict(updates),
         )
-        if hasattr(clone, "templ_hash") and hasattr(reference, "templ_hash"):
-            clone.templ_hash = getattr(reference, "templ_hash", None)
+        clone.templ_hash = reference.templ_hash
         return clone
 
     @classmethod
@@ -600,6 +597,8 @@ class UpdateCloneProvisioner:
             reference = find_offer.callback(_ctx=_ctx)
             if reference is None:
                 return None
+            if not isinstance(reference, Entity):
+                raise TypeError("UPDATE/CLONE offers require Entity references")
             updates = cls._extract_update_payload(create_offer, _ctx=_ctx)
             if policy & ProvisionPolicy.UPDATE:
                 return cls._apply_updates_in_place(reference, updates)
@@ -608,16 +607,16 @@ class UpdateCloneProvisioner:
             return None
 
         distance = max(
-            int(getattr(find_offer, "distance_from_caller", 999)),
-            int(getattr(create_offer, "distance_from_caller", 999)),
+            find_offer.distance_from_caller,
+            create_offer.distance_from_caller,
         )
         specificity = max(
-            int(getattr(find_offer, "specificity", 0)),
-            int(getattr(create_offer, "specificity", 0)),
+            find_offer.specificity,
+            create_offer.specificity,
         )
         priority = max(
-            int(getattr(find_offer, "priority", Priority.NORMAL)),
-            int(getattr(create_offer, "priority", Priority.NORMAL)),
+            find_offer.priority,
+            create_offer.priority,
         )
         return ProvisionOffer(
             origin_id=f"UpdateCloneProvisioner:{policy.name.lower()}",
@@ -626,7 +625,7 @@ class UpdateCloneProvisioner:
             priority=priority,
             distance_from_caller=distance,
             specificity=specificity,
-            candidate=getattr(find_offer, "candidate", None),
+            candidate=find_offer.candidate,
         )
 
     @classmethod

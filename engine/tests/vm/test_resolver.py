@@ -50,6 +50,7 @@ from tangl.vm.provision import (
     StubProvisioner,
     ProvisionOffer,
 )
+from tangl.vm.provision.matching import annotate_offer_specificity
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
@@ -567,6 +568,12 @@ class TestResolverOfferGathering:
         )
         ordered = sorted([inexact, exact], key=lambda offer: offer.sort_key())
         assert ordered[0] is exact
+
+    def test_offer_annotation_requires_typed_provision_offer(self) -> None:
+        req = Requirement(has_kind=Entity)
+
+        with pytest.raises(AttributeError, match="candidate"):
+            annotate_offer_specificity(req, SimpleNamespace())
 
     def test_update_clone_declines_without_two_part_formula(self) -> None:
         source = Entity(label="source")

@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
+
 from tangl.core import TemplateRegistry
 from tangl.story.ctx import StoryRuntimeCtx
-from tangl.story.fabula.materializer import _PrelinkCtx
+from tangl.story.fabula.materializer import StoryMaterializer, _PrelinkCtx
 from tangl.story.story_graph import StoryGraph
+from tangl.vm import Requirement
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
@@ -63,3 +68,15 @@ def test_prelink_ctx_derives_child_phase_ctx() -> None:
         "phase": "prelink",
         "request_ctx_path": "story.child",
     }
+
+
+def test_preview_requirement_contract_requires_typed_offer() -> None:
+    graph = StoryGraph()
+    materializer = StoryMaterializer()
+
+    with pytest.raises(AttributeError, match="candidate"):
+        materializer.preview_requirement_contract(
+            requirement=Requirement(has_identifier="scene.child"),
+            offer=SimpleNamespace(),
+            graph=graph,
+        )

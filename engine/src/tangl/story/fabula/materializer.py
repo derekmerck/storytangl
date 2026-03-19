@@ -18,6 +18,7 @@ from tangl.vm import (
     Blocker,
     Dependency,
     Fanout,
+    ProvisionOffer,
     ProvisionPolicy,
     Requirement,
     Resolver,
@@ -224,7 +225,7 @@ class StoryMaterializer:
         self,
         *,
         requirement: Requirement,
-        offer: Any,
+        offer: ProvisionOffer,
         graph: Any,
         _ctx: Any = None,
     ) -> list[Blocker]:
@@ -232,13 +233,13 @@ class StoryMaterializer:
         if not isinstance(graph, StoryGraph):
             return []
 
-        template = getattr(offer, "candidate", None)
-        target_ctx = getattr(offer, "target_ctx", None)
+        template = offer.candidate
+        target_ctx = offer.target_ctx
         if not isinstance(template, EntityTemplate) or not isinstance(target_ctx, str) or not target_ctx:
             return []
 
         blockers: list[Blocker] = []
-        build_segments = list(getattr(offer, "build_plan", None) or ())
+        build_segments = list(offer.build_plan or ())
         parent_paths = self._parent_prefix_paths(target_ctx)
         missing_paths = parent_paths[-len(build_segments) :] if build_segments else []
 
@@ -1368,14 +1369,14 @@ class StoryMaterializer:
         )
 
     @staticmethod
-    def _unique_template_candidates(offers: list[Any]) -> list[Any]:
-        candidates: list[Any] = []
+    def _unique_template_candidates(offers: list[ProvisionOffer]) -> list[EntityTemplate]:
+        candidates: list[EntityTemplate] = []
         seen: set[UUID] = set()
         for offer in offers:
-            candidate = getattr(offer, "candidate", None)
-            candidate_uid = getattr(candidate, "uid", None)
-            if not isinstance(candidate_uid, UUID):
+            candidate = offer.candidate
+            if not isinstance(candidate, EntityTemplate):
                 continue
+            candidate_uid = candidate.uid
             if candidate_uid in seen:
                 continue
             seen.add(candidate_uid)

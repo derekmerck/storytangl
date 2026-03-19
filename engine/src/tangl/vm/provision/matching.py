@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from tangl.core import Selector
 
-logger = logging.getLogger(__name__)
+from .provisioner import ProvisionOffer
 
 
 def _selector_criteria(selector: Selector) -> dict[str, Any]:
@@ -103,7 +102,7 @@ def policy_tier(policy: Any) -> int:
     return 9
 
 
-def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int, int]:
+def offer_sort_key(offer: ProvisionOffer) -> tuple[int, int, int, int, int, int, int]:
     """Deterministic offer sort key.
 
     Order:
@@ -115,79 +114,41 @@ def offer_sort_key(offer: Any) -> tuple[int, int, int, int, int, int, int]:
     6) explicit offer priority
     7) creation sequence
     """
-    scope = getattr(offer, "scope_distance", 0)
-    if not isinstance(scope, int):
-        scope = 0
-    distance = getattr(offer, "distance_from_caller", 999)
-    if not isinstance(distance, int):
-        distance = 999
-    specificity = getattr(offer, "specificity", 0)
-    if not isinstance(specificity, int):
-        specificity = 0
-    exact_kind_match = bool(getattr(offer, "exact_kind_match", False))
-    priority = getattr(offer, "priority", 0)
-    if not isinstance(priority, int):
-        priority = 0
-    seq = getattr(offer, "seq", 0)
-    if not isinstance(seq, int):
-        seq = 0
-
     return (
         policy_tier(offer.policy),
-        scope,
-        distance,
-        0 if exact_kind_match else 1,
-        -specificity,
-        priority,
-        seq,
+        offer.scope_distance,
+        offer.distance_from_caller,
+        0 if offer.exact_kind_match else 1,
+        -offer.specificity,
+        offer.priority,
+        offer.seq,
     )
 
 
-def annotate_offer_specificity(requirement: Selector, offer: Any) -> Any:
-    candidate = getattr(offer, "candidate", None)
+def annotate_offer_specificity(
+    requirement: Selector,
+    offer: ProvisionOffer,
+) -> ProvisionOffer:
+    candidate = offer.candidate
     specificity = score_requirement_specificity(requirement, candidate=candidate)
     exact_kind_match = _exact_kind_match(requirement, candidate)
-    if hasattr(offer, "model_copy"):
-        try:
-            return offer.model_copy(
-                update={
-                    "specificity": specificity,
-                    "exact_kind_match": exact_kind_match,
-                }
-            )
-        except Exception as exc:
-            logger.debug(
-                "offer.model_copy failed while annotating specificity; "
-                "origin_id=%s specificity=%s exact_kind_match=%s",
-                getattr(offer, "origin_id", None),
-                specificity,
-                exact_kind_match,
-                exc_info=exc,
-            )
-    if hasattr(offer, "specificity"):
-        try:
-            offer.specificity = specificity
-            if hasattr(offer, "exact_kind_match"):
-                offer.exact_kind_match = exact_kind_match
-            return offer
-        except Exception as exc:
-            logger.debug(
-                "in-place offer specificity annotation failed; origin_id=%s",
-                getattr(offer, "origin_id", None),
-                exc_info=exc,
-            )
-    return offer
+    return offer.model_copy(
+        update={
+            "specificity": specificity,
+            "exact_kind_match": exact_kind_match,
+        }
+    )
 
 
-def summarize_offer(offer: Any) -> dict[str, Any]:
+def summarize_offer(offer: ProvisionOffer) -> dict[str, Any]:
     return {
-        "origin_id": str(getattr(offer, "origin_id", "")) or None,
-        "policy": str(getattr(offer, "policy", None)),
-        "scope_distance": getattr(offer, "scope_distance", None),
-        "build_plan": getattr(offer, "build_plan", None),
-        "target_ctx": getattr(offer, "target_ctx", None),
-        "distance_from_caller": getattr(offer, "distance_from_caller", None),
-        "exact_kind_match": getattr(offer, "exact_kind_match", None),
-        "specificity": getattr(offer, "specificity", None),
-        "priority": getattr(offer, "priority", None),
+        "origin_id": str(offer.origin_id or "") or None,
+        "policy": str(offer.policy),
+        "scope_distance": offer.scope_distance,
+        "build_plan": offer.build_plan,
+        "target_ctx": offer.target_ctx,
+        "distance_from_caller": offer.distance_from_caller,
+        "exact_kind_match": offer.exact_kind_match,
+        "specificity": offer.specificity,
+        "priority": offer.priority,
     }
