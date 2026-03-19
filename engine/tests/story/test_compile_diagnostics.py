@@ -57,6 +57,28 @@ class TestCompileDiagnosticsBundleContract:
 
         assert bundle.issues == []
 
+    def test_multi_file_source_map_does_not_reuse_first_file_as_default(self) -> None:
+        script = _valid_script()
+        script["scenes"]["intro"]["blocks"]["start"]["roles"] = [
+            {"label": "host", "actor_ref": "missing_actor"},
+        ]
+
+        bundle = StoryCompiler().compile(
+            script,
+            source_map={
+                "__source_files__": [
+                    {"path": "scripts/a.yaml", "story_key": None},
+                    {"path": "scripts/b.yaml", "story_key": None},
+                ]
+            },
+        )
+
+        issue = bundle.issues[0]
+        assert issue.source_ref is not None
+        assert issue.source_ref.path is None
+        assert issue.source_ref.story_key is None
+        assert issue.source_ref.authored_path == "scenes[0].intro.blocks[0].start.roles[0]"
+
 
 # ============================================================================
 # Structural Reference Issues
@@ -87,7 +109,7 @@ class TestCompileDiagnosticsStructuralRefs:
             "canonical_ref": "intro.missing",
         }
         assert issue.source_ref is not None
-        assert issue.source_ref.authored_path == "scenes.intro.blocks.start.actions[0]"
+        assert issue.source_ref.authored_path == "scenes[0].intro.blocks[0].start.actions[0]"
 
     def test_dangling_actor_ref_is_recorded_on_bundle(self) -> None:
         script = _valid_script()
@@ -107,7 +129,7 @@ class TestCompileDiagnosticsStructuralRefs:
             "missing_ref": "missing_actor",
         }
         assert issue.source_ref is not None
-        assert issue.source_ref.authored_path == "scenes.intro.blocks.start.roles[0]"
+        assert issue.source_ref.authored_path == "scenes[0].intro.blocks[0].start.roles[0]"
 
     def test_dangling_location_ref_is_recorded_on_bundle(self) -> None:
         script = _valid_script()
@@ -127,7 +149,7 @@ class TestCompileDiagnosticsStructuralRefs:
             "missing_ref": "missing_place",
         }
         assert issue.source_ref is not None
-        assert issue.source_ref.authored_path == "scenes.intro.blocks.start.settings[0]"
+        assert issue.source_ref.authored_path == "scenes[0].intro.blocks[0].start.settings[0]"
 
 
 # ============================================================================
@@ -153,7 +175,25 @@ class TestCompileDiagnosticsSourceIntegrity:
         assert issue.related_identifiers == []
         assert issue.details == {
             "normalized_label": "guide",
-            "occurrences": ["templates.guide", "actors.guide"],
+            "occurrences": ["templates[0].guide", "actors[0].guide"],
+        }
+
+    def test_duplicate_list_items_keep_distinct_occurrence_paths(self) -> None:
+        script = {
+            "label": "duplicate_scenes",
+            "metadata": {"start_at": "scene1.block1"},
+            "scenes": [
+                {"label": "scene1", "blocks": {"block1": {"content": "A"}}},
+                {"label": "scene1", "blocks": {"block2": {"content": "B"}}},
+            ],
+        }
+
+        bundle = _compile(script)
+
+        issue = next(issue for issue in bundle.issues if issue.code == "compile:duplicate_label")
+        assert issue.details == {
+            "normalized_label": "scene1",
+            "occurrences": ["scenes[0].scene1", "scenes[1].scene1"],
         }
 
     def test_invalid_start_at_records_empty_entry_resolution(self) -> None:
@@ -207,8 +247,8 @@ class TestCompileDiagnosticsAggregation:
             "compile:duplicate_label",
         ]
         assert [issue.source_ref.authored_path if issue.source_ref is not None else None for issue in bundle.issues] == [
-            "scenes.intro.blocks.start.actions[0]",
-            "scenes.intro.blocks.start.roles[0]",
-            "scenes.intro.blocks.start.settings[0]",
-            "templates.guide",
+            "scenes[0].intro.blocks[0].start.actions[0]",
+            "scenes[0].intro.blocks[0].start.roles[0]",
+            "scenes[0].intro.blocks[0].start.settings[0]",
+            "templates[0].guide",
         ]

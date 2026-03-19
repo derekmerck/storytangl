@@ -69,9 +69,14 @@ class _CompileCollector:
         if not isinstance(source_map, dict):
             return cls()
         refs = source_map.get("__source_files__")
-        if not isinstance(refs, list) or not refs:
+        if isinstance(refs, list):
+            if len(refs) != 1:
+                return cls()
+            first = refs[0]
+        elif refs is not None:
+            first = refs
+        else:
             return cls()
-        first = refs[0]
         if isinstance(first, dict):
             return cls(
                 default_source_path=_coerce_text(first.get("path")),
@@ -309,6 +314,12 @@ def _sanitize_issue_details(code: str, details: dict[str, JsonValue]) -> dict[st
     return {key: details[key] for key in allowed_keys if key in details}
 
 
+def _authored_item_path(prefix: str, index: int, label: str | None) -> str:
+    if label:
+        return f"{prefix}[{index}].{label}"
+    return f"{prefix}[{index}]"
+
+
 def _coerce_text(value: Any) -> str | None:
     if value is None:
         return None
@@ -454,9 +465,9 @@ class StoryCompiler:
         )
 
         scenes = self._normalize_mapping(data.get("scenes"))
-        root_scene_labels = {scene_label for scene_label, _ in scenes}
-        for scene_label, scene_data in scenes:
-            scene_authored_path = f"scenes.{scene_label}"
+        root_scene_labels = {scene_label for _scene_index, scene_label, _scene_data in scenes}
+        for scene_index, scene_label, scene_data in scenes:
+            scene_authored_path = _authored_item_path("scenes", scene_index, scene_label)
             scene_payload = self._build_payload(
                 kind=self._resolve_kind(
                     scene_data.get("kind"),
@@ -510,8 +521,12 @@ class StoryCompiler:
             )
 
             blocks = self._normalize_mapping(scene_data.get("blocks"))
-            for block_index, (block_label, block_data) in enumerate(blocks):
-                block_authored_path = f"{scene_authored_path}.blocks.{block_label}"
+            for block_index, block_label, block_data in blocks:
+                block_authored_path = _authored_item_path(
+                    f"{scene_authored_path}.blocks",
+                    block_index,
+                    block_label,
+                )
                 qualified_label = f"{scene_label}.{block_label}"
                 actions = self._canonicalize_action_specs(
                     self._normalize_list(block_data.get("actions")),
@@ -643,12 +658,17 @@ class StoryCompiler:
         collector: _CompileCollector,
         authored_path_prefix: str,
     ) -> None:
-        for label, item_data in self._normalize_mapping(items):
+        for item_index, label, item_data in self._normalize_mapping(items):
             parent_label = parent.get_label()
             scoped_label = (
                 label
                 if getattr(parent, "parent", None) is None
                 else f"{parent_label}.{label}"
+            )
+            item_authored_path = _authored_item_path(
+                authored_path_prefix,
+                item_index,
+                label,
             )
             payload = self._build_payload(
                 kind=self._resolve_kind(
@@ -661,7 +681,7 @@ class StoryCompiler:
             collector.add_declaration(
                 template_label=scoped_label,
                 payload=payload,
-                authored_path=f"{authored_path_prefix}.{label}",
+                authored_path=item_authored_path,
             )
             templ = TemplateGroup(
                 label=scoped_label,
@@ -674,26 +694,26 @@ class StoryCompiler:
                 items=item_data.get("templates"),
                 fallback_kind=fallback_kind,
                 collector=collector,
-                authored_path_prefix=f"{authored_path_prefix}.{label}.templates",
+                authored_path_prefix=f"{item_authored_path}.templates",
             )
 
     @staticmethod
-    def _normalize_mapping(value: Any) -> list[tuple[str, dict[str, Any]]]:
+    def _normalize_mapping(value: Any) -> list[tuple[int, str, dict[str, Any]]]:
         if not value:
             return []
         if isinstance(value, dict):
-            items: list[tuple[str, dict[str, Any]]] = []
-            for label, data in value.items():
+            items: list[tuple[int, str, dict[str, Any]]] = []
+            for index, (label, data) in enumerate(value.items()):
                 if isinstance(data, dict):
                     payload = dict(data)
                 else:
                     payload = dict(getattr(data, "model_dump", lambda **_: {})())
                 payload.setdefault("label", label)
-                items.append((str(label), payload))
+                items.append((index, str(label), payload))
             return items
         items = []
         anon_counter = 0
-        for item in value:
+        for index, item in enumerate(value):
             if isinstance(item, dict):
                 payload = dict(item)
             else:
@@ -704,7 +724,7 @@ class StoryCompiler:
                 anon_counter += 1
                 payload["label"] = label
                 payload["_is_anonymous"] = True
-            items.append((str(label), payload))
+            items.append((index, str(label), payload))
         return items
 
     @staticmethod
@@ -908,14 +928,14 @@ class StoryCompiler:
 
     @staticmethod
     def _next_block_label(
-        blocks: list[tuple[str, dict[str, Any]]],
+        blocks: list[tuple[int, str, dict[str, Any]]],
         current_index: int,
         scene_label: str,
     ) -> str | None:
         next_index = current_index + 1
         if next_index >= len(blocks):
             return None
-        return f"{scene_label}.{blocks[next_index][0]}"
+        return f"{scene_label}.{blocks[next_index][1]}"
 
     def _resolve_kind(self, raw_kind: Any, *, fallback: type[Entity]) -> type[Entity]:
         if isinstance(raw_kind, type):
