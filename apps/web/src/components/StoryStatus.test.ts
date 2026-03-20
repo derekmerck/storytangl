@@ -38,31 +38,24 @@ describe('StoryStatus', () => {
     const wrapper = mountStatus()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('status')
-    expect(wrapper.text()).toContain('ok')
-  })
-
-  it('applies custom styles when provided', async () => {
-    const wrapper = mountStatus()
-    await flushPromises()
-
-    const styled = wrapper.findAll('[style]')
-    expect(styled.length).toBeGreaterThan(0)
-  })
-
-  it('handles items without styles', async () => {
-    const wrapper = mountStatus()
-    await flushPromises()
-
+    expect(wrapper.text()).toContain('Session')
     expect(wrapper.text()).toContain('Dark Forest')
   })
 
-  it('displays icon when provided', async () => {
+  it('renders projected section titles and values', async () => {
     const wrapper = mountStatus()
     await flushPromises()
 
-    const icons = wrapper.findAll('.v-icon')
-    expect(icons.length).toBeGreaterThanOrEqual(1)
+    expect(wrapper.text()).toContain('Cursor')
+    expect(wrapper.text()).toContain('Journal size')
+  })
+
+  it('renders custom section kinds generically', async () => {
+    const wrapper = mountStatus()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Flags')
+    expect(wrapper.text()).toContain('torch_lit, met_guide')
   })
 
   it('handles empty status payload', async () => {

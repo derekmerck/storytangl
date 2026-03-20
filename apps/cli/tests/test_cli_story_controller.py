@@ -48,7 +48,31 @@ class RecordingCLI(cmd2.Cmd):
         if endpoint.endswith("resolve_choice"):
             return {"fragments": [SimpleNamespace(content="moved")]} 
         if endpoint.endswith("get_story_info"):
-            return {"title": "demo", "cursor_id": uuid4(), "step": 0, "journal_size": 1}
+            return {
+                "sections": [
+                    {
+                        "section_id": "session",
+                        "title": "Session",
+                        "kind": "stats",
+                        "value": {
+                            "value_type": "kv_list",
+                            "items": [
+                                {"key": "Cursor", "value": "Dark Forest"},
+                                {"key": "Step", "value": 0},
+                            ],
+                        },
+                    },
+                    {
+                        "section_id": "flags",
+                        "title": "Flags",
+                        "kind": "custom_metrics",
+                        "value": {
+                            "value_type": "badges",
+                            "items": ["torch_lit", "met_guide"],
+                        },
+                    },
+                ]
+            }
         if endpoint.endswith("drop_story"):
             return {
                 "status": "dropped",
@@ -127,3 +151,16 @@ def test_drop_story_invokes_service_and_clears_context(story_controller: StoryCo
     assert cli.outputs[1].startswith("Dropped ledger:")
     assert cli.outputs[2] == "Archived: True"
     assert cli.outputs[3] == "Persistence deleted: False"
+
+
+def test_status_renders_projected_sections_generically(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    cli.outputs.clear()
+
+    story_controller.do_status()
+
+    output = "\n".join(cli.outputs)
+    assert "Session:" in output
+    assert "Cursor: Dark Forest" in output
+    assert "Flags:" in output
+    assert "torch_lit, met_guide" in output

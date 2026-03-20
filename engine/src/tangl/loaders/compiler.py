@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from tangl.story.fabula import StoryCompiler, World
 
@@ -19,6 +19,7 @@ class _WorldDomainFacet:
 
         self.dispatch_registry = BehaviorRegistry(label="world_domain_dispatch")
         self._authorities: list[Any] = [self.dispatch_registry]
+        self._story_info_projector_factories: list[Callable[[], Any]] = []
         self.modules: list[Any] = []
         self.class_registry: dict[str, Any] = {}
 
@@ -31,6 +32,10 @@ class _WorldDomainFacet:
             for authority in get_authorities() or ():
                 if authority not in self._authorities:
                     self._authorities.append(authority)
+
+        get_story_info_projector = getattr(module, "get_story_info_projector", None)
+        if callable(get_story_info_projector):
+            self._story_info_projector_factories.append(get_story_info_projector)
 
         try:
             from tangl.core import Entity
@@ -47,6 +52,13 @@ class _WorldDomainFacet:
 
     def get_authorities(self) -> list[Any]:
         return list(self._authorities)
+
+    def get_story_info_projector(self) -> Any | None:
+        for factory in self._story_info_projector_factories:
+            projector = factory()
+            if projector is not None:
+                return projector
+        return None
 
 
 class _WorldAssetsFacet:

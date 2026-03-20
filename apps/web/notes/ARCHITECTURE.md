@@ -51,7 +51,7 @@
 │  API Endpoints:                                                 │
 │  - GET  /story/update     → RuntimeEnvelope                     │
 │  - POST /story/do         → RuntimeEnvelope                     │
-│  - GET  /story/info       → RuntimeInfo                         │
+│  - GET  /story/info       → ProjectedState                      │
 │  - GET  /system/info      → SystemStatus                        │
 │  - GET  /world/:id/info   → WorldInfo                           │
 └─────────────────────────────────────────────────────────────────┘

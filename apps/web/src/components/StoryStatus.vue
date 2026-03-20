@@ -2,150 +2,93 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { useGlobal } from '@/composables/globals'
-import type { JournalKVItem, RuntimeInfo, StoryStatus as StoryStatusPayload } from '@/types'
+import type {
+  BadgeListValue,
+  ItemListValue,
+  KvListValue,
+  PrimitiveValue,
+  ProjectedSection,
+  StoryStatus as StoryStatusPayload,
+  TableValue,
+} from '@/types'
 
-type StatusItem = JournalKVItem & { style?: Record<string, string | number> }
-type StatusValue = number | string | unknown[]
+type StatusItem = {
+  key: string
+  value?: string
+}
+type StatusSection = {
+  sectionId: string
+  title: string
+  items: StatusItem[]
+}
 
 const { $http } = useGlobal()
 
-const statusItems = ref<StatusItem[]>([])
+const statusSections = ref<StatusSection[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const STATUS_KEY_LABELS: Record<string, string> = {
-  status: 'status',
-  message: 'message',
-  cursor_label: 'location',
-  turn: 'turn',
-  step: 'step',
-  choice_steps: 'choices made',
-  cursor_steps: 'moves',
-  journal_size: 'journal entries',
-  last_redirect: 'last redirect',
-  redirect_trace: 'redirect trace',
-}
-
-const STATUS_KEY_ICONS: Record<string, string> = {
-  status: 'check-circle',
-  cursor_label: 'map-marker',
-  turn: 'timeline-outline',
-  step: 'counter',
-  choice_steps: 'source-branch',
-  journal_size: 'book-open-page-variant',
-}
-
-const normaliseStyle = (item: JournalKVItem) => {
-  const source = item.style ?? item.style_dict
-  if (!source) {
-    return undefined
-  }
-
-  const entries = Object.entries(source).filter(([, value]) => {
-    return typeof value === 'string' || typeof value === 'number'
-  }) as Array<[string, string | number]>
-
-  return entries.length ? Object.fromEntries(entries) : undefined
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const formatValue = (value: unknown): StatusValue | undefined => {
-  if (value === null || value === undefined || value === '') {
-    return undefined
-  }
-  if (Array.isArray(value)) {
-    return value.length ? value : undefined
-  }
-  if (typeof value === 'number' || typeof value === 'string') {
-    return value
-  }
+const formatPrimitive = (value: PrimitiveValue): string => {
   if (typeof value === 'boolean') {
     return value ? 'yes' : 'no'
-  }
-  if (isRecord(value)) {
-    const entries = Object.entries(value)
-    return entries.length ? JSON.stringify(value) : undefined
   }
   return String(value)
 }
 
-const statusStyleFor = (key: string, value: StatusValue | undefined) => {
-  if (key === 'status' && value === 'ok') {
-    return { color: 'rgb(var(--v-theme-success))', fontWeight: 600 }
+const normalizeKvList = (value: KvListValue): StatusItem[] =>
+  value.items.map((item) => ({
+    key: item.key,
+    value: formatPrimitive(item.value),
+  }))
+
+const normalizeItemList = (value: ItemListValue): StatusItem[] =>
+  value.items.map((item) => {
+    const extras = [item.detail, item.tags?.length ? item.tags.join(', ') : undefined].filter(Boolean)
+    return {
+      key: item.label,
+      value: extras.length ? extras.join(' | ') : undefined,
+    }
+  })
+
+const normalizeTable = (value: TableValue): StatusItem[] =>
+  value.rows.map((row, index) => ({
+    key: `Row ${index + 1}`,
+    value: row
+      .map((cell, cellIndex) => `${value.columns[cellIndex]}: ${formatPrimitive(cell)}`)
+      .join(' | '),
+  }))
+
+const normalizeBadges = (value: BadgeListValue): StatusItem[] =>
+  value.items.length ? [{ key: 'Values', value: value.items.join(', ') }] : []
+
+const normalizeSection = (section: ProjectedSection): StatusSection => {
+  const value = section.value
+
+  if (value.value_type === 'kv_list') {
+    return { sectionId: section.section_id, title: section.title, items: normalizeKvList(value) }
   }
-  if (key === 'status' && value === 'error') {
-    return { color: 'rgb(var(--v-theme-error))', fontWeight: 600 }
+  if (value.value_type === 'item_list') {
+    return { sectionId: section.section_id, title: section.title, items: normalizeItemList(value) }
   }
-  return undefined
+  if (value.value_type === 'table') {
+    return { sectionId: section.section_id, title: section.title, items: normalizeTable(value) }
+  }
+  if (value.value_type === 'badges') {
+    return { sectionId: section.section_id, title: section.title, items: normalizeBadges(value) }
+  }
+
+  return {
+    sectionId: section.section_id,
+    title: section.title,
+    items: [{ key: 'Value', value: formatPrimitive(value.value) }],
+  }
 }
 
-const normalizeRuntimeStatus = (payload: RuntimeInfo): StatusItem[] => {
-  const orderedKeys = [
-    'status',
-    'message',
-    'cursor_label',
-    'turn',
-    'step',
-    'choice_steps',
-    'cursor_steps',
-    'journal_size',
-    'last_redirect',
-    'redirect_trace',
-  ]
-  const ignoredKeys = new Set(['code', 'cursor_id', 'details'])
-  const items: StatusItem[] = []
-  const pushItem = (key: string, rawValue: unknown) => {
-    const value = formatValue(rawValue)
-    if (value === undefined) {
-      return
-    }
-    items.push({
-      key: STATUS_KEY_LABELS[key] ?? key,
-      value,
-      icon: STATUS_KEY_ICONS[key],
-      style: statusStyleFor(key, value),
-    })
+const normalizeStatusPayload = (payload: StoryStatusPayload | null | undefined): StatusSection[] => {
+  if (!payload?.sections?.length) {
+    return []
   }
-
-  for (const key of orderedKeys) {
-    pushItem(key, payload[key])
-  }
-
-  const details = isRecord(payload.details) ? payload.details : null
-  if (details) {
-    for (const key of Object.keys(details)) {
-      if (orderedKeys.includes(key) || ignoredKeys.has(key)) {
-        continue
-      }
-      pushItem(key, details[key])
-    }
-  }
-
-  for (const [key, value] of Object.entries(payload)) {
-    if (orderedKeys.includes(key) || ignoredKeys.has(key)) {
-      continue
-    }
-    pushItem(key, value)
-  }
-
-  return items
-}
-
-const normalizeStatusPayload = (payload: StoryStatusPayload | null | undefined): StatusItem[] => {
-  if (Array.isArray(payload)) {
-    return payload.map((item) => ({
-      ...item,
-      style: normaliseStyle(item),
-    }))
-  }
-
-  if (isRecord(payload)) {
-    return normalizeRuntimeStatus(payload as RuntimeInfo)
-  }
-
-  return []
+  return payload.sections.map(normalizeSection)
 }
 
 onMounted(async () => {
@@ -153,17 +96,17 @@ onMounted(async () => {
     loading.value = true
     error.value = null
     const response = await $http.value.get<StoryStatusPayload>('/story/info')
-    statusItems.value = normalizeStatusPayload(response.data)
+    statusSections.value = normalizeStatusPayload(response.data)
   } catch (err) {
     console.error('Failed to fetch status:', err)
     error.value = 'Unable to load story status. Please try again later.'
-    statusItems.value = []
+    statusSections.value = []
   } finally {
     loading.value = false
   }
 })
 
-const hasItems = computed(() => statusItems.value.length > 0)
+const hasSections = computed(() => statusSections.value.length > 0)
 </script>
 
 <template>
@@ -181,21 +124,25 @@ const hasItems = computed(() => statusItems.value.length > 0)
       {{ error }}
     </v-alert>
 
-    <v-list v-else-if="hasItems" density="compact">
-      <v-list-item v-for="item in statusItems" :key="item.key">
-        <template #prepend>
-          <v-icon v-if="item.icon" :icon="item.icon.startsWith('mdi-') ? item.icon : `mdi-${item.icon}`" />
-        </template>
+    <div v-else-if="hasSections">
+      <div v-for="section in statusSections" :key="section.sectionId" class="mb-2">
+        <div class="text-overline text-medium-emphasis px-4 pt-2">
+          {{ section.title }}
+        </div>
 
-        <v-list-item-title class="text-body-2 font-weight-medium">
-          {{ item.key }}
-        </v-list-item-title>
+        <v-list density="compact">
+          <v-list-item v-for="item in section.items" :key="`${section.sectionId}-${item.key}`">
+            <v-list-item-title class="text-body-2 font-weight-medium">
+              {{ item.key }}
+            </v-list-item-title>
 
-        <v-list-item-subtitle :style="item.style">
-          {{ item.value }}
-        </v-list-item-subtitle>
-      </v-list-item>
-    </v-list>
+            <v-list-item-subtitle v-if="item.value">
+              {{ item.value }}
+            </v-list-item-subtitle>
+          </v-list-item>
+        </v-list>
+      </div>
+    </div>
 
     <div v-else class="text-caption text-medium-emphasis px-4 py-2">
       No status data available.

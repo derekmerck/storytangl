@@ -1,157 +1,185 @@
 # StoryTangl Contributor Guide
 
-Welcome! This project powers StoryTangl, an abstract narrative graph engine. Use this
-file as the quick-reference guide for coding conventions, documentation tone, and the
-core ideas you should understand before contributing.
+Welcome! This project powers StoryTangl, an abstract narrative graph engine.
+Use this file as the quick-reference guide for design philosophy, coding
+conventions, and the core ideas you should understand before contributing.
+
+This is a **research platform and reference implementation**, not a production
+SaaS product.  Code clarity, conceptual integrity, and ease of comprehension
+are more important than robustness against hypothetical misuse.
+
+
+## Design philosophy
+
+These principles override all other guidance in this document.  When in doubt,
+choose the option that leaves the code easier to read in five minutes.
+
+### 1. Trust the types
+
+StoryTangl has well-defined types at every layer.  Use them.
+
+- **Do not `getattr` your way around typed interfaces.**  If a function
+  receives a `PhaseCtx`, access `.graph` directly — do not write
+  `getattr(ctx, "graph", None)`.  If the type is wrong, let it fail loudly.
+- **Do not accept `Any` when a concrete type is known.**  `_ctx: Any` as a
+  parameter type is a design smell.  Use the protocol (`VmPhaseCtx`,
+  `VmResolverCtx`) or the concrete class (`PhaseCtx`).  If multiple context
+  types are possible, use a `Union` or a shared protocol.
+- **Do not add `isinstance` guards for types the caller is already required
+  to provide.**  If a handler signature says `caller: TraversableNode`, do not
+  begin the body with `if not isinstance(caller, TraversableNode): return`.
+- **Use protocols for duck typing, not runtime probing.**  When a function
+  genuinely needs to work with multiple unrelated types, define or reuse a
+  `Protocol`.  Do not scatter `hasattr`/`getattr`/`callable(getattr(...))`
+  probes through implementation code.
+
+The only valid exception is interop boundaries where data arrives from
+persistence, user input, or external systems with genuinely unknown shape.
+
+### 2. Minimize cognitive overhead
+
+Every line of code has a reading cost.  Minimize total cost.
+
+- **Prefer direct expression over indirection.**  A 3-line function body is
+  better than a 1-line call to a helper that exists nowhere else.
+  Conversely, if you see the same 3-line stanza pasted in 5 places, extract
+  it once and name it well.
+- **Do not add layers "for flexibility."**  No abstract base class with one
+  concrete subclass.  No strategy pattern with one strategy.  No registry
+  when a dict suffices.  No factory when a constructor suffices.
+  Add the abstraction *when the second use case arrives*, not before.
+- **Do not write code to handle cases that cannot arise.**  If the graph
+  always has a cursor during phase execution, do not write `if cursor is None:
+  return`.  If a function is only called from one site and that site always
+  passes a non-None value, do not guard against None.
+- **Do not add compatibility shims preemptively.**  If a rename happens,
+  update the callers.  A shim is warranted only when external consumers
+  exist that you cannot update (e.g., persisted pickle references).
+
+### 3. Reuse existing patterns
+
+The codebase already has well-tested mechanisms.  Use them before inventing
+alternatives.
+
+- **Selector** is how you query entities.  Do not write bespoke filter loops.
+- **BehaviorRegistry** and `chain_execute_all` is how you compose dispatch.
+  Do not invent new plugin/hook registries.
+- **`PhaseCtx.derive()`** is how you create a child context for a different
+  cursor.  Do not manually pluck fields off a context to build another one.
+- **EntityTemplate → materialize** is how you create runtime entities from
+  authored data.  Do not bypass this with direct constructor calls unless the
+  entity is genuinely ephemeral (like an `AnonymousEdge`).
+- **`_DESIGN.md` files** in each subpackage describe the intended shape.
+  Read the relevant design doc before adding a new module or public class.
+  If your addition doesn't fit the described shape, discuss the mismatch
+  before proceeding.
+
+### 4. Keep layer boundaries sharp
+
+```
+Service  → Lifecycle, persistence, transport, access control
+Story    → Narrative vocabulary, compilation, materialization, journal content
+VM       → Phase pipeline, provisioning, traversal mechanics, replay
+Core     → Timeless primitives: entity, registry, graph, selector, dispatch
+```
+
+- Import only downward.  Story may import VM and Core.  VM may import Core.
+  Service may import all three.  **Never import upward.**
+- If a function needs knowledge from a higher layer, accept it as a callback
+  or protocol parameter — do not import the module.
+- If you find yourself wanting to import `tangl.story` from `tangl.vm`, the
+  feature belongs in story, not vm.  Move it.
+
+### 5. Prefer deletion over annotation
+
+If code is not used, delete it.  Do not comment it out.  Do not add a
+`# deprecated` or `# legacy` marker and leave it.  `git` remembers.
+
+- **No `# TODO: maybe...` on speculative features.**  File an issue or delete
+  the comment.
+- **No legacy compatibility shims without a documented consumer.**  If you
+  cannot name the call site that needs the shim, the shim is dead code.
+- **No accumulation of "just in case" parameters.**  If a parameter is always
+  passed as `None` or `False`, remove it.
+
+---
 
 ## Repository layout
-- `engine/src/tangl/`: primary Python package with the runtime engine and utilities.
+- `engine/src/tangl/`: primary Python package with the runtime engine.
 - `engine/tests/`: canonical test suite (pytest based).
-- `apps/` and `worlds/`: optional entry points and sample content; most engine work
-  lives under `engine/src/tangl/`.
-- `docs/`: Sphinx documentation sources; keep docstrings compatible with Sphinx.
+- `apps/` and `worlds/`: optional entry points and sample content.
+- `docs/`: Sphinx documentation sources.
 
 ## Coding style
-- Target **Python 3.13** and enable postponed annotations with
-  `from __future__ import annotations` in new modules when you need forward references.
-- Use **type hints everywhere** (functions, methods, attributes). Prefer concrete
-  collection types (`set[str]`, `list[int]`, etc.) and reuse shared aliases from
-  `tangl.type_hints` when available.
-- Engine models generally inherit from **`BaseModelPlus`** (see
-  `tangl.core.bases`) or other Pydantic models. Extending
-  `BaseModelPlus` gives you uniform identifier handling, comparison, and reset
-  semantics—use it for new persistent entities unless you have a strong reason not to.
-- Keep imports explicit and grouped: standard library, third-party, then local.
-  Avoid wildcard imports.
-- Follow Black-like formatting (4-space indents, trailing commas where they aid
-  diffs, double quotes by default). Keep lines under 100 characters when possible.
-- Use the project logging conventions: acquire module-level loggers with
-  `logging.getLogger(__name__)` and prefer structured messages over f-string
-  interpolation inside log calls.
-- Align with the architectural and naming guidance in
-  `docs/src/contrib/coding_style.md`. The quick summary: keep mechanisms
-  explicit, respect the layer boundaries (`core` → `vm` → `service` → `app` →
-  `presentation`), favor small nouns and deterministic behavior, and document the
-  curated API surface. Review the doc for deeper rationale, anti-patterns, and
-  testing expectations.
+- Target **Python 3.13**.  Use `from __future__ import annotations` for forward
+  references.
+- **Type hints everywhere.**  Prefer concrete types (`list[str]`, not
+  `Iterable[Any]`).  Reuse aliases from `tangl.type_hints`.
+- Engine models inherit from **`BaseModelPlus`** or other Pydantic models.
+  Use it for new persistent entities unless you have a strong reason not to.
+- Explicit, grouped imports: stdlib → third-party → local.  No wildcards.
+- Black-like formatting: 4-space indents, trailing commas for diffs, double
+  quotes.  Lines under 100 characters.
+- Module-level loggers: `logging.getLogger(__name__)`.  Structured messages,
+  no f-strings inside log calls.
+- See `docs/src/contrib/coding_style.md` for deeper rationale.
 
 ## Docstrings and comments
-- Write docstrings in **reStructuredText** so Sphinx can build narrative docs.
-  - Follow the `Why / Key Features / API / (Notes / See also)` structure for
-    public classes as described in `docs/src/contrib/docstring_style.md`.
-    Include the signature headline, single-sentence summary, and curated API
-    bullets; defer exhaustive method prose to autodoc.
-  - Keep module docstrings terse unless they introduce multiple peer concepts.
-    Subpackage `__init__` files should outline conceptual layers and design
-    intent. See the doc for section header underlines, linking conventions, and
-    guidance on enum or record docstrings.
-  - Cross-reference other symbols with `:class:`, `:meth:`, and section anchors to
-    match existing docs (`tangl/core/entity.py` is a good model).
-- Use `"""` triple double quotes for docstrings. Keep commentary sentences inside
-  docstrings; reserve inline comments for clarifying implementation details.
+- **reStructuredText** for Sphinx compatibility.
+- Follow `Why / Key Features / API / Notes / See also` for public classes
+  (see `docs/src/contrib/docstring_style.md`).
+- Triple double quotes.  Commentary inside docstrings; inline comments only
+  for implementation clarification.
+- Do not write docstrings that merely restate the function signature.  If the
+  name and types are self-explanatory, a one-line summary suffices.
 
-## Core abstractions to understand
-- **Entity** (`tangl.core.entity.Entity`): canonical base class for graph-managed
-  objects. Provides identifiers, tagging, and comparison semantics.
-- **Registry** (`tangl.core.registry.Registry`): collection helper that indexes
-  entities by identifiers and criteria. New collections should extend this or use it.
-- **Graph** (`tangl.core.graph.Graph` and friends): manages nodes, edges, and
-  subgraphs for narrative structure.
-- **Record / StreamRegistry / Snapshot** (`tangl.core.record`): immutable runtime
-  artifacts capturing story state and playback.
-- **Fragments** (`tangl.core.BaseFragment`, `tangl.journal.content`): narrative
-  output payloads that the UI or downstream systems consume.
-- **Behavior & Dispatch** (`tangl.core.behavior`, `tangl.vm.dispatch`): behavior
-  pipelines that wrap and sequence callable actions while auditing results.
-- **Virtual Machine** (`tangl.vm`): Interpreter loop for evaluating and evolving 
-  graph state.
-- **Orchestrator** (`tangl.service.Orchestrator`): registers controller endpoints
-  and hydrates `User`, `Ledger`, and `Frame` dependencies based on type hints.
-  Applications should invoke controller logic via the orchestrator instead of the
-  deprecated `ServiceManager`.
+## Core abstractions
 
-## Rendering Architecture
-- See `tangl.story.runtime.render` for the two-stage rendering pipeline.
-- See `tangl.story.episode.block` for the multi-handler JOURNAL pattern.
-- Key principle: Pure text transformation (render) is separate from 
-  fragment wrapping (domain nodes).
+These are the vocabulary of the engine.  Align new features with them instead
+of creating parallel abstractions.
 
-## Service layer workflow (v3.7+)
-- Controllers live in `tangl.service.controllers` and expose orchestrated
-  endpoints via `@ApiEndpoint.annotate`.
-- Applications call `Orchestrator.execute("Controller.method", user_id=..., **params)`
-  and receive raw engine objects or dictionaries; transport layers handle
-  serialization.
+- **Entity** (`tangl.core.entity.Entity`): base for graph-managed objects.
+- **Registry** (`tangl.core.registry.Registry`): indexed owning collection.
+- **Graph** (`tangl.core.graph`): nodes, edges, subgraphs, hierarchy.
+- **Selector** (`tangl.core.selector`): composable query predicates.
+- **Behavior & Dispatch** (`tangl.core.behavior`, `tangl.vm.dispatch`):
+  deterministic hook pipelines.
+- **Record / StreamRegistry** (`tangl.core.record`): immutable ordered facts.
+- **EntityTemplate** (`tangl.core.template`): authored prototypes, compiled
+  then materialized.
+- **Frame / Ledger** (`tangl.vm.runtime`): ephemeral pipeline driver and
+  persistent cursor state.
+- **Orchestrator** (`tangl.service`): endpoint dispatch with resource
+  hydration.
 
-When introducing new engine features, align them with these primitives instead of
-creating parallel abstractions. Favor composition over inheritance unless extending
-one of the above base types.
+## Service layer workflow
+- Controllers in `tangl.service.controllers` expose endpoints via
+  `@ApiEndpoint.annotate`.
+- Callers use `Orchestrator.execute("Controller.method", ...)`.
 
-## Testing and quality checks
-- Run `pytest engine/tests` (or `poetry run pytest engine/tests`) before submitting
-  changes. Add targeted tests in the matching module-specific folder.
-- Use the poetry-managed venv to avoid missing dependency issues, add `engine/tests`
-  and other test paths to PYTHONPATH for pytest, if necessary.
-- Keep fixtures lightweight; prefer deterministic data seeded from `engine/tests` or
-  sample YAML fixtures under `engine/tests/resources`.
-- If you add CLI or REST surface changes, also update the relevant app/world tests
-  when they exist.
-
-## Documentation and storytelling assets
-- Update Sphinx docs under `docs/` when you add public APIs or change behavior. The
-  docs assume the terminology outlined above—reuse section titles and glossary entries.
-- Content YAML files under `worlds/` and `engine/src/tangl/mechanics/**` provide data
-  for tests and demos. Maintain schema consistency and keep narrative examples
-  inclusive and lore-friendly.
+## Testing
+- Run `pytest engine/tests` before submitting changes.
+- Use the poetry-managed venv.  Add test paths to `PYTHONPATH` if needed.
+- Keep fixtures lightweight and deterministic.
+- See `engine/tests/AGENTS.md` for detailed test conventions.
 
 ## Configuration
-- StoryTangl uses Dynaconf via ``tangl.config.settings`` and ``defaults.toml``.
-- Paths (worlds, media, etc.) live under ``[service.paths]`` and use ``@path`` casting.
-- New code should read configuration through ``tangl.config.settings`` or helpers like
-  ``get_world_dirs()`` / ``get_sys_media_dir()``.
-- Do not introduce new settings systems (no extra Pydantic ``BaseSettings`` for core
-  config).
+- Dynaconf via `tangl.config.settings` and `defaults.toml`.
+- Paths under `[service.paths]` with `@path` casting.
+- Read config through `tangl.config.settings` or its helpers.
+- Do not introduce parallel settings systems.
 
 ### Media & Binary Assets (PNG / LFS safety)
 
-StoryTangl uses Git LFS for binary media files such as `.png` and `.jpg`.  
-To avoid corrupting the repository, all agents MUST follow these rules:
+StoryTangl uses Git LFS for `.png` and `.jpg` files.
 
-1. **Never create or propose new PNG/JPG files inside the repository.**  
-   - Do NOT generate placeholder `.png` files.  
-   - Do NOT suggest adding new media files under `worlds/` or `engine/tests/resources/`.  
-   - Do NOT modify `.gitattributes` or any Git LFS configuration.
+1. **Never create PNG/JPG files inside the repository.**
+2. **Use SVG primitives** for examples and test worlds.
+3. **Create SVG files only in `tmp_path`** during tests, not in the repo.
 
-2. **For examples and test worlds, always use safe SVG primitives.**  
-   - Use `.svg` files containing a simple shape (circle, square, etc.).  
-   - SVG is text-based and does NOT trigger Git LFS filters.  
-   - Example media files in documentation may reference imaginary SVG filenames, but
-     **do not create the files**; these are logical examples only.
-
-3. **For automated tests, create SVG files only inside temporary directories**  
-   (e.g., pytest `tmp_path`) rather than inside the repo.  
-   - Example:
-     ```python
-     (tmp_path / "circle.svg").write_text(
-         '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">'
-         '<circle cx="16" cy="16" r="14" fill="red"/></svg>'
-     )
-     ```
-
-These rules ensure the media pipeline can be tested safely without introducing
-invalid or untracked binary files into the repository.
-
-## Miscellaneous guidelines
-- Avoid try/except around imports. Feature-detect capabilities with optional imports
-  only when the feature is genuinely optional; otherwise declare dependencies in
-  `pyproject.toml`.
-- Prefer `Path` objects from `pathlib` over raw strings when handling filesystem
-  paths (see `tangl.config.cast_path`).
-- Respect existing serialization hooks—use `model_dump`/`model_validate` from
-  Pydantic instead of manual dict munging when possible.
-- When adding enums or user-facing strings, sanitize labels via `sanitize_str` and
-  respect identifier/tag casing conventions.
-- If updating an implementation that is detailed in an existing design or planning 
-  doc, be sure to update the 'status' section so the document doesn't go stale.
-
-Thanks for contributing to StoryTangl!
+## Miscellaneous
+- No try/except around imports.  Declare dependencies in `pyproject.toml`.
+- `Path` objects over raw strings for filesystem paths.
+- Use `model_dump`/`model_validate`, not manual dict munging.
+- If updating an implementation detailed in a `_DESIGN.md` doc, update the
+  doc's status section so it does not go stale.

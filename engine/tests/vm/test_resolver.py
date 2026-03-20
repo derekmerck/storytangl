@@ -35,6 +35,8 @@ from tangl.media.media_resource import (
     MediaResourceInventoryTag as MediaRIT,
     MediaResourceRegistry,
 )
+from tangl.story.fabula.materializer import _PrelinkCtx
+from tangl.story.story_graph import StoryGraph
 from tangl.vm.provision import (
     Affordance,
     Dependency,
@@ -48,6 +50,9 @@ from tangl.vm.provision import (
     StubProvisioner,
     ProvisionOffer,
 )
+from tangl.vm.provision.matching import annotate_offer_specificity
+from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
 
 
@@ -74,6 +79,16 @@ def _dependency(graph: Graph, **kwargs) -> Dependency:
     dependency = Dependency(**kwargs)
     graph.add(dependency)
     return dependency
+
+
+def _phase_ctx(
+    *,
+    graph: Graph,
+    cursor: TraversableNode,
+    step: int = 0,
+    **kwargs,
+) -> PhaseCtx:
+    return PhaseCtx(graph=graph, cursor_id=cursor.uid, step=step, **kwargs)
 
 
 def _ctx_with_seed(seed: int) -> SimpleNamespace:
@@ -111,6 +126,25 @@ def _ctx_with_media_inventories(*inventories: MediaInventory, graph: Graph | Non
         cursor=None,
         get_authorities=lambda: [registry],
         get_inline_behaviors=lambda: [],
+    )
+
+
+def _phase_ctx_with_media_inventories(
+    *,
+    graph: Graph,
+    cursor: TraversableNode,
+    inventories: tuple[MediaInventory, ...],
+) -> PhaseCtx:
+    registry = BehaviorRegistry(label="media_inventory_registry")
+
+    def _inventories(*, caller, requirement, ctx, **kw):
+        return list(inventories)
+    registry.register(func=_inventories, task="get_media_inventories")
+
+    return _phase_ctx(
+        graph=graph,
+        cursor=cursor,
+        local_authorities=[registry],
     )
 
 
@@ -535,6 +569,12 @@ class TestResolverOfferGathering:
         ordered = sorted([inexact, exact], key=lambda offer: offer.sort_key())
         assert ordered[0] is exact
 
+    def test_offer_annotation_requires_typed_provision_offer(self) -> None:
+        req = Requirement(has_kind=Entity)
+
+        with pytest.raises(AttributeError, match="candidate"):
+            annotate_offer_specificity(req, SimpleNamespace())
+
     def test_update_clone_declines_without_two_part_formula(self) -> None:
         source = Entity(label="source")
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
@@ -937,6 +977,98 @@ class TestResolverRequirementResolution:
         assert isinstance(registry, TemplateRegistry)
         assert registry.find_one(Selector(has_identifier="templ")) is template
 
+
+class TestResolverNodeContext:
+    def test_make_node_ctx_derives_from_phase_ctx(self) -> None:
+        parent_graph = Graph()
+        parent = _node(parent_graph, label="parent")
+        child_graph = Graph()
+        child = _node(child_graph, label="child")
+        parent_ctx = _phase_ctx(
+            graph=parent_graph,
+            cursor=parent,
+            step=7,
+            current_phase=ResolutionPhase.UPDATE,
+            correlation_id="corr-1",
+            meta={"source": "parent"},
+            incoming_payload={"kind": "payload"},
+        )
+
+        node_ctx = Resolver()._make_node_ctx(
+            graph=child_graph,
+            node=child,
+            _ctx=parent_ctx,
+            request_ctx_path="story.child",
+        )
+
+        assert isinstance(node_ctx, PhaseCtx)
+        assert node_ctx is not parent_ctx
+        assert node_ctx.graph is child_graph
+        assert node_ctx.cursor_id == child.uid
+        assert node_ctx.step == 7
+        assert node_ctx.current_phase is ResolutionPhase.INIT
+        assert node_ctx.correlation_id == "corr-1"
+        assert node_ctx.meta == {
+            "source": "parent",
+            "request_ctx_path": "story.child",
+        }
+        assert node_ctx.random is parent_ctx.random
+
+    def test_make_node_ctx_derives_from_prelink_ctx(self) -> None:
+        graph = StoryGraph()
+        source = TraversableNode(label="source")
+        child = TraversableNode(label="child")
+        graph.add(source)
+        graph.add(child)
+        prelink_ctx = _PrelinkCtx(
+            graph=graph,
+            template_registry=TemplateRegistry(label="story_templates"),
+            cursor_id=source.uid,
+            correlation_id="prelink-1",
+            meta={"phase": "prelink"},
+        )
+
+        node_ctx = Resolver()._make_node_ctx(
+            graph=graph,
+            node=child,
+            _ctx=prelink_ctx,
+            request_ctx_path="story.child",
+        )
+
+        assert isinstance(node_ctx, PhaseCtx)
+        assert node_ctx.graph is graph
+        assert node_ctx.cursor_id == child.uid
+        assert node_ctx.step == 0
+        assert node_ctx.correlation_id == "prelink-1"
+        assert node_ctx.meta == {
+            "phase": "prelink",
+            "request_ctx_path": "story.child",
+        }
+
+    def test_make_node_ctx_rejects_unsupported_context(self) -> None:
+        graph = Graph()
+        node = _node(graph, label="child")
+        bad_ctx = SimpleNamespace(
+            graph=graph,
+            cursor_id=node.uid,
+            step=3,
+            correlation_id="bad",
+            meta={"phase": "bad"},
+            get_authorities=lambda: [],
+            get_inline_behaviors=lambda: [],
+            get_location_entity_groups=lambda: [[node]],
+            get_template_scope_groups=lambda: [],
+        )
+
+        with pytest.raises(TypeError, match="derive"):
+            Resolver()._make_node_ctx(
+                graph=graph,
+                node=node,
+                _ctx=bad_ctx,
+                request_ctx_path="story.child",
+            )
+
+
 class TestResolverDependencyResolution:
     def test_resolve_dependency_links_provider(self) -> None:
         reg = Registry()
@@ -960,12 +1092,7 @@ class TestResolverDependencyResolution:
             requirement=Requirement.from_identifier("sword"),
             predecessor_id=node.uid,
         )
-        ctx = SimpleNamespace(
-            step=3,
-            cursor_id=node.uid,
-            get_authorities=lambda: [],
-            get_inline_behaviors=lambda: [],
-        )
+        ctx = _phase_ctx(graph=g, cursor=node, step=3)
 
         resolver = Resolver(entity_groups=[[sword]])
         success = resolver.resolve_dependency(dep, _ctx=ctx)
@@ -1014,7 +1141,11 @@ class TestResolverDependencyResolution:
         resolver = Resolver(location_entity_groups=[], template_scope_groups=[])
         success = resolver.resolve_dependency(
             dep,
-            _ctx=_ctx_with_media_inventories(inventory, graph=graph),
+            _ctx=_phase_ctx_with_media_inventories(
+                graph=graph,
+                cursor=node,
+                inventories=(inventory,),
+            ),
         )
 
         assert success is True
@@ -1039,12 +1170,7 @@ class TestResolverDependencyResolution:
         )
 
         resolver = Resolver(entity_groups=[], template_groups=[])
-        ctx = SimpleNamespace(
-            step=11,
-            cursor_id=node.uid,
-            get_authorities=lambda: [],
-            get_inline_behaviors=lambda: [],
-        )
+        ctx = _phase_ctx(graph=g, cursor=node, step=11)
         success = resolver.resolve_dependency(dep, allow_stubs=True, _ctx=ctx)
         assert success is True
         assert dep.provider is not None
@@ -1109,12 +1235,11 @@ class TestResolverDependencyResolution:
             transitions.append((reason, step_id))
             return True
 
-        ctx = SimpleNamespace(
+        ctx = _phase_ctx(
+            graph=g,
+            cursor=node,
             step=11,
-            cursor_id=node.uid,
-            get_authorities=lambda: [],
-            get_inline_behaviors=lambda: [],
-            escalate_to_hard_dirty=_escalate,
+            escalate_to_hard_dirty_callback=_escalate,
         )
         resolver = Resolver(entity_groups=[], template_groups=[])
         assert resolver.resolve_dependency(dep, allow_stubs=True, _ctx=ctx) is True
@@ -1152,13 +1277,7 @@ class TestResolverDependencyResolution:
             location_entity_groups=[[cursor]],
             template_scope_groups=[_template_registry(leaf_template, root_template, child_template)],
         )
-        ctx = SimpleNamespace(
-            graph=g,
-            cursor=cursor,
-            cursor_id=cursor.uid,
-            get_authorities=lambda: [],
-            get_inline_behaviors=lambda: [],
-        )
+        ctx = _phase_ctx(graph=g, cursor=cursor)
 
         assert resolver.resolve_dependency(dep, _ctx=ctx) is True
         root = next((node for node in g.values() if isinstance(node, FinalizableContainer) and node.label == "root"), None)

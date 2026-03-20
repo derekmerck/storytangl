@@ -20,6 +20,70 @@ def _fragment_text(fragment: Any) -> str:
     return str(fragment)
 
 
+def _projected_section_lines(section: dict[str, Any]) -> list[str]:
+    value = section.get("value")
+    if not isinstance(value, dict):
+        return [str(value)] if value is not None else []
+
+    value_type = value.get("value_type")
+    if value_type == "kv_list":
+        items = value.get("items")
+        if not isinstance(items, list):
+            return []
+        return [
+            f"{item.get('key')}: {item.get('value')}"
+            for item in items
+            if isinstance(item, dict) and item.get("key") is not None
+        ]
+
+    if value_type == "item_list":
+        items = value.get("items")
+        if not isinstance(items, list):
+            return []
+        lines: list[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            label = item.get("label")
+            if label is None:
+                continue
+            line = str(label)
+            detail = item.get("detail")
+            tags = item.get("tags")
+            extras: list[str] = []
+            if detail:
+                extras.append(str(detail))
+            if isinstance(tags, list) and tags:
+                extras.append(", ".join(str(tag) for tag in tags))
+            if extras:
+                line = f"{line}: {' | '.join(extras)}"
+            lines.append(line)
+        return lines
+
+    if value_type == "table":
+        columns = value.get("columns")
+        rows = value.get("rows")
+        if not isinstance(columns, list) or not isinstance(rows, list):
+            return []
+        lines = [" | ".join(str(column) for column in columns)]
+        for row in rows:
+            if isinstance(row, list):
+                lines.append(" | ".join(str(cell) for cell in row))
+        return lines
+
+    if value_type == "badges":
+        badges = value.get("items")
+        if isinstance(badges, list) and badges:
+            return [", ".join(str(item) for item in badges)]
+        return []
+
+    if value_type == "scalar":
+        scalar = value.get("value")
+        return [str(scalar)] if scalar is not None else []
+
+    return [str(value)]
+
+
 @with_default_category("Story")
 class StoryController(CommandSet):
     """Story commands backed by :class:`tangl.service.controllers.RuntimeController`."""
@@ -312,6 +376,29 @@ class StoryController(CommandSet):
             payload = info
         else:
             payload = {"info": str(info)}
+
+        sections = payload.get("sections")
+        if isinstance(sections, list):
+            if not sections:
+                self._cmd.poutput("No status data available.")
+                return
+
+            for index, section in enumerate(sections):
+                if not isinstance(section, dict):
+                    self._cmd.poutput(str(section))
+                    continue
+
+                title = section.get("title") or section.get("section_id") or "Section"
+                self._cmd.poutput(f"{title}:")
+                lines = _projected_section_lines(section)
+                if not lines:
+                    self._cmd.poutput("  (No details)")
+                else:
+                    for line in lines:
+                        self._cmd.poutput(f"  {line}")
+                if index < len(sections) - 1:
+                    self._cmd.poutput("")
+            return
 
         for key, value in payload.items():
             self._cmd.poutput(f"{key}: {value}")

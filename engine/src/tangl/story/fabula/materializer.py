@@ -6,15 +6,19 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.core import EntityTemplate, GraphItem, Selector, TemplateRegistry
+from tangl.core.ctx import CoreCtx
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
 from tangl.media.story_media import get_story_resource_manager
 from tangl.vm.dispatch import do_gather_ns
+from tangl.vm.ctx import VmRequirementStampCtx
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm import (
     Affordance,
     Blocker,
     Dependency,
     Fanout,
+    ProvisionOffer,
     ProvisionPolicy,
     Requirement,
     Resolver,
@@ -55,6 +59,7 @@ class _PrelinkCtx:
     graph: StoryGraph
     template_registry: TemplateRegistry
     cursor_id: UUID | None = None
+    step: int | None = None
     correlation_id: UUID | str | None = None
     logger: Any | None = None
     meta: Mapping[str, Any] | None = field(default_factory=dict)
@@ -120,6 +125,29 @@ class _PrelinkCtx:
             if registries:
                 return registries
         return [self.template_registry]
+
+    def derive(
+        self,
+        *,
+        cursor_id: UUID | None = None,
+        graph: StoryGraph | None = None,
+        meta_overrides: Mapping[str, Any] | None = None,
+        **field_overrides: Any,
+    ) -> PhaseCtx:
+        meta = dict(self.meta or {})
+        if meta_overrides:
+            meta.update(meta_overrides)
+
+        kwargs: dict[str, Any] = {
+            "graph": self.graph if graph is None else graph,
+            "cursor_id": self.cursor_id if cursor_id is None else cursor_id,
+            "step": 0 if self.step is None else self.step,
+            "correlation_id": self.correlation_id,
+            "logger": self.logger,
+            "meta": meta,
+        }
+        kwargs.update(field_overrides)
+        return PhaseCtx(**kwargs)
 
 
 class StoryMaterializer:
@@ -197,7 +225,7 @@ class StoryMaterializer:
         self,
         *,
         requirement: Requirement,
-        offer: Any,
+        offer: ProvisionOffer,
         graph: Any,
         _ctx: Any = None,
     ) -> list[Blocker]:
@@ -205,13 +233,13 @@ class StoryMaterializer:
         if not isinstance(graph, StoryGraph):
             return []
 
-        template = getattr(offer, "candidate", None)
-        target_ctx = getattr(offer, "target_ctx", None)
+        template = offer.candidate
+        target_ctx = offer.target_ctx
         if not isinstance(template, EntityTemplate) or not isinstance(target_ctx, str) or not target_ctx:
             return []
 
         blockers: list[Blocker] = []
-        build_segments = list(getattr(offer, "build_plan", None) or ())
+        build_segments = list(offer.build_plan or ())
         parent_paths = self._parent_prefix_paths(target_ctx)
         missing_paths = parent_paths[-len(build_segments) :] if build_segments else []
 
@@ -612,13 +640,25 @@ class StoryMaterializer:
         request_ctx_path: str,
         _ctx: Any = None,
     ) -> _PrelinkCtx:
+        correlation_id = None
+        logger = None
+        step = None
+        meta: dict[str, Any] = {}
+        if isinstance(_ctx, CoreCtx):
+            correlation_id = _ctx.correlation_id
+            logger = _ctx.logger
+            meta.update(_ctx.get_meta())
+        if isinstance(_ctx, VmRequirementStampCtx):
+            step = _ctx.step
+        meta["request_ctx_path"] = request_ctx_path
         return _PrelinkCtx(
             graph=graph,
             template_registry=self._template_registry_for_graph(graph),
             cursor_id=None,
-            correlation_id=getattr(_ctx, "correlation_id", None),
-            logger=getattr(_ctx, "logger", None),
-            meta={"request_ctx_path": request_ctx_path},
+            step=step,
+            correlation_id=correlation_id,
+            logger=logger,
+            meta=meta,
         )
 
     def _preview_immediate_hard_dependencies(
@@ -1329,14 +1369,14 @@ class StoryMaterializer:
         )
 
     @staticmethod
-    def _unique_template_candidates(offers: list[Any]) -> list[Any]:
-        candidates: list[Any] = []
+    def _unique_template_candidates(offers: list[ProvisionOffer]) -> list[EntityTemplate]:
+        candidates: list[EntityTemplate] = []
         seen: set[UUID] = set()
         for offer in offers:
-            candidate = getattr(offer, "candidate", None)
-            candidate_uid = getattr(candidate, "uid", None)
-            if not isinstance(candidate_uid, UUID):
+            candidate = offer.candidate
+            if not isinstance(candidate, EntityTemplate):
                 continue
+            candidate_uid = candidate.uid
             if candidate_uid in seen:
                 continue
             seen.add(candidate_uid)

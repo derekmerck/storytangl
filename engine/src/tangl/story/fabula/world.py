@@ -36,6 +36,8 @@ class World:
       bundle.
     - :meth:`get_authorities` exposes optional world/domain dispatch
       registries.
+    - :meth:`get_story_info_projector` resolves the optional projected-state
+      projector for ``/story/info`` surfaces.
     - :meth:`get_template_scope_groups` returns extra template groups available
       at runtime.
     - :meth:`find_template` and :meth:`find_templates` delegate template lookup
@@ -51,6 +53,7 @@ class World:
     templates: Any | None = None
     assets: Any | None = None
     resources: Any | None = None
+    story_info_projector: Any | None = None
     _instances: ClassVar[dict[str, "World"]] = {}
 
     def __post_init__(self) -> None:
@@ -116,6 +119,20 @@ class World:
                 if authority not in authorities:
                     authorities.append(authority)
         return authorities
+
+    def get_story_info_projector(self) -> Any | None:
+        """Return the explicit or domain-provided story-info projector."""
+        if self.story_info_projector is not None:
+            return self.story_info_projector
+
+        domain = self.domain
+        if domain is None:
+            return None
+
+        get_projector = getattr(domain, "get_story_info_projector", None)
+        if callable(get_projector):
+            return get_projector()
+        return None
 
     def get_template_scope_groups(
         self,
@@ -196,6 +213,7 @@ class World:
         templates: Any | None = None,
         assets: Any | None = None,
         resources: Any | None = None,
+        story_info_projector: Any | None = None,
     ) -> "World":
         compiler = compiler or StoryCompiler()
         bundle = compiler.compile(script_data)
@@ -206,6 +224,7 @@ class World:
             templates=templates,
             assets=assets,
             resources=resources,
+            story_info_projector=story_info_projector,
         )
 
     @classmethod

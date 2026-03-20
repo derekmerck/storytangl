@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from random import Random
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Protocol, runtime_checkable
 from uuid import UUID
 
 from tangl.core.ctx import CoreCtx, DispatchCtx
 from tangl.core import TemplateRegistry
+
+if TYPE_CHECKING:
+    from .runtime.frame import PhaseCtx
 
 
 @runtime_checkable
@@ -44,8 +47,37 @@ class VmPhaseCtx(VmResolverCtx, Protocol):
     def get_random(self) -> Random: ...
 
 
+@runtime_checkable
+class VmRequirementStampCtx(Protocol):
+    """Minimal context contract for requirement resolution metadata stamping."""
+
+    step: int | None
+    cursor_id: UUID | None
+
+
+@runtime_checkable
+class VmDerivedPhaseCtx(VmResolverCtx, VmRequirementStampCtx, Protocol):
+    """Context that can derive a child :class:`PhaseCtx` for nested validation."""
+
+    graph: Any
+    correlation_id: UUID | str | None
+    logger: Any | None
+    meta: Mapping[str, Any] | None
+
+    def derive(
+        self,
+        *,
+        cursor_id: UUID | None = None,
+        graph: Any | None = None,
+        meta_overrides: Mapping[str, Any] | None = None,
+        **field_overrides: Any,
+    ) -> "PhaseCtx": ...
+
+
 __all__ = [
+    "VmDerivedPhaseCtx",
     "VmDispatchCtx",
     "VmPhaseCtx",
+    "VmRequirementStampCtx",
     "VmResolverCtx",
 ]

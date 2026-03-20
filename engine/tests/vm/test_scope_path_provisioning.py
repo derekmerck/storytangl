@@ -9,8 +9,6 @@ Covers:
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from tangl.core import EntityTemplate, Graph, TemplateRegistry
 from tangl.vm.provision import (
     ProvisionOffer,
@@ -25,19 +23,13 @@ from tangl.vm.provision import (
     target_context_candidates,
 )
 from tangl.vm.provision.scope import MAX_SCOPE_BRACE_EXPANSIONS
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
 from tangl.vm import Dependency
 
 
-def _ctx(*, graph: Graph, cursor: TraversableNode) -> SimpleNamespace:
-    return SimpleNamespace(
-        graph=graph,
-        cursor=cursor,
-        cursor_id=cursor.uid,
-        step=0,
-        get_authorities=lambda: [],
-        get_inline_behaviors=lambda: [],
-    )
+def _ctx(*, graph: Graph, cursor: TraversableNode) -> PhaseCtx:
+    return PhaseCtx(graph=graph, cursor_id=cursor.uid, step=0)
 
 
 def _template_registry(*templates: EntityTemplate) -> TemplateRegistry:

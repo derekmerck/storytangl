@@ -438,7 +438,7 @@ class TestCompilerCanonicalSuccessorPolicy:
         assert action_spec["successor_ref"] == "scene1.block2"
         assert action_spec["successor_is_absolute"] is False
 
-    def test_duplicate_root_scene_labels_fail_compile(self) -> None:
+    def test_duplicate_root_scene_labels_record_compile_issue(self) -> None:
         script = {
             "label": "compiler_duplicate_scenes",
             "metadata": {
@@ -452,5 +452,6 @@ class TestCompilerCanonicalSuccessorPolicy:
             ],
         }
 
-        with pytest.raises(ValueError, match="Duplicate root scene labels"):
-            StoryCompiler().compile(script)
+        bundle = StoryCompiler().compile(script)
+
+        assert any(issue.code == "compile:duplicate_label" for issue in bundle.issues)

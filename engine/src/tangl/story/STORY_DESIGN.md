@@ -190,6 +190,10 @@ implementation.
 seeded randomness. Story extends further with `get_story_locals()`,
 `get_location_entity_groups()`, and `get_template_scope_groups()`. Each layer
 defines what it minimally expects. The runtime `PhaseCtx` satisfies all layers.
+Story's `_PrelinkCtx` intentionally stays smaller and story-specific, but it can
+explicitly derive a child `PhaseCtx` when resolver-driven nested validation needs
+the full runtime surface. Story code should use that explicit derivation seam
+rather than manually copying context fields.
 
 
 ### Fragments (`fragments.py`)
@@ -370,7 +374,8 @@ runtime story graphs.
 
 The compiler accepts raw dicts or validated IR models and produces a
 `StoryTemplateBundle` containing a validated `TemplateRegistry` tree, metadata,
-locals, entry points, and provenance.
+locals, entry points, provenance, and structured compile diagnostics for
+bundle-local authoring problems.
 
 **Compilation is intentionally separate from materialization.** One compiled bundle
 can produce many independent story graphs. This separation enables resetting a

@@ -16,7 +16,7 @@ from tangl.core import (
     Selector,
 )
 from ..dispatch import do_get_media_inventories, do_get_token_catalogs, on_provision
-from ..ctx import VmResolverCtx
+from ..ctx import VmDerivedPhaseCtx, VmResolverCtx
 from ..traversable import TraversableNode
 from .materialization import (
     MaterializeRole,
@@ -39,7 +39,14 @@ from .provisioner import (
     ProvisionPolicy,
     _template_hash_value,
 )
-from .requirement import Requirement, PT, Dependency, Affordance, Fanout
+from .requirement import (
+    Requirement,
+    PT,
+    Dependency,
+    Affordance,
+    Fanout,
+    stamp_requirement_resolution,
+)
 from .scope import (
     build_plan,
     prefix_paths,
@@ -470,13 +477,13 @@ class Resolver:
         deduped: list[ProvisionOffer] = []
         seen_keys: set[tuple[UUID, str | None]] = set()
         for offer in offers:
-            candidate = getattr(offer, "candidate", None)
+            candidate = offer.candidate
             candidate_uid = getattr(candidate, "uid", None)
             if not isinstance(candidate_uid, UUID):
                 deduped.append(offer)
                 continue
 
-            key = (candidate_uid, getattr(offer, "target_ctx", None))
+            key = (candidate_uid, offer.target_ctx)
             if key in seen_keys:
                 continue
             seen_keys.add(key)
@@ -616,17 +623,6 @@ class Resolver:
         for affordance in list(self._iter_fanout_affordances(fanout)):
             graph.remove(affordance.uid, _ctx=_ctx)
 
-    @staticmethod
-    def _stamp_requirement_resolution(requirement: Requirement[Any], *, _ctx: Any = None) -> None:
-        step = getattr(_ctx, "step", None)
-        requirement.resolved_step = step if isinstance(step, int) else None
-
-        cursor_id = getattr(_ctx, "cursor_id", None)
-        if cursor_id is None:
-            cursor = getattr(_ctx, "cursor", None)
-            cursor_id = getattr(cursor, "uid", None)
-        requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
-
     def gather_fanout_offers(
         self,
         requirement: Requirement[PT],
@@ -650,7 +646,7 @@ class Resolver:
         _ctx: Any = None,
     ) -> PT | None:
         def _existing_instance_for_template() -> PT | None:
-            candidate = getattr(offer, "candidate", None)
+            candidate = offer.candidate
             if not isinstance(candidate, EntityTemplate):
                 return None
 
@@ -673,7 +669,7 @@ class Resolver:
 
             return None
 
-        target_ctx = getattr(offer, "target_ctx", None)
+        target_ctx = offer.target_ctx
         if isinstance(target_ctx, str) and target_ctx:
             existing = self._find_existing_path_node(graph, target_ctx)
             if isinstance(existing, RegistryAware):
@@ -750,7 +746,7 @@ class Resolver:
             except (TypeError, ValueError, RuntimeError) as exc:
                 logger.debug(
                     "Skipping invalid fanout offer origin=%s for fanout=%s",
-                    getattr(offer, "origin_id", None),
+                    offer.origin_id,
                     fanout,
                     exc_info=exc,
                 )
@@ -781,7 +777,7 @@ class Resolver:
                 affordance.set_provider(provider, _ctx=_ctx)
 
         requirement = fanout.requirement
-        self._stamp_requirement_resolution(requirement, _ctx=_ctx)
+        stamp_requirement_resolution(requirement, _ctx=_ctx)
         requirement.unsatisfiable = False
         requirement.unambiguously_resolved = len(providers) == 1
         requirement.selected_offer_policy = accepted_offers[0].policy if accepted_offers else None
@@ -947,7 +943,7 @@ class Resolver:
         offer: ProvisionOffer,
         _ctx: Any = None,
     ) -> _StructuralChainPlan:
-        offer_target_ctx = getattr(offer, "target_ctx", None)
+        offer_target_ctx = offer.target_ctx
         target_ctx = (
             offer_target_ctx
             if isinstance(offer_target_ctx, str) and offer_target_ctx
@@ -955,7 +951,7 @@ class Resolver:
         )
         return _StructuralChainPlan(
             target_ctx=target_ctx,
-            build_segments=tuple(getattr(offer, "build_plan", None) or ()),
+            build_segments=tuple(offer.build_plan or ()),
         )
 
     @staticmethod
@@ -1065,11 +1061,11 @@ class Resolver:
     def _offer_materializes_runtime_entity(offer: ProvisionOffer) -> bool:
         return bool(
             offer.policy & (ProvisionPolicy.CREATE | ProvisionPolicy.CLONE)
-        ) or isinstance(getattr(offer, "candidate", None), EntityTemplate)
+        ) or isinstance(offer.candidate, EntityTemplate)
 
     @staticmethod
     def _offer_template(offer: ProvisionOffer) -> EntityTemplate | None:
-        candidate = getattr(offer, "candidate", None)
+        candidate = offer.candidate
         if isinstance(candidate, EntityTemplate):
             return candidate
         return None
@@ -1086,6 +1082,15 @@ class Resolver:
             return fallback
         return None
 
+    @staticmethod
+    def _derive_phase_ctx_source(_ctx: Any) -> VmDerivedPhaseCtx:
+        resolved = resolve_ctx(_ctx)
+        if resolved is None or not isinstance(resolved, VmDerivedPhaseCtx):
+            raise TypeError(
+                "Nested runtime validation requires a typed context with derive()",
+            )
+        return resolved
+
     def _make_node_ctx(
         self,
         *,
@@ -1094,39 +1099,14 @@ class Resolver:
         _ctx: Any = None,
         request_ctx_path: str | None = None,
     ) -> Any:
-        from tangl.vm.runtime.frame import PhaseCtx
-
-        meta = dict(getattr(_ctx, "meta", None) or {})
+        meta_overrides = None
         if isinstance(request_ctx_path, str) and request_ctx_path:
-            meta["request_ctx_path"] = request_ctx_path
-
-        kwargs: dict[str, Any] = {
-            "graph": graph,
-            "cursor_id": node.uid,
-            "step": int(getattr(_ctx, "step", 0) or 0),
-            "correlation_id": getattr(_ctx, "correlation_id", None),
-            "logger": getattr(_ctx, "logger", None),
-            "meta": meta,
-            "mark_soft_dirty_callback": getattr(_ctx, "mark_soft_dirty_callback", None),
-            "escalate_to_hard_dirty_callback": getattr(
-                _ctx,
-                "escalate_to_hard_dirty_callback",
-                None,
-            ),
-            "inline_behaviors": list(getattr(_ctx, "inline_behaviors", None) or []),
-            "local_authorities": list(getattr(_ctx, "local_authorities", None) or []),
-            "incoming_edge": getattr(_ctx, "incoming_edge", None),
-            "incoming_payload": getattr(_ctx, "incoming_payload", None),
-        }
-        causality_mode = self._ctx_causality_mode(_ctx)
-        if causality_mode is not None:
-            kwargs["causality_mode"] = causality_mode
-
-        node_ctx = PhaseCtx(**kwargs)
-        random = getattr(_ctx, "random", None)
-        if random is not None:
-            node_ctx.random = random
-        return node_ctx
+            meta_overrides = {"request_ctx_path": request_ctx_path}
+        return self._derive_phase_ctx_source(_ctx).derive(
+            cursor_id=node.uid,
+            graph=graph,
+            meta_overrides=meta_overrides,
+        )
 
     def _post_materialize_entity(
         self,
@@ -1175,7 +1155,7 @@ class Resolver:
         offer: ProvisionOffer,
         graph: Any,
     ) -> PT | None:
-        target_ctx = getattr(offer, "target_ctx", None)
+        target_ctx = offer.target_ctx
         if not isinstance(target_ctx, str) or not target_ctx:
             return None
 
@@ -1232,7 +1212,7 @@ class Resolver:
                 entity=provider,
                 graph=graph,
                 _ctx=_ctx,
-                request_ctx_path=getattr(offer, "target_ctx", None),
+                request_ctx_path=offer.target_ctx,
             ):
                 raise RuntimeError("Provisioned provider failed runtime validation")
 
@@ -1373,7 +1353,7 @@ class Resolver:
             return ViabilityResult(
                 viable=True,
                 chain=list(plan.build_segments),
-                scope_distance=int(getattr(offer, "scope_distance", 0) or 0),
+                scope_distance=offer.scope_distance,
                 blockers=[],
             )
         if story_blockers:
@@ -1656,18 +1636,7 @@ class Resolver:
             if provider.registry is not dependency.registry:
                 dependency.registry.add(provider, _ctx=_ctx)
             dependency.requirement.provider_id = provider.uid
-            dependency.requirement.resolved_step = (
-                getattr(_ctx, "step", None)
-                if isinstance(getattr(_ctx, "step", None), int)
-                else None
-            )
-            cursor_id = getattr(_ctx, "cursor_id", None)
-            if cursor_id is None:
-                cursor = getattr(_ctx, "cursor", None)
-                cursor_id = getattr(cursor, "uid", None)
-            dependency.requirement.resolved_cursor_id = (
-                cursor_id if isinstance(cursor_id, UUID) else None
-            )
+            stamp_requirement_resolution(dependency.requirement, _ctx=_ctx)
             dependency.requirement.resolution_reason = "stub_link_resolved"
             escalate = getattr(_ctx, "escalate_to_hard_dirty", None)
             if callable(escalate):

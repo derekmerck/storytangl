@@ -98,6 +98,7 @@ from .response import (
     WorldSceneList,
     coerce_runtime_info,
 )
+from .story_info import DefaultStoryInfoProjector, StoryInfoProjector
 from .world_registry import WorldRegistry
 
 
@@ -139,6 +140,8 @@ __all__ = [
     "ServiceOperation",
     "SystemInfo",
     "TableValue",
+    "StoryInfoProjector",
+    "DefaultStoryInfoProjector",
     "UserAuthInfo",
     "UserInfo",
     "UserSecret",

@@ -127,7 +127,7 @@ describe('MyComponent', () => {
 - **JournalStoryUpdate**: narrative block with text, media, and actions
 - **JournalAction**: clickable action button with uid and optional payload
 - **MediaRole**: semantic role for media (narrative_im, avatar_im, etc.)
-- **StoryStatus**: runtime info or key-value status items for sidebar display
+- **StoryStatus**: projected current-state sections for sidebar display
 - **useGlobal()**: composable providing $http, remapURL, makeMediaDict utilities
 
 ## Component architecture

@@ -66,7 +66,8 @@ describe('App.vue', () => {
 
     const drawer = wrapper.find('.v-navigation-drawer')
     expect(drawer.text()).toContain('Status')
-    expect(drawer.text()).toContain('ok')
+    expect(drawer.text()).toContain('Session')
+    expect(drawer.text()).toContain('Flags')
     expect(drawer.text()).toContain('Dark Forest')
   })
 })

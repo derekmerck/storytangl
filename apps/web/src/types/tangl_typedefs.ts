@@ -186,7 +186,60 @@ export interface JournalKVItem {
   style?: StyleHints
 }
 
+export type PrimitiveValue = string | number | boolean
+
+export interface ProjectedKVItem {
+  key: string
+  value: PrimitiveValue
+}
+
+export interface ScalarValue {
+  value_type: 'scalar'
+  value: PrimitiveValue
+}
+
+export interface KvListValue {
+  value_type: 'kv_list'
+  items: ProjectedKVItem[]
+}
+
+export interface ProjectedItem {
+  label: string
+  detail?: string | null
+  tags?: string[]
+}
+
+export interface ItemListValue {
+  value_type: 'item_list'
+  items: ProjectedItem[]
+}
+
+export interface TableValue {
+  value_type: 'table'
+  columns: string[]
+  rows: PrimitiveValue[][]
+}
+
+export interface BadgeListValue {
+  value_type: 'badges'
+  items: string[]
+}
+
+export type SectionValue = ScalarValue | KvListValue | ItemListValue | TableValue | BadgeListValue
+
+export interface ProjectedSection {
+  section_id: string
+  title: string
+  kind?: string | null
+  value: SectionValue
+  hints?: StyleHints | null
+}
+
+export interface ProjectedState {
+  sections: ProjectedSection[]
+}
+
 export type JournalEntry = JournalStoryUpdate[]
-export type StoryStatus = JournalKVItem[] | RuntimeInfo
+export type StoryStatus = ProjectedState
 export type WorldSceneList = JournalKVItem[]
 export type WorldList = JournalKVItem[]

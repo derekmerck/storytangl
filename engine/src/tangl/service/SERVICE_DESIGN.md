@@ -336,11 +336,11 @@ and deferred imports so lower-layer service modules can be imported without
 eagerly pulling the full controller stack.
 
 **Controllers return native results.** The convention is `RuntimeInfo` for
-runtime acknowledgments and session-status endpoints, `InfoModel` subclasses for
-metadata queries, fragment lists for content endpoints, and media-native payloads
-for media endpoints. The orchestrator validates the result shape against
-`response_type`. Controllers never serialize to JSON or format for a specific
-transport.
+runtime acknowledgments, `ProjectedState` and other `InfoModel` subclasses for
+metadata queries, fragment lists for content endpoints, and media-native
+payloads for media endpoints. The orchestrator validates the result shape
+against `response_type`. Controllers never serialize to JSON or format for a
+specific transport.
 
 
 ### Response Vocabulary (`response.py`)
@@ -370,9 +370,11 @@ output plus cursor position, step, redirect trace, and metadata. Controllers may
 embed it inside `RuntimeInfo.details` when an operation needs an acknowledgment
 wrapper and a transport-ready runtime snapshot together.
 
-**`InfoModel`** is the base for typed metadata payloads: `SystemInfo`, `UserInfo`,
-`WorldInfo`, and `ProjectedState`. `ProjectedState` is the canonical ordered
-section model for runtime-state surfaces; it is service-native data, not a
+**`InfoModel`** is the base for typed metadata payloads: `SystemInfo`,
+`UserInfo`, `WorldInfo`, and `ProjectedState`. `ProjectedState` is the
+canonical ordered section model for runtime-state surfaces; `get_story_info()`
+now returns it directly through a world-authored projector seam rather than
+wrapping it inside `RuntimeInfo.details`. It is service-native data, not a
 journal fragment. These models serialize cleanly for any transport.
 
 **Response type decision flowchart:**

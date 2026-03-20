@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
+from ..ctx import VmRequirementStampCtx
 from .provisioner import ProvisionPolicy
 
 PT = TypeVar('PT', bound=RegistryAware)  # 'ProviderType'
@@ -130,6 +131,24 @@ class Requirement(Selector, Generic[PT]):
     media_basename: Optional[str] = None
 
 
+def stamp_requirement_resolution(
+    requirement: Requirement[Any],
+    *,
+    _ctx: VmRequirementStampCtx | None = None,
+) -> None:
+    """Write shared step/cursor resolution metadata from a typed runtime context."""
+    if _ctx is None:
+        requirement.resolved_step = None
+        requirement.resolved_cursor_id = None
+        return
+
+    step = _ctx.step
+    requirement.resolved_step = step if isinstance(step, int) else None
+
+    cursor_id = _ctx.cursor_id
+    requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
+
+
 class HasRequirement(RegistryAware, Generic[PT]):
     """HasRequirement(requirement: Requirement[PT])
 
@@ -194,20 +213,7 @@ class HasRequirement(RegistryAware, Generic[PT]):
         if (self.requirement._validate_satisfied_by(provider) and
                 self.registry._validate_linkable(provider)):
             self.requirement.provider_id = provider.uid
-            step = getattr(_ctx, "step", None)
-            if isinstance(step, int):
-                self.requirement.resolved_step = step
-            else:
-                self.requirement.resolved_step = None
-
-            cursor_id = getattr(_ctx, "cursor_id", None)
-            if cursor_id is None:
-                cursor = getattr(_ctx, "cursor", None)
-                cursor_id = getattr(cursor, "uid", None)
-            if isinstance(cursor_id, UUID):
-                self.requirement.resolved_cursor_id = cursor_id
-            else:
-                self.requirement.resolved_cursor_id = None
+            stamp_requirement_resolution(self.requirement, _ctx=_ctx)
 
     @provider.setter
     def provider(self, value: PT) -> None:
@@ -428,15 +434,7 @@ class Fanout(Edge, Generic[PT]):
                 validated_ids.append(provider.uid)
 
         self.provider_ids = validated_ids
-
-        step = getattr(_ctx, "step", None)
-        self.requirement.resolved_step = step if isinstance(step, int) else None
-
-        cursor_id = getattr(_ctx, "cursor_id", None)
-        if cursor_id is None:
-            cursor = getattr(_ctx, "cursor", None)
-            cursor_id = getattr(cursor, "uid", None)
-        self.requirement.resolved_cursor_id = cursor_id if isinstance(cursor_id, UUID) else None
+        stamp_requirement_resolution(self.requirement, _ctx=_ctx)
 
     def clear_providers(self) -> None:
         self.provider_ids.clear()

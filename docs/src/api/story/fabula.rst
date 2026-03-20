@@ -23,6 +23,9 @@ Compilation
 
 .. autoclass:: tangl.story.fabula.compiler.StoryCompiler
 .. autoclass:: tangl.story.fabula.compiler.StoryTemplateBundle
+.. autoclass:: tangl.story.fabula.types.CompileIssue
+.. autoclass:: tangl.story.fabula.types.CompileSeverity
+.. autoclass:: tangl.story.fabula.types.AuthoredRef
 
 Materialization
 ---------------

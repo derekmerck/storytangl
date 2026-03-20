@@ -291,6 +291,54 @@ def test_codec_merge_collisions_are_reported(tmp_path: Path) -> None:
     assert any("overwrote top-level keys" in warning for warning in warnings)
 
 
+def test_world_compile_preserves_compile_issues_separately_from_codec_warnings(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "diagnostic_world"
+    bundle_root.mkdir()
+    scripts_dir = bundle_root / "scripts"
+    scripts_dir.mkdir()
+
+    (bundle_root / "world.yaml").write_text(
+        """
+        label: diagnostic_world
+        scripts:
+          - scripts/a.yaml
+          - scripts/b.yaml
+        """,
+        encoding="utf-8",
+    )
+
+    (scripts_dir / "a.yaml").write_text(
+        """
+        label: diagnostic_world
+        metadata:
+          start_at: intro.start
+        scenes:
+          intro:
+            blocks:
+              start:
+                content: Start
+                roles:
+                  - label: host
+                    actor_ref: missing_actor
+        """,
+        encoding="utf-8",
+    )
+    (scripts_dir / "b.yaml").write_text(
+        """
+        metadata:
+          title: Override
+        """,
+        encoding="utf-8",
+    )
+
+    bundle = WorldBundle.load(bundle_root)
+    world = WorldCompiler().compile(bundle)
+
+    assert [issue.code for issue in world.bundle.issues] == ["compile:dangling_actor_ref"]
+    assert any("overwrote top-level keys" in warning for warning in world.metadata["codec_warnings"])
+    assert "loss_records" not in world.bundle.codec_state
+
+
 @pytest.mark.skip(
     reason=(
         "Retired from the cutover parity gate: validates runtime37 world internals "

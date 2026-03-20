@@ -66,6 +66,9 @@ from .concepts import (
 )
 from .episode import Action, Block, MenuBlock, Scene
 from .fabula import (
+    AuthoredRef,
+    CompileIssue,
+    CompileSeverity,
     GraphInitializationError,
     InitMode,
     InitReport,
@@ -94,8 +97,11 @@ from . import system_handlers  # noqa: F401
 __all__ = [
     "Action",
     "Actor",
+    "AuthoredRef",
     "Block",
     "ChoiceFragment",
+    "CompileIssue",
+    "CompileSeverity",
     "ContentFragment",
     "EntityKnowledge",
     "GraphInitializationError",
