@@ -4,7 +4,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_serializer, field_validator, model_validator
 
 from tangl.core import Graph, Selector, TemplateRegistry
 
@@ -59,7 +59,7 @@ class StoryGraph(Graph):
     locals: dict[str, Any] = Field(default_factory=dict)
     factory: TemplateRegistry | None = Field(default=None, exclude=True)
     script_manager: Any | None = Field(default=None, exclude=True)
-    world: Any | None = Field(default=None, exclude=True)
+    world: Any | None = None
     story_id: UUID | None = Field(default=None, exclude=True)
     story_resources: Any | None = Field(default=None, exclude=True)
     story_materialize: Any | None = Field(default=None, exclude=True)
@@ -72,6 +72,51 @@ class StoryGraph(Graph):
     def get_story_locals(self) -> dict[str, Any]:
         """Return story-level locals exposed to runtime render/provision paths."""
         return dict(self.locals)
+
+    @field_serializer("world")
+    def _serialize_world_ref(self, value: Any | None) -> str | None:
+        """Serialize the bound world as a lightweight label reference."""
+        return getattr(value, "label", None) if value is not None else None
+
+    @field_validator("world", mode="before")
+    @classmethod
+    def _resolve_world_ref(cls, value: Any) -> Any:
+        """Resolve serialized world labels back to loaded world instances.
+
+        TODO: Replace this temporary StoryGraph-local shim with proper
+        singleton-aware structuring in core bases so object references with
+        ``unstructure()`` / ``structure()`` semantics round-trip uniformly.
+        """
+        if value is None or value == "":
+            return None
+
+        if isinstance(value, str):
+            from .fabula.world import World
+
+            return World.get_instance(value)
+
+        if isinstance(value, dict):
+            label = value.get("label")
+            if isinstance(label, str) and label:
+                from .fabula.world import World
+
+                return World.get_instance(label)
+
+        return value
+
+    @model_validator(mode="after")
+    def _restore_world_runtime_refs(self) -> StoryGraph:
+        """Restore lightweight runtime pointers that can be derived from world."""
+        world = self.world
+        if world is not None:
+            if self.script_manager is None:
+                self.script_manager = getattr(world, "script_manager", None)
+            if self.factory is None:
+                bundle = getattr(world, "bundle", None)
+                self.factory = getattr(bundle, "template_registry", None)
+        if self.story_id is None:
+            self.story_id = self.uid
+        return self
 
     def get_authorities(self) -> list[object]:
         """Return application/world authority registries when available."""
