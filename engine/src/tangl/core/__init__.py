@@ -43,6 +43,7 @@ tangl/core/
 ├── graph.py              # GraphItem, Graph, Subgraph, Node, Edge
 │
 │   # Creation
+├── factory.py            # Singleton graph authority + eager materialization
 ├── token.py              # Delegate to singleton
 ├── template.py           # Semi-structured data, TemplateRegistry
 │
@@ -90,6 +91,7 @@ from .bases import HasContent
 # Provides:
 # - building
 # - dispatch hooks
+from .factory import GraphFactory
 from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
 from .token import Token, TokenCatalog, TokenFactory  # Delegated reference builder
 from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink

@@ -25,6 +25,7 @@ from pydantic import AliasChoices, Field
 from .entity import Entity
 from .registry import EntityGroup, HierarchicalGroup, Registry, RegistryAware
 from .selector import Selector
+from .singleton import Singleton
 
 
 class GraphItem(RegistryAware):
@@ -123,9 +124,22 @@ class Graph(Registry[GraphItem]):
     Creation helpers instantiate ``kind(**attrs)`` directly, then rely on registry
     ownership for binding and lifecycle hooks.
 
+    ``Graph`` may also carry an optional singleton ``factory`` authority. This is
+    explicitly structured and unstructured by hand so graphs can recover behavior
+    registries after persistence. This mirrors the story-layer ``StoryGraph.world``
+    round-trip shim and is an interim pattern until core gains generic recursive
+    handling for entity-shaped fields.
+
     Typed find helpers apply narrowing via ``selector.with_criteria(has_kind=...)``.
     Because ``with_criteria`` avoids widening ``has_kind``, callers may narrow kinds
     but cannot widen helper defaults.
+
+    API
+    ---
+    - :meth:`bind_factory` attaches or clears the singleton graph authority.
+    - :meth:`path_dist` ranks candidates by shared containment ancestry.
+    - :meth:`unstructure` and :meth:`structure` preserve singleton factory identity
+      across graph round-trips.
 
     Example:
         >>> g = Graph()
@@ -138,14 +152,16 @@ class Graph(Registry[GraphItem]):
         True
     """
 
+    factory: Any | None = Field(default=None, exclude=True)
+
     def get_authorities(self) -> list[object]:
         """Return application-level behavior registries for dispatch bootstrapping.
 
         Extension hook — override in application-layer graph subclasses to
         expose domain-specific registries to the VM dispatch chain.
 
-        The no-op default is correct for a bare ``Graph``.  Application graphs
-        override this to return their registries:
+        A bare ``Graph`` delegates to its bound singleton ``factory`` when present.
+        Application graphs may override this to add richer authority chains:
 
         - :class:`~tangl.story.StoryGraph` returns ``[story_dispatch]``
           and cascades to ``world.get_authorities()`` when a world is attached.
@@ -173,7 +189,68 @@ class Graph(Registry[GraphItem]):
         in declaration order.  Lower dispatch layers (LOCAL, INLINE) are added
         by ``PhaseCtx.get_authorities`` and inline behavior expansion separately.
         """
-        return []
+        authorities: list[object] = []
+        get_factory_authorities = getattr(self.factory, "get_authorities", None)
+        if callable(get_factory_authorities):
+            for authority in get_factory_authorities() or ():
+                if authority not in authorities:
+                    authorities.append(authority)
+        return authorities
+
+    def bind_factory(self, value: Singleton | None) -> None:
+        """Bind a singleton graph authority used for persistence-safe behavior lookup."""
+        if value is not None and not isinstance(value, Singleton):
+            raise TypeError("Graph factory must be a Singleton-compatible authority")
+        self.factory = value
+
+    def unstructure(self):
+        """Return constructor-form graph data including a singleton factory reference."""
+        data = super().unstructure()
+        if self.factory is None or not isinstance(self.factory, Singleton):
+            return data
+        data["factory"] = self.factory.unstructure()
+        return data
+
+    @classmethod
+    def structure(cls, data, _ctx=None):
+        """Structure a graph and restore any persisted singleton factory reference."""
+        payload = dict(data)
+        factory_data = payload.pop("factory", None)
+        graph = super().structure(payload, _ctx=_ctx)
+        if factory_data is None:
+            return graph
+        if isinstance(factory_data, Singleton):
+            graph.bind_factory(factory_data)
+            return graph
+        if not isinstance(factory_data, dict):
+            raise TypeError("Persisted graph factory references must be singleton constructor data")
+        graph.bind_factory(Singleton.structure(dict(factory_data)))
+        return graph
+
+    def path_dist(self, a: GraphItem, b: GraphItem) -> int:
+        """Return containment distance between two graph items.
+
+        The distance is measured over containment ancestry rather than edge
+        traversal. When two items do not share a common ancestor, they receive a
+        graph-wide disconnection penalty so connected candidates always sort ahead
+        of disconnected ones.
+        """
+        self._validate_linkable(a)
+        self._validate_linkable(b)
+
+        def _chain(item: GraphItem) -> list[GraphItem]:
+            return [item, *list(item.ancestors())]
+
+        a_chain = _chain(a)
+        b_chain = _chain(b)
+        b_index = {item.uid: idx for idx, item in enumerate(b_chain)}
+
+        for a_idx, item in enumerate(a_chain):
+            if item.uid in b_index:
+                return a_idx + b_index[item.uid]
+
+        disconnected_penalty = max(1, len(self.members) * 2)
+        return disconnected_penalty + len(a_chain) + len(b_chain)
 
     def add(self, value: GraphItem, _ctx=None) -> None:
         """Add and bind legacy ``graph`` pointers when present."""
