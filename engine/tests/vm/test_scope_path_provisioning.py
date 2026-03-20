@@ -337,7 +337,7 @@ class TestResolverPreviewAndExecution:
         assert dep.satisfied is True
         assert dep.provider is not None
         assert dep.provider.registry is graph
-        assert dep.provider.templ_hash == template.content_hash().hex()
+        assert dep.provider.templ_hash == template.content_hash()
 
     def test_provider_rejected_keeps_added_provider_as_invariant_safety_net(self) -> None:
         graph = Graph()

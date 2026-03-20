@@ -111,11 +111,11 @@ def _next_provision_uid(*, _ctx: Any = None) -> UUID:
     return uuid4()
 
 
-def _template_hash_value(template: EntityTemplate) -> str:
+def _template_hash_value(template: EntityTemplate) -> bytes:
     content_hash = template.content_hash()
-    if isinstance(content_hash, bytes):
-        return content_hash.hex()
-    return str(content_hash)
+    if not isinstance(content_hash, (bytes, bytearray, memoryview)):
+        raise TypeError("EntityTemplate.content_hash() must return bytes-like data")
+    return bytes(content_hash)
 
 
 @dataclass
