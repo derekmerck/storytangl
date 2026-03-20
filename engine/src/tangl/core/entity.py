@@ -9,7 +9,7 @@ import re
 
 from pydantic import Field
 
-from tangl.type_hints import StringMap
+from tangl.type_hints import StringMap, Hash
 
 from .bases import HasIdentity, Unstructurable, is_identifier
 from .namespace import HasNamespace
@@ -67,7 +67,7 @@ class Entity(Unstructurable, HasIdentity, HasNamespace):
         Ambient context helpers for hook propagation.
     """
 
-    templ_hash: str | None = None
+    templ_hash: Hash | None = Field(default=None, json_schema_extra={"is_identifier": True})
     """Optional provenance hash of the template used to materialize this entity."""
 
     def is_instance(self, kind: type | tuple[type, ...]) -> bool:

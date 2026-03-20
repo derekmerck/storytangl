@@ -255,6 +255,7 @@ class EntityTemplate(RegistryAware, Record, Generic[ET]):
                 )
         if not preserve_uid:
             updates.setdefault('uid', uuid4())  # create a new uid if not provided
+            updates['templ_hash'] = self.content_hash()  # indicate origin
         else:
             updates.pop('uid', None)  # exact copy, discard any override uid
         return self.payload.evolve(**updates)
