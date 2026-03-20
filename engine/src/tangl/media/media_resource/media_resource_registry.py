@@ -16,7 +16,7 @@ from tangl.core import (
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.WARNING)
 
 class MediaResourceRegistry(Registry[MediaRIT]):
     """
@@ -50,6 +50,8 @@ class MediaResourceRegistry(Registry[MediaRIT]):
         for item in items:
             # Initial record creation
             record = mrt_cls.from_source(item)
+
+            # logger.debug(f"indexing {record!r}")
 
             # Check for duplicates by content
             if record in self:

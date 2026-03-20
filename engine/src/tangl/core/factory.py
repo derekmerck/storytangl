@@ -23,13 +23,19 @@ def _ancestor_templs(templ: EntityTemplate) -> Iterator[TemplateGroup]:
         parent = _parent_templ(parent)
 
 
+def _get_ancestors_by_templ(templ_hash: Hash,
+                            templs: TemplateRegistry) -> list[TemplateGroup]:
+    ref_templ = templs.find_one(Selector.from_id(templ_hash))
+    return list(_ancestor_templs(ref_templ))
+
+
 def _get_node_by_templ(templ_hash: Hash,
                        templs: TemplateRegistry,
                        graph: Graph) -> Optional[GraphItem]:
     # 1. find a template
     # 3. find the materialized node based on that template in the current graph
     ref_templ = templs.find_one(Selector.from_id(templ_hash))
-    return graph.find_one(Selector.from_id(ref_templ.content_hash))
+    return graph.find_one(Selector.from_id(ref_templ.content_hash()))
 
 
 def _get_parent_by_templ(templ_hash: Hash,
@@ -72,14 +78,13 @@ class GraphFactory(Singleton):
         return [ self.dispatch ]
 
     def get_entry_cursor(self, graph: Graph) -> GraphItem:
-        def _path_precision(item: GraphItem) -> int:
-            return len(item.path.split('.'))
-        # todo: need `chain_or`
+        # todo: check only within a scope and this becomes reusable for
+        #       any container entry point
         s = Selector.chain_or(
             Selector(has_identifier=self.default_entry_ref),
             Selector(has_tags={self.default_entry_ref})
         )
-        return graph.find_one(s, sort_key=lambda x: len(*_ancestor_templs(x)))
+        return graph.find_one(s, sort_key=lambda x: len(list(x.ancestors)))
 
     @property
     def _kind_map(self) -> dict[str, Type[GraphItem]]:
@@ -111,9 +116,10 @@ class GraphFactory(Singleton):
     #         self.materialize_graph(graph=caller)
 
     def materialize_graph(self, graph: Graph = None, **kwargs):
-        # EAGER default materialization
+        # Simple EAGER default materialization
         #
-        # Strictly creation and wiring connectivity
+        # This is not a resolver. It is strictly a deterministic expander for
+        # already-resolved template topology.
         #
         # Assumptions:
         #  - all template payloads already have correct kind
@@ -132,7 +138,7 @@ class GraphFactory(Singleton):
         for templs in templ_regs:
             for templ in templs.find_all(
                     Selector.from_kind(Subgraph),
-                    sort_key=lambda x: len(*_ancestor_templs(x))):
+                    sort_key=lambda x: len(_get_ancestors_by_templ(x.templ_hash, templs))):
                 # sort with fewest ancestors first (closest to root)
                 group: Subgraph = templ.materialize()
                 graph.add(group)
