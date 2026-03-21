@@ -128,6 +128,8 @@ class Token(Node, Generic[WST]):
     @model_validator(mode="after")
     def _hydrate_instance_vars_from_referent(self) -> Self:
         """Backfill unset instance vars from the referenced singleton instance."""
+        if self.label is None:
+            self.label = self.token_from
         for field_name in self._instance_vars(self.wrapped_cls):
             if field_name in self.model_fields_set:
                 continue

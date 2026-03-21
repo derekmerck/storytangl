@@ -299,7 +299,7 @@ class TestTokenCatalog:
 
         token = catalog.materialize_one(base)
         assert token.token_from == "sword"
-        assert token.label is None
+        assert token.label == "sword"
 
     def test_materialize_one_accepts_label_override(self) -> None:
         base = WeaponType(label="sword", damage="1d6")
