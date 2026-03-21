@@ -6,7 +6,7 @@ from pydantic import Field
 
 from .registry import HierarchicalGroup
 from .singleton import Singleton
-from .graph import Graph, GraphItem, Subgraph, Node, Edge
+from .graph import Graph, GraphItem, Subgraph, Node, Edge, _ancestor_list
 from .selector import Selector
 from .behavior import BehaviorRegistry
 from .template import TemplateRegistry, EntityTemplate, TemplateGroup
@@ -131,7 +131,7 @@ class GraphFactory(Singleton):
             Selector(has_identifier=self.default_entry_ref),
             Selector(has_tags={self.default_entry_ref}),
         )
-        return graph.find_one(s, sort_key=lambda x: len(list(x.ancestors())))
+        return graph.find_one(s, sort_key=lambda x: len(_ancestor_list(x)))
 
     @property
     def _kind_map(self) -> dict[str, type[GraphItem]]:

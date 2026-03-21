@@ -29,6 +29,21 @@ from .selector import Selector
 from .singleton import Singleton
 
 
+def _ancestor_list(item: GraphItem | RegistryAware) -> list[GraphItem | RegistryAware]:
+    """Return containment ancestry for graph and hierarchy items.
+
+    ``GraphItem`` exposes ``ancestors()`` as a method, while
+    ``HierarchicalGroup`` exposes ``ancestors`` as a property. Core graph
+    helpers need to work across both shapes.
+    """
+    raw_ancestors = getattr(item, "ancestors", None)
+    if raw_ancestors is None:
+        return []
+    if callable(raw_ancestors):
+        return list(raw_ancestors())
+    return list(raw_ancestors)
+
+
 class GraphItem(RegistryAware):
     """Base class for items managed by :class:`Graph`.
 
@@ -79,7 +94,7 @@ class GraphItem(RegistryAware):
         path = getattr(self, "path", None)
         if not isinstance(path, str):
             labels: list[str] = [self.get_label()]
-            for ancestor in self.ancestors():
+            for ancestor in _ancestor_list(self):
                 labels.append(ancestor.get_label())
             path = ".".join(reversed(labels))
         return fnmatch(path, pattern)
@@ -91,7 +106,7 @@ class GraphItem(RegistryAware):
         wanted = set(tags)
         pooled: set[str] = set()
         pooled.update(getattr(self, "tags", set()) or set())
-        for ancestor in self.ancestors():
+        for ancestor in _ancestor_list(self):
             pooled.update(getattr(ancestor, "tags", set()) or set())
         return wanted.issubset(pooled)
 
@@ -102,7 +117,7 @@ class GraphItem(RegistryAware):
         forbidden = set(tags)
         pooled: set[str] = set()
         pooled.update(getattr(self, "tags", set()) or set())
-        for ancestor in self.ancestors():
+        for ancestor in _ancestor_list(self):
             pooled.update(getattr(ancestor, "tags", set()) or set())
         return forbidden.isdisjoint(pooled)
 
@@ -238,7 +253,7 @@ class Graph(Registry[GraphItem]):
         self._validate_linkable(b)
 
         def _chain(item: GraphItem) -> list[GraphItem]:
-            return [item, *list(item.ancestors())]
+            return [item, *_ancestor_list(item)]
 
         a_chain = _chain(a)
         b_chain = _chain(b)

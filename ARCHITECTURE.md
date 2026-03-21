@@ -228,20 +228,19 @@ VM defines how the graph evolves over time. It knows about traversal,
 phases, provisioning, and replay. It does **not** define narrative
 semantics such as scenes, actors, or story structure.
 
-### No Separate VM Factory Class (Today)
+### TraversableGraph / TraversableGraphFactory (`vm/factory.py`)
 
-There is currently **no concrete `TraversableGraphFactory` class** in the
-codebase. Do not invent one casually.
+VM adds one thin factory layer over core graph materialization.
 
-Traversal-readiness is currently provided by a combination of:
+- **TraversableGraph** — a `Graph` carrying `initial_cursor_id`, the default
+  traversal entry chosen from graph shape.
+- **TraversableGraphFactory** — a `GraphFactory` subclass that materializes a
+  `TraversableGraph`, resolves the shallowest entry-like node, stamps
+  `initial_cursor_id`, and validates traversal contracts.
 
-- VM traversal contracts (`TraversableNode`, `TraversableEdge`)
-- VM runtime execution (`Frame`, `Ledger`, `PhaseCtx`)
-- story-layer materialization and validation (`StoryMaterializer`)
-
-If a real second use case for a VM-level factory emerges later, it should be
-introduced deliberately. For now, the concrete factory abstraction is
-`core.GraphFactory`.
+This is intentionally narrow. VM does not define a second "runtime factory"
+for planning or replay. Those remain runtime behavior over a traversable graph,
+not separate graph-authority classes.
 
 ### ResolutionPhase (`vm/resolution_phase.py`)
 
@@ -429,8 +428,9 @@ What `World` does today:
   `ScriptManager`
 
 **Intended direction:** world-like story authorities are expected to converge
-on the same singleton graph-authority pattern as `core.GraphFactory`, but that
-is not the current implementation contract.
+on the same singleton graph-authority pattern as `core.GraphFactory` and
+`vm.TraversableGraphFactory`, but that is not the current implementation
+contract.
 
 ### ScriptManager (`story/fabula/script_manager.py`)
 
@@ -551,7 +551,7 @@ infrastructure.
 - No bespoke registry query sugar competing with `Selector`.
 - No upward imports (`vm → story`, `core → vm`, etc.).
 - No custom reference-tracking serializers for `Singleton`s.
-- No speculative `TraversableGraphFactory` implementation just because the
-  name sounds plausible.
+- No second speculative VM factory layer beyond `TraversableGraphFactory`
+  without a concrete new use case.
 - No wrapper layer that pretends `World` is already a `GraphFactory`
   subclass when it is not.

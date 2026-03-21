@@ -16,13 +16,16 @@ import pytest
 from tangl.core import (
     BehaviorRegistry,
     DispatchLayer,
+    EntityTemplate,
     Graph,
     GraphFactory,
     OrderedRegistry,
     Record,
+    Selector,
     TemplateRegistry,
 )
 from tangl.vm.dispatch import (
+    on_provision,
     on_get_template_scope_groups,
     on_journal,
     on_prereqs,
@@ -30,6 +33,7 @@ from tangl.vm.dispatch import (
     on_update,
     on_validate,
 )
+from tangl.vm.factory import TraversableGraphFactory
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import Frame, PhaseCtx
 from tangl.vm.traversable import (
@@ -51,6 +55,17 @@ def _edge(graph: Graph, **kwargs) -> TraversableEdge:
     return edge
 
 
+class RefTraversableEdge(TraversableEdge):
+    """Test edge exposing factory predecessor/successor refs."""
+
+    predecessor_ref: bytes | None = None
+    successor_ref: str | None = None
+
+
+class FrameFactoryTestDouble(TraversableGraphFactory):
+    """Test-local singleton subclass used for VM frame factory coverage."""
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -68,6 +83,34 @@ def _simple_graph(*labels: str) -> tuple[Graph, list[TraversableNode]]:
             successor_id=nodes[i + 1].uid,
         )
     return g, nodes
+
+
+def _factory_graph(*labels: str) -> tuple[Graph, list[TraversableNode], TraversableEdge]:
+    """Build a linear traversable graph through the VM factory."""
+    FrameFactoryTestDouble.clear_instances()
+    template_registry = TemplateRegistry(label="frame_factory_templates")
+    templates = [
+        EntityTemplate(label=label, payload=TraversableNode(label=label), registry=template_registry)
+        for label in labels
+    ]
+    for index in range(len(templates) - 1):
+        EntityTemplate(
+            label=f"{labels[index]}.go",
+            payload=RefTraversableEdge(
+                label=f"{labels[index]}_go",
+                predecessor_ref=templates[index].content_hash(),
+                successor_ref=labels[index + 1],
+            ),
+            registry=template_registry,
+        )
+
+    factory = FrameFactoryTestDouble(label="frame_factory", templates=template_registry)
+    graph = factory.materialize_graph()
+    nodes = [graph.find_node(Selector(label=label)) for label in labels]
+    edge = graph.find_edge(Selector(label=f"{labels[0]}_go"))
+    assert all(isinstance(node, TraversableNode) for node in nodes)
+    assert isinstance(edge, TraversableEdge)
+    return graph, nodes, edge
 
 
 # ============================================================================
@@ -362,6 +405,25 @@ class TestFollowEdge:
 
         frame.follow_edge(AnonymousEdge(predecessor=a, successor=b))
         assert b.locals["frame_local"] is True
+
+    def test_planning_phase_runs_on_factory_built_traversable_graph(self, clean_vm_dispatch) -> None:
+        provisioned: list[str] = []
+
+        @on_provision
+        def track(*, caller, ctx, **kw):
+            provisioned.append(caller.label)
+            return None
+
+        graph, nodes, edge = _factory_graph("start", "next")
+        start, _next = nodes
+
+        try:
+            frame = Frame(graph=graph, cursor=start)
+            frame.follow_edge(edge)
+        finally:
+            FrameFactoryTestDouble.clear_instances()
+
+        assert "next" in provisioned
 
 
 class TestFollowEdgeEntryPhase:

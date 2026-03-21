@@ -96,6 +96,16 @@ def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
 
 
+def test_ledger_from_story_graph_defaults_to_story_initial_cursor() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("run_lazy", init_mode=InitMode.LAZY)
+
+    ledger = Ledger.from_graph(result.graph)
+
+    assert ledger.cursor_id == result.graph.initial_cursor_id
+    assert ledger.cursor is result.graph.get(result.graph.initial_cursor_id)
+
+
 def test_freeze_shape_requires_eager_mode() -> None:
     world = World.from_script_data(script_data=_base_script())
 

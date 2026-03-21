@@ -13,9 +13,10 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core import Graph, Selector, Snapshot
+from tangl.core import EntityTemplate, Graph, Selector, Snapshot, TemplateRegistry
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.media.media_data_type import MediaDataType
+from tangl.vm import TraversableGraphFactory
 from tangl.vm.dispatch import on_prereqs
 from tangl.vm.replay import CausalityTransitionRecord, RollbackRecord, StepRecord
 from tangl.vm.resolution_phase import ResolutionPhase
@@ -41,6 +42,43 @@ def _edge(graph: Graph, **kwargs) -> TraversableEdge:
     edge = TraversableEdge(**kwargs)
     graph.add(edge)
     return edge
+
+
+class RefTraversableEdge(TraversableEdge):
+    """Test edge exposing factory predecessor/successor refs."""
+
+    predecessor_ref: bytes | None = None
+    successor_ref: str | None = None
+
+
+class LedgerFactoryTestDouble(TraversableGraphFactory):
+    """Test-local singleton subclass used for VM ledger factory coverage."""
+
+
+def _factory_graph(*labels: str) -> tuple[Graph, list[TraversableNode]]:
+    """Build a linear traversable graph through the VM factory."""
+    LedgerFactoryTestDouble.clear_instances()
+    template_registry = TemplateRegistry(label="ledger_factory_templates")
+    templates = [
+        EntityTemplate(label=label, payload=TraversableNode(label=label), registry=template_registry)
+        for label in labels
+    ]
+    for index in range(len(templates) - 1):
+        EntityTemplate(
+            label=f"{labels[index]}.go",
+            payload=RefTraversableEdge(
+                label=f"{labels[index]}_go",
+                predecessor_ref=templates[index].content_hash(),
+                successor_ref=labels[index + 1],
+            ),
+            registry=template_registry,
+        )
+
+    factory = LedgerFactoryTestDouble(label="ledger_factory", templates=template_registry)
+    graph = factory.materialize_graph()
+    nodes = [graph.find_node(Selector(label=label)) for label in labels]
+    assert all(isinstance(node, TraversableNode) for node in nodes)
+    return graph, nodes
 
 
 # ============================================================================
@@ -88,6 +126,19 @@ class TestLedgerCursor:
         assert ledger.choice_steps == 0
         assert ledger.cursor_steps == 0
 
+    def test_from_graph_defaults_to_graph_initial_cursor_id(self) -> None:
+        graph, nodes = _factory_graph("start", "next")
+        start = nodes[0]
+
+        try:
+            ledger = Ledger.from_graph(graph=graph)
+        finally:
+            LedgerFactoryTestDouble.clear_instances()
+
+        assert graph.initial_cursor_id == start.uid
+        assert ledger.cursor_id == start.uid
+        assert ledger.cursor is start
+
     def test_initialize_ledger_updates_call_stack_ids(self, monkeypatch) -> None:
         g = Graph()
         a = _node(g, label="a")
@@ -106,6 +157,14 @@ class TestLedgerCursor:
         monkeypatch.setattr(Ledger, "get_frame", lambda self: _FrameWithReturn())
         ledger.initialize_ledger(entry_id=a.uid)
         assert ledger.call_stack_ids == [call_edge.uid]
+
+    def test_initialize_ledger_requires_explicit_entry_or_graph_default(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        ledger = Ledger(graph=g, cursor_id=a.uid)
+
+        with pytest.raises(ValueError, match="graph does not define initial_cursor_id"):
+            ledger.initialize_ledger()
 
     def test_fresh_construction_initializes_counters(self) -> None:
         g = Graph()

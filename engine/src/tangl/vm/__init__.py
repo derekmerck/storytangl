@@ -15,6 +15,8 @@ Conceptual layers
 2. Traversal contracts
 
    - :class:`TraversableNode` / :class:`TraversableEdge` define cursor movement.
+   - :class:`TraversableGraph` carries traversal entry metadata for factory-built graphs.
+   - :class:`TraversableGraphFactory` materializes traversal-ready graphs from templates.
    - :mod:`tangl.vm.traversal` provides pure history/call-stack queries.
 
 3. Provisioning
@@ -74,6 +76,7 @@ from .traversable import (
     assert_traversal_contracts,
     validate_traversal_contracts,
 )
+from .factory import TraversableGraph, TraversableGraphFactory
 from .traversal import (
     count_turns,
     get_call_depth,
@@ -146,6 +149,8 @@ __all__ = [
     "ViabilityResult",
     "CloneProvisioner",
     "TraversableEdge",
+    "TraversableGraph",
+    "TraversableGraphFactory",
     "TraversableNode",
     "Patch",
     "Event",
