@@ -9,7 +9,7 @@ from .graph import Graph, GraphItem, Subgraph, Node, Edge
 from .selector import Selector
 from .behavior import BehaviorRegistry
 from .template import TemplateRegistry, EntityTemplate, TemplateGroup
-from .token import TokenFactory
+from .token import TokenCatalog
 
 
 # pseudo-graph-item helpers for template hierarchy
@@ -43,7 +43,7 @@ def _get_parent_by_templ(
     templ_hash: bytes,
     templs: TemplateRegistry,
     graph: Graph,
-) -> Subgraph | None:
+) -> GraphItem | None:
     ref_templ = _resolve_single_match(
         list(templs.find_all(Selector(has_identifier=templ_hash))),
         f"template {templ_hash!r}",
@@ -53,9 +53,21 @@ def _get_parent_by_templ(
         return None
     ref_templ_parent_hash = ref_templ_parent.content_hash()
     return _resolve_single_match(
-        list(graph.find_subgraphs(Selector(templ_hash=ref_templ_parent_hash))),
-        f"parent subgraph for template {ref_templ_parent.get_label()!r}",
+        list(graph.find_all(Selector(templ_hash=ref_templ_parent_hash))),
+        f"parent graph item for template {ref_templ_parent.get_label()!r}",
     )
+
+
+def _attach_to_parent(parent: GraphItem, child: GraphItem) -> None:
+    add_member = getattr(parent, "add_member", None)
+    if callable(add_member):
+        add_member(child)
+        return
+    add_child = getattr(parent, "add_child", None)
+    if callable(add_child):
+        add_child(child)
+        return
+    raise TypeError(f"Parent {parent.__class__.__name__} does not support child membership")
 
 
 class GraphFactory(Singleton):
@@ -137,8 +149,8 @@ class GraphFactory(Singleton):
         return [self.templates]
 
     # @dispatch.register(task="on_get_providers")
-    def _provide_token_catalogs(self, **kwargs) -> list[TokenFactory]:
-        return [TokenFactory(wst=cls) for cls in self.token_types]
+    def _provide_token_catalogs(self, **kwargs) -> list[TokenCatalog]:
+        return [TokenCatalog(wst=cls) for cls in self.token_types]
 
     # @dispatch.register(task="on_init", wants_caller=Graph)
     # def _materialize_graph(self, caller: Graph, mode = None, **kwargs):
@@ -225,24 +237,29 @@ class GraphFactory(Singleton):
 
         for templs in templ_regs:
             for templ in templs.find_all(
-                Selector(has_kind=Subgraph),
+                Selector(predicate=lambda templ: isinstance(templ, TemplateGroup)),
                 sort_key=_template_depth,
             ):
-                group: Subgraph = templ.materialize()
+                group: GraphItem = templ.materialize()
                 graph.add(group)
 
                 parent = _get_parent_by_templ(group.templ_hash, templs, graph)
                 if parent:
-                    parent.add_member(group)
+                    _attach_to_parent(parent, group)
 
         for templs in templ_regs:
-            for templ in templs.find_all(Selector(has_kind=Node)):
+            for templ in templs.find_all(
+                Selector(
+                    predicate=lambda templ: not isinstance(templ, TemplateGroup),
+                    has_kind=Node,
+                )
+            ):
                 node: Node = templ.materialize()
                 graph.add(node)
 
                 parent = _get_parent_by_templ(node.templ_hash, templs, graph)
                 if parent:
-                    parent.add_member(node)
+                    _attach_to_parent(parent, node)
 
         for templs in templ_regs:
             for templ in templs.find_all(Selector(has_kind=Edge)):

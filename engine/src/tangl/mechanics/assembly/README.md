@@ -1,7 +1,7 @@
 # Mechanics: Assembly
 
 Composable slot-based containers for arranging components into loadouts. Slots use
-`tangl.core.entity.Entity.matches()` to determine eligibility, enabling both declarative
+`tangl.core.Selector.matches()` to determine eligibility, enabling both declarative
 criteria (tags, type checks) and custom predicates without duplicating selector logic.
 
 Key pieces:

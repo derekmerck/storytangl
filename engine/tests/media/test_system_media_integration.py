@@ -59,7 +59,7 @@ def test_system_media_fallback(tmp_path, monkeypatch):
     _run_planning(frame, block)
 
     media_dep = next(edge for edge in block.edges_out() if isinstance(edge, MediaDep))
-    assert media_dep.destination is not None
+    assert media_dep.successor is not None
     assert media_dep.scope == "sys"
 
     fragments = _run_journal(frame, block)
@@ -99,6 +99,6 @@ def test_world_media_preferred_over_system(tmp_path, monkeypatch):
     _run_planning(frame, block)
 
     media_dep = next(edge for edge in block.edges_out() if isinstance(edge, MediaDep))
-    assert media_dep.destination is not None
+    assert media_dep.successor is not None
     assert media_dep.scope == "world"
-    assert getattr(media_dep.destination, "path", None) == world_asset
+    assert getattr(media_dep.successor, "path", None) == world_asset

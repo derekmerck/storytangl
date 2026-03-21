@@ -111,19 +111,6 @@ class Token(Node, Generic[WST]):
 
     token_from: str = Field(...)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _compat_token_from_aliases(cls, data: Any) -> Any:
-        """Legacy bridge: infer ``token_from`` from ``from_ref`` or ``label``."""
-        if isinstance(data, dict) and "token_from" not in data:
-            coerced = dict(data)
-            if coerced.get("from_ref") is not None:
-                coerced["token_from"] = coerced["from_ref"]
-            elif coerced.get("label") is not None:
-                coerced["token_from"] = coerced["label"]
-            return coerced
-        return data
-
     # todo: why is this commented out, probably _do_ want to be able to update tags
     #       maybe b/c discarding would be hard?  (i.e., keep {-foo} and use it to
     #       hide {foo}?)  Probably want something like this anyway for other complete
@@ -336,24 +323,3 @@ class TokenCatalog(Generic[WST]):
             label=label,
             **token_locals,
         )
-
-
-@dataclass
-class TokenFactory(Generic[WST]):
-    """Provisioner-facing adapter around ``Token[WST](token_from=...)``.
-
-    Each factory instance wraps one singleton type and exposes a tiny materialization
-    API compatible with builder-like provisioner flows.
-    """
-
-    wst: Type[WST]
-
-    def has_kind(self, kind: Type[Node]) -> bool:
-        return self.wst.has_kind(kind)
-
-    @classmethod
-    def _materialize_one(cls, wrapped_cls: Type[WST], token_from: str) -> Token[WST]:
-        return Token[wrapped_cls](token_from=token_from)
-
-    def materialize_one(self, token_from: str) -> Token[WST]:
-        return self._materialize_one(self.wst, token_from)

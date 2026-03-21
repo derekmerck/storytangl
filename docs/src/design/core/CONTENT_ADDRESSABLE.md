@@ -144,10 +144,10 @@ template2 = ActorScript(name="guard", hp=50)  # Same content
 registry.add(template1)
 registry.add(template2)  # Duplicate - same hash
 
-# Find by content hash
-matches = registry.find_all(content_hash=template1.content_hash)
+# Find by content hash identifier
+matches = registry.find_all(Selector.from_identifier(template1.content_hash()))
 assert len(matches) == 2  # Both instances
-assert matches[0].content_hash == matches[1].content_hash
+assert matches[0].content_hash() == matches[1].content_hash()
 ```
 
 ## Provenance Tracking
@@ -156,7 +156,7 @@ Use `content_hash` in BuildReceipts to track what was used:
 
 ```python
 # In provisioner
-template = world.template_registry.find_one(label="guard")
+template = world.template_registry.find_one(Selector.from_identifier("guard"))
 
 receipt = BuildReceipt(
     destination_uid=actor.uid,

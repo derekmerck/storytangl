@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
 from tangl.media import MediaResourceInventoryTag as MediaRIT, MediaDataType
+from tangl.core import Selector
 
 def test_resource_inventory_tag_initialization():
     tag = MediaRIT(label="test", content_hash=b"hash123", data_type=MediaDataType.IMAGE)
@@ -32,7 +33,7 @@ def test_resource_inventory_tag_expiry_conversion():
 def test_resource_inventory_tag_get_aliases():
     tag = MediaRIT(label="test", content_hash=b"hash123", data_type=MediaDataType.IMAGE)
     assert tag.has_identifier(b"hash123")
-    assert tag.matches(has_identifier=b"hash123")
+    assert Selector(has_identifier=b"hash123").matches(tag)
 
 
 def test_compute_hash_caching(temp_image_fp):

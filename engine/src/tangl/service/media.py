@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable
 
+from tangl.core import Selector
 from tangl.journal.fragments import MediaFragment
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaInventory
@@ -226,7 +227,7 @@ def _resolve_fallback_rit(
             {"path": fallback_path},
             {"label": fallback_name},
         ):
-            found = registry.find_one(**criteria)
+            found = registry.find_one(Selector(**criteria))
             if isinstance(found, MediaRIT):
                 return found, inventory.scope
     return None

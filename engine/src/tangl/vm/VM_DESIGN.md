@@ -605,7 +605,7 @@ and passes the annotated list to the renderer. The renderer decides presentation
 |--------|-----|-----|-----------|
 | Effect lists | `entry_effects` / `final_effects` (two fields) | `effects: list[TraversableEffect]` + `trigger_phase` | Single list, phase declared on the effect |
 | Availability/Effects location | `core.bases.HasAvailability`, `HasEffects` | `vm.traversable.HasAvailability`, `HasEffects` | Phase vocabulary is VM, not core |
-| Token provisioning | `TokenFactory` in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
+| Token provisioning | token helpers in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
 | Template discovery | Graph/facet call-chain wiring | `do_get_template_scope_groups` dispatch task | VM no longer knows world internals |
 | Catalog discovery | Explicit wiring / polling APIs | `do_get_token_catalogs` dispatch task | Unified discovery contract across search spaces |
 | System handlers | Self-registering mixins via `@on_update` on class body | Module-level `@on_update` with `hasattr` duck-type | No import side effects on dispatch registry |

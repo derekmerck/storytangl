@@ -55,7 +55,7 @@ def build_world_with_logo_media_block(world_media_dir: Path | None = None) -> Me
 
     dep = MediaDep(
         graph=story,
-        source_id=block.uid,
+        predecessor_id=block.uid,
         media_path="logo.svg",
         media_role="logo",
     )

@@ -75,7 +75,7 @@ presentation (renderers, web/UI)
 
 ## 6) Handlers & dispatch
 - Handlers are entity-centric; dispatch orders by priority → registration → uid.
-- Selection via `Selectable`/criteria; avoid hard-coded switches.
+- Selection via `Selector` criteria; avoid hard-coded switches.
 - Thin handler bodies, rich `JobReceipt`s for aggregation and audit.
 - **Priority ordering**: Use `Priority` enum (not strings) for deterministic sort order.
 
@@ -134,17 +134,17 @@ StoryTangl maintains strict separation between identity (UUIDs) and references (
 **Pattern**:
 ```python
 class Edge(GraphItem):
-    source_id: Optional[UUID] = None
-    destination_id: Optional[UUID] = None
+    predecessor_id: Optional[UUID] = None
+    successor_id: Optional[UUID] = None
     
     @property
-    def source(self) -> Optional[Node]:
-        """Resolve source node via graph registry (watched)."""
-        return self.graph.get(self.source_id) if self.source_id else None
+    def predecessor(self) -> Optional[Node]:
+        """Resolve predecessor node via graph registry (watched)."""
+        return self.graph.get(self.predecessor_id) if self.predecessor_id else None
     
-    @source.setter
-    def source(self, node: Optional[Node]):
-        self.source_id = node.uid if node else None
+    @predecessor.setter
+    def predecessor(self, node: Optional[Node]):
+        self.predecessor_id = node.uid if node else None
 ```
 
 **Why**:
@@ -188,7 +188,7 @@ def members(self) -> Iterator[GraphItem]:
 
 def edges_in(self, **criteria) -> Iterator[Edge]:
     """Yield incoming edges matching criteria."""
-    return self.graph.find_edges(destination=self, **criteria)
+    return self.graph.find_edges(successor=self, **criteria)
 ```
 
 **Why**:

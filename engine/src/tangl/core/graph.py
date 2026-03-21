@@ -16,11 +16,12 @@ See Also
 from __future__ import annotations
 
 import itertools
+from functools import cached_property
 from fnmatch import fnmatch
 from typing import Any, Iterable, Iterator, Optional
 from uuid import UUID
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 
 from .entity import Entity
 from .registry import EntityGroup, HierarchicalGroup, Registry, RegistryAware
@@ -44,28 +45,26 @@ class GraphItem(RegistryAware):
         # Compatibility for legacy graph containers that assign item.graph directly.
         self.bind_registry(value)
 
-    def _compat_parent(self) -> GraphItem | None:
-        parent = getattr(self, "parent", None)
-        if parent is not None:
-            return parent
+    @cached_property
+    def parent(self) -> GraphItem | None:
+        """Return first owning hierarchical graph node, if present.
+
+        Plain :class:`Subgraph` membership is intentionally ignored here. Subgraphs
+        are bag-like graph views; only :class:`HierarchicalNode` membership defines
+        a single parent path for graph items.
+        """
         registry = getattr(self, "registry", None)
         if registry is None:
             return None
-        for candidate in registry.find_all(Selector(has_member=self)):
-            if candidate is not self:
-                return candidate
-        return None
+        selector = Selector(has_kind=HierarchicalNode, has_member=self)
+        return registry.find_one(selector)
 
     def ancestors(self):
-        """Legacy compatibility iterator from parent to root.
-
-        Falls back to membership-derived ancestry when no hierarchical
-        ``parent`` is available (for example, plain Subgraph membership).
-        """
+        """Yield containment ancestry from membership-derived parent to root."""
         seen: set[UUID | None] = {getattr(self, "uid", None)}
         current: GraphItem | None = self
         while current is not None:
-            parent = current._compat_parent()
+            parent = getattr(current, "parent", None)
             if parent is None:
                 return
             uid = getattr(parent, "uid", None)
@@ -277,15 +276,8 @@ class Graph(Registry[GraphItem]):
         **attrs,
     ) -> Edge:
         """Create and add an edge between predecessor and successor items."""
-        # Legacy arg aliases.
-        if predecessor is None and "source" in attrs:
-            predecessor = attrs.pop("source")
-        if successor is None and "destination" in attrs:
-            successor = attrs.pop("destination")
-
-        # Legacy id aliases when node refs are not supplied.
-        predecessor_id = attrs.pop("source_id", None)
-        successor_id = attrs.pop("destination_id", None)
+        predecessor_id = attrs.pop("predecessor_id", None)
+        successor_id = attrs.pop("successor_id", None)
 
         if predecessor is not None:
             self._validate_linkable(predecessor)
@@ -313,74 +305,39 @@ class Graph(Registry[GraphItem]):
             subgraph.add_member(item)
         return subgraph
 
-    @staticmethod
-    def _normalize_edge_criteria(criteria: dict[str, Any]) -> dict[str, Any]:
-        normalized = dict(criteria)
-        if "source" in normalized:
-            normalized.setdefault("predecessor", normalized.pop("source"))
-        if "destination" in normalized:
-            normalized.setdefault("successor", normalized.pop("destination"))
-        return normalized
-
-    @classmethod
-    def _normalize_edge_selector(
-        cls,
-        selector: Selector | dict[str, Any] | Any,
-    ) -> Selector | dict[str, Any] | Any:
-        if isinstance(selector, dict):
-            return cls._normalize_edge_criteria(selector)
-        if isinstance(selector, Selector):
-            payload = dict(selector.__pydantic_extra__ or {})
-            for field_name in type(selector).model_fields:
-                value = getattr(selector, field_name)
-                if value is not None:
-                    payload[field_name] = value
-            normalized_payload = cls._normalize_edge_criteria(payload)
-            if normalized_payload != payload:
-                return Selector(**normalized_payload)
-        return selector
-
     def _typed_selector(
         self,
         kind: type[GraphItem],
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Selector:
-        if issubclass(kind, Edge):
-            selector = self._normalize_edge_selector(selector)
-            criteria = self._normalize_edge_criteria(criteria)
-        base_selector = self._normalize_selector(selector, **criteria) or Selector()
+        base_selector = self._ensure_selector(selector) or Selector()
         return base_selector.with_criteria(has_kind=kind)
 
     def _find_typed_all(
         self,
         kind: type[GraphItem],
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[GraphItem]:
-        return self.find_all(selector=self._typed_selector(kind, selector, **criteria))
+        return self.find_all(selector=self._typed_selector(kind, selector))
 
     def _find_typed_one(
         self,
         kind: type[GraphItem],
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> GraphItem | None:
-        return self.find_one(selector=self._typed_selector(kind, selector, **criteria))
+        return self.find_one(selector=self._typed_selector(kind, selector))
 
     def find_subgraphs(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Subgraph]:
-        return self._find_typed_all(Subgraph, selector, **criteria)
+        return self._find_typed_all(Subgraph, selector)
 
     def find_subgraph(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Optional[Subgraph]:
-        return self._find_typed_one(Subgraph, selector, **criteria)
+        return self._find_typed_one(Subgraph, selector)
 
     @property
     def subgraphs(self) -> list[Subgraph]:
@@ -388,10 +345,9 @@ class Graph(Registry[GraphItem]):
 
     def find_edges(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Edge]:
-        return self._find_typed_all(Edge, selector, **criteria)
+        return self._find_typed_all(Edge, selector)
 
     @property
     def edges(self) -> list[Edge]:
@@ -399,17 +355,15 @@ class Graph(Registry[GraphItem]):
 
     def find_edge(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Optional[Edge]:
-        return self._find_typed_one(Edge, selector, **criteria)
+        return self._find_typed_one(Edge, selector)
 
     def find_nodes(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Node]:
-        return self._find_typed_all(Node, selector, **criteria)
+        return self._find_typed_all(Node, selector)
 
     @property
     def nodes(self) -> list[Node]:
@@ -417,10 +371,9 @@ class Graph(Registry[GraphItem]):
 
     def find_node(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Optional[Node]:
-        return self._find_typed_one(Node, selector, **criteria)
+        return self._find_typed_one(Node, selector)
 
     def _do_link(self, caller: GraphItem, node: Node, _ctx):
         """Bridge to dispatch ``do_link`` hook."""
@@ -449,6 +402,7 @@ class Subgraph(EntityGroup, GraphItem):
         _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
             self.graph._do_link(self, item, _ctx)
+        item._invalidate_parent_attr()
         super().add_member(item)
 
     def remove_member(self, item: GraphItem, _ctx=None) -> None:
@@ -457,9 +411,10 @@ class Subgraph(EntityGroup, GraphItem):
         _ctx = resolve_ctx(_ctx)
         if _ctx is not None:
             self.graph._do_unlink(self, item, _ctx)
+        item._invalidate_parent_attr()
         super().remove_member(item)
 
-    def members(self, selector: Selector = None, sort_key=None) -> Iterator[GraphItem]:
+    def members(self, selector: Selector | None = None, sort_key=None) -> Iterator[GraphItem]:
         """Yield typed graph-item members."""
         return super().members(selector=selector, sort_key=sort_key)
 
@@ -469,8 +424,6 @@ class Edge(GraphItem):
 
     Notes
     -----
-    - v38 names endpoints ``predecessor`` / ``successor`` (legacy used
-      ``source`` / ``destination``).
     - Endpoints may be dangling (`None`) by design.
 
     Access patterns:
@@ -486,14 +439,8 @@ class Edge(GraphItem):
         <Edge:anon->n>
     """
 
-    predecessor_id: Optional[UUID] = Field(
-        default=None,
-        validation_alias=AliasChoices("predecessor_id", "source_id"),
-    )
-    successor_id: Optional[UUID] = Field(
-        default=None,
-        validation_alias=AliasChoices("successor_id", "destination_id"),
-    )
+    predecessor_id: Optional[UUID] = None
+    successor_id: Optional[UUID] = None
 
     @property
     def predecessor(self) -> Optional[Node]:
@@ -539,45 +486,6 @@ class Edge(GraphItem):
     def successor(self, value: Node) -> None:
         self.set_successor(value)
 
-    # Legacy aliases retained for non-retiring call sites.
-    @property
-    def source(self) -> Optional[Node]:
-        return self.predecessor
-
-    def set_source(self, value: Node, _ctx=None) -> None:
-        self.set_predecessor(value, _ctx=_ctx)
-
-    @source.setter
-    def source(self, value: Node) -> None:
-        self.set_predecessor(value)
-
-    @property
-    def destination(self) -> Optional[Node]:
-        return self.successor
-
-    def set_destination(self, value: Node, _ctx=None) -> None:
-        self.set_successor(value, _ctx=_ctx)
-
-    @destination.setter
-    def destination(self, value: Node) -> None:
-        self.set_successor(value)
-
-    @property
-    def source_id(self) -> Optional[UUID]:
-        return self.predecessor_id
-
-    @source_id.setter
-    def source_id(self, value: UUID | None) -> None:
-        self.predecessor_id = value
-
-    @property
-    def destination_id(self) -> Optional[UUID]:
-        return self.successor_id
-
-    @destination_id.setter
-    def destination_id(self, value: UUID | None) -> None:
-        self.successor_id = value
-
     def __repr__(self) -> str:
         src = self.predecessor.get_label() if self.predecessor is not None else "anon"
         dst = self.successor.get_label() if self.successor is not None else "anon"
@@ -589,57 +497,48 @@ class Node(GraphItem):
 
     def edges_in(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Edge]:
-        selector = (self.graph._normalize_selector(selector, **criteria) or Selector()).with_criteria(
-            successor=self
-        )
+        selector = (self.graph._ensure_selector(selector) or Selector()).with_criteria(successor=self)
         return self.graph.find_edges(selector=selector)
 
     def predecessors(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Node]:
         """Yield immediate predecessor nodes via incoming edges."""
         return (
             edge.predecessor
-            for edge in self.edges_in(selector=selector, **criteria)
+            for edge in self.edges_in(selector=selector)
             if edge.predecessor
         )
 
     def edges_out(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Edge]:
-        selector = (self.graph._normalize_selector(selector, **criteria) or Selector()).with_criteria(
-            predecessor=self
-        )
+        selector = (self.graph._ensure_selector(selector) or Selector()).with_criteria(predecessor=self)
         return self.graph.find_edges(selector=selector)
 
     def successors(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Node]:
         """Yield immediate successor nodes via outgoing edges."""
         return (
             edge.successor
-            for edge in self.edges_out(selector=selector, **criteria)
+            for edge in self.edges_out(selector=selector)
             if edge.successor
         )
 
     def edges(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[Edge]:
         """Yield all incident edges (incoming then outgoing)."""
         return itertools.chain(
-            self.edges_in(selector=selector, **criteria),
-            self.edges_out(selector=selector, **criteria),
+            self.edges_in(selector=selector),
+            self.edges_out(selector=selector),
         )
 
     def add_edge_to(self, node: Node, kind=None, **attrs) -> Edge:

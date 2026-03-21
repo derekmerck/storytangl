@@ -138,8 +138,8 @@ class HasGame:
         if victory_dest is not None:
             victory_edge = ChoiceEdge(
                 graph=graph,
-                source_id=node.uid,
-                destination_id=victory_dest.uid,
+                predecessor_id=node.uid,
+                successor_id=victory_dest.uid,
                 trigger_phase=P.POSTREQS,
                 predicate="game_won",
                 label="Victory!",
@@ -149,8 +149,8 @@ class HasGame:
         if defeat_dest is not None:
             defeat_edge = ChoiceEdge(
                 graph=graph,
-                source_id=node.uid,
-                destination_id=defeat_dest.uid,
+                predecessor_id=node.uid,
+                successor_id=defeat_dest.uid,
                 trigger_phase=P.POSTREQS,
                 predicate="game_lost",
                 label="Defeat",
@@ -160,8 +160,8 @@ class HasGame:
         if draw_dest is not None:
             draw_edge = ChoiceEdge(
                 graph=graph,
-                source_id=node.uid,
-                destination_id=draw_dest.uid,
+                predecessor_id=node.uid,
+                successor_id=draw_dest.uid,
                 trigger_phase=P.POSTREQS,
                 predicate="game_draw",
                 label="Draw",

@@ -2,7 +2,7 @@ from collections.abc import Mapping
 
 import pytest
 
-from tangl.core import Graph
+from tangl.core import Graph, Selector
 # from tangl.core.domain.affiliate import SingletonDomain
 from tangl.vm import Ledger
 from tangl.vm.replay import CheckpointRecord
@@ -38,7 +38,7 @@ def test_ledger_roundtrip_all_backends(manager):
     assert restored.uid == ledger.uid
     assert restored.step == 42
     assert restored.cursor_id == node.uid
-    assert restored.graph.find_one(label="test_node") is not None
+    assert restored.graph.find_one(Selector(label="test_node")) is not None
     # assert [domain.label for domain in restored.domains] == ["demo_domain"]
 
 
@@ -53,5 +53,5 @@ def test_event_sourced_rebuild_all_backends(manager):
     retrieved = manager.get(ledger.uid)
     restored = _load_ledger(retrieved)
 
-    assert restored.output_stream.last(is_instance=CheckpointRecord) is not None
-    assert restored.graph.find_one(label="event_node") is not None
+    assert restored.output_stream.last(Selector(is_instance=CheckpointRecord)) is not None
+    assert restored.graph.find_one(Selector(label="event_node")) is not None

@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterable
 from markdown_it import MarkdownIt
 from pydantic import BaseModel
 
-from tangl.core import BehaviorRegistry, DispatchLayer, Priority
+from tangl.core import BehaviorRegistry, DispatchLayer, Priority, Selector
 
 from .operations import ServiceOperation
 
@@ -87,7 +87,7 @@ class GatewayHooks:
         current: dict[str, Any] = dict(params)
         for phase in (HookPhase.EARLY, HookPhase.NORMAL, HookPhase.LATE):
             behaviors = self._registry.find_all(
-                task=f"inbound.{phase.value}",
+                Selector(task=f"inbound.{phase.value}"),
                 sort_key=lambda value: value.sort_key,
             )
             for behavior in behaviors:
@@ -115,7 +115,7 @@ class GatewayHooks:
         current = result
         for phase in (HookPhase.EARLY, HookPhase.NORMAL, HookPhase.LATE):
             behaviors = self._registry.find_all(
-                task=f"outbound.{phase.value}",
+                Selector(task=f"outbound.{phase.value}"),
                 sort_key=lambda value: value.sort_key,
             )
             for behavior in behaviors:

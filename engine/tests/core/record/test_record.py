@@ -171,6 +171,13 @@ class TestOrderedRegistryBasics:
         reg.extend([a, b])
         assert list(reg.find_all(Selector(has_tags={"x"}))) == [a]
 
+    def test_last_rejects_kwargs_lookup(self) -> None:
+        reg = OrderedRegistry()
+        reg.append(SimpleRecord(content="a"))
+
+        with pytest.raises(TypeError):
+            reg.last(label="a")
+
     def test_append_out_of_order_sorts_correctly(self) -> None:
         reg = OrderedRegistry()
         a = SimpleRecord(content="a", seq=3)

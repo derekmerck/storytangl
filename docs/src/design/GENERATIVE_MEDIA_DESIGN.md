@@ -290,7 +290,7 @@ authority for story-scoped generated `MediaRIT` nodes; `story_resources` is the 
 index facade that keeps `/media/story/{story_id}/...` stable.
 
 For story-scoped RITs, the graph *is* the registry. `MediaRIT` nodes are full graph
-entities. `content_hash` is already `@is_identifier`. `graph.find_all(Selector(has_kind=MediaRIT, **criteria))` is the complete story-scope EXISTING search — no adapter, no wrapper.
+entities. `content_hash` is already `@is_identifier`. `graph.find_all(Selector(has_kind=MediaRIT).with_criteria(**criteria))` is the complete story-scope EXISTING search — no adapter, no wrapper.
 
 The `get_media_registries` dispatch handler for story scope simply returns the graph:
 

@@ -487,9 +487,3 @@ class BehaviorRegistry(Registry[Behavior]):
             selector=selector,
             inline_behaviors=inline_behaviors,
         )
-
-
-# Legacy vocabulary aliases retained during namespace cutover.
-HandlerPriority = Priority
-HandlerLayer = DispatchLayer
-LayeredDispatch = BehaviorRegistry

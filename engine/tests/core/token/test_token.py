@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import is_dataclass
 from typing import TypeVar
 
 import pytest
@@ -12,7 +11,7 @@ from tangl.core.entity import Entity
 from tangl.core.graph import Graph, GraphItem, HierarchicalNode, Node
 from tangl.core.selector import Selector
 from tangl.core.singleton import Singleton
-from tangl.core.token import Token, TokenCatalog, TokenFactory
+from tangl.core.token import Token, TokenCatalog
 
 from ..conftest import ArmorType, NPCType, WeaponType
 
@@ -57,6 +56,16 @@ class TestTokenCreation:
         WeaponType(label="sword", damage="1d6")
         token = Token[WeaponType](token_from="sword", label="Glamdring")
         assert token.token_from == "sword"
+
+    def test_from_ref_no_longer_aliases_token_from(self) -> None:
+        WeaponType(label="sword", damage="1d6")
+        with pytest.raises(ValidationError):
+            Token[WeaponType](from_ref="sword", label="Glamdring")
+
+    def test_label_does_not_infer_token_from(self) -> None:
+        WeaponType(label="sword", damage="1d6")
+        with pytest.raises(ValidationError):
+            Token[WeaponType](label="sword")
 
     def test_invalid_ref_raises(self) -> None:
         with pytest.raises(ValidationError):
@@ -273,29 +282,6 @@ class TestTokenGraphIntegration:
         child = HierToken(token_from="sword", label="Glamdring", registry=graph)
         root.add_child(child)
         assert child.parent is root
-
-
-class TestTokenFactory:
-    def test_materialize_one_creates_token(self) -> None:
-        WeaponType(label="sword", damage="1d6")
-        factory = TokenFactory[WeaponType](wst=WeaponType)
-        token = factory.materialize_one("sword")
-        assert isinstance(token, Token[WeaponType])
-        assert token.token_from == "sword"
-
-    def test_materialize_one_invalid_ref(self) -> None:
-        factory = TokenFactory[WeaponType](wst=WeaponType)
-        with pytest.raises(ValidationError):
-            factory.materialize_one("missing")
-
-    def test_class_method_materialize(self) -> None:
-        WeaponType(label="sword", damage="1d6")
-        token = TokenFactory._materialize_one(WeaponType, "sword")
-        assert isinstance(token, Token[WeaponType])
-
-    def test_factory_is_dataclass(self) -> None:
-        assert is_dataclass(TokenFactory)
-
 
 class TestTokenCatalog:
     def test_find_all_uses_singleton_registry(self) -> None:

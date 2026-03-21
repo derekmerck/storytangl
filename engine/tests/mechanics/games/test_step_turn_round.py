@@ -46,8 +46,8 @@ class TestCurrentStepBehavior:
         b = g.add_node(label="B")
         c = g.add_node(label="C")
         
-        ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
-        bc = ChoiceEdge(graph=g, source_id=b.uid, destination_id=c.uid)
+        ab = ChoiceEdge(graph=g, predecessor_id=a.uid, successor_id=b.uid)
+        bc = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=c.uid)
         
         frame = _make_frame(g, a.uid)
         assert frame.step == 0
@@ -66,8 +66,8 @@ class TestCurrentStepBehavior:
         a = g.add_node(label="A")
         b = g.add_node(label="B")
         
-        ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
-        ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
+        ab = ChoiceEdge(graph=g, predecessor_id=a.uid, successor_id=b.uid)
+        ba = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=a.uid)
         
         frame = _make_frame(g, a.uid)
         
@@ -85,7 +85,7 @@ class TestCurrentStepBehavior:
         g = Graph(label="loop")
         node = g.add_node(label="game")
         
-        loop = ChoiceEdge(graph=g, source_id=node.uid, destination_id=node.uid)
+        loop = ChoiceEdge(graph=g, predecessor_id=node.uid, successor_id=node.uid)
         
         frame = _make_frame(g, node.uid)
         
@@ -118,9 +118,9 @@ class TestCursorHistoryProposal:
         a = g.add_node(label="A")
         b = g.add_node(label="B")
         
-        ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
-        ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
-        bb = ChoiceEdge(graph=g, source_id=b.uid, destination_id=b.uid)
+        ab = ChoiceEdge(graph=g, predecessor_id=a.uid, successor_id=b.uid)
+        ba = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=a.uid)
+        bb = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=b.uid)
         
         frame = _make_frame(g, a.uid)
         
@@ -162,9 +162,9 @@ class TestCursorHistoryProposal:
         a = g.add_node(label="A")
         b = g.add_node(label="B")
         
-        ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
-        ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
-        bb = ChoiceEdge(graph=g, source_id=b.uid, destination_id=b.uid)
+        ab = ChoiceEdge(graph=g, predecessor_id=a.uid, successor_id=b.uid)
+        ba = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=a.uid)
+        bb = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=b.uid)
         
         frame = _make_frame(g, a.uid)
         cursor_history: list[UUID] = [frame.cursor_id]
@@ -198,8 +198,8 @@ class TestCursorHistoryProposal:
         start = g.add_node(label="start")
         shrine = g.add_node(label="shrine")
         
-        to_shrine = ChoiceEdge(graph=g, source_id=start.uid, destination_id=shrine.uid)
-        back = ChoiceEdge(graph=g, source_id=shrine.uid, destination_id=start.uid)
+        to_shrine = ChoiceEdge(graph=g, predecessor_id=start.uid, successor_id=shrine.uid)
+        back = ChoiceEdge(graph=g, predecessor_id=shrine.uid, successor_id=start.uid)
         
         frame = _make_frame(g, start.uid)
         cursor_history: list[UUID] = [frame.cursor_id]
@@ -248,9 +248,9 @@ class TestGameRoundTracking:
         game = g.add_node(label="game")
         outro = g.add_node(label="outro")
         
-        to_game = ChoiceEdge(graph=g, source_id=intro.uid, destination_id=game.uid)
-        play = ChoiceEdge(graph=g, source_id=game.uid, destination_id=game.uid)
-        to_outro = ChoiceEdge(graph=g, source_id=game.uid, destination_id=outro.uid)
+        to_game = ChoiceEdge(graph=g, predecessor_id=intro.uid, successor_id=game.uid)
+        play = ChoiceEdge(graph=g, predecessor_id=game.uid, successor_id=game.uid)
+        to_outro = ChoiceEdge(graph=g, predecessor_id=game.uid, successor_id=outro.uid)
         
         # Game state (would be in Game entity)
         game_round = 0
@@ -282,9 +282,9 @@ class TestGameRoundTracking:
         hub = g.add_node(label="hub")
         game = g.add_node(label="game")
         
-        to_game = ChoiceEdge(graph=g, source_id=hub.uid, destination_id=game.uid)
-        play = ChoiceEdge(graph=g, source_id=game.uid, destination_id=game.uid)
-        back = ChoiceEdge(graph=g, source_id=game.uid, destination_id=hub.uid)
+        to_game = ChoiceEdge(graph=g, predecessor_id=hub.uid, successor_id=game.uid)
+        play = ChoiceEdge(graph=g, predecessor_id=game.uid, successor_id=game.uid)
+        back = ChoiceEdge(graph=g, predecessor_id=game.uid, successor_id=hub.uid)
         
         frame = _make_frame(g, hub.uid)
         
@@ -326,7 +326,7 @@ class TestLedgerLevelTracking:
         a = g.add_node(label="A")
         b = g.add_node(label="B")
         
-        ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
+        ab = ChoiceEdge(graph=g, predecessor_id=a.uid, successor_id=b.uid)
         
         ledger = _make_ledger(g, a.uid)
         ledger.push_snapshot()
@@ -353,8 +353,8 @@ class TestLedgerLevelTracking:
         a = g.add_node(label="A")
         b = g.add_node(label="B")
         
-        ab = ChoiceEdge(graph=g, source_id=a.uid, destination_id=b.uid)
-        ba = ChoiceEdge(graph=g, source_id=b.uid, destination_id=a.uid)
+        ab = ChoiceEdge(graph=g, predecessor_id=a.uid, successor_id=b.uid)
+        ba = ChoiceEdge(graph=g, predecessor_id=b.uid, successor_id=a.uid)
         
         ledger = _make_ledger(g, a.uid)
         ledger.push_snapshot()
@@ -399,7 +399,7 @@ class TestMarkerBasedRoundTracking:
         g = Graph(label="markers")
         node = g.add_node(label="game")
         
-        loop = ChoiceEdge(graph=g, source_id=node.uid, destination_id=node.uid)
+        loop = ChoiceEdge(graph=g, predecessor_id=node.uid, successor_id=node.uid)
 
         ledger = _make_ledger(g, node.uid)
         for _ in range(3):

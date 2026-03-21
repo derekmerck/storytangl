@@ -8,9 +8,9 @@ from tangl.core import (
     EntityTemplate,
     Graph,
     GraphFactory,
+    HierarchicalNode,
     Node,
     Selector,
-    Subgraph,
     TemplateRegistry,
 )
 from tangl.core.graph import Edge
@@ -38,7 +38,7 @@ def clear_factories() -> None:
 def _template_group(*, registry, label: str) -> TemplateGroup:
     return TemplateGroup(
         label=label,
-        payload=Subgraph(label=label.rsplit(".", 1)[-1]),
+        payload=HierarchicalNode(label=label.rsplit(".", 1)[-1]),
         registry=registry,
     )
 
@@ -82,8 +82,8 @@ class TestGraphFactoryMaterialize:
         factory = GraphFactoryTestDouble(label="tree_factory", templates=template_registry)
         graph = factory.materialize_graph()
 
-        root_group = graph.find_subgraph(Selector(label="root"))
-        chapter_group = graph.find_subgraph(Selector(label="chapter"))
+        root_group = graph.find_node(Selector(label="root"))
+        chapter_group = graph.find_node(Selector(label="chapter"))
         start_node = graph.find_node(Selector(label="start"))
         finish_node = graph.find_node(Selector(label="finish"))
 

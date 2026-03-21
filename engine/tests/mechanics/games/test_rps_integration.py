@@ -60,8 +60,8 @@ def test_complete_rps_game_to_victory():
 
     intro_to_game = ChoiceEdge(
         graph=graph,
-        source_id=intro.uid,
-        destination_id=game_block.uid,
+        predecessor_id=intro.uid,
+        successor_id=game_block.uid,
         label="Play RPS",
     )
 
@@ -123,8 +123,8 @@ def test_rps_game_to_defeat():
 
     intro_to_game = ChoiceEdge(
         graph=graph,
-        source_id=intro.uid,
-        destination_id=game_block.uid,
+        predecessor_id=intro.uid,
+        successor_id=game_block.uid,
         label="Play RPS",
     )
 

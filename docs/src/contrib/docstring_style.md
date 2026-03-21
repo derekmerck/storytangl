@@ -228,7 +228,7 @@ If a class stores `*_id` fields and provides resolution methods/properties, docu
 ```rst
 Notes
 -----
-Endpoint properties (``source``, ``destination``) resolve via the owning
+Endpoint properties (``predecessor``, ``successor``) resolve via the owning
 graph. Every access goes through ``self.graph.get()`` for watchability.
 ```
 
@@ -262,7 +262,7 @@ See also
 ### Example: Comprehensive Edge docstring
 
 ```rst
-Edge(source: Node, destination: Node, edge_type: str)
+Edge(predecessor: Node, successor: Node, edge_type: str)
 
 Directed connection between two nodes in the same graph.
 
@@ -274,14 +274,14 @@ endpoint ids for serialization, with properties that resolve to live nodes.
 Key Features
 ------------
 * **Typed** – optional :attr:`edge_type`.
-* **Endpoint conversion** – pre-init validator accepts ``source``/``destination``
+* **Endpoint conversion** – pre-init validator accepts ``predecessor``/``successor``
   as :class:`GraphItem` and converts them to ids.
-* **Live accessors** – :attr:`source` / :attr:`destination` resolve via graph.
+* **Live accessors** – :attr:`predecessor` / :attr:`successor` resolve via graph.
 
 API
 ---
-- :attr:`source_id`, :attr:`destination_id` – UUIDs (nullable for dangling edges).
-- :attr:`source` / :attr:`destination` – properties with validation on set.
+- :attr:`predecessor_id`, :attr:`successor_id` – UUIDs (nullable for dangling edges).
+- :attr:`predecessor` / :attr:`successor` – properties with validation on set.
 - :meth:`__repr__` – compact label showing endpoints for debugging.
 
 Notes
@@ -430,7 +430,7 @@ autodoc_default_options = {
 
 ## P. Quick examples from our codebase (as reference)
 
-- **Entity / Registry / Graph / Node / Edge / Subgraph / Record / OrderedRegistry / Snapshot / BaseFragment / Handler / DispatchRegistry / JobReceipt / Singleton / InheritingSingleton / Token** all follow the template above.
+- **Entity / Registry / Graph / Node / Edge / Subgraph / Record / OrderedRegistry / Snapshot / BaseFragment / Handler / DispatchRegistry / JobReceipt / Singleton / InstanceInheritance / Token** all follow the template above.
 - **Subpackage `tangl.core.__init__`** shows “Conceptual layers” and “Design intent”—copy that pattern for other subpackages (`tangl.lang`, `tangl.resolution`, etc.).
 - **Subpackage summary RST** (`tangl.core.rst`) mirrors those layers with labeled sections and `.. autoclass::` lists—treat it as the canonical *map*.
 

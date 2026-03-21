@@ -27,7 +27,7 @@ class ScriptManager:
             return self.template_registry.get(reference)
 
         key = str(reference)
-        found = self.template_registry.find_one(Selector(has_identifier=key))
+        found = self.template_registry.find_one(Selector.from_identifier(key))
         if found is not None:
             return found
         return self.template_registry.find_one(Selector(label=key))

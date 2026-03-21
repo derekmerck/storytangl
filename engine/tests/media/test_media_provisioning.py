@@ -6,6 +6,7 @@ from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource.media_provisioning import MediaProvisioner
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag
+from tangl.core import Selector
 from tangl.vm.provision import ProvisionPolicy, Requirement
 
 
@@ -34,7 +35,7 @@ def test_media_provisioner_creates_media_from_template() -> None:
     assert len(offers) == 1
     provider = offers[0].accept(ctx=_StubContext())
 
-    assert registry.find_one(has_identifier=provider.content_hash) is provider
+    assert registry.find_one(Selector.from_identifier(provider.content_hash)) is provider
 
 
 def test_media_provisioner_returns_existing_provider() -> None:
@@ -51,7 +52,7 @@ def test_media_provisioner_returns_existing_provider() -> None:
     offers = provisioner.generate_offers(ctx=_StubContext())
 
     assert len(offers) == 1
-    assert offers[0].provider_id == registry.find_one(label="alias").uid
+    assert offers[0].provider_id == registry.find_one(Selector(label="alias")).uid
 
 
 def test_media_dep_inline_data_defaults_to_any_policy() -> None:

@@ -205,70 +205,45 @@ class Registry(Entity, Generic[ET]):
             yield from sorted(values, key=sort_key)
 
     @staticmethod
-    def _normalize_selector(
-        selector: Selector | dict[str, Any] | Any = None,
-        **criteria: Any,
-    ) -> Selector | None:
-        """Normalize v38 selectors and legacy criteria kwargs.
-
-        Compatibility notes
-        -------------------
-        Legacy callers frequently use:
-        - ``find_one(label="foo")``
-        - ``find_one(identifier=...)``
-        - ``find_one(<identifier>)``
-
-        v38 canonical shape is ``find_one(selector=Selector(...))``.
-        This helper accepts both forms.
-        """
-        if isinstance(selector, dict):
-            criteria = {**selector, **criteria}
-            selector = None
-        elif selector is not None and not isinstance(selector, Selector):
-            selector = Selector.from_identifier(selector)
-
-        if selector is None and not criteria:
-            return None
-        if selector is None:
-            return Selector(**criteria)
-        if criteria:
-            return selector.with_criteria(**criteria)
-        return selector
+    def _ensure_selector(selector: Selector | None) -> Selector | None:
+        """Validate selector-only lookup input."""
+        if selector is None or isinstance(selector, Selector):
+            return selector
+        raise TypeError(
+            f"Registry lookup requires Selector | None, got {type(selector)!r}"
+        )
 
     def find_all(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
+        selector: Selector | None = None,
         sort_key=None,
-        **criteria: Any,
     ) -> Iterator[ET]:
-        """Yield members matching selector/criteria and optional sort key."""
-        selector = self._normalize_selector(selector, **criteria)
+        """Yield members matching an optional selector and optional sort key."""
+        selector = self._ensure_selector(selector)
         values = self.members.values()
         return self._filter_and_sort(values, selector=selector, sort_key=sort_key)
 
     def find_one(
         self,
-        selector: Selector | dict[str, Any] | Any = None,
+        selector: Selector | None = None,
         sort_key=None,
-        **criteria: Any,
     ) -> Optional[ET]:
         """Return first match from :meth:`find_all`, or ``None``."""
-        return next(self.find_all(selector, sort_key=sort_key, **criteria), None)
+        return next(self.find_all(selector, sort_key=sort_key), None)
 
     @classmethod
     def chain_find_all(
         cls,
         *registries: Self,
-        selector: Selector | dict[str, Any] | Any = None,
+        selector: Selector | None = None,
         sort_key=None,
-        **criteria: Any,
     ) -> Iterator[ET]:
         """Yield matches across registries in argument order.
 
         Use ``next(Registry.chain_find_all(...), None)`` for one-off first-match
         behavior.
         """
-        selector = cls._normalize_selector(selector, **criteria)
+        selector = cls._ensure_selector(selector)
         values = itertools.chain.from_iterable(r.members.values() for r in registries)
         return cls._filter_and_sort(values, selector=selector, sort_key=sort_key)
 
@@ -370,6 +345,8 @@ class RegistryAware(Entity):
     - it returns the first `HierarchicalGroup` in the owning registry that lists this item
       as a member
     - it is meaningful only when the registry contains hierarchical groups
+    - plain `EntityGroup` membership does not define a parent; non-hierarchical groups
+      are bags, not ownership paths
     - it is cached and must be invalidated when membership changes (`_invalidate_parent_attr`)
 
     Example:
@@ -420,16 +397,14 @@ class RegistryAware(Entity):
 
     @cached_property
     def parent(self) -> Optional[RegistryAware]:
-        """Return first owning :class:`HierarchicalGroup`, if present."""
+        """Return first owning :class:`HierarchicalGroup`, if present.
+
+        Non-hierarchical :class:`EntityGroup` membership is intentionally ignored.
+        """
         if self.registry is None:
             return None
         selector = Selector(has_kind=HierarchicalGroup, has_member=self)
-        find_one = getattr(self.registry, "find_one")
-        try:
-            return find_one(selector)
-        except TypeError:
-            # Legacy registries accept only criteria kwargs.
-            return find_one(has_kind=HierarchicalGroup, has_member=self)
+        return self.registry.find_one(selector)
 
     def _invalidate_parent_attr(self):
         # On reparent
@@ -467,13 +442,13 @@ class EntityGroup(RegistryAware):
     """
     member_ids: list[UUID] = Field(default_factory=list)
 
-    def member(self, selector: Selector = None, sort_key=None) -> RT:
+    def member(self, selector: Selector | None = None, sort_key=None) -> RT:
         """Return first dereferenced member matching optional selector."""
         return next(self.members(selector, sort_key=sort_key), None)
 
-    def members(self, selector: Selector = None, sort_key=None) -> Iterator[RT]:
+    def members(self, selector: Selector | None = None, sort_key=None) -> Iterator[RT]:
         """Yield dereferenced members, optionally filtered and sorted."""
-        selector = selector or Selector()
+        selector = Registry._ensure_selector(selector) or Selector()
         if self.registry is not None:
             items = (item for uid in self.member_ids if (item := self.registry.get(uid)))
             return self.registry._filter_and_sort(items, selector=selector, sort_key=sort_key)
@@ -570,7 +545,7 @@ class HierarchicalGroup(EntityGroup):
 
     # Aliases for membership ops -> children ops
 
-    def children(self, selector: Selector = None, sort_key=None) -> Iterator[RT]:
+    def children(self, selector: Selector | None = None, sort_key=None) -> Iterator[RT]:
         """Alias of :meth:`members` for hierarchy semantics."""
         return self.members(selector=selector, sort_key=sort_key)
 

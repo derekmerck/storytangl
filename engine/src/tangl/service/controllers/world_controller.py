@@ -9,6 +9,7 @@ import yaml
 
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.core import Selector
 from tangl.story.fabula import World
 from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.ordered_tuple_dict import OrderedTupleDict
@@ -135,7 +136,7 @@ class WorldController(HasApiEndpoints):
         if media_registry is None or not hasattr(media_registry, "find_one"):
             raise ValueError(f"World '{world.label}' does not expose media resources")
 
-        media_obj = media_registry.find_one(alias=media)
+        media_obj = media_registry.find_one(Selector(alias=media))
         if media_obj is None:
             raise ValueError(f"Media '{media}' not found for world '{world.label}'")
         return media_obj.get_content(**kwargs)
