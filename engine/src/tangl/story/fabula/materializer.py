@@ -331,7 +331,7 @@ class StoryMaterializer:
             world=world,
         )
         graph.story_id = graph.uid
-        graph.story_resources = get_story_resource_manager(graph.story_id, create=True)
+        graph.story_resources = get_story_resource_manager(graph.story_id, create=False)
         graph.story_materialize = self.story_materialize_template
         graph.story_post_materialize = self.story_post_materialize
         graph.story_preview_requirement = self.preview_requirement_contract
