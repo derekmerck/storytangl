@@ -96,6 +96,16 @@ def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
 
 
+def test_ledger_from_story_graph_defaults_to_story_initial_cursor() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("run_lazy", init_mode=InitMode.LAZY)
+
+    ledger = Ledger.from_graph(result.graph)
+
+    assert ledger.cursor_id == result.graph.initial_cursor_id
+    assert ledger.cursor is result.graph.get(result.graph.initial_cursor_id)
+
+
 def test_freeze_shape_requires_eager_mode() -> None:
     world = World.from_script_data(script_data=_base_script())
 
@@ -458,6 +468,24 @@ def test_story_graph_authorities_include_story_and_world_authorities() -> None:
     authorities = result.graph.get_authorities()
     assert story_dispatch in authorities
     assert world_authority in authorities
+
+
+def test_story_init_does_not_create_story_media_until_needed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story_media_root = tmp_path / "story_media"
+
+    monkeypatch.setattr(
+        "tangl.media.story_media.get_story_media_dir",
+        lambda story_id=None: story_media_root if story_id is None else story_media_root / str(story_id),
+    )
+
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("no_media_story", init_mode=InitMode.LAZY)
+
+    assert result.graph.story_resources is None
+    assert not story_media_root.exists()
 
 
 def test_story_graph_template_lineage_is_nearest_first() -> None:

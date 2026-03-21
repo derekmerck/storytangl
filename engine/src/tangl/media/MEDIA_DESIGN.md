@@ -10,11 +10,13 @@
 > (no version suffix).
 >
 > The static media pipeline (file-based assets through to service-layer payload
-> resolution) is wired and tested. The generative creator pipeline now has real
-> sync/async lifecycle infrastructure plus a deterministic in-process checker
-> harness, but external worker-backed forges are still provisional. This note
-> describes the implemented architecture and the design commitments for the
-> still-evolving creator layer.
+> resolution) is wired and tested. File-backed `MediaRIT` inventory loading
+> caches the resolved content hash through `utils.shelved2`, keyed by source
+> path plus file stat, so repeat indexing does not reread unchanged files. The
+> generative creator pipeline now has real sync/async lifecycle infrastructure
+> plus a deterministic in-process checker harness, but external worker-backed
+> forges are still provisional. This note describes the implemented
+> architecture and the design commitments for the still-evolving creator layer.
 >
 > The package-level architecture is canonical here. Broader design documents
 > under `docs/src/design/` remain useful for subsystem history, rationale, and

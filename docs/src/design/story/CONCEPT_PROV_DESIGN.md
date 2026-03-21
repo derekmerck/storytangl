@@ -484,7 +484,7 @@ roles:
 ```
 
 **Provisioning:**
-- TemplateProvisioner queries `world.template_registry.find_one(label="generic_guard")`
+- TemplateProvisioner queries `world.template_registry.find_one(Selector.from_identifier("generic_guard"))`
 - Filters by scope (checks if template is valid in current context)
 - Creates from template: cost=200
 - **Defaults to policy=CREATE** (always fresh instance)
@@ -871,10 +871,10 @@ class GraphProvisioner(Provisioner):
         # Build search criteria
         criteria = requirement.criteria or {}
         if requirement.identifier:
-            criteria['label'] = requirement.identifier
+            criteria['identifier'] = requirement.identifier
         
         # Search existing nodes
-        for node in ctx.graph.find_all(**criteria):
+        for node in ctx.graph.find_all(Selector(**criteria)):
             if requirement.satisfied_by(node):
                 # Calculate proximity
                 proximity = self._calculate_proximity(node, ctx.cursor)
@@ -960,20 +960,29 @@ class TemplateProvisioner(Provisioner):
             # Infer type from requirement context
             if hasattr(requirement, '_node_type'):  # Set by Role/Setting
                 return registry.find_one(
-                    label=requirement.template_ref,
-                    is_instance=requirement._node_type
+                    Selector.from_identifier(requirement.template_ref).with_criteria(
+                        is_instance=requirement._node_type
+                    )
                 )
             else:
                 # Try both types
                 return (
-                    registry.find_one(label=requirement.template_ref, is_instance=ActorScript)
-                    or registry.find_one(label=requirement.template_ref, is_instance=LocationScript)
+                    registry.find_one(
+                        Selector.from_identifier(requirement.template_ref).with_criteria(
+                            is_instance=ActorScript
+                        )
+                    )
+                    or registry.find_one(
+                        Selector.from_identifier(requirement.template_ref).with_criteria(
+                            is_instance=LocationScript
+                        )
+                    )
                 )
         
         # Priority 2: Criteria search
         if requirement.criteria:
             # Search by criteria (tags, attributes)
-            return registry.find_one(**requirement.criteria)
+            return registry.find_one(Selector(**requirement.criteria))
         
         return None
     
@@ -1073,7 +1082,7 @@ guard_1.hp = 50  # Player damages guard
 assert guard_2.hp == 100  # Fresh, undamaged
 
 # Template unchanged
-template = world.template_registry.find_one(label="generic_guard")
+template = world.template_registry.find_one(Selector.from_identifier("generic_guard"))
 assert template.hp == 100  # Immutable
 ```
 

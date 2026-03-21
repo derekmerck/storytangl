@@ -208,13 +208,20 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
     @shelved(fn="rits")
     @staticmethod
     def _from_path(cls, path: Path) -> MediaResourceInventoryTag:
-        return cls(path=path)
+        record = cls(path=path)
+        record.preset_content_hash = record._resolve_content_hash()
+        return record
 
     @classmethod
-    def from_source(cls, item: Path) -> Self:
+    def from_source(cls, item: Path | str) -> Self:
         if isinstance(item, (Path, str)):
-            mtime = item.stat().st_mtime
-            return cls._from_path(cls, item, check_value=mtime)
+            path = Path(item)
+            stat = path.stat()
+            return cls._from_path(
+                cls,
+                path,
+                check_value=(stat.st_mtime_ns, stat.st_size),
+            )
         raise NotImplementedError("Can only load from file paths currently")
 
     @classmethod

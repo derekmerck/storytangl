@@ -142,18 +142,34 @@ class Ledger(Entity):
     def from_graph(
         cls,
         graph: Graph,
-        entry_id: UUID,
+        entry_id: UUID | None = None,
         *,
         uid: UUID | None = None,
     ) -> Self:
         """Construct and initialize a ledger at a graph entry node."""
-        payload: dict[str, Any] = {"graph": graph, "cursor_id": entry_id}
+        resolved_entry_id = cls._resolve_entry_id(graph, entry_id)
+        payload: dict[str, Any] = {"graph": graph, "cursor_id": resolved_entry_id}
         if uid is not None:
             payload["uid"] = uid
         ledger = cls(**payload)
-        ledger._seed_counters(entry_id=entry_id)
+        ledger._seed_counters(entry_id=resolved_entry_id)
         ledger.initialize_entry()
         return ledger
+
+    @staticmethod
+    def _resolve_entry_id(graph: Graph, entry_id: UUID | None = None) -> UUID:
+        """Return explicit entry id or the graph's default traversal entry."""
+        if entry_id is not None:
+            return entry_id
+
+        graph_entry_id = getattr(graph, "initial_cursor_id", None)
+        if isinstance(graph_entry_id, UUID):
+            return graph_entry_id
+        if graph_entry_id is None:
+            raise ValueError(
+                "Entry id not provided and graph does not define initial_cursor_id",
+            )
+        raise ValueError("Graph initial_cursor_id must be a UUID when present")
 
     def _seed_counters(self, entry_id: UUID | None = None) -> None:
         """Initialize cursor and counters without dispatch/pipeline execution."""
@@ -182,7 +198,8 @@ class Ledger(Entity):
 
     def initialize_ledger(self, entry_id: UUID | None = None) -> None:
         """Backward-compatible initializer for entry setup."""
-        self._seed_counters(entry_id=entry_id)
+        resolved_entry_id = self._resolve_entry_id(self.graph, entry_id)
+        self._seed_counters(entry_id=resolved_entry_id)
         self.initialize_entry()
 
     def model_post_init(self, __context) -> None:

@@ -52,8 +52,8 @@ def _build_outfit(actor: HasOutfit | HasLook) -> None:
         layer=WearableLayer.OVER,
     )
 
-    actor.outfit.assign("top_60", Wearable(label=shirt_type.label))
-    actor.outfit.assign("top_80", Wearable(label=coat_type.label))
+    actor.outfit.assign("top_60", Wearable(token_from=shirt_type.label))
+    actor.outfit.assign("top_80", Wearable(token_from=coat_type.label))
 
 
 def _build_ornaments(actor: HasOrnamentation | HasLook) -> None:

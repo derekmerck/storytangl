@@ -248,9 +248,9 @@ class TestResolverOfferGathering:
         )
 
         assert hook_calls == [template.get_label()]
-        assert leaf.templ_hash == template.content_hash().hex()
-        assert init.templ_hash == template.content_hash().hex()
-        assert intermediate.templ_hash == template.content_hash().hex()
+        assert leaf.templ_hash == template.content_hash()
+        assert init.templ_hash == template.content_hash()
+        assert intermediate.templ_hash == template.content_hash()
 
     def test_materialize_node_uid_falls_back_without_rng_context(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
@@ -650,7 +650,7 @@ class TestResolverOfferGathering:
 
     def test_clone_offer_inherits_reference_templ_hash(self) -> None:
         source = Entity(label="source")
-        source.templ_hash = "refhash123"
+        source.templ_hash = b"refhash123"
         template = EntityTemplate(payload={"kind": Entity, "label": "patched"})
         resolver = Resolver(
             location_entity_groups=[[source]],
@@ -665,7 +665,7 @@ class TestResolverOfferGathering:
 
         clone = resolver.resolve_requirement(req)
         assert clone is not None
-        assert clone.templ_hash == "refhash123"
+        assert clone.templ_hash == b"refhash123"
 
     def test_clone_offer_uid_is_deterministic_for_same_seed(self) -> None:
         def _resolve(seed: int) -> tuple[Entity, Entity]:

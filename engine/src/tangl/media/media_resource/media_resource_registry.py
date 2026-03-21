@@ -11,12 +11,13 @@ from tangl.core import (
     CallReceipt,
     DispatchLayer,
     Registry,
+    Selector,
     resolve_ctx,
 )
 from .media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+# logger.setLevel(logging.WARNING)
 
 class MediaResourceRegistry(Registry[MediaRIT]):
     """
@@ -51,9 +52,11 @@ class MediaResourceRegistry(Registry[MediaRIT]):
             # Initial record creation
             record = mrt_cls.from_source(item)
 
+            # logger.debug(f"indexing {record!r}")
+
             # Check for duplicates by content
             if record in self:
-                results.append(self.find_one(has_identifier=record.content_hash()))
+                results.append(self.find_one(Selector.from_identifier(record.content_hash())))
                 continue
 
             # Run through indexing pipeline
@@ -84,5 +87,5 @@ class MediaResourceRegistry(Registry[MediaRIT]):
     def __contains__(self, item: MediaRIT | UUID) -> bool:
         """Find existing record with matching content hash"""
         if isinstance(item, MediaRIT):
-            return bool(self.find_one(has_identifier=item.content_hash()))
+            return bool(self.find_one(Selector.from_identifier(item.content_hash())))
         return super().__contains__(item)

@@ -14,7 +14,7 @@ Dereferencing GraphItems
 
     subgraph.members              # Iterator[GraphItem], not cached
     node.edges_in()               # Iterator[Edge], fresh lookup
-    registry.find_all(label='x')  # Iterator[Entity], filtered
+    registry.find_all(Selector(label='x'))  # Iterator[Entity], filtered
 
 All iterators are **single-use**. Materialize explicitly if multiple
 passes needed::

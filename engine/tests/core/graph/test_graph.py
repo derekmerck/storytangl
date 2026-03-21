@@ -71,19 +71,13 @@ class TestGraphCreationAndFind:
         assert graph.find_edge(Selector(predecessor=a)) is e
         assert graph.find_subgraph(Selector(label="s")) is s
 
-    def test_find_edge_normalizes_legacy_direction_aliases_in_dict_selector(self) -> None:
+    def test_find_edge_rejects_non_selector_lookup_input(self) -> None:
         graph = Graph()
         a = graph.add_node(label="a")
         b = graph.add_node(label="b")
-        edge = graph.add_edge(a, b)
-        assert graph.find_edge({"source": a, "destination": b}) is edge
-
-    def test_find_edge_normalizes_legacy_direction_aliases_in_selector(self) -> None:
-        graph = Graph()
-        a = graph.add_node(label="a")
-        b = graph.add_node(label="b")
-        edge = graph.add_edge(a, b)
-        assert graph.find_edge(Selector(source=a, destination=b)) is edge
+        graph.add_edge(a, b)
+        with pytest.raises(TypeError, match="Selector"):
+            graph.find_edge({"predecessor": a, "successor": b})
 
 
 class TestEdgeAndNode:
@@ -128,6 +122,17 @@ class TestGraphItemHierarchyAndSerialization:
         graph.add(node)
         assert isinstance(node, GraphItem)
         assert node.graph is graph
+
+    def test_subgraph_membership_does_not_set_parent(self) -> None:
+        graph = Graph()
+        group = graph.add_subgraph(label="group")
+        node = graph.add_node(label="node")
+
+        group.add_member(node)
+        assert node.parent is None
+
+        group.remove_member(node)
+        assert node.parent is None
 
     def test_hierarchical_node_reparenting(self) -> None:
         graph = Graph()

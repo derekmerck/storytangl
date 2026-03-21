@@ -27,15 +27,15 @@ def test_locked_choice_surfaces_to_journal() -> None:
 
     Action(
         graph=graph,
-        source_id=hallway.uid,
-        destination_id=open_room.uid,
+        predecessor_id=hallway.uid,
+        successor_id=open_room.uid,
         label="enter_open_room",
         content="Enter open room",
     )
     Action(
         graph=graph,
-        source_id=hallway.uid,
-        destination_id=locked_room.uid,
+        predecessor_id=hallway.uid,
+        successor_id=locked_room.uid,
         label="enter_locked_room",
         content="Enter locked room",
         conditions=["False"],
@@ -47,7 +47,12 @@ def test_locked_choice_surfaces_to_journal() -> None:
         policy=ProvisionPolicy.EXISTING,
         hard_requirement=True,
     )
-    Dependency(graph=graph, source_id=locked_room.uid, requirement=key_requirement, label="keycard")
+    Dependency(
+        graph=graph,
+        predecessor_id=locked_room.uid,
+        requirement=key_requirement,
+        label="keycard",
+    )
 
     graph.initial_cursor_id = hallway.uid
 

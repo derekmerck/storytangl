@@ -89,17 +89,17 @@ class Singleton(Entity):
         """Return the registered instance for ``label`` or ``uid`` when present."""
         if isinstance(label, UUID):
             return cls._instances.get(label)
-        return cls._instances.find_one(label=label)
+        return cls._instances.find_one(Selector(label=label))
 
     @classmethod
-    def find_instance(cls, **criteria) -> Self | None:
-        """Legacy compatibility lookup by selector criteria."""
-        return cls._instances.find_one(**criteria)
+    def find_instance(cls, selector: Selector | None = None) -> Self | None:
+        """Return the first selector-matching registered instance."""
+        return cls._instances.find_one(selector)
 
     @classmethod
-    def find_all_instances(cls, **criteria):
-        """Legacy compatibility iterator for selector-filtered instances."""
-        return cls._instances.find_all(**criteria)
+    def find_all_instances(cls, selector: Selector | None = None):
+        """Return selector-filtered registered instances."""
+        return cls._instances.find_all(selector)
 
     @classmethod
     def clear_instances(cls) -> None:
@@ -204,7 +204,3 @@ class InstanceInheritance(Singleton):
             kwargs = defaults | kwargs
 
         super().__init__(label=label, inherit_from=inherit_from, **kwargs)
-
-
-# Legacy compatibility alias retained during namespace cutover.
-InheritingSingleton = InstanceInheritance

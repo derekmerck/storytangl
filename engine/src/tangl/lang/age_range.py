@@ -2,6 +2,7 @@ from typing import Self
 from enum import IntEnum
 
 from tangl.utils.enum_plus import EnumPlusMixin
+from tangl.utils.tag_values import get_tag_values
 
 class AgeRange(EnumPlusMixin, IntEnum):
     VERY_YOUNG = CHILD = 1  # 10     ~2^(n+2)?
@@ -27,17 +28,18 @@ class AgeRange(EnumPlusMixin, IntEnum):
         If multiple values are present, we pick the 'oldest' (largest-valued)
         AgeRange, relying on the IntEnum ordering to reflect age.
         """
-        if not hasattr(item, "get_tag_kv"):
+        tags = getattr(item, "tags", None)
+        if tags is None:
             return cls.OTHER
 
         # 1. Direct categorical age-range tags, including enum members.
-        ranges = item.get_tag_kv(prefix="age", enum_type=cls)
+        ranges = get_tag_values(tags, prefix="age", value_type=cls)
         if ranges:
             # Choose the "oldest" category: highest numeric value wins.
             return max(ranges, key=lambda r: r.value)
 
         # 2. Raw numeric ages, to be bucketed into a range.
-        ages = item.get_tag_kv(prefix="age", enum_type=int)
+        ages = get_tag_values(tags, prefix="age", value_type=int)
         if ages:
             # Use the highest age we saw for bucketing.
             return cls.from_age(max(ages))

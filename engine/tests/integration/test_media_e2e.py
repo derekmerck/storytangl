@@ -44,8 +44,8 @@ def test_media_full_flow_world_scope(resources_dir) -> None:
     media_deps = [edge for edge in block.edges_out() if isinstance(edge, MediaDep)]
     assert media_deps
     dep = media_deps[0]
-    assert dep.destination is not None
-    assert isinstance(dep.destination, MediaRIT)
+    assert dep.successor is not None
+    assert isinstance(dep.successor, MediaRIT)
 
     fragments = frame.run_phase(P.JOURNAL)
     assert fragments

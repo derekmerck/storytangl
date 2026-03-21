@@ -94,6 +94,27 @@ class TestRegistrySelection:
         reg.add(Entity(label="b"))
         assert reg.all_labels() == {"a", "b"}
 
+    @pytest.mark.parametrize(
+        "bad_selector",
+        [
+            {"label": "a"},
+            "a",
+        ],
+    )
+    def test_find_one_rejects_non_selector_input(self, bad_selector) -> None:
+        reg = Registry()
+        reg.add(Entity(label="a"))
+
+        with pytest.raises(TypeError, match="Selector"):
+            reg.find_one(bad_selector)
+
+    def test_find_one_rejects_kwargs_lookup(self) -> None:
+        reg = Registry()
+        reg.add(Entity(label="a"))
+
+        with pytest.raises(TypeError):
+            reg.find_one(label="a")
+
 
 class TestRegistrySerialization:
     def test_unstructure_includes_members(self) -> None:
@@ -207,6 +228,15 @@ class TestRegistryAwareAndGroups:
         group.member_ids.append(uuid4())
         assert list(group.members()) == [member]
 
+    def test_entity_group_membership_does_not_define_parent(self) -> None:
+        reg = Registry()
+        group = SimpleGroup(label="g", registry=reg)
+        member = TrackedEntity(label="a", registry=reg)
+
+        group.add_member(member)
+
+        assert member.parent is None
+
 
     def test_hierarchical_group_reparenting_and_path(self) -> None:
         reg = Registry()
@@ -241,4 +271,3 @@ class TestRegistryAwareAndGroups:
         parent.add_members(high, low)
         ordered = list(parent.children(sort_key=lambda item: item.value))
         assert ordered == [low, high]
-

@@ -41,6 +41,7 @@ VM provides the *contract* for how these things plug in, not their implementatio
 ```
 tangl.vm
 ├── Resolution     → resolution_phase.py  (ResolutionPhase enum, causal ordering)
+├── Factory        → factory.py           (TraversableGraph, TraversableGraphFactory)
 ├── Traversal      → traversable.py       (TraversableNode, TraversableEdge, AnonymousEdge)
 │                  → traversal.py         (history queries: visit_count, call_depth, etc.)
 ├── Runtime        → runtime/frame.py     (Frame: one resolve_choice driver)
@@ -57,6 +58,24 @@ tangl.vm
 ---
 
 ## Component Design
+
+### TraversableGraph / TraversableGraphFactory (`factory.py`)
+
+VM adds one narrow factory layer above core eager topology expansion.
+
+**`TraversableGraph`** is a `core.Graph` subtype carrying one extra field:
+`initial_cursor_id`. This is traversal metadata derived from graph shape, not
+session state. `Ledger` still owns the live cursor and cursor history.
+
+**`TraversableGraphFactory`** subclasses `core.GraphFactory` and adds only two
+behaviors after core materialization:
+
+- resolve the default traversal entry via `get_entry_cursor()`
+- validate traversal contracts with `assert_traversal_contracts()`
+
+This keeps VM's authority surface small. Planning, replay, and causality stay
+runtime behavior over a traversable graph; they are not separate factory
+classes.
 
 ### ResolutionPhase (`resolution_phase.py`)
 
@@ -605,7 +624,7 @@ and passes the annotated list to the renderer. The renderer decides presentation
 |--------|-----|-----|-----------|
 | Effect lists | `entry_effects` / `final_effects` (two fields) | `effects: list[TraversableEffect]` + `trigger_phase` | Single list, phase declared on the effect |
 | Availability/Effects location | `core.bases.HasAvailability`, `HasEffects` | `vm.traversable.HasAvailability`, `HasEffects` | Phase vocabulary is VM, not core |
-| Token provisioning | `TokenFactory` in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
+| Token provisioning | token helpers in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
 | Template discovery | Graph/facet call-chain wiring | `do_get_template_scope_groups` dispatch task | VM no longer knows world internals |
 | Catalog discovery | Explicit wiring / polling APIs | `do_get_token_catalogs` dispatch task | Unified discovery contract across search spaces |
 | System handlers | Self-registering mixins via `@on_update` on class body | Module-level `@on_update` with `hasattr` duck-type | No import side effects on dispatch registry |

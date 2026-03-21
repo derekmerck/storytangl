@@ -18,9 +18,8 @@ from tangl.vm import (
     on_update,
 )
 from tangl.vm.dispatch import vm_dispatch
-from tangl.core.behavior import HandlerPriority as Prio
+from tangl.core.behavior import Priority as Prio
 from tangl.story.dispatch import on_gather_content
-from tangl.vm.dispatch import dispatch as vm_dispatch
 
 from .has_game import HasGame
 
@@ -176,8 +175,8 @@ def provision_game_moves(
         actions.append(
             Action(
                 graph=cursor.graph,
-                source_id=cursor.uid,
-                destination_id=cursor.uid,
+                predecessor_id=cursor.uid,
+                successor_id=cursor.uid,
                 label=f"Play {move}",
                 payload={"move": move},
             )

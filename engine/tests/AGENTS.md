@@ -328,7 +328,7 @@ def populated_registry():
 
 
 def test_registry_find_by_label(populated_registry):
-    result = populated_registry.find_one(label="a")
+    result = populated_registry.find_one(Selector(label="a"))
     assert result is not None
     assert result.label == "a"
 ```
@@ -380,7 +380,7 @@ def test_registry_get_raises_on_string_label(self):
     reg = Registry()
     with pytest.raises(ValueError) as exc_info:
         reg.get("some_label")
-    assert "find_one(label='some_label')" in str(exc_info.value)
+    assert "find_one(Selector(label='some_label'))" in str(exc_info.value)
 ```
 
 ### Testing Serialization

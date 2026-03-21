@@ -368,12 +368,11 @@ making Tokens transparently findable by their wrapped singleton type via Selecto
 queries. This is the mechanism that lets `graph.find_nodes(Selector(has_kind=SwordType))`
 find tokens.
 
-**Core exposes token adapters; VM owns provisioning policy.** `TokenFactory` and
-`TokenCatalog` in core are thin adapters around token materialization and singleton
-instance lookup. `vm.provision.TokenProvisioner` consumes these adapters inside the
-offer pipeline and applies runtime policy (`ProvisionPolicy`, ranking, resolution).
-Token itself remains provisioning-agnostic; it only defines wrapper semantics and
-instance behavior.
+**Core exposes token catalogs; VM owns provisioning policy.** `TokenCatalog` in core is
+a thin adapter around singleton instance lookup and token materialization.
+`vm.provision.TokenProvisioner` consumes catalogs inside the offer pipeline and applies
+runtime policy (`ProvisionPolicy`, ranking, resolution). Token itself remains
+provisioning-agnostic; it only defines wrapper semantics and instance behavior.
 
 
 ### RuntimeOp (`runtime_op.py`)
@@ -557,14 +556,14 @@ authors a consistent inheritance ladder to extend.
 |--------|-----|-----|-----------|
 | Edge endpoints | `source` / `destination` | `predecessor` / `successor` | Graph theory convention; avoid domain collision |
 | Matching direction | `entity.matches(**kw)` | `Selector(**kw).matches(entity)` | Selectors are first-class, composable |
-| Find API | `find_all(**criteria)` | `find_all(selector=S)` | Typed, storable, composable queries |
+| Find API | `find_all(**criteria)` | `find_all(Selector(...))` | Typed, storable, composable queries |
 | Kind field | legacy class-key field | `kind` | Clearer semantics |
 | Graph storage | `graph.data` | `registry.members` | Graph IS a Registry now |
 | Registry awareness | Implicit | `RegistryAware` mixin | Explicit binding with rebind protection |
 | Template payload | Flattened fields | Separate `payload: Entity` | Clean separation of wrapper and content |
 | Ordered slicing | Seq-specific markers | Sort-key-generic `get_slice` | Composable with arbitrary orderings |
 | Token reference | `label` (overloaded) | `token_from` (separate) | Distinct identity vs. reference |
-| Token provisioner | `TokenFactory` in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
+| Token provisioner | factory helpers in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
 | Availability/Effects | `HasAvailability`, `HasEffects` in core | `HasAvailability`, `HasEffects`, `TraversableEffect` in vm | Phase vocabulary belongs at VM layer |
 | Behavior API | `add_behavior` / `dispatch` | `register` / `execute_all` | Clearer verbs; ctx-aware chaining |
 | Dispatch layers | `HandlerPriority` / `HandlerLayer` | `Priority` / `DispatchLayer` | Simplified naming |

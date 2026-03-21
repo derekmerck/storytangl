@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Iterable
 
-from tangl.core import Priority, Record, Selector, TemplateRegistry
+from tangl.core import GraphFactory, Priority, Record, Selector, TemplateRegistry
 from tangl.prose import DialogHandler
 from tangl.media import get_system_resource_manager
 from tangl.media.media_data_type import MediaDataType
@@ -81,6 +81,9 @@ def gather_story_template_scope_groups(*, caller, ctx, **_kw):
         return None
 
     factory = getattr(graph, "factory", None)
+    if isinstance(factory, GraphFactory):
+        return factory.get_template_scope_groups(caller=caller, graph=graph)
+
     if isinstance(factory, TemplateRegistry):
         return [factory]
 

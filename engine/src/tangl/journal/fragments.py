@@ -14,7 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
-from tangl.core import BaseFragment, Registry
+from tangl.core import BaseFragment, Registry, Selector
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.type_hints import Identifier, Pathlike, StyleClass, StyleDict, StyleId, UnstructuredData
@@ -124,7 +124,7 @@ class ControlFragment(BaseFragment, extra="allow"):
         return self
 
     def reference(self, registry: Registry[BaseFragment]) -> BaseFragment:
-        return registry.find_one(identifier=self.reference_id)
+        return registry.find_one(Selector.from_identifier(self.reference_id))
 
 
 class UserEventFragment(BaseFragment, extra="allow"):

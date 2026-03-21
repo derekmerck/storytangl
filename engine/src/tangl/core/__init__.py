@@ -43,6 +43,7 @@ tangl/core/
 ├── graph.py              # GraphItem, Graph, Subgraph, Node, Edge
 │
 │   # Creation
+├── factory.py            # Singleton graph authority + eager materialization
 ├── token.py              # Delegate to singleton
 ├── template.py           # Semi-structured data, TemplateRegistry
 │
@@ -77,7 +78,7 @@ from .registry import Registry, RegistryAware, EntityGroup, HierarchicalGroup
 # - behaviors (Behavior(), Behavior.defer())
 # - groups of behaviors (BehaviorRegistry.execute_all(), .chain_execute_al)
 from .runtime_op import RuntimeOp
-from .singleton import InheritingSingleton, Singleton
+from .singleton import InstanceInheritance, Singleton
 from .record import Record, OrderedRegistry
 from .base_fragment import BaseFragment
 from .graph import GraphItem, Graph, Subgraph, Edge, Node, HierarchicalNode
@@ -90,18 +91,16 @@ from .bases import HasContent
 # Provides:
 # - building
 # - dispatch hooks
+from .factory import GraphFactory
 from .template import EntityTemplate, Snapshot, TemplateRegistry  # Recipe builder
-from .token import Token, TokenCatalog, TokenFactory  # Delegated reference builder
+from .token import Token, TokenCatalog  # Delegated reference builder
 from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_item, on_link, on_unlink
 
 from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
 
-
 # Legacy-compatible aliases retained during namespace cutover.
 # ContentAddressable: used by tangl.media.media_resource.media_resource_inv_tag
-# LayeredDispatch: used by tangl.ir.dispatch
 ContentAddressable = HasContent
-LayeredDispatch = BehaviorRegistry
 
 
 def _alias_legacy_module(alias: str, target: str) -> None:
