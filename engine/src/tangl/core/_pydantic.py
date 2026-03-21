@@ -70,8 +70,12 @@ class BaseModelPlus(BaseModel):
                     return False
             return True
 
+        seen_names: set[str] = set()
         for cls_ in cls.__mro__:
             for name, attrib in cls_.__dict__.items():
+                if name in seen_names:
+                    continue
+                seen_names.add(name)
                 if callable(attrib) and _method_matches(attrib):
                     yield name
 
@@ -102,7 +106,10 @@ class BaseModelPlus(BaseModel):
 
     def force_set(self, attrib_name: str, value: Any) -> None:
         """Set field values on frozen instances directly, bypassing validation."""
+        if attrib_name not in type(self).model_fields:
+            raise AttributeError(f"Unknown field: {attrib_name}")
         self.__dict__[attrib_name] = value
+        self.__pydantic_fields_set__.add(attrib_name)
 
     @classmethod
     def __fqn__(cls) -> str:

@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4, UUID
 
 import pydantic
@@ -54,9 +55,10 @@ def test_json_persistence_round_trip_preserves_entity_templ_hash_bytes(tmp_path)
     manager.save(entity)
     raw = manager.storage[entity.uid]
     loaded = manager.load(entity.uid)
+    payload = json.loads(raw)
 
-    assert '"__tangl_type__": "bytes"' in raw
-    assert '"hex": "1234abcd"' in raw
+    assert payload["templ_hash"]["__tangl_type__"] == "bytes"
+    assert payload["templ_hash"]["hex"] == "1234abcd"
     assert isinstance(loaded, Entity)
     assert loaded.templ_hash == entity.templ_hash
     assert isinstance(loaded.templ_hash, bytes)

@@ -188,10 +188,8 @@ class Selector(BaseModel, extra="allow"):
             selectors: tuple[Selector, ...]
 
             def matches(self, entity: Entity) -> bool:
-                for selector in self.selectors:
-                    if selector.matches(entity):
-                        return True
-                return False
+                if not super().matches(entity):
+                    return False
+                return any(selector.matches(entity) for selector in self.selectors)
 
         return ChainedOrSelector(selectors=selectors)
-

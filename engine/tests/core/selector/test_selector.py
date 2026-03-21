@@ -211,6 +211,16 @@ class TestSelectorComposition:
         updated = selector.with_criteria(label="a")
         assert updated.matches(Entity(label="a"))
 
+    def test_chain_or_preserves_base_criteria_when_narrowed(self) -> None:
+        selector = Selector.chain_or(
+            Selector(label="flamebrand"),
+            Selector(label="frostbite"),
+        ).with_criteria(has_kind=Weapon, magic=True)
+
+        assert selector.matches(Weapon(label="flamebrand", magic=True))
+        assert not selector.matches(Weapon(label="flamebrand", magic=False))
+        assert not selector.matches(Entity(label="flamebrand"))
+
 
 class TestSelectorInteropWithEntity:
     def test_selector_with_has_tags_calls_entity_method(self) -> None:

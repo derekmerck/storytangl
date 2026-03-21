@@ -66,6 +66,7 @@ from tangl.core import (
     Behavior,
     BehaviorRegistry,
     Graph,
+    GraphFactory,
     Node,
     OrderedRegistry,
     Record,
@@ -377,7 +378,9 @@ class PhaseCtx:
         if groups:
             return groups
 
-        factory = getattr(self.graph, "factory", None)
+        factory = self.graph.factory
+        if isinstance(factory, GraphFactory):
+            return factory.get_template_scope_groups(caller=self.cursor, graph=self.graph)
         if isinstance(factory, TemplateRegistry):
             return [factory]
         return []

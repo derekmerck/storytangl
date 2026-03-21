@@ -139,6 +139,11 @@ class OrderedRegistry(Registry[OrderedEntity]):
         """Legacy compatibility helper used by stream-oriented call sites."""
         self.append(record)
 
+    def _last_seq(self) -> int | None:
+        """Return the highest record sequence, or ``None`` when empty."""
+        last_item = self.last()
+        return int(last_item.seq) if last_item is not None else None
+
     def last(self, selector: Selector | None = None) -> OrderedEntity | None:
         """Return the last matching item by ``seq``."""
         selector = self._ensure_selector(selector)
@@ -202,7 +207,7 @@ class OrderedRegistry(Registry[OrderedEntity]):
         overwrite: bool = False,
     ) -> None:
         """Set/update a named stream marker (legacy compatibility)."""
-        next_seq = self.max_key()
+        next_seq = self._last_seq()
         marker_seq = (next_seq + 1 if next_seq is not None else 0) if marker_seq is None else marker_seq
         marker_bucket = self.markers.setdefault(marker_type, {})
         if not overwrite and marker_name in marker_bucket:
@@ -211,7 +216,7 @@ class OrderedRegistry(Registry[OrderedEntity]):
 
     def _next_marker_seq(self, start_seq: int, marker_type: str = "_") -> int:
         """Return next marker seq of same type, or stream end."""
-        max_seq = self.max_key()
+        max_seq = self._last_seq()
         stream_end = max_seq + 1 if max_seq is not None else 0
         marker_bucket = self.markers.get(marker_type, {})
         if not marker_bucket:

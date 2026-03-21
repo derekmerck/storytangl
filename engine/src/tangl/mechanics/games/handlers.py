@@ -20,7 +20,6 @@ from tangl.vm import (
 from tangl.vm.dispatch import vm_dispatch
 from tangl.core.behavior import Priority as Prio
 from tangl.story.dispatch import on_gather_content
-from tangl.vm.dispatch import dispatch as vm_dispatch
 
 from .has_game import HasGame
 

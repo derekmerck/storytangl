@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Iterator, Type
+from typing import Iterator
 
 from pydantic import Field
 
+from .registry import HierarchicalGroup
 from .singleton import Singleton
 from .graph import Graph, GraphItem, Subgraph, Node, Edge
 from .selector import Selector
@@ -14,7 +15,7 @@ from .token import TokenCatalog
 
 # pseudo-graph-item helpers for template hierarchy
 def _parent_templ(templ: EntityTemplate) -> TemplateGroup | None:
-    registry = getattr(templ, "registry", None)
+    registry = templ.registry
     if registry is None:
         return None
     return registry.find_one(Selector(has_member=templ))
@@ -59,13 +60,8 @@ def _get_parent_by_templ(
 
 
 def _attach_to_parent(parent: GraphItem, child: GraphItem) -> None:
-    add_member = getattr(parent, "add_member", None)
-    if callable(add_member):
-        add_member(child)
-        return
-    add_child = getattr(parent, "add_child", None)
-    if callable(add_child):
-        add_child(child)
+    if isinstance(parent, (Subgraph, HierarchicalGroup)):
+        parent.add_member(child)
         return
     raise TypeError(f"Parent {parent.__class__.__name__} does not support child membership")
 
@@ -111,8 +107,8 @@ class GraphFactory(Singleton):
     dispatch: BehaviorRegistry = Field(default_factory=BehaviorRegistry)
 
     token_types: list[type[Singleton]] = Field(default_factory=list)
-    template_types: list[Type[GraphItem]] = Field(default_factory=list)
-    graph_type: Type[Graph] = Graph
+    template_types: list[type[GraphItem]] = Field(default_factory=list)
+    graph_type: type[Graph] = Graph
 
     templates: TemplateRegistry = Field(default_factory=TemplateRegistry)
     default_entry_ref: str = "start"
@@ -120,9 +116,17 @@ class GraphFactory(Singleton):
     def get_authorities(self) -> list[BehaviorRegistry]:
         return [self.dispatch]
 
+    def get_template_scope_groups(
+        self,
+        *,
+        caller: GraphItem | None = None,
+        graph: Graph | None = None,
+    ) -> list[TemplateRegistry]:
+        """Return the template registries authoritative for factory-built graphs."""
+        _ = caller, graph
+        return [self.templates]
+
     def get_entry_cursor(self, graph: Graph) -> GraphItem | None:
-        # TODO: check only within a scope and this becomes reusable for
-        # any container entry point.
         s = Selector.chain_or(
             Selector(has_identifier=self.default_entry_ref),
             Selector(has_tags={self.default_entry_ref}),
@@ -130,7 +134,7 @@ class GraphFactory(Singleton):
         return graph.find_one(s, sort_key=lambda x: len(list(x.ancestors())))
 
     @property
-    def _kind_map(self) -> dict[str, Type[GraphItem]]:
+    def _kind_map(self) -> dict[str, type[GraphItem]]:
         return {
             kind.__name__: kind for kind in (
                 *self.template_types,
@@ -138,25 +142,15 @@ class GraphFactory(Singleton):
                 self.graph_type)
         }
 
-    # todo: needs 'HasBehaviors' for registering cls/inst behaviors
-    # @dispatch.register(task="on_create", wants_caller=EntityTemplate)
     def _dereference_kind(self, data: dict, **kwargs):
         if 'kind' in data and data['kind'] in self._kind_map:
             data['kind'] = self._kind_map.get(data['kind'])
 
-    # @dispatch.register(task="on_get_providers")
     def _provide_templates(self, **kwargs) -> list[TemplateRegistry]:
         return [self.templates]
 
-    # @dispatch.register(task="on_get_providers")
     def _provide_token_catalogs(self, **kwargs) -> list[TokenCatalog]:
         return [TokenCatalog(wst=cls) for cls in self.token_types]
-
-    # @dispatch.register(task="on_init", wants_caller=Graph)
-    # def _materialize_graph(self, caller: Graph, mode = None, **kwargs):
-    #     # Could do this, but probably ouroboros
-    #     if mode == "eager":
-    #         self.materialize_graph(graph=caller)
 
     def _resolve_edge_ref(self, edge: Edge, field_name: str) -> object:
         if not hasattr(edge, field_name):
@@ -198,7 +192,7 @@ class GraphFactory(Singleton):
             Selector(has_identifier=successor_ref),
             Selector(has_path=successor_ref),
         )
-        candidates = [node for node in graph.nodes if selector.matches(node)]
+        candidates = list(graph.find_nodes(selector))
         if not candidates:
             raise ValueError(
                 f"successor {successor_ref!r} for edge {edge.get_label()!r} did not resolve"
@@ -227,11 +221,7 @@ class GraphFactory(Singleton):
         """
         if graph is None:
             graph = self.graph_type(**kwargs)
-        bind_factory = getattr(graph, "bind_factory", None)
-        if callable(bind_factory):
-            bind_factory(self)
-        else:
-            graph.factory = self
+        graph.bind_factory(self)
 
         templ_regs = self._provide_templates()
 

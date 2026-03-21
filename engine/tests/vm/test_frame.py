@@ -17,6 +17,7 @@ from tangl.core import (
     BehaviorRegistry,
     DispatchLayer,
     Graph,
+    GraphFactory,
     OrderedRegistry,
     Record,
     TemplateRegistry,
@@ -228,6 +229,24 @@ class TestPhaseCtx:
         a = _node(g, label="a")
         ctx = PhaseCtx(graph=g, cursor_id=a.uid)
         assert ctx.get_template_scope_groups() == [marker]
+
+    def test_template_scope_groups_fall_back_to_graph_factory_templates(self) -> None:
+        class TestFactory(GraphFactory):
+            pass
+
+        TestFactory.clear_instances()
+        try:
+            marker = TemplateRegistry(label="factory_templates")
+            factory = TestFactory(label="phase_ctx_factory", templates=marker)
+            g = Graph()
+            g.bind_factory(factory)
+            a = _node(g, label="a")
+
+            ctx = PhaseCtx(graph=g, cursor_id=a.uid)
+
+            assert ctx.get_template_scope_groups() == [marker]
+        finally:
+            TestFactory.clear_instances()
 
 
 class TestFrameRandomDeterminism:
