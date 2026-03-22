@@ -103,7 +103,8 @@ class TestScriptManager38ScopeGroups:
         }
         # The cursor's own template (intro.start) should lead
         own_tmpl_uid = graph.template_by_entity_id.get(cursor.uid)
-        own_tmpl = graph.factory.get(own_tmpl_uid) if own_tmpl_uid else None
+        registry = graph.template_registry
+        own_tmpl = registry.get(own_tmpl_uid) if own_tmpl_uid and registry is not None else None
         if own_tmpl is not None:
             assert own_tmpl.get_label() in first_group_labels or own_tmpl in groups[0]
 
@@ -118,7 +119,9 @@ class TestScriptManager38ScopeGroups:
             for group in groups
             for item in group
         }
-        for tmpl in graph.factory.values():
+        registry = graph.template_registry
+        assert registry is not None
+        for tmpl in registry.values():
             assert tmpl.uid in flat, f"Template {tmpl.get_label()} missing from scope groups"
 
     def test_cursor_lineage_heads_precede_global_pool(self) -> None:
@@ -224,7 +227,7 @@ class TestWorldScopeProviderIntegration:
         _ = extra_tmpl
 
         world = World(
-            label=base_world.label,
+            label=f"{base_world.label}.scope",
             bundle=base_world.bundle,
             templates=_FakeFacet(extra=extra_reg),
         )
@@ -256,7 +259,7 @@ class TestWorldScopeProviderIntegration:
         )
 
         world = World(
-            label=base_world.label,
+            label=f"{base_world.label}.scope_ctx",
             bundle=base_world.bundle,
             templates=_FakeFacet(extra=extra_reg),
         )

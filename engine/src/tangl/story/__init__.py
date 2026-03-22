@@ -11,9 +11,11 @@ Conceptual layers
 
    - :class:`StoryCompiler` validates and normalizes authored scripts into a
      :class:`StoryTemplateBundle`.
-   - :class:`StoryMaterializer` instantiates story graphs from compiled
-     templates.
-   - :class:`World` is the main external entry point for creating story runs.
+   - :class:`WorldBuilder` assembles world adjuncts around a compiled bundle.
+   - :class:`StoryMaterializer` wires story-specific topology and runtime hooks
+     as a helper behind :class:`World`.
+   - :class:`World` is the singleton story authority and main external entry
+     point for creating story runs.
    - :class:`ScriptManager` resolves template lookups across lineage-aware
      scope groups.
 
@@ -34,8 +36,8 @@ Conceptual layers
 
 4. Runtime graph and journal output
 
-   - :class:`StoryGraph` carries story locals, template lineage, and world
-     references for runtime resolution.
+   - :class:`StoryGraph` carries story locals, template lineage, and a
+     compatibility world alias over its bound factory for runtime resolution.
    - :class:`StoryRuntimeCtx` defines the context accessors expected by story
      runtime helpers.
    - :class:`ContentFragment`, :class:`ChoiceFragment`, and
@@ -81,6 +83,7 @@ from .fabula import (
     StoryTemplateBundle,
     UnresolvedDependency,
     WorldAssetsFacet,
+    WorldBuilder,
     WorldDomainFacet,
     WorldResourcesFacet,
     WorldTemplatesFacet,
@@ -124,6 +127,7 @@ __all__ = [
     "StoryTemplateBundle",
     "UnresolvedDependency",
     "WorldAssetsFacet",
+    "WorldBuilder",
     "WorldDomainFacet",
     "WorldResourcesFacet",
     "WorldTemplatesFacet",

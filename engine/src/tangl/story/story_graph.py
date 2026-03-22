@@ -4,9 +4,10 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field, field_serializer, field_validator, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
-from tangl.core import Graph, Selector, TemplateRegistry
+from tangl.core import EntityTemplate, Selector, TemplateRegistry
+from tangl.vm import TraversableGraph
 
 from .dispatch import story_dispatch
 
@@ -24,7 +25,7 @@ def _runtime_wiring_symbols():
     return TraversableNode, (Action, Role, Setting, MediaDep, Fanout)
 
 
-class StoryGraph(Graph):
+class StoryGraph(TraversableGraph):
     """StoryGraph()
 
     Runtime graph specialization for story-layer execution state.
@@ -32,14 +33,14 @@ class StoryGraph(Graph):
     Why
     ----
     Story execution needs more than generic graph topology. ``StoryGraph`` adds
-    story locals, template lineage, and world references so runtime handlers and
-    provisioning can resolve scoped data without reaching back into compile-time
-    structures directly.
+    story locals, runtime lineage state, and a compatibility world alias over
+    the bound graph factory so story handlers can resolve scoped data without
+    reaching back into compile-time structures directly.
 
     Key Features
     ------------
     * Tracks one or more initial cursor ids for entry into the runtime graph.
-    * Carries story locals and world/script-manager references outside
+    * Carries story locals and a compatibility script-manager pointer outside
       serialized graph payloads.
     * Records template lineage for each materialized entity so provisioning can
       recover template scope.
@@ -53,79 +54,143 @@ class StoryGraph(Graph):
       closest scope outward.
     """
 
-    initial_cursor_id: UUID | None = None
     initial_cursor_ids: list[UUID] = Field(default_factory=list)
     frozen_shape: bool = False
     locals: dict[str, Any] = Field(default_factory=dict)
-    factory: TemplateRegistry | None = Field(default=None, exclude=True)
-    script_manager: Any | None = Field(default=None, exclude=True)
-    world: Any | None = None
+    world_ref: Any | None = Field(default=None, exclude=True, validation_alias="world")
     story_id: UUID | None = Field(default=None, exclude=True)
     story_resources: Any | None = Field(default=None, exclude=True)
-    story_materialize: Any | None = Field(default=None, exclude=True)
-    story_post_materialize: Any | None = Field(default=None, exclude=True)
-    story_preview_requirement: Any | None = Field(default=None, exclude=True)
     template_by_entity_id: dict[UUID, UUID] = Field(default_factory=dict, exclude=True)
     template_lineage_by_entity_id: dict[UUID, list[UUID]] = Field(default_factory=dict, exclude=True)
     wired_node_ids: set[UUID] = Field(default_factory=set, exclude=True)
+
+    _world_override: Any = PrivateAttr(default=None)
+    _script_manager_override: Any = PrivateAttr(default=None)
+    _story_materialize_override: Any = PrivateAttr(default=None)
+    _story_post_materialize_override: Any = PrivateAttr(default=None)
+    _story_preview_requirement_override: Any = PrivateAttr(default=None)
+
+    @property
+    def world(self) -> Any | None:
+        if self._world_override is not None:
+            return self._world_override
+        from .fabula.world import World
+
+        if isinstance(self.factory, World):
+            return self.factory
+        return None
+
+    @world.setter
+    def world(self, value: Any | None) -> None:
+        from .fabula.world import World
+
+        if isinstance(value, World):
+            self.bind_factory(value)
+            self._world_override = None
+            return
+        self._world_override = value
+
+    @property
+    def script_manager(self) -> Any | None:
+        if self._script_manager_override is not None:
+            return self._script_manager_override
+        world = self.world
+        if world is None:
+            return None
+        return getattr(world, "script_manager", None)
+
+    @script_manager.setter
+    def script_manager(self, value: Any | None) -> None:
+        self._script_manager_override = value
+
+    @property
+    def story_materialize(self) -> Any | None:
+        if self._story_materialize_override is not None:
+            return self._story_materialize_override
+        world = self.world
+        if world is None:
+            return None
+        return getattr(world, "story_materialize_template", None)
+
+    @story_materialize.setter
+    def story_materialize(self, value: Any | None) -> None:
+        self._story_materialize_override = value
+
+    @property
+    def story_post_materialize(self) -> Any | None:
+        if self._story_post_materialize_override is not None:
+            return self._story_post_materialize_override
+        world = self.world
+        if world is None:
+            return None
+        return getattr(world, "story_post_materialize", None)
+
+    @story_post_materialize.setter
+    def story_post_materialize(self, value: Any | None) -> None:
+        self._story_post_materialize_override = value
+
+    @property
+    def story_preview_requirement(self) -> Any | None:
+        if self._story_preview_requirement_override is not None:
+            return self._story_preview_requirement_override
+        world = self.world
+        if world is None:
+            return None
+        return getattr(world, "preview_requirement_contract", None)
+
+    @story_preview_requirement.setter
+    def story_preview_requirement(self, value: Any | None) -> None:
+        self._story_preview_requirement_override = value
+
+    @model_validator(mode="after")
+    def _restore_runtime_refs(self) -> StoryGraph:
+        """Restore lightweight runtime pointers derived from the bound world."""
+        if self.world_ref is not None and self._world_override is None:
+            self._world_override = self.world_ref
+        if self.story_id is None:
+            self.story_id = self.uid
+        if not self.template_by_entity_id and not self.template_lineage_by_entity_id:
+            self.rebuild_template_lineage()
+        return self
 
     def get_story_locals(self) -> dict[str, Any]:
         """Return story-level locals exposed to runtime render/provision paths."""
         return dict(self.locals)
 
-    @field_serializer("world")
-    def _serialize_world_ref(self, value: Any | None) -> str | None:
-        """Serialize the bound world as a lightweight label reference."""
-        return getattr(value, "label", None) if value is not None else None
+    def _template_registry(self) -> TemplateRegistry | None:
+        factory = getattr(self, "factory", None)
+        if isinstance(factory, TemplateRegistry):
+            return factory
 
-    @field_validator("world", mode="before")
-    @classmethod
-    def _resolve_world_ref(cls, value: Any) -> Any:
-        """Resolve serialized world labels back to loaded world instances.
+        templates = getattr(factory, "templates", None)
+        if isinstance(templates, TemplateRegistry):
+            return templates
 
-        TODO: Replace this temporary StoryGraph-local shim with proper
-        singleton-aware structuring in core bases so object references with
-        ``unstructure()`` / ``structure()`` semantics round-trip uniformly.
-        """
-        if value is None or value == "":
-            return None
+        script_manager = getattr(self, "script_manager", None)
+        registry = getattr(script_manager, "template_registry", None)
+        if isinstance(registry, TemplateRegistry):
+            return registry
+        return None
 
-        if isinstance(value, str):
-            from .fabula.world import World
-
-            return World.get_instance(value)
-
-        if isinstance(value, dict):
-            label = value.get("label")
-            if isinstance(label, str) and label:
-                from .fabula.world import World
-
-                return World.get_instance(label)
-
-        return value
-
-    @model_validator(mode="after")
-    def _restore_world_runtime_refs(self) -> StoryGraph:
-        """Restore lightweight runtime pointers that can be derived from world."""
-        world = self.world
-        if world is not None:
-            if self.script_manager is None:
-                self.script_manager = getattr(world, "script_manager", None)
-            if self.factory is None:
-                bundle = getattr(world, "bundle", None)
-                self.factory = getattr(bundle, "template_registry", None)
-        if self.story_id is None:
-            self.story_id = self.uid
-        return self
+    @property
+    def template_registry(self) -> TemplateRegistry | None:
+        """Return the template registry authoritative for this story graph."""
+        return self._template_registry()
 
     def get_authorities(self) -> list[object]:
-        """Return application/world authority registries when available."""
+        """Return story + application/world authority registries when available."""
         registries: list[object] = [story_dispatch]
-        get_world_authorities = getattr(self.world, "get_authorities", None)
-        if callable(get_world_authorities):
-            for registry in get_world_authorities() or ():
-                if registry not in registries:
-                    registries.append(registry)
+        for registry in super().get_authorities():
+            if registry not in registries:
+                registries.append(registry)
+
+        world = self.world
+        if world is not None and world is not self.factory:
+            get_world_authorities = getattr(world, "get_authorities", None)
+            if callable(get_world_authorities):
+                for registry in get_world_authorities() or ():
+                    if registry not in registries:
+                        registries.append(registry)
         return registries
 
     def get_template_scope_groups(self, caller) -> list[list[object]]:
@@ -139,7 +204,8 @@ class StoryGraph(Graph):
             if groups:
                 return [list(group) for group in groups]
 
-        if self.factory is None:
+        registry = self._template_registry()
+        if registry is None:
             return []
 
         groups: list[list[object]] = []
@@ -157,7 +223,7 @@ class StoryGraph(Graph):
                 groups.append(bucket)
 
         for template_id in lineage:
-            template = self.factory.get(template_id)
+            template = registry.get(template_id)
             if template is None:
                 continue
             values: list[object] = [template]
@@ -165,7 +231,7 @@ class StoryGraph(Graph):
                 values.extend(list(template.members()))
             add_group(values)
 
-        add_group(self.factory.values())
+        add_group(registry.values())
         return groups
 
     @staticmethod
@@ -191,6 +257,28 @@ class StoryGraph(Graph):
         self.template_lineage_by_entity_id[entity_uid] = self.template_lineage_ids_for_template(
             template
         )
+
+    def rebuild_template_lineage(self, registry: TemplateRegistry | None = None) -> None:
+        """Rebuild runtime template lineage from templ_hash provenance."""
+        registry = registry or self._template_registry()
+        if registry is None:
+            return
+
+        template_by_hash: dict[bytes, EntityTemplate] = {}
+        for template in registry.values():
+            if isinstance(template, EntityTemplate):
+                template_by_hash[template.content_hash()] = template
+
+        self.template_by_entity_id.clear()
+        self.template_lineage_by_entity_id.clear()
+        for entity in self.values():
+            templ_hash = getattr(entity, "templ_hash", None)
+            if not isinstance(templ_hash, bytes):
+                continue
+            template = template_by_hash.get(templ_hash)
+            if template is None:
+                continue
+            self.record_runtime_template(entity, template)
 
     def is_runtime_wired_node(self, node: Any) -> bool:
         """Return whether runtime topology has already been wired for ``node``."""
@@ -231,3 +319,8 @@ class StoryGraph(Graph):
                         exc,
                     )
         self.wired_node_ids = rebuilt
+
+    @classmethod
+    def structure(cls, data, _ctx=None):
+        graph = super().structure(data, _ctx=_ctx)
+        return graph._restore_runtime_refs()

@@ -27,6 +27,29 @@ class TraversableGraphFactoryTestDouble(TraversableGraphFactory):
     """Test-local singleton subclass used to isolate VM factory instances."""
 
 
+class _TemplateSubset:
+    """Minimal read-only template subset for seed-graph tests."""
+
+    def __init__(self, registry: TemplateRegistry, selected_labels: set[str]) -> None:
+        self.registry = registry
+        self.selected_labels = selected_labels
+
+    def _values(self):
+        return [
+            value
+            for value in self.registry.values()
+            if getattr(value, "label", None) in self.selected_labels
+        ]
+
+    def find_all(self, selector: Selector | None = None, *, sort_key=None):
+        values = self._values()
+        if selector is not None:
+            values = list(selector.filter(values))
+        if sort_key is not None:
+            values = sorted(values, key=sort_key)
+        return values
+
+
 @pytest.fixture(autouse=True)
 def clear_factories() -> None:
     TraversableGraphFactoryTestDouble.clear_instances()
@@ -161,3 +184,30 @@ class TestTraversableGraphFactoryMaterialize:
         )
         with pytest.raises(ValueError, match="Traversal contract validation failed"):
             factory.materialize_graph()
+
+    def test_materialize_seed_graph_materializes_only_selected_templates(self) -> None:
+        template_registry = TemplateRegistry(label="vm_seed_templates")
+        scene = _group_template(registry=template_registry, label="scene")
+        start = _node_template(registry=template_registry, label="scene.start")
+        later = _node_template(registry=template_registry, label="scene.later")
+
+        scene.add_child(start)
+        scene.add_child(later)
+
+        factory = TraversableGraphFactoryTestDouble(
+            label="vm_seed_factory",
+            templates=template_registry,
+        )
+        graph = factory.materialize_seed_graph(
+            template_groups=[
+                _TemplateSubset(
+                    template_registry,
+                    selected_labels={"scene", "scene.start"},
+                )
+            ]
+        )
+
+        labels = {getattr(item, "label", None) for item in graph.values()}
+        assert labels >= {"scene", "start"}
+        assert "later" not in labels
+        assert graph.initial_cursor_id is not None

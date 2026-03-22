@@ -102,8 +102,37 @@ def test_ledger_from_story_graph_defaults_to_story_initial_cursor() -> None:
 
     ledger = Ledger.from_graph(result.graph)
 
+    assert result.graph.factory is world
+    assert result.graph.world is world
     assert ledger.cursor_id == result.graph.initial_cursor_id
     assert ledger.cursor is result.graph.get(result.graph.initial_cursor_id)
+
+
+def test_story_graph_roundtrip_preserves_world_factory_identity() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("story_roundtrip", init_mode=InitMode.EAGER)
+
+    payload = result.graph.unstructure()
+    restored = type(result.graph).structure(payload)
+
+    assert "world" not in payload
+    assert restored.factory is world
+    assert restored.world is world
+    assert restored.script_manager is world.script_manager
+
+
+@pytest.mark.parametrize("init_mode", [InitMode.LAZY, InitMode.EAGER])
+def test_create_story_uses_direct_world_fields_when_bundle_is_cleared(init_mode: InitMode) -> None:
+    world = World.from_script_data(script_data=_base_script())
+    world.force_set("bundle", None)
+
+    result = world.create_story(f"bundleless_{init_mode.value}", init_mode=init_mode)
+
+    assert result.graph.factory is world
+    assert result.graph.initial_cursor_id is not None
+    assert result.source_map == world.source_map
+    assert result.codec_state == world.codec_state
+    assert result.codec_id == world.codec_id
 
 
 def test_freeze_shape_requires_eager_mode() -> None:
@@ -254,7 +283,9 @@ def test_eager_mode_prelink_selection_is_deterministic() -> None:
     world_a = World.from_script_data(script_data=script)
     result_a = world_a.create_story("run_det_a", init_mode=InitMode.EAGER)
 
-    world_b = World.from_script_data(script_data=script)
+    script_b = dict(script)
+    script_b["label"] = "story_demo_second"
+    world_b = World.from_script_data(script_data=script_b)
     result_b = world_b.create_story("run_det_b", init_mode=InitMode.EAGER)
 
     role_a = next(Selector(has_kind=Role).filter(result_a.graph.values()))
@@ -534,7 +565,7 @@ def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
     lineage = [
         templ_id
         for templ_id in graph.template_lineage_by_entity_id.get(cursor.uid, [])
-        if graph.factory.get(templ_id) is not None
+        if graph.template_registry is not None and graph.template_registry.get(templ_id) is not None
     ]
     group_heads = [getattr(group[0], "uid", None) for group in groups if group]
     assert group_heads[: len(lineage)] == lineage
@@ -570,7 +601,7 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
     _ = extra_template
 
     world = World(
-        label=base_world.label,
+        label=f"{base_world.label}.scope",
         bundle=base_world.bundle,
         templates=_TemplateScopeFacet(extra_template_registry=extra_registry),
     )

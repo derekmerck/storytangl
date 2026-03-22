@@ -95,12 +95,15 @@ def _story_from_async_spec(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     story_label: str = "async-media-story",
+    world_label: str = "async_media_world",
 ):
     monkeypatch.setattr(
         "tangl.media.story_media.get_story_media_dir",
         _story_media_root(tmp_path),
     )
-    world = World.from_script_data(script_data=_async_spec_script())
+    script = _async_spec_script()
+    script["label"] = world_label
+    world = World.from_script_data(script_data=script)
     result = world.create_story(story_label)
     story = result.graph
     block = next(node for node in story.values() if getattr(node, "label", None) == "start")
@@ -190,11 +193,13 @@ class TestAsyncInlineLifecycle:
             monkeypatch=monkeypatch,
             tmp_path=tmp_path,
             story_label="story-one",
+            world_label="async_media_world_one",
         )
         _, _, _, dep_two = _story_from_async_spec(
             monkeypatch=monkeypatch,
             tmp_path=tmp_path,
             story_label="story-two",
+            world_label="async_media_world_two",
         )
 
         first = dep_one.provider

@@ -200,8 +200,10 @@ class TestLinearTraversal:
 
     def test_traversal_is_deterministic(self) -> None:
         """Same script produces same traversal path on two independent ledgers."""
-        def _run() -> list[str]:
-            world = World.from_script_data(script_data=_linear_script())
+        def _run(label: str) -> list[str]:
+            script = _linear_script()
+            script["label"] = label
+            world = World.from_script_data(script_data=script)
             result = world.create_story("det_play", init_mode=InitMode.EAGER)
             ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)
             path: list[str] = [ledger.cursor.label]
@@ -215,7 +217,7 @@ class TestLinearTraversal:
                 path.append(ledger.cursor.label)
             return path
 
-        assert _run() == _run()
+        assert _run("linear_world_a") == _run("linear_world_b")
 
 
 # ---------------------------------------------------------------------------

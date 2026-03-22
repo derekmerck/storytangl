@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 from typing import Any, Mapping
 from uuid import UUID
 
-from tangl.core import EntityTemplate, GraphItem, Selector, TemplateRegistry
+from tangl.core import EntityTemplate, GraphFactory, GraphItem, Selector, TemplateRegistry
 from tangl.core.ctx import CoreCtx
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
-from tangl.media.story_media import get_story_resource_manager
 from tangl.vm.dispatch import do_gather_ns
 from tangl.vm.ctx import VmRequirementStampCtx
 from tangl.vm.runtime.frame import PhaseCtx
@@ -33,7 +31,6 @@ from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, MenuBlock, Scene
 from ..story_graph import StoryGraph
 from .compiler import StoryTemplateBundle
-from .script_manager import ScriptManager
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -48,9 +45,13 @@ from .types import (
 @dataclass(slots=True)
 class _MaterializationState:
     graph: StoryGraph
-    bundle: StoryTemplateBundle
+    template_registry: TemplateRegistry
     report: InitReport
-    template_to_entity: dict[UUID, GraphItem] = field(default_factory=dict)
+    entry_template_ids: list[str] = field(default_factory=list)
+    source_map: dict[str, Any] = field(default_factory=dict)
+    codec_state: dict[str, Any] = field(default_factory=dict)
+    codec_id: str | None = None
+    bundle_id: str | None = None
     id_to_entity: dict[str, GraphItem] = field(default_factory=dict)
 
 
@@ -111,8 +112,11 @@ class _PrelinkCtx:
                 groups.append(bucket)
 
         add_group([cursor])
-        if hasattr(cursor, "ancestors"):
-            for ancestor in cursor.ancestors:
+        ancestors = getattr(cursor, "ancestors", None)
+        if callable(ancestors):
+            ancestors = ancestors()
+        if ancestors is not None:
+            for ancestor in ancestors:
                 if hasattr(ancestor, "children"):
                     add_group(ancestor.children())
         add_group(self.graph.values())
@@ -153,27 +157,30 @@ class _PrelinkCtx:
 class StoryMaterializer:
     """StoryMaterializer()
 
-    Instantiate runtime story graphs from a compiled
-    :class:`~tangl.story.fabula.StoryTemplateBundle`.
+    Story-policy helper for runtime graph wiring and compatibility delegation.
 
     Why
     ----
-    Materialization translates the static template hierarchy into concrete graph
-    items, attaches lineage metadata, and optionally pre-resolves dependencies
-    so runtime traversal starts from a coherent story graph.
+    ``World.create_story(...)`` now owns graph creation directly by layering over
+    :class:`~tangl.vm.TraversableGraphFactory`. ``StoryMaterializer`` remains as
+    the focused helper that applies story-specific topology, eager prelink
+    policy, and runtime materialization hooks on top of that lower-layer graph
+    creation.
 
     Key Features
     ------------
-    * Supports :class:`InitMode.LAZY` and :class:`InitMode.EAGER`
-      initialization.
+    * Wires story-specific topology onto an already-materialized graph.
+    * Supports eager prelink/report passes once generic graph creation
+      completes.
     * Preserves template-to-entity lineage for runtime scope lookup.
-    * Finalizes scene contracts and wires node destinations after
-      instantiation.
+    * Finalizes scene contracts and wires node destinations after instantiation.
     * Uses vm resolver semantics instead of reimplementing provisioning logic.
 
     API
     ---
-    - :meth:`create_story` materializes one story graph from a compiled bundle.
+    - :meth:`create_story` delegates to a bound world for compatibility.
+    - :meth:`make_state` builds story wiring state from direct runtime
+      authorities.
     """
 
     def story_materialize_template(
@@ -277,97 +284,45 @@ class StoryMaterializer:
         freeze_shape: bool = False,
         world: object | None = None,
     ) -> StoryInitResult:
-        """Create one runtime story graph from a compiled bundle.
+        if world is not None:
+            create_story = getattr(world, "create_story", None)
+            if callable(create_story):
+                return create_story(
+                    story_label,
+                    init_mode=init_mode,
+                    freeze_shape=freeze_shape,
+                )
+        msg = "StoryMaterializer.create_story now requires a World authority"
+        raise ValueError(msg)
 
-        ``LAZY`` mode materializes only entry paths and defers deeper
-        provisioning. ``EAGER`` mode materializes the full template registry and
-        fails fast on unresolved hard dependencies.
-        """
-        state = self._initialize_state(
-            bundle=bundle,
-            story_label=story_label,
-            init_mode=init_mode,
-            freeze_shape=freeze_shape,
-            world=world,
-        )
-        entry_templates = self._require_entry_templates(bundle)
-        self._materialize_templates(
-            state=state,
-            templates=self._materialization_templates(
-                bundle=bundle,
-                entry_templates=entry_templates,
-                init_mode=init_mode,
-            ),
-        )
-        self._run_topology_passes(state=state)
-        self._run_prelink_passes(state=state)
-
-        entry_nodes = self._require_entry_nodes(
-            state=state,
-            entry_templates=entry_templates,
-        )
-        self._set_initial_cursor(state.graph, entry_nodes)
-        return self._build_story_init_result(state=state)
-
-    def _initialize_state(
+    def make_state(
         self,
         *,
-        bundle: StoryTemplateBundle,
-        story_label: str,
-        init_mode: InitMode,
-        freeze_shape: bool,
-        world: object | None,
+        graph: StoryGraph,
+        mode: InitMode,
+        template_registry: TemplateRegistry | None = None,
+        entry_template_ids: list[str] | None = None,
+        source_map: dict[str, Any] | None = None,
+        codec_state: dict[str, Any] | None = None,
+        codec_id: str | None = None,
+        bundle_id: str | None = None,
     ) -> _MaterializationState:
-        script_manager = getattr(world, "script_manager", None) if world is not None else None
-        if script_manager is None:
-            script_manager = ScriptManager(template_registry=bundle.template_registry)
-
-        graph = StoryGraph(
-            label=story_label,
-            frozen_shape=(init_mode is InitMode.EAGER and freeze_shape),
-            locals=dict(bundle.locals),
-            factory=bundle.template_registry,
-            script_manager=script_manager,
-            world=world,
-        )
-        graph.story_id = graph.uid
-        graph.story_resources = get_story_resource_manager(graph.story_id, create=False)
-        graph.story_materialize = self.story_materialize_template
-        graph.story_post_materialize = self.story_post_materialize
-        graph.story_preview_requirement = self.preview_requirement_contract
-        return _MaterializationState(
+        """Build a story wiring/prelink state from direct runtime authority."""
+        resolved_registry = template_registry or self._template_registry_for_graph(graph)
+        if bundle_id is None:
+            bundle_id = getattr(resolved_registry, "label", None)
+        state = _MaterializationState(
             graph=graph,
-            bundle=bundle,
-            report=InitReport(mode=init_mode),
+            template_registry=resolved_registry,
+            report=InitReport(mode=mode),
+            entry_template_ids=list(entry_template_ids or []),
+            source_map=dict(source_map or {}),
+            codec_state=dict(codec_state or {}),
+            codec_id=codec_id,
+            bundle_id=bundle_id,
         )
-
-    def _require_entry_templates(self, bundle: StoryTemplateBundle) -> list[Any]:
-        entry_templates = self._resolve_entry_templates(bundle)
-        if not entry_templates:
-            raise ValueError("No entry templates resolved for story initialization")
-        return entry_templates
-
-    def _materialization_templates(
-        self,
-        *,
-        bundle: StoryTemplateBundle,
-        entry_templates: list[Any],
-        init_mode: InitMode,
-    ) -> list[Any]:
-        if init_mode is InitMode.LAZY:
-            return list(entry_templates)
-        if init_mode is InitMode.EAGER:
-            return sorted(bundle.template_registry.values(), key=self._template_depth)
-        raise ValueError(f"Unsupported init mode: {init_mode}")
-
-    def _materialize_templates(
-        self,
-        *,
-        state: _MaterializationState,
-        templates: list[Any],
-    ) -> None:
-        for templ in templates:
-            self._materialize_with_ancestors(templ=templ, state=state)
+        self._index_graph_entities(state=state)
+        return state
 
     def _run_topology_passes(self, *, state: _MaterializationState) -> None:
         nodes = self._unwired_traversable_nodes(state=state)
@@ -377,6 +332,13 @@ class StoryMaterializer:
         self._wire_block_actions(nodes=nodes, state=state)
         self._wire_media_dependencies(nodes=nodes, state=state)
         self._mark_nodes_wired(nodes=nodes, state=state)
+
+    @staticmethod
+    def _recount_materialized(*, state: _MaterializationState) -> None:
+        state.report.materialized_counts.clear()
+        for entity in state.graph.values():
+            if isinstance(entity, GraphItem):
+                state.report.bump_materialized(entity.__class__.__name__)
 
     def _run_prelink_passes(self, *, state: _MaterializationState) -> None:
         if state.report.mode is not InitMode.EAGER:
@@ -394,37 +356,16 @@ class StoryMaterializer:
         self._verify_prelinked_story_graph(state=state)
         self._raise_on_unresolved_hard_dependencies(state=state)
 
-    def _require_entry_nodes(
-        self,
-        *,
-        state: _MaterializationState,
-        entry_templates: list[Any],
-    ) -> list[TraversableNode]:
-        entry_nodes = [
-            node
-            for templ in entry_templates
-            if isinstance((node := state.template_to_entity.get(templ.uid)), TraversableNode)
-        ]
-        if not entry_nodes:
-            raise ValueError("Entry templates did not materialize traversable nodes")
-        return entry_nodes
-
-    @staticmethod
-    def _set_initial_cursor(graph: StoryGraph, entry_nodes: list[TraversableNode]) -> None:
-        graph.initial_cursor_ids = [node.uid for node in entry_nodes]
-        graph.initial_cursor_id = graph.initial_cursor_ids[0]
-
     @staticmethod
     def _build_story_init_result(*, state: _MaterializationState) -> StoryInitResult:
         graph = state.graph
-        bundle = state.bundle
         return StoryInitResult(
             graph=graph,
             report=state.report,
             entry_ids=graph.initial_cursor_ids,
-            source_map=dict(bundle.source_map),
-            codec_state=dict(bundle.codec_state),
-            codec_id=bundle.codec_id,
+            source_map=dict(state.source_map),
+            codec_state=dict(state.codec_state),
+            codec_id=state.codec_id,
         )
 
     @staticmethod
@@ -432,6 +373,8 @@ class StoryMaterializer:
         registry = getattr(graph, "factory", None)
         if isinstance(registry, TemplateRegistry):
             return registry
+        if isinstance(registry, GraphFactory) and isinstance(registry.templates, TemplateRegistry):
+            return registry.templates
 
         script_manager = getattr(graph, "script_manager", None)
         registry = getattr(script_manager, "template_registry", None)
@@ -439,22 +382,18 @@ class StoryMaterializer:
             return registry
         return TemplateRegistry(label="story_runtime_templates")
 
-    def _runtime_state(self, *, graph: StoryGraph) -> _MaterializationState:
-        bundle = getattr(getattr(graph, "world", None), "bundle", None)
-        if bundle is None:
-            bundle = SimpleNamespace(
-                template_registry=self._template_registry_for_graph(graph),
-                source_map={},
-                codec_state={},
-                codec_id=None,
-            )
-        state = _MaterializationState(
+    def _runtime_state(self, *, graph: StoryGraph, mode: InitMode = InitMode.LAZY) -> _MaterializationState:
+        world = getattr(graph, "world", None)
+        return self.make_state(
             graph=graph,
-            bundle=bundle,
-            report=InitReport(mode=InitMode.LAZY),
+            mode=mode,
+            template_registry=self._template_registry_for_graph(graph),
+            entry_template_ids=list(getattr(world, "entry_template_ids", []) or []),
+            source_map=dict(getattr(world, "source_map", {}) or {}),
+            codec_state=dict(getattr(world, "codec_state", {}) or {}),
+            codec_id=getattr(world, "codec_id", None),
+            bundle_id=getattr(self._template_registry_for_graph(graph), "label", None),
         )
-        self._index_graph_entities(state=state)
-        return state
 
     def _index_graph_entities(self, *, state: _MaterializationState) -> None:
         for entity in state.graph.values():
@@ -794,56 +733,22 @@ class StoryMaterializer:
         label = templ.get_label() if hasattr(templ, "get_label") else ""
         return depth, seq, label
 
-    def _resolve_entry_templates(self, bundle: StoryTemplateBundle) -> list[Any]:
+    def _resolve_entry_templates(
+        self,
+        *,
+        template_registry: TemplateRegistry,
+        entry_template_ids: list[str],
+    ) -> list[Any]:
         templates = []
-        for identifier in bundle.entry_template_ids:
-            templ = bundle.template_registry.find_one(
+        for identifier in entry_template_ids:
+            templ = template_registry.find_one(
                 Selector(has_identifier=identifier),
             )
             if templ is None:
-                templ = bundle.template_registry.find_one(Selector(label=identifier))
+                templ = template_registry.find_one(Selector(label=identifier))
             if templ is not None:
                 templates.append(templ)
         return templates
-
-    def _materialize_with_ancestors(self, *, templ: Any, state: _MaterializationState) -> None:
-        chain: list[Any] = []
-        current = templ
-        while current is not None:
-            chain.append(current)
-            current = getattr(current, "parent", None)
-        chain.reverse()
-
-        for item in chain:
-            self._materialize_one(item, state=state)
-
-    def _materialize_one(self, templ: Any, *, state: _MaterializationState) -> GraphItem | None:
-        if templ.uid in state.template_to_entity:
-            return state.template_to_entity[templ.uid]
-
-        entity = materialize_template_entity(
-            templ,
-            _ctx=state,
-            role=MaterializeRole.INIT,
-        )
-        if not isinstance(entity, GraphItem):
-            return None
-
-        state.graph.add(entity)
-        state.template_to_entity[templ.uid] = entity
-        state.graph.record_runtime_template(entity, templ)
-        state.report.bump_materialized(entity.__class__.__name__)
-
-        self._index_entity(state=state, entity=entity, template=templ)
-
-        parent_templ = getattr(templ, "parent", None)
-        if parent_templ is not None:
-            parent_entity = state.template_to_entity.get(parent_templ.uid)
-            if isinstance(parent_entity, TraversableNode) and isinstance(entity, GraphItem):
-                if hasattr(parent_entity, "add_child"):
-                    attach_child(parent_entity, entity)
-
-        return entity
 
     def _finalize_scene_contracts(self, *, state: _MaterializationState) -> None:
         for scene in Selector(has_kind=Scene).filter(state.graph.values()):
@@ -1256,7 +1161,7 @@ class StoryMaterializer:
     ) -> _PrelinkCtx:
         return _PrelinkCtx(
             graph=state.graph,
-            template_registry=state.bundle.template_registry,
+            template_registry=state.template_registry,
             cursor_id=cursor_id,
         )
 
@@ -1341,7 +1246,7 @@ class StoryMaterializer:
     ) -> None:
         ctx = _PrelinkCtx(
             graph=state.graph,
-            template_registry=state.bundle.template_registry,
+            template_registry=state.template_registry,
             cursor_id=source.uid,
         )
         resolver = Resolver.from_ctx(ctx)
@@ -1420,7 +1325,7 @@ class StoryMaterializer:
 
     @staticmethod
     def _bundle_id(state: _MaterializationState) -> str | None:
-        label = getattr(state.bundle.template_registry, "label", None)
+        label = state.bundle_id
         if isinstance(label, str) and label:
             return label
         return None

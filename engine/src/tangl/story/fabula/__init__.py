@@ -13,13 +13,16 @@ Conceptual layers
 
 2. Materialization
 
-   - :class:`StoryMaterializer` walks the compiled template registry and
-     instantiates concrete runtime entities inside a :class:`~tangl.story.StoryGraph`.
+   - :class:`StoryMaterializer` applies story topology, eager prelink policy,
+     and runtime materialization hooks over graphs created by
+     :class:`~tangl.story.World`.
 
-3. World entry point
+3. World assembly and entry point
 
-   - :class:`World` packages a compiled bundle with optional world facets and
-     exposes :meth:`World.create_story`.
+   - :class:`WorldBuilder` assembles world adjunct providers around a compiled
+     :class:`StoryTemplateBundle`.
+   - :class:`World` is the singleton story authority over runtime graph
+     creation and exposes :meth:`World.create_story`.
 
 4. Runtime script lookup
 
@@ -35,9 +38,12 @@ Design intent
 -------------
 Compilation is intentionally separate from materialization so one validated
 bundle can produce many independent story graphs without reparsing script data.
+Runtime graph creation belongs to :class:`World`; story-specific wiring remains
+factored into :class:`StoryMaterializer`.
 """
 
 from .compiler import StoryCompiler, StoryTemplateBundle
+from .builder import WorldBuilder
 from .materializer import StoryMaterializer
 from .script_manager import ScriptManager
 from .types import (
@@ -74,6 +80,7 @@ __all__ = [
     "StoryTemplateBundle",
     "UnresolvedDependency",
     "WorldAssetsFacet",
+    "WorldBuilder",
     "WorldDomainFacet",
     "WorldResourcesFacet",
     "WorldTemplatesFacet",

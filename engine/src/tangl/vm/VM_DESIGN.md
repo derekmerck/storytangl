@@ -73,6 +73,10 @@ behaviors after core materialization:
 - resolve the default traversal entry via `get_entry_cursor()`
 - validate traversal contracts with `assert_traversal_contracts()`
 
+It also exposes `materialize_seed_graph(...)`, the VM-level public seam for
+lazy seed-graph creation from an already-resolved template subset. This keeps
+selected-path seeding in VM without introducing a second runtime factory type.
+
 This keeps VM's authority surface small. Planning, replay, and causality stay
 runtime behavior over a traversable graph; they are not separate factory
 classes.

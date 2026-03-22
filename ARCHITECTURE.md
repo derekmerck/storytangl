@@ -236,7 +236,9 @@ VM adds one thin factory layer over core graph materialization.
   traversal entry chosen from graph shape.
 - **TraversableGraphFactory** — a `GraphFactory` subclass that materializes a
   `TraversableGraph`, resolves the shallowest entry-like node, stamps
-  `initial_cursor_id`, and validates traversal contracts.
+  `initial_cursor_id`, and validates traversal contracts. It also exposes
+  `materialize_seed_graph(...)` for lazy seed-graph creation from a template
+  subset.
 
 This is intentionally narrow. VM does not define a second "runtime factory"
 for planning or replay. Those remain runtime behavior over a traversable graph,
@@ -352,9 +354,8 @@ Today it adds:
 
 - one or more initial cursor ids
 - story locals
-- world reference
-- script-manager reference
-- template registry reference for runtime scope lookup
+- a compatibility `world` property over the bound `factory`
+- delegated access to the world's script manager and story materialization hooks
 - template lineage maps from runtime entities back to templates
 - runtime wiring markers
 
@@ -392,45 +393,46 @@ stories.
 
 ### Materializer (`story/fabula/materializer.py`)
 
-`StoryMaterializer` turns a compiled story bundle into a `StoryGraph`.
+`StoryMaterializer` is now a story-policy helper and compatibility wrapper,
+not the primary owner of graph creation.
 
-It adds story-layer policy on top of template materialization:
+It still owns story-layer helper logic such as:
 
 - preserves template lineage for runtime scope recovery
 - wires structural/runtime story topology
 - optionally pre-resolves dependencies in eager mode
 - validates traversal contracts for the resulting graph
 
-This is where story currently layers policy above the more minimal
-core-factory materialization model.
+Generic graph creation now belongs to `World.create_story(...)` layered over
+`vm.TraversableGraphFactory`, while `StoryMaterializer.create_story(...)`
+delegates for compatibility.
 
 ### World (`story/fabula/world.py`)
 
-The primary story entry point over a compiled bundle.
+The primary story authority and story-init entry point.
 
 **Current shape:**
 
-- `World` is a lightweight dataclass, not a `Singleton`
-- it is **not** currently a `GraphFactory` subclass
+- `World` is a singleton `TraversableGraphFactory` subclass
 - it owns a compiled `StoryTemplateBundle`
-- it may hold optional domain/template/asset/resource facets
-- it creates runtime stories via `StoryMaterializer`
-- it keeps a lightweight process-local instance registry for convenient
-  label-based round-tripping in `StoryGraph`
+- it directly owns runtime story metadata, locals, entry ids, and adjunct
+  providers
+- it uses lower-layer factory materialization for eager and lazy graph creation
+- it keeps compatibility aliases such as `domain`, `resource_manager`,
+  `asset_manager`, `bundle`, and `script_manager`
 
 What `World` does today:
 
-- `create_story(...)` materializes one runtime story graph
+- `create_story(...)` builds eager or lazy `StoryGraph` instances directly
 - `get_authorities()` exposes optional world/domain behavior registries
 - `get_template_scope_groups(...)` exposes optional runtime template scopes
 - `get_media_inventories(...)` exposes optional runtime media inventories
 - `find_template(...)` and `find_templates(...)` delegate through the
   `ScriptManager`
 
-**Intended direction:** world-like story authorities are expected to converge
-on the same singleton graph-authority pattern as `core.GraphFactory` and
-`vm.TraversableGraphFactory`, but that is not the current implementation
-contract.
+`World.bundle` remains as a compile-artifact compatibility surface for one
+phase, but runtime story creation no longer depends on it as the active
+authority.
 
 ### ScriptManager (`story/fabula/script_manager.py`)
 

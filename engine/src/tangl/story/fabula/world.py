@@ -1,159 +1,283 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable
+from collections.abc import Iterable
+from typing import Any
+from uuid import UUID
 
-from .compiler import StoryCompiler, StoryTemplateBundle
+from pydantic import Field, PrivateAttr, model_validator
+
+from tangl.core import BehaviorRegistry, EntityTemplate, Selector, TemplateRegistry, TokenCatalog
+from tangl.media.media_resource import MediaInventory
+from tangl.media.story_media import get_story_resource_manager
+from tangl.vm import TraversableGraphFactory, TraversableNode
+
+from ..provider_collection import collect_template_registries
+from ..story_graph import StoryGraph
+from .compiler import StoryCompiler
 from .materializer import StoryMaterializer
 from .script_manager import ScriptManager
 from .types import InitMode, StoryInitResult
 
 
-@dataclass(slots=True)
-class World:
-    """World(label: str, bundle: StoryTemplateBundle)
+def _copy_bundle_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, list):
+        return list(value)
+    return value
 
-    Primary story entry point over a compiled template bundle.
+
+def _template_depth(templ: Any) -> tuple[int, int, str]:
+    depth = 0
+    current = getattr(templ, "parent", None)
+    while current is not None:
+        depth += 1
+        current = getattr(current, "parent", None)
+    seq = getattr(templ, "seq", 0)
+    label = templ.get_label() if hasattr(templ, "get_label") else ""
+    return depth, seq, label
+
+
+class _TemplateSubset:
+    """Read-only filtered template view for VM lazy seed materialization."""
+
+    def __init__(self, registry: TemplateRegistry, selected_ids: set[UUID]) -> None:
+        self.registry = registry
+        self._selected_ids = selected_ids
+        self.label = f"{registry.label}.seed"
+
+    def _values(self) -> list[Any]:
+        return [
+            value
+            for value in self.registry.values()
+            if getattr(value, "uid", None) in self._selected_ids
+        ]
+
+    def values(self) -> list[Any]:
+        return self._values()
+
+    def find_all(
+        self,
+        selector: Selector | None = None,
+        *,
+        sort_key=None,
+    ) -> list[Any]:
+        values = self._values()
+        if selector is not None:
+            values = list(selector.filter(values))
+        if sort_key is not None:
+            values = sorted(values, key=sort_key)
+        return values
+
+    def find_one(
+        self,
+        selector: Selector | None = None,
+        *,
+        sort_key=None,
+    ) -> Any | None:
+        matches = self.find_all(selector, sort_key=sort_key)
+        return matches[0] if matches else None
+
+
+class _WorldDomainView:
+    """Compatibility view exposing legacy world-domain helpers."""
+
+    def __init__(
+        self,
+        *,
+        dispatch_registry: BehaviorRegistry,
+        class_registry: dict[str, Any],
+        modules: list[Any],
+        authorities: list[Any],
+        story_info_projector: Any | None,
+    ) -> None:
+        self.dispatch_registry = dispatch_registry
+        self.class_registry = class_registry
+        self.modules = modules
+        self._authorities = authorities
+        self._story_info_projector = story_info_projector
+
+    def get_authorities(self) -> list[Any]:
+        return list(self._authorities)
+
+    def get_story_info_projector(self) -> Any | None:
+        return self._story_info_projector
+
+
+class World(TraversableGraphFactory):
+    """World(label: str)
+
+    Unitary story authority over templates, runtime graph creation, and world
+    adjunct providers.
 
     Why
     ----
-    ``World`` binds a reusable compiled story bundle to optional domain,
-    template, asset, and resource facets so applications can create runtime
-    stories without manually assembling materializer dependencies each time.
+    ``World`` is the canonical story-layer authority object. It owns the story
+    template bundle, runtime behavior authorities, and compatible accessors for
+    loader/service surfaces while delegating generic graph materialization to
+    :class:`~tangl.vm.TraversableGraphFactory`.
 
     Key Features
     ------------
-    * Owns the compiled bundle and default :class:`ScriptManager`.
-    * Delegates runtime graph creation to :class:`StoryMaterializer`.
-    * Exposes optional authority and template-scope hooks from attached world
-      facets.
-    * Keeps a lightweight process-local instance registry for convenience
-      lookup.
+    * Acts as the singleton shape and behavior authority for
+      :class:`~tangl.story.StoryGraph`.
+    * Preserves bundle-derived metadata, locals, entries, and compile
+      provenance directly on the world.
+    * Keeps compatibility alias views for one phase of the world cutover.
 
     API
     ---
-    - :meth:`create_story` materializes one runtime graph from the compiled
-      bundle.
-    - :meth:`get_authorities` exposes optional world/domain dispatch
-      registries.
-    - :meth:`get_story_info_projector` resolves the optional projected-state
-      projector for ``/story/info`` surfaces.
-    - :meth:`get_template_scope_groups` returns extra template groups available
-      at runtime.
-    - :meth:`find_template` and :meth:`find_templates` delegate template lookup
-      to the configured :class:`ScriptManager`.
-    - :meth:`get_instance`, :meth:`all_instances`, and :meth:`clear_instances`
-      manage the lightweight process-local world registry.
+    - :meth:`create_story` is the public story initialization entry point.
+    - :meth:`get_authorities` exposes world-owned dispatch registries.
+    - :meth:`get_story_info_projector` returns the world-owned projector when
+      present.
+    - :meth:`find_template` and :meth:`find_templates` delegate to the runtime
+      script manager helper.
     """
 
-    label: str
-    bundle: StoryTemplateBundle
+    graph_type: type[StoryGraph] = StoryGraph
+
+    bundle: Any | None = Field(default=None, exclude=True)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    locals: dict[str, Any] = Field(default_factory=dict)
+    entry_template_ids: list[str] = Field(default_factory=list)
+    source_map: dict[str, Any] = Field(default_factory=dict)
+    codec_state: dict[str, Any] = Field(default_factory=dict)
+    codec_id: str | None = None
+    issues: list[Any] = Field(default_factory=list)
+
     script_manager: ScriptManager | None = None
-    domain: Any | None = None
-    templates: Any | None = None
+    template_scope_provider: Any | None = Field(default=None, exclude=True)
     assets: Any | None = None
     resources: Any | None = None
+    class_registry: dict[str, Any] = Field(default_factory=dict)
+    modules: list[Any] = Field(default_factory=list)
+    extra_authorities: list[Any] = Field(default_factory=list)
     story_info_projector: Any | None = None
-    _instances: ClassVar[dict[str, "World"]] = {}
 
-    def __post_init__(self) -> None:
-        if self.templates is None:
-            self.templates = self.bundle.template_registry
-        if self.script_manager is None:
-            self.script_manager = ScriptManager(
-                template_registry=self.bundle.template_registry,
-                world_scope_provider=self._world_template_scope_groups,
+    _domain_view: Any = PrivateAttr(default=None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_bundle_authority(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        payload = dict(data)
+        bundle = payload.get("bundle")
+        bundle_registry = getattr(bundle, "template_registry", None)
+        if isinstance(bundle_registry, TemplateRegistry):
+            templates = payload.get("templates")
+            if templates is None:
+                payload["templates"] = bundle_registry
+            elif not isinstance(templates, TemplateRegistry):
+                payload.setdefault("template_scope_provider", templates)
+                payload["templates"] = bundle_registry
+
+            bundle_defaults = {
+                "metadata": getattr(bundle, "metadata", None),
+                "locals": getattr(bundle, "locals", None),
+                "entry_template_ids": getattr(bundle, "entry_template_ids", None),
+                "source_map": getattr(bundle, "source_map", None),
+                "codec_state": getattr(bundle, "codec_state", None),
+                "codec_id": getattr(bundle, "codec_id", None),
+                "issues": getattr(bundle, "issues", None),
+            }
+            for field_name, value in bundle_defaults.items():
+                if field_name in payload:
+                    continue
+                if value is None:
+                    continue
+                payload[field_name] = _copy_bundle_value(value)
+
+        return payload
+
+    @model_validator(mode="after")
+    def _ensure_story_helpers(self) -> "World":
+        if self.script_manager is None and isinstance(self.templates, TemplateRegistry):
+            self.force_set(
+                "script_manager",
+                ScriptManager(
+                    template_registry=self.templates,
+                    world_scope_provider=self._world_template_scope_groups,
+                ),
             )
-        self.__class__._instances[self.label] = self
-
-    @property
-    def metadata(self) -> dict[str, Any]:
-        return self.bundle.metadata
-
-    def create_story(
-        self,
-        story_label: str,
-        *,
-        init_mode: InitMode = InitMode.EAGER,
-        freeze_shape: bool = False,
-        namespace: dict[str, Any] | None = None,
-    ) -> StoryInitResult:
-        if freeze_shape and init_mode is not InitMode.EAGER:
-            raise ValueError("freeze_shape requires InitMode.EAGER")
-
-        materializer = StoryMaterializer()
-        result = materializer.create_story(
-            bundle=self.bundle,
-            story_label=story_label,
-            init_mode=init_mode,
-            freeze_shape=freeze_shape,
-            world=self,
-        )
-
-        if namespace is not None:
-            override_uid = self._resolve_entry_override(result.graph, namespace)
-            if override_uid is not None:
-                result.graph.initial_cursor_id = override_uid
-                result.graph.initial_cursor_ids[:] = [override_uid]
-
-        return result
-
-    def _resolve_entry_override(
-        self,
-        graph: Any,
-        namespace: dict[str, Any],
-    ) -> Any | None:
-        """Return an optional init-time entry override for this world."""
-        return None
+        return self
 
     def get_authorities(self) -> list[object]:
-        """Return optional domain/world behavior registries."""
-        domain = self.domain
-        if domain is None:
-            return []
-
+        """Return world-owned behavior authorities with stable declaration order."""
         authorities: list[object] = []
-        get_authorities = getattr(domain, "get_authorities", None)
-        if callable(get_authorities):
-            for authority in get_authorities() or ():
-                if authority not in authorities:
-                    authorities.append(authority)
+        for authority in [self.dispatch, *self.extra_authorities]:
+            if authority is None or authority in authorities:
+                continue
+            authorities.append(authority)
         return authorities
 
+    @property
+    def domain(self) -> Any | None:
+        if self._domain_view is not None:
+            return self._domain_view
+        return _WorldDomainView(
+            dispatch_registry=self.dispatch,
+            class_registry=self.class_registry,
+            modules=self.modules,
+            authorities=list(self.get_authorities()),
+            story_info_projector=self.story_info_projector,
+        )
+
+    @property
+    def domain_manager(self) -> Any | None:
+        return self.domain
+
+    @property
+    def resource_manager(self) -> Any | None:
+        return self.resources
+
+    @property
+    def asset_manager(self) -> Any | None:
+        return self.assets
+
     def get_story_info_projector(self) -> Any | None:
-        """Return the explicit or domain-provided story-info projector."""
-        if self.story_info_projector is not None:
-            return self.story_info_projector
+        """Return the world-owned story-info projector when present."""
+        return self.story_info_projector
 
-        domain = self.domain
-        if domain is None:
-            return None
-
-        get_projector = getattr(domain, "get_story_info_projector", None)
-        if callable(get_projector):
-            return get_projector()
-        return None
+    def get_entry_cursor(self, graph: StoryGraph) -> Any | None:
+        """Return the default story entry, falling back to generic VM rules."""
+        entry_templates = self._resolve_story_entry_templates()
+        if entry_templates:
+            entry_nodes = self._entry_nodes_for_templates(
+                graph=graph,
+                entry_templates=entry_templates,
+            )
+            if entry_nodes:
+                return entry_nodes[0]
+        return super().get_entry_cursor(graph)
 
     def get_template_scope_groups(
         self,
         *,
         caller: Any = None,
         graph: Any = None,
-    ) -> list[Iterable[Any]]:
-        """Optional world-authoritative template groups for runtime provisioning."""
-        template_facet = self.templates
-        if template_facet is None or template_facet is self.bundle.template_registry:
-            return []
+    ) -> list[TemplateRegistry]:
+        """Return authoritative template registries for runtime scope discovery."""
+        providers = [self.templates]
+        if self.template_scope_provider is not None:
+            providers.append(self.template_scope_provider)
+        return collect_template_registries(
+            providers,
+            caller=caller,
+            graph=graph,
+        )
 
-        get_scope_groups = getattr(template_facet, "get_template_scope_groups", None)
-        if callable(get_scope_groups):
-            groups = get_scope_groups(caller=caller, graph=graph)
-            return list(groups or [])
-
-        values = getattr(template_facet, "values", None)
-        if callable(values):
-            return [list(values())]
-        return []
+    def get_token_catalogs(
+        self,
+        *,
+        caller: Any = None,
+        requirement: Any = None,
+        graph: Any = None,
+    ) -> list[TokenCatalog]:
+        _ = caller, requirement, graph
+        return list(self._provide_token_catalogs())
 
     def get_media_inventories(
         self,
@@ -161,10 +285,9 @@ class World:
         caller: Any = None,
         requirement: Any = None,
         graph: Any = None,
-    ) -> list[Any]:
-        """Optional world-authoritative media inventories for runtime provisioning."""
-        from tangl.media.media_resource import MediaInventory
-
+    ) -> list[MediaInventory]:
+        """Return optional world-authoritative media inventories."""
+        _ = caller, requirement, graph
         resource_facet = self.resources
         if resource_facet is None:
             return []
@@ -192,16 +315,219 @@ class World:
         return list(self.get_template_scope_groups(caller=caller, graph=graph) or [])
 
     def find_template(self, reference: str) -> Any | None:
-        """Find one template via script manager lookup semantics."""
+        """Find one template via script-manager lookup semantics."""
         if self.script_manager is None:
             return None
         return self.script_manager.find_template(reference)
 
-    def find_templates(self, selector=None) -> list[Any]:
-        """Find all templates matching selector via script manager."""
+    def find_templates(self, selector: Selector | None = None) -> list[Any]:
+        """Find all templates matching ``selector`` via the script manager."""
         if self.script_manager is None:
             return []
         return self.script_manager.find_templates(selector=selector)
+
+    def story_materialize_template(
+        self,
+        template,
+        _ctx: Any = None,
+    ):
+        """Compatibility hook delegating story materialization to the helper."""
+        return StoryMaterializer().story_materialize_template(template, _ctx=_ctx)
+
+    def story_post_materialize(
+        self,
+        *,
+        template,
+        entity: Any,
+        role,
+        _ctx: Any = None,
+    ) -> None:
+        """Compatibility hook delegating post-materialization policy to the helper."""
+        StoryMaterializer().story_post_materialize(
+            template=template,
+            entity=entity,
+            role=role,
+            _ctx=_ctx,
+        )
+
+    def preview_requirement_contract(
+        self,
+        *,
+        requirement,
+        offer,
+        graph,
+        _ctx: Any = None,
+    ):
+        """Compatibility hook delegating preview checks to the helper."""
+        return StoryMaterializer().preview_requirement_contract(
+            requirement=requirement,
+            offer=offer,
+            graph=graph,
+            _ctx=_ctx,
+        )
+
+    @staticmethod
+    def _story_entry_selector(default_entry_ref: str) -> Selector:
+        return Selector.chain_or(
+            Selector(has_identifier=default_entry_ref),
+            Selector(has_tags={default_entry_ref}),
+        )
+
+    def _resolve_story_entry_templates(self) -> list[EntityTemplate]:
+        materializer = StoryMaterializer()
+        return [
+            templ
+            for templ in materializer._resolve_entry_templates(
+                template_registry=self.templates,
+                entry_template_ids=self.entry_template_ids,
+            )
+            if isinstance(templ, EntityTemplate)
+        ]
+
+    def _resolve_seed_entry_templates(self) -> list[EntityTemplate]:
+        explicit = self._resolve_story_entry_templates()
+        if explicit:
+            return explicit
+        return [
+            templ
+            for templ in self.templates.find_all(
+                self._story_entry_selector(self.default_entry_ref),
+                sort_key=_template_depth,
+            )
+            if isinstance(templ, EntityTemplate)
+        ]
+
+    def _seed_template_groups(
+        self,
+        entry_templates: list[EntityTemplate],
+    ) -> list[_TemplateSubset]:
+        selected_ids: set[UUID] = set()
+        for template in entry_templates:
+            current: Any | None = template
+            while current is not None:
+                uid = getattr(current, "uid", None)
+                if isinstance(uid, UUID):
+                    selected_ids.add(uid)
+                current = getattr(current, "parent", None)
+        return [_TemplateSubset(self.templates, selected_ids)]
+
+    def _build_story_graph(
+        self,
+        *,
+        story_label: str,
+        init_mode: InitMode,
+        freeze_shape: bool,
+    ) -> StoryGraph:
+        graph = StoryGraph(
+            label=story_label,
+            frozen_shape=(init_mode is InitMode.EAGER and freeze_shape),
+            locals=dict(self.locals),
+            factory=self,
+        )
+        graph.story_id = graph.uid
+        graph.story_resources = get_story_resource_manager(graph.story_id, create=False)
+        return graph
+
+    @staticmethod
+    def _entry_nodes_for_templates(
+        *,
+        graph: StoryGraph,
+        entry_templates: list[EntityTemplate],
+    ) -> list[TraversableNode]:
+        nodes: list[TraversableNode] = []
+        seen_ids: set[UUID] = set()
+        for template in entry_templates:
+            template_hash = template.content_hash()
+            node = graph.find_one(
+                Selector(has_kind=TraversableNode, templ_hash=template_hash),
+            )
+            if isinstance(node, TraversableNode) and node.uid not in seen_ids:
+                seen_ids.add(node.uid)
+                nodes.append(node)
+        return nodes
+
+    @staticmethod
+    def _apply_story_entry_ids(
+        *,
+        graph: StoryGraph,
+        entry_templates: list[EntityTemplate],
+    ) -> None:
+        entry_nodes = World._entry_nodes_for_templates(
+            graph=graph,
+            entry_templates=entry_templates,
+        )
+        graph.initial_cursor_ids = [node.uid for node in entry_nodes]
+        if graph.initial_cursor_ids:
+            graph.initial_cursor_id = graph.initial_cursor_ids[0]
+
+    def create_story(
+        self,
+        story_label: str,
+        *,
+        init_mode: InitMode = InitMode.EAGER,
+        freeze_shape: bool = False,
+        namespace: dict[str, Any] | None = None,
+    ) -> StoryInitResult:
+        if freeze_shape and init_mode is not InitMode.EAGER:
+            raise ValueError("freeze_shape requires InitMode.EAGER")
+
+        materializer = StoryMaterializer()
+        explicit_entry_templates = self._resolve_story_entry_templates()
+        seed_entry_templates = self._resolve_seed_entry_templates()
+        if init_mode is InitMode.LAZY and not seed_entry_templates:
+            raise ValueError("No entry templates resolved for story initialization")
+
+        graph = self._build_story_graph(
+            story_label=story_label,
+            init_mode=init_mode,
+            freeze_shape=freeze_shape,
+        )
+        if init_mode is InitMode.EAGER:
+            graph = super().materialize_graph(graph=graph)
+        else:
+            graph = super().materialize_seed_graph(
+                graph=graph,
+                template_groups=self._seed_template_groups(seed_entry_templates),
+            )
+
+        graph.rebuild_template_lineage(self.templates)
+        state = materializer.make_state(
+            graph=graph,
+            mode=init_mode,
+            template_registry=self.templates,
+            entry_template_ids=list(self.entry_template_ids),
+            source_map=dict(self.source_map),
+            codec_state=dict(self.codec_state),
+            codec_id=self.codec_id,
+            bundle_id=getattr(self.templates, "label", None),
+        )
+        materializer._run_topology_passes(state=state)
+        if init_mode is InitMode.EAGER:
+            materializer._run_prelink_passes(state=state)
+        materializer._recount_materialized(state=state)
+
+        self._apply_story_entry_ids(
+            graph=graph,
+            entry_templates=explicit_entry_templates,
+        )
+        result = materializer._build_story_init_result(state=state)
+
+        if namespace is not None:
+            override_uid = self._resolve_entry_override(result.graph, namespace)
+            if override_uid is not None:
+                result.graph.initial_cursor_id = override_uid
+                result.graph.initial_cursor_ids[:] = [override_uid]
+
+        return result
+
+    def _resolve_entry_override(
+        self,
+        graph: Any,
+        namespace: dict[str, Any],
+    ) -> Any | None:
+        """Return an optional init-time entry override for this world."""
+        _ = graph, namespace
+        return None
 
     @classmethod
     def from_script_data(
@@ -215,26 +541,16 @@ class World:
         resources: Any | None = None,
         story_info_projector: Any | None = None,
     ) -> "World":
+        from .builder import WorldBuilder
+
         compiler = compiler or StoryCompiler()
         bundle = compiler.compile(script_data)
-        return cls(
+        return WorldBuilder().build(
             label=script_data.get("label") or "story_world",
             bundle=bundle,
-            domain=domain,
-            templates=templates,
             assets=assets,
             resources=resources,
+            template_scope_provider=templates,
+            domain=domain,
             story_info_projector=story_info_projector,
         )
-
-    @classmethod
-    def get_instance(cls, label: str) -> "World | None":
-        return cls._instances.get(label)
-
-    @classmethod
-    def all_instances(cls) -> list["World"]:
-        return list(cls._instances.values())
-
-    @classmethod
-    def clear_instances(cls) -> None:
-        cls._instances.clear()

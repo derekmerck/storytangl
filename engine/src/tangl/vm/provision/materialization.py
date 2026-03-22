@@ -31,6 +31,10 @@ def resolve_story_materialize_hook(
             return meta_hook
 
     graph = getattr(_ctx, "graph", None)
+    factory = getattr(graph, "factory", None)
+    factory_hook = getattr(factory, "story_materialize_template", None)
+    if callable(factory_hook):
+        return factory_hook
     graph_hook = getattr(graph, "story_materialize", None)
     if callable(graph_hook):
         return graph_hook
@@ -52,6 +56,10 @@ def resolve_story_post_materialize_hook(
             return meta_hook
 
     graph = getattr(_ctx, "graph", None)
+    factory = getattr(graph, "factory", None)
+    factory_hook = getattr(factory, "story_post_materialize", None)
+    if callable(factory_hook):
+        return factory_hook
     graph_hook = getattr(graph, "story_post_materialize", None)
     if callable(graph_hook):
         return graph_hook
@@ -73,6 +81,10 @@ def resolve_story_preview_requirement_hook(
             return meta_hook
 
     graph = getattr(_ctx, "graph", None)
+    factory = getattr(graph, "factory", None)
+    factory_hook = getattr(factory, "preview_requirement_contract", None)
+    if callable(factory_hook):
+        return factory_hook
     graph_hook = getattr(graph, "story_preview_requirement", None)
     if callable(graph_hook):
         return graph_hook

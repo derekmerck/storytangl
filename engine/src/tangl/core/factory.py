@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Iterator
 
 from pydantic import Field
@@ -53,8 +54,11 @@ def _get_parent_by_templ(
     if ref_templ_parent is None:
         return None
     ref_templ_parent_hash = ref_templ_parent.content_hash()
+    matches = list(graph.find_all(Selector(templ_hash=ref_templ_parent_hash)))
+    if not matches:
+        return None
     return _resolve_single_match(
-        list(graph.find_all(Selector(templ_hash=ref_templ_parent_hash))),
+        matches,
         f"parent graph item for template {ref_templ_parent.get_label()!r}",
     )
 
@@ -209,7 +213,13 @@ class GraphFactory(Singleton):
                 )
         return ranked[0]
 
-    def materialize_graph(self, graph: Graph | None = None, **kwargs) -> Graph:
+    def materialize_graph(
+        self,
+        graph: Graph | None = None,
+        *,
+        template_groups: Iterable[object] | None = None,
+        **kwargs,
+    ) -> Graph:
         """Materialize a graph from already-resolved template topology.
 
         Assumptions
@@ -217,17 +227,22 @@ class GraphFactory(Singleton):
         - all template payloads already have the correct concrete kind;
         - container membership is already encoded in the template hierarchy;
         - edge refs are already canonicalized for deterministic lookup;
+        - any ``template_groups`` override provides ``find_all`` / ``find_one``
+          over an already-resolved template subset;
         - this method does not infer scope, compile policy, or token provision.
         """
         if graph is None:
             graph = self.graph_type(**kwargs)
         graph.bind_factory(self)
 
-        templ_regs = self._provide_templates()
+        templ_regs = list(template_groups) if template_groups is not None else self._provide_templates()
 
         for templs in templ_regs:
             for templ in templs.find_all(
-                Selector(predicate=lambda templ: isinstance(templ, TemplateGroup)),
+                Selector(
+                    predicate=lambda templ: isinstance(templ, TemplateGroup)
+                    and templ.has_payload_kind(GraphItem),
+                ),
                 sort_key=_template_depth,
             ):
                 group: GraphItem = templ.materialize()

@@ -103,8 +103,8 @@ tangl.story
 │                  → episode/menu_block.py   (MenuBlock: dynamic choice hub)
 └── Fabula         → fabula/
                    → fabula/compiler.py      (StoryCompiler → StoryTemplateBundle)
-                   → fabula/materializer.py  (StoryMaterializer → StoryGraph)
-                   → fabula/world.py         (World: entry point packaging bundle + facets)
+                   → fabula/materializer.py  (StoryMaterializer: story wiring and compat helpers)
+                   → fabula/world.py         (World: story authority and story-init owner)
                    → fabula/script_manager.py (ScriptManager: runtime template scope facade)
                    → fabula/types.py         (InitMode, InitReport, StoryInitResult, facet protocols)
 ```
@@ -172,10 +172,18 @@ resolver needs templates for a frontier node, `get_template_scope_groups(caller)
 returns templates from closest scope (the node's own template group) outward to
 the broadest scope (the full template registry).
 
-**World and factory back-pointers.** `world`, `factory`, and `script_manager` are
-non-serialized back-pointers set during materialization. They give runtime handlers
-access to world facets and the template registry without serializing compile-time
-structures into the runtime graph.
+**Delegated runtime helpers.** `script_manager`, `story_materialize`,
+`story_post_materialize`, and `story_preview_requirement` are now compatibility
+properties that delegate to the bound `World` by default. `StoryGraph` keeps
+only per-story-instance state and reconstructible lineage maps; world-owned
+authorities remain the canonical source of runtime hooks.
+
+**World and factory authority.** `StoryGraph.world` is now a compatibility
+property over the bound `factory` when that factory is a `World`. Runtime
+handlers reach world-owned helpers such as the script manager and story
+materialization hooks through that authority rather than through separately
+serialized graph fields. Persisted graphs rebuild lineage from `templ_hash`
+plus `world.templates` on restore when the runtime maps are absent.
 
 
 ### Context Protocol (`ctx.py`)
@@ -392,24 +400,24 @@ the materializer's lazy destination resolver can match against.
 
 #### StoryMaterializer → StoryGraph
 
-The materializer walks a compiled template registry and instantiates concrete
-runtime entities inside a `StoryGraph`. After the Wave 4 decomposition, it
-operates in five explicit passes:
+`World.create_story(...)` now owns graph creation directly by layering over
+`vm.TraversableGraphFactory`. `StoryMaterializer` remains as a helper surface
+for story-specific work:
 
-1. **Initialization** — create graph, set up story locals and factory back-pointers
-2. **Materialization** — walk template tree, create nodes and edges via shared
-   `materialize_template_entity` helpers
-3. **Topology** — wire scene contracts, role/setting dependencies, menu fanout,
-   actions, and media dependencies
-4. **Prelink** — resolve dependencies eagerly (in EAGER mode), verify traversal
-   contracts, promote hard errors
-5. **Result assembly** — package graph, entry IDs, and diagnostics into
-   `StoryInitResult`
+1. **Story topology** — wire scene contracts, role/setting dependencies, menu
+   fanout, actions, and media dependencies on top of lower-layer graph creation
+2. **Prelink** — resolve dependencies eagerly (in EAGER mode) and promote hard
+   errors after lower-layer traversal validation
+3. **Runtime hooks** — supply story-specific materialize/post-materialize and
+   preview logic for VM provisioning
+4. **Compatibility wrapper** — `StoryMaterializer.create_story(...)` delegates
+   to `World.create_story(...)`
 
 **InitMode controls materialization breadth.** `EAGER` materializes the full
-template registry, prelinks dependencies, and raises `GraphInitializationError`
-on unsatisfied hard requirements. `LAZY` materializes only entry templates and
-defers deeper graph expansion and dependency resolution to runtime planning.
+template registry through the bound factory, prelinks dependencies, and raises
+`GraphInitializationError` on unsatisfied hard requirements. `LAZY` seeds only
+the entry closure through `TraversableGraphFactory.materialize_seed_graph(...)`
+and defers deeper graph expansion and dependency resolution to runtime planning.
 EAGER is the default.
 
 **Runtime materialization contract (`InitMode.LAZY`, phase 1).** The supported
@@ -470,21 +478,27 @@ path, availability, and traversal coverage in the existing story/vm tests.
 
 #### World
 
-The primary external entry point. `World` packages a compiled bundle with optional
-facets (domain, templates, assets, resources) and exposes `create_story()`.
+The primary external entry point. `World` is the singleton story authority: it
+owns compiled story data, optional adjunct providers, and the public
+`create_story()` runtime-init surface.
 
-**World facets are protocol-typed.** `WorldDomainFacet`, `WorldTemplatesFacet`,
-`WorldAssetsFacet`, `WorldResourcesFacet` are `Protocol` types that world
-implementations can satisfy without inheriting from a specific base class. This
-keeps world plumbing decoupled from the engine.
+**Compatibility adjunct facets remain protocol-typed.** `WorldDomainFacet`,
+`WorldTemplatesFacet`, `WorldAssetsFacet`, and `WorldResourcesFacet` still
+document the optional adjunct shapes loader/service code may provide, but the
+runtime authority itself is now the concrete singleton `World`.
 
-**Process-local instance registry.** `World._instances` provides a lightweight
-`get_instance(label)` lookup so service controllers can find loaded worlds by
-label without a separate world-management service.
+**Factory-owned runtime creation.** `World.create_story()` constructs a
+`StoryGraph`, delegates generic topology creation to `TraversableGraphFactory`,
+then layers story topology and prelink policy on top. The compiled bundle
+remains attached as a compatibility artifact, but runtime creation reads direct
+world fields (`templates`, `locals`, `entry_template_ids`, `source_map`,
+`codec_state`, `codec_id`) instead of consulting the bundle as an active
+authority.
 
 #### ScriptManager
 
-Runtime template lookup facade. `ScriptManager` wraps a `TemplateRegistry` with
+Runtime template lookup facade. `ScriptManager` remains world-owned in this
+phase. It wraps a `TemplateRegistry` with
 `find_template` (single lookup by selector/uid/label/identifier) and
 `get_template_scope_groups` (lineage-ordered scope groups for provisioning).
 
