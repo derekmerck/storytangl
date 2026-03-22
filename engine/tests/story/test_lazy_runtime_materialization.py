@@ -317,7 +317,7 @@ def test_rebuild_runtime_materialization_state_prevents_duplicate_post_materiali
     graph.wired_node_ids.clear()
     graph.rebuild_runtime_materialization_state()
 
-    template = graph.script_manager.find_template("intro.middle")
+    template = graph.world.find_template("intro.middle")
     ctx = PhaseCtx(graph=graph, cursor_id=middle.uid)
     graph.story_post_materialize(
         template=template,

@@ -5,7 +5,6 @@ from typing import Any
 from tangl.core import BehaviorRegistry
 
 from .compiler import StoryTemplateBundle
-from .script_manager import ScriptManager
 from .world import World, _WorldDomainView
 
 
@@ -125,13 +124,6 @@ class WorldBuilder:
                 modules=world.modules,
                 authorities=list(world.get_authorities()),
                 story_info_projector=world.story_info_projector,
-            ),
-        )
-        world.force_set(
-            "script_manager",
-            ScriptManager(
-                template_registry=world.templates,
-                world_scope_provider=world._world_template_scope_groups,
             ),
         )
         return world

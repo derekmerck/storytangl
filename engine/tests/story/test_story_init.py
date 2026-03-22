@@ -118,7 +118,7 @@ def test_story_graph_roundtrip_preserves_world_factory_identity() -> None:
     assert "world" not in payload
     assert restored.factory is world
     assert restored.world is world
-    assert restored.script_manager is world.script_manager
+    assert restored.world.find_template("intro.start") is world.find_template("intro.start")
 
 
 @pytest.mark.parametrize("init_mode", [InitMode.LAZY, InitMode.EAGER])

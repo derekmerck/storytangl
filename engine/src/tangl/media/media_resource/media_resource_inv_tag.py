@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
-from tangl.core import ContentAddressable, RegistryAware
+from tangl.core import HasContent, RegistryAware
 from tangl.core.bases import Hash, is_identifier
 from tangl.media.media_data_type import MediaDataType
 from tangl.utils.hashing import compute_data_hash
@@ -49,7 +49,7 @@ class MediaPersistencePolicy(str, Enum):
     EXTERNAL_REFERENCE = "external_reference"
 
 
-class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
+class MediaResourceInventoryTag(RegistryAware, HasContent):
     """
     MediaResourceInventoryTags track data resources, in-mem or on disk.
 

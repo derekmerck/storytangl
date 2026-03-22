@@ -86,7 +86,6 @@ not the mechanisms themselves:
 tangl.story
 ├── Dispatch       → dispatch.py             (story_dispatch registry, on_journal, on_gather_ns, etc.)
 ├── Graph          → story_graph.py          (StoryGraph: runtime graph with story locals and authorities)
-├── Context        → ctx.py                  (StoryRuntimeCtx protocol)
 ├── Fragments      → fragments.py            (compatibility re-exports from `tangl.journal.fragments`)
 ├── Providers      → provider_collection.py  (collect_template_registries, collect_token_catalogs, etc.)
 ├── Handlers       → system_handlers.py      (APPLICATION-layer namespace, provisioning, and journal handlers)
@@ -103,10 +102,9 @@ tangl.story
 │                  → episode/menu_block.py   (MenuBlock: dynamic choice hub)
 └── Fabula         → fabula/
                    → fabula/compiler.py      (StoryCompiler → StoryTemplateBundle)
-                   → fabula/materializer.py  (StoryMaterializer: story wiring and compat helpers)
+                   → fabula/materializer.py  (StoryMaterializer: story-only wiring and prelink policy)
                    → fabula/world.py         (World: story authority and story-init owner)
-                   → fabula/script_manager.py (ScriptManager: runtime template scope facade)
-                   → fabula/types.py         (InitMode, InitReport, StoryInitResult, facet protocols)
+                   → fabula/types.py         (InitMode, InitReport, StoryInitResult)
 ```
 
 ---
@@ -138,17 +136,11 @@ register namespace contributors that expose resolved providers under their label
 System handlers contribute story and world locals. The assembled namespace is what
 `format_map` renders against in block content.
 
-**Legacy keyword normalization.** `_normalize_legacy_register_kwargs` translates
-v37 registration patterns (`caller=`, `is_instance=`, `handler_layer=`) to
-current vocabulary (`wants_caller_kind=`, `dispatch_layer=`). This enables
-gradual migration of handler registrations without a flag day.
-
-**Legacy sub-hook seam.** `on_gather_content` is a surviving sub-hook from the v37
-three-stage journal pipeline (gather-content / post-process-content / get-choices).
-The current pipeline uses prioritized `on_journal` handlers instead.
-`on_gather_content` has one active consumer (`mechanics.games.handlers`); the
-other two sub-hooks were removed (zero consumers). See `scratch/legacy` for the
-v37 pipeline if the full collect/enrich/compose decomposition is needed later.
+**Direct registration surface.** Story journal and namespace handlers now register
+directly on the shared story dispatch registry. The retired legacy keyword
+normalization and sub-hook seams were removed in favor of one explicit journal
+pipeline: raw `on_journal` emission followed by optional `on_compose_journal`
+rewrites.
 
 
 ### StoryGraph (`story_graph.py`)
@@ -172,36 +164,23 @@ resolver needs templates for a frontier node, `get_template_scope_groups(caller)
 returns templates from closest scope (the node's own template group) outward to
 the broadest scope (the full template registry).
 
-**Delegated runtime helpers.** `script_manager`, `story_materialize`,
-`story_post_materialize`, and `story_preview_requirement` are now compatibility
-properties that delegate to the bound `World` by default. `StoryGraph` keeps
-only per-story-instance state and reconstructible lineage maps; world-owned
-authorities remain the canonical source of runtime hooks.
+**Delegated runtime helpers.** `story_materialize`, `story_post_materialize`,
+and `story_preview_requirement` delegate to the bound `World` by default.
+`StoryGraph` keeps only per-story-instance state and reconstructible lineage
+maps; world-owned authorities remain the canonical source of runtime hooks.
 
-**World and factory authority.** `StoryGraph.world` is now a compatibility
-property over the bound `factory` when that factory is a `World`. Runtime
-handlers reach world-owned helpers such as the script manager and story
-materialization hooks through that authority rather than through separately
-serialized graph fields. Persisted graphs rebuild lineage from `templ_hash`
-plus `world.templates` on restore when the runtime maps are absent.
+**World and factory authority.** `StoryGraph.world` is a compatibility property
+over the bound `factory` when that factory is a `World`. Persisted graphs rebuild
+lineage from `templ_hash` plus `world.templates` on restore when the runtime maps
+are absent.
 
 
-### Context Protocol (`ctx.py`)
+### Runtime Context
 
-`StoryRuntimeCtx` is a structural `Protocol` extending `VmResolverCtx` with
-story-specific accessors. It documents the minimal contract story helpers and
-handlers need from a runtime context without coupling to one concrete context
-implementation.
-
-**Progressive protocol layering.** Core expects `get_authorities()` and
-`get_inline_behaviors()`. VM extends with graph access, namespace caching, and
-seeded randomness. Story extends further with `get_story_locals()`,
-`get_location_entity_groups()`, and `get_template_scope_groups()`. Each layer
-defines what it minimally expects. The runtime `PhaseCtx` satisfies all layers.
-Story's `_PrelinkCtx` intentionally stays smaller and story-specific, but it can
-explicitly derive a child `PhaseCtx` when resolver-driven nested validation needs
-the full runtime surface. Story code should use that explicit derivation seam
-rather than manually copying context fields.
+Story runtime helpers use the VM's canonical `PhaseCtx` directly. Nested preview
+and validation paths derive child contexts through `PhaseCtx.derive(...)` or
+build fresh `PhaseCtx` instances with explicit metadata instead of carrying a
+second story-only runtime context type.
 
 
 ### Fragments (`fragments.py`)
@@ -253,11 +232,9 @@ The handlers divide into three domains:
 world locals, resolved roles, and resolved settings into the assembled scoped
 namespaces that block content renders against.
 
-**Provisioning discovery.** `on_get_template_scope_groups`,
-`on_get_token_catalogs`, and `on_get_media_inventories` handlers delegate to
-`provider_collection` helpers, collecting templates, token catalogs, and media
-inventories from graph, world, and domain facets. The `on_provision` handler
-invokes the resolver for each frontier node's dependencies.
+**Provisioning.** The `on_provision` handler invokes the resolver for each
+frontier node's dependencies. Resolver search spaces come from the world/factory
+authority chain through `PhaseCtx`, not from story-owned VM discovery hooks.
 
 **Journal emission.** `on_journal` handlers at EARLY, NORMAL, and LATE priorities
 produce content, media, and choice fragments respectively. The `on_compose_journal`
@@ -482,10 +459,9 @@ The primary external entry point. `World` is the singleton story authority: it
 owns compiled story data, optional adjunct providers, and the public
 `create_story()` runtime-init surface.
 
-**Compatibility adjunct facets remain protocol-typed.** `WorldDomainFacet`,
-`WorldTemplatesFacet`, `WorldAssetsFacet`, and `WorldResourcesFacet` still
-document the optional adjunct shapes loader/service code may provide, but the
-runtime authority itself is now the concrete singleton `World`.
+**World is the runtime authority.** Optional adjunct providers may still be
+passed into `WorldBuilder`, but the runtime authority is the concrete singleton
+`World`, not a set of exported facet protocols.
 
 **Factory-owned runtime creation.** `World.create_story()` constructs a
 `StoryGraph`, delegates generic topology creation to `TraversableGraphFactory`,
@@ -495,12 +471,12 @@ world fields (`templates`, `locals`, `entry_template_ids`, `source_map`,
 `codec_state`, `codec_id`) instead of consulting the bundle as an active
 authority.
 
-#### ScriptManager
+#### Template Lookup
 
-Runtime template lookup facade. `ScriptManager` remains world-owned in this
-phase. It wraps a `TemplateRegistry` with
-`find_template` (single lookup by selector/uid/label/identifier) and
-`get_template_scope_groups` (lineage-ordered scope groups for provisioning).
+Runtime template lookup is world-owned. `World.find_template(...)`,
+`World.find_templates(...)`, and `StoryGraph.get_template_scope_groups(...)`
+cover the runtime lookup surface directly without a separate world-owned script
+manager object.
 
 ---
 

@@ -19,7 +19,6 @@ from tangl.vm.traversable import TraversableEdge, TraversableNode
 
 from .causality import CausalityMode
 from .frame import Frame, PhaseCtx, StepTrace
-from ..fragments import Fragment
 from ..replay import (
     CausalityTransitionRecord,
     CheckpointRecord,
@@ -433,9 +432,9 @@ class Ledger(Entity):
         self._commit_frame_choice(frame=frame)
 
     @staticmethod
-    def _coerce_fragment_record(record: Any) -> Fragment | BaseFragment | None:
-        """Normalize mixed fragment record shapes into vm fragments."""
-        if isinstance(record, (Fragment, BaseFragment)):
+    def _coerce_fragment_record(record: Any) -> BaseFragment | None:
+        """Normalize mixed fragment record shapes into the canonical fragment base."""
+        if isinstance(record, BaseFragment):
             return record
         fragment_type = getattr(record, "fragment_type", None)
         if fragment_type is None:
@@ -449,11 +448,11 @@ class Ledger(Entity):
         for key in ("content", "text", "source_id", "edge_id", "available", "unavailable_reason"):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
-        return Fragment(**payload)
+        return BaseFragment(**payload)
 
-    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[Fragment | BaseFragment]:
+    def get_journal(self, *, since_step: int = 0, limit: int = 0) -> list[BaseFragment]:
         """Return output fragments in chronological order, optionally filtered."""
-        fragments: list[Fragment | BaseFragment] = []
+        fragments: list[BaseFragment] = []
 
         for record in self.output_stream.values():
             fragment = self._coerce_fragment_record(record)

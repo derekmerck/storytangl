@@ -24,12 +24,7 @@ Conceptual layers
    - :class:`World` is the singleton story authority over runtime graph
      creation and exposes :meth:`World.create_story`.
 
-4. Runtime script lookup
-
-   - :class:`ScriptManager` resolves lineage-aware template scope groups for
-     runtime provisioning.
-
-5. Init result types
+4. Init result types
 
    - :class:`InitMode`, :class:`InitReport`, and :class:`StoryInitResult`
      describe materialization depth, diagnostics, and final outputs.
@@ -45,7 +40,6 @@ factored into :class:`StoryMaterializer`.
 from .compiler import StoryCompiler, StoryTemplateBundle
 from .builder import WorldBuilder
 from .materializer import StoryMaterializer
-from .script_manager import ScriptManager
 from .types import (
     AuthoredRef,
     CompileIssue,
@@ -57,10 +51,6 @@ from .types import (
     ResolutionFailureReason,
     StoryInitResult,
     UnresolvedDependency,
-    WorldAssetsFacet,
-    WorldDomainFacet,
-    WorldResourcesFacet,
-    WorldTemplatesFacet,
 )
 from .world import World
 
@@ -73,16 +63,11 @@ __all__ = [
     "InitReport",
     "ResolutionError",
     "ResolutionFailureReason",
-    "ScriptManager",
     "StoryCompiler",
     "StoryInitResult",
     "StoryMaterializer",
     "StoryTemplateBundle",
     "UnresolvedDependency",
-    "WorldAssetsFacet",
     "WorldBuilder",
-    "WorldDomainFacet",
-    "WorldResourcesFacet",
-    "WorldTemplatesFacet",
     "World",
 ]

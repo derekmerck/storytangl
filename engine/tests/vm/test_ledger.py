@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 
 from tangl.core import EntityTemplate, Graph, Selector, Snapshot, TemplateRegistry
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.journal.media import MediaFragment as JournalMediaFragment
 from tangl.media.media_data_type import MediaDataType
 from tangl.vm import TraversableGraphFactory
@@ -29,7 +30,6 @@ from tangl.vm.traversable import (
     TraversableEdge,
     TraversableNode,
 )
-from tangl.vm.fragments import ChoiceFragment, ContentFragment
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:

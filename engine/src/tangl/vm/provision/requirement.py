@@ -11,7 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
-from ..ctx import VmRequirementStampCtx
+from ..ctx import VmPhaseCtx
 from .provisioner import ProvisionPolicy
 
 PT = TypeVar('PT', bound=RegistryAware)  # 'ProviderType'
@@ -134,7 +134,7 @@ class Requirement(Selector, Generic[PT]):
 def stamp_requirement_resolution(
     requirement: Requirement[Any],
     *,
-    _ctx: VmRequirementStampCtx | None = None,
+    _ctx: VmPhaseCtx | None = None,
 ) -> None:
     """Write shared step/cursor resolution metadata from a typed runtime context."""
     if _ctx is None:

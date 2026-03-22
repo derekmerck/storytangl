@@ -98,10 +98,6 @@ from .dispatch import on_init, on_create, on_add_item, on_get_item, on_remove_it
 
 from .ctx import CoreCtx, Ctx, DispatchCtx, get_ctx, resolve_ctx, using_ctx
 
-# Legacy-compatible aliases retained during namespace cutover.
-# ContentAddressable: used by tangl.media.media_resource.media_resource_inv_tag
-ContentAddressable = HasContent
-
 
 def _alias_legacy_module(alias: str, target: str) -> None:
     """Map legacy deep-import module paths to canonical flat modules."""

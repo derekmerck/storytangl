@@ -11,12 +11,11 @@ from tangl.core import (
     Priority,
     RegistryAware,
     TemplateRegistry,
-    resolve_ctx,
     Node,
     Selector,
 )
-from ..dispatch import do_get_media_inventories, do_get_token_catalogs, on_provision
-from ..ctx import VmDerivedPhaseCtx, VmResolverCtx
+from ..dispatch import on_provision
+from ..ctx import VmPhaseCtx
 from ..traversable import TraversableNode
 from .materialization import (
     MaterializeRole,
@@ -130,26 +129,17 @@ class Resolver:
         if not self.template_scope_groups and self.template_groups:
             self.template_scope_groups = self.template_groups
 
-    @staticmethod
-    def _ctx_location_entity_groups(ctx) -> Iterable[Iterable[Any]]:
-        getter = getattr(ctx, "get_location_entity_groups", None)
-        if callable(getter):
-            return getter()
-        raise TypeError("Resolver context must provide get_location_entity_groups()")
-
-    @staticmethod
-    def _ctx_template_scope_groups(ctx) -> Iterable[TemplateRegistry]:
-        getter = getattr(ctx, "get_template_scope_groups", None)
-        if callable(getter):
-            return getter()
-        raise TypeError("Resolver context must provide get_template_scope_groups()")
-
     @classmethod
-    def from_ctx(cls, ctx: VmResolverCtx) -> Self:
+    def from_ctx(cls, ctx: VmPhaseCtx) -> Self:
         """Build a resolver from the entity and template groups exposed by ``ctx``."""
+        if not isinstance(ctx, VmPhaseCtx):
+            raise TypeError(
+                "Resolver.from_ctx() requires a VmPhaseCtx with "
+                "get_location_entity_groups() and get_template_scope_groups()",
+            )
         return cls(
-            location_entity_groups=cls._ctx_location_entity_groups(ctx),
-            template_scope_groups=cls._ctx_template_scope_groups(ctx),
+            location_entity_groups=ctx.get_location_entity_groups(),
+            template_scope_groups=ctx.get_template_scope_groups(),
         )
 
     @staticmethod
@@ -167,24 +157,16 @@ class Resolver:
         return isinstance(kind, type) and issubclass(kind, TraversableNode)
 
     @staticmethod
-    def _request_ctx_path(_ctx: Any) -> str:
-        _ctx = resolve_ctx(_ctx)
+    def _request_ctx_path(_ctx: VmPhaseCtx | None) -> str:
         if _ctx is None:
             return ""
 
-        meta = getattr(_ctx, "meta", None)
-        if isinstance(meta, dict):
-            request_ctx_path = meta.get("request_ctx_path")
-            if isinstance(request_ctx_path, str) and request_ctx_path:
-                return request_ctx_path
+        meta = dict(_ctx.meta or {})
+        request_ctx_path = meta.get("request_ctx_path")
+        if isinstance(request_ctx_path, str) and request_ctx_path:
+            return request_ctx_path
 
-        cursor = getattr(_ctx, "cursor", None)
-        if cursor is None:
-            graph = getattr(_ctx, "graph", None)
-            cursor_id = getattr(_ctx, "cursor_id", None)
-            if graph is not None and cursor_id is not None and hasattr(graph, "get"):
-                cursor = graph.get(cursor_id)
-
+        cursor = _ctx.cursor
         if cursor is None:
             return ""
         path = getattr(cursor, "path", None)
@@ -196,35 +178,34 @@ class Resolver:
         return ""
 
     @staticmethod
-    def _ctx_causality_mode(_ctx: Any) -> Any | None:
+    def _ctx_causality_mode(_ctx: VmPhaseCtx | None) -> Any | None:
+        if _ctx is None:
+            return None
         mode = getattr(_ctx, "causality_mode", None)
         if mode is not None:
             return mode
 
-        meta = getattr(_ctx, "meta", None)
-        if isinstance(meta, dict) and "causality_mode" in meta:
+        meta = dict(_ctx.meta or {})
+        if "causality_mode" in meta:
             return meta["causality_mode"]
         return None
 
     @classmethod
-    def _stubs_allowed(cls, *, allow_stubs: bool, _ctx: Any = None) -> bool:
+    def _stubs_allowed(cls, *, allow_stubs: bool, _ctx: VmPhaseCtx | None = None) -> bool:
         if allow_stubs:
             return True
         mode = cls._ctx_causality_mode(_ctx)
         if mode is None:
             return False
-        try:
-            from tangl.vm.runtime import CausalityMode
+        from tangl.vm.runtime import CausalityMode
 
-            return mode == CausalityMode.HARD_DIRTY
-        except Exception:
-            return str(mode) == "hard_dirty"
+        return mode == CausalityMode.HARD_DIRTY
 
     @staticmethod
     def _materialize_node(
         template: EntityTemplate,
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
         role: MaterializeRole | str = MaterializeRole.PROVISION_LEAF,
         story_materialize: Any = None,
     ) -> Entity:
@@ -235,7 +216,12 @@ class Resolver:
             story_materialize=story_materialize,
         )
 
-    def _resolve_target_path_for_requirement(self, requirement: Requirement, *, _ctx: Any = None) -> str | None:
+    def _resolve_target_path_for_requirement(
+        self,
+        requirement: Requirement,
+        *,
+        _ctx: VmPhaseCtx | None = None,
+    ) -> str | None:
         return resolve_target_path(
             identifier=self._selector_identifier(requirement),
             request_ctx=self._request_ctx_path(_ctx),
@@ -248,10 +234,10 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         request_ctx = self._request_ctx_path(_ctx)
-        graph = getattr(_ctx, "graph", None)
+        graph = _ctx.graph if _ctx is not None else None
         story_materialize = resolve_story_materialize_hook(_ctx)
 
         provisioner = TemplateProvisioner(
@@ -267,18 +253,12 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
-        _ctx = resolve_ctx(_ctx)
         if _ctx is None:
             return []
 
-        caller = getattr(_ctx, "cursor", None)
-        catalogs = do_get_token_catalogs(
-            caller,
-            requirement=requirement,
-            ctx=_ctx,
-        )
+        catalogs = list(_ctx.get_token_catalogs(requirement=requirement))
         if not catalogs:
             return []
         return list(TokenProvisioner(catalogs=catalogs).get_dependency_offers(requirement))
@@ -287,18 +267,12 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
-        _ctx = resolve_ctx(_ctx)
         if _ctx is None:
             return []
 
-        caller = getattr(_ctx, "cursor", None)
-        inventories = do_get_media_inventories(
-            caller,
-            requirement=requirement,
-            ctx=_ctx,
-        )
+        inventories = list(_ctx.get_media_inventories(requirement=requirement))
         if not inventories:
             return []
 
@@ -310,14 +284,12 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
-        _ctx = resolve_ctx(_ctx)
-
         from tangl.media.media_resource.media_provisioning import MediaSpecProvisioner
 
         return list(
-            MediaSpecProvisioner(graph=getattr(_ctx, "graph", None)).get_dependency_offers(
+            MediaSpecProvisioner(graph=_ctx.graph if _ctx is not None else None).get_dependency_offers(
                 requirement,
                 _ctx=_ctx,
             )
@@ -328,7 +300,7 @@ class Resolver:
         requirement: Requirement[PT],
         *,
         allow_stubs: bool = False,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         """Return template-only dependency offers using resolver matching semantics."""
         offers = self._template_offers_for_requirement(requirement, _ctx=_ctx)
@@ -366,7 +338,7 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         return list(
             InlineTemplateProvisioner(
@@ -380,7 +352,7 @@ class Resolver:
         requirement: Requirement[PT],
         *,
         preferred_offers: Iterable[ProvisionOffer] = (),
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         offers: list[ProvisionOffer] = list(preferred_offers or [])
         offers.extend(self._existing_offers_for_requirement(requirement))
@@ -396,7 +368,7 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         offers = self._existing_offers_for_requirement(requirement)
         offers.extend(self._template_offers_for_requirement(requirement, _ctx=_ctx))
@@ -407,9 +379,8 @@ class Resolver:
         requirement: Requirement[PT],
         offers: list[ProvisionOffer],
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
-        _ctx = resolve_ctx(_ctx)
         if _ctx is None:
             return offers
 
@@ -438,7 +409,7 @@ class Resolver:
         offers: list[ProvisionOffer],
         *,
         allow_stubs: bool = False,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         stubs_allowed = self._stubs_allowed(allow_stubs=allow_stubs, _ctx=_ctx)
 
@@ -1083,13 +1054,12 @@ class Resolver:
         return None
 
     @staticmethod
-    def _derive_phase_ctx_source(_ctx: Any) -> VmDerivedPhaseCtx:
-        resolved = resolve_ctx(_ctx)
-        if resolved is None or not isinstance(resolved, VmDerivedPhaseCtx):
+    def _derive_phase_ctx_source(_ctx: VmPhaseCtx | None) -> VmPhaseCtx:
+        if _ctx is None or not callable(getattr(_ctx, "derive", None)):
             raise TypeError(
                 "Nested runtime validation requires a typed context with derive()",
             )
-        return resolved
+        return _ctx
 
     def _make_node_ctx(
         self,

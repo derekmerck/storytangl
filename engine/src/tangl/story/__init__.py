@@ -16,9 +16,6 @@ Conceptual layers
      as a helper behind :class:`World`.
    - :class:`World` is the singleton story authority and main external entry
      point for creating story runs.
-   - :class:`ScriptManager` resolves template lookups across lineage-aware
-     scope groups.
-
 2. Episode vocabulary
 
    - :class:`Block` is the primary interactive cursor node.
@@ -38,8 +35,6 @@ Conceptual layers
 
    - :class:`StoryGraph` carries story locals, template lineage, and a
      compatibility world alias over its bound factory for runtime resolution.
-   - :class:`StoryRuntimeCtx` defines the context accessors expected by story
-     runtime helpers.
    - :class:`ContentFragment`, :class:`ChoiceFragment`, and
      :class:`MediaFragment` are re-exported journal output types.
 
@@ -76,23 +71,17 @@ from .fabula import (
     InitReport,
     ResolutionError,
     ResolutionFailureReason,
-    ScriptManager,
     StoryCompiler,
     StoryInitResult,
     StoryMaterializer,
     StoryTemplateBundle,
     UnresolvedDependency,
-    WorldAssetsFacet,
     WorldBuilder,
-    WorldDomainFacet,
-    WorldResourcesFacet,
-    WorldTemplatesFacet,
     World,
 )
 from .story_graph import StoryGraph
 from .dispatch import on_compose_journal, on_gather_ns, on_journal, story_dispatch
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
-from .ctx import StoryRuntimeCtx
 
 # Register story-level journal handlers.
 from . import system_handlers  # noqa: F401
@@ -115,22 +104,16 @@ __all__ = [
     "MenuBlock",
     "ResolutionError",
     "ResolutionFailureReason",
-    "ScriptManager",
     "Role",
     "Scene",
     "Setting",
-    "StoryRuntimeCtx",
     "StoryCompiler",
     "StoryGraph",
     "StoryInitResult",
     "StoryMaterializer",
     "StoryTemplateBundle",
     "UnresolvedDependency",
-    "WorldAssetsFacet",
     "WorldBuilder",
-    "WorldDomainFacet",
-    "WorldResourcesFacet",
-    "WorldTemplatesFacet",
     "World",
     "get_narrator_key",
     "on_compose_journal",

@@ -415,7 +415,9 @@ class DomainCharacter(Entity):
     assert world_one.domain_manager is world_two.domain_manager
     assert world_one.resource_manager is world_two.resource_manager
     assert world_one.asset_manager is not world_two.asset_manager
-    assert world_one.script_manager is not world_two.script_manager
+    assert not hasattr(world_one, "script_manager")
+    assert not hasattr(world_two, "script_manager")
+    assert world_one.templates is not world_two.templates
 
     assert "DomainCharacter" in world_one.domain_manager.class_registry
     assert world_one.metadata["author"] == "Steve"
@@ -491,9 +493,11 @@ class DomainCharacter(Entity):
     assert world_one.domain is world_two.domain
     assert world_one.assets is world_two.assets
     assert world_one.resources is world_two.resources
-    assert world_one.script_manager is not world_two.script_manager
+    assert not hasattr(world_one, "script_manager")
+    assert not hasattr(world_two, "script_manager")
     assert world_one.templates is world_one.bundle.template_registry
     assert world_two.templates is world_two.bundle.template_registry
+    assert world_one.templates is not world_two.templates
     assert "DomainCharacter" in world_one.domain.class_registry
     assert world_one.domain.dispatch_registry in world_one.get_authorities()
 

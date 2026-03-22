@@ -37,7 +37,7 @@ from collections import ChainMap
 from collections.abc import Iterable as IterableABC, Mapping
 from typing import Any, Callable, Iterable, TYPE_CHECKING
 
-from tangl.core import BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record, Selector
+from tangl.core import BaseFragment, BehaviorRegistry, CallReceipt, DispatchLayer, Node, Record, Selector
 if TYPE_CHECKING:
     from tangl.core import TemplateRegistry
     from tangl.core.token import TokenCatalog
@@ -62,10 +62,6 @@ dispatch = BehaviorRegistry(
 All ``on_*`` registrations go here.  ``do_*`` functions include this registry
 automatically alongside any registries provided by the dispatch context.
 """
-
-# Legacy compatibility alias retained during namespace cutover.
-vm_dispatch = dispatch
-
 
 # ---------------------------------------------------------------------------
 # Hook generation helpers
@@ -138,9 +134,6 @@ def _assert_redirect_result(value, *, task: str):
 
 
 def _assert_fragment_result(value, *, task: str):
-    from tangl.core import BaseFragment
-    from .fragments import Fragment
-
     def _coerce_fragment(item):
         if isinstance(item, (Record, BaseFragment)):
             return item
@@ -152,7 +145,7 @@ def _assert_fragment_result(value, *, task: str):
             for key in ("content", "text", "source_id", "edge_id", "available", "unavailable_reason"):
                 if hasattr(item, key):
                     payload[key] = getattr(item, key)
-            return Fragment(**payload)
+            return BaseFragment(**payload)
         return None
 
     if value is None:
@@ -300,27 +293,6 @@ def on_gather_ns(func=None, **kwargs):
     return dispatch.register(func=func, task="gather_ns", **kwargs)
 
 
-def on_get_template_scope_groups(func=None, **kwargs):
-    """Register a template-scope discovery contributor."""
-    if func is None:
-        return lambda f: dispatch.register(func=f, task="get_template_scope_groups", **kwargs)
-    return dispatch.register(func=func, task="get_template_scope_groups", **kwargs)
-
-
-def on_get_token_catalogs(func=None, **kwargs):
-    """Register a token-catalog discovery contributor."""
-    if func is None:
-        return lambda f: dispatch.register(func=f, task="get_token_catalogs", **kwargs)
-    return dispatch.register(func=func, task="get_token_catalogs", **kwargs)
-
-
-def on_get_media_inventories(func=None, **kwargs):
-    """Register a media-inventory discovery contributor."""
-    if func is None:
-        return lambda f: dispatch.register(func=f, task="get_media_inventories", **kwargs)
-    return dispatch.register(func=func, task="get_media_inventories", **kwargs)
-
-
 def _coerce_ns_layers(value: Any, *, source: str) -> list[Mapping[str, Any]]:
     if value is None:
         return []
@@ -335,103 +307,6 @@ def _coerce_ns_layers(value: Any, *, source: str) -> list[Mapping[str, Any]]:
     if isinstance(value, Mapping):
         return [value] if value else []
     raise TypeError(f"{source} must return Mapping | ChainMap | None, got {type(value)!r}")
-
-
-def _coerce_template_registries(value: Any, *, source: str) -> list["TemplateRegistry"]:
-    from tangl.core import TemplateRegistry as _TemplateRegistry
-
-    if value is None:
-        return []
-
-    if isinstance(value, _TemplateRegistry):
-        raw = [value]
-    elif isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
-        raise TypeError(
-            f"{source} must return TemplateRegistry | Iterable[TemplateRegistry] | None, got {type(value)!r}"
-        )
-    else:
-        raw = list(value)
-
-    registries: list[_TemplateRegistry] = []
-    seen_registry_ids: set[int] = set()
-    for item in raw:
-        if item is None:
-            continue
-        if not isinstance(item, _TemplateRegistry):
-            raise TypeError(
-                "get_template_scope_groups handlers must return TemplateRegistry entries only"
-            )
-        item_id = id(item)
-        if item_id in seen_registry_ids:
-            continue
-        seen_registry_ids.add(item_id)
-        registries.append(item)
-    return registries
-
-
-def _coerce_token_catalogs(value: Any, *, source: str) -> list["TokenCatalog"]:
-    from tangl.core.token import TokenCatalog as _TokenCatalog
-
-    if value is None:
-        return []
-
-    if isinstance(value, _TokenCatalog):
-        raw = [value]
-    elif isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
-        raise TypeError(
-            f"{source} must return TokenCatalog | Iterable[TokenCatalog] | None, got {type(value)!r}"
-        )
-    else:
-        raw = list(value)
-
-    catalogs: list[_TokenCatalog] = []
-    seen_wrapped: set[int] = set()
-    for item in raw:
-        if item is None:
-            continue
-        if not isinstance(item, _TokenCatalog):
-            raise TypeError(
-                "get_token_catalogs handlers must return TokenCatalog entries only"
-            )
-        wrapped_cls = getattr(item, "wst", None)
-        wrapped_id = id(wrapped_cls)
-        if wrapped_id in seen_wrapped:
-            continue
-        seen_wrapped.add(wrapped_id)
-        catalogs.append(item)
-    return catalogs
-
-
-def _coerce_media_inventories(value: Any, *, source: str) -> list["MediaInventory"]:
-    from tangl.media.media_resource import MediaInventory as _MediaInventory
-
-    if value is None:
-        return []
-
-    if isinstance(value, _MediaInventory):
-        raw = [value]
-    elif isinstance(value, (str, bytes, dict)) or not isinstance(value, IterableABC):
-        raise TypeError(
-            f"{source} must return MediaInventory | Iterable[MediaInventory] | None, got {type(value)!r}"
-        )
-    else:
-        raw = list(value)
-
-    inventories: list[_MediaInventory] = []
-    seen_registry_ids: set[int] = set()
-    for item in raw:
-        if item is None:
-            continue
-        if not isinstance(item, _MediaInventory):
-            raise TypeError(
-                "get_media_inventories handlers must return MediaInventory entries only"
-            )
-        registry_id = id(item.registry)
-        if registry_id in seen_registry_ids:
-            continue
-        seen_registry_ids.add(registry_id)
-        inventories.append(item)
-    return inventories
 
 
 def _merge_nested_layers(
@@ -497,74 +372,6 @@ def do_gather_ns(node: Node, *, ctx) -> ChainMap[str, Any]:
     return ChainMap(*layers) if layers else ChainMap()
 
 
-def do_get_template_scope_groups(caller, *, ctx) -> list["TemplateRegistry"]:
-    """Execute template-scope discovery handlers and return merged registries."""
-    _validate_dispatch_ctx(ctx)
-    with _subdispatch_context(ctx) as subctx:
-        receipts = _materialize_receipts(
-            dispatch.execute_all(
-                task="get_template_scope_groups",
-                call_kwargs={"caller": caller},
-                ctx=subctx,
-                selector=Selector(caller_kind=type(caller)),
-            ),
-            ctx=subctx,
-        )
-        merged = CallReceipt.merge_results(*receipts)
-    return _coerce_template_registries(
-        merged,
-        source="get_template_scope_groups handler",
-    )
-
-
-def do_get_token_catalogs(
-    caller,
-    *,
-    requirement: "Requirement" | None = None,
-    ctx,
-) -> list["TokenCatalog"]:
-    """Execute token-catalog discovery handlers and return deduped catalogs."""
-    _validate_dispatch_ctx(ctx)
-
-    selector = Selector(caller_kind=type(caller)) if caller is not None else None
-    with _subdispatch_context(ctx) as subctx:
-        receipts = _materialize_receipts(
-            dispatch.execute_all(
-                task="get_token_catalogs",
-                call_kwargs={"caller": caller, "requirement": requirement},
-                ctx=subctx,
-                selector=selector,
-            ),
-            ctx=subctx,
-        )
-        merged = CallReceipt.merge_results(*receipts)
-    return _coerce_token_catalogs(merged, source="get_token_catalogs handler")
-
-
-def do_get_media_inventories(
-    caller,
-    *,
-    requirement: "Requirement" | None = None,
-    ctx,
-) -> list["MediaInventory"]:
-    """Execute media-inventory discovery handlers and return deduped inventories."""
-    _validate_dispatch_ctx(ctx)
-
-    selector = Selector(caller_kind=type(caller)) if caller is not None else None
-    with _subdispatch_context(ctx) as subctx:
-        receipts = _materialize_receipts(
-            dispatch.execute_all(
-                task="get_media_inventories",
-                call_kwargs={"caller": caller, "requirement": requirement},
-                ctx=subctx,
-                selector=selector,
-            ),
-            ctx=subctx,
-        )
-        merged = CallReceipt.merge_results(*receipts)
-    return _coerce_media_inventories(merged, source="get_media_inventories handler")
-
-
 # ---------------------------------------------------------------------------
 # Provisioning hook (separate — different call signature)
 # ---------------------------------------------------------------------------
@@ -619,7 +426,6 @@ def do_resolve(requirement: Requirement, *, offers: Iterable[ProvisionOffer], ct
 
 __all__ = [
     "dispatch",
-    "vm_dispatch",
     # phase decos and invocation
     "on_validate", "do_validate",
     "on_provision", "do_provision",
@@ -631,8 +437,5 @@ __all__ = [
     "on_postreqs", "do_postreqs",
     # helper decos and invocation
     "on_gather_ns", "do_gather_ns",
-    "on_get_template_scope_groups", "do_get_template_scope_groups",
-    "on_get_token_catalogs", "do_get_token_catalogs",
-    "on_get_media_inventories", "do_get_media_inventories",
     "on_resolve", "do_resolve",
 ]

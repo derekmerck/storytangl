@@ -3,10 +3,8 @@ from __future__ import annotations
 """VM phase handlers for game mechanics integration."""
 
 import logging
-from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
-from tangl.core import CallReceipt, Selector
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
     ResolutionPhase as P,
@@ -17,9 +15,7 @@ from tangl.vm import (
     on_provision,
     on_update,
 )
-from tangl.vm.dispatch import vm_dispatch
-from tangl.core.behavior import Priority as Prio
-from tangl.story.dispatch import on_gather_content
+from tangl.vm.dispatch import dispatch as vm_dispatch
 
 from .has_game import HasGame
 
@@ -362,49 +358,3 @@ def inject_game_context(
         "game_draw": cursor.game.result == GameResult.DRAW,
         "game_in_progress": cursor.game.result == GameResult.IN_PROCESS,
     }
-
-
-@on_gather_content(caller=HasGame, priority=Prio.FIRST)
-def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
-    """
-    Generate game journal content via ``generate_journal`` subdispatch.
-
-    Runs with FIRST priority so blocks embedding games prefer the game's
-    generated journal content over inline block content. Returns either a
-    string (for post-processing) or a list of fragments produced by
-    ``generate_journal`` handlers.
-    """
-
-    if not isinstance(cursor, HasGame):
-        return None
-
-    game = getattr(cursor, "game", None)
-    if game is None:
-        return None
-
-    with_subdispatch = getattr(ctx, "with_subdispatch", None)
-    subdispatch = with_subdispatch() if callable(with_subdispatch) else nullcontext(ctx)
-    with subdispatch:
-        game_receipts = vm_dispatch.dispatch(
-            caller=game,
-            task="generate_journal",
-            ctx=ctx,
-        )
-
-    content = CallReceipt.first_result(*game_receipts)
-
-    if content:
-        return content
-
-    # Fallback: custom game journal handlers may register on the VM
-    # phase bus during migration away from legacy vm_dispatch tasks.
-    vm_receipts = list(
-        vm_dispatch.execute_all(
-            task="generate_journal",
-            call_kwargs={"caller": game},
-            ctx=ctx,
-            selector=Selector(caller_kind=type(game)),
-        )
-    )
-    vm_content = CallReceipt.first_result(*vm_receipts)
-    return vm_content if vm_content else None

@@ -5,11 +5,9 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from tangl.core import EntityTemplate, GraphFactory, GraphItem, Selector, TemplateRegistry
-from tangl.core.ctx import CoreCtx
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
-from tangl.vm.dispatch import do_gather_ns
-from tangl.vm.ctx import VmRequirementStampCtx
+from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm import (
     Affordance,
@@ -22,7 +20,6 @@ from tangl.vm import (
     Resolver,
     TraversableNode,
     assert_traversal_contracts,
-    do_get_template_scope_groups,
 )
 from tangl.vm.provision import MaterializeRole, attach_child, materialize_template_entity
 from tangl.vm.provision.provisioner import _next_provision_uid
@@ -53,106 +50,6 @@ class _MaterializationState:
     codec_id: str | None = None
     bundle_id: str | None = None
     id_to_entity: dict[str, GraphItem] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class _PrelinkCtx:
-    graph: StoryGraph
-    template_registry: TemplateRegistry
-    cursor_id: UUID | None = None
-    step: int | None = None
-    correlation_id: UUID | str | None = None
-    logger: Any | None = None
-    meta: Mapping[str, Any] | None = field(default_factory=dict)
-
-    @property
-    def cursor(self):
-        if self.cursor_id is None:
-            return None
-        return self.graph.get(self.cursor_id)
-
-    def get_authorities(self) -> list[object]:
-        getter = getattr(self.graph, "get_authorities", None)
-        if callable(getter):
-            return list(getter() or [])
-        return []
-
-    def get_inline_behaviors(self):
-        return []
-
-    def get_meta(self) -> Mapping[str, Any]:
-        return dict(self.meta or {})
-
-    def get_story_locals(self) -> Mapping[str, Any]:
-        return self.graph.get_story_locals()
-
-    def get_ns(self, node: Any = None) -> Mapping[str, Any]:
-        target = node or self.cursor
-        if target is None:
-            return self.graph.get_story_locals()
-        return do_gather_ns(target, ctx=self)
-
-    def get_location_entity_groups(self):
-        cursor = self.cursor
-        if cursor is None:
-            return [self.graph.values()]
-
-        groups: list[list[Any]] = []
-        seen_ids: set[UUID] = set()
-
-        def add_group(values):
-            bucket: list[Any] = []
-            for value in values:
-                uid = getattr(value, "uid", None)
-                if uid is None or uid in seen_ids:
-                    continue
-                seen_ids.add(uid)
-                bucket.append(value)
-            if bucket:
-                groups.append(bucket)
-
-        add_group([cursor])
-        ancestors = getattr(cursor, "ancestors", None)
-        if callable(ancestors):
-            ancestors = ancestors()
-        if ancestors is not None:
-            for ancestor in ancestors:
-                if hasattr(ancestor, "children"):
-                    add_group(ancestor.children())
-        add_group(self.graph.values())
-        return groups or [list(self.graph.values())]
-
-    def get_template_scope_groups(self):
-        cursor = self.cursor
-        if cursor is not None:
-            registries = do_get_template_scope_groups(cursor, ctx=self)
-            if registries:
-                return registries
-        return [self.template_registry]
-
-    def derive(
-        self,
-        *,
-        cursor_id: UUID | None = None,
-        graph: StoryGraph | None = None,
-        meta_overrides: Mapping[str, Any] | None = None,
-        **field_overrides: Any,
-    ) -> PhaseCtx:
-        meta = dict(self.meta or {})
-        if meta_overrides:
-            meta.update(meta_overrides)
-
-        kwargs: dict[str, Any] = {
-            "graph": self.graph if graph is None else graph,
-            "cursor_id": self.cursor_id if cursor_id is None else cursor_id,
-            "step": 0 if self.step is None else self.step,
-            "correlation_id": self.correlation_id,
-            "logger": self.logger,
-            "meta": meta,
-        }
-        kwargs.update(field_overrides)
-        return PhaseCtx(**kwargs)
-
 
 class StoryMaterializer:
     """StoryMaterializer()
@@ -375,11 +272,6 @@ class StoryMaterializer:
             return registry
         if isinstance(registry, GraphFactory) and isinstance(registry.templates, TemplateRegistry):
             return registry.templates
-
-        script_manager = getattr(graph, "script_manager", None)
-        registry = getattr(script_manager, "template_registry", None)
-        if isinstance(registry, TemplateRegistry):
-            return registry
         return TemplateRegistry(label="story_runtime_templates")
 
     def _runtime_state(self, *, graph: StoryGraph, mode: InitMode = InitMode.LAZY) -> _MaterializationState:
@@ -494,10 +386,10 @@ class StoryMaterializer:
         graph: StoryGraph,
         reference: str,
     ) -> EntityTemplate | None:
-        script_manager = getattr(graph, "script_manager", None)
-        finder = getattr(script_manager, "find_template", None)
-        if callable(finder):
-            found = finder(reference)
+        world = getattr(graph, "world", None)
+        find_template = getattr(world, "find_template", None)
+        if callable(find_template):
+            found = find_template(reference)
             if isinstance(found, EntityTemplate):
                 return found
 
@@ -524,8 +416,7 @@ class StoryMaterializer:
         for child in children():
             if not isinstance(child, TraversableNode):
                 continue
-            template_uid = graph.template_by_entity_id.get(child.uid)
-            if template_uid == getattr(template, "uid", None):
+            if getattr(child, "templ_hash", None) == template.content_hash():
                 return child
             path = getattr(child, "path", None)
             if isinstance(path, str) and path == template.get_label():
@@ -578,21 +469,19 @@ class StoryMaterializer:
         graph: StoryGraph,
         request_ctx_path: str,
         _ctx: Any = None,
-    ) -> _PrelinkCtx:
+    ) -> PhaseCtx:
         correlation_id = None
         logger = None
         step = None
         meta: dict[str, Any] = {}
-        if isinstance(_ctx, CoreCtx):
+        if isinstance(_ctx, VmPhaseCtx):
             correlation_id = _ctx.correlation_id
             logger = _ctx.logger
             meta.update(_ctx.get_meta())
-        if isinstance(_ctx, VmRequirementStampCtx):
             step = _ctx.step
         meta["request_ctx_path"] = request_ctx_path
-        return _PrelinkCtx(
+        return PhaseCtx(
             graph=graph,
-            template_registry=self._template_registry_for_graph(graph),
             cursor_id=None,
             step=step,
             correlation_id=correlation_id,
@@ -1158,10 +1047,9 @@ class StoryMaterializer:
         *,
         state: _MaterializationState,
         cursor_id: UUID | None,
-    ) -> _PrelinkCtx:
-        return _PrelinkCtx(
+    ) -> PhaseCtx:
+        return PhaseCtx(
             graph=state.graph,
-            template_registry=state.template_registry,
             cursor_id=cursor_id,
         )
 
@@ -1244,9 +1132,8 @@ class StoryMaterializer:
         canonical_ref: str,
         requirement: Requirement,
     ) -> None:
-        ctx = _PrelinkCtx(
+        ctx = PhaseCtx(
             graph=state.graph,
-            template_registry=state.template_registry,
             cursor_id=source.uid,
         )
         resolver = Resolver.from_ctx(ctx)

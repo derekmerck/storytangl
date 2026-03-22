@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import pytest
 
-from tangl.core import TemplateRegistry
 from tangl.journal.media import MediaFragment
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaInventory
@@ -16,8 +15,8 @@ from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.media.worker_dispatcher import WorkerResult
 from tangl.service.media import MediaRenderProfile, media_fragment_to_payload
 from tangl.story.fabula import World
-from tangl.story.fabula.materializer import _PrelinkCtx
 from tangl.vm.provision.resolver import Resolver
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.runtime.ledger import Ledger
 
 
@@ -228,9 +227,8 @@ class TestAsyncInlineLifecycle:
         )
         story.add(duplicate_dep)
 
-        ctx = _PrelinkCtx(
+        ctx = PhaseCtx(
             graph=story,
-            template_registry=TemplateRegistry(),
             cursor_id=block.uid,
         )
         Resolver.from_ctx(ctx).resolve_dependency(duplicate_dep, allow_stubs=False, _ctx=ctx)

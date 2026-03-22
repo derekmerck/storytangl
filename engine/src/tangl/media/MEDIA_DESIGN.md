@@ -182,7 +182,7 @@ document) and provides:
 - **Lifecycle metadata** — status, worker/job info, timestamps, persistence policy
 - **Spec provenance** — adapted/executed spec payloads and hashes for generated media
 
-`MediaRIT` extends `RegistryAware` and `ContentAddressable`. It does *not*
+`MediaRIT` extends `RegistryAware` and `HasContent`. It does *not*
 extend `GraphItem`; RITs can live in registries outside any graph. When a media
 dependency is resolved, the accepted RIT may be copied into the story graph as a
 graph-local entity, but inventory-scoped registries remain the authoritative

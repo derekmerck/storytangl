@@ -26,7 +26,6 @@ from tangl.core import (
 )
 from tangl.vm.dispatch import (
     on_provision,
-    on_get_template_scope_groups,
     on_journal,
     on_prereqs,
     on_postreqs,
@@ -257,21 +256,23 @@ class TestPhaseCtx:
         with ctx.with_subdispatch() as nested:
             assert nested is ctx
 
-    def test_template_scope_groups_resolve_via_dispatch(self) -> None:
-        class GuardGraph(Graph):
-            def get_template_scope_groups(self, caller):  # pragma: no cover - should never run
-                raise AssertionError("legacy graph template scope lookup should not be called")
+    def test_template_scope_groups_resolve_via_graph_factory_authority(self) -> None:
+        class TestFactory(GraphFactory):
+            def get_template_scope_groups(self, *, caller=None, graph=None):
+                return [marker]
 
         marker = TemplateRegistry(label="marker")
+        TestFactory.clear_instances()
+        try:
+            factory = TestFactory(label="phase_ctx_scope_factory")
+            g = Graph()
+            g.bind_factory(factory)
+            a = _node(g, label="a")
+            ctx = PhaseCtx(graph=g, cursor_id=a.uid)
 
-        @on_get_template_scope_groups
-        def provide(*, caller, ctx, **kw):
-            return [marker]
-
-        g = GuardGraph()
-        a = _node(g, label="a")
-        ctx = PhaseCtx(graph=g, cursor_id=a.uid)
-        assert ctx.get_template_scope_groups() == [marker]
+            assert ctx.get_template_scope_groups() == [marker]
+        finally:
+            TestFactory.clear_instances()
 
     def test_template_scope_groups_fall_back_to_graph_factory_templates(self) -> None:
         class TestFactory(GraphFactory):

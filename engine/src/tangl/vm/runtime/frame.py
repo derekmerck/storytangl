@@ -77,7 +77,6 @@ from ..ctx import VmPhaseCtx
 from ..dispatch import (
     do_finalize,
     do_gather_ns,
-    do_get_template_scope_groups,
     do_journal,
     do_postreqs,
     do_prereqs,
@@ -152,7 +151,7 @@ class PhaseCtx:
     """
 
     graph: Graph
-    cursor_id: UUID
+    cursor_id: UUID | None
     step: int = 0
     current_phase: ResolutionPhase = ResolutionPhase.INIT
     correlation_id: UUID | str | None = None
@@ -278,12 +277,14 @@ class PhaseCtx:
     # -- VM-specific accessors ----------------------------------------------
 
     @property
-    def cursor(self) -> TraversableNode:
+    def cursor(self) -> TraversableNode | None:
         """The current node, dereferenced through the graph.
 
         Uses ``graph.get(cursor_id)`` rather than caching, so that watched
         registries (future event-sourcing) can intercept the lookup.
         """
+        if self.cursor_id is None:
+            return None
         return self.graph.get(self.cursor_id)
 
     def get_ns(self, node: Node = None) -> ChainMap[str, Any]:
@@ -374,15 +375,41 @@ class PhaseCtx:
 
     def get_template_scope_groups(self) -> list[TemplateRegistry]:
         """Template registries available for scoped provisioning."""
-        groups = do_get_template_scope_groups(self.cursor, ctx=self)
-        if groups:
-            return groups
-
         factory = self.graph.factory
         if isinstance(factory, GraphFactory):
             return factory.get_template_scope_groups(caller=self.cursor, graph=self.graph)
         if isinstance(factory, TemplateRegistry):
             return [factory]
+        return []
+
+    def get_token_catalogs(self, *, requirement: Any = None) -> list[Any]:
+        """Token catalogs authoritative for the current graph/factory."""
+        factory = self.graph.factory
+        get_catalogs = getattr(factory, "get_token_catalogs", None)
+        if callable(get_catalogs):
+            return list(
+                get_catalogs(
+                    caller=self.cursor,
+                    requirement=requirement,
+                    graph=self.graph,
+                )
+                or []
+            )
+        return []
+
+    def get_media_inventories(self, *, requirement: Any = None) -> list[Any]:
+        """Media inventories authoritative for the current graph/factory."""
+        factory = self.graph.factory
+        get_inventories = getattr(factory, "get_media_inventories", None)
+        if callable(get_inventories):
+            return list(
+                get_inventories(
+                    caller=self.cursor,
+                    requirement=requirement,
+                    graph=self.graph,
+                )
+                or []
+            )
         return []
 
 

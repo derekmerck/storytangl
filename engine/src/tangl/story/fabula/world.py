@@ -7,15 +7,19 @@ from uuid import UUID
 from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.core import BehaviorRegistry, EntityTemplate, Selector, TemplateRegistry, TokenCatalog
+from tangl.media import get_system_resource_manager
 from tangl.media.media_resource import MediaInventory
 from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import TraversableGraphFactory, TraversableNode
 
-from ..provider_collection import collect_template_registries
+from ..provider_collection import (
+    collect_media_inventories,
+    collect_template_registries,
+    collect_token_catalogs,
+)
 from ..story_graph import StoryGraph
 from .compiler import StoryCompiler
 from .materializer import StoryMaterializer
-from .script_manager import ScriptManager
 from .types import InitMode, StoryInitResult
 
 
@@ -131,8 +135,8 @@ class World(TraversableGraphFactory):
     - :meth:`get_authorities` exposes world-owned dispatch registries.
     - :meth:`get_story_info_projector` returns the world-owned projector when
       present.
-    - :meth:`find_template` and :meth:`find_templates` delegate to the runtime
-      script manager helper.
+    - :meth:`find_template` and :meth:`find_templates` resolve directly against
+      the world's template registry.
     """
 
     graph_type: type[StoryGraph] = StoryGraph
@@ -146,7 +150,6 @@ class World(TraversableGraphFactory):
     codec_id: str | None = None
     issues: list[Any] = Field(default_factory=list)
 
-    script_manager: ScriptManager | None = None
     template_scope_provider: Any | None = Field(default=None, exclude=True)
     assets: Any | None = None
     resources: Any | None = None
@@ -191,18 +194,6 @@ class World(TraversableGraphFactory):
                 payload[field_name] = _copy_bundle_value(value)
 
         return payload
-
-    @model_validator(mode="after")
-    def _ensure_story_helpers(self) -> "World":
-        if self.script_manager is None and isinstance(self.templates, TemplateRegistry):
-            self.force_set(
-                "script_manager",
-                ScriptManager(
-                    template_registry=self.templates,
-                    world_scope_provider=self._world_template_scope_groups,
-                ),
-            )
-        return self
 
     def get_authorities(self) -> list[object]:
         """Return world-owned behavior authorities with stable declaration order."""
@@ -276,7 +267,18 @@ class World(TraversableGraphFactory):
         requirement: Any = None,
         graph: Any = None,
     ) -> list[TokenCatalog]:
-        _ = caller, requirement, graph
+        providers = [
+            getattr(self, "assets", None),
+            getattr(self, "domain", None),
+        ]
+        catalogs = collect_token_catalogs(
+            providers,
+            caller=caller,
+            requirement=requirement,
+            graph=graph,
+        )
+        if catalogs:
+            return catalogs
         return list(self._provide_token_catalogs())
 
     def get_media_inventories(
@@ -287,24 +289,47 @@ class World(TraversableGraphFactory):
         graph: Any = None,
     ) -> list[MediaInventory]:
         """Return optional world-authoritative media inventories."""
-        _ = caller, requirement, graph
-        resource_facet = self.resources
-        if resource_facet is None:
-            return []
+        story_manager = None
+        if graph is not None:
+            story_manager = getattr(graph, "story_resources", None)
+            if story_manager is None and getattr(graph, "story_id", None) is not None:
+                story_manager = get_story_resource_manager(graph.story_id, create=False)
+                if story_manager is not None:
+                    graph.story_resources = story_manager
 
-        get_inventories = getattr(resource_facet, "get_media_inventories", None)
-        if callable(get_inventories):
-            return list(
-                get_inventories(
-                    caller=caller,
-                    requirement=requirement,
-                    graph=graph,
-                )
-                or []
+        inventories: list[MediaInventory] = []
+        inventories.extend(
+            collect_media_inventories(
+                [graph, story_manager],
+                caller=caller,
+                requirement=requirement,
+                graph=graph,
+                scope="story",
             )
-
-        inventory = MediaInventory.from_provider(resource_facet, scope="world")
-        return [inventory] if inventory is not None else []
+        )
+        inventories.extend(
+            collect_media_inventories(
+                [
+                    getattr(self, "resources", None),
+                    getattr(self, "assets", None),
+                    getattr(self, "domain", None),
+                ],
+                caller=caller,
+                requirement=requirement,
+                graph=graph,
+                scope="world",
+            )
+        )
+        inventories.extend(
+            collect_media_inventories(
+                [get_system_resource_manager()],
+                caller=caller,
+                requirement=requirement,
+                graph=graph,
+                scope="sys",
+            )
+        )
+        return inventories
 
     def _world_template_scope_groups(
         self,
@@ -315,16 +340,23 @@ class World(TraversableGraphFactory):
         return list(self.get_template_scope_groups(caller=caller, graph=graph) or [])
 
     def find_template(self, reference: str) -> Any | None:
-        """Find one template via script-manager lookup semantics."""
-        if self.script_manager is None:
+        """Find one template by selector, uid, identifier, or label."""
+        if reference is None:
             return None
-        return self.script_manager.find_template(reference)
+        if isinstance(reference, UUID):
+            return self.templates.get(reference)
+
+        key = str(reference)
+        found = self.templates.find_one(Selector.from_identifier(key))
+        if found is not None:
+            return found
+        return self.templates.find_one(Selector(label=key))
 
     def find_templates(self, selector: Selector | None = None) -> list[Any]:
-        """Find all templates matching ``selector`` via the script manager."""
-        if self.script_manager is None:
-            return []
-        return self.script_manager.find_templates(selector=selector)
+        """Find all templates matching ``selector``."""
+        if selector is None:
+            return list(self.templates.values())
+        return list(selector.filter(self.templates.values()))
 
     def story_materialize_template(
         self,

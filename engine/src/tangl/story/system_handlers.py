@@ -16,32 +16,22 @@ from __future__ import annotations
 import logging
 from typing import Any, Iterable
 
-from tangl.core import GraphFactory, Priority, Record, Selector, TemplateRegistry
+from tangl.core import Priority, Record, Selector
 from tangl.prose import DialogHandler
-from tangl.media import get_system_resource_manager
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep
-from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import (
     Affordance,
     Dependency,
     Resolver,
     do_compose_journal,
-    on_get_media_inventories,
     on_provision,
-    on_get_template_scope_groups,
-    on_get_token_catalogs,
 )
 
 from tangl.journal.fragments import ChoiceFragment, ContentFragment, MediaFragment
 
 from .dispatch import on_compose_journal, on_gather_ns, on_journal
 from .episode import Action, Block, MenuBlock
-from .provider_collection import (
-    collect_media_inventories,
-    collect_template_registries,
-    collect_token_catalogs,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -69,144 +59,6 @@ def gather_story_world_locals(*, caller, ctx, **_kw):
     if isinstance(locals_, dict) and locals_:
         return dict(locals_)
     return None
-
-
-@on_get_template_scope_groups(priority=Priority.EARLY)
-def gather_story_template_scope_groups(*, caller, ctx, **_kw):
-    """Contribute story template registries for the current caller."""
-    graph = getattr(caller, "graph", None)
-    if graph is None:
-        graph = getattr(ctx, "graph", None)
-    if graph is None:
-        return None
-
-    factory = getattr(graph, "factory", None)
-    if isinstance(factory, GraphFactory):
-        return factory.get_template_scope_groups(caller=caller, graph=graph)
-
-    if isinstance(factory, TemplateRegistry):
-        return [factory]
-
-    script_manager = getattr(graph, "script_manager", None)
-    template_registry = getattr(script_manager, "template_registry", None)
-    if isinstance(template_registry, TemplateRegistry):
-        return [template_registry]
-
-    return None
-
-
-@on_get_template_scope_groups(priority=Priority.LATE)
-def gather_world_template_scope_groups(*, caller, ctx, **_kw):
-    """Contribute world-level template registries after story-local sources."""
-    graph = getattr(caller, "graph", None)
-    if graph is None:
-        graph = getattr(ctx, "graph", None)
-    if graph is None:
-        return None
-
-    world = getattr(graph, "world", None)
-    if world is None:
-        return None
-
-    providers = [
-        getattr(world, "templates", None),
-        world,
-    ]
-    registries = collect_template_registries(
-        providers,
-        caller=caller,
-        graph=graph,
-    )
-    return registries or None
-
-
-@on_get_token_catalogs(priority=Priority.LATE)
-def gather_world_token_catalogs(*, caller, requirement=None, ctx, **_kw):
-    """Contribute token catalogs from world-level asset/domain providers."""
-    graph = getattr(caller, "graph", None)
-    if graph is None:
-        graph = getattr(ctx, "graph", None)
-    if graph is None:
-        return None
-
-    world = getattr(graph, "world", None)
-    if world is None:
-        return None
-
-    providers = [
-        getattr(world, "assets", None),
-        getattr(world, "domain", None),
-        world,
-    ]
-    catalogs = collect_token_catalogs(
-        providers,
-        caller=caller,
-        requirement=requirement,
-        graph=graph,
-    )
-    return catalogs or None
-
-
-@on_get_media_inventories(priority=Priority.FIRST)
-def gather_story_media_inventories(*, caller, requirement=None, ctx, **_kw):
-    """Contribute story-local media inventory ahead of world/system scopes."""
-    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
-    if graph is None:
-        return None
-
-    manager = getattr(graph, "story_resources", None)
-    if manager is None and getattr(graph, "story_id", None) is not None:
-        manager = get_story_resource_manager(graph.story_id, create=False)
-        if manager is not None:
-            graph.story_resources = manager
-
-    inventories = collect_media_inventories(
-        [graph, manager],
-        caller=caller,
-        requirement=requirement,
-        graph=graph,
-        scope="story",
-    )
-    return inventories or None
-
-
-@on_get_media_inventories(priority=Priority.LATE)
-def gather_world_media_inventories(*, caller, requirement=None, ctx, **_kw):
-    """Contribute world-scoped media inventories after story-local sources."""
-    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
-    if graph is None:
-        return None
-
-    world = getattr(graph, "world", None)
-    if world is None:
-        return None
-
-    providers = [
-        getattr(world, "resources", None),
-        world,
-    ]
-    inventories = collect_media_inventories(
-        providers,
-        caller=caller,
-        requirement=requirement,
-        graph=graph,
-        scope="world",
-    )
-    return inventories or None
-
-
-@on_get_media_inventories(priority=Priority.LAST)
-def gather_system_media_inventories(*, caller, requirement=None, ctx, **_kw):
-    """Contribute shared system media inventory last."""
-    graph = getattr(caller, "graph", None) or getattr(ctx, "graph", None)
-    inventories = collect_media_inventories(
-        [get_system_resource_manager()],
-        caller=caller,
-        requirement=requirement,
-        graph=graph,
-        scope="sys",
-    )
-    return inventories or None
 
 
 def _has_tags(value: Any, *tags: str) -> bool:

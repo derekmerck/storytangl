@@ -35,7 +35,6 @@ from tangl.media.media_resource import (
     MediaResourceInventoryTag as MediaRIT,
     MediaResourceRegistry,
 )
-from tangl.story.fabula.materializer import _PrelinkCtx
 from tangl.story.story_graph import StoryGraph
 from tangl.vm.provision import (
     Affordance,
@@ -52,6 +51,7 @@ from tangl.vm.provision import (
 )
 from tangl.vm.provision.matching import annotate_offer_specificity
 from tangl.vm.resolution_phase import ResolutionPhase
+from tangl.vm.runtime.causality import CausalityMode
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
 
@@ -91,42 +91,87 @@ def _phase_ctx(
     return PhaseCtx(graph=graph, cursor_id=cursor.uid, step=step, **kwargs)
 
 
-def _ctx_with_seed(seed: int) -> SimpleNamespace:
-    rng = Random(seed)
-    return SimpleNamespace(
-        get_authorities=lambda: [],
-        get_inline_behaviors=lambda: [],
-        get_random=lambda: rng,
-    )
+class _ResolverCtx:
+    def __init__(
+        self,
+        *,
+        graph: Graph | None = None,
+        cursor: TraversableNode | None = None,
+        step: int = 0,
+        meta: dict[str, object] | None = None,
+        authorities: list[BehaviorRegistry] | None = None,
+        rng: Random | None = None,
+        location_entity_groups: list[list[object]] | None = None,
+        template_scope_groups: list[TemplateRegistry] | None = None,
+        token_catalogs: tuple[TokenCatalog, ...] = (),
+        media_inventories: tuple[MediaInventory, ...] = (),
+        causality_mode: CausalityMode | None = None,
+    ) -> None:
+        self.graph = graph
+        self.cursor = cursor
+        self.cursor_id = cursor.uid if cursor is not None else None
+        self.step = step
+        self.current_phase = ResolutionPhase.INIT
+        self.correlation_id = None
+        self.logger = None
+        self.meta = dict(meta or {})
+        self.selected_edge = None
+        self.selected_payload = None
+        self._authorities = list(authorities or [])
+        self._rng = rng or Random(0)
+        self._location_entity_groups = list(location_entity_groups or [])
+        self._template_scope_groups = list(template_scope_groups or [])
+        self._token_catalogs = tuple(token_catalogs)
+        self._media_inventories = tuple(media_inventories)
+        self.causality_mode = causality_mode
+
+    def get_authorities(self):
+        return list(self._authorities)
+
+    def get_inline_behaviors(self):
+        return []
+
+    def get_random(self):
+        return self._rng
+
+    def get_meta(self):
+        return dict(self.meta)
+
+    def get_ns(self, node=None):
+        _ = node
+        return {}
+
+    def get_location_entity_groups(self):
+        return list(self._location_entity_groups)
+
+    def get_template_scope_groups(self):
+        return list(self._template_scope_groups)
+
+    def get_token_catalogs(self, *, requirement=None):
+        _ = requirement
+        return list(self._token_catalogs)
+
+    def get_media_inventories(self, *, requirement=None):
+        _ = requirement
+        return list(self._media_inventories)
+
+    def derive(self, **kwargs):
+        raise NotImplementedError
 
 
-def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> SimpleNamespace:
-    registry = BehaviorRegistry(label="token_catalog_registry")
-
-    def _catalogs(*, caller, requirement, ctx, **kw):
-        return list(catalogs)
-    registry.register(func=_catalogs, task="get_token_catalogs")
-
-    return SimpleNamespace(
-        cursor=None,
-        get_authorities=lambda: [registry],
-        get_inline_behaviors=lambda: [],
-    )
+def _ctx_with_seed(seed: int) -> _ResolverCtx:
+    return _ResolverCtx(rng=Random(seed))
 
 
-def _ctx_with_media_inventories(*inventories: MediaInventory, graph: Graph | None = None) -> SimpleNamespace:
-    registry = BehaviorRegistry(label="media_inventory_registry")
+def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> _ResolverCtx:
+    return _ResolverCtx(token_catalogs=tuple(catalogs))
 
-    def _inventories(*, caller, requirement, ctx, **kw):
-        return list(inventories)
-    registry.register(func=_inventories, task="get_media_inventories")
 
-    return SimpleNamespace(
-        graph=graph,
-        cursor=None,
-        get_authorities=lambda: [registry],
-        get_inline_behaviors=lambda: [],
-    )
+def _ctx_with_media_inventories(
+    *inventories: MediaInventory,
+    graph: Graph | None = None,
+) -> _ResolverCtx:
+    return _ResolverCtx(graph=graph, media_inventories=tuple(inventories))
 
 
 def _phase_ctx_with_media_inventories(
@@ -134,17 +179,11 @@ def _phase_ctx_with_media_inventories(
     graph: Graph,
     cursor: TraversableNode,
     inventories: tuple[MediaInventory, ...],
-) -> PhaseCtx:
-    registry = BehaviorRegistry(label="media_inventory_registry")
-
-    def _inventories(*, caller, requirement, ctx, **kw):
-        return list(inventories)
-    registry.register(func=_inventories, task="get_media_inventories")
-
-    return _phase_ctx(
+) -> _ResolverCtx:
+    return _ResolverCtx(
         graph=graph,
         cursor=cursor,
-        local_authorities=[registry],
+        media_inventories=inventories,
     )
 
 
@@ -494,10 +533,8 @@ class TestResolverOfferGathering:
     def test_hard_dirty_context_auto_allows_stub_offers(self) -> None:
         resolver = Resolver(entity_groups=[], template_groups=[])
         req = Requirement.from_identifier("missing")
-        ctx = SimpleNamespace(
-            causality_mode="hard_dirty",
-            get_authorities=lambda: [],
-            get_inline_behaviors=lambda: [],
+        ctx = _ResolverCtx(
+            causality_mode=CausalityMode.HARD_DIRTY,
         )
         offers = resolver.gather_offers(req, allow_stubs=False, _ctx=ctx)
         assert any(offer.policy == ProvisionPolicy.STUB for offer in offers)
@@ -811,7 +848,7 @@ class TestResolverFanout:
             authored_path="scene.leaf",
             is_qualified=True,
         )
-        ctx = SimpleNamespace(graph=graph, cursor=hub, cursor_id=hub.uid)
+        ctx = _ResolverCtx(graph=graph, cursor=hub)
 
         offers = resolver.gather_fanout_offers(requirement, _ctx=ctx)
 
@@ -951,10 +988,7 @@ class TestResolverRequirementResolution:
 
         local_registry = BehaviorRegistry(label="test_resolve_req_registry")
         local_registry.register(func=bad_override, task="resolve_req")
-        ctx = SimpleNamespace(
-            get_authorities=lambda: [local_registry],
-            get_inline_behaviors=lambda: [],
-        )
+        ctx = _ResolverCtx(authorities=[local_registry])
         resolver = Resolver(entity_groups=[])
         req = Requirement(has_identifier="missing", provision_policy=ProvisionPolicy.EXISTING)
         provider = resolver.resolve_requirement(req, _ctx=ctx)
@@ -966,9 +1000,9 @@ class TestResolverRequirementResolution:
     def test_from_ctx_prefers_new_scope_methods_when_both_exist(self) -> None:
         provider = Entity(label="provider")
         template = EntityTemplate(payload={"kind": Entity, "label": "templ"})
-        ctx = SimpleNamespace(
-            get_location_entity_groups=lambda: [[provider]],
-            get_template_scope_groups=lambda: [_template_registry(template)],
+        ctx = _ResolverCtx(
+            location_entity_groups=[[provider]],
+            template_scope_groups=[_template_registry(template)],
         )
 
         resolver = Resolver.from_ctx(ctx)
@@ -1014,15 +1048,14 @@ class TestResolverNodeContext:
         }
         assert node_ctx.random is parent_ctx.random
 
-    def test_make_node_ctx_derives_from_prelink_ctx(self) -> None:
+    def test_make_node_ctx_derives_from_phase_ctx_for_story_graph(self) -> None:
         graph = StoryGraph()
         source = TraversableNode(label="source")
         child = TraversableNode(label="child")
         graph.add(source)
         graph.add(child)
-        prelink_ctx = _PrelinkCtx(
+        prelink_ctx = PhaseCtx(
             graph=graph,
-            template_registry=TemplateRegistry(label="story_templates"),
             cursor_id=source.uid,
             correlation_id="prelink-1",
             meta={"phase": "prelink"},

@@ -40,8 +40,8 @@ class StoryGraph(TraversableGraph):
     Key Features
     ------------
     * Tracks one or more initial cursor ids for entry into the runtime graph.
-    * Carries story locals and a compatibility script-manager pointer outside
-      serialized graph payloads.
+    * Carries story locals plus runtime lineage state outside serialized graph
+      payloads.
     * Records template lineage for each materialized entity so provisioning can
       recover template scope.
 
@@ -65,7 +65,6 @@ class StoryGraph(TraversableGraph):
     wired_node_ids: set[UUID] = Field(default_factory=set, exclude=True)
 
     _world_override: Any = PrivateAttr(default=None)
-    _script_manager_override: Any = PrivateAttr(default=None)
     _story_materialize_override: Any = PrivateAttr(default=None)
     _story_post_materialize_override: Any = PrivateAttr(default=None)
     _story_preview_requirement_override: Any = PrivateAttr(default=None)
@@ -89,19 +88,6 @@ class StoryGraph(TraversableGraph):
             self._world_override = None
             return
         self._world_override = value
-
-    @property
-    def script_manager(self) -> Any | None:
-        if self._script_manager_override is not None:
-            return self._script_manager_override
-        world = self.world
-        if world is None:
-            return None
-        return getattr(world, "script_manager", None)
-
-    @script_manager.setter
-    def script_manager(self, value: Any | None) -> None:
-        self._script_manager_override = value
 
     @property
     def story_materialize(self) -> Any | None:
@@ -165,11 +151,6 @@ class StoryGraph(TraversableGraph):
         templates = getattr(factory, "templates", None)
         if isinstance(templates, TemplateRegistry):
             return templates
-
-        script_manager = getattr(self, "script_manager", None)
-        registry = getattr(script_manager, "template_registry", None)
-        if isinstance(registry, TemplateRegistry):
-            return registry
         return None
 
     @property
@@ -197,12 +178,6 @@ class StoryGraph(TraversableGraph):
         """Return template groups ordered from closest template scope outward."""
         caller_uid = getattr(caller, "uid", None)
         lineage = self.template_lineage_by_entity_id.get(caller_uid, [])
-
-        get_groups = getattr(self.script_manager, "get_template_scope_groups", None)
-        if callable(get_groups):
-            groups = get_groups(caller=caller, graph=self, lineage_ids=lineage)
-            if groups:
-                return [list(group) for group in groups]
 
         registry = self._template_registry()
         if registry is None:
@@ -232,6 +207,14 @@ class StoryGraph(TraversableGraph):
             add_group(values)
 
         add_group(registry.values())
+
+        world = self.world
+        get_registries = getattr(world, "get_template_scope_groups", None)
+        if callable(get_registries):
+            for template_registry in get_registries(caller=caller, graph=self) or ():
+                values = getattr(template_registry, "values", None)
+                if callable(values):
+                    add_group(values())
         return groups
 
     @staticmethod

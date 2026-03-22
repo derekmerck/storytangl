@@ -50,7 +50,7 @@ def test_world_builder_populates_canonical_fields_and_aliases() -> None:
     assert world.metadata == bundle.metadata
     assert world.locals == bundle.locals
     assert world.entry_template_ids == bundle.entry_template_ids
-    assert world.script_manager is not None
+    assert world.find_template("intro.start") is not None
     assert world.asset_manager is assets
     assert world.resource_manager is resources
     assert world.domain is not None
