@@ -1,6 +1,6 @@
 # tangl.service — Design Notes
 
-> Status: Current contract
+> Status: Current manager-first contract with compatibility wrappers
 > Authority: The service-native response contract lives in `engine/src/tangl/service/response.py`; projected runtime state is defined there as `ProjectedState`.
 >
 > Architectural intent, design decisions, and rationale for the canonical service
@@ -38,31 +38,28 @@ Core         → Timeless primitives and mechanisms
 ### Service's Defining Characteristic
 
 Service defines the canonical invocation contract for the engine: how callers
-identify operations, how execution context is hydrated, how mutations are
-persisted, and how results are classified for transport. The orchestrator handles
-resource hydration, access, and writeback; controllers express application use
-cases in engine terms; the gateway stabilizes and transforms the external API
-surface.
+invoke explicit use cases, how execution context is opened, how mutations are
+persisted, and which typed payloads are returned. `ServiceManager` is the
+canonical public interface. The older orchestrator/gateway/controller stack
+remains only as a compatibility layer for existing transports.
 
 ### Current Service Semantics
 
 Five statements that orient readers quickly:
 
-- Applications invoke **stable operation tokens** through the gateway or
-  **internal endpoint names** through the orchestrator. They never construct
-  engine objects or call story/vm layers directly.
-- The orchestrator **hydrates resources** (`User`, `Ledger`, `Frame`) from type
-  hints on controller method signatures and handles persistence writeback
-  according to endpoint policy.
-- **Controllers** are small service façades over engine use cases. They call
-  story/vm APIs and return native results; they know nothing about transport,
-  persistence, or serialization.
-- The **gateway** adds a stable operation-token API, inbound parameter
-  normalization, and outbound response transformation (render profiles) on top
-  of the orchestrator.
-- **Response types** classify what an endpoint produces (content, info, runtime,
-  media), which determines how the result is validated, normalized, and
-  serialized by transport.
+- Applications should call explicit `ServiceManager` methods such as
+  `create_story`, `resolve_choice`, `get_world_info`, and `get_system_info`.
+- `ServiceManager` opens `User`, `Ledger`, and world context explicitly through
+  small helpers (`open_user`, `open_session`, `open_world`) rather than generic
+  endpoint binding and path-based writeback.
+- `@service_method(...)` metadata is descriptive and bounded: access class,
+  context, writeback, blocking behavior, optional capability tag, and optional
+  operation id for wrappers/docs.
+- Typed response models (`RuntimeEnvelope`, `ProjectedState`, `RuntimeInfo`,
+  `UserInfo`, `WorldInfo`, `SystemInfo`, `UserSecret`) are the canonical service
+  payload vocabulary.
+- The orchestrator, controllers, and gateway are still importable for existing
+  transports, but they no longer define the canonical service nucleus.
 
 ### What Service Explicitly Does NOT Define
 
@@ -83,28 +80,22 @@ the transport layer's job.
 
 ```
 tangl.service
-├── Gateway tier
-│   → gateway.py           (ServiceGateway: operation-token execution with hooks)
-│   → rest_adapter.py      (GatewayRestAdapter: transport normalization)
-│   → hooks.py             (GatewayHooks: inbound/outbound behavior pipelines)
-│   → operations.py        (ServiceOperation enum, token ↔ endpoint mapping)
-│   → bootstrap.py         (build_service_gateway: assembly-time wiring)
-├── Orchestrator tier
-│   → orchestrator.py      (Orchestrator: binding, hydration, invocation, writeback)
-│   → api_endpoint.py      (ApiEndpoint decorator, policy types, enums)
-├── Controllers
-│   → controllers/runtime_controller.py  (story session lifecycle)
-│   → controllers/world_controller.py    (world catalog and loading)
-│   → controllers/system_controller.py   (health and diagnostics)
-│   → user/user_controller.py            (user CRUD and auth)
-├── Response and auth
-│   → response.py          (RuntimeInfo, RuntimeEnvelope, InfoModel, domain info models)
-│   → exceptions.py        (ServiceError hierarchy → RuntimeInfo error codes)
-│   → auth.py              (UserAuthInfo, API key resolution)
-└── Domain support
-    → user/user.py         (User entity model)
-    → media.py             (media fragment → service-facing payload translation)
-    → world_registry.py    (world discovery and lazy compilation)
+├── Canonical nucleus
+│   → service_manager.py   (ServiceManager: explicit public method surface)
+│   → service_method.py    (bounded method metadata for access/context/writeback)
+│   → response.py          (RuntimeEnvelope, RuntimeInfo, InfoModel, domain info models)
+│   → auth.py              (UserAuthInfo, persisted-key auth resolution)
+│   → bootstrap.py         (build_service_manager)
+├── Domain support
+│   → user/user.py         (User entity model)
+│   → world_registry.py    (world discovery and lazy compilation)
+└── Compatibility layer
+    → orchestrator.py      (generic endpoint executor)
+    → api_endpoint.py      (controller endpoint metadata)
+    → gateway.py           (operation-token execution with hooks)
+    → rest_adapter.py      (transport normalization)
+    → operations.py        (legacy operation-token catalog)
+    → controllers/*.py     (legacy service façades)
 ```
 
 ---

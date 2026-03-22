@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-"""Bootstrap helpers for service orchestrator and gateway wiring."""
+"""Bootstrap helpers for canonical and compatibility service wiring."""
 
 from typing import Any
 
+from tangl.persistence import PersistenceManager, PersistenceManagerFactory
+
+from .service_manager import ServiceManager
 from .controllers import get_default_controllers
 from .gateway import ServiceGateway
 from .orchestrator import Orchestrator
@@ -34,16 +37,27 @@ def build_service_gateway(
     *,
     default_render_profile: str = "raw",
 ) -> ServiceGateway:
-    """Build a configured service gateway."""
+    """Build the compatibility gateway over the controller/orchestrator stack."""
 
     orchestrator = Orchestrator(persistence_manager)
     register_default_controllers(orchestrator)
     apply_default_endpoint_policies(orchestrator)
     return ServiceGateway(orchestrator, default_render_profile=default_render_profile)
 
+
+def build_service_manager(
+    persistence_manager: PersistenceManager | None = None,
+) -> ServiceManager:
+    """Build the canonical explicit service manager."""
+
+    if persistence_manager is None:
+        persistence_manager = PersistenceManagerFactory.create_persistence_manager()
+    return ServiceManager(persistence_manager)
+
 __all__ = [
     "DEFAULT_ENDPOINT_POLICIES",
     "apply_default_endpoint_policies",
+    "build_service_manager",
     "build_service_gateway",
     "register_default_controllers",
 ]
