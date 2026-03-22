@@ -162,10 +162,11 @@ class WorldController(HasApiEndpoints):
         if not isinstance(script_data, dict):
             raise ValueError("script_data is required to load a world")
 
-        world = World.from_script_data(script_data=script_data)
         legacy_label = _legacy_world_label(script_data)
-        if legacy_label:
-            world.label = legacy_label
+        world = World.from_script_data(
+            script_data=script_data,
+            label=legacy_label,
+        )
         _MANUAL_WORLDS[world.label] = world
         return RuntimeInfo.ok(message="World loaded", world_label=world.label)
 

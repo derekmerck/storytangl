@@ -534,6 +534,7 @@ class World(TraversableGraphFactory):
         cls,
         *,
         script_data: dict[str, Any],
+        label: str | None = None,
         compiler: StoryCompiler | None = None,
         domain: Any | None = None,
         templates: Any | None = None,
@@ -546,7 +547,7 @@ class World(TraversableGraphFactory):
         compiler = compiler or StoryCompiler()
         bundle = compiler.compile(script_data)
         return WorldBuilder().build(
-            label=script_data.get("label") or "story_world",
+            label=label or script_data.get("label") or "story_world",
             bundle=bundle,
             assets=assets,
             resources=resources,
