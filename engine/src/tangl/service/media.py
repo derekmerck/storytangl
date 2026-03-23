@@ -4,7 +4,7 @@ from base64 import b64encode
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from tangl.core import Selector
 from tangl.journal.fragments import MediaFragment
@@ -12,6 +12,7 @@ from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaInventory
 from tangl.media.media_resource import MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
+from tangl.type_hints import Identifier
 
 _UNSUPPORTED_MEDIA_TYPES = {
     MediaDataType.AUDIO,
@@ -68,41 +69,25 @@ class FailedMediaResult:
     derivation_spec: dict[str, Any] | None = None
 
 
-def _normalize_profile_tokens(render_profile: str | Iterable[str] | None) -> set[str]:
-    if render_profile is None:
-        return set()
-    if isinstance(render_profile, str):
-        return {
-            token.strip().lower()
-            for raw in render_profile.replace("+", ",").split(",")
-            if (token := raw.strip())
-        }
-    return {str(token).strip().lower() for token in render_profile if str(token).strip()}
+def resolve_world_media(
+    *,
+    world: Any,
+    media: MediaRIT | Identifier,
+    **kwargs: Any,
+) -> MediaDataType:
+    """Resolve one world media payload through the world's media registry."""
 
+    if isinstance(media, MediaRIT):
+        return media.get_content(**kwargs)
 
-def _coerce_render_profile(render_profile: str | Iterable[str] | MediaRenderProfile | None) -> MediaRenderProfile:
-    if isinstance(render_profile, MediaRenderProfile):
-        return render_profile
+    media_registry = getattr(world, "media_registry", None)
+    if media_registry is None or not hasattr(media_registry, "find_one"):
+        raise ValueError(f"World '{world.label}' does not expose media resources")
 
-    tokens = _normalize_profile_tokens(render_profile)
-    content_profile = MediaContentProfile.MEDIA_SERVER
-    if "inline_data" in tokens:
-        content_profile = MediaContentProfile.INLINE_DATA
-    elif "passthrough" in tokens:
-        content_profile = MediaContentProfile.PASSTHROUGH
-    elif "media_url" in tokens or "raw" in tokens:
-        content_profile = MediaContentProfile.MEDIA_SERVER
-
-    pending_policy = MediaPendingPolicy.FALLBACK
-    if "poll_media" in tokens or "poll" in tokens:
-        pending_policy = MediaPendingPolicy.POLL
-    elif "discard_pending" in tokens:
-        pending_policy = MediaPendingPolicy.DISCARD
-
-    return MediaRenderProfile(
-        pending_policy=pending_policy,
-        content_profile=content_profile,
-    )
+    media_obj = media_registry.find_one(Selector(alias=media))
+    if media_obj is None:
+        raise ValueError(f"Media '{media}' not found for world '{world.label}'")
+    return media_obj.get_content(**kwargs)
 
 
 def _relative_url_path_for_rit(
@@ -415,7 +400,7 @@ def _pending_or_failed_payload(
 def media_fragment_to_payload(
     fragment: Any,
     *,
-    render_profile: str | Iterable[str] | MediaRenderProfile | None = None,
+    render_profile: MediaRenderProfile | None = None,
     world_id: str | None = None,
     story_id: str | None = None,
     world_media_root: Path | None = None,
@@ -426,7 +411,7 @@ def media_fragment_to_payload(
 
     if isinstance(fragment, MediaFragment):
         scope = getattr(fragment, "scope", None) or "world"
-        payload_profile = _coerce_render_profile(render_profile)
+        payload_profile = render_profile or MediaRenderProfile()
 
         if fragment.content_format == "rit":
             rit = fragment.content

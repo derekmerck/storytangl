@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from tangl.core import BehaviorRegistry
+from tangl.core import BehaviorRegistry, TemplateRegistry
 
 from .compiler import StoryTemplateBundle
-from .world import World, _WorldDomainView
+from .world import World, _coerce_template_registries
 
 
 def _dedupe(values: list[Any]) -> list[Any]:
@@ -50,7 +50,6 @@ class WorldBuilder:
             "class_registry": dict(class_registry or {}),
             "modules": list(modules or []),
             "story_info_projector": projector,
-            "domain_view": domain,
         }
 
     def build(
@@ -65,8 +64,7 @@ class WorldBuilder:
         modules: list[Any] | None = None,
         story_info_projector: Any | None = None,
         dispatch: BehaviorRegistry | None = None,
-        domain_view: Any | None = None,
-        template_scope_provider: Any | None = None,
+        extra_template_registries: list[TemplateRegistry] | None = None,
         domain: Any | None = None,
     ) -> World:
         if domain is not None:
@@ -84,8 +82,6 @@ class WorldBuilder:
                 modules = list(coerced.get("modules") or [])
             if story_info_projector is None:
                 story_info_projector = coerced.get("story_info_projector")
-            if domain_view is None:
-                domain_view = coerced.get("domain_view")
 
         if dispatch is None:
             dispatch = BehaviorRegistry(label=f"{label}.world_dispatch")
@@ -93,6 +89,7 @@ class WorldBuilder:
         extra = [authority for authority in authorities if authority is not dispatch]
         class_registry = dict(class_registry or {})
         modules = list(modules or [])
+        registries = list(extra_template_registries or [])
 
         world = World(
             label=label,
@@ -106,24 +103,12 @@ class WorldBuilder:
             codec_state=dict(bundle.codec_state),
             codec_id=bundle.codec_id,
             issues=list(bundle.issues),
-            template_scope_provider=template_scope_provider,
+            extra_template_registries=registries,
             assets=assets,
             resources=resources,
             class_registry=class_registry,
             modules=modules,
             extra_authorities=extra,
             story_info_projector=story_info_projector,
-        )
-        object.__setattr__(
-            world,
-            "_domain_view",
-            domain_view
-            or _WorldDomainView(
-                dispatch_registry=dispatch,
-                class_registry=world.class_registry,
-                modules=world.modules,
-                authorities=list(world.get_authorities()),
-                story_info_projector=world.story_info_projector,
-            ),
         )
         return world

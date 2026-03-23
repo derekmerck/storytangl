@@ -4,19 +4,15 @@ from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field, PrivateAttr, model_validator
+from pydantic import Field, model_validator
 
-from tangl.core import BehaviorRegistry, EntityTemplate, Selector, TemplateRegistry, TokenCatalog
+from tangl.core import EntityTemplate, Selector, Singleton, TemplateRegistry, TokenCatalog
 from tangl.media import get_system_resource_manager
 from tangl.media.media_resource import MediaInventory
 from tangl.media.story_media import get_story_resource_manager
 from tangl.vm import TraversableGraphFactory, TraversableNode
+from tangl.vm.ctx import VmPhaseCtx
 
-from ..provider_collection import (
-    collect_media_inventories,
-    collect_template_registries,
-    collect_token_catalogs,
-)
 from ..story_graph import StoryGraph
 from .compiler import StoryCompiler
 from .materializer import StoryMaterializer
@@ -40,6 +36,129 @@ def _template_depth(templ: Any) -> tuple[int, int, str]:
     seq = getattr(templ, "seq", 0)
     label = templ.get_label() if hasattr(templ, "get_label") else ""
     return depth, seq, label
+
+
+def _registry_from_values(values: Iterable[Any]) -> TemplateRegistry | None:
+    found: TemplateRegistry | None = None
+    for item in values:
+        registry = getattr(item, "registry", None)
+        if not isinstance(registry, TemplateRegistry):
+            continue
+        if found is None:
+            found = registry
+            continue
+        if found is not registry:
+            return None
+    return found
+
+
+def _coerce_template_registry_item(value: Any) -> TemplateRegistry | None:
+    if isinstance(value, TemplateRegistry):
+        return value
+    nested = getattr(value, "template_registry", None)
+    if isinstance(nested, TemplateRegistry):
+        return nested
+    if isinstance(value, (str, bytes, dict)) or not isinstance(value, Iterable):
+        return None
+    return _registry_from_values(value)
+
+
+def _coerce_template_registries(value: Any) -> list[TemplateRegistry]:
+    if value is None:
+        return []
+    get_scope_groups = getattr(value, "get_template_scope_groups", None)
+    raw = get_scope_groups(caller=None, graph=None) if callable(get_scope_groups) else value
+    if raw is None:
+        return []
+    if isinstance(raw, TemplateRegistry):
+        values = [raw]
+    elif isinstance(raw, (str, bytes, dict)) or not isinstance(raw, Iterable):
+        values = [raw]
+    else:
+        values = list(raw)
+
+    registries: list[TemplateRegistry] = []
+    seen_ids: set[int] = set()
+    for item in values:
+        registry = _coerce_template_registry_item(item)
+        if registry is None:
+            continue
+        registry_id = id(registry)
+        if registry_id in seen_ids:
+            continue
+        seen_ids.add(registry_id)
+        registries.append(registry)
+    return registries
+
+
+def _coerce_token_catalogs(
+    provider: Any,
+    *,
+    caller: Any,
+    requirement: Any = None,
+    graph: Any = None,
+) -> list[TokenCatalog]:
+    if provider is None:
+        return []
+    get_catalogs = getattr(provider, "get_token_catalogs", None)
+    if callable(get_catalogs):
+        raw = get_catalogs(caller=caller, requirement=requirement, graph=graph)
+    else:
+        get_tokenizable = getattr(provider, "get_tokenizable", None)
+        raw = get_tokenizable() if callable(get_tokenizable) else None
+    if raw is None or isinstance(raw, (str, bytes, dict)):
+        return []
+
+    values = list(raw) if isinstance(raw, Iterable) else [raw]
+    catalogs: list[TokenCatalog] = []
+    seen_ids: set[int] = set()
+    for item in values:
+        catalog: TokenCatalog | None
+        if isinstance(item, TokenCatalog):
+            catalog = item
+        elif isinstance(item, type) and issubclass(item, Singleton):
+            catalog = TokenCatalog(wst=item)
+        else:
+            catalog = None
+        if catalog is None:
+            continue
+        catalog_id = id(catalog)
+        if catalog_id in seen_ids:
+            continue
+        seen_ids.add(catalog_id)
+        catalogs.append(catalog)
+    return catalogs
+
+
+def _extend_media_inventories(
+    inventories: list[MediaInventory],
+    *,
+    provider: Any,
+    caller: Any,
+    requirement: Any = None,
+    graph: Any = None,
+    scope: str | None = None,
+    seen_registry_ids: set[int],
+) -> None:
+    if provider is None:
+        return
+    get_inventories = getattr(provider, "get_media_inventories", None)
+    raw = get_inventories(caller=caller, requirement=requirement, graph=graph) if callable(get_inventories) else provider
+    if raw is None:
+        return
+    if isinstance(raw, (str, bytes, dict)) or not isinstance(raw, Iterable):
+        values = [raw]
+    else:
+        values = list(raw)
+    for value in values:
+        inventory = MediaInventory.from_provider(value, scope=scope)
+        if inventory is None:
+            continue
+        registry_id = id(inventory.registry)
+        if registry_id in seen_registry_ids:
+            continue
+        seen_registry_ids.add(registry_id)
+        inventories.append(inventory)
 
 
 class _TemplateSubset:
@@ -81,31 +200,6 @@ class _TemplateSubset:
     ) -> Any | None:
         matches = self.find_all(selector, sort_key=sort_key)
         return matches[0] if matches else None
-
-
-class _WorldDomainView:
-    """Compatibility view exposing legacy world-domain helpers."""
-
-    def __init__(
-        self,
-        *,
-        dispatch_registry: BehaviorRegistry,
-        class_registry: dict[str, Any],
-        modules: list[Any],
-        authorities: list[Any],
-        story_info_projector: Any | None,
-    ) -> None:
-        self.dispatch_registry = dispatch_registry
-        self.class_registry = class_registry
-        self.modules = modules
-        self._authorities = authorities
-        self._story_info_projector = story_info_projector
-
-    def get_authorities(self) -> list[Any]:
-        return list(self._authorities)
-
-    def get_story_info_projector(self) -> Any | None:
-        return self._story_info_projector
 
 
 class World(TraversableGraphFactory):
@@ -150,15 +244,13 @@ class World(TraversableGraphFactory):
     codec_id: str | None = None
     issues: list[Any] = Field(default_factory=list)
 
-    template_scope_provider: Any | None = Field(default=None, exclude=True)
+    extra_template_registries: list[TemplateRegistry] = Field(default_factory=list, exclude=True)
     assets: Any | None = None
     resources: Any | None = None
     class_registry: dict[str, Any] = Field(default_factory=dict)
     modules: list[Any] = Field(default_factory=list)
     extra_authorities: list[Any] = Field(default_factory=list)
     story_info_projector: Any | None = None
-
-    _domain_view: Any = PrivateAttr(default=None)
 
     @model_validator(mode="before")
     @classmethod
@@ -167,6 +259,7 @@ class World(TraversableGraphFactory):
             return data
 
         payload = dict(data)
+        extra_template_registries = list(payload.get("extra_template_registries") or [])
         bundle = payload.get("bundle")
         bundle_registry = getattr(bundle, "template_registry", None)
         if isinstance(bundle_registry, TemplateRegistry):
@@ -174,8 +267,7 @@ class World(TraversableGraphFactory):
             if templates is None:
                 payload["templates"] = bundle_registry
             elif not isinstance(templates, TemplateRegistry):
-                payload.setdefault("template_scope_provider", templates)
-                payload["templates"] = bundle_registry
+                raise TypeError("World.templates must be a TemplateRegistry")
 
             bundle_defaults = {
                 "metadata": getattr(bundle, "metadata", None),
@@ -193,6 +285,17 @@ class World(TraversableGraphFactory):
                     continue
                 payload[field_name] = _copy_bundle_value(value)
 
+        if extra_template_registries:
+            deduped: list[TemplateRegistry] = []
+            seen_ids: set[int] = set()
+            for registry in extra_template_registries:
+                registry_id = id(registry)
+                if registry_id in seen_ids:
+                    continue
+                seen_ids.add(registry_id)
+                deduped.append(registry)
+            payload["extra_template_registries"] = deduped
+
         return payload
 
     def get_authorities(self) -> list[object]:
@@ -203,30 +306,6 @@ class World(TraversableGraphFactory):
                 continue
             authorities.append(authority)
         return authorities
-
-    @property
-    def domain(self) -> Any | None:
-        if self._domain_view is not None:
-            return self._domain_view
-        return _WorldDomainView(
-            dispatch_registry=self.dispatch,
-            class_registry=self.class_registry,
-            modules=self.modules,
-            authorities=list(self.get_authorities()),
-            story_info_projector=self.story_info_projector,
-        )
-
-    @property
-    def domain_manager(self) -> Any | None:
-        return self.domain
-
-    @property
-    def resource_manager(self) -> Any | None:
-        return self.resources
-
-    @property
-    def asset_manager(self) -> Any | None:
-        return self.assets
 
     def get_story_info_projector(self) -> Any | None:
         """Return the world-owned story-info projector when present."""
@@ -251,14 +330,17 @@ class World(TraversableGraphFactory):
         graph: Any = None,
     ) -> list[TemplateRegistry]:
         """Return authoritative template registries for runtime scope discovery."""
-        providers = [self.templates]
-        if self.template_scope_provider is not None:
-            providers.append(self.template_scope_provider)
-        return collect_template_registries(
-            providers,
-            caller=caller,
-            graph=graph,
-        )
+        _ = caller, graph
+        registries = [self.templates, *self.extra_template_registries]
+        deduped: list[TemplateRegistry] = []
+        seen_ids: set[int] = set()
+        for registry in registries:
+            registry_id = id(registry)
+            if registry_id in seen_ids:
+                continue
+            seen_ids.add(registry_id)
+            deduped.append(registry)
+        return deduped
 
     def get_token_catalogs(
         self,
@@ -267,12 +349,8 @@ class World(TraversableGraphFactory):
         requirement: Any = None,
         graph: Any = None,
     ) -> list[TokenCatalog]:
-        providers = [
-            getattr(self, "assets", None),
-            getattr(self, "domain", None),
-        ]
-        catalogs = collect_token_catalogs(
-            providers,
+        catalogs = _coerce_token_catalogs(
+            self.assets,
             caller=caller,
             requirement=requirement,
             graph=graph,
@@ -298,46 +376,53 @@ class World(TraversableGraphFactory):
                     graph.story_resources = story_manager
 
         inventories: list[MediaInventory] = []
-        inventories.extend(
-            collect_media_inventories(
-                [graph, story_manager],
-                caller=caller,
-                requirement=requirement,
-                graph=graph,
-                scope="story",
-            )
+        seen_registry_ids: set[int] = set()
+        _extend_media_inventories(
+            inventories,
+            provider=graph,
+            caller=caller,
+            requirement=requirement,
+            graph=graph,
+            scope="story",
+            seen_registry_ids=seen_registry_ids,
         )
-        inventories.extend(
-            collect_media_inventories(
-                [
-                    getattr(self, "resources", None),
-                    getattr(self, "assets", None),
-                    getattr(self, "domain", None),
-                ],
-                caller=caller,
-                requirement=requirement,
-                graph=graph,
-                scope="world",
-            )
+        _extend_media_inventories(
+            inventories,
+            provider=story_manager,
+            caller=caller,
+            requirement=requirement,
+            graph=graph,
+            scope="story",
+            seen_registry_ids=seen_registry_ids,
         )
-        inventories.extend(
-            collect_media_inventories(
-                [get_system_resource_manager()],
-                caller=caller,
-                requirement=requirement,
-                graph=graph,
-                scope="sys",
-            )
+        _extend_media_inventories(
+            inventories,
+            provider=self.resources,
+            caller=caller,
+            requirement=requirement,
+            graph=graph,
+            scope="world",
+            seen_registry_ids=seen_registry_ids,
+        )
+        _extend_media_inventories(
+            inventories,
+            provider=self.assets,
+            caller=caller,
+            requirement=requirement,
+            graph=graph,
+            scope="world",
+            seen_registry_ids=seen_registry_ids,
+        )
+        _extend_media_inventories(
+            inventories,
+            provider=get_system_resource_manager(),
+            caller=caller,
+            requirement=requirement,
+            graph=graph,
+            scope="sys",
+            seen_registry_ids=seen_registry_ids,
         )
         return inventories
-
-    def _world_template_scope_groups(
-        self,
-        *,
-        caller: Any = None,
-        graph: Any = None,
-    ) -> list[Iterable[Any]]:
-        return list(self.get_template_scope_groups(caller=caller, graph=graph) or [])
 
     def find_template(self, reference: str) -> Any | None:
         """Find one template by selector, uid, identifier, or label."""
@@ -361,7 +446,7 @@ class World(TraversableGraphFactory):
     def story_materialize_template(
         self,
         template,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ):
         """Compatibility hook delegating story materialization to the helper."""
         return StoryMaterializer().story_materialize_template(template, _ctx=_ctx)
@@ -372,7 +457,7 @@ class World(TraversableGraphFactory):
         template,
         entity: Any,
         role,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> None:
         """Compatibility hook delegating post-materialization policy to the helper."""
         StoryMaterializer().story_post_materialize(
@@ -388,7 +473,7 @@ class World(TraversableGraphFactory):
         requirement,
         offer,
         graph,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ):
         """Compatibility hook delegating preview checks to the helper."""
         return StoryMaterializer().preview_requirement_contract(
@@ -583,7 +668,7 @@ class World(TraversableGraphFactory):
             bundle=bundle,
             assets=assets,
             resources=resources,
-            template_scope_provider=templates,
+            extra_template_registries=_coerce_template_registries(templates),
             domain=domain,
             story_info_projector=story_info_projector,
         )

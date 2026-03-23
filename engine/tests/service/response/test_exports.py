@@ -1,12 +1,4 @@
-"""Service export contract tests.
-
-This suite is the service replacement for:
-  ``engine/tests/service/response/test_exports.py``
-  → ``engine/tests/service/response/test_exports.py``
-
-It verifies that service public exports remain importable and that
-``tangl.service.__all__`` advertises the expected compatibility surface.
-"""
+"""Service export contract tests."""
 
 from __future__ import annotations
 
@@ -97,7 +89,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         assert getattr(service, name, None) is not None, f"Missing export: {name}"
 
 
-def test_service_package_keeps_legacy_gateway_stack_as_compatibility_attributes() -> None:
+def test_service_package_does_not_export_removed_gateway_stack() -> None:
     import tangl.service as service
 
     compatibility = {
@@ -116,4 +108,4 @@ def test_service_package_keeps_legacy_gateway_stack_as_compatibility_attributes(
     }
 
     for name in compatibility:
-        assert getattr(service, name, None) is not None, f"Missing compatibility export: {name}"
+        assert not hasattr(service, name), f"Unexpected compatibility export: {name}"

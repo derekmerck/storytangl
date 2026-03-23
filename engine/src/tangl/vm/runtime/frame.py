@@ -96,6 +96,7 @@ from .causality import CausalityMode
 logger = logging.getLogger(__name__)
 
 NS: TypeAlias = Mapping[str, Any]
+_UNSET = object()
 
 __all__ = ["PhaseCtx", "Frame"]
 
@@ -198,8 +199,8 @@ class PhaseCtx:
     def derive(
         self,
         *,
-        cursor_id: UUID | None = None,
-        graph: Graph | None = None,
+        cursor_id: UUID | None | object = _UNSET,
+        graph: Graph | None | object = _UNSET,
         meta_overrides: Mapping[str, Any] | None = None,
         **field_overrides: Any,
     ) -> "PhaseCtx":
@@ -209,8 +210,8 @@ class PhaseCtx:
             meta.update(meta_overrides)
 
         kwargs: dict[str, Any] = {
-            "graph": self.graph if graph is None else graph,
-            "cursor_id": self.cursor_id if cursor_id is None else cursor_id,
+            "graph": self.graph if graph is _UNSET else graph,
+            "cursor_id": self.cursor_id if cursor_id is _UNSET else cursor_id,
             "step": self.step,
             "correlation_id": self.correlation_id,
             "logger": self.logger,

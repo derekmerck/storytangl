@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from tangl.core import Entity, EntityTemplate
 
+from ..ctx import VmPhaseCtx
 from .provisioner import _next_provision_uid, _template_hash_value
 
 
@@ -17,20 +18,12 @@ class MaterializeRole(StrEnum):
 
 
 def resolve_story_materialize_hook(
-    _ctx: Any,
+    _ctx: VmPhaseCtx | None,
 ) -> Callable[[EntityTemplate, Any], Entity] | None:
     """Return an optional story-specific materializer hook from ``_ctx``."""
-    hook = getattr(_ctx, "story_materialize", None)
-    if callable(hook):
-        return hook
-
-    meta = getattr(_ctx, "meta", None)
-    if isinstance(meta, dict):
-        meta_hook = meta.get("story_materialize")
-        if callable(meta_hook):
-            return meta_hook
-
-    graph = getattr(_ctx, "graph", None)
+    if _ctx is None:
+        return None
+    graph = _ctx.graph
     factory = getattr(graph, "factory", None)
     factory_hook = getattr(factory, "story_materialize_template", None)
     if callable(factory_hook):
@@ -42,20 +35,12 @@ def resolve_story_materialize_hook(
 
 
 def resolve_story_post_materialize_hook(
-    _ctx: Any,
+    _ctx: VmPhaseCtx | None,
 ) -> Callable[..., Any] | None:
     """Return an optional story post-materialization hook from ``_ctx``."""
-    hook = getattr(_ctx, "story_post_materialize", None)
-    if callable(hook):
-        return hook
-
-    meta = getattr(_ctx, "meta", None)
-    if isinstance(meta, dict):
-        meta_hook = meta.get("story_post_materialize")
-        if callable(meta_hook):
-            return meta_hook
-
-    graph = getattr(_ctx, "graph", None)
+    if _ctx is None:
+        return None
+    graph = _ctx.graph
     factory = getattr(graph, "factory", None)
     factory_hook = getattr(factory, "story_post_materialize", None)
     if callable(factory_hook):
@@ -67,20 +52,12 @@ def resolve_story_post_materialize_hook(
 
 
 def resolve_story_preview_requirement_hook(
-    _ctx: Any,
+    _ctx: VmPhaseCtx | None,
 ) -> Callable[..., Any] | None:
     """Return an optional story preview hook from ``_ctx``."""
-    hook = getattr(_ctx, "story_preview_requirement", None)
-    if callable(hook):
-        return hook
-
-    meta = getattr(_ctx, "meta", None)
-    if isinstance(meta, dict):
-        meta_hook = meta.get("story_preview_requirement")
-        if callable(meta_hook):
-            return meta_hook
-
-    graph = getattr(_ctx, "graph", None)
+    if _ctx is None:
+        return None
+    graph = _ctx.graph
     factory = getattr(graph, "factory", None)
     factory_hook = getattr(factory, "preview_requirement_contract", None)
     if callable(factory_hook):

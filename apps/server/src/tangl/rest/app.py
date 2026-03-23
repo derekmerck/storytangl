@@ -34,43 +34,35 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 
 from tangl.config import settings
-from tangl.rest.dependencies_gateway import get_service_gateway
+from tangl.rest.dependencies_gateway import get_service_manager
 from tangl.rest.media_mounts import mount_system_media
-from tangl.service import ServiceGateway, ServiceOperation
+from tangl.service import ServiceManager
 from tangl.service.response import RuntimeInfo
 
 logger = logging.getLogger(__name__)
 
 
 # todo: this is a placeholder that creates a default user for testing
-def get_user_credentials(gateway: ServiceGateway) -> UUID:
+def get_user_credentials(service_manager: ServiceManager) -> UUID:
     secret = settings.client.secret
-    result = gateway.execute(ServiceOperation.USER_CREATE, secret=secret)
+    result = service_manager.create_user(secret=secret)
 
     user_id: UUID | None = None
-    user_obj = None
 
     if isinstance(result, RuntimeInfo):
         if result.status != "ok":
-            raise RuntimeError("Service gateway failed to create dev user")
+            raise RuntimeError("Service manager failed to create dev user")
         details = result.details or {}
-        user_obj = details.get("user")
         raw_user_id = details.get("user_id")
         try:
             user_id = UUID(str(raw_user_id)) if raw_user_id is not None else None
         except (TypeError, ValueError):
             user_id = None
-        if user_id is None and hasattr(user_obj, "uid"):
-            user_id = getattr(user_obj, "uid")
-    else:
-        # Backward compatibility with previous create_user return type
-        user_obj = result
-        user_id = getattr(result, "uid", None)
 
     if user_id is None:
-        raise RuntimeError("Service gateway failed to return a user identifier")
+        raise RuntimeError("Service manager failed to return a user identifier")
 
-    logger.debug("Created dev user via service gateway", extra={"user_id": str(user_id)})
+    logger.debug("Created dev user via service manager", extra={"user_id": str(user_id)})
     return user_id
 
 
@@ -78,7 +70,7 @@ def get_user_credentials(gateway: ServiceGateway) -> UUID:
 async def _app_lifespan(_: FastAPI):
     """Run startup initialization for service-backed REST app."""
     try:
-        get_user_credentials(get_service_gateway())
+        get_user_credentials(get_service_manager())
     except Exception:
         logger.exception("Failed to initialize dev user credentials during startup")
         raise

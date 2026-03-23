@@ -1093,7 +1093,7 @@ class TestResolverNodeContext:
             get_template_scope_groups=lambda: [],
         )
 
-        with pytest.raises(TypeError, match="derive"):
+        with pytest.raises(AttributeError, match="derive"):
             Resolver()._make_node_ctx(
                 graph=graph,
                 node=node,

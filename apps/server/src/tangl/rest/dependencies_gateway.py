@@ -1,74 +1,48 @@
-"""REST gateway dependencies (service adapter + shared locks)."""
+"""REST service-manager dependencies and auth helpers."""
 
 from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from typing import Callable
 from uuid import UUID
 
 from fastapi import HTTPException
 
-from tangl.rest.dependencies import get_orchestrator
-from tangl.service import (
-    GatewayRestAdapter,
-    ServiceGateway,
-    UserAuthInfo,
-    build_service_gateway,
-    user_id_by_key,
-)
+from tangl.rest.dependencies import get_persistence
+from tangl.service import ServiceAccess, ServiceManager, UserAuthInfo, build_service_manager, user_id_by_key
 
-_gateway: ServiceGateway | None = None
-_adapter: GatewayRestAdapter | None = None
+_service_manager: ServiceManager | None = None
 _user_locks: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
 _api_key_index: dict[str, UUID] = {}
 
 
-def _build_service_gateway() -> ServiceGateway:
-    base_orchestrator = get_orchestrator()
-    return build_service_gateway(base_orchestrator.persistence)
+def _build_service_manager() -> ServiceManager:
+    return build_service_manager(get_persistence())
 
 
-def get_service_gateway() -> ServiceGateway:
-    """Return process-wide service gateway singleton."""
+def get_service_manager() -> ServiceManager:
+    """Return the process-wide service-manager singleton."""
 
-    global _gateway
-    if _gateway is None:
-        _gateway = _build_service_gateway()
-    return _gateway
+    global _service_manager
+    if _service_manager is None:
+        _service_manager = _build_service_manager()
+    return _service_manager
 
 
 def _resolve_user_auth_from_key(
     api_key: str,
     *,
-    gateway: ServiceGateway | None = None,
+    service_manager: ServiceManager | None = None,
 ) -> UserAuthInfo:
-    service_gateway = gateway or get_service_gateway()
+    manager = service_manager or get_service_manager()
     auth = user_id_by_key(
         api_key,
-        service_gateway.persistence,
+        manager.persistence,
         reverse_index=_api_key_index,
     )
     if auth is None:
         raise ValueError("Invalid API key")
     return auth
-
-
-def _build_service_adapter() -> GatewayRestAdapter:
-    gateway = get_service_gateway()
-    resolver: Callable[[str], UserAuthInfo] = (
-        lambda api_key: _resolve_user_auth_from_key(api_key, gateway=gateway)
-    )
-    return GatewayRestAdapter(gateway, auth_resolver=resolver)
-
-
-def get_service_adapter() -> GatewayRestAdapter:
-    """Return process-wide REST adapter singleton."""
-
-    global _adapter
-    if _adapter is None:
-        _adapter = _build_service_adapter()
-    return _adapter
 
 
 def get_user_locks() -> dict[UUID, asyncio.Lock]:
@@ -80,35 +54,41 @@ def get_user_locks() -> dict[UUID, asyncio.Lock]:
 def resolve_user_auth(
     api_key: str,
     *,
-    gateway: ServiceGateway | None = None,  # backward-compat call sites
-    adapter: GatewayRestAdapter | None = None,
+    service_manager: ServiceManager | None = None,
 ) -> UserAuthInfo:
     """Resolve API key to user auth context for route handlers."""
 
     try:
-        if adapter is not None:
-            return adapter.resolve_user_auth(api_key)
-        return _resolve_user_auth_from_key(api_key, gateway=gateway)
+        return _resolve_user_auth_from_key(api_key, service_manager=service_manager)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
-def resolve_user_id(
-    api_key: str,
+def require_service_access(
+    method_name: str,
     *,
-    gateway: ServiceGateway | None = None,  # backward-compat call sites
-    adapter: GatewayRestAdapter | None = None,
-) -> UUID:
-    """Resolve API key to user id for user-scoped operations."""
+    user_auth: UserAuthInfo | None = None,
+) -> None:
+    """Enforce service-method access metadata for transport calls."""
 
-    return resolve_user_auth(api_key, gateway=gateway, adapter=adapter).user_id
+    try:
+        spec = ServiceManager.get_service_methods()[method_name]
+    except KeyError as exc:  # pragma: no cover - programmer error
+        raise RuntimeError(f"Unknown service method: {method_name}") from exc
+
+    if spec.access == ServiceAccess.PUBLIC:
+        return
+    if user_auth is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if spec.access == ServiceAccess.DEV and not user_auth.is_privileged:
+        raise HTTPException(status_code=403, detail="Access denied")
 
 
-def reset_service_gateway_for_testing() -> None:
-    """Reset cached service gateway singleton (testing hook)."""
+def reset_service_manager_for_testing() -> None:
+    """Reset cached service-manager singleton (testing hook)."""
 
-    global _gateway, _adapter
-    _gateway = None
-    _adapter = None
+    global _service_manager
+    _service_manager = None
     _user_locks.clear()
     _api_key_index.clear()
+

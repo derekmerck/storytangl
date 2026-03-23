@@ -15,7 +15,7 @@ from tangl.vm import (
     on_provision,
     on_update,
 )
-from tangl.vm.dispatch import dispatch as vm_dispatch
+from tangl.vm.dispatch import dispatch
 
 from .has_game import HasGame
 
@@ -68,7 +68,7 @@ def _ctx_selected_payload(ctx: Any) -> Any:
     return None
 
 
-@vm_dispatch.register(task=P.PREREQS, caller=HasGame)
+@dispatch.register(task=P.PREREQS, caller=HasGame)
 @on_prereqs(wants_caller_kind=HasGame, wants_exact_kind=False)
 def setup_game_on_first_visit(
     cursor: HasGame | None = None,
@@ -113,7 +113,7 @@ def setup_game_on_first_visit(
     return None
 
 
-@vm_dispatch.register(task=P.PLANNING, caller=HasGame)
+@dispatch.register(task=P.PLANNING, caller=HasGame)
 @on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
 def provision_game_moves(
     cursor: HasGame | None = None,
@@ -187,7 +187,7 @@ def provision_game_moves(
     return actions
 
 
-@vm_dispatch.register(task=P.UPDATE, caller=HasGame)
+@dispatch.register(task=P.UPDATE, caller=HasGame)
 @on_update(wants_caller_kind=HasGame, wants_exact_kind=False)
 def process_game_move(
     cursor: HasGame | None = None,
@@ -261,7 +261,7 @@ def process_game_move(
     return None
 
 
-@vm_dispatch.register(task=P.JOURNAL, caller=HasGame)
+@dispatch.register(task=P.JOURNAL, caller=HasGame)
 @on_journal(wants_caller_kind=HasGame, wants_exact_kind=False)
 def generate_game_journal(
     cursor: HasGame | None = None,
@@ -323,7 +323,7 @@ def generate_game_journal(
     return fragments
 
 
-@vm_dispatch.register(task="get_ns", caller=HasGame)
+@dispatch.register(task="get_ns", caller=HasGame)
 @on_gather_ns(wants_caller_kind=HasGame, wants_exact_kind=False)
 def inject_game_context(
     cursor: HasGame | None = None,

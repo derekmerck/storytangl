@@ -13,7 +13,11 @@ from tangl.media.media_resource import MediaDep, MediaInventory
 from tangl.media.media_resource import MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.media.worker_dispatcher import WorkerResult
-from tangl.service.media import MediaRenderProfile, media_fragment_to_payload
+from tangl.service.media import (
+    MediaContentProfile,
+    MediaRenderProfile,
+    media_fragment_to_payload,
+)
 from tangl.story.fabula import World
 from tangl.vm.provision.resolver import Resolver
 from tangl.vm.runtime.frame import PhaseCtx
@@ -156,7 +160,7 @@ class TestAsyncMediaRitModel:
 
         payload = media_fragment_to_payload(
             fragment,
-            render_profile="inline_data",
+            render_profile=MediaRenderProfile(content_profile=MediaContentProfile.INLINE_DATA),
             story_id="story-1",
         )
 

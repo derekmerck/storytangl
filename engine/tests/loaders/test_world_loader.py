@@ -412,14 +412,14 @@ class DomainCharacter(Entity):
     world_one = anthology["book1"]
     world_two = anthology["book2"]
 
-    assert world_one.domain_manager is world_two.domain_manager
-    assert world_one.resource_manager is world_two.resource_manager
-    assert world_one.asset_manager is not world_two.asset_manager
+    assert world_one.dispatch is world_two.dispatch
+    assert world_one.resources is world_two.resources
+    assert world_one.assets is not world_two.assets
     assert not hasattr(world_one, "script_manager")
     assert not hasattr(world_two, "script_manager")
     assert world_one.templates is not world_two.templates
 
-    assert "DomainCharacter" in world_one.domain_manager.class_registry
+    assert "DomainCharacter" in world_one.class_registry
     assert world_one.metadata["author"] == "Steve"
     assert world_one.metadata["title"] == "Book One"
     assert world_two.metadata["author"] == "Steve"
@@ -490,7 +490,7 @@ class DomainCharacter(Entity):
 
     assert isinstance(world_one, World)
     assert isinstance(world_two, World)
-    assert world_one.domain is world_two.domain
+    assert world_one.dispatch is world_two.dispatch
     assert world_one.assets is world_two.assets
     assert world_one.resources is world_two.resources
     assert not hasattr(world_one, "script_manager")
@@ -498,8 +498,8 @@ class DomainCharacter(Entity):
     assert world_one.templates is world_one.bundle.template_registry
     assert world_two.templates is world_two.bundle.template_registry
     assert world_one.templates is not world_two.templates
-    assert "DomainCharacter" in world_one.domain.class_registry
-    assert world_one.domain.dispatch_registry in world_one.get_authorities()
+    assert "DomainCharacter" in world_one.class_registry
+    assert world_one.dispatch in world_one.get_authorities()
 
 
 def test_compiler_adds_bundle_root_for_domain_imports(tmp_path: Path) -> None:
@@ -548,9 +548,8 @@ scenes: {}
         world = compiler.compile(bundle)
 
         assert isinstance(world, World)
-        assert world.domain is not None
-        assert "DomainCharacter" in world.domain.class_registry
-        assert world.domain.dispatch_registry in world.get_authorities()
+        assert "DomainCharacter" in world.class_registry
+        assert world.dispatch in world.get_authorities()
         assert str(bundle_root) in sys.path
         assert str(bundle.domain_dir) not in sys.path
     finally:

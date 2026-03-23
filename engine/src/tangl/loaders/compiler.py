@@ -131,7 +131,6 @@ class WorldCompiler:
             story_info_projector=(
                 domain_adjuncts.get_story_info_projector() if domain_adjuncts is not None else None
             ),
-            domain_view=domain_adjuncts,
         )
         return world
 
@@ -203,7 +202,6 @@ class WorldCompiler:
                     if world_domain_adjuncts is not None
                     else None
                 ),
-                domain_view=world_domain_adjuncts,
             )
             worlds[story_key] = world
 

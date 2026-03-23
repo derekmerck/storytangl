@@ -9,6 +9,7 @@ from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
 from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.runtime.frame import PhaseCtx
+from tangl.vm.provision.materialization import resolve_story_materialize_hook
 from tangl.vm import (
     Affordance,
     Blocker,
@@ -27,7 +28,6 @@ from tangl.vm.provision.provisioner import _next_provision_uid
 from ..concepts import Actor, Location, Role, Setting
 from ..episode import Action, Block, MenuBlock, Scene
 from ..story_graph import StoryGraph
-from .compiler import StoryTemplateBundle
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -49,7 +49,6 @@ class _MaterializationState:
     codec_state: dict[str, Any] = field(default_factory=dict)
     codec_id: str | None = None
     bundle_id: str | None = None
-    id_to_entity: dict[str, GraphItem] = field(default_factory=dict)
 
 class StoryMaterializer:
     """StoryMaterializer()
@@ -83,7 +82,7 @@ class StoryMaterializer:
     def story_materialize_template(
         self,
         template: EntityTemplate,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> GraphItem:
         """Materialize one story template payload with resolver-stable uid rules."""
         return template.materialize(uid=_next_provision_uid(_ctx=_ctx))
@@ -94,13 +93,15 @@ class StoryMaterializer:
         template: EntityTemplate | None,
         entity: Any,
         role: MaterializeRole | str = MaterializeRole.PROVISION_LEAF,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> None:
         """Finalize runtime story contracts for one newly attached entity."""
         if isinstance(role, str):
             role = MaterializeRole(role)
 
-        graph = getattr(entity, "graph", None) or getattr(_ctx, "graph", None)
+        graph = entity.graph if isinstance(entity, GraphItem) else None
+        if graph is None and _ctx is not None:
+            graph = _ctx.graph
         if not isinstance(graph, StoryGraph):
             return
 
@@ -131,7 +132,7 @@ class StoryMaterializer:
         requirement: Requirement,
         offer: ProvisionOffer,
         graph: Any,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[Blocker]:
         """Return story-level selected-path blockers for one preview offer."""
         if not isinstance(graph, StoryGraph):
@@ -175,7 +176,6 @@ class StoryMaterializer:
     def create_story(
         self,
         *,
-        bundle: StoryTemplateBundle,
         story_label: str,
         init_mode: InitMode,
         freeze_shape: bool = False,
@@ -218,7 +218,6 @@ class StoryMaterializer:
             codec_id=codec_id,
             bundle_id=bundle_id,
         )
-        self._index_graph_entities(state=state)
         return state
 
     def _run_topology_passes(self, *, state: _MaterializationState) -> None:
@@ -286,30 +285,6 @@ class StoryMaterializer:
             codec_id=getattr(world, "codec_id", None),
             bundle_id=getattr(self._template_registry_for_graph(graph), "label", None),
         )
-
-    def _index_graph_entities(self, *, state: _MaterializationState) -> None:
-        for entity in state.graph.values():
-            if isinstance(entity, GraphItem):
-                self._index_entity(state=state, entity=entity)
-
-    def _index_entity(
-        self,
-        *,
-        state: _MaterializationState,
-        entity: GraphItem,
-        template: EntityTemplate | None = None,
-    ) -> None:
-        template_label = template.get_label() if isinstance(template, EntityTemplate) else None
-        if template_label:
-            state.id_to_entity[template_label] = entity
-
-        entity_label = entity.get_label() if hasattr(entity, "get_label") else None
-        if isinstance(entity_label, str) and entity_label:
-            state.id_to_entity.setdefault(entity_label, entity)
-
-        for identifier in entity.get_identifiers():
-            key = str(identifier)
-            state.id_to_entity.setdefault(key, entity)
 
     def _run_runtime_topology_passes(
         self,
@@ -402,6 +377,37 @@ class StoryMaterializer:
             return found
         return None
 
+    def _find_runtime_entity(
+        self,
+        *,
+        graph: StoryGraph,
+        reference: str,
+        kind: type[GraphItem] | None = None,
+    ) -> GraphItem | None:
+        selectors = [
+            Selector(has_kind=kind, has_path=reference) if kind is not None else Selector(has_path=reference),
+            Selector(has_kind=kind, has_identifier=reference)
+            if kind is not None
+            else Selector(has_identifier=reference),
+            Selector(has_kind=kind, label=reference) if kind is not None else Selector(label=reference),
+        ]
+        for selector in selectors:
+            found = graph.find_one(selector)
+            if isinstance(found, GraphItem):
+                return found
+
+        template = self._find_template_for_path(graph=graph, reference=reference)
+        if isinstance(template, EntityTemplate):
+            selector = (
+                Selector(has_kind=kind, templ_hash=template.content_hash())
+                if kind is not None
+                else Selector(templ_hash=template.content_hash())
+            )
+            found = graph.find_one(selector)
+            if isinstance(found, GraphItem):
+                return found
+        return None
+
     def _find_existing_child_for_template(
         self,
         *,
@@ -429,7 +435,7 @@ class StoryMaterializer:
         graph: StoryGraph,
         template: EntityTemplate,
         container: TraversableNode,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> TraversableNode | None:
         entry_template = self._entry_template_for_container(template)
         if entry_template is None:
@@ -441,12 +447,12 @@ class StoryMaterializer:
             template=entry_template,
         )
         if entry_node is None:
-            story_materialize = getattr(graph, "story_materialize", None)
+            story_materialize = resolve_story_materialize_hook(_ctx)
             entry_node = materialize_template_entity(
                 entry_template,
                 _ctx=_ctx,
                 role=MaterializeRole.PROVISION_LEAF,
-                story_materialize=story_materialize if callable(story_materialize) else None,
+                story_materialize=story_materialize,
             )
             if not isinstance(entry_node, TraversableNode):
                 return None
@@ -468,25 +474,18 @@ class StoryMaterializer:
         *,
         graph: StoryGraph,
         request_ctx_path: str,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> PhaseCtx:
-        correlation_id = None
-        logger = None
-        step = None
-        meta: dict[str, Any] = {}
-        if isinstance(_ctx, VmPhaseCtx):
-            correlation_id = _ctx.correlation_id
-            logger = _ctx.logger
-            meta.update(_ctx.get_meta())
-            step = _ctx.step
-        meta["request_ctx_path"] = request_ctx_path
+        if _ctx is not None:
+            return _ctx.derive(
+                cursor_id=None,
+                graph=graph,
+                meta_overrides={"request_ctx_path": request_ctx_path},
+            )
         return PhaseCtx(
             graph=graph,
             cursor_id=None,
-            step=step,
-            correlation_id=correlation_id,
-            logger=logger,
-            meta=meta,
+            meta={"request_ctx_path": request_ctx_path},
         )
 
     def _preview_immediate_hard_dependencies(
@@ -495,7 +494,7 @@ class StoryMaterializer:
         graph: StoryGraph,
         template: EntityTemplate,
         request_ctx_path: str,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[Blocker]:
         payload = getattr(template, "payload", None)
         if not isinstance(payload, TraversableNode):
@@ -846,7 +845,11 @@ class StoryMaterializer:
                 trigger_phase=trigger_phase,
             )
 
-            target = state.id_to_entity.get(successor_ref)
+            target = self._find_runtime_entity(
+                graph=state.graph,
+                reference=successor_ref,
+                kind=TraversableNode,
+            )
             if isinstance(target, TraversableNode):
                 action.set_successor(target)
                 continue
@@ -939,7 +942,11 @@ class StoryMaterializer:
             )
 
             if identifier:
-                candidate = state.id_to_entity.get(identifier)
+                candidate = self._find_runtime_entity(
+                    graph=state.graph,
+                    reference=identifier,
+                    kind=provider_kind,
+                )
                 if isinstance(candidate, provider_kind):
                     dep.set_provider(candidate)
 

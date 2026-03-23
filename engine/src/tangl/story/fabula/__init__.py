@@ -9,7 +9,7 @@ Conceptual layers
 1. Compilation
 
    - :class:`StoryCompiler` validates authored script data and emits a
-     :class:`StoryTemplateBundle`.
+     compiled template bundle.
 
 2. Materialization
 
@@ -20,7 +20,7 @@ Conceptual layers
 3. World assembly and entry point
 
    - :class:`WorldBuilder` assembles world adjunct providers around a compiled
-     :class:`StoryTemplateBundle`.
+     template bundle.
    - :class:`World` is the singleton story authority over runtime graph
      creation and exposes :meth:`World.create_story`.
 
@@ -37,7 +37,7 @@ Runtime graph creation belongs to :class:`World`; story-specific wiring remains
 factored into :class:`StoryMaterializer`.
 """
 
-from .compiler import StoryCompiler, StoryTemplateBundle
+from .compiler import StoryCompiler
 from .builder import WorldBuilder
 from .materializer import StoryMaterializer
 from .types import (
@@ -66,7 +66,6 @@ __all__ = [
     "StoryCompiler",
     "StoryInitResult",
     "StoryMaterializer",
-    "StoryTemplateBundle",
     "UnresolvedDependency",
     "WorldBuilder",
     "World",

@@ -51,15 +51,18 @@ def _first_choice_edge(ledger: Ledger) -> Action:
 
 @pytest.fixture(autouse=True)
 def _clear_manual_worlds() -> None:
-    from tangl.service.controllers.world_controller import _MANUAL_WORLDS
+    from tangl.service.world_registry import clear_manual_worlds, iter_manual_worlds
 
-    snapshot = dict(_MANUAL_WORLDS)
-    _MANUAL_WORLDS.clear()
+    snapshot = dict(iter_manual_worlds())
+    clear_manual_worlds()
     try:
         yield
     finally:
-        _MANUAL_WORLDS.clear()
-        _MANUAL_WORLDS.update(snapshot)
+        clear_manual_worlds()
+        for world in snapshot.values():
+            from tangl.service.world_registry import register_manual_world
+
+            register_manual_world(world)
 
 
 @pytest.fixture

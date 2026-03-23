@@ -8,11 +8,9 @@ from pydantic import BaseModel
 
 from tangl.config import settings
 from tangl.rest.dependencies_gateway import (
-    get_service_adapter,
     get_user_locks,
     resolve_user_auth,
 )
-from tangl.service import GatewayRestAdapter
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -40,7 +38,6 @@ def _not_implemented_response(endpoint_name: str) -> JSONResponse:
 
 @story_router.put("/go", tags=["Restricted"])
 async def goto_story_block(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -51,15 +48,14 @@ async def goto_story_block(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ):
     """Jump the active frame to ``block_id``."""
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key)
     async with user_locks[user_auth.user_id]:
-        _ = (adapter, block_id, render_profile)
+        _ = (block_id, render_profile)
         return _not_implemented_response("story/go")
 
 
 @story_router.get("/inspect", tags=["Restricted"])
 async def inspect_story_node(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -73,16 +69,15 @@ async def inspect_story_node(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> Any:
     """Return debug inspection info for the active node (or a specific node)."""
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key)
     async with user_locks[user_auth.user_id]:
-        _ = (adapter, node_id, render_profile)
+        _ = (node_id, render_profile)
         return _not_implemented_response("story/inspect")
 
 
 @story_router.post("/check", tags=["Restricted"])
 async def check_expression(
     request: DebugExprRequest = Body(...),
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -92,16 +87,15 @@ async def check_expression(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> Any:
     """Evaluate a debug expression in the active story context."""
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key)
     async with user_locks[user_auth.user_id]:
-        _ = (adapter, request, render_profile)
+        _ = (request, render_profile)
         return _not_implemented_response("story/check")
 
 
 @story_router.post("/apply", tags=["Restricted"])
 async def apply_effect_post(
     request: DebugExprRequest = Body(...),
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -111,16 +105,15 @@ async def apply_effect_post(
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> Any:
     """Apply a debug expression in the active story context."""
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
+    user_auth = resolve_user_auth(api_key)
     async with user_locks[user_auth.user_id]:
-        _ = (adapter, request, render_profile)
+        _ = (request, render_profile)
         return _not_implemented_response("story/apply")
 
 
 @story_router.put("/apply", tags=["Restricted"])
 async def apply_effect_put(
     request: DebugExprRequest = Body(...),
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
     user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(
         example=key_for_secret(settings.client.secret),
@@ -132,7 +125,6 @@ async def apply_effect_put(
     """Compatibility alias for :route:`POST /story/apply`."""
     return await apply_effect_post(
         request=request,
-        adapter=adapter,
         user_locks=user_locks,
         api_key=api_key,
         render_profile=render_profile,

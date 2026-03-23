@@ -22,8 +22,6 @@ See Also
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pytest
 
 from tangl.core import EntityTemplate, Selector, TemplateRegistry
@@ -210,13 +208,6 @@ class TestWorldScopeProviderIntegration:
     """World-contributed template groups appear in resolved scope groups."""
 
     def test_world_extra_templates_appear_in_scope(self) -> None:
-        @dataclass(slots=True)
-        class _FakeFacet:
-            extra: TemplateRegistry
-
-            def get_template_scope_groups(self, *, caller=None, graph=None):
-                return [list(self.extra.values())]
-
         base_world = World.from_script_data(script_data=_multi_scene_script())
         extra_reg = TemplateRegistry(label="extra")
         extra_tmpl = EntityTemplate(
@@ -229,7 +220,8 @@ class TestWorldScopeProviderIntegration:
         world = World(
             label=f"{base_world.label}.scope",
             bundle=base_world.bundle,
-            templates=_FakeFacet(extra=extra_reg),
+            templates=base_world.bundle.template_registry,
+            extra_template_registries=[extra_reg],
         )
         result = world.create_story("world_scope_story", init_mode=InitMode.EAGER)
         cursor = result.graph.get(result.graph.initial_cursor_id)
@@ -243,13 +235,6 @@ class TestWorldScopeProviderIntegration:
         assert "world.extra.npc" in all_labels
 
     def test_world_extra_templates_appear_in_phase_ctx_dispatch_scope(self) -> None:
-        @dataclass(slots=True)
-        class _FakeFacet:
-            extra: TemplateRegistry
-
-            def get_template_scope_groups(self, *, caller=None, graph=None):
-                return [list(self.extra.values())]
-
         base_world = World.from_script_data(script_data=_multi_scene_script())
         extra_reg = TemplateRegistry(label="extra")
         _ = EntityTemplate(
@@ -261,7 +246,8 @@ class TestWorldScopeProviderIntegration:
         world = World(
             label=f"{base_world.label}.scope_ctx",
             bundle=base_world.bundle,
-            templates=_FakeFacet(extra=extra_reg),
+            templates=base_world.bundle.template_registry,
+            extra_template_registries=[extra_reg],
         )
         result = world.create_story("world_scope_story_ctx", init_mode=InitMode.EAGER)
         cursor = result.graph.get(result.graph.initial_cursor_id)

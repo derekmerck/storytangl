@@ -7,7 +7,7 @@ import pytest
 from tangl.journal.media import MediaFragment
 from tangl.media import system_media
 from tangl.media.media_resource.media_dependency import MediaDep
-from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.media import media_fragment_to_payload
 from tangl.vm import AnonymousEdge, Frame, ResolutionPhase as P
 
 from media.helpers import MediaWorld, build_world_with_logo_media_block
@@ -65,8 +65,7 @@ def test_system_media_fallback(tmp_path, monkeypatch):
     fragments = _run_journal(frame, block)
     media_frag = next(frag for frag in fragments if isinstance(frag, MediaFragment))
 
-    controller = RuntimeController()
-    result = controller._dereference_media(media_frag, world_id=str(world.label))
+    result = media_fragment_to_payload(media_frag, world_id=str(world.label))
 
     assert result["scope"] == "sys"
     assert result["url"].startswith("/media/sys/")

@@ -18,13 +18,9 @@ from tangl.type_hints import Identifier, UnstructuredData
 from tangl.utils.hash_secret import key_for_secret
 from tangl.vm.runtime.ledger import Ledger
 
-from .controllers.system_controller import SystemController
-from .controllers.world_controller import (
-    _MANUAL_WORLDS,
-    _legacy_world_label,
-    resolve_world,
-)
 from .exceptions import AuthMismatchError
+from ._user_support import parse_bool_flag, parse_datetime_field
+from .media import resolve_world_media
 from .response import (
     ProjectedState,
     RuntimeEnvelope,
@@ -43,10 +39,17 @@ from .service_method import (
     get_service_method_spec,
     service_method,
 )
+from .system_info import get_system_info, reset_system
 from .story_info import resolve_story_info_projector
 from .user import User
-from .user.user_controller import _parse_bool_flag, _parse_datetime_field
-from .world_registry import WorldRegistry
+from .world_registry import (
+    WorldRegistry,
+    iter_manual_worlds,
+    legacy_world_label,
+    pop_manual_world,
+    register_manual_world,
+    resolve_world,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from tangl.media import MediaDataType
@@ -494,12 +497,12 @@ class ServiceManager:
                 api_key = key_for_secret(secret)
 
             if "last_played_dt" in kwargs:
-                user.last_played_dt = _parse_datetime_field(
+                user.last_played_dt = parse_datetime_field(
                     kwargs["last_played_dt"],
                     field_name="last_played_dt",
                 )
             if "privileged" in kwargs:
-                next_privileged = _parse_bool_flag(
+                next_privileged = parse_bool_flag(
                     kwargs["privileged"],
                     field_name="privileged",
                 )
@@ -580,9 +583,10 @@ class ServiceManager:
         registry = WorldRegistry()
         worlds = registry.list_worlds()
 
-        if _MANUAL_WORLDS:
+        manual_worlds = dict(iter_manual_worlds())
+        if manual_worlds:
             known = {item.get("label") for item in worlds}
-            for label, world in _MANUAL_WORLDS.items():
+            for label, world in manual_worlds.items():
                 if label in known:
                     continue
                 worlds.append(
@@ -637,10 +641,11 @@ class ServiceManager:
     ) -> Any:
         """Return implementation-specific media content for one world asset."""
 
-        from .controllers.world_controller import WorldController
-
-        world_controller = WorldController()
-        return world_controller.get_world_media(world=self.open_world(world_id), media=media, **kwargs)
+        return resolve_world_media(
+            world=self.open_world(world_id),
+            media=media,
+            **kwargs,
+        )
 
     @service_method(
         access=ServiceAccess.DEV,
@@ -667,12 +672,12 @@ class ServiceManager:
         if not isinstance(script_data, dict):
             raise ValueError("script_data is required to load a world")
 
-        legacy_label = _legacy_world_label(script_data)
+        legacy_label = legacy_world_label(script_data)
         world = World.from_script_data(
             script_data=script_data,
             label=legacy_label,
         )
-        _MANUAL_WORLDS[world.label] = world
+        register_manual_world(world)
         return RuntimeInfo.ok(message="World loaded", world_label=world.label)
 
     @service_method(
@@ -686,7 +691,7 @@ class ServiceManager:
         """Unload one process-local manual world."""
 
         world = self.open_world(world_id)
-        removed = _MANUAL_WORLDS.pop(world.label, None)
+        removed = pop_manual_world(world.label)
         if removed is None:
             return RuntimeInfo.error(
                 code="WORLD_NOT_MANUAL",
@@ -704,7 +709,7 @@ class ServiceManager:
     def get_system_info(self) -> SystemInfo:
         """Return service/system metadata."""
 
-        return SystemController.get_system_info()
+        return get_system_info()
 
     @service_method(
         access=ServiceAccess.DEV,
@@ -716,7 +721,7 @@ class ServiceManager:
     def reset_system(self, *, hard: bool = False) -> RuntimeInfo:
         """Implementation-specific system reset hook."""
 
-        return SystemController.reset_system(hard=hard)
+        return reset_system(hard=hard)
 
 
 __all__ = [

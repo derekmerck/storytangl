@@ -16,6 +16,7 @@ from tangl.core import (
 )
 from ..dispatch import on_provision
 from ..ctx import VmPhaseCtx
+from ..runtime.causality import CausalityMode
 from ..traversable import TraversableNode
 from .materialization import (
     MaterializeRole,
@@ -177,29 +178,13 @@ class Resolver:
             return label
         return ""
 
-    @staticmethod
-    def _ctx_causality_mode(_ctx: VmPhaseCtx | None) -> Any | None:
-        if _ctx is None:
-            return None
-        mode = getattr(_ctx, "causality_mode", None)
-        if mode is not None:
-            return mode
-
-        meta = dict(_ctx.meta or {})
-        if "causality_mode" in meta:
-            return meta["causality_mode"]
-        return None
-
     @classmethod
     def _stubs_allowed(cls, *, allow_stubs: bool, _ctx: VmPhaseCtx | None = None) -> bool:
         if allow_stubs:
             return True
-        mode = cls._ctx_causality_mode(_ctx)
-        if mode is None:
+        if _ctx is None:
             return False
-        from tangl.vm.runtime import CausalityMode
-
-        return mode == CausalityMode.HARD_DIRTY
+        return _ctx.causality_mode == CausalityMode.HARD_DIRTY
 
     @staticmethod
     def _materialize_node(
@@ -467,7 +452,7 @@ class Resolver:
         *,
         allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         """Return ranked offers that are currently admissible for ``requirement``.
 
@@ -587,7 +572,12 @@ class Resolver:
                 continue
             yield affordance
 
-    def _clear_fanout_affordances(self, fanout: Fanout[Any], *, _ctx: Any = None) -> None:
+    def _clear_fanout_affordances(
+        self,
+        fanout: Fanout[Any],
+        *,
+        _ctx: VmPhaseCtx | None = None,
+    ) -> None:
         graph = fanout.registry
         if graph is None:
             return
@@ -598,7 +588,7 @@ class Resolver:
         self,
         requirement: Requirement[PT],
         *,
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[ProvisionOffer]:
         """Return all admissible EXISTING/CREATE offers for ``requirement``."""
         offers = self._discover_fanout_offers(requirement, _ctx=_ctx)
@@ -614,7 +604,7 @@ class Resolver:
         requirement: Requirement[PT],
         offer: ProvisionOffer,
         graph: Any,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> PT | None:
         def _existing_instance_for_template() -> PT | None:
             candidate = offer.candidate
@@ -694,7 +684,7 @@ class Resolver:
         self,
         fanout: Fanout[PT],
         *,
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[PT]:
         """Resolve and publish every eligible provider for ``fanout``."""
         graph = fanout.registry
@@ -772,7 +762,7 @@ class Resolver:
         *,
         allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> tuple[Optional[PT], Optional[ProvisionOffer], list[ProvisionOffer]]:
         offers = self.gather_offers(
             requirement,
@@ -822,7 +812,7 @@ class Resolver:
         *,
         allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> Optional[PT]:
         """Resolve and materialize one provider for ``requirement`` if possible."""
         provider, _, _ = self._resolve_requirement_offer(
@@ -912,7 +902,7 @@ class Resolver:
         requirement: Requirement,
         *,
         offer: ProvisionOffer,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> _StructuralChainPlan:
         offer_target_ctx = offer.target_ctx
         target_ctx = (
@@ -1008,7 +998,7 @@ class Resolver:
         segment_path: str,
         target_ctx: str,
         graph: Any,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> tuple[RegistryAware, EntityTemplate]:
         template = self._find_structural_template(
             identifier=segment_path,
@@ -1053,26 +1043,22 @@ class Resolver:
             return fallback
         return None
 
-    @staticmethod
-    def _derive_phase_ctx_source(_ctx: VmPhaseCtx | None) -> VmPhaseCtx:
-        if _ctx is None or not callable(getattr(_ctx, "derive", None)):
-            raise TypeError(
-                "Nested runtime validation requires a typed context with derive()",
-            )
-        return _ctx
-
     def _make_node_ctx(
         self,
         *,
         graph: Any,
         node: RegistryAware,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
         request_ctx_path: str | None = None,
-    ) -> Any:
+    ) -> VmPhaseCtx:
+        if _ctx is None:
+            raise TypeError(
+                "Nested runtime validation requires a typed context with derive()",
+            )
         meta_overrides = None
         if isinstance(request_ctx_path, str) and request_ctx_path:
             meta_overrides = {"request_ctx_path": request_ctx_path}
-        return self._derive_phase_ctx_source(_ctx).derive(
+        return _ctx.derive(
             cursor_id=node.uid,
             graph=graph,
             meta_overrides=meta_overrides,
@@ -1084,7 +1070,7 @@ class Resolver:
         entity: RegistryAware,
         template: EntityTemplate | None,
         role: MaterializeRole,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> None:
         story_post_materialize = resolve_story_post_materialize_hook(_ctx)
         if callable(story_post_materialize):
@@ -1100,7 +1086,7 @@ class Resolver:
         *,
         entity: RegistryAware,
         graph: Any,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
         request_ctx_path: str | None = None,
     ) -> bool:
         if not isinstance(entity, TraversableNode):
@@ -1152,7 +1138,7 @@ class Resolver:
         provider: PT,
         graph: Any,
         parent: Any | None,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> PT:
         reused = self._existing_target_provider(
             requirement=requirement,
@@ -1194,7 +1180,7 @@ class Resolver:
         requirement: Requirement,
         offer: ProvisionOffer,
         graph: Any,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> Any | None:
         plan = self._chain_plan_for_offer(requirement, offer=offer, _ctx=_ctx)
         if not plan.requires_chain:
@@ -1251,7 +1237,7 @@ class Resolver:
         provider: PT,
         offer: ProvisionOffer,
         parent: Any | None = None,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> bool:
         provider = self._attach_and_finalize_provider(
             requirement=dependency.requirement,
@@ -1271,7 +1257,7 @@ class Resolver:
         allow_stubs: bool = False,
         preferred_offers: Iterable[ProvisionOffer] = (),
         max_depth: int = 8,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> ViabilityResult:
         """Return a non-mutating viability preview for one requirement."""
         # depth/visited are reserved for future recursive chain variants.
@@ -1283,7 +1269,7 @@ class Resolver:
             _ctx=_ctx,
         )
 
-        graph = getattr(_ctx, "graph", None)
+        graph = _ctx.graph if _ctx is not None else None
         preview = self._preview_viable_offer(
             requirement=requirement,
             offers=offers,
@@ -1302,7 +1288,7 @@ class Resolver:
         requirement: Requirement,
         offers: Iterable[ProvisionOffer],
         graph: Any,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> ViabilityResult | None:
         story_blockers: list[Blocker] = []
         preview_requirement = resolve_story_preview_requirement_hook(_ctx)
@@ -1375,7 +1361,7 @@ class Resolver:
         self,
         requirement: Requirement,
         *,
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[str]:
         identifier = self._selector_identifier(requirement)
         target_ctxs = target_context_candidates(
@@ -1476,7 +1462,7 @@ class Resolver:
         requirement: Requirement,
         admitted_candidates: list[tuple[EntityTemplate, str]],
         target_ctxs: list[str],
-        _ctx: Any = None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> list[Blocker] | None:
         if not self._is_episode_requirement(requirement):
             return None
@@ -1501,7 +1487,7 @@ class Resolver:
         if not requirement.is_qualified or not target_ctxs:
             return None
 
-        graph = getattr(_ctx, "graph", None)
+        graph = _ctx.graph if _ctx is not None else None
         unresolved: list[dict[str, Any]] = []
         for _template, target_ctx in admitted_candidates:
             plan = self._chain_plan_for_target_ctx(target_ctx, graph=graph)
@@ -1526,7 +1512,12 @@ class Resolver:
             ]
         return None
 
-    def _diagnose_blockers(self, *, requirement: Requirement, _ctx: Any = None) -> list[Blocker]:
+    def _diagnose_blockers(
+        self,
+        *,
+        requirement: Requirement,
+        _ctx: VmPhaseCtx | None = None,
+    ) -> list[Blocker]:
         target_ctxs = self._target_contexts_for_requirement(requirement, _ctx=_ctx)
         templates = list(self._iter_templates())
         blockers = self._diagnose_identity_blockers(
@@ -1570,7 +1561,7 @@ class Resolver:
         dependency: Dependency[PT],
         *,
         allow_stubs: bool = False,
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> bool:
         """Resolve one dependency edge and bind its provider into the graph."""
         preferred_offers = self._linked_affordance_offers(
@@ -1608,9 +1599,8 @@ class Resolver:
             dependency.requirement.provider_id = provider.uid
             stamp_requirement_resolution(dependency.requirement, _ctx=_ctx)
             dependency.requirement.resolution_reason = "stub_link_resolved"
-            escalate = getattr(_ctx, "escalate_to_hard_dirty", None)
-            if callable(escalate):
-                escalate("stub_link_accepted", step_id=str(dependency.uid))
+            if _ctx is not None:
+                _ctx.escalate_to_hard_dirty("stub_link_accepted", step_id=str(dependency.uid))
             Edge.set_successor(dependency, provider, _ctx=_ctx)
             return True
 
@@ -1642,7 +1632,7 @@ class Resolver:
         node: Node,
         *,
         allow_stubs: bool = False,
-        _ctx=None,
+        _ctx: VmPhaseCtx | None = None,
     ) -> bool:
         """Resolve all open dependencies on ``node`` and verify traversal viability."""
         # Note this is not unsatisfied deps, it's anyone without a provider

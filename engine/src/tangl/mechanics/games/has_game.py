@@ -126,7 +126,7 @@ class HasGame:
             The created node instance.
         """
 
-        from tangl.vm import ResolutionPhase as P, TraversableEdge as ChoiceEdge
+        from tangl.vm import ResolutionPhase as P, TraversableEdge
 
         node = _add_node_compat(graph, kind=cls, label=label, **kwargs)
 
@@ -136,7 +136,7 @@ class HasGame:
             object.__setattr__(node, "_game_handler_class", handler_class)
 
         if victory_dest is not None:
-            victory_edge = ChoiceEdge(
+            victory_edge = TraversableEdge(
                 graph=graph,
                 predecessor_id=node.uid,
                 successor_id=victory_dest.uid,
@@ -147,7 +147,7 @@ class HasGame:
             node.victory_edge_id = victory_edge.uid
 
         if defeat_dest is not None:
-            defeat_edge = ChoiceEdge(
+            defeat_edge = TraversableEdge(
                 graph=graph,
                 predecessor_id=node.uid,
                 successor_id=defeat_dest.uid,
@@ -158,7 +158,7 @@ class HasGame:
             node.defeat_edge_id = defeat_edge.uid
 
         if draw_dest is not None:
-            draw_edge = ChoiceEdge(
+            draw_edge = TraversableEdge(
                 graph=graph,
                 predecessor_id=node.uid,
                 successor_id=draw_dest.uid,

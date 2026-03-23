@@ -15,7 +15,8 @@ import pytest
 from tangl.loaders import WorldBundle, WorldCompiler
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.resource_manager import ResourceManager
-from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.persistence import PersistenceManagerFactory
+from tangl.service import build_service_manager
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
 from tangl.story.concepts import Actor, Location, Role, Setting
@@ -423,12 +424,11 @@ scenes:
     compiled = WorldCompiler().compile(bundle)
 
     assert isinstance(compiled, World)
-    assert compiled.domain is not None
     assert compiled.assets is not None
     assert compiled.resources is not None
     assert compiled.templates is compiled.bundle.template_registry
-    assert "DomainCharacter" in compiled.domain.class_registry
-    assert compiled.domain.dispatch_registry in compiled.get_authorities()
+    assert "DomainCharacter" in compiled.class_registry
+    assert compiled.dispatch in compiled.get_authorities()
     result = compiled.create_story("loader_story", init_mode=InitMode.LAZY)
     assert result.graph.initial_cursor_id is not None
     assert result.codec_id in {"near_native", "near_native_yaml"}
@@ -467,23 +467,22 @@ def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
     assert "dependency_id" not in start.media[2]
 
 
-def test_runtime_controller_create_story_with_world_param() -> None:
+def test_service_manager_create_story_with_world_param() -> None:
     world = World.from_script_data(script_data=_base_script())
-    controller = RuntimeController()
+    manager = build_service_manager(PersistenceManagerFactory.native_in_mem())
     user = User(label="test-user")
+    manager.persistence.save(user)
 
-    result = controller.create_story(
-        user=user,
+    result = manager.create_story(
+        user_id=user.uid,
         world_id=world.label,
         world=world,
         init_mode=InitMode.EAGER.value,
         story_label="svc_story",
     )
 
-    assert result.status == "ok"
     assert result.cursor_id is not None
-    assert result.details is not None
-    assert result.details.get("world_id") == world.label
+    assert result.metadata.get("world_id") == world.label
 
 
 def test_story_graph_authorities_include_story_and_world_authorities() -> None:
@@ -584,13 +583,6 @@ def test_world_template_lookup_facade_finds_templates() -> None:
 
 
 def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
-    @dataclass(slots=True)
-    class _TemplateScopeFacet:
-        extra_template_registry: TemplateRegistry
-
-        def get_template_scope_groups(self, *, caller=None, graph=None):
-            return [self.extra_template_registry.values()]
-
     base_world = World.from_script_data(script_data=_base_script())
     extra_registry = TemplateRegistry(label="world_extra_templates")
     extra_template = EntityTemplate(
@@ -603,7 +595,8 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
     world = World(
         label=f"{base_world.label}.scope",
         bundle=base_world.bundle,
-        templates=_TemplateScopeFacet(extra_template_registry=extra_registry),
+        templates=base_world.bundle.template_registry,
+        extra_template_registries=[extra_registry],
     )
     result = world.create_story("scope_world_story", init_mode=InitMode.EAGER)
     cursor = result.graph.get(result.graph.initial_cursor_id)

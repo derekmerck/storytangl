@@ -10,7 +10,7 @@ Conceptual layers
 1. Fabula
 
    - :class:`StoryCompiler` validates and normalizes authored scripts into a
-     :class:`StoryTemplateBundle`.
+     compiled template bundle.
    - :class:`WorldBuilder` assembles world adjuncts around a compiled bundle.
    - :class:`StoryMaterializer` wires story-specific topology and runtime hooks
      as a helper behind :class:`World`.
@@ -74,7 +74,6 @@ from .fabula import (
     StoryCompiler,
     StoryInitResult,
     StoryMaterializer,
-    StoryTemplateBundle,
     UnresolvedDependency,
     WorldBuilder,
     World,
@@ -111,7 +110,6 @@ __all__ = [
     "StoryGraph",
     "StoryInitResult",
     "StoryMaterializer",
-    "StoryTemplateBundle",
     "UnresolvedDependency",
     "WorldBuilder",
     "World",

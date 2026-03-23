@@ -51,17 +51,15 @@ def test_world_builder_populates_canonical_fields_and_aliases() -> None:
     assert world.locals == bundle.locals
     assert world.entry_template_ids == bundle.entry_template_ids
     assert world.find_template("intro.start") is not None
-    assert world.asset_manager is assets
-    assert world.resource_manager is resources
-    assert world.domain is not None
-    assert world.domain_manager is world.domain
-    assert world.domain.class_registry["Actor"] is Actor
-    assert world.domain.dispatch_registry is dispatch
+    assert world.assets is assets
+    assert world.resources is resources
+    assert world.class_registry["Actor"] is Actor
+    assert world.dispatch is dispatch
     assert world.get_story_info_projector() is projector
     assert world.get_authorities() == [dispatch, extra]
 
 
-def test_world_builder_coerces_legacy_domain_and_template_scope_provider() -> None:
+def test_world_builder_coerces_legacy_domain_and_extra_template_registries() -> None:
     bundle = StoryCompiler().compile(_script())
     extra_templates = TemplateRegistry(label="builder_extra_templates")
     _ = EntityTemplate(
@@ -77,21 +75,19 @@ def test_world_builder_coerces_legacy_domain_and_template_scope_provider() -> No
         get_authorities=lambda: [],
         get_story_info_projector=lambda: projector,
     )
-    template_scope_provider = SimpleNamespace(
-        get_template_scope_groups=lambda *, caller=None, graph=None: [list(extra_templates.values())]
-    )
 
     world = WorldBuilder().build(
         label="builder_world_legacy",
         bundle=bundle,
         domain=domain,
-        template_scope_provider=template_scope_provider,
+        extra_template_registries=[extra_templates],
     )
 
     registries = world.get_template_scope_groups()
 
-    assert world.domain is domain
     assert world.templates is bundle.template_registry
+    assert world.class_registry["Actor"] is Actor
+    assert world.dispatch.label == "legacy_domain_dispatch"
     assert world.get_story_info_projector() is projector
     assert registries[0] is bundle.template_registry
     assert extra_templates in registries
