@@ -14,29 +14,25 @@ from sphinx.util.docutils import SphinxDirective
 from sphinx.util.nodes import nested_parse_with_titles
 
 from tangl.rest.api_server import app as api_server_app
-from tangl.service.api_endpoint import ApiEndpoint, EndpointPolicy, ResourceBinding
-from tangl.service.bootstrap import DEFAULT_ENDPOINT_POLICIES
-from tangl.service.controllers import get_default_controllers
-from tangl.service.operations import ServiceOperation, endpoint_for_operation
+from tangl.service import ServiceManager
+from tangl.service.service_method import ServiceMethodSpec
 
 
 @dataclass(frozen=True)
-class _ServiceEndpointDoc:
-    """Resolved documentation fields for one controller endpoint."""
+class _ServiceMethodDoc:
+    """Resolved documentation fields for one canonical service method."""
 
-    controller: type
-    endpoint_name: str
-    endpoint: ApiEndpoint
-    operation: ServiceOperation | None
-    policy: EndpointPolicy
+    method_name: str
+    method: Any
+    spec: ServiceMethodSpec
 
     @property
     def qualified_name(self) -> str:
-        return f"{self.controller.__name__}.{self.endpoint_name}"
+        return f"{ServiceManager.__name__}.{self.method_name}"
 
     @property
     def method_ref(self) -> str:
-        return f"{self.endpoint.func.__module__}.{self.controller.__name__}.{self.endpoint_name}"
+        return f"{self.method.__module__}.{ServiceManager.__name__}.{self.method_name}"
 
 
 @dataclass(frozen=True)
@@ -93,64 +89,26 @@ def _format_signature(func: Any) -> str:
     return rendered
 
 
-def _format_bindings(bindings: tuple[ResourceBinding, ...] | None) -> str:
-    if bindings is None:
-        return "inferred from type hints"
-    if not bindings:
-        return "none"
-    return ", ".join(f"``{binding.value}``" for binding in bindings)
-
-
-def _format_paths(paths: tuple[str, ...]) -> str:
-    if not paths:
-        return "none"
-    return ", ".join(f"``{path}``" for path in paths)
-
-
-def _operation_by_endpoint() -> dict[str, ServiceOperation]:
-    return {
-        endpoint_for_operation(operation): operation
-        for operation in ServiceOperation
-    }
-
-
-def _effective_policy(endpoint_name: str, endpoint: ApiEndpoint) -> EndpointPolicy:
-    policy = EndpointPolicy.from_endpoint(endpoint)
-    override = DEFAULT_ENDPOINT_POLICIES.get(endpoint_name)
-    if override is None:
-        return policy
-    return policy.merged(EndpointPolicy(**override))
-
-
-def _endpoint_source_line(endpoint: ApiEndpoint) -> int:
+def _source_line(func: Any) -> int:
     try:
-        _, lineno = inspect.getsourcelines(endpoint.func)
+        _, lineno = inspect.getsourcelines(func)
     except (OSError, TypeError):  # pragma: no cover - doc ordering fallback
         return 0
     return lineno
 
 
-def _service_endpoint_docs() -> list[_ServiceEndpointDoc]:
-    operation_lookup = _operation_by_endpoint()
-    docs: list[_ServiceEndpointDoc] = []
-    for controller in get_default_controllers():
-        endpoints = controller.get_api_endpoints()
-        ordered = sorted(
-            endpoints.items(),
-            key=lambda item: _endpoint_source_line(item[1]),
-        )
-        for endpoint_name, endpoint in ordered:
-            qualified_name = f"{controller.__name__}.{endpoint_name}"
-            docs.append(
-                _ServiceEndpointDoc(
-                    controller=controller,
-                    endpoint_name=endpoint_name,
-                    endpoint=endpoint,
-                    operation=operation_lookup.get(qualified_name),
-                    policy=_effective_policy(qualified_name, endpoint),
-                )
+def _service_method_docs() -> list[_ServiceMethodDoc]:
+    docs: list[_ServiceMethodDoc] = []
+    for method_name, spec in ServiceManager.get_service_methods().items():
+        method = getattr(ServiceManager, method_name)
+        docs.append(
+            _ServiceMethodDoc(
+                method_name=method_name,
+                method=method,
+                spec=spec,
             )
-    return docs
+        )
+    return sorted(docs, key=lambda item: _source_line(item.method))
 
 
 def _rest_route_docs() -> list[_RestRouteDoc]:
@@ -198,56 +156,49 @@ class _GeneratedRstDirective(SphinxDirective):
         return container.children
 
 
-class ServiceOperationCatalogDirective(_GeneratedRstDirective):
-    """Render a service endpoint catalog from live controller metadata."""
+class ServiceMethodCatalogDirective(_GeneratedRstDirective):
+    """Render a canonical service-method catalog from live manager metadata."""
 
     def run(self) -> list[nodes.Node]:
         lines: list[str] = []
-        docs = _service_endpoint_docs()
+        docs = _service_method_docs()
 
-        current_controller: type | None = None
+        title = ServiceManager.__name__
+        lines.extend(
+            [
+                title,
+                "-" * len(title),
+                "",
+            ]
+        )
+
         for entry in docs:
-            if entry.controller is not current_controller:
-                current_controller = entry.controller
-                if lines:
-                    lines.append("")
-                title = current_controller.__name__
-                lines.extend(
-                    [
-                        title,
-                        "-" * len(title),
-                        "",
-                    ]
-                )
-
-            label = f"``{entry.qualified_name}``"
-            if entry.operation is not None:
-                label = f"``{entry.operation.value}`` / {label}"
+            label = f"``{entry.method_name}``"
+            if entry.spec.operation_id is not None:
+                label = f"``{entry.spec.operation_id}`` / {label}"
 
             lines.extend(
                 [
                     label,
                     "",
-                    f"  {_first_sentence(entry.endpoint.func)}",
+                    f"  {_first_sentence(entry.method)}",
                     "",
-                    f"  :Controller endpoint: :meth:`{entry.method_ref}`",
+                    f"  :Service method: :meth:`{entry.method_ref}`",
                     (
-                        f"  :Service operation token: ``{entry.operation.value}``"
-                        if entry.operation is not None
-                        else "  :Service operation token: not assigned (endpoint-only)"
+                        f"  :Operation id: ``{entry.spec.operation_id}``"
+                        if entry.spec.operation_id is not None
+                        else "  :Operation id: not assigned"
                     ),
-                    f"  :Endpoint group: ``{entry.endpoint.group}``",
+                    f"  :Access level: ``{entry.spec.access.value}``",
+                    f"  :Context: ``{entry.spec.context.value}``",
+                    f"  :Writeback: ``{entry.spec.writeback.value}``",
+                    f"  :Blocking: ``{entry.spec.blocking.value}``",
                     (
-                        "  :Method type: "
-                        f"``{entry.endpoint.method_type.value}`` "
-                        f"(default HTTP verb ``{entry.endpoint.method_type.http_verb()}``)"
+                        f"  :Capability: ``{entry.spec.capability}``"
+                        if entry.spec.capability is not None
+                        else "  :Capability: none"
                     ),
-                    f"  :Response type: ``{entry.endpoint.response_type.value}``",
-                    f"  :Access level: ``{entry.endpoint.access_level.name}``",
-                    f"  :Hydration bindings: {_format_bindings(entry.endpoint.binds)}",
-                    f"  :Writeback mode: ``{entry.policy.writeback_mode.value}``",
-                    f"  :Persist paths: {_format_paths(entry.policy.persist_paths)}",
-                    f"  :Call signature: ``{_format_signature(entry.endpoint.func)}``",
+                    f"  :Call signature: ``{_format_signature(entry.method)}``",
                     "",
                 ]
             )
@@ -283,7 +234,7 @@ class RestRouteCatalogDirective(_GeneratedRstDirective):
 def setup(app) -> dict[str, bool]:
     """Register custom directives used by the StoryTangl API docs."""
 
-    app.add_directive("service-operation-catalog", ServiceOperationCatalogDirective)
+    app.add_directive("service-method-catalog", ServiceMethodCatalogDirective)
     app.add_directive("rest-route-catalog", RestRouteCatalogDirective)
     return {
         "parallel_read_safe": True,

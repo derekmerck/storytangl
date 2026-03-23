@@ -1,14 +1,13 @@
 .. currentmodule:: tangl.service
 
-tangl.service orchestration
-===========================
+tangl.service bootstrap and metadata
+====================================
 
-Gateway and endpoint abstractions that execute controller logic against a
-hydrated runtime context.
+Service bootstrapping and bounded metadata for the manager-first API.
 
-Use :doc:`operations` for the generated service-operation catalog. This page
-documents the gateway, orchestrator, and endpoint metadata types that power
-that catalog.
+Use :doc:`operations` for the generated service-method catalog. This page
+documents the bootstrap helper and metadata types that describe the public
+service surface.
 
 .. rubric:: Related design docs
 
@@ -19,39 +18,43 @@ that catalog.
 - :doc:`../../notes/reference/code_adjacent_design_docs`
 - :doc:`../../notes/migration/v38-phase1-review`
 
-Orchestration
+Bootstrap
+---------
+
+.. autofunction:: tangl.service.build_service_manager
+
+Metadata
+--------
+
+.. autofunction:: tangl.service.service_method
+
+.. autoclass:: tangl.service.ServiceMethodSpec
+   :members:
+   :member-order: bysource
+
+.. autoclass:: tangl.service.ServiceAccess
+   :members:
+   :member-order: bysource
+
+.. autoclass:: tangl.service.ServiceContext
+   :members:
+   :member-order: bysource
+
+.. autoclass:: tangl.service.ServiceWriteback
+   :members:
+   :member-order: bysource
+
+.. autoclass:: tangl.service.BlockingMode
+   :members:
+   :member-order: bysource
+
+Support types
 -------------
 
-.. autoclass:: tangl.service.Orchestrator
+.. autoclass:: tangl.service.UserAuthInfo
    :members:
    :member-order: bysource
 
-.. autoclass:: tangl.service.ApiEndpoint
+.. autoclass:: tangl.service.WorldRegistry
    :members:
    :member-order: bysource
-
-.. autoclass:: tangl.service.EndpointPolicy
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.ExecuteOptions
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.ServiceGateway
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.GatewayExecuteOptions
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.GatewayRequest
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.GatewayRestAdapter
-   :members:
-   :member-order: bysource
-
-.. autofunction:: tangl.service.build_service_gateway

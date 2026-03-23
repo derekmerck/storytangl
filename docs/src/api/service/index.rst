@@ -1,8 +1,8 @@
 Service API
 ===========
 
-Curated API reference for controllers, orchestration, and transport-facing
-response models.
+Curated API reference for the manager-first service surface, bounded method
+metadata, and typed response models.
 
 .. toctree::
    :maxdepth: 1

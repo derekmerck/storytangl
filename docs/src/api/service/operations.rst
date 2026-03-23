@@ -1,15 +1,13 @@
 .. currentmodule:: tangl.service
 
-tangl.service operations
-========================
+tangl.service methods
+=====================
 
-Stable service operations are the gateway-facing tokens executed by
-:class:`tangl.service.ServiceGateway` and resolved onto controller endpoints by
-:class:`tangl.service.Orchestrator`.
+Canonical service behavior is exposed as explicit
+:class:`tangl.service.ServiceManager` methods.
 
-This page is generated from live :class:`tangl.service.ApiEndpoint` metadata,
-the :class:`tangl.service.ServiceOperation` mapping, and the default bootstrap
-policy overrides in :mod:`tangl.service.bootstrap`.
+This page is generated from live :func:`tangl.service.service_method`
+metadata attached to those methods.
 
 .. rubric:: Related design docs
 
@@ -28,4 +26,4 @@ policy overrides in :mod:`tangl.service.bootstrap`.
 Catalog
 -------
 
-.. service-operation-catalog::
+.. service-method-catalog::
