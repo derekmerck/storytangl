@@ -228,7 +228,20 @@ class Graph(Registry[GraphItem]):
     @classmethod
     def structure(cls, data, _ctx=None):
         """Structure a graph and restore any persisted singleton factory reference."""
-        payload = dict(data)
+        def _coerce_kind_refs(value: Any) -> Any:
+            if isinstance(value, dict):
+                normalized: dict[str, Any] = {}
+                for key, item in value.items():
+                    if key == "kind" and isinstance(item, str):
+                        normalized[key] = Entity.dereference_cls_name(item) or item
+                    else:
+                        normalized[key] = _coerce_kind_refs(item)
+                return normalized
+            if isinstance(value, list):
+                return [_coerce_kind_refs(item) for item in value]
+            return value
+
+        payload = _coerce_kind_refs(dict(data))
         factory_data = payload.pop("factory", None)
         graph = super().structure(payload, _ctx=_ctx)
         if factory_data is None:
@@ -238,7 +251,13 @@ class Graph(Registry[GraphItem]):
             return graph
         if not isinstance(factory_data, dict):
             raise TypeError("Persisted graph factory references must be singleton constructor data")
-        graph.bind_factory(Singleton.structure(dict(factory_data)))
+        factory = Singleton.structure(dict(factory_data))
+        if factory is None:
+            raise LookupError(
+                "Persisted graph factory reference could not be resolved to a registered singleton: "
+                f"{factory_data!r}"
+            )
+        graph.bind_factory(factory)
         return graph
 
     def path_dist(self, a: GraphItem, b: GraphItem) -> int:

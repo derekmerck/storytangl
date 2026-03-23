@@ -625,7 +625,7 @@ class World(TraversableGraphFactory):
 
         self._apply_story_entry_ids(
             graph=graph,
-            entry_templates=explicit_entry_templates,
+            entry_templates=explicit_entry_templates or seed_entry_templates,
         )
         result = materializer._build_story_init_result(state=state)
 

@@ -122,6 +122,17 @@ def test_story_graph_roundtrip_preserves_world_factory_identity() -> None:
     assert restored.world.find_template("intro.start") is world.find_template("intro.start")
 
 
+def test_create_story_preserves_seed_entry_ids_when_explicit_entries_are_cleared() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    world.force_set("entry_template_ids", [])
+
+    result = world.create_story("seed_entry_story", init_mode=InitMode.LAZY)
+
+    assert result.graph.initial_cursor_id is not None
+    assert result.graph.initial_cursor_ids == [result.graph.initial_cursor_id]
+    assert result.entry_ids == [result.graph.initial_cursor_id]
+
+
 @pytest.mark.parametrize("init_mode", [InitMode.LAZY, InitMode.EAGER])
 def test_create_story_uses_direct_world_fields_when_bundle_is_cleared(init_mode: InitMode) -> None:
     world = World.from_script_data(script_data=_base_script())
