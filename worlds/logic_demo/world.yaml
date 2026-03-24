@@ -1,0 +1,6 @@
+label: logic_demo
+scripts: script.yaml
+domain_module: logic_demo.domain
+metadata:
+  title: "Logic Demo"
+  description: "Parity and half-adder machines authored directly in StoryTangl YAML."

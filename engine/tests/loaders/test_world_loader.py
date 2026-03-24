@@ -554,3 +554,54 @@ scenes: {}
         assert str(bundle.domain_dir) not in sys.path
     finally:
         sys.path[:] = original_sys_path
+
+
+def test_compiler_adds_bundle_root_for_explicit_domain_module_imports(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "explicit_domain_world"
+    bundle_root.mkdir()
+
+    package_dir = bundle_root / "explicit_domain_world"
+    package_dir.mkdir()
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "domain.py").write_text(
+        """
+from tangl.core import Entity
+
+
+class ExplicitDomainCharacter(Entity):
+    ...
+        """,
+        encoding="utf-8",
+    )
+
+    (bundle_root / "world.yaml").write_text(
+        """
+label: explicit_domain_world
+scripts: script.yaml
+domain_module: explicit_domain_world.domain
+        """,
+        encoding="utf-8",
+    )
+
+    (bundle_root / "script.yaml").write_text(
+        """
+label: explicit_domain_world
+metadata:
+  title: Explicit Domain World
+scenes: {}
+        """,
+        encoding="utf-8",
+    )
+
+    bundle = WorldBundle.load(bundle_root)
+    compiler = WorldCompiler()
+
+    original_sys_path = list(sys.path)
+    try:
+        world = compiler.compile(bundle)
+
+        assert isinstance(world, World)
+        assert "ExplicitDomainCharacter" in world.class_registry
+        assert str(bundle_root) in sys.path
+    finally:
+        sys.path[:] = original_sys_path

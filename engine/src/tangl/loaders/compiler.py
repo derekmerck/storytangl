@@ -317,13 +317,13 @@ class WorldCompiler:
         )
 
     def _get_domain_module(self, bundle: WorldBundle) -> str | None:
+        if str(bundle.bundle_root) not in sys.path:
+            sys.path.insert(0, str(bundle.bundle_root))
+
         if bundle.manifest.domain_module is not None:
             return bundle.manifest.domain_module
 
         if bundle.domain_dir is None:
             return None
-
-        if str(bundle.bundle_root) not in sys.path:
-            sys.path.insert(0, str(bundle.bundle_root))
 
         return f"{bundle.manifest.label}.domain"

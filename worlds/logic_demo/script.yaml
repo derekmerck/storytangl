@@ -1,0 +1,192 @@
+label: logic_demo
+
+metadata:
+  title: "Logic Demo"
+  description: "Parity and half-adder machines authored directly in StoryTangl YAML."
+  start_at: demo.choose_machine
+
+scenes:
+  demo:
+    blocks:
+      choose_machine:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "Inspect the parity checker"
+            successor: parity.parity_first_input
+          - text: "Inspect the half adder"
+            successor: half_adder.half_adder_pick_a
+
+  parity:
+    blocks:
+      parity_first_input:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "First bit = 0"
+            successor: parity_even_state
+          - text: "First bit = 1"
+            successor: parity_odd_state
+
+      parity_even_state:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        actions:
+          - text: "Second bit = 0"
+            successor: parity_even_output
+          - text: "Second bit = 1"
+            successor: parity_odd_output
+
+      parity_odd_state:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        actions:
+          - text: "Second bit = 0"
+            successor: parity_odd_output
+          - text: "Second bit = 1"
+            successor: parity_even_output
+
+      parity_even_output:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+        media:
+          - spec:
+              kind: "logic_demo.domain.GateBadgeSpec"
+              label: "parity_even_badge"
+              gate_type: OUTPUT
+              badge_text: "EVEN"
+            media_role: "logic_badge"
+            scope: "story"
+
+      parity_odd_output:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+        media:
+          - spec:
+              kind: "logic_demo.domain.GateBadgeSpec"
+              label: "parity_odd_badge"
+              gate_type: OUTPUT
+              badge_text: "ODD"
+            media_role: "logic_badge"
+            scope: "story"
+
+  half_adder:
+    blocks:
+      half_adder_pick_a:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "A = 0"
+            successor: half_adder_a_zero
+          - text: "A = 1"
+            successor: half_adder_a_one
+
+      half_adder_a_zero:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "B = 0"
+            successor: half_adder_xor_00
+          - text: "B = 1"
+            successor: half_adder_xor_01
+
+      half_adder_a_one:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "B = 0"
+            successor: half_adder_xor_10
+          - text: "B = 1"
+            successor: half_adder_xor_11
+
+      half_adder_xor_00:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: half_adder_and_00
+            trigger: last
+
+      half_adder_and_00:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: AND
+        continues:
+          - successor: half_adder_output_00
+            trigger: last
+
+      half_adder_xor_01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: half_adder_and_01
+            trigger: last
+
+      half_adder_and_01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: AND
+        continues:
+          - successor: half_adder_output_10
+            trigger: last
+
+      half_adder_xor_10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: half_adder_and_10
+            trigger: last
+
+      half_adder_and_10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: AND
+        continues:
+          - successor: half_adder_output_10
+            trigger: last
+
+      half_adder_xor_11:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: half_adder_and_11
+            trigger: last
+
+      half_adder_and_11:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: AND
+        continues:
+          - successor: half_adder_output_01
+            trigger: last
+
+      half_adder_output_00:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+        media:
+          - spec:
+              kind: "logic_demo.domain.GateBadgeSpec"
+              label: "half_adder_00_badge"
+              gate_type: OUTPUT
+              badge_text: "S0 C0"
+            media_role: "logic_badge"
+            scope: "story"
+
+      half_adder_output_10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+        media:
+          - spec:
+              kind: "logic_demo.domain.GateBadgeSpec"
+              label: "half_adder_10_badge"
+              gate_type: OUTPUT
+              badge_text: "S1 C0"
+            media_role: "logic_badge"
+            scope: "story"
+
+      half_adder_output_01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+        media:
+          - spec:
+              kind: "logic_demo.domain.GateBadgeSpec"
+              label: "half_adder_01_badge"
+              gate_type: OUTPUT
+              badge_text: "S0 C1"
+            media_role: "logic_badge"
+            scope: "story"
