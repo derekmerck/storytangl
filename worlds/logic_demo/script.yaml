@@ -2,7 +2,7 @@ label: logic_demo
 
 metadata:
   title: "Logic Demo"
-  description: "Parity and half-adder machines authored directly in StoryTangl YAML."
+  description: "Parity, half-adder, and full-adder machines authored directly in StoryTangl YAML."
   start_at: demo.choose_machine
 
 scenes:
@@ -16,6 +16,8 @@ scenes:
             successor: parity.parity_first_input
           - text: "Inspect the half adder"
             successor: half_adder.half_adder_pick_a
+          - text: "Inspect the full adder"
+            successor: full_adder.full_adder_pick_a
 
   parity:
     blocks:
@@ -190,3 +192,212 @@ scenes:
               badge_text: "S0 C1"
             media_role: "logic_badge"
             scope: "story"
+
+  full_adder:
+    blocks:
+      full_adder_pick_a:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "A = 0"
+            successor: full_adder_a_zero
+          - text: "A = 1"
+            successor: full_adder_a_one
+
+      full_adder_a_zero:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "B = 0"
+            successor: full_adder_ab_00
+          - text: "B = 1"
+            successor: full_adder_ab_01
+
+      full_adder_a_one:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "B = 0"
+            successor: full_adder_ab_10
+          - text: "B = 1"
+            successor: full_adder_ab_11
+
+      full_adder_ab_00:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "Cin = 0"
+            successor: full_adder_xor_000
+          - text: "Cin = 1"
+            successor: full_adder_xor_001
+
+      full_adder_ab_01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "Cin = 0"
+            successor: full_adder_xor_010
+          - text: "Cin = 1"
+            successor: full_adder_xor_011
+
+      full_adder_ab_10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "Cin = 0"
+            successor: full_adder_xor_100
+          - text: "Cin = 1"
+            successor: full_adder_xor_101
+
+      full_adder_ab_11:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: INPUT
+        actions:
+          - text: "Cin = 0"
+            successor: full_adder_xor_110
+          - text: "Cin = 1"
+            successor: full_adder_xor_111
+
+      full_adder_xor_000:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_000
+            trigger: last
+
+      full_adder_or_000:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_000_sc00
+            trigger: last
+
+      full_adder_xor_001:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_001
+            trigger: last
+
+      full_adder_or_001:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_001_sc10
+            trigger: last
+
+      full_adder_xor_010:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_010
+            trigger: last
+
+      full_adder_or_010:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_010_sc10
+            trigger: last
+
+      full_adder_xor_011:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_011
+            trigger: last
+
+      full_adder_or_011:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_011_sc01
+            trigger: last
+
+      full_adder_xor_100:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_100
+            trigger: last
+
+      full_adder_or_100:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_100_sc10
+            trigger: last
+
+      full_adder_xor_101:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_101
+            trigger: last
+
+      full_adder_or_101:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_101_sc01
+            trigger: last
+
+      full_adder_xor_110:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_110
+            trigger: last
+
+      full_adder_or_110:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_110_sc01
+            trigger: last
+
+      full_adder_xor_111:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: XOR
+        continues:
+          - successor: full_adder_or_111
+            trigger: last
+
+      full_adder_or_111:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OR
+        continues:
+          - successor: full_adder_output_111_sc11
+            trigger: last
+
+      full_adder_output_000_sc00:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_001_sc10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_010_sc10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_011_sc01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_100_sc10:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_101_sc01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_110_sc01:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT
+
+      full_adder_output_111_sc11:
+        kind: "logic_demo.domain.LogicBlock"
+        gate_type: OUTPUT

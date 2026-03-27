@@ -10,7 +10,15 @@ from typing import Any, Callable, Iterable, Mapping
 
 from tangl.core import Edge, EntityTemplate, Node, Selector, TemplateRegistry
 from tangl.media.media_resource import MediaDep, MediaResourceInventoryTag as MediaRIT
-from tangl.vm import Dependency, Fanout, ResolutionPhase, TraversableEdge, TraversableNode
+from tangl.vm import (
+    Dependency,
+    Fanout,
+    Ledger,
+    ResolutionPhase,
+    TraversableEdge,
+    TraversableNode,
+)
+from tangl.vm.traversal import get_visit_count
 
 from .concepts import Actor, Location, Role, Setting
 from .episode import Action, Block, Scene
@@ -29,6 +37,8 @@ class ProjectedNode:
     label: str
     source_id: str | None
     source_kind: str | None
+    synthetic: bool = False
+    origin_node_ids: list[str] = field(default_factory=list)
     attrs: dict[str, object] = field(default_factory=dict)
 
 
@@ -41,6 +51,8 @@ class ProjectedEdge:
     source_edge_id: str | None
     source_kind: str | None
     edge_role: str
+    synthetic: bool = False
+    origin_edge_ids: list[str] = field(default_factory=list)
     attrs: dict[str, object] = field(default_factory=dict)
 
 
@@ -52,6 +64,8 @@ class ProjectedGroup:
     member_node_ids: list[str]
     source_id: str | None
     source_kind: str | None
+    synthetic: bool = False
+    origin_node_ids: list[str] = field(default_factory=list)
     attrs: dict[str, object] = field(default_factory=dict)
 
 
@@ -63,6 +77,48 @@ class ProjectedGraph:
     _source_nodes_by_id: dict[str, Any] = field(default_factory=dict, repr=False)
     _source_edges_by_id: dict[str, Any] = field(default_factory=dict, repr=False)
     _projected_node_id_by_source_id: dict[str, str] = field(default_factory=dict, repr=False)
+    _origin_source_nodes_by_id: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass(slots=True)
+class _ProjectedGraphIndex:
+    outgoing: dict[str, list[ProjectedEdge]]
+    incoming: dict[str, list[ProjectedEdge]]
+    indegree: dict[str, int]
+    outdegree: dict[str, int]
+    node_by_id: dict[str, ProjectedNode]
+    edge_by_id: dict[str, ProjectedEdge]
+    group_by_id: dict[str, ProjectedGroup]
+    groups_for_node: dict[str, list[str]]
+
+    @classmethod
+    def build(cls, projected_graph: ProjectedGraph) -> "_ProjectedGraphIndex":
+        outgoing: dict[str, list[ProjectedEdge]] = {node.id: [] for node in projected_graph.nodes}
+        incoming: dict[str, list[ProjectedEdge]] = {node.id: [] for node in projected_graph.nodes}
+        edge_by_id = {edge.id: edge for edge in projected_graph.edges}
+
+        for edge in projected_graph.edges:
+            outgoing.setdefault(edge.source_id, []).append(edge)
+            incoming.setdefault(edge.target_id, []).append(edge)
+
+        groups_for_node: dict[str, list[str]] = defaultdict(list)
+        for group in projected_graph.groups:
+            for node_id in group.member_node_ids:
+                groups_for_node[node_id].append(group.id)
+
+        for node_id in groups_for_node:
+            groups_for_node[node_id].sort()
+
+        return cls(
+            outgoing=outgoing,
+            incoming=incoming,
+            indegree={node.id: len(incoming.get(node.id, [])) for node in projected_graph.nodes},
+            outdegree={node.id: len(outgoing.get(node.id, [])) for node in projected_graph.nodes},
+            node_by_id={node.id: node for node in projected_graph.nodes},
+            edge_by_id=edge_by_id,
+            group_by_id={group.id: group for group in projected_graph.groups},
+            groups_for_node=dict(groups_for_node),
+        )
 
 
 @dataclass(slots=True)
@@ -225,7 +281,8 @@ def cluster_by_scene() -> ProjectedGraphProcessor:
     def processor(projected_graph: ProjectedGraph) -> ProjectedGraph:
         grouped: dict[str, dict[str, Any]] = {}
         for node in projected_graph.nodes:
-            source = projected_graph._source_nodes_by_id.get(node.id)
+            source_nodes = resolve_source_nodes(node, projected_graph)
+            source = source_nodes[0] if source_nodes else None
             scene = _runtime_scene_for_node(source)
             if scene is None:
                 continue
@@ -257,6 +314,8 @@ def cluster_by_scene() -> ProjectedGraphProcessor:
                     member_node_ids=sorted(bucket["member_node_ids"]),
                     source_id=bucket["source_id"],
                     source_kind=bucket["source_kind"],
+                    synthetic=False,
+                    origin_node_ids=sorted(bucket["member_node_ids"]),
                     attrs={},
                 )
             )
@@ -311,6 +370,286 @@ def mark_node_styles(style_policy: NodeStylePolicy) -> ProjectedGraphProcessor:
         if not changed:
             return projected_graph
         return _replace_projected_graph(projected_graph, nodes=updated_nodes)
+
+    return processor
+
+
+def annotate_runtime(
+    ledger: Ledger,
+    *,
+    include_availability: bool = True,
+) -> ProjectedGraphProcessor:
+    """Return one processor that stamps runtime attrs from one live ledger."""
+
+    def processor(projected_graph: ProjectedGraph) -> ProjectedGraph:
+        current_projected_id = projected_graph._projected_node_id_by_source_id.get(
+            _stringify_identifier(ledger.cursor_id)
+        )
+        if current_projected_id is None:
+            return projected_graph
+
+        node_updates: list[ProjectedNode] = []
+        for node in projected_graph.nodes:
+            source = projected_graph._source_nodes_by_id.get(node.id)
+            source_uid = getattr(source, "uid", None)
+            visit_count = get_visit_count(source_uid, ledger.cursor_history) if source_uid is not None else 0
+            visit_index = _first_visit_index(cursor_id=source_uid, history=ledger.cursor_history)
+            attrs = dict(node.attrs)
+            attrs["runtime.current"] = source_uid == ledger.cursor_id
+            attrs["runtime.visited"] = visit_count > 0
+            attrs["runtime.visit_index"] = visit_index
+            attrs["runtime.visit_count"] = visit_count
+            node_updates.append(replace(node, attrs=attrs))
+
+        followed_pairs = _followed_projected_pairs(ledger=ledger, projected_graph=projected_graph)
+        edge_updates: list[ProjectedEdge] = []
+        for edge in projected_graph.edges:
+            attrs = dict(edge.attrs)
+            attrs["runtime.followed"] = (edge.source_id, edge.target_id) in followed_pairs
+            attrs["runtime.current_outgoing"] = edge.source_id == current_projected_id
+            attrs["runtime.available"] = None
+            source_edge = projected_graph._source_edges_by_id.get(edge.id)
+            if include_availability and edge.source_id == current_projected_id and isinstance(
+                source_edge, TraversableEdge
+            ):
+                attrs["runtime.available"] = source_edge.available(ctx=None)
+            edge_updates.append(replace(edge, attrs=attrs))
+
+        return _replace_projected_graph(
+            projected_graph,
+            nodes=node_updates,
+            edges=edge_updates,
+        )
+
+    return processor
+
+
+def focus_runtime_window(
+    ledger: Ledger,
+    *,
+    history_steps: int = 6,
+    include_current_successors: bool = True,
+    include_current_predecessors: bool = False,
+) -> ProjectedGraphProcessor:
+    """Return one processor that filters one projection to the active runtime slice."""
+
+    def processor(projected_graph: ProjectedGraph) -> ProjectedGraph:
+        current_projected_id = projected_graph._projected_node_id_by_source_id.get(
+            _stringify_identifier(ledger.cursor_id)
+        )
+        if current_projected_id is None:
+            return projected_graph
+
+        index = _ProjectedGraphIndex.build(projected_graph)
+        history_anchor_ids = _history_anchor_ids(
+            ledger=ledger,
+            projected_graph=projected_graph,
+            current_projected_id=current_projected_id,
+            history_steps=history_steps,
+        )
+
+        retained_node_ids = {current_projected_id, *history_anchor_ids}
+        if include_current_successors:
+            retained_node_ids.update(edge.target_id for edge in index.outgoing.get(current_projected_id, []))
+        if include_current_predecessors:
+            retained_node_ids.update(edge.source_id for edge in index.incoming.get(current_projected_id, []))
+
+        retained_nodes: list[ProjectedNode] = []
+        for node in projected_graph.nodes:
+            if node.id not in retained_node_ids:
+                continue
+            attrs = dict(node.attrs)
+            attrs["runtime.history_anchor"] = node.id in history_anchor_ids
+            retained_nodes.append(replace(node, attrs=attrs))
+
+        retained_edges = [
+            edge
+            for edge in projected_graph.edges
+            if edge.source_id in retained_node_ids and edge.target_id in retained_node_ids
+        ]
+        retained_groups = _filter_groups_to_retained_nodes(
+            projected_graph.groups,
+            retained_node_ids,
+            drop_empty=True,
+            drop_single_member=False,
+        )
+        return _replace_projected_graph(
+            projected_graph,
+            nodes=retained_nodes,
+            edges=retained_edges,
+            groups=retained_groups,
+            source_nodes_by_id={
+                node.id: projected_graph._source_nodes_by_id[node.id]
+                for node in retained_nodes
+                if node.id in projected_graph._source_nodes_by_id
+            },
+            source_edges_by_id={
+                edge.id: projected_graph._source_edges_by_id[edge.id]
+                for edge in retained_edges
+                if edge.id in projected_graph._source_edges_by_id
+            },
+            projected_node_id_by_source_id={
+                source_id: node_id
+                for source_id, node_id in projected_graph._projected_node_id_by_source_id.items()
+                if node_id in retained_node_ids
+            },
+        )
+
+    return processor
+
+
+def collapse_linear_chains(
+    *,
+    min_length: int = 2,
+    preserve_visited: bool = False,
+) -> ProjectedGraphProcessor:
+    """Return one processor that collapses eligible linear chains."""
+
+    def processor(projected_graph: ProjectedGraph) -> ProjectedGraph:
+        index = _ProjectedGraphIndex.build(projected_graph)
+        collapsed: dict[str, dict[str, Any]] = {}
+        chain_by_first_id: dict[str, dict[str, Any]] = {}
+        seen: set[str] = set()
+
+        for node in projected_graph.nodes:
+            if node.id in seen or not _collapse_candidate(
+                node.id,
+                index=index,
+                preserve_visited=preserve_visited,
+            ):
+                continue
+            if _has_eligible_chain_predecessor(
+                node.id,
+                index=index,
+                preserve_visited=preserve_visited,
+            ):
+                continue
+
+            chain_ids = [node.id]
+            current_id = node.id
+            while True:
+                outgoing = index.outgoing.get(current_id, [])
+                if len(outgoing) != 1:
+                    break
+                next_id = outgoing[0].target_id
+                if next_id in seen or not _collapse_candidate(
+                    next_id,
+                    index=index,
+                    preserve_visited=preserve_visited,
+                ):
+                    break
+                if _group_membership_key(current_id, index) != _group_membership_key(next_id, index):
+                    break
+                chain_ids.append(next_id)
+                current_id = next_id
+
+            if len(chain_ids) < min_length:
+                continue
+
+            for node_id in chain_ids:
+                seen.add(node_id)
+
+            chain = _collapse_chain(
+                chain_ids=chain_ids,
+                projected_graph=projected_graph,
+                index=index,
+            )
+            chain_by_first_id[chain_ids[0]] = chain
+            for node_id in chain_ids:
+                collapsed[node_id] = chain
+
+        if not chain_by_first_id:
+            return projected_graph
+
+        new_nodes: list[ProjectedNode] = []
+        retained_node_ids: set[str] = set()
+        for node in projected_graph.nodes:
+            chain = collapsed.get(node.id)
+            if chain is None:
+                new_nodes.append(node)
+                retained_node_ids.add(node.id)
+                continue
+            if chain["first_id"] != node.id:
+                continue
+            new_nodes.append(chain["node"])
+            retained_node_ids.add(chain["node"].id)
+
+        chain_entry_by_source_id = {first_id: chain for first_id, chain in chain_by_first_id.items()}
+        replacement_edge_ids: set[str] = set()
+        new_edges: list[ProjectedEdge] = []
+        for edge in projected_graph.edges:
+            if edge.source_id in collapsed and edge.target_id in collapsed:
+                continue
+
+            replacement = None
+            if edge.target_id in chain_entry_by_source_id and edge.source_id not in collapsed:
+                replacement = chain_entry_by_source_id[edge.target_id]["incoming_edge"]
+            elif edge.source_id in chain_entry_by_source_id and edge.target_id not in collapsed:
+                replacement = chain_entry_by_source_id[edge.source_id]["outgoing_edge"]
+
+            if replacement is not None:
+                if replacement.id not in replacement_edge_ids:
+                    new_edges.append(replacement)
+                    replacement_edge_ids.add(replacement.id)
+                continue
+
+            if edge.source_id in collapsed or edge.target_id in collapsed:
+                continue
+            new_edges.append(edge)
+
+        new_groups = _replace_group_memberships_after_collapse(
+            projected_graph.groups,
+            collapsed,
+            retained_node_ids,
+        )
+        source_nodes_by_id = {
+            node.id: projected_graph._source_nodes_by_id[node.id]
+            for node in new_nodes
+            if not node.synthetic and node.id in projected_graph._source_nodes_by_id
+        }
+        source_edges_by_id = {
+            edge.id: projected_graph._source_edges_by_id[edge.id]
+            for edge in new_edges
+            if not edge.synthetic and edge.id in projected_graph._source_edges_by_id
+        }
+        projected_node_id_by_source_id = {
+            node.source_id: node.id
+            for node in new_nodes
+            if not node.synthetic and node.source_id is not None
+        }
+        for chain in chain_by_first_id.values():
+            for source_id in _source_ids_for_origin_nodes(
+                origin_node_ids=chain["node"].origin_node_ids,
+                projected_graph=projected_graph,
+            ):
+                projected_node_id_by_source_id[source_id] = chain["node"].id
+
+        return _replace_projected_graph(
+            projected_graph,
+            nodes=new_nodes,
+            edges=new_edges,
+            groups=new_groups,
+            source_nodes_by_id=source_nodes_by_id,
+            source_edges_by_id=source_edges_by_id,
+            projected_node_id_by_source_id=projected_node_id_by_source_id,
+        )
+
+    return processor
+
+
+def mark_runtime_styles() -> ProjectedGraphProcessor:
+    """Return one processor that converts runtime attrs into renderer style attrs."""
+
+    def processor(projected_graph: ProjectedGraph) -> ProjectedGraph:
+        nodes = [_styled_runtime_node(node) for node in projected_graph.nodes]
+        edges = [_styled_runtime_edge(edge) for edge in projected_graph.edges]
+        groups = [replace(group, attrs=_without_style_attrs(group.attrs)) for group in projected_graph.groups]
+        return _replace_projected_graph(
+            projected_graph,
+            nodes=nodes,
+            edges=edges,
+            groups=groups,
+        )
 
     return processor
 
@@ -383,6 +722,8 @@ def projected_graph_to_dict(projected_graph: ProjectedGraph) -> dict[str, object
                 "label": node.label,
                 "source_id": node.source_id,
                 "source_kind": node.source_kind,
+                "synthetic": node.synthetic,
+                "origin_node_ids": list(node.origin_node_ids),
                 "attrs": dict(node.attrs),
             }
             for node in projected_graph.nodes
@@ -396,6 +737,8 @@ def projected_graph_to_dict(projected_graph: ProjectedGraph) -> dict[str, object
                 "source_edge_id": edge.source_edge_id,
                 "source_kind": edge.source_kind,
                 "edge_role": edge.edge_role,
+                "synthetic": edge.synthetic,
+                "origin_edge_ids": list(edge.origin_edge_ids),
                 "attrs": dict(edge.attrs),
             }
             for edge in projected_graph.edges
@@ -408,11 +751,310 @@ def projected_graph_to_dict(projected_graph: ProjectedGraph) -> dict[str, object
                 "member_node_ids": list(group.member_node_ids),
                 "source_id": group.source_id,
                 "source_kind": group.source_kind,
+                "synthetic": group.synthetic,
+                "origin_node_ids": list(group.origin_node_ids),
                 "attrs": dict(group.attrs),
             }
             for group in projected_graph.groups
         ],
     }
+
+
+def resolve_source_nodes(node: ProjectedNode, projected_graph: ProjectedGraph) -> list[Any]:
+    """Return the ordered live source nodes for one projected node."""
+
+    if not node.synthetic:
+        source = projected_graph._source_nodes_by_id.get(node.id)
+        if source is not None:
+            return [source]
+
+    resolved: list[Any] = []
+    for origin_id in node.origin_node_ids:
+        source = projected_graph._origin_source_nodes_by_id.get(origin_id)
+        if source is not None:
+            resolved.append(source)
+    return resolved
+
+
+def _filter_groups_to_retained_nodes(
+    groups: list[ProjectedGroup],
+    retained_node_ids: set[str],
+    *,
+    drop_empty: bool = True,
+    drop_single_member: bool = False,
+) -> list[ProjectedGroup]:
+    filtered_groups: list[ProjectedGroup] = []
+    for group in groups:
+        member_node_ids = [node_id for node_id in group.member_node_ids if node_id in retained_node_ids]
+        if not member_node_ids and drop_empty:
+            continue
+        if len(member_node_ids) == 1 and drop_single_member:
+            continue
+        filtered_groups.append(replace(group, member_node_ids=member_node_ids))
+    return filtered_groups
+
+
+def _first_visit_index(*, cursor_id: Any, history: list[Any]) -> int | None:
+    if cursor_id is None:
+        return None
+    for index, node_id in enumerate(history):
+        if node_id == cursor_id:
+            return index
+    return None
+
+
+def _followed_projected_pairs(
+    *,
+    ledger: Ledger,
+    projected_graph: ProjectedGraph,
+) -> set[tuple[str, str]]:
+    pairs: set[tuple[str, str]] = set()
+    projected_ids = [
+        projected_graph._projected_node_id_by_source_id.get(_stringify_identifier(node_id))
+        for node_id in ledger.cursor_history
+    ]
+    for predecessor_id, successor_id in zip(projected_ids, projected_ids[1:], strict=False):
+        if predecessor_id is None or successor_id is None:
+            continue
+        pairs.add((predecessor_id, successor_id))
+    return pairs
+
+
+def _history_anchor_ids(
+    *,
+    ledger: Ledger,
+    projected_graph: ProjectedGraph,
+    current_projected_id: str,
+    history_steps: int,
+) -> list[str]:
+    distinct_reversed: list[str] = []
+    seen: set[str] = {current_projected_id}
+    for node_id in reversed(ledger.cursor_history):
+        projected_id = projected_graph._projected_node_id_by_source_id.get(_stringify_identifier(node_id))
+        if projected_id is None or projected_id in seen:
+            continue
+        seen.add(projected_id)
+        distinct_reversed.append(projected_id)
+        if len(distinct_reversed) >= history_steps:
+            break
+    distinct_reversed.reverse()
+    return distinct_reversed
+
+
+def _group_membership_key(node_id: str, index: _ProjectedGraphIndex) -> tuple[str, ...]:
+    return tuple(index.groups_for_node.get(node_id, ()))
+
+
+def _collapse_candidate(
+    node_id: str,
+    *,
+    index: _ProjectedGraphIndex,
+    preserve_visited: bool,
+) -> bool:
+    node = index.node_by_id[node_id]
+    if node.synthetic:
+        return False
+    if node.attrs.get("runtime.current") is True:
+        return False
+    if node.attrs.get("runtime.history_anchor") is True:
+        return False
+    if preserve_visited and node.attrs.get("runtime.visited") is True:
+        return False
+    if "media.preview_path" in node.attrs:
+        return False
+    if index.outdegree.get(node_id, 0) != 1:
+        return False
+    if index.indegree.get(node_id, 0) > 1:
+        return False
+    return True
+
+
+def _has_eligible_chain_predecessor(
+    node_id: str,
+    *,
+    index: _ProjectedGraphIndex,
+    preserve_visited: bool,
+) -> bool:
+    incoming = index.incoming.get(node_id, [])
+    if len(incoming) != 1:
+        return False
+    predecessor_id = incoming[0].source_id
+    if predecessor_id not in index.node_by_id:
+        return False
+    if _group_membership_key(predecessor_id, index) != _group_membership_key(node_id, index):
+        return False
+    return _collapse_candidate(
+        predecessor_id,
+        index=index,
+        preserve_visited=preserve_visited,
+    )
+
+
+def _collapse_chain(
+    *,
+    chain_ids: list[str],
+    projected_graph: ProjectedGraph,
+    index: _ProjectedGraphIndex,
+) -> dict[str, Any]:
+    first_id = chain_ids[0]
+    last_id = chain_ids[-1]
+    chain_nodes = [index.node_by_id[node_id] for node_id in chain_ids]
+    chain_set = set(chain_ids)
+
+    synthetic_node = ProjectedNode(
+        id=f"chain:{first_id}->{last_id}",
+        label=f"{chain_nodes[0].label} ··· {chain_nodes[-1].label}",
+        source_id=None,
+        source_kind=None,
+        synthetic=True,
+        origin_node_ids=[
+            origin_id
+            for node in chain_nodes
+            for origin_id in node.origin_node_ids
+        ],
+        attrs=_aggregate_runtime_node_attrs(chain_nodes),
+    )
+
+    incoming_edge = None
+    for edge in index.incoming.get(first_id, []):
+        if edge.source_id in chain_set:
+            continue
+        incoming_edge = ProjectedEdge(
+            id=f"{edge.source_id}:{edge.edge_role}:{synthetic_node.id}",
+            source_id=edge.source_id,
+            target_id=synthetic_node.id,
+            label=edge.label,
+            source_edge_id=None,
+            source_kind=None,
+            edge_role=edge.edge_role,
+            synthetic=True,
+            origin_edge_ids=list(edge.origin_edge_ids),
+            attrs=_aggregate_runtime_edge_attrs([edge]),
+        )
+        break
+
+    outgoing_edge = None
+    for edge in index.outgoing.get(last_id, []):
+        if edge.target_id in chain_set:
+            continue
+        outgoing_edge = ProjectedEdge(
+            id=f"{synthetic_node.id}:{edge.edge_role}:{edge.target_id}",
+            source_id=synthetic_node.id,
+            target_id=edge.target_id,
+            label=edge.label,
+            source_edge_id=None,
+            source_kind=None,
+            edge_role=edge.edge_role,
+            synthetic=True,
+            origin_edge_ids=list(edge.origin_edge_ids),
+            attrs=_aggregate_runtime_edge_attrs([edge]),
+        )
+        break
+
+    return {
+        "first_id": first_id,
+        "last_id": last_id,
+        "member_ids": chain_ids,
+        "node": synthetic_node,
+        "incoming_edge": incoming_edge,
+        "outgoing_edge": outgoing_edge,
+    }
+
+
+def _aggregate_runtime_node_attrs(nodes: list[ProjectedNode]) -> dict[str, object]:
+    attrs: dict[str, object] = {}
+    if any(node.attrs.get("runtime.visited") is True for node in nodes):
+        attrs["runtime.visited"] = True
+    return attrs
+
+
+def _aggregate_runtime_edge_attrs(edges: list[ProjectedEdge]) -> dict[str, object]:
+    attrs: dict[str, object] = {}
+    if any(edge.attrs.get("runtime.followed") is True for edge in edges):
+        attrs["runtime.followed"] = True
+    if any(edge.attrs.get("runtime.current_outgoing") is True for edge in edges):
+        attrs["runtime.current_outgoing"] = True
+    available_values = [edge.attrs.get("runtime.available") for edge in edges if edge.attrs.get("runtime.available") is not None]
+    if available_values:
+        attrs["runtime.available"] = bool(available_values[0])
+    return attrs
+
+
+def _source_ids_for_origin_nodes(
+    *,
+    origin_node_ids: list[str],
+    projected_graph: ProjectedGraph,
+) -> list[str]:
+    source_ids: list[str] = []
+    for origin_id in origin_node_ids:
+        source = projected_graph._origin_source_nodes_by_id.get(origin_id)
+        source_id = _stringify_identifier(getattr(source, "uid", None))
+        if source_id:
+            source_ids.append(source_id)
+    return source_ids
+
+
+def _replace_group_memberships_after_collapse(
+    groups: list[ProjectedGroup],
+    collapsed: dict[str, dict[str, Any]],
+    retained_node_ids: set[str],
+) -> list[ProjectedGroup]:
+    updated_groups: list[ProjectedGroup] = []
+    for group in groups:
+        member_node_ids: list[str] = []
+        for node_id in group.member_node_ids:
+            replacement = collapsed.get(node_id)
+            mapped_id = replacement["node"].id if replacement is not None else node_id
+            if mapped_id not in retained_node_ids or mapped_id in member_node_ids:
+                continue
+            member_node_ids.append(mapped_id)
+        if not member_node_ids:
+            continue
+        updated_groups.append(replace(group, member_node_ids=member_node_ids))
+    return updated_groups
+
+
+def _without_style_attrs(attrs: Mapping[str, object]) -> dict[str, object]:
+    return {
+        key: value
+        for key, value in attrs.items()
+        if not key.startswith("style.")
+    }
+
+
+def _styled_runtime_node(node: ProjectedNode) -> ProjectedNode:
+    attrs = _without_style_attrs(node.attrs)
+    if node.attrs.get("runtime.current") is True:
+        attrs["style.style"] = "filled"
+        attrs["style.fillcolor"] = "#2563eb"
+        attrs["style.fontcolor"] = "white"
+        attrs["style.penwidth"] = 2
+        return replace(node, attrs=attrs)
+    if node.synthetic:
+        attrs["style.style"] = "filled,dashed"
+        attrs["style.fillcolor"] = "#dbeafe" if node.attrs.get("runtime.visited") is True else "#f1f5f9"
+        return replace(node, attrs=attrs)
+    if node.attrs.get("runtime.visited") is True:
+        attrs["style.style"] = "filled"
+        attrs["style.fillcolor"] = "#dbeafe"
+    return replace(node, attrs=attrs)
+
+
+def _styled_runtime_edge(edge: ProjectedEdge) -> ProjectedEdge:
+    attrs = _without_style_attrs(edge.attrs)
+    if edge.attrs.get("runtime.current_outgoing") is True:
+        available = edge.attrs.get("runtime.available")
+        if available is False:
+            attrs["style.color"] = "#94a3b8"
+            attrs["style.style"] = "dashed"
+        else:
+            attrs["style.color"] = "#2563eb"
+            attrs["style.style"] = "solid"
+        return replace(edge, attrs=attrs)
+    if edge.attrs.get("runtime.followed") is True:
+        attrs["style.color"] = "#0d9488"
+        attrs["style.penwidth"] = 2
+    return replace(edge, attrs=attrs)
 
 
 def build_script_report(bundle_or_world: StoryTemplateBundle | World) -> ScriptGraphReport:
@@ -614,6 +1256,7 @@ def _project_selected_items(
     projected_nodes: list[ProjectedNode] = []
     source_nodes_by_id: dict[str, Any] = {}
     projected_node_id_by_source_id: dict[str, str] = {}
+    origin_source_nodes_by_id: dict[str, Any] = {}
     node_counts: dict[str, int] = defaultdict(int)
 
     for seed in node_seeds:
@@ -625,11 +1268,14 @@ def _project_selected_items(
             label=seed.label,
             source_id=seed.source_id,
             source_kind=seed.source_kind,
+            synthetic=False,
+            origin_node_ids=[projected_id],
             attrs={},
         )
         projected_nodes.append(projected_node)
         source_nodes_by_id[projected_id] = seed.source
         projected_node_id_by_source_id[seed.source_id] = projected_id
+        origin_source_nodes_by_id[projected_id] = seed.source
 
     edge_seeds: list[_EdgeSeed] = []
     for edge in edge_candidates:
@@ -670,6 +1316,8 @@ def _project_selected_items(
             source_edge_id=seed.source_id,
             source_kind=seed.source_kind,
             edge_role=seed.edge_role,
+            synthetic=False,
+            origin_edge_ids=[edge_id],
             attrs={},
         )
         projected_edges.append(projected_edge)
@@ -682,6 +1330,7 @@ def _project_selected_items(
         _source_nodes_by_id=source_nodes_by_id,
         _source_edges_by_id=source_edges_by_id,
         _projected_node_id_by_source_id=projected_node_id_by_source_id,
+        _origin_source_nodes_by_id=origin_source_nodes_by_id,
     )
 
 
@@ -691,26 +1340,53 @@ def _replace_projected_graph(
     nodes: list[ProjectedNode] | None = None,
     edges: list[ProjectedEdge] | None = None,
     groups: list[ProjectedGroup] | None = None,
+    source_nodes_by_id: dict[str, Any] | None = None,
+    source_edges_by_id: dict[str, Any] | None = None,
+    projected_node_id_by_source_id: dict[str, str] | None = None,
+    origin_source_nodes_by_id: dict[str, Any] | None = None,
 ) -> ProjectedGraph:
     return ProjectedGraph(
         nodes=list(projected_graph.nodes if nodes is None else nodes),
         edges=list(projected_graph.edges if edges is None else edges),
         groups=list(projected_graph.groups if groups is None else groups),
-        _source_nodes_by_id=dict(projected_graph._source_nodes_by_id),
-        _source_edges_by_id=dict(projected_graph._source_edges_by_id),
-        _projected_node_id_by_source_id=dict(projected_graph._projected_node_id_by_source_id),
+        _source_nodes_by_id=dict(
+            projected_graph._source_nodes_by_id if source_nodes_by_id is None else source_nodes_by_id
+        ),
+        _source_edges_by_id=dict(
+            projected_graph._source_edges_by_id if source_edges_by_id is None else source_edges_by_id
+        ),
+        _projected_node_id_by_source_id=dict(
+            projected_graph._projected_node_id_by_source_id
+            if projected_node_id_by_source_id is None
+            else projected_node_id_by_source_id
+        ),
+        _origin_source_nodes_by_id=dict(
+            projected_graph._origin_source_nodes_by_id
+            if origin_source_nodes_by_id is None
+            else origin_source_nodes_by_id
+        ),
     )
 
 
 def _sorted_projected_graph(projected_graph: ProjectedGraph) -> ProjectedGraph:
-    nodes = sorted(projected_graph.nodes, key=lambda node: (node.id, node.label, node.source_kind or ""))
+    nodes = sorted(
+        projected_graph.nodes,
+        key=lambda node: (node.id, node.label, node.source_kind or "", tuple(node.origin_node_ids)),
+    )
     edges = sorted(
         projected_graph.edges,
-        key=lambda edge: (edge.source_id, edge.target_id, edge.edge_role, edge.label, edge.id),
+        key=lambda edge: (
+            edge.source_id,
+            edge.target_id,
+            edge.edge_role,
+            edge.label,
+            tuple(edge.origin_edge_ids),
+            edge.id,
+        ),
     )
     groups = sorted(
         projected_graph.groups,
-        key=lambda group: (group.group_kind, group.label, group.id),
+        key=lambda group: (group.group_kind, group.label, group.id, tuple(group.member_node_ids)),
     )
     return _replace_projected_graph(projected_graph, nodes=nodes, edges=edges, groups=groups)
 
@@ -1094,17 +1770,22 @@ __all__ = [
     "ScriptGraphNode",
     "ScriptGraphReport",
     "attach_media_preview",
+    "annotate_runtime",
     "build_script_report",
+    "collapse_linear_chains",
     "cluster_by_scene",
     "episode_only_selector",
     "episode_plus_concepts_selector",
+    "focus_runtime_window",
     "mark_node_styles",
+    "mark_runtime_styles",
     "project_story_graph",
     "project_world_graph",
     "projected_graph_to_dict",
     "render_basic_svg",
     "render_dot",
     "report_to_dict",
+    "resolve_source_nodes",
     "structural_selector",
     "to_dot",
 ]

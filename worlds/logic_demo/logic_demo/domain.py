@@ -56,15 +56,31 @@ _PROSE_BY_LABEL: dict[str, str] = {
     "half_adder_output_00": "Half-adder output: sum 0, carry 0.",
     "half_adder_output_10": "Half-adder output: sum 1, carry 0.",
     "half_adder_output_01": "Half-adder output: sum 0, carry 1.",
+    "full_adder_pick_a": "Full adder: choose the value of input A.",
+    "full_adder_a_zero": "Input A is 0. Choose the value of input B.",
+    "full_adder_a_one": "Input A is 1. Choose the value of input B.",
+    "full_adder_ab_00": "Inputs A and B are both 0. Choose the carry-in bit.",
+    "full_adder_ab_01": "Inputs A and B are 0 and 1. Choose the carry-in bit.",
+    "full_adder_ab_10": "Inputs A and B are 1 and 0. Choose the carry-in bit.",
+    "full_adder_ab_11": "Inputs A and B are both 1. Choose the carry-in bit.",
 }
 
 
 def logic_prose_for_block(block: LogicBlock) -> str:
     """Return deterministic prose for one already-resolved logic block."""
 
-    prose = _PROSE_BY_LABEL.get(block.get_label())
+    label = block.get_label()
+    prose = _PROSE_BY_LABEL.get(label)
     if prose is not None:
         return prose
+    if label.startswith("full_adder_xor_"):
+        return "Full-adder XOR stage resolves the sum bit."
+    if label.startswith("full_adder_or_"):
+        return "Full-adder carry-combine stage resolves the carry bit."
+    if label.startswith("full_adder_output_"):
+        suffix = label.removeprefix("full_adder_output_").split("_sc", 1)[-1]
+        if len(suffix) == 2:
+            return f"Full-adder output: sum {suffix[0]}, carry {suffix[1]}."
     return f"{block.gate_type.value} node {block.get_label()}."
 
 

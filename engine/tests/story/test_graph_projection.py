@@ -62,6 +62,14 @@ def _story_media_root(tmp_path: Path):
     return _resolve
 
 
+@pytest.fixture(autouse=True)
+def _install_story_media_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "tangl.media.story_media.get_story_media_dir",
+        _story_media_root(tmp_path),
+    )
+
+
 def _choice_by_text(ledger: Ledger, text: str) -> Action:
     return next(
         action
@@ -119,6 +127,8 @@ def _dot_fixture_graph() -> ProjectedGraph:
                 label="Start",
                 source_id=None,
                 source_kind="tests.Start",
+                synthetic=False,
+                origin_node_ids=["n1"],
                 attrs={},
             ),
             ProjectedNode(
@@ -126,6 +136,8 @@ def _dot_fixture_graph() -> ProjectedGraph:
                 label="Result",
                 source_id=None,
                 source_kind="tests.Result",
+                synthetic=False,
+                origin_node_ids=["n2"],
                 attrs={
                     "media.preview_path": "/tmp/thumb.svg",
                     "style.shape": "diamond",
@@ -141,6 +153,8 @@ def _dot_fixture_graph() -> ProjectedGraph:
                 source_edge_id=None,
                 source_kind="tests.Edge",
                 edge_role="choice",
+                synthetic=False,
+                origin_edge_ids=["n1:choice:n2"],
                 attrs={},
             )
         ],
@@ -152,6 +166,8 @@ def _dot_fixture_graph() -> ProjectedGraph:
                 member_node_ids=["n1"],
                 source_id=None,
                 source_kind=None,
+                synthetic=False,
+                origin_node_ids=["n1"],
                 attrs={},
             ),
             ProjectedGroup(
@@ -161,6 +177,8 @@ def _dot_fixture_graph() -> ProjectedGraph:
                 member_node_ids=["n2"],
                 source_id=None,
                 source_kind=None,
+                synthetic=False,
+                origin_node_ids=["n2"],
                 attrs={},
             ),
         ],

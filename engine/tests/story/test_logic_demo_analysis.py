@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tangl.loaders import WorldBundle
 from tangl.loaders.compiler import WorldCompiler
 from tangl.story import build_script_report, render_basic_svg, report_to_dict
@@ -17,6 +19,25 @@ def _compile_logic_world():
     loader_bundle = WorldBundle.load(_logic_root())
     world = WorldCompiler().compile(loader_bundle)
     return world.bundle, world
+
+
+def _story_media_root(tmp_path: Path):
+    root = tmp_path / "story_media"
+
+    def _resolve(story_id=None):
+        if story_id is None:
+            return root
+        return root / str(story_id)
+
+    return _resolve
+
+
+@pytest.fixture(autouse=True)
+def _install_story_media_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "tangl.media.story_media.get_story_media_dir",
+        _story_media_root(tmp_path),
+    )
 
 
 def test_build_script_report_returns_expected_logic_demo_nodes_and_edges() -> None:

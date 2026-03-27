@@ -124,3 +124,30 @@ def test_half_adder_routes_all_input_pairs_to_expected_outputs(
         ledger.resolve_choice(_choice_by_text(ledger, b_choice).uid)
 
         assert ledger.cursor.label == expected_label
+
+
+def test_full_adder_routes_all_input_triples_to_expected_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _install_story_media_root(monkeypatch, tmp_path)
+    world = _compile_logic_world()
+    expectations = {
+        ("A = 0", "B = 0", "Cin = 0"): "full_adder_output_000_sc00",
+        ("A = 0", "B = 0", "Cin = 1"): "full_adder_output_001_sc10",
+        ("A = 0", "B = 1", "Cin = 0"): "full_adder_output_010_sc10",
+        ("A = 0", "B = 1", "Cin = 1"): "full_adder_output_011_sc01",
+        ("A = 1", "B = 0", "Cin = 0"): "full_adder_output_100_sc10",
+        ("A = 1", "B = 0", "Cin = 1"): "full_adder_output_101_sc01",
+        ("A = 1", "B = 1", "Cin = 0"): "full_adder_output_110_sc01",
+        ("A = 1", "B = 1", "Cin = 1"): "full_adder_output_111_sc11",
+    }
+
+    for index, ((a_choice, b_choice, cin_choice), expected_label) in enumerate(expectations.items()):
+        ledger = _make_ledger(world=world, story_label=f"logic_demo_full_adder_{index}")
+        ledger.resolve_choice(_choice_by_text(ledger, "Inspect the full adder").uid)
+        ledger.resolve_choice(_choice_by_text(ledger, a_choice).uid)
+        ledger.resolve_choice(_choice_by_text(ledger, b_choice).uid)
+        ledger.resolve_choice(_choice_by_text(ledger, cin_choice).uid)
+
+        assert ledger.cursor.label == expected_label
