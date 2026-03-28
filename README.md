@@ -1,4 +1,4 @@
-# StoryTangl
+# StoryTan<span style="display: inline-block; transform: rotate(180deg) scaleY(120%) scaleX(80%) translateY(-15%) ; margin-inline: -.07em; text-transform: capitalize;">g</span>l
 
 **A research platform for graph-based computational narratology.**
 
