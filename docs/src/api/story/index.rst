@@ -10,4 +10,5 @@ construction, and runtime graph surfaces.
    concepts
    episode
    fabula
+   analysis
    runtime

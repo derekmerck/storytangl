@@ -11,6 +11,7 @@ preview, and journaling.
 - :doc:`../../design/story/philosophy`
 - :doc:`../../design/story/JOURNAL_COMPOSE_CONTRACT`
 - :doc:`../../design/traversal/NAV_DESIGN`
+- :doc:`analysis`
 
 .. rubric:: Related notes
 

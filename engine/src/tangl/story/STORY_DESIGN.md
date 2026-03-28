@@ -121,6 +121,27 @@ maps when graph/template lookup can answer the question directly.
 The journal is the only narrative output surface. Story owns what fragments
 mean; service/transports decide how to present them.
 
+## Graph Analysis And Projection
+
+Story also owns the graph-analysis helpers that sit *beside* runtime execution
+rather than inside the VM pipeline.
+
+- `ProjectedGraph` is the canonical analysis/view model for graph inspection.
+- `project_story_graph(...)` is the live-graph adapter.
+- `project_world_graph(...)` is defined by creating an eager frozen inspection
+  story, then projecting that `StoryGraph`.
+- Selection is expressed with core `Selector`; there is no parallel graph-query
+  DSL.
+- Processors are ordered pure transforms over `ProjectedGraph`.
+- Structural rewrites such as chain collapse happen **after** projection, not
+  on the source `StoryGraph`.
+- Renderers such as DOT are dumb sinks over the projected view. They do not
+  inspect runtime graph internals directly.
+
+The canonical runtime inspection pipeline is:
+
+`project_story_graph(...) -> annotate_runtime(...) -> focus_runtime_window(...) -> cluster_by_scene() -> collapse_linear_chains(...) -> mark_runtime_styles() -> to_dot(...)`
+
 ## What Story Does Not Define
 
 Story does not define:

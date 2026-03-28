@@ -1,0 +1,38 @@
+:: StoryTitle
+Twine Logic Demo
+
+:: StoryData
+{
+  "start": "Start",
+  "format": "Twine 2",
+  "format-version": "2.0"
+}
+
+:: Start [entry]
+This parity checker is authored in Twee rather than native StoryTangl YAML.
+
+[[Begin parity checker->FirstInput]]
+
+:: FirstInput
+Enter the first bit.
+
+[[First bit = 0->EvenState]]
+[[First bit = 1->OddState]]
+
+:: EvenState
+The XOR accumulator is even so far. Enter the second bit.
+
+[[Second bit = 0->EvenOutput]]
+[[Second bit = 1->OddOutput]]
+
+:: OddState
+The XOR accumulator is odd so far. Enter the second bit.
+
+[[Second bit = 0->OddOutput]]
+[[Second bit = 1->EvenOutput]]
+
+:: EvenOutput
+Parity result: the two-bit input is even.
+
+:: OddOutput
+Parity result: the two-bit input is odd.
