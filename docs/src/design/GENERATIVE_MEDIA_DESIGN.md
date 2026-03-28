@@ -31,7 +31,14 @@ then server-side async lifecycle, then concrete worker backends, then anticipato
   Phase 3 harness. It exercises both `FAST_SYNC` and `ASYNC` generation paths on the
   shipped `MediaSpec` / `WorkerDispatcher` interfaces without requiring an external
   worker backend.
-- **Still deferred:** concrete worker backends, named `MediaSpecRegistry` templates,
+- **March 28, 2026:** A first concrete external worker backend now exists via
+  `comfy_forge`. `ComfyDispatcher` submits and polls real ComfyUI jobs on the
+  existing async lifecycle, `ComfySpec` materializes workflow-backed adapted
+  specs for dedupe and dispatch, and `ComfyForge` now provides the matching
+  `FAST_SYNC` path on the same workflow contract. Local worker settings are
+  intentionally isolated behind one shared helper even though the current
+  config path is still `content.apis.stableforge.comfy_workers[0]`.
+- **Still deferred:** named `MediaSpecRegistry` templates,
   `GenerationHints`, `get_media_registries` / dispatch-generalized media resolution,
   and anticipatory affordance quotas.
 

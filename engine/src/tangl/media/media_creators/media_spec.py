@@ -24,6 +24,7 @@ on_create_media = BehaviorRegistry(
 
 _SPEC_ALIAS_MAP = {
     "checker": "tangl.media.media_creators.checker_forge.checker_spec.CheckerSpec",
+    "comfy": "tangl.media.media_creators.comfy_forge.comfy_spec.ComfySpec",
     "stable": "tangl.media.media_creators.stable_forge.stable_spec.StableSpec",
     "vector": "tangl.media.media_creators.svg_forge.vector_spec.VectorSpec",
     "tts": "tangl.media.media_creators.tts_forge.tts_spec.TtsSpec",

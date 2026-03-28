@@ -9,6 +9,18 @@ from .auto1111_api import Auto1111Api
 
 StableSpecT = TypeVar('StableSpecT', bound=StableSpec)
 
+
+def _stableforge_settings():
+    content = getattr(settings, "content", None)
+    apis = getattr(content, "apis", None) if content is not None else None
+    stableforge = getattr(apis, "stableforge", None) if apis is not None else None
+    if stableforge is not None:
+        return stableforge
+
+    media = getattr(settings, "media", None)
+    apis = getattr(media, "apis", None) if media is not None else None
+    return getattr(apis, "stableforge", None) if apis is not None else None
+
 class StableForge:
     """
     Implements MediaForgeP
@@ -44,11 +56,13 @@ class StableForge:
         """
         Get an auto1111 worker from config
         """
-        if not settings.media.apis.stableforge.enabled:
+        stableforge = _stableforge_settings()
+        if stableforge is None or not getattr(stableforge, "enabled", False):
             raise RuntimeError("StableForge disabled!")
-        if not settings.media.apis.stableforge.auto1111_workers:
+        workers = getattr(stableforge, "auto1111_workers", None) or []
+        if not workers:
             raise RuntimeError('No auto1111 workers in config')
-        url = settings.media.apis.stableforge.auto1111_workers[0]
+        url = workers[0]
         return Auto1111Api(url)
 
     # @classmethod

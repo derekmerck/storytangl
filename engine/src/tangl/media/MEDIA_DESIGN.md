@@ -14,8 +14,8 @@
 > caches the resolved content hash through `utils.shelved2`, keyed by source
 > path plus file stat, so repeat indexing does not reread unchanged files. The
 > generative creator pipeline now has real sync/async lifecycle infrastructure
-> plus a deterministic in-process checker harness, but external worker-backed
-> forges are still provisional. This note describes the implemented
+> plus a deterministic in-process checker harness and a first real ComfyUI
+> worker backend. This note describes the implemented
 > architecture and the design commitments for the still-evolving creator layer.
 >
 > The package-level architecture is canonical here. Broader design documents
@@ -83,6 +83,7 @@ tangl.media
 ├── Creators       → media_creators/
 │                  → media_creators/media_spec.py             (MediaSpec, MediaResolutionClass, on_adapt_media_spec, on_create_media)
 │                  → media_creators/checker_forge/            (deterministic in-process harness)
+│                  → media_creators/comfy_forge/              (ComfyUI worker backend + workflow spec)
 │                  → media_creators/svg_forge/                (SVG composition, partial)
 │                  → media_creators/stable_forge/             (Stable Diffusion adapters, partial)
 │                  → media_creators/tts_forge/                (text-to-speech adapters, stub/partial)
@@ -311,15 +312,23 @@ first forge that handles the spec type wins.
 | Forge | Media type | Status |
 |-------|------------|--------|
 | `checker_forge` | IMAGE | Active deterministic harness used to prove sync/async pipeline slices |
+| `comfy_forge` | IMAGE | Active ComfyUI backend with workflow-backed specs, async dispatch, and optional `FAST_SYNC` creation |
 | `svg_forge` | VECTOR | Partial — group/transform/viewbox infrastructure exists |
 | `stable_forge` | IMAGE | Partial — API client and spec model exist |
 | `tts_forge` | AUDIO | Partial/stub — API clients exist, worker-backed flow deferred |
 | `raster_forge` | IMAGE | Stub |
 
-The creator pipeline will continue to change as worker-backed forges take final
-shape. The stable commitments are the dispatch pattern, the two-phase
-adapt→create contract, and the use of story-scoped generated RITs as the
-topological satisfaction point for media deps.
+The creator pipeline will continue to change as richer worker-backed forges and
+named spec registries take final shape. The stable commitments are the dispatch
+pattern, the two-phase adapt→create contract, and the use of story-scoped
+generated RITs as the topological satisfaction point for media deps. The
+current Comfy worker endpoint is resolved through one shared settings helper;
+today that helper reads `content.apis.stableforge.comfy_workers[0]`, but that
+Dynaconf layout is intentionally treated as an implementation detail.
+`ComfySpec` keeps the stable-aligned authored fields (`prompt`, `n_prompt`,
+`model`, `seed`, `sampler`, `iterations`, `dims`) and materializes a concrete
+workflow into `adapted_spec` before either async dispatch or `FAST_SYNC`
+creation.
 
 
 ### Dispatch and Phase Hooks (`dispatch.py`, `dispatch_handlers.py`, `phase_hooks.py`)

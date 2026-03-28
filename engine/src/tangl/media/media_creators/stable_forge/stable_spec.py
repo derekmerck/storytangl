@@ -43,3 +43,4 @@ class StableSpec(MediaSpec):
 
 
 StableSpec.render_prompts._behavior.wants_caller_kind = StableSpec
+StableSpec.render_prompts._behavior.wants_exact_kind = False

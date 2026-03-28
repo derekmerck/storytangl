@@ -1,0 +1,63 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sdxl.safetensors"
+    },
+    "_meta": {
+      "title": "checkpoint_loader"
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "portrait of a character"
+    },
+    "_meta": {
+      "title": "positive_prompt"
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "low quality, blurry"
+    },
+    "_meta": {
+      "title": "negative_prompt"
+    }
+  },
+  "4": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "latent_image"
+    }
+  },
+  "5": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 1,
+      "steps": 20,
+      "cfg": 7.0,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "ksampler"
+    }
+  },
+  "6": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "storytangl-portrait"
+    },
+    "_meta": {
+      "title": "save_image"
+    }
+  }
+}
