@@ -149,6 +149,32 @@ def test_story_methods_return_typed_runtime_payloads(
     assert isinstance(projected, ProjectedState)
 
 
+def test_create_story_passes_user_namespace_to_world_override(
+    manager: ServiceManager,
+    persistence,
+    user: User,
+) -> None:
+    class UserScopedWorld(World):
+        def _resolve_entry_override(self, graph, namespace):
+            if namespace.get("user") is None:
+                return None
+            target = next(graph.find_nodes(Selector(label="end")), None)
+            return getattr(target, "uid", None)
+
+    world = UserScopedWorld.from_script_data(script_data=_story_script())
+    manager.create_story(
+        user_id=user.uid,
+        world_id=world.label,
+        world=world,
+        init_mode=InitMode.EAGER.value,
+        story_label="svc_manager_story_override",
+    )
+
+    ledger = persistence[user.current_ledger_id]
+    assert isinstance(ledger, Ledger)
+    assert ledger.cursor.label == "end"
+
+
 def test_story_drop_clears_user_session_without_implicit_ledger_archive(
     manager: ServiceManager,
     persistence,

@@ -1,7 +1,7 @@
 # Story Entry Resolution
 
-**Document Version:** 1.0  
-**Status:** DESIGN ACCEPTED — not yet implemented on the current `tangl.story` / `tangl.service` runtime surface  
+**Document Version:** 1.1  
+**Status:** CURRENT CONTRACT — compile-time defaults and world-level init-time overrides are implemented on the current `tangl.story` / `tangl.service` runtime surface  
 **Relevant layers:** `tangl.story.fabula`, `loaders`, `tangl.service`, `tangl.vm.runtime`
 
 ---
@@ -51,7 +51,7 @@ default."
 
 ## Namespace Contract
 
-The intended API shape is for `World.create_story` to accept an optional
+`World.create_story` accepts an optional
 `namespace` argument:
 
 ```python
@@ -68,8 +68,9 @@ The caller passes `{"user": User}` at minimum. Resolver logic may then inspect
 domain-specific state such as carried flags, stats, or achievements without the
 engine imposing a schema on user locals.
 
-The intended caller is the service runtime controller, which already holds the
-`User` object at story-creation time.
+The canonical service caller is `ServiceManager.create_story(...)`, which now
+forwards a caller-provided namespace and injects the resolved `user` object for
+user-bound story creation.
 
 ---
 
@@ -168,19 +169,20 @@ ledger owns traversal state after initialization.
 
 ## Current Implementation Status
 
-The current `tangl.story` runtime already supports compile-time entry
-resolution through `StoryTemplateBundle.entry_template_ids` and graph-level
-`initial_cursor_id` assignment during materialization.
+The current `tangl.story` runtime supports both parts of the entry-resolution
+chain:
 
-The init-time override hook described here is still aspirational on the current
-v38 surface:
+- compile-time entry resolution through `StoryTemplateBundle.entry_template_ids`
+- init-time override through `World.create_story(..., namespace=...)` plus
+  `_resolve_entry_override(...)`
 
-- `World.create_story(...)` does not yet accept `namespace`
-- `RuntimeController.create_story(...)` does not yet pass such a namespace
-- no `_resolve_entry_override(...)` seam exists on `World`
+The canonical service path also participates:
 
-This document should therefore be read as an accepted future design rather than
-as a description of current behavior.
+- `ServiceManager.create_story(...)` forwards a namespace and injects the
+  resolved `user` object for user-bound story initialization
+
+The remaining design freedom is intentionally domain-level: worlds decide what
+extra namespace keys they consume beyond the baseline `user` object.
 
 ---
 
@@ -189,5 +191,5 @@ as a description of current behavior.
 - `tangl.story.fabula.world.World.create_story`
 - `tangl.story.fabula.materializer.StoryMaterializer`
 - `tangl.story.fabula.compiler.StoryCompiler`
-- `tangl.service.controllers.runtime_controller.RuntimeController.create_story`
+- `tangl.service.service_manager.ServiceManager.create_story`
 - `docs/src/design/story/compilers.rst`

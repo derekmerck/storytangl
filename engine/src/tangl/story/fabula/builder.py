@@ -57,6 +57,7 @@ class WorldBuilder:
         *,
         label: str,
         bundle: StoryTemplateBundle,
+        world_type: type[World] = World,
         assets: Any | None = None,
         resources: Any | None = None,
         extra_authorities: list[Any] | None = None,
@@ -91,7 +92,7 @@ class WorldBuilder:
         modules = list(modules or [])
         registries = list(extra_template_registries or [])
 
-        world = World(
+        world = world_type(
             label=label,
             bundle=bundle,
             dispatch=dispatch,

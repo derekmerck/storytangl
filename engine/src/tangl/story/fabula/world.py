@@ -666,6 +666,7 @@ class World(TraversableGraphFactory):
         return WorldBuilder().build(
             label=label or script_data.get("label") or "story_world",
             bundle=bundle,
+            world_type=cls,
             assets=assets,
             resources=resources,
             extra_template_registries=_coerce_template_registries(templates),

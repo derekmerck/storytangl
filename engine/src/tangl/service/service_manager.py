@@ -302,11 +302,14 @@ class ServiceManager:
             mode = InitMode(mode_raw.lower()) if isinstance(mode_raw, str) else InitMode(mode_raw)
             freeze_shape = bool(kwargs.get("freeze_shape", False))
             worker_dispatcher = kwargs.get("worker_dispatcher")
+            namespace = dict(kwargs.pop("namespace", None) or {})
+            namespace.setdefault("user", user)
 
             init_result = world.create_story(
                 story_label,
                 init_mode=mode,
                 freeze_shape=freeze_shape,
+                namespace=namespace,
             )
             story_graph = init_result.graph
             if story_graph.initial_cursor_id is None:

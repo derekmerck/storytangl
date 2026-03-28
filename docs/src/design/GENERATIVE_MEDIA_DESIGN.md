@@ -70,7 +70,7 @@ Supporting structures:
 - Deterministic `adapt_spec()` / `spec_fingerprint()` behavior — normalized payloads omit transient identity fields and commit a seed before hashing when the spec supports one
 - `MediaSpecProvisioner` — implemented today for dependency-carried inline specs; named `MediaSpecRegistry` templates remain the next authoring-layer extension
 - Two thin phase-bus hooks — implemented as guarded `@on_provision` reconciliation and dispatch passes that run once per `PhaseCtx`
-- `MediaRenderProfile` + typed resolve-result objects at the service boundary; extracting a formal `resolve_media_data` dispatch task is still future work
+- `MediaRenderProfile` + typed resolve-result objects at the service boundary; conceptually this remains one media-resolution seam (`resolve_media_data`) even though the current implementation is still helper-shaped rather than a formal dispatch task
 
 ---
 

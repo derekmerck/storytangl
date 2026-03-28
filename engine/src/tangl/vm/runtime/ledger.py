@@ -225,6 +225,7 @@ class Ledger(Entity):
 
     def _frame_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {"causality_mode": self.causality_mode.value}
+        meta["cursor_history"] = list(self.cursor_history)
         if self.user is not None:
             meta["user"] = self.user
         if self.user_id is not None:

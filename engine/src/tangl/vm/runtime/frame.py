@@ -582,13 +582,20 @@ class Frame:
         cursor changes between calls and the context (including ns cache)
         must reflect the new position.
         """
+        meta = dict(self.meta or {})
+        history = meta.get("cursor_history")
+        combined_history = list(history) if isinstance(history, list) else []
+        if self.cursor_trace:
+            combined_history.extend(self.cursor_trace)
+        if combined_history:
+            meta["cursor_history"] = combined_history
         return PhaseCtx(
             graph=self.graph,
             cursor_id=self.cursor.uid,
             step=self.step_base + self.cursor_steps,
             correlation_id=self.correlation_id,
             logger=self.logger,
-            meta=dict(self.meta or {}),
+            meta=meta,
             causality_mode=self.causality_mode,
             mark_soft_dirty_callback=self.mark_soft_dirty_callback,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty_callback,
