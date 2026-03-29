@@ -1,5 +1,5 @@
 """
-Composable loadout containers built on :class:`tangl.core.entity.Entity.matches`.
+Composable loadout containers built on :class:`tangl.core.Selector`.
 """
 
 from .base import HasResourceCost, HasSlottedContainer, SlottedContainer

@@ -10,13 +10,12 @@ Conceptual layers
 1. Fabula
 
    - :class:`StoryCompiler` validates and normalizes authored scripts into a
-     :class:`StoryTemplateBundle`.
-   - :class:`StoryMaterializer` instantiates story graphs from compiled
-     templates.
-   - :class:`World` is the main external entry point for creating story runs.
-   - :class:`ScriptManager` resolves template lookups across lineage-aware
-     scope groups.
-
+     compiled template bundle.
+   - :class:`WorldBuilder` assembles world adjuncts around a compiled bundle.
+   - :class:`StoryMaterializer` wires story-specific topology and runtime hooks
+     as a helper behind :class:`World`.
+   - :class:`World` is the singleton story authority and main external entry
+     point for creating story runs.
 2. Episode vocabulary
 
    - :class:`Block` is the primary interactive cursor node.
@@ -34,10 +33,8 @@ Conceptual layers
 
 4. Runtime graph and journal output
 
-   - :class:`StoryGraph` carries story locals, template lineage, and world
-     references for runtime resolution.
-   - :class:`StoryRuntimeCtx` defines the context accessors expected by story
-     runtime helpers.
+   - :class:`StoryGraph` carries story locals, template lineage, and a
+     compatibility world alias over its bound factory for runtime resolution.
    - :class:`ContentFragment`, :class:`ChoiceFragment`, and
      :class:`MediaFragment` are re-exported journal output types.
 
@@ -74,22 +71,44 @@ from .fabula import (
     InitReport,
     ResolutionError,
     ResolutionFailureReason,
-    ScriptManager,
     StoryCompiler,
     StoryInitResult,
     StoryMaterializer,
-    StoryTemplateBundle,
     UnresolvedDependency,
-    WorldAssetsFacet,
-    WorldDomainFacet,
-    WorldResourcesFacet,
-    WorldTemplatesFacet,
+    WorldBuilder,
     World,
+)
+from .analysis import (
+    ProjectedEdge,
+    ProjectedGraph,
+    ProjectedGroup,
+    ProjectedNode,
+    ScriptGraphEdge,
+    ScriptGraphNode,
+    ScriptGraphReport,
+    attach_media_preview,
+    annotate_runtime,
+    build_script_report,
+    collapse_linear_chains,
+    cluster_by_scene,
+    episode_only_selector,
+    episode_plus_concepts_selector,
+    focus_runtime_window,
+    mark_node_styles,
+    mark_runtime_styles,
+    project_story_graph,
+    project_world_graph,
+    projected_graph_to_dict,
+    render_basic_svg,
+    render_dot,
+    report_to_dict,
+    resolve_source_nodes,
+    structural_selector,
+    to_dot,
 )
 from .story_graph import StoryGraph
 from .dispatch import on_compose_journal, on_gather_ns, on_journal, story_dispatch
 from .fragments import ChoiceFragment, ContentFragment, MediaFragment
-from .ctx import StoryRuntimeCtx
 
 # Register story-level journal handlers.
 from . import system_handlers  # noqa: F401
@@ -99,6 +118,13 @@ __all__ = [
     "Actor",
     "AuthoredRef",
     "Block",
+    "ProjectedEdge",
+    "ProjectedGraph",
+    "ProjectedGroup",
+    "ProjectedNode",
+    "ScriptGraphEdge",
+    "ScriptGraphNode",
+    "ScriptGraphReport",
     "ChoiceFragment",
     "CompileIssue",
     "CompileSeverity",
@@ -112,26 +138,39 @@ __all__ = [
     "MenuBlock",
     "ResolutionError",
     "ResolutionFailureReason",
-    "ScriptManager",
     "Role",
     "Scene",
     "Setting",
-    "StoryRuntimeCtx",
     "StoryCompiler",
     "StoryGraph",
     "StoryInitResult",
     "StoryMaterializer",
-    "StoryTemplateBundle",
     "UnresolvedDependency",
-    "WorldAssetsFacet",
-    "WorldDomainFacet",
-    "WorldResourcesFacet",
-    "WorldTemplatesFacet",
+    "WorldBuilder",
     "World",
+    "attach_media_preview",
+    "annotate_runtime",
+    "build_script_report",
+    "collapse_linear_chains",
+    "cluster_by_scene",
+    "episode_only_selector",
+    "episode_plus_concepts_selector",
+    "focus_runtime_window",
     "get_narrator_key",
+    "mark_node_styles",
+    "mark_runtime_styles",
     "on_compose_journal",
     "on_gather_ns",
     "on_journal",
+    "project_story_graph",
+    "project_world_graph",
+    "projected_graph_to_dict",
+    "render_basic_svg",
+    "render_dot",
+    "report_to_dict",
+    "resolve_source_nodes",
+    "structural_selector",
     "story_dispatch",
+    "to_dot",
     "MediaFragment",
 ]

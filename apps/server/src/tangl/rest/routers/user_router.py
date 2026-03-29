@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from tangl.config import settings
 from tangl.rest.dependencies_gateway import (
-    get_service_adapter,
+    get_service_manager,
     get_user_locks,
+    require_service_access,
     resolve_user_auth,
 )
-from tangl.service.exceptions import AccessDeniedError
-from tangl.service import GatewayRestAdapter, ServiceOperation, UserAuthInfo
-from tangl.service.response import UserInfo, UserSecret
+from tangl.service import ServiceManager
+from tangl.service.exceptions import AccessDeniedError, AuthMismatchError
+from tangl.service.response import RuntimeInfo, UserInfo, UserSecret
 from tangl.type_hints import UniqueLabel
 from tangl.utils.hash_secret import key_for_secret
 
@@ -22,138 +19,104 @@ from tangl.utils.hash_secret import key_for_secret
 router = APIRouter(tags=["User"])
 
 
-def _call(
-    adapter: GatewayRestAdapter,
-    operation: ServiceOperation,
-    /,
-    *,
-    user_id: UUID | None = None,
-    user_auth: UserAuthInfo | None = None,
-    render_profile: str = "raw",
-    **params: Any,
-) -> Any:
+def _call_service_method(
+    service_manager: ServiceManager,
+    method_name: str,
+    **params: object,
+) -> object:
+    method = getattr(service_manager, method_name)
     try:
-        return adapter.execute_operation(
-            operation,
-            user_id=user_id,
-            user_auth=user_auth,
-            render_profile=render_profile,
-            **params,
-        )
-    except AccessDeniedError as exc:
+        return method(**params)
+    except (AccessDeniedError, AuthMismatchError) as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/info")
 async def get_user_info(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
+    service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
 ) -> UserInfo:
     """Return profile information for the authenticated user."""
 
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
-    return _call(
-        adapter,
-        ServiceOperation.USER_INFO,
+    _ = render_profile
+    user_auth = resolve_user_auth(api_key, service_manager=service_manager)
+    require_service_access("get_user_info", user_auth=user_auth)
+    return _call_service_method(
+        service_manager,
+        "get_user_info",
         user_id=user_auth.user_id,
         user_auth=user_auth,
-        render_profile=render_profile,
     )
 
 
 @router.post("/create")
 async def create_user(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
+    service_manager: ServiceManager = Depends(get_service_manager),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-):
+) -> UserSecret:
     """Create a user and return the secret metadata for clients."""
 
-    user = _call(
-        adapter,
-        ServiceOperation.USER_CREATE,
-        render_profile=render_profile,
-        secret=secret,
-    )
-    user_id = getattr(user, "uid", None)
-    if user_id is None:
-        details = getattr(user, "details", None) or {}
-        raw_user_id = details.get("user_id") if isinstance(details, dict) else None
-        if raw_user_id is not None:
-            user_id = UUID(str(raw_user_id))
-    if user_id is None:
+    _ = render_profile
+    require_service_access("create_user")
+    created = service_manager.create_user(secret=secret)
+    if not isinstance(created, RuntimeInfo):
         raise HTTPException(status_code=500, detail="Failed to create user")
-    api_info = _call(
-        adapter,
-        ServiceOperation.USER_KEY,
-        render_profile=render_profile,
-        secret=secret,
-    )
-    api_key = getattr(api_info, "api_key", None) or key_for_secret(secret)
-    return UserSecret(user_secret=secret, api_key=api_key)
+    if created.status != "ok":
+        raise HTTPException(status_code=500, detail=created.message or "Failed to create user")
+    return service_manager.get_key_for_secret(secret=secret)
 
 
 @router.put("/world")
 async def set_user_world():
-    """Linking users to worlds is not yet implemented in the orchestrated REST API."""
+    """Linking users to worlds is not yet implemented in the REST API."""
 
     raise HTTPException(status_code=501, detail="Setting user worlds is not yet supported")
 
 
 @router.put("/secret")
 async def update_user_secret(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
-    user_locks = Depends(get_user_locks),
+    service_manager: ServiceManager = Depends(get_service_manager),
+    user_locks=Depends(get_user_locks),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     secret: str = Query(example=settings.client.secret, default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-):
+) -> UserSecret:
     """Update the secret for the authenticated user and surface the new API key."""
 
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
+    _ = render_profile
+    user_auth = resolve_user_auth(api_key, service_manager=service_manager)
+    require_service_access("update_user", user_auth=user_auth)
     async with user_locks[user_auth.user_id]:
-        info = _call(
-            adapter,
-            ServiceOperation.USER_UPDATE,
+        _call_service_method(
+            service_manager,
+            "update_user",
             user_id=user_auth.user_id,
             user_auth=user_auth,
-            render_profile=render_profile,
             secret=secret,
         )
-    api_key_value = getattr(info, "api_key", None)
-    secret_value = getattr(info, "secret", secret)
-    if api_key_value is None:
-        api_key_value = key_for_secret(secret_value)
     return UserSecret(
-        user_secret=secret_value,
-        api_key=api_key_value,
+        user_secret=secret,
+        api_key=key_for_secret(secret),
         user_id=user_auth.user_id,
     )
 
 
 @router.delete("/drop")
 async def drop_user(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
+    service_manager: ServiceManager = Depends(get_service_manager),
     api_key: UniqueLabel = Header(example=key_for_secret(settings.client.secret), default=None),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-):
+) -> RuntimeInfo:
     """Remove the authenticated user and purge persisted resources."""
 
-    user_auth = resolve_user_auth(api_key, adapter=adapter)
-    identifiers = _call(
-        adapter,
-        ServiceOperation.USER_DROP,
+    _ = render_profile
+    user_auth = resolve_user_auth(api_key, service_manager=service_manager)
+    require_service_access("drop_user", user_auth=user_auth)
+    return _call_service_method(
+        service_manager,
+        "drop_user",
         user_id=user_auth.user_id,
         user_auth=user_auth,
-        render_profile=render_profile,
     )
-    persistence = adapter.persistence
-    if persistence is not None and isinstance(identifiers, Iterable):
-        for identifier in identifiers:
-            if not isinstance(identifier, UUID):
-                continue
-            try:
-                persistence.remove(identifier)
-            except KeyError:
-                continue

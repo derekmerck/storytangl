@@ -329,7 +329,7 @@ class MediaProvisioner(Record):
         identifier = self._requirement_identifier(requirement)
         for registry in self.registries:
             if identifier:
-                existing = registry.find_one(has_identifier=identifier)
+                existing = registry.find_one(Selector.from_identifier(identifier))
                 if existing is not None:
                     return existing
         return None

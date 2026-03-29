@@ -3,6 +3,9 @@ Game Mechanics
 
 Game mechanics model various complex interactions that can be wrapped in interactive GameBlocks. The framework follows the common handler/component pattern.
 
+See also: ``GAME_MECHANICS_DESIGN.md`` for the broader family taxonomy, the
+round-vs-turn model, and the future game shapes this package is meant to host.
+
 The GameHandler encapsulates all functionality into just a few public api calls:
 
 - `setup_game`

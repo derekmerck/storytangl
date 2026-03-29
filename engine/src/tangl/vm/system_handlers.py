@@ -79,12 +79,23 @@ from .dispatch import (
     on_postreqs,
 )
 from .resolution_phase import ResolutionPhase
+from .traversal import get_visit_count, is_first_visit, steps_since_last_visit
 from .traversable import TraversableNode, TraversableEdge, AnonymousEdge
 
 if TYPE_CHECKING:
     from .runtime.frame import PhaseCtx
 
 logger = logging.getLogger(__name__)
+
+
+def _ctx_cursor_history(ctx: "PhaseCtx | None") -> list[object]:
+    if ctx is None:
+        return []
+    meta = ctx.get_meta() if hasattr(ctx, "get_meta") else {}
+    if not isinstance(meta, Mapping):
+        return []
+    history = meta.get("cursor_history")
+    return list(history) if isinstance(history, list) else []
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +200,26 @@ def contribute_runtime_user_context(*, caller, ctx, **kw):
         reserved = {"user", "user_id"}
         result.update({key: value for key, value in user_ns.items() if key not in reserved})
     return result or None
+
+
+@on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
+def contribute_visit_stats(*, caller, ctx, **kw):
+    """Inject generic visit statistics for the assembled caller namespace.
+
+    ``node_completed`` intentionally aliases ``node_visited`` for the generic
+    VM surface. Richer completion semantics remain a story/mechanics concern.
+    """
+    _ = kw
+    history = _ctx_cursor_history(ctx)
+    visit_count = get_visit_count(caller.uid, history)
+    visited = visit_count > 0
+    return {
+        "node_visited": visited,
+        "node_num_visits": visit_count,
+        "node_steps_since": steps_since_last_visit(caller.uid, history),
+        "node_completed": visited,
+        "is_first_visit": is_first_visit(caller.uid, history),
+    }
 
 
 # ---------------------------------------------------------------------------

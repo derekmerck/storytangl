@@ -41,22 +41,44 @@ VM provides the *contract* for how these things plug in, not their implementatio
 ```
 tangl.vm
 ├── Resolution     → resolution_phase.py  (ResolutionPhase enum, causal ordering)
+├── Factory        → factory.py           (TraversableGraph, TraversableGraphFactory)
 ├── Traversal      → traversable.py       (TraversableNode, TraversableEdge, AnonymousEdge)
 │                  → traversal.py         (history queries: visit_count, call_depth, etc.)
 ├── Runtime        → runtime/frame.py     (Frame: one resolve_choice driver)
 │                  → runtime/ledger.py    (Ledger: state across player actions)
 │                  → runtime/causality.py (CausalityMode: clean/soft_dirty/hard_dirty)
-│                  → ctx.py              (VmPhaseCtx, VmDispatchCtx, VmResolverCtx protocols)
+│                  → ctx.py              (VmPhaseCtx protocol)
 ├── Provisioning   → provision/           (Requirement, Dependency, Resolver, Provisioners)
 ├── Dispatch       → dispatch.py          (on_*/do_* hook pairs for the phase pipeline)
 │                  → system_handlers.py   (SYSTEM-layer behavior registrations)
-├── Fragments      → fragments.py         (Fragment records emitted by JOURNAL)
 └── Replay         → replay/              (Event, Patch, StepRecord, DiffReplayEngine)
 ```
 
 ---
 
 ## Component Design
+
+### TraversableGraph / TraversableGraphFactory (`factory.py`)
+
+VM adds one narrow factory layer above core eager topology expansion.
+
+**`TraversableGraph`** is a `core.Graph` subtype carrying one extra field:
+`initial_cursor_id`. This is traversal metadata derived from graph shape, not
+session state. `Ledger` still owns the live cursor and cursor history.
+
+**`TraversableGraphFactory`** subclasses `core.GraphFactory` and adds only two
+behaviors after core materialization:
+
+- resolve the default traversal entry via `get_entry_cursor()`
+- validate traversal contracts with `assert_traversal_contracts()`
+
+It also exposes `materialize_seed_graph(...)`, the VM-level public seam for
+lazy seed-graph creation from an already-resolved template subset. This keeps
+selected-path seeding in VM without introducing a second runtime factory type.
+
+This keeps VM's authority surface small. Planning, replay, and causality stay
+runtime behavior over a traversable graph; they are not separate factory
+classes.
 
 ### ResolutionPhase (`resolution_phase.py`)
 
@@ -206,8 +228,6 @@ requirement resolution.
 | Decorator | Invocation | Purpose |
 |-----------|------------|---------|
 | `on_gather_ns` | `do_gather_ns` | Namespace assembly from caller/ancestor `get_ns()` + immediate dispatch |
-| `on_get_template_scope_groups` | `do_get_template_scope_groups` | Discover template search-space groups in dispatch order |
-| `on_get_token_catalogs` | `do_get_token_catalogs` | Discover token catalogs in dispatch order (deduped by wrapped type) |
 | `on_resolve` | `do_resolve` | Offer override/filter during provisioning |
 
 **`do_resolve` is a filter hook, not an addition hook.** Handlers return `None` to leave
@@ -216,11 +236,11 @@ existing offers unchanged, or `Iterable[ProvisionOffer]` to replace them. Provis
 `Resolver.gather_offers`. `do_resolve` is for late filtering, scoring adjustments, and
 story-layer offer manipulation — not for generating new offer sources.
 
-**Nested discovery uses a subdispatch boundary.** Discovery helpers (`do_get_template_scope_groups`
-and `do_get_token_catalogs`) run inside `ctx.with_subdispatch()` when available. In vm
-today this pushes a fresh per-subdispatch result pipe on `PhaseCtx`, so nested dispatch
-can inspect prior handler outputs through `ctx.results` without smearing those results
-into the parent pipeline pass.
+**Search-space discovery is authority-based, not dispatch-based.** `PhaseCtx`
+delegates template, token, and media lookup directly to `graph.factory` /
+world authority methods. The VM no longer exposes dedicated discovery hook
+families for those search spaces, which keeps story/media vocabulary out of
+the VM dispatch surface.
 
 **Aggregation modes match phase semantics.** PREREQS and POSTREQS use `first_result`
 (first redirect wins, subsequent handlers skipped). VALIDATE uses `all_true` (all
@@ -249,10 +269,11 @@ order. Frame and Ledger may also inject populated local registries explicitly fo
 call path via `PhaseCtx.local_authorities`. This keeps story/world registries automatic
 while preserving narrow local override seams without ambient per-instance discovery.
 
-**Template scope discovery is dispatch-first.** `PhaseCtx.get_template_scope_groups()`
-calls `do_get_template_scope_groups(caller=cursor, ctx=self)` and uses that merged result
-when available. The graph factory fallback remains as a compatibility path when no
-contributors are registered.
+**Template scope discovery is factory-authority-first.** `PhaseCtx.get_template_scope_groups()`
+delegates to the bound graph factory when it exposes `get_template_scope_groups(...)`
+and otherwise falls back to the factory's template registry. Token catalogs and media
+inventories use the same authority pattern through `get_token_catalogs(...)` and
+`get_media_inventories(...)`.
 
 **Namespace is cached per-node per-context.** `get_ns(node)` delegates to
 `do_gather_ns` on cache miss, caches the result by node UID. `do_gather_ns` uses a
@@ -359,8 +380,8 @@ fundamental resolution strategies:
 | Provisioner | Source | Policy | Distance |
 |-------------|--------|--------|----------|
 | `FindProvisioner` | entity_groups from graph | EXISTING | location distance |
-| `TemplateProvisioner` | `do_get_template_scope_groups` discovery | CREATE | scope distance |
-| `TokenProvisioner` | `do_get_token_catalogs` discovery | CREATE | 0 |
+| `TemplateProvisioner` | `ctx.get_template_scope_groups()` | CREATE | scope distance |
+| `TokenProvisioner` | `ctx.get_token_catalogs(requirement=...)` | CREATE | 0 |
 
 **Provisioners are not registered — they are called.** `Resolver.gather_offers` calls
 each provisioner directly before `do_resolve` fires. This is intentional: provisioners
@@ -380,7 +401,7 @@ pipeline. It is a thin source/filter/offer loop:
 
 ```python
 # Resolver-side discovery
-catalogs = do_get_token_catalogs(caller, requirement=requirement, ctx=ctx)
+catalogs = ctx.get_token_catalogs(requirement=requirement)
 offers = TokenProvisioner(catalogs=catalogs).get_dependency_offers(requirement)
 ```
 
@@ -466,14 +487,13 @@ registries remain opt-in per call path.
 | Manager | Authority hook | VM consumer |
 |---------|---------------|-------------|
 | `DomainManager` | registers handlers directly | fires through normal dispatch |
-| Story/World discovery handlers | `on_get_template_scope_groups` | Template search-space discovery |
-| World asset/domain providers | `on_get_token_catalogs` (often adapting provider APIs) | Token catalog discovery |
-| `MediaManager` | `on_provision_media` or similar | future provision hook |
+| World/factory template providers | `World.get_template_scope_groups(...)` | Template search-space discovery |
+| World asset/domain providers | `World.get_token_catalogs(...)` | Token catalog discovery |
+| World/media providers | `World.get_media_inventories(...)` | Media inventory discovery |
 
-Template scope groups and token catalogs are both discovered through dispatch tasks, so
-the VM stays ignorant of world/facet plumbing details. World internals can keep facet
-organization (`templates`, `assets`, etc.); contributors translate that into dispatch
-results.
+Template scope groups, token catalogs, and media inventories now come from the
+graph/factory authority chain, so the VM stays ignorant of world/facet plumbing
+details without carrying story/media-specific dispatch tasks.
 
 
 ### System Handlers (`system_handlers.py`)
@@ -571,19 +591,20 @@ edge type with narrative-specific fields subclasses `Choice`, not `TraversableEd
 The vm machinery sees `TraversableEdge` (via `isinstance` or duck-type) and behaves
 correctly.
 
-### Catalog Discovery: Dispatch-Native, Not VM-Wired
+### Search-Space Discovery: Authority-Native, Not VM-Wired
 
-Resolver performs catalog/scope discovery by dispatching:
+Resolver performs search-space discovery by calling the runtime context:
 
-- `do_get_template_scope_groups(caller, ctx=ctx)`
-- `do_get_token_catalogs(caller, requirement=req, ctx=ctx)`
+- `ctx.get_template_scope_groups()`
+- `ctx.get_token_catalogs(requirement=req)`
+- `ctx.get_media_inventories(requirement=req)`
 
-Contributors decide where data comes from (story lineage maps, world facets, mod systems,
-procedural generators). The VM contract is only "dispatch task in, normalized result out."
+World/factory authorities decide where that data comes from (story lineage maps,
+world fields, asset/resource managers, mod systems). The VM contract is only
+"typed context in, normalized registries/catalogs/inventories out."
 
-This keeps provisioning extensible without adding VM-specific integration points for each
-new search space. It also centralizes merge/validation rules (flattening, token catalog
-dedupe by wrapped type) in one place.
+This keeps provisioning extensible without adding VM-specific integration points
+for each new story/media search space.
 
 ### Availability vs. Existence
 
@@ -605,9 +626,9 @@ and passes the annotated list to the renderer. The renderer decides presentation
 |--------|-----|-----|-----------|
 | Effect lists | `entry_effects` / `final_effects` (two fields) | `effects: list[TraversableEffect]` + `trigger_phase` | Single list, phase declared on the effect |
 | Availability/Effects location | `core.bases.HasAvailability`, `HasEffects` | `vm.traversable.HasAvailability`, `HasEffects` | Phase vocabulary is VM, not core |
-| Token provisioning | `TokenFactory` in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
-| Template discovery | Graph/facet call-chain wiring | `do_get_template_scope_groups` dispatch task | VM no longer knows world internals |
-| Catalog discovery | Explicit wiring / polling APIs | `do_get_token_catalogs` dispatch task | Unified discovery contract across search spaces |
+| Token provisioning | token helpers in core | `TokenProvisioner` in vm | Provisioning is context-aware; core is timeless |
+| Template discovery | Graph/facet call-chain wiring | `ctx.get_template_scope_groups()` via factory authority | VM no longer knows world internals |
+| Catalog discovery | Explicit wiring / polling APIs | `ctx.get_token_catalogs()` via factory authority | Unified discovery contract across search spaces |
 | System handlers | Self-registering mixins via `@on_update` on class body | Module-level `@on_update` with `hasattr` duck-type | No import side effects on dispatch registry |
 | Phase dispatch | Manual aggregation per `do_*` function | `AggregationMode` table driving factory (planned) | Eliminate copy-paste; aggregation mode is data |
 | Provisioner registration | Implicit (attached to context) | Explicit call in `gather_offers` | Clear source of truth for what generates offers |

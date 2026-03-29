@@ -1,4 +1,4 @@
-"""Import guardrails for canonical service/story controller isolation."""
+"""Import guardrails for manager-first service modules."""
 
 from __future__ import annotations
 
@@ -7,25 +7,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2] / "src" / "tangl"
-
-def _discover_implementation_modules() -> tuple[Path, ...]:
-    modules: list[Path] = []
-    for package_root in (ROOT / "story", ROOT / "service" / "controllers"):
-        for path in package_root.rglob("*_controller.py"):
-            modules.append(path)
-    return tuple(sorted(modules))
-
-
-IMPLEMENTATION_MODULES = _discover_implementation_modules()
-
-BARREL_MODULE = ROOT / "service" / "controllers" / "__init__.py"
-BARREL_ALLOWED_IMPORTS = {
-    "__future__",
-    "runtime_controller",
-    "system_controller",
-    "user_controller",
-    "world_controller",
-}
+SERVICE_PUBLIC_MODULE = ROOT / "service" / "__init__.py"
+BOOTSTRAP_MODULE = ROOT / "service" / "bootstrap.py"
 
 
 def _import_modules(path: Path) -> list[str]:
@@ -38,9 +21,17 @@ def _import_modules(path: Path) -> list[str]:
             if node.module is not None:
                 modules.append(node.module)
     return modules
-def test_service_controller_barrel_imports_only_controller_modules() -> None:
-    violations: list[str] = []
-    for module_name in _import_modules(BARREL_MODULE):
-        if module_name not in BARREL_ALLOWED_IMPORTS:
-            violations.append(module_name)
-    assert not violations, f"Unexpected barrel imports: {violations}"
+
+
+def test_service_public_module_no_longer_imports_compatibility_stack() -> None:
+    imported = _import_modules(SERVICE_PUBLIC_MODULE)
+    forbidden = {"api_endpoint", "gateway", "operations", "orchestrator", "rest_adapter"}
+    violations = [module for module in imported if any(name in module for name in forbidden)]
+    assert not violations, f"Unexpected compatibility imports: {violations}"
+
+
+def test_service_bootstrap_only_exposes_manager_builder() -> None:
+    imported = _import_modules(BOOTSTRAP_MODULE)
+    forbidden = {"controllers", "gateway", "operations", "orchestrator"}
+    violations = [module for module in imported if any(name in module for name in forbidden)]
+    assert not violations, f"Unexpected compatibility imports: {violations}"

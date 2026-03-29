@@ -46,8 +46,7 @@ class TestRpsTavernWorld:
         bundle = WorldBundle.load(_rps_root())
         world = WorldCompiler().compile(bundle)
 
-        assert world.domain is not None
-        assert "RpsBlock" in world.domain.class_registry
+        assert "RpsBlock" in world.class_registry
 
         result = world.create_story("rps_tavern_demo", init_mode=InitMode.EAGER)
         ledger = Ledger.from_graph(result.graph, entry_id=result.graph.initial_cursor_id)

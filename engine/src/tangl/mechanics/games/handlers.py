@@ -3,10 +3,8 @@ from __future__ import annotations
 """VM phase handlers for game mechanics integration."""
 
 import logging
-from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
-from tangl.core import CallReceipt, Selector
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
     ResolutionPhase as P,
@@ -17,10 +15,7 @@ from tangl.vm import (
     on_provision,
     on_update,
 )
-from tangl.vm.dispatch import vm_dispatch
-from tangl.core.behavior import HandlerPriority as Prio
-from tangl.story.dispatch import on_gather_content
-from tangl.vm.dispatch import dispatch as vm_dispatch
+from tangl.vm.dispatch import dispatch
 
 from .has_game import HasGame
 
@@ -73,7 +68,7 @@ def _ctx_selected_payload(ctx: Any) -> Any:
     return None
 
 
-@vm_dispatch.register(task=P.PREREQS, caller=HasGame)
+@dispatch.register(task=P.PREREQS, caller=HasGame)
 @on_prereqs(wants_caller_kind=HasGame, wants_exact_kind=False)
 def setup_game_on_first_visit(
     cursor: HasGame | None = None,
@@ -118,7 +113,7 @@ def setup_game_on_first_visit(
     return None
 
 
-@vm_dispatch.register(task=P.PLANNING, caller=HasGame)
+@dispatch.register(task=P.PLANNING, caller=HasGame)
 @on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
 def provision_game_moves(
     cursor: HasGame | None = None,
@@ -176,8 +171,8 @@ def provision_game_moves(
         actions.append(
             Action(
                 graph=cursor.graph,
-                source_id=cursor.uid,
-                destination_id=cursor.uid,
+                predecessor_id=cursor.uid,
+                successor_id=cursor.uid,
                 label=f"Play {move}",
                 payload={"move": move},
             )
@@ -192,7 +187,7 @@ def provision_game_moves(
     return actions
 
 
-@vm_dispatch.register(task=P.UPDATE, caller=HasGame)
+@dispatch.register(task=P.UPDATE, caller=HasGame)
 @on_update(wants_caller_kind=HasGame, wants_exact_kind=False)
 def process_game_move(
     cursor: HasGame | None = None,
@@ -266,7 +261,7 @@ def process_game_move(
     return None
 
 
-@vm_dispatch.register(task=P.JOURNAL, caller=HasGame)
+@dispatch.register(task=P.JOURNAL, caller=HasGame)
 @on_journal(wants_caller_kind=HasGame, wants_exact_kind=False)
 def generate_game_journal(
     cursor: HasGame | None = None,
@@ -328,7 +323,7 @@ def generate_game_journal(
     return fragments
 
 
-@vm_dispatch.register(task="get_ns", caller=HasGame)
+@dispatch.register(task="get_ns", caller=HasGame)
 @on_gather_ns(wants_caller_kind=HasGame, wants_exact_kind=False)
 def inject_game_context(
     cursor: HasGame | None = None,
@@ -363,49 +358,3 @@ def inject_game_context(
         "game_draw": cursor.game.result == GameResult.DRAW,
         "game_in_progress": cursor.game.result == GameResult.IN_PROCESS,
     }
-
-
-@on_gather_content(caller=HasGame, priority=Prio.FIRST)
-def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
-    """
-    Generate game journal content via ``generate_journal`` subdispatch.
-
-    Runs with FIRST priority so blocks embedding games prefer the game's
-    generated journal content over inline block content. Returns either a
-    string (for post-processing) or a list of fragments produced by
-    ``generate_journal`` handlers.
-    """
-
-    if not isinstance(cursor, HasGame):
-        return None
-
-    game = getattr(cursor, "game", None)
-    if game is None:
-        return None
-
-    with_subdispatch = getattr(ctx, "with_subdispatch", None)
-    subdispatch = with_subdispatch() if callable(with_subdispatch) else nullcontext(ctx)
-    with subdispatch:
-        game_receipts = vm_dispatch.dispatch(
-            caller=game,
-            task="generate_journal",
-            ctx=ctx,
-        )
-
-    content = CallReceipt.first_result(*game_receipts)
-
-    if content:
-        return content
-
-    # Fallback: custom game journal handlers may register on the VM
-    # phase bus during migration away from legacy vm_dispatch tasks.
-    vm_receipts = list(
-        vm_dispatch.execute_all(
-            task="generate_journal",
-            call_kwargs={"caller": game},
-            ctx=ctx,
-            selector=Selector(caller_kind=type(game)),
-        )
-    )
-    vm_content = CallReceipt.first_result(*vm_receipts)
-    return vm_content if vm_content else None

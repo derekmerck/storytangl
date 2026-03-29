@@ -1,8 +1,8 @@
 # Scope Matching & Structural Provisioning Design
 
-**Status:** Design reference (v3, Phase C implemented)
+**Status:** Design reference (v3, Phase C implemented; bytes-native provenance updated)
 **Scope:** vm/provision, core/template, story prereq handlers
-**Date:** 2026-03-01
+**Date:** 2026-03-20
 
 ---
 
@@ -446,8 +446,11 @@ materialization — the content hash of the source template:
 ```python
 class Entity:
     # existing fields...
-    templ_hash: str | None = None
+    templ_hash: bytes | None = None
 ```
+
+Serializer layers may choose tagged hex/base64 wire encodings for bytes, but
+the model field itself stays native ``bytes`` in memory and in structured data.
 
 For MVP, cross-context concept reuse relies on FindProvisioner's
 existing spatial proximity ranking (entity group distance from caller).

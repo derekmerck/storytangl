@@ -80,6 +80,8 @@ def _resolve_rand(*, rand: Random | None, ctx: Any = None) -> Random | None:
 
 def _ctx_is_hard_dirty(ctx: Any = None) -> bool:
     """Return True when context indicates causality fidelity is broken."""
+    from .runtime.causality import CausalityMode
+
     if ctx is None:
         return False
     mode = getattr(ctx, "causality_mode", None)
@@ -89,12 +91,7 @@ def _ctx_is_hard_dirty(ctx: Any = None) -> bool:
             mode = meta.get("causality_mode")
     if mode is None:
         return False
-    try:
-        from .runtime.causality import CausalityMode
-
-        return mode == CausalityMode.HARD_DIRTY
-    except Exception:
-        return str(mode) == "hard_dirty"
+    return mode == CausalityMode.HARD_DIRTY
 
 
 class TraversableEffect(Effect):

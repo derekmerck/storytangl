@@ -6,7 +6,7 @@ from uuid import uuid4
 from tangl.journal.media import MediaFragment
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.media import media_fragment_to_payload
 
 
 def test_system_media_dereference_to_sys_url(tmp_path: Path) -> None:
@@ -28,8 +28,7 @@ def test_system_media_dereference_to_sys_url(tmp_path: Path) -> None:
         scope="sys",
     )
 
-    controller = RuntimeController()
-    result = controller._dereference_media(fragment, world_id="ignored")
+    result = media_fragment_to_payload(fragment, world_id="ignored")
 
     assert result["url"].startswith("/media/sys/")
     assert result["url"].endswith("logo.svg")

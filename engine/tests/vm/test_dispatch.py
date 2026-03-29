@@ -13,17 +13,13 @@ from contextlib import contextmanager
 
 import pytest
 
-from tangl.core import Graph, Record, Selector, Singleton, TemplateRegistry, TokenCatalog
+from tangl.core import Graph, Record, Selector
 from tangl.journal.fragments import ContentFragment
-from tangl.media.media_resource import MediaInventory, MediaResourceRegistry
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     do_compose_journal,
     do_finalize,
     do_gather_ns,
-    do_get_media_inventories,
-    do_get_template_scope_groups,
-    do_get_token_catalogs,
     do_journal,
     do_postreqs,
     do_prereqs,
@@ -33,9 +29,6 @@ from tangl.vm.dispatch import (
     on_compose_journal,
     on_finalize,
     on_gather_ns,
-    on_get_media_inventories,
-    on_get_template_scope_groups,
-    on_get_token_catalogs,
     on_journal,
     on_postreqs,
     on_prereqs,
@@ -111,9 +104,6 @@ class TestHookRegistration:
             (on_finalize, "finalize_step"),
             (on_postreqs, "get_postreqs"),
             (on_gather_ns, "gather_ns"),
-            (on_get_media_inventories, "get_media_inventories"),
-            (on_get_template_scope_groups, "get_template_scope_groups"),
-            (on_get_token_catalogs, "get_token_catalogs"),
         ]
         for on_hook, expected_task in pairs:
             on_hook(lambda *, caller, ctx, **kw: None)
@@ -132,9 +122,19 @@ class TestHookRegistration:
         with pytest.raises(TypeError, match="wants_caller_kind"):
             on_gather_ns(lambda *, caller, ctx, **kw: None, has_kind=TraversableNode)
 
-    def test_on_get_ns_not_exposed_in_vm_api(self) -> None:
+    def test_legacy_discovery_hooks_not_exposed_in_vm_api(self) -> None:
         assert not hasattr(vm_dispatch_api, "on_get_ns")
         assert not hasattr(vm_api, "on_get_ns")
+        for name in (
+            "on_get_template_scope_groups",
+            "do_get_template_scope_groups",
+            "on_get_token_catalogs",
+            "do_get_token_catalogs",
+            "on_get_media_inventories",
+            "do_get_media_inventories",
+        ):
+            assert not hasattr(vm_dispatch_api, name)
+            assert not hasattr(vm_api, name)
 
 
 # ============================================================================
@@ -353,168 +353,6 @@ class TestDoUpdate:
         node = _node(g, label="n")
         with pytest.raises(TypeError, match="apply_update"):
             do_update(node, ctx=null_ctx)
-
-
-class TestDiscoveryHooks:
-    def test_template_scope_groups_merge_in_dispatch_order(self, null_ctx) -> None:
-        first_registry = TemplateRegistry(label="first")
-        second_registry = TemplateRegistry(label="second")
-
-        @on_get_template_scope_groups
-        def first(*, caller, ctx, **kw):
-            return [first_registry]
-
-        @on_get_template_scope_groups
-        def second(*, caller, ctx, **kw):
-            return [second_registry]
-
-        g = Graph()
-        node = _node(g, label="n")
-        registries = do_get_template_scope_groups(node, ctx=null_ctx)
-        assert registries == [first_registry, second_registry]
-
-    def test_discovery_subdispatch_uses_fresh_ctx_result_pipe(self) -> None:
-        first_registry = TemplateRegistry(label="first")
-        seen: dict[str, list[object]] = {}
-
-        @on_get_template_scope_groups
-        def first(*, caller, ctx, **kw):
-            seen["during"] = list(ctx.results)
-            return [first_registry]
-
-        g = Graph()
-        node = _node(g, label="n")
-        ctx = PhaseCtx(graph=g, cursor_id=node.uid)
-        ctx.push_result("outer")
-
-        registries = do_get_template_scope_groups(node, ctx=ctx)
-
-        assert seen["during"] == []
-        assert ctx.results == ["outer"]
-        assert registries == [first_registry]
-
-    def test_template_scope_groups_invalid_shape_raises(self, null_ctx) -> None:
-        @on_get_template_scope_groups
-        def bad(*, caller, ctx, **kw):
-            return ["not-a-group"]
-
-        g = Graph()
-        node = _node(g, label="n")
-        with pytest.raises(TypeError, match="TemplateRegistry entries only"):
-            do_get_template_scope_groups(node, ctx=null_ctx)
-
-    def test_token_catalogs_dedupe_by_wrapped_type(self, null_ctx) -> None:
-        class GearType(Singleton):
-            pass
-
-        cat_a = TokenCatalog(wst=GearType)
-        cat_b = TokenCatalog(wst=GearType)
-
-        @on_get_token_catalogs
-        def first(*, caller, requirement, ctx, **kw):
-            return [cat_a]
-
-        @on_get_token_catalogs
-        def second(*, caller, requirement, ctx, **kw):
-            return [cat_b]
-
-        g = Graph()
-        node = _node(g, label="n")
-        catalogs = do_get_token_catalogs(node, requirement=None, ctx=null_ctx)
-        assert len(catalogs) == 1
-        assert catalogs[0].wst is GearType
-
-    def test_token_catalogs_invalid_entries_raise(self, null_ctx) -> None:
-        @on_get_token_catalogs
-        def bad(*, caller, requirement, ctx, **kw):
-            return ["not-a-catalog"]
-
-        g = Graph()
-        node = _node(g, label="n")
-        with pytest.raises(TypeError, match="TokenCatalog entries only"):
-            do_get_token_catalogs(node, requirement=None, ctx=null_ctx)
-
-    def test_media_inventories_dedupe_by_registry(self, null_ctx) -> None:
-        registry = MediaResourceRegistry(label="media")
-        inv_a = MediaInventory(registry=registry, scope="world", label="a")
-        inv_b = MediaInventory(registry=registry, scope="world", label="b")
-
-        @on_get_media_inventories
-        def first(*, caller, requirement, ctx, **kw):
-            return [inv_a]
-
-        @on_get_media_inventories
-        def second(*, caller, requirement, ctx, **kw):
-            return [inv_b]
-
-        g = Graph()
-        node = _node(g, label="n")
-        inventories = do_get_media_inventories(node, requirement=None, ctx=null_ctx)
-        assert inventories == [inv_a]
-
-    def test_media_inventories_invalid_entries_raise(self, null_ctx) -> None:
-        @on_get_media_inventories
-        def bad(*, caller, requirement, ctx, **kw):
-            return ["not-an-inventory"]
-
-        g = Graph()
-        node = _node(g, label="n")
-        with pytest.raises(TypeError, match="MediaInventory entries only"):
-            do_get_media_inventories(node, requirement=None, ctx=null_ctx)
-
-    def test_discovery_uses_subdispatch_context_when_available(self) -> None:
-        seen_ctx = {"value": None}
-
-        class _SubCtx:
-            def __init__(self, parent) -> None:
-                self.parent = parent
-
-            def get_authorities(self):
-                return []
-
-            def get_inline_behaviors(self):
-                return []
-
-        class _Ctx:
-            def __init__(self) -> None:
-                self.entered = False
-                self.exited = False
-
-            def get_authorities(self):
-                return []
-
-            def get_inline_behaviors(self):
-                return []
-
-            def with_subdispatch(self):
-                @contextmanager
-                def _cm():
-                    self.entered = True
-                    subctx = _SubCtx(self)
-                    try:
-                        yield subctx
-                    finally:
-                        self.exited = True
-                return _cm()
-
-        @on_get_template_scope_groups
-        def _noop(*, caller, ctx, **kw):
-            seen_ctx["value"] = ctx
-            return []
-
-        g = Graph()
-        node = _node(g, label="n")
-        ctx = _Ctx()
-        assert do_get_template_scope_groups(node, ctx=ctx) == []
-        assert ctx.entered is True
-        assert ctx.exited is True
-        assert seen_ctx["value"] is not None
-        assert seen_ctx["value"] is not ctx
-
-
-# ============================================================================
-# Namespace gathering — two-phase contract
-# ============================================================================
 
 
 class TestDoGatherNs:

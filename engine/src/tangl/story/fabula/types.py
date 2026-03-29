@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable, Literal, Protocol, TypeAlias, runtime_checkable
+from typing import Any, Literal, TypeAlias
 from uuid import UUID
 
 
@@ -66,31 +66,6 @@ class CompileIssue:
     source_ref: AuthoredRef | None = None
     related_identifiers: list[str] = field(default_factory=list)
     details: dict[str, JsonValue] = field(default_factory=dict)
-
-
-@runtime_checkable
-class WorldDomainFacet(Protocol):
-    """Protocol for world facets that contribute behavior authorities."""
-
-    def get_authorities(self) -> Iterable[object]: ...
-
-
-@runtime_checkable
-class WorldTemplatesFacet(Protocol):
-    """Protocol for world facets that contribute runtime template scope groups."""
-
-    def get_template_scope_groups(self, *, caller: Any = None, graph: Any = None) -> Iterable[Iterable[Any]]: ...
-
-
-@runtime_checkable
-class WorldAssetsFacet(Protocol):
-    """Protocol marker for world-level asset providers."""
-
-
-@runtime_checkable
-class WorldResourcesFacet(Protocol):
-    """Protocol marker for world-level resource inventories."""
-
 
 @dataclass(slots=True)
 class UnresolvedDependency:

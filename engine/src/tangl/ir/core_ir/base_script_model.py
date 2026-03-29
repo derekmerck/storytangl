@@ -144,7 +144,7 @@ class BaseScriptItem(Record):
         return pattern
 
     def get_selection_criteria(self) -> StringMap:
-        criteria = dict(super().get_selection_criteria())
+        criteria: StringMap = {}
 
         path_pattern = self.get_path_pattern()
         if path_pattern is not None:

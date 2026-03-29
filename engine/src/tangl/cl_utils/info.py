@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 
-from tangl.service.controllers.system_controller import SystemController
+from tangl.service import build_service_manager
 
 
 def main() -> int:
@@ -19,7 +19,7 @@ def main() -> int:
     - exits 0 on success, nonzero on failure
     """
     try:
-        info = SystemController.get_system_info()
+        info = build_service_manager().get_system_info()
     except Exception as exc:  # noqa: BLE001
         print(f"[FAIL] system.get_system_info errored: {exc!r}", file=sys.stderr)
         return 1

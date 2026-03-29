@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any, ItemsView
 
 from tangl.loaders import UniqueLabel, WorldBundle, WorldCompiler
 from tangl.story.fabula import World
+from tangl.utils.sanitize_str import sanitize_str
 
 logger = logging.getLogger(__name__)
+
+
+_MANUAL_WORLDS: dict[str, World] = {}
 
 
 def _get_world_dirs() -> list[Path]:
@@ -18,6 +23,58 @@ def get_world_dirs() -> list[Path]:
     from tangl.config import get_world_dirs as _config_get_world_dirs
 
     return list(_config_get_world_dirs())
+
+
+def legacy_world_label(script_data: dict[str, Any]) -> str | None:
+    """Derive a stable legacy label from raw script payload."""
+
+    metadata = script_data.get("metadata")
+    if isinstance(metadata, dict):
+        title = metadata.get("title")
+        if isinstance(title, str) and title.strip():
+            return sanitize_str(title).lower()
+
+    raw_label = script_data.get("label")
+    if isinstance(raw_label, str) and raw_label.strip():
+        return sanitize_str(raw_label).lower()
+    return None
+
+
+def register_manual_world(world: World) -> None:
+    """Register one process-local manual world."""
+
+    _MANUAL_WORLDS[world.label] = world
+
+
+def pop_manual_world(world_id: str) -> World | None:
+    """Remove one process-local manual world by label."""
+
+    return _MANUAL_WORLDS.pop(world_id, None)
+
+
+def iter_manual_worlds() -> ItemsView[str, World]:
+    """Return the process-local manual worlds."""
+
+    return _MANUAL_WORLDS.items()
+
+
+def clear_manual_worlds() -> None:
+    """Clear process-local manual worlds."""
+
+    _MANUAL_WORLDS.clear()
+
+
+def resolve_world(world_id: str) -> World:
+    """Resolve a world from manual overrides or configured registries."""
+
+    if world_id in _MANUAL_WORLDS:
+        return _MANUAL_WORLDS[world_id]
+
+    registry = WorldRegistry()
+    world = registry.get_world(world_id)
+    if not isinstance(world, World):
+        raise TypeError(f"Expected Story world for '{world_id}', got {type(world)!r}")
+    return world
 
 
 class WorldRegistry:

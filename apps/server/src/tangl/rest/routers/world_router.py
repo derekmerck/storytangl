@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
-from tangl.rest.dependencies_gateway import get_service_adapter
-from tangl.service import GatewayRestAdapter, ServiceOperation
+from tangl.rest.dependencies_gateway import get_service_manager, require_service_access
+from tangl.service import ServiceManager
+from tangl.service.response import WorldInfo
 
 
 router = APIRouter(tags=["World"])
@@ -11,21 +12,15 @@ router = APIRouter(tags=["World"])
 
 @router.get("/{world_id}/info")
 async def get_world_info(
-    adapter: GatewayRestAdapter = Depends(get_service_adapter),
+    service_manager: ServiceManager = Depends(get_service_manager),
     world_id: str = Path(example="my_world"),
     render_profile: str = Query(default="raw", description="Response rendering profile."),
-) -> dict:
+) -> WorldInfo:
     """Return metadata describing ``world_id``."""
+
+    _ = render_profile
+    require_service_access("get_world_info")
     try:
-        result = adapter.execute_operation(
-            ServiceOperation.WORLD_INFO,
-            render_profile=render_profile,
-            world_id=world_id,
-        )
-        if hasattr(result, "model_dump"):
-            return result.model_dump(mode="json")
-        if isinstance(result, dict):
-            return result
-        return {"value": result}
+        return service_manager.get_world_info(world_id=world_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=f"World {world_id} not found") from exc

@@ -118,8 +118,8 @@ class TestGameBlockFactory:
         assert edge.predicate == "game_won"
         assert _edge_available(edge, {"game_won": True}) is True
         assert _edge_available(edge, {"game_won": False}) is False
-        assert edge.source_id == block.uid
-        assert edge.destination_id == victory.uid
+        assert edge.predecessor_id == block.uid
+        assert edge.successor_id == victory.uid
         assert edge.trigger_phase is P.POSTREQS
 
     def test_factory_creates_defeat_edge(self) -> None:

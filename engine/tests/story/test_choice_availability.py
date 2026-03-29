@@ -32,6 +32,7 @@ from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.story_graph import StoryGraph
 from tangl.story.system_handlers import render_block, render_block_choices
 from tangl.vm import Dependency, Requirement
+from tangl.vm.runtime.frame import PhaseCtx
 
 import tangl.story  # noqa: F401 – register story handlers
 
@@ -174,6 +175,18 @@ class TestPredicateGating:
     def test_compound_or_predicate_passes_when_any_term_true(self) -> None:
         graph, start, _end, _action = _graph_with_choice(guard_expr="gold > 3 or has_key")
         ctx = _simple_ctx({"gold": 5, "has_key": False})
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].available is True
+
+    def test_successor_predicate_can_use_generic_visit_stats(self) -> None:
+        graph, start, _end, _action = _graph_with_choice(guard_expr="node_num_visits > 1")
+        ctx = PhaseCtx(
+            graph=graph,
+            cursor_id=start.uid,
+            meta={"cursor_history": [start.uid, _end.uid, _end.uid]},
+        )
 
         fragments = render_block_choices(caller=start, ctx=ctx)
 

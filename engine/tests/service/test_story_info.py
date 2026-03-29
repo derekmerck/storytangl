@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from tangl.core import Graph
 from tangl.persistence.factory import PersistenceManagerFactory
-from tangl.service import ServiceOperation, build_service_gateway
+from tangl.service import build_service_manager
 from tangl.service.response import KvListValue, ProjectedKVItem, ProjectedSection, ProjectedState
 from tangl.service.story_info import (
     DEFAULT_STORY_INFO_PROJECTOR,
@@ -120,7 +120,7 @@ def test_story_info_keeps_world_projector_after_structured_persistence_roundtrip
         persistence = PersistenceManagerFactory.create_persistence_manager(
             manager_name="json_sqlite_in_mem",
         )
-        gateway = build_service_gateway(persistence)
+        manager = build_service_manager(persistence)
 
         user = User(label="story-info-structured-user")
         persistence.save(user)
@@ -132,19 +132,17 @@ def test_story_info_keeps_world_projector_after_structured_persistence_roundtrip
             ),
         )
 
-        created = gateway.execute(
-            ServiceOperation.STORY_CREATE,
+        created = manager.create_story(
             user_id=user.uid,
             world_id=world.label,
             world=world,
             init_mode=InitMode.EAGER.value,
             story_label="story_info_structured_story",
         )
-        assert created.status == "ok"
+        assert created.metadata["world_id"] == world.label
 
-        fresh_gateway = build_service_gateway(persistence)
-        info = fresh_gateway.execute(
-            ServiceOperation.STORY_INFO,
+        fresh_manager = build_service_manager(persistence)
+        info = fresh_manager.get_story_info(
             user_id=user.uid,
         )
 

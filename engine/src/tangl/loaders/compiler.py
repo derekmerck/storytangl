@@ -4,15 +4,15 @@ import importlib
 import sys
 from typing import Any, Callable
 
-from tangl.story.fabula import StoryCompiler, World
+from tangl.story.fabula import StoryCompiler, World, WorldBuilder
 
 from .bundle import WorldBundle
 from .codec import CodecRegistry, DecodeResult
 from .compilers import AssetCompiler, DomainCompiler, MediaCompiler, ScriptCompiler
 
 
-class _WorldDomainFacet:
-    """Lightweight world-domain facet for world assembly."""
+class _WorldDomainAdjuncts:
+    """Collected domain-side adjuncts used during world assembly."""
 
     def __init__(self) -> None:
         from tangl.core import BehaviorRegistry
@@ -112,20 +112,25 @@ class WorldCompiler:
             default_title = bundle.manifest.story_label(story_key)
         script_metadata.setdefault("title", default_title)
 
-        domain_facet, assets_facet, resources_facet = self._build_world_facets(bundle)
+        domain_adjuncts, assets_facet, resources_facet = self._build_world_facets(bundle)
         story_bundle = self.story_compiler.compile(
             script_data,
             source_map=decode_result.source_map,
             codec_state=decode_result.codec_state,
             codec_id=codec_id,
         )
-        world = World(
+        world = WorldBuilder().build(
             label=bundle.manifest.story_label(story_key),
             bundle=story_bundle,
-            domain=domain_facet,
-            templates=story_bundle.template_registry,
             assets=assets_facet,
             resources=resources_facet,
+            dispatch=domain_adjuncts.dispatch_registry if domain_adjuncts is not None else None,
+            extra_authorities=domain_adjuncts.get_authorities() if domain_adjuncts is not None else None,
+            class_registry=domain_adjuncts.class_registry if domain_adjuncts is not None else None,
+            modules=domain_adjuncts.modules if domain_adjuncts is not None else None,
+            story_info_projector=(
+                domain_adjuncts.get_story_info_projector() if domain_adjuncts is not None else None
+            ),
         )
         return world
 
@@ -140,7 +145,7 @@ class WorldCompiler:
         base_metadata = bundle.manifest.metadata.copy()
 
         (
-            world_domain_facet,
+            world_domain_adjuncts,
             world_assets_facet,
             world_resources_facet,
         ) = self._build_world_facets(bundle)
@@ -171,13 +176,32 @@ class WorldCompiler:
                 codec_state=decode_result.codec_state,
                 codec_id=codec_id,
             )
-            world = World(
+            world = WorldBuilder().build(
                 label=bundle.manifest.story_label(story_key),
                 bundle=story_bundle,
-                domain=world_domain_facet,
-                templates=story_bundle.template_registry,
                 assets=world_assets_facet,
                 resources=world_resources_facet,
+                dispatch=(
+                    world_domain_adjuncts.dispatch_registry
+                    if world_domain_adjuncts is not None
+                    else None
+                ),
+                extra_authorities=(
+                    world_domain_adjuncts.get_authorities()
+                    if world_domain_adjuncts is not None
+                    else None
+                ),
+                class_registry=(
+                    world_domain_adjuncts.class_registry
+                    if world_domain_adjuncts is not None
+                    else None
+                ),
+                modules=world_domain_adjuncts.modules if world_domain_adjuncts is not None else None,
+                story_info_projector=(
+                    world_domain_adjuncts.get_story_info_projector()
+                    if world_domain_adjuncts is not None
+                    else None
+                ),
             )
             worlds[story_key] = world
 
@@ -190,7 +214,7 @@ class WorldCompiler:
         domain_facet: Any | None = None
         domain_module = self._get_domain_module(bundle)
         if domain_module:
-            domain_facet = _WorldDomainFacet()
+            domain_facet = _WorldDomainAdjuncts()
             self.domain_compiler.load_into(domain_module, domain_facet)
 
         assets_facet: Any | None = _WorldAssetsFacet()
@@ -293,13 +317,13 @@ class WorldCompiler:
         )
 
     def _get_domain_module(self, bundle: WorldBundle) -> str | None:
+        if str(bundle.bundle_root) not in sys.path:
+            sys.path.insert(0, str(bundle.bundle_root))
+
         if bundle.manifest.domain_module is not None:
             return bundle.manifest.domain_module
 
         if bundle.domain_dir is None:
             return None
-
-        if str(bundle.bundle_root) not in sys.path:
-            sys.path.insert(0, str(bundle.bundle_root))
 
         return f"{bundle.manifest.label}.domain"

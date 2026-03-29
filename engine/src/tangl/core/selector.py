@@ -170,3 +170,26 @@ class Selector(BaseModel, extra="allow"):
     def from_kind(cls, kind: Type[ET]) -> Self:
         """Build ``Selector(has_kind=kind)``."""
         return cls(has_kind=kind)
+
+    @classmethod
+    def chain_or(cls, *selectors: Selector) -> Selector:
+        """Return a ChainedOrSelector.
+
+        Example:
+            >>> class P(Entity):
+            ...     foo: str = "bar"
+            >>> s = Selector.chain_or(Selector(foo="bar"), Selector(foo="baz"))
+            >>> s.matches(P())
+            True
+            >>> s.matches(P(foo="baz"))
+            True
+        """
+        class ChainedOrSelector(Selector):
+            selectors: tuple[Selector, ...]
+
+            def matches(self, entity: Entity) -> bool:
+                if not super().matches(entity):
+                    return False
+                return any(selector.matches(entity) for selector in self.selectors)
+
+        return ChainedOrSelector(selectors=selectors)

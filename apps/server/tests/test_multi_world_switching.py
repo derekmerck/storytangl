@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 from tangl.config import settings
 from tangl.rest.app import app
-from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
-from tangl.rest.dependencies_gateway import reset_service_gateway_for_testing
+from tangl.rest.dependencies import reset_service_state_for_testing
+from tangl.rest.dependencies_gateway import get_service_manager, reset_service_manager_for_testing
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
@@ -38,23 +38,23 @@ LINEAR_SCRIPT = (
 
 @pytest.fixture()
 def multi_world_client() -> tuple[TestClient, dict[str, str], UUID]:
-    reset_orchestrator_for_testing()
-    reset_service_gateway_for_testing()
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
     World.clear_instances()
 
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
     secret = settings.client.secret
     user_id = uuid_for_secret(secret)
 
     user = User(uid=user_id)
     user.set_secret(secret)
-    orchestrator.persistence.save(user)
+    service_manager.persistence.save(user)
 
     demo_data = yaml.safe_load(DEMO_SCRIPT.read_text())
-    orchestrator.execute("WorldController.load_world", script_data=demo_data)
+    service_manager.load_world(script_data=demo_data)
 
     linear_data = yaml.safe_load(LINEAR_SCRIPT.read_text())
-    orchestrator.execute("WorldController.load_world", script_data=linear_data)
+    service_manager.load_world(script_data=linear_data)
 
     client = TestClient(app, base_url="http://test/api/v2/")
     headers = {"X-API-Key": key_for_secret(secret)}
@@ -64,8 +64,8 @@ def multi_world_client() -> tuple[TestClient, dict[str, str], UUID]:
     finally:
         client.close()
         World.clear_instances()
-        reset_service_gateway_for_testing()
-        reset_orchestrator_for_testing()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()
 
 
 def _fragment_contains(fragments: list[dict[str, object]], text: str) -> bool:
@@ -92,6 +92,14 @@ def _session_value(payload: dict[str, object], key: str) -> object | None:
             if isinstance(item, dict) and item.get("key") == key:
                 return item.get("value")
     return None
+
+
+def _ledger_id(payload: dict[str, object]) -> str | None:
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    ledger_id = metadata.get("ledger_id")
+    return str(ledger_id) if ledger_id is not None else None
 
 
 def test_drop_story_without_active_story_returns_400(
@@ -179,7 +187,7 @@ def test_drop_story_archive_preserves_ledger(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:
     client, headers, user_id = multi_world_client
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
 
     create_resp = client.post(
         "story/story/create",
@@ -187,7 +195,8 @@ def test_drop_story_archive_preserves_ledger(
         headers=headers,
     )
     assert create_resp.status_code == 200
-    ledger_id = create_resp.json()["ledger_id"]
+    ledger_id = _ledger_id(create_resp.json())
+    assert ledger_id is not None
 
     drop_resp = client.delete(
         "story/drop",
@@ -201,10 +210,10 @@ def test_drop_story_archive_preserves_ledger(
     assert payload["dropped_ledger_id"] == ledger_id
     assert "persistence_deleted" not in payload
 
-    user = orchestrator.persistence[user_id]
+    user = service_manager.persistence[user_id]
     assert user.current_ledger_id is None
 
-    archived_ledger = orchestrator.persistence.get(UUID(ledger_id))
+    archived_ledger = service_manager.persistence.get(UUID(ledger_id))
     assert archived_ledger is not None
 
 
@@ -212,7 +221,7 @@ def test_drop_story_without_archive_deletes_ledger(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:
     client, headers, user_id = multi_world_client
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
 
     create_resp = client.post(
         "story/story/create",
@@ -220,7 +229,8 @@ def test_drop_story_without_archive_deletes_ledger(
         headers=headers,
     )
     assert create_resp.status_code == 200
-    ledger_id = create_resp.json()["ledger_id"]
+    ledger_id = _ledger_id(create_resp.json())
+    assert ledger_id is not None
 
     drop_resp = client.delete("story/drop", headers=headers)
     assert drop_resp.status_code == 200
@@ -228,18 +238,18 @@ def test_drop_story_without_archive_deletes_ledger(
     assert payload["archived"] is False
     assert payload.get("persistence_deleted") is True
 
-    user = orchestrator.persistence[user_id]
+    user = service_manager.persistence[user_id]
     assert user.current_ledger_id is None
 
     with pytest.raises(KeyError):
-        orchestrator.persistence[UUID(ledger_id)]
+        service_manager.persistence[UUID(ledger_id)]
 
 
 def test_multi_world_switching_flow(
     multi_world_client: tuple[TestClient, dict[str, str], UUID]
 ) -> None:
     client, headers, user_id = multi_world_client
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
 
     create_demo = client.post(
         "story/story/create",
@@ -247,7 +257,8 @@ def test_multi_world_switching_flow(
         headers=headers,
     )
     assert create_demo.status_code == 200
-    demo_ledger_id = create_demo.json()["ledger_id"]
+    demo_ledger_id = _ledger_id(create_demo.json())
+    assert demo_ledger_id is not None
 
     update_one = client.get("story/update", headers=headers)
     assert update_one.status_code == 200
@@ -292,7 +303,7 @@ def test_multi_world_switching_flow(
     assert drop_demo.status_code == 200
     assert drop_demo.json()["dropped_ledger_id"] == demo_ledger_id
 
-    user = orchestrator.persistence[user_id]
+    user = service_manager.persistence[user_id]
     assert user.current_ledger_id is None
 
     create_linear = client.post(
@@ -301,7 +312,8 @@ def test_multi_world_switching_flow(
         headers=headers,
     )
     assert create_linear.status_code == 200
-    linear_ledger_id = create_linear.json()["ledger_id"]
+    linear_ledger_id = _ledger_id(create_linear.json())
+    assert linear_ledger_id is not None
     assert linear_ledger_id != demo_ledger_id
 
     update_three = client.get("story/update", headers=headers)
@@ -333,7 +345,8 @@ def test_multi_world_switching_flow(
         headers=headers,
     )
     assert recreate_demo.status_code == 200
-    new_demo_ledger = recreate_demo.json()["ledger_id"]
+    new_demo_ledger = _ledger_id(recreate_demo.json())
+    assert new_demo_ledger is not None
     assert new_demo_ledger not in {demo_ledger_id, linear_ledger_id}
 
     final_update = client.get("story/update", headers=headers)

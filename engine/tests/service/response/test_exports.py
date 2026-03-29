@@ -1,12 +1,4 @@
-"""Service export contract tests.
-
-This suite is the service replacement for:
-  ``engine/tests/service/response/test_exports.py``
-  → ``engine/tests/service/response/test_exports.py``
-
-It verifies that service public exports remain importable and that
-``tangl.service.__all__`` advertises the expected compatibility surface.
-"""
+"""Service export contract tests."""
 
 from __future__ import annotations
 
@@ -22,8 +14,10 @@ def test_service_response_types_importable() -> None:
         NativeResponse,
         ProjectedSection,
         ProjectedState,
+        RuntimeEnvelope,
         RuntimeInfo,
         ScalarValue,
+        UserSecret,
         coerce_runtime_info,
     )
     from tangl.service.story_info import DefaultStoryInfoProjector, StoryInfoProjector
@@ -37,44 +31,55 @@ def test_service_response_types_importable() -> None:
     assert NativeResponse is not None
     assert ProjectedSection is not None
     assert ProjectedState is not None
+    assert RuntimeEnvelope is not None
     assert RuntimeInfo is not None
     assert ScalarValue is not None
+    assert UserSecret is not None
     assert coerce_runtime_info is not None
     assert DefaultStoryInfoProjector is not None
     assert StoryInfoProjector is not None
 
 
-def test_service_package_exports_include_response_and_gateway_contracts() -> None:
+def test_service_package_exports_include_manager_first_contract() -> None:
     import tangl.service as service
 
     expected = {
-        "ApiEndpoint",
         "BadgeListValue",
-        "EndpointPolicy",
-        "ExecuteOptions",
+        "BlockingMode",
+        "DefaultStoryInfoProjector",
         "FragmentStream",
-        "GatewayExecuteOptions",
-        "GatewayRequest",
-        "GatewayRestAdapter",
         "InfoModel",
         "ItemListValue",
         "KvListValue",
         "MediaNative",
         "NativeResponse",
-        "Orchestrator",
+        "PrimitiveValue",
+        "ProjectedItem",
+        "ProjectedKVItem",
         "ProjectedSection",
         "ProjectedState",
-        "ResourceBinding",
+        "RuntimeEnvelope",
         "RuntimeInfo",
         "ScalarValue",
-        "ServiceGateway",
-        "ServiceOperation",
-        "DefaultStoryInfoProjector",
+        "SectionValue",
+        "ServiceAccess",
+        "ServiceContext",
+        "ServiceManager",
+        "ServiceMethodSpec",
+        "ServiceSession",
+        "ServiceWriteback",
         "StoryInfoProjector",
+        "SystemInfo",
+        "TableValue",
         "UserAuthInfo",
-        "WritebackMode",
-        "build_service_gateway",
+        "UserInfo",
+        "UserSecret",
+        "WorldInfo",
+        "WorldRegistry",
+        "build_service_manager",
         "coerce_runtime_info",
+        "get_service_method_spec",
+        "service_method",
         "user_id_by_key",
     }
 
@@ -82,3 +87,25 @@ def test_service_package_exports_include_response_and_gateway_contracts() -> Non
     assert expected.issubset(exported)
     for name in expected:
         assert getattr(service, name, None) is not None, f"Missing export: {name}"
+
+
+def test_service_package_does_not_export_removed_gateway_stack() -> None:
+    import tangl.service as service
+
+    compatibility = {
+        "ApiEndpoint",
+        "EndpointPolicy",
+        "ExecuteOptions",
+        "GatewayExecuteOptions",
+        "GatewayRequest",
+        "GatewayRestAdapter",
+        "Orchestrator",
+        "ResourceBinding",
+        "ServiceGateway",
+        "ServiceOperation",
+        "WritebackMode",
+        "build_service_gateway",
+    }
+
+    for name in compatibility:
+        assert not hasattr(service, name), f"Unexpected compatibility export: {name}"

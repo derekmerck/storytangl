@@ -20,10 +20,10 @@ provisioners decoupled from registry internals.
 1. Replace registry lookups with the facade:
    ```python
    # Before
-   template = world.script_manager.template_registry.find_one(label="guard")
+   template = world.script_manager.template_registry.find_one(Selector.from_identifier("guard"))
 
    # After
-   template = world.script_manager.find_template(identifier="guard")
+   template = world.script_manager.find_template("guard")
    ```
 2. Provide a selector when you need scope-aware lookup:
    ```python

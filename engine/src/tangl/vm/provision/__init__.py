@@ -72,10 +72,6 @@ from .provisioner import (
 from .materialization import MaterializeRole, attach_child, materialize_template_entity
 from .resolver import Resolver
 
-
-# Legacy compatibility alias retained during namespace cutover.
-ProvisioningPolicy = ProvisionPolicy
-
 __all__ = [
     "Requirement",
     "HasRequirement",
@@ -95,7 +91,6 @@ __all__ = [
     "scope_prefix",
     "target_context_candidates",
     "ProvisionPolicy",
-    "ProvisioningPolicy",
     "ProvisionOffer",
     "Provisioner",
     "TemplateProvisioner",

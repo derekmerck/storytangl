@@ -2,15 +2,18 @@ from functools import partial
 from typing import Iterator
 
 from tangl.core.behavior import (
-    BehaviorRegistry as LayeredDispatch,
+    BehaviorRegistry,
     CallReceipt,
     DispatchLayer as L,
-    HandlerPriority as Prio,
+    Priority as Prio,
     RuntimeCtx as ContextP,
 )
 from tangl.ir.core_ir import BaseScriptItem
 
-script_dispatch = LayeredDispatch(label="script.dispatch", handler_layer=L.APPLICATION)
+script_dispatch = BehaviorRegistry(
+    label="script.dispatch",
+    default_dispatch_layer=L.APPLICATION,
+)
 
 on_materialize = partial(script_dispatch.register, task="materialize")
 

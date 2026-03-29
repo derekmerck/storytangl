@@ -25,9 +25,9 @@ class HasResourceCost(Protocol):
 class SlottedContainer(BaseModel, Generic[CT]):
     """Generic container that assigns components into named slots.
 
-    Slots declare selection criteria that mirror :meth:`Entity.matches` so that eligibility is
-    resolved by the components themselves. Subclasses define ``slots`` and may enable resource
-    tracking via ``tracked_resources``.
+    Slots declare selector criteria so eligibility is resolved through
+    :class:`tangl.core.Selector`. Subclasses define ``slots`` and may enable
+    resource tracking via ``tracked_resources``.
     """
 
     slots: ClassVar[dict[str, Slot]] = {}

@@ -1,0 +1,38 @@
+name: Docker Build Smoke
+
+on:
+  # Opt-in on PRs by adding the "ci:docker" label.
+  pull_request:
+    branches: ["**"]
+    types: ["labeled"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build-smoke:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:docker')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Build runtime image
+        run: |
+          docker build \
+            --file deployment/docker/Dockerfile \
+            --tag storytangl-smoke:${{ github.sha }} \
+            .
+
+      - name: Build web client image
+        run: |
+          docker build \
+            --file apps/web/deployment/Dockerfile \
+            --tag storytangl-web-smoke:${{ github.sha }} \
+            apps/web

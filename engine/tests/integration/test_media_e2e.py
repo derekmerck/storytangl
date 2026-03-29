@@ -7,7 +7,7 @@ import pytest
 from tangl.journal.media import MediaFragment
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
 from tangl.media.media_resource.media_dependency import MediaDep
-from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.media import media_fragment_to_payload
 from tangl.service.world_registry import WorldRegistry
 from tangl.story import Block
 from tangl.vm import VmPhaseCtx as Context, Frame, ResolutionPhase as P
@@ -44,8 +44,8 @@ def test_media_full_flow_world_scope(resources_dir) -> None:
     media_deps = [edge for edge in block.edges_out() if isinstance(edge, MediaDep)]
     assert media_deps
     dep = media_deps[0]
-    assert dep.destination is not None
-    assert isinstance(dep.destination, MediaRIT)
+    assert dep.successor is not None
+    assert isinstance(dep.successor, MediaRIT)
 
     fragments = frame.run_phase(P.JOURNAL)
     assert fragments
@@ -54,9 +54,8 @@ def test_media_full_flow_world_scope(resources_dir) -> None:
     assert media_frags
     frag = media_frags[0]
 
-    controller = RuntimeController()
     world_id = getattr(world, "uid", "media_e2e")
-    deref = controller._dereference_media(frag, world_id=world_id)
+    deref = media_fragment_to_payload(frag, world_id=world_id)
 
     assert deref["fragment_type"] == "media"
     assert deref["url"].startswith(f"/media/world/{world_id}/")

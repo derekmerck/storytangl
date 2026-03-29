@@ -7,16 +7,12 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, MutableMapping
 from uuid import UUID
 
-from .api_endpoint import AccessLevel
-from tangl.utils.hash_secret import uuid_for_key
-
-
 @dataclass(frozen=True)
 class UserAuthInfo:
     """Resolved authentication context for a user-bound request."""
 
     user_id: UUID
-    access_level: AccessLevel
+    is_privileged: bool = False
 
 
 def user_id_by_key(
@@ -34,8 +30,7 @@ def user_id_by_key(
 
     Lookup order:
     1) reverse index cache (if provided),
-    2) persistence scan for matching ``content_hash``,
-    3) legacy fallback ``uuid_for_key(api_key)``.
+    2) persistence scan for matching ``content_hash``.
     """
 
     if not api_key or persistence is None:
@@ -58,23 +53,14 @@ def user_id_by_key(
             reverse_index[api_key] = candidate.uid
         return _auth_info_from_user(candidate)
 
-    # Compatibility path for older "uid derived from key" workflows.
-    try:
-        legacy_uid = uuid_for_key(api_key)
-    except (ValueError, TypeError):
-        return None
-    legacy_user = _get_from_persistence(persistence, legacy_uid)
-    if _looks_like_user(legacy_user):
-        if reverse_index is not None:
-            reverse_index[api_key] = legacy_uid
-        return _auth_info_from_user(legacy_user)
-
     return None
 
 
 def _auth_info_from_user(user: Any) -> UserAuthInfo:
-    access_level = AccessLevel.RESTRICTED if bool(getattr(user, "privileged", False)) else AccessLevel.USER
-    return UserAuthInfo(user_id=user.uid, access_level=access_level)
+    return UserAuthInfo(
+        user_id=user.uid,
+        is_privileged=bool(getattr(user, "privileged", False)),
+    )
 
 
 def _decode_key_hash(api_key: str) -> bytes | None:

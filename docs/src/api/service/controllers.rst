@@ -1,13 +1,13 @@
 .. currentmodule:: tangl.service
 
-tangl.service.controllers
-=========================
+tangl.service manager
+=====================
 
-Controller entrypoints exposed through the service orchestrator.
+The canonical service surface is the explicit :class:`tangl.service.ServiceManager`.
 
-The controller classes below are the source of truth for endpoint docstrings.
-See :doc:`operations` for the generated gateway-facing catalog derived from
-their :class:`tangl.service.ApiEndpoint` metadata.
+Its public methods are the source of truth for service behavior. See
+:doc:`operations` for the generated method catalog derived from
+:func:`tangl.service.service_method` metadata.
 
 .. rubric:: Related design docs
 
@@ -18,21 +18,13 @@ their :class:`tangl.service.ApiEndpoint` metadata.
 - :doc:`../../notes/reference/code_adjacent_design_docs`
 - :doc:`../../notes/migration/cutover-log`
 
-Controllers
------------
+Manager
+-------
 
-.. autoclass:: tangl.service.controllers.runtime_controller.RuntimeController
+.. autoclass:: tangl.service.ServiceManager
    :members:
    :member-order: bysource
 
-.. autoclass:: tangl.service.controllers.world_controller.WorldController
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.controllers.user_controller.UserController
-   :members:
-   :member-order: bysource
-
-.. autoclass:: tangl.service.controllers.system_controller.SystemController
+.. autoclass:: tangl.service.ServiceSession
    :members:
    :member-order: bysource

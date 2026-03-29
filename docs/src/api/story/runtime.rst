@@ -11,6 +11,7 @@ preview, and journaling.
 - :doc:`../../design/story/philosophy`
 - :doc:`../../design/story/JOURNAL_COMPOSE_CONTRACT`
 - :doc:`../../design/traversal/NAV_DESIGN`
+- :doc:`analysis`
 
 .. rubric:: Related notes
 
@@ -22,7 +23,13 @@ Runtime graph
 .. automodule:: tangl.story.story_graph
 
 .. autoclass:: tangl.story.story_graph.StoryGraph
-.. autoclass:: tangl.story.ctx.StoryRuntimeCtx
+
+Runtime context
+---------------
+
+Story runtime helpers use the VM's canonical phase context directly.
+
+.. autoclass:: tangl.vm.runtime.frame.PhaseCtx
 
 Journal handlers
 ----------------

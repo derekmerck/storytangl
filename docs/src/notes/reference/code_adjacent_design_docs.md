@@ -14,6 +14,7 @@ design section over time.
 
 - `engine/src/tangl/core/CORE_DESIGN.md`
 - `engine/src/tangl/media/MEDIA_DESIGN.md`
+- `engine/src/tangl/mechanics/games/GAME_MECHANICS_DESIGN.md`
 - `engine/src/tangl/service/SERVICE_DESIGN.md`
 - `engine/src/tangl/story/STORY_DESIGN.md`
 - `engine/src/tangl/vm/VM_DESIGN.md`

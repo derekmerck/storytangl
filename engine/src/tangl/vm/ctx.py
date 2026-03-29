@@ -1,4 +1,4 @@
-"""VM context protocol contracts."""
+"""VM runtime context protocol."""
 
 from __future__ import annotations
 
@@ -6,63 +6,41 @@ from random import Random
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Protocol, runtime_checkable
 from uuid import UUID
 
-from tangl.core.ctx import CoreCtx, DispatchCtx
 from tangl.core import TemplateRegistry
+from tangl.core.ctx import DispatchCtx
 
 if TYPE_CHECKING:
     from .runtime.frame import PhaseCtx
 
 
 @runtime_checkable
-class VmDispatchCtx(DispatchCtx, Protocol):
-    """Minimal context contract required by vm phase dispatch hooks."""
-
-
-@runtime_checkable
-class VmResolverCtx(VmDispatchCtx, CoreCtx, Protocol):
-    """Context contract required by vm provision resolver."""
-
-    def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
-    def get_template_scope_groups(self) -> Iterable[TemplateRegistry]: ...
-
-
-@runtime_checkable
-class VmPhaseCtx(VmResolverCtx, Protocol):
-    """Context contract used by phase handlers during one follow-edge pass."""
+class VmPhaseCtx(DispatchCtx, Protocol):
+    """Canonical runtime context implemented by :class:`PhaseCtx`."""
 
     graph: Any
-    cursor_id: UUID
-    step: int
+    cursor_id: UUID | None
+    step: int | None
     current_phase: Any
+    correlation_id: UUID | str | None
+    logger: Any | None
+    meta: Mapping[str, Any] | None
     selected_edge: Any | None
     selected_payload: Any
 
     @property
-    def cursor(self) -> Any: ...
+    def cursor(self) -> Any | None: ...
+
+    def get_meta(self) -> Mapping[str, Any]: ...
 
     def get_ns(self, node: Any = None) -> Mapping[str, Any]:
         """Return the assembled scoped namespace for a node."""
         ...
 
     def get_random(self) -> Random: ...
-
-
-@runtime_checkable
-class VmRequirementStampCtx(Protocol):
-    """Minimal context contract for requirement resolution metadata stamping."""
-
-    step: int | None
-    cursor_id: UUID | None
-
-
-@runtime_checkable
-class VmDerivedPhaseCtx(VmResolverCtx, VmRequirementStampCtx, Protocol):
-    """Context that can derive a child :class:`PhaseCtx` for nested validation."""
-
-    graph: Any
-    correlation_id: UUID | str | None
-    logger: Any | None
-    meta: Mapping[str, Any] | None
+    def get_location_entity_groups(self) -> Iterable[Iterable[Any]]: ...
+    def get_template_scope_groups(self) -> Iterable[TemplateRegistry]: ...
+    def get_token_catalogs(self, *, requirement: Any = None) -> Iterable[Any]: ...
+    def get_media_inventories(self, *, requirement: Any = None) -> Iterable[Any]: ...
 
     def derive(
         self,
@@ -74,10 +52,4 @@ class VmDerivedPhaseCtx(VmResolverCtx, VmRequirementStampCtx, Protocol):
     ) -> "PhaseCtx": ...
 
 
-__all__ = [
-    "VmDerivedPhaseCtx",
-    "VmDispatchCtx",
-    "VmPhaseCtx",
-    "VmRequirementStampCtx",
-    "VmResolverCtx",
-]
+__all__ = ["VmPhaseCtx"]

@@ -27,27 +27,33 @@ class RecordingCLI(cmd2.Cmd):
     def set_ledger(self, ledger_id: UUID | None) -> None:  # type: ignore[override]
         self.ledger_id = ledger_id
 
-    def call_endpoint(self, endpoint: str, /, **params: object) -> object:
-        self.calls.append((endpoint, params))
-        if endpoint.endswith("get_journal_entries"):
-            return [
-                SimpleNamespace(
-                    fragment_type="block",
-                    content="start",
-                    choices=[
-                        SimpleNamespace(
-                            fragment_type="choice",
-                            uid=self.choice_id,
-                            source_id=self.choice_id,
-                            label="Go",
-                            active=True,
-                        )
-                    ],
-                ),
-            ]
-        if endpoint.endswith("resolve_choice"):
-            return {"fragments": [SimpleNamespace(content="moved")]} 
-        if endpoint.endswith("get_story_info"):
+    def call_service(self, method_name: str, /, **params: object) -> object:
+        self.calls.append((method_name, params))
+        if method_name in {"create_story", "get_story_update"}:
+            return SimpleNamespace(
+                metadata={"ledger_id": str(self.ledger_id)},
+                fragments=[
+                    SimpleNamespace(
+                        fragment_type="block",
+                        content="start",
+                        choices=[
+                            SimpleNamespace(
+                                fragment_type="choice",
+                                uid=self.choice_id,
+                                source_id=self.choice_id,
+                                label="Go",
+                                active=True,
+                            )
+                        ],
+                    ),
+                ],
+            )
+        if method_name == "resolve_choice":
+            return SimpleNamespace(
+                metadata={"ledger_id": str(self.ledger_id)},
+                fragments=[SimpleNamespace(content="moved")],
+            )
+        if method_name == "get_story_info":
             return {
                 "sections": [
                     {
@@ -73,7 +79,7 @@ class RecordingCLI(cmd2.Cmd):
                     },
                 ]
             }
-        if endpoint.endswith("drop_story"):
+        if method_name == "drop_story":
             return {
                 "status": "dropped",
                 "dropped_ledger_id": str(self.ledger_id),
@@ -91,7 +97,7 @@ def story_controller() -> StoryController:
 def test_story_command_fetches_journal_and_choices(story_controller: StoryController) -> None:
     story_controller.do_story()
     cli = story_controller._cmd
-    assert cli.calls[0][0].endswith("get_journal_entries")
+    assert cli.calls[0][0] == "get_story_update"
     assert any("Choices:" in line for line in cli.outputs)
 
 
@@ -99,7 +105,7 @@ def test_do_command_resolves_choice(story_controller: StoryController) -> None:
     story_controller.do_story()
     story_controller.do_do("1")
     cli = story_controller._cmd
-    resolve_calls = [call for call in cli.calls if call[0].endswith("resolve_choice")]
+    resolve_calls = [call for call in cli.calls if call[0] == "resolve_choice"]
     assert resolve_calls
     _, params = resolve_calls[-1]
     assert params["choice_id"] == cli.choice_id
@@ -140,7 +146,7 @@ def test_drop_story_invokes_service_and_clears_context(story_controller: StoryCo
 
     story_controller.do_drop_story("--archive")
 
-    drop_calls = [call for call in cli.calls if call[0].endswith("drop_story")]
+    drop_calls = [call for call in cli.calls if call[0] == "drop_story"]
     assert drop_calls
     _, params = drop_calls[-1]
     assert params["archive"] is True
