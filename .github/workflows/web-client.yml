@@ -13,6 +13,9 @@ on:
       - ".github/workflows/web-client.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: web-client-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
