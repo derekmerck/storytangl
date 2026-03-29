@@ -1,19 +1,19 @@
-name: Redis Persistence Smoke
+name: Remote Backend Persistence Smoke
 
 on:
-  # Opt-in on PRs by adding the "ci:redis" label.
+  # Opt-in on PRs by adding the "ci:remote-backends" label.
   pull_request:
     branches: ["**"]
     types: ["labeled"]
   workflow_dispatch:
 
 concurrency:
-  group: redis-smoke-${{ github.event.pull_request.number || github.ref }}
+  group: remote-backends-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  redis-persistence-tests:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:redis')
+  remote-backend-persistence-tests:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:remote-backends')
     runs-on: ubuntu-latest
     services:
       redis:
@@ -25,6 +25,10 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
     steps:
       - uses: actions/checkout@v5
         with:
@@ -46,10 +50,35 @@ jobs:
           poetry install --no-interaction --with dev
           pip install -e .
 
-      - name: Run Redis persistence smoke tests
+      - name: Wait for Mongo
+        env:
+          TANGL_SERVICE__APIS__MONGO__ENABLED: "true"
+          TANGL_SERVICE__APIS__MONGO__URL: "mongodb://localhost:27017/tangl"
+        run: |
+          poetry run python -c '
+          from time import sleep
+          from tangl.persistence.storage.mongo_storage import MongoStorage
+
+          last_error = None
+          for _ in range(30):
+              try:
+                  storage = MongoStorage(db="test")
+                  storage.clear()
+                  print("Mongo ready")
+                  break
+              except Exception as exc:
+                  last_error = exc
+                  sleep(1)
+          else:
+              raise last_error
+          '
+
+      - name: Run remote backend persistence smoke tests
         env:
           TANGL_SERVICE__APIS__REDIS__ENABLED: "true"
           TANGL_SERVICE__APIS__REDIS__URL: "redis://localhost:6379/0"
+          TANGL_SERVICE__APIS__MONGO__ENABLED: "true"
+          TANGL_SERVICE__APIS__MONGO__URL: "mongodb://localhost:27017/tangl"
         run: |
           poetry run pytest \
             engine/tests/persistence/test_storage.py \
