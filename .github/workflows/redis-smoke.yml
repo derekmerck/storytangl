@@ -1,0 +1,60 @@
+name: Redis Persistence Smoke
+
+on:
+  # Opt-in on PRs by adding the "ci:redis" label.
+  pull_request:
+    branches: ["**"]
+    types: ["labeled"]
+  workflow_dispatch:
+
+concurrency:
+  group: redis-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  redis-persistence-tests:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:redis')
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13
+          cache: "pip"
+          cache-dependency-path: "poetry.lock"
+
+      - name: Install dependencies
+        env:
+          POETRY_VIRTUALENVS_CREATE: "true"
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --no-interaction --with dev
+          pip install -e .
+
+      - name: Run Redis persistence smoke tests
+        env:
+          TANGL_SERVICE__APIS__REDIS__ENABLED: "true"
+          TANGL_SERVICE__APIS__REDIS__URL: "redis://localhost:6379/0"
+        run: |
+          poetry run pytest \
+            engine/tests/persistence/test_storage.py \
+            engine/tests/persistence/test_manager.py \
+            engine/tests/persistence/test_persistence_mgr_factory.py \
+            -rs \
+            -W ignore::DeprecationWarning \
+            -W ignore::pytest.PytestCollectionWarning

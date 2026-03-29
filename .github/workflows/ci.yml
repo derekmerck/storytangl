@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
-    branches-ignore:
-      # codex usually runs its own tests and only pushes a branch for a p/r
-      # so this keeps it from running ci redundantly
-      - "codex*"
-      - "codex/**"
+    # PRs cover feature branches; keep push CI for the default branch only.
+    branches: ["main"]
   pull_request:
     branches: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   python-tests:
@@ -40,34 +42,6 @@ jobs:
           PYTHONPATH: "engine/src:apps/cli/src:apps/rest/src"
         run: |
           poetry run pytest -W ignore::DeprecationWarning -W ignore::pytest.PytestCollectionWarning
-
-  web-client-tests:
-    # vite tests for apps/web
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'yarn'
-          cache-dependency-path: 'apps/web/yarn.lock'
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-
-      - name: Type check
-        run: yarn type-check
-
-      - name: Run tests
-        run: yarn test --run
-
-      - name: Build
-        run: yarn build
 
   distribution-tests:
     runs-on: ubuntu-latest

@@ -1,0 +1,47 @@
+name: Web Client Checks
+
+on:
+  # Opt-in on PRs by adding the "ci:web" label.
+  pull_request:
+    branches: ["**"]
+    types: ["labeled"]
+  # Keep main honest when web files actually change.
+  push:
+    branches: ["main"]
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/web-client.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: web-client-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-client-tests:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci:web')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+          cache-dependency-path: "apps/web/yarn.lock"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Type check
+        run: yarn type-check
+
+      - name: Run tests
+        run: yarn test --run
+
+      - name: Build
+        run: yarn build

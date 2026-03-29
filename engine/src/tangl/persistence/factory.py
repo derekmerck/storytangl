@@ -23,6 +23,7 @@ PersistenceManagerName = Literal[
     "pickle_redis",
     "pickle_sqlite_file",
     "pickle_sqlite_in_mem",
+    "json_redis",
     "json_file",
     "json_sqlite_in_mem",
     "json_sqlite_file",
