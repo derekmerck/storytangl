@@ -3,13 +3,12 @@
 Organized by functionality:
 - Story lifecycle: async pending -> running -> resolved flow using Comfy specs
 - Service payloads: resolved story media still dereferences to canonical story URLs
-- Live integration: optional real-node polling against a user-provided workflow fixture
+- Live integration: optional real-node polling through ComfySpec materialization
 """
 
 from __future__ import annotations
 
 import io
-import json
 import os
 import time
 from pathlib import Path
@@ -19,6 +18,7 @@ import pytest
 from PIL import Image
 
 from tangl.journal.media import MediaFragment
+from tangl.media.media_creators.comfy_forge import ComfyApi, ComfySpec
 from tangl.media.media_data_type import MediaDataType
 from tangl.media.media_resource import MediaDep, MediaRITStatus
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
@@ -248,22 +248,40 @@ def _run_live_comfy() -> bool:
 
 
 @pytest.mark.skipif(
-    not _run_live_comfy() or not os.environ.get("COMFY_TEST_WORKFLOW_PATH"),
-    reason="Requires RUN_COMFY_INTEGRATION=1 and COMFY_TEST_WORKFLOW_PATH",
+    not _run_live_comfy(),
+    reason="Requires RUN_COMFY_INTEGRATION=1",
 )
 class TestComfyLiveIntegration:
-    """Optional live-node smoke test for a real ComfyUI worker."""
+    """Optional live-node smoke test for a real ComfyUI worker through ComfySpec."""
 
-    def test_real_comfy_dispatcher_returns_image_bytes(self) -> None:
+    def test_real_comfy_dispatcher_returns_image_bytes_from_comfy_spec(self) -> None:
         from tangl.media.media_creators.comfy_forge import ComfyDispatcher
 
-        workflow_path = Path(os.environ["COMFY_TEST_WORKFLOW_PATH"])
-        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-        dispatcher = ComfyDispatcher(url=os.environ.get("COMFY_URL", "titan2.lan:8188"))
+        url = os.environ.get("COMFY_URL", "titan2.lan:8188")
+        api = ComfyApi(url)
+        checkpoint = os.environ.get("COMFY_TEST_CHECKPOINT")
+        if checkpoint is None:
+            checkpoints = api.list_models("checkpoints")
+            if not checkpoints:
+                pytest.skip("No checkpoints available on configured ComfyUI worker")
+            checkpoint = checkpoints[0]
+
+        spec = ComfySpec(
+            workflow_template="portrait_txt2img",
+            prompt="portrait of a hero",
+            n_prompt="low quality, blurry, bad anatomy, worst quality",
+            model=checkpoint,
+            seed=42,
+            dims=(512, 768),
+            iterations=20,
+        )
+        adapted_payload = spec.normalized_spec_payload()
+        dispatcher = ComfyDispatcher(url=url, api=api)
         snapshot = dispatcher.describe_worker()
 
         assert "checkpoints" in snapshot.model_types
-        job_id = dispatcher.submit({"workflow": workflow})
+        assert adapted_payload.get("workflow")
+        job_id = dispatcher.submit(adapted_payload)
 
         deadline = time.time() + 60
         result = None

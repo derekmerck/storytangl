@@ -11,7 +11,8 @@
   "2": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "wide establishing shot"
+      "text": "wide establishing shot",
+      "clip": ["1", 1]
     },
     "_meta": {
       "title": "positive_prompt"
@@ -20,7 +21,8 @@
   "3": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "low quality, blurry"
+      "text": "low quality, blurry",
+      "clip": ["1", 1]
     },
     "_meta": {
       "title": "negative_prompt"
@@ -40,6 +42,10 @@
   "5": {
     "class_type": "KSampler",
     "inputs": {
+      "model": ["1", 0],
+      "positive": ["2", 0],
+      "negative": ["3", 0],
+      "latent_image": ["4", 0],
       "seed": 1,
       "steps": 20,
       "cfg": 7.0,
@@ -52,8 +58,19 @@
     }
   },
   "6": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["5", 0],
+      "vae": ["1", 2]
+    },
+    "_meta": {
+      "title": "vae_decode"
+    }
+  },
+  "7": {
     "class_type": "SaveImage",
     "inputs": {
+      "images": ["6", 0],
       "filename_prefix": "storytangl-establishing"
     },
     "_meta": {
