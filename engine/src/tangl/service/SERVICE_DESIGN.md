@@ -84,6 +84,57 @@ session hydration, or resource-opening helpers. In current v1 relay mode,
 protected upstream calls execute under one configured upstream identity rather
 than forwarding each caller's auth context end-to-end.
 
+### Remote Setup (v1)
+
+Remote mode is selected through `build_service_manager(...)` or config:
+
+```toml
+[service.manager]
+backend = "remote"
+
+[service.remote]
+api_url = "http://127.0.0.1:8000/api/v2"
+api_key = ""
+secret = ""
+timeout_s = 5.0
+```
+
+Typical CLI usage in v1 is:
+
+1. point the manager at a remote REST server with `service.manager.backend = "remote"`
+2. leave `api_key`/`secret` blank for anonymous bootstrap
+3. create a user through the service surface
+4. play stories normally through the same manager methods
+
+The remote manager is a transport adapter, not a second persistence model. The
+server still owns worlds, users, ledgers, and session state.
+
+### Remote Coverage (v1)
+
+Supported through REST parity today:
+
+- `create_story`
+- `resolve_choice`
+- `get_story_update`
+- `get_story_info`
+- `drop_story`
+- `create_user`
+- `update_user` for secret rotation only
+- `get_user_info`
+- `drop_user`
+- `get_key_for_secret`
+- `list_worlds`
+- `get_world_info`
+- `get_system_info`
+
+Explicitly unsupported in current remote mode:
+
+- local resource-opening helpers such as `open_user`, `open_ledger`,
+  `open_session`, and `open_world`
+- world media access
+- world mutation (`load_world`, `unload_world`)
+- dev/system mutation (`reset_system`)
+
 ## Response Contract
 
 The canonical response contract is typed Python models:

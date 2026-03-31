@@ -533,12 +533,13 @@ class RemoteServiceManager(ServiceManager):
         secret_info = self._decode_model(UserSecret, payload, label="user secret")
         self._bind_auth_from_secret(secret_info)
 
-        if secret_info.user_id is None:
-            raise ServiceError("Remote service create_user did not return a user id")
+        info_payload = self._request("GET", "/user/info", auth_required=True)
+        user_info = self._decode_model(UserInfo, info_payload, label="user info")
+        self._bound_user_id = user_info.user_id
 
         return RuntimeInfo.ok(
             message="User created",
-            user_id=str(secret_info.user_id),
+            user_id=str(user_info.user_id),
         )
 
     @service_method(
