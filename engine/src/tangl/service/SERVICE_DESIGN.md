@@ -2,8 +2,8 @@
 
 > Status: Current manager-first contract
 > Authority: The canonical public service surface is `ServiceManager`,
-> `build_service_manager`, `service_method`, auth helpers, and the typed
-> response models in `response.py`.
+> `RemoteServiceManager`, `build_service_manager`, `service_method`, auth
+> helpers, and the typed response models in `response.py`.
 
 ## Position in the Architecture
 
@@ -27,6 +27,9 @@ Core         → Timeless graph/entity/dispatch primitives
   `resolve_choice`, `get_story_update`, `get_user_info`, `get_world_info`, and
   `get_system_info`.
 - `build_service_manager(...)` is the canonical bootstrap helper.
+- `RemoteServiceManager` is an optional transport-backed implementation that
+  fulfills the same public manager contract through the REST API for the subset
+  of methods with route parity.
 - `@service_method(...)` is bounded descriptive metadata on manager methods:
   access class, context class, writeback policy, blocking hint, optional
   capability tag, and optional operation id.
@@ -75,6 +78,11 @@ writeback machinery.
 Service methods are direct Python code, not metadata-driven endpoint
 dispatchers. The metadata exists for wrappers, docs, and access checks; it does
 not assemble or execute the service layer.
+
+Remote mode is still service-first. It does not expose remote persistence,
+session hydration, or resource-opening helpers. In current v1 relay mode,
+protected upstream calls execute under one configured upstream identity rather
+than forwarding each caller's auth context end-to-end.
 
 ## Response Contract
 

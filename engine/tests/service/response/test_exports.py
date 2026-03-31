@@ -60,6 +60,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "ProjectedState",
         "RuntimeEnvelope",
         "RuntimeInfo",
+        "RemoteServiceManager",
         "ScalarValue",
         "SectionValue",
         "ServiceAccess",

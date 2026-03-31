@@ -38,6 +38,15 @@ persistence = "native_in_mem"           # native objects in memory, ephemeral
 #persistence = "bson_file"               # bson binary files
 #persistence = "bson_mongo"              # bson binary in db
 
+[service.manager]
+backend = "local"                       # local service manager or remote REST relay
+
+[service.remote]
+api_url = ""                            # remote REST api root, e.g. https://host/api/v2
+api_key = ""                            # optional bound remote API key
+secret = ""                             # optional bound secret resolved to api_key
+timeout_s = 5.0                         # request timeout in seconds
+
 # URLs for integrated REST service
 [service.rest]
 api_url =   "https://localhost:8000/api/v2"  # rest server root

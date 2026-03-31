@@ -10,6 +10,8 @@ The service nucleus is manager-first:
    writeback, blocking behavior, and optional capability tags.
 3. Typed response models in :mod:`tangl.service.response` remain the canonical
    payload vocabulary.
+4. :class:`RemoteServiceManager` optionally fulfills the same public manager
+   contract through the REST API.
 """
 
 from __future__ import annotations
@@ -50,6 +52,7 @@ from .response import (
     WorldSceneList,
     coerce_runtime_info,
 )
+from .remote_service_manager import RemoteServiceManager
 from .service_manager import ServiceManager, ServiceSession
 from .service_method import (
     BlockingMode,
@@ -82,6 +85,7 @@ __all__ = [
     "ProjectedSection",
     "ProjectedState",
     "ResourceNotFoundError",
+    "RemoteServiceManager",
     "RuntimeEnvelope",
     "RuntimeInfo",
     "ScalarValue",
