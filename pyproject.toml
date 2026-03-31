@@ -7,6 +7,7 @@ readme = "README.md"
 packages = [
     { include = "tangl", from = "engine/src" },
     { include = "tangl", from = "apps/cli/src" },
+    { include = "tangl", from = "apps/renpy/src" },
     { include = "tangl", from = "apps/server/src" },
     # { include = "reference", as = "tangle.worlds.reference" }
     # 'as' is not allowed
@@ -123,6 +124,7 @@ testpaths = [
     "docs/tests",                 # docs tests
 #    "apps/**/tests",             # all apps tests
     "apps/cli/tests",             # cli tests
+    "apps/renpy/tests",           # renpy adapter tests
     "apps/server/tests"           # rest server tests
 #    "worlds/*/tests"             # sample world tests
 ]
@@ -130,6 +132,7 @@ pythonpath = [
     "engine/src/",
     "engine/tests/",
     "apps/cli/src/",
+    "apps/renpy/src/",
     "apps/server/src",
     "apps/server/tests"
 ]

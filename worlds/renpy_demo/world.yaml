@@ -1,0 +1,7 @@
+label: renpy_demo
+scripts: script.yaml
+domain_module: renpy_demo.domain
+metadata:
+  title: "Ren'Py Demo"
+  description: "A tiny VN-shaped StoryTangl world for the Ren'Py adapter demo."
+

@@ -1,0 +1,59 @@
+label: renpy_demo
+
+metadata:
+  title: "Ren'Py Demo"
+  description: "A tiny VN-shaped story for the Ren'Py adapter proof of concept."
+  start_at: foyer.arrival
+
+scenes:
+  foyer:
+    title: "Rain At The Inn"
+    roles:
+      guide:
+        kind: tangl.story.concepts.actor.role.Role
+        actor_ref: guide
+    blocks:
+      arrival:
+        content: |
+          Rain drums against the inn windows as you step inside.
+          A lantern paints the room in amber light.
+        media:
+          - name: rainy_inn.svg
+            media_role: narrative_im
+        actions:
+          - text: "Approach the waiting guide"
+            successor: guide_offer
+
+      guide_offer:
+        content: |
+          You cross the common room and stop beside the hearth.
+
+          > [!NPC.concerned] guide
+          > You're right on time. The road north opens at dawn.
+
+          > [!NPC] guide
+          > We can take the lantern road through the pines, or risk the river path and arrive sooner.
+        media:
+          - name: guide_portrait.svg
+            media_role: dialog_im
+        actions:
+          - text: "Take the lantern road"
+            successor: lantern_road
+          - text: "Risk the river path"
+            successor: river_path
+
+      lantern_road:
+        content: |
+          You choose the lantern road.
+          By sunrise, the forest opens into calm golden fields.
+
+      river_path:
+        content: |
+          You gamble on the river path.
+          The crossing is cold and fast, but the guide gets you through before first light.
+
+actors:
+  guide:
+    kind: renpy_demo.domain.RenPyGuide
+    name: "Guide"
+
