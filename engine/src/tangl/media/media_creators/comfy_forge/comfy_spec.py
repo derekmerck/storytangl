@@ -9,20 +9,12 @@ from typing import Any, Self
 from pydantic import model_validator
 
 from tangl.core import Priority
+from tangl.media.media_creators.media_shot_plan import MediaShotPlan
 from tangl.media.media_creators.media_spec import MediaResolutionClass, on_adapt_media_spec
 from tangl.media.media_data_type import MediaDataType
 
 from ..stable_forge.stable_spec import StableSpec
 from .comfy_api import ComfyWorkflow
-
-_STYLE_KEYS = (
-    "art_style",
-    "art_style_desc",
-    "style",
-    "style_description",
-    "visual_style",
-    "world_style",
-)
 
 _REQUIRED_TEMPLATE_TITLES = (
     "checkpoint_loader",
@@ -33,61 +25,18 @@ _REQUIRED_TEMPLATE_TITLES = (
     "save_image",
 )
 
-
-def _string_value(value: Any) -> str | None:
-    if isinstance(value, str):
-        stripped = value.strip()
-        return stripped or None
-    return None
-
-
-def _mapping_description(value: Any) -> str | None:
-    if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="python", exclude_none=True)
-    if not isinstance(value, Mapping):
-        return None
-    description = value.get("description")
-    return _string_value(description)
-
-
-def _unique_fragments(*values: str | None) -> list[str]:
-    fragments: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        text = _string_value(value)
-        if text is None:
-            continue
-        key = text.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        fragments.append(text)
-    return fragments
-
-
-def _merge_prompt(prompt: str | None, *, ctx: Mapping[str, Any] | None) -> str | None:
-    if not isinstance(ctx, Mapping):
-        return _string_value(prompt)
-
-    look_payload = _mapping_description(ctx.get("look_media_payload"))
-    look_description = _string_value(ctx.get("look_description"))
-    outfit_description = _string_value(ctx.get("outfit_description"))
-    style_fragments = [_string_value(ctx.get(key)) for key in _STYLE_KEYS]
-    fragments = _unique_fragments(
-        look_payload,
-        look_description,
-        outfit_description,
-        *style_fragments,
-    )
-
-    base_prompt = _string_value(prompt)
-    if base_prompt is None:
-        return ", ".join(fragments) or None
-
-    extra = [item for item in fragments if item.casefold() not in base_prompt.casefold()]
-    if not extra:
-        return base_prompt
-    return f"{base_prompt}, {', '.join(extra)}"
+_COMFY_SHOT_DEFAULTS = {
+    "portrait": {
+        "visual_workflow": "portrait_txt2img",
+        "visual_dims": (512, 768),
+        "visual_prompt_open": "portrait of a character",
+    },
+    "establishing": {
+        "visual_workflow": "establishing_txt2img",
+        "visual_dims": (896, 512),
+        "visual_prompt_open": "wide establishing shot",
+    },
+}
 
 
 class ComfySpec(StableSpec):
@@ -101,8 +50,10 @@ class ComfySpec(StableSpec):
 
     @model_validator(mode="after")
     def _validate_workflow_source(self) -> Self:
-        if not self.workflow and not self.workflow_template:
-            raise ValueError("ComfySpec requires either workflow or workflow_template")
+        if not self.workflow and not self.workflow_template and not self.shot_type:
+            raise ValueError(
+                "ComfySpec requires workflow, workflow_template, or shot_type"
+            )
         return self
 
     @classmethod
@@ -152,7 +103,37 @@ class ComfySpec(StableSpec):
                     f"Comfy workflow template {template_name!r} is missing required node {title!r}"
                 ) from exc
 
+    @classmethod
+    def _apply_shot_defaults(cls, spec: "ComfySpec", ctx: dict[str, Any]) -> None:
+        shot_type = spec.shot_type
+        if not isinstance(shot_type, str) or not shot_type:
+            return
+        defaults = _COMFY_SHOT_DEFAULTS.get(shot_type)
+        if defaults is None:
+            return
+        ctx.setdefault("visual_shot_type", shot_type)
+        for key, value in defaults.items():
+            ctx.setdefault(key, value)
+
+    def build_shot_plan(self, *, ctx: Mapping[str, Any] | None = None) -> MediaShotPlan:
+        scratch = dict(ctx) if isinstance(ctx, Mapping) else {}
+        self._apply_shot_defaults(self, scratch)
+        return MediaShotPlan.from_ctx_and_spec(spec=self, ctx=scratch)
+
+    def apply_shot_plan(self, plan: MediaShotPlan) -> None:
+        if plan.workflow_template is not None:
+            self.workflow_template = plan.workflow_template
+        if plan.dims is not None:
+            self.dims = plan.dims
+        if plan.checkpoint is not None:
+            self.model = plan.checkpoint
+        self.prompt = plan.render_prompt(base_prompt=self.prompt)
+        self.n_prompt = plan.render_negative_prompt(base_prompt=self.n_prompt)
+
     def materialize_workflow(self) -> dict[str, Any]:
+        if self.workflow is None and self.workflow_template is None and self.shot_type is not None:
+            self.apply_shot_plan(self.build_shot_plan())
+
         loaded_from_template = self.workflow is None
         source = self.workflow or self._load_packaged_workflow(str(self.workflow_template))
         workflow = ComfyWorkflow(spec=deepcopy(source))
@@ -242,11 +223,17 @@ class ComfySpec(StableSpec):
         return super().normalized_spec_payload(exclude=excluded)
 
     @on_adapt_media_spec.register(priority=Priority.NORMAL)
-    def apply_context_prompt_fragments(self, ctx: Mapping[str, Any] | None = None):
-        self.prompt = _merge_prompt(self.prompt, ctx=ctx)
-        if self.n_prompt is None and isinstance(ctx, Mapping):
-            self.n_prompt = _string_value(ctx.get("negative_prompt") or ctx.get("n_prompt"))
+    def apply_shot_defaults(self, ctx: dict[str, Any] | None = None):
+        if ctx is None:
+            return self
+        self._apply_shot_defaults(self, ctx)
+        return self
+
+    @on_adapt_media_spec.register(priority=Priority.LATE)
+    def apply_media_shot_plan(self, ctx: Mapping[str, Any] | None = None):
+        self.apply_shot_plan(self.build_shot_plan(ctx=ctx))
         return self
 
 
-ComfySpec.apply_context_prompt_fragments._behavior.wants_caller_kind = ComfySpec
+ComfySpec.apply_shot_defaults._behavior.wants_caller_kind = ComfySpec
+ComfySpec.apply_media_shot_plan._behavior.wants_caller_kind = ComfySpec

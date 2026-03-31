@@ -328,7 +328,13 @@ Dynaconf layout is intentionally treated as an implementation detail.
 `ComfySpec` keeps the stable-aligned authored fields (`prompt`, `n_prompt`,
 `model`, `seed`, `sampler`, `iterations`, `dims`) and materializes a concrete
 workflow into `adapted_spec` before either async dispatch or `FAST_SYNC`
-creation.
+creation. As of March 30, 2026, the Comfy adaptation path also uses a small
+transient `MediaShotPlan` microconcept during `adapt_spec()`: the gathered
+runtime namespace is copied into media-private scratch state, small shot
+defaults such as `shot_type="portrait"` or `shot_type="establishing"` are
+resolved there, and the resulting plan is then mapped back onto `ComfySpec`
+before workflow materialization. This keeps backend workflow assembly
+mechanical while preserving the existing dispatch-backed adapt→create contract.
 
 
 ### Dispatch and Phase Hooks (`dispatch.py`, `dispatch_handlers.py`, `phase_hooks.py`)

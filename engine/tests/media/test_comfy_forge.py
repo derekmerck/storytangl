@@ -47,13 +47,23 @@ def _png_bytes(*, color: tuple[int, int, int] = (255, 0, 0)) -> bytes:
     return buffer.getvalue()
 
 
-def _world_script(*, resolution_class: str | None = None) -> dict[str, object]:
+def _world_script(
+    *,
+    resolution_class: str | None = None,
+    spec_overrides: dict[str, object] | None = None,
+) -> dict[str, object]:
     spec: dict[str, object] = {
         "kind": "comfy",
         "label": "hero_portrait",
         "workflow_template": "portrait_txt2img",
         "prompt": "portrait of a hero",
     }
+    if spec_overrides:
+        for key, value in spec_overrides.items():
+            if value is None:
+                spec.pop(key, None)
+                continue
+            spec[key] = value
     if resolution_class is not None:
         spec["resolution_class"] = resolution_class
 
@@ -82,12 +92,23 @@ def _world_script(*, resolution_class: str | None = None) -> dict[str, object]:
     }
 
 
-def _make_story(*, monkeypatch, tmp_path: Path, resolution_class: str | None = None):
+def _make_story(
+    *,
+    monkeypatch,
+    tmp_path: Path,
+    resolution_class: str | None = None,
+    spec_overrides: dict[str, object] | None = None,
+):
     monkeypatch.setattr(
         "tangl.media.story_media.get_story_media_dir",
         _story_media_root(tmp_path),
     )
-    world = World.from_script_data(script_data=_world_script(resolution_class=resolution_class))
+    world = World.from_script_data(
+        script_data=_world_script(
+            resolution_class=resolution_class,
+            spec_overrides=spec_overrides,
+        )
+    )
     result = world.create_story("comfy-story")
     story = result.graph
     block = next(node for node in story.values() if getattr(node, "label", None) == "start")
@@ -198,6 +219,34 @@ class TestComfyStoryLifecycle:
         assert payload["scope"] == "story"
         assert payload["url"].startswith(f"/media/story/{story.story_id}/hero_portrait-")
         assert payload["url"].endswith(".png")
+
+    def test_async_comfy_shot_type_still_dispatches_final_workflow(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+    ) -> None:
+        story, _block, dep = _make_story(
+            monkeypatch=monkeypatch,
+            tmp_path=tmp_path,
+            spec_overrides={
+                "shot_type": "portrait",
+                "workflow_template": None,
+                "prompt": None,
+            },
+        )
+        provider = dep.provider
+        dispatcher = FakeDispatcher()
+        ledger = _make_ledger(story, dispatcher=dispatcher)
+
+        assert provider.status == MediaRITStatus.PENDING
+        assert provider.adapted_spec is not None
+        assert provider.adapted_spec.get("workflow") is not None
+        assert "workflow_template" not in provider.adapted_spec
+
+        _advance(ledger)
+
+        assert provider.status == MediaRITStatus.RUNNING
+        assert dispatcher.submitted[0][1] == provider.adapted_spec
 
     def test_fast_sync_comfy_spec_resolves_immediately_to_story_url(
         self,

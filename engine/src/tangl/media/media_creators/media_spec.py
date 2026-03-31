@@ -129,6 +129,8 @@ class MediaSpec(Entity):
         if ref is not None:
             if ctx is None and hasattr(ref, "gather_context"):
                 ctx = ref.gather_context()
+        if isinstance(ctx, Mapping):
+            ctx = dict(ctx)
         if ref is not None or ctx is not None:
             receipts = on_adapt_media_spec.dispatch(
                 self,

@@ -38,6 +38,13 @@ then server-side async lifecycle, then concrete worker backends, then anticipato
   `FAST_SYNC` path on the same workflow contract. Local worker settings are
   intentionally isolated behind one shared helper even though the current
   config path is still `content.apis.stableforge.comfy_workers[0]`.
+- **March 30, 2026:** The first Comfy-first Phase C slice is now implemented.
+  `StableSpec` carries an authored `shot_type`, `adapt_spec()` copies the
+  gathered namespace before media-specific enrichment, and `ComfySpec` now
+  routes adaptation through a transient `MediaShotPlan` microconcept before
+  workflow materialization. The shipped scope is intentionally small:
+  `portrait` and `establishing` defaults plus current look/outfit/ornament and
+  style inputs.
 - **Still deferred:** named `MediaSpecRegistry` templates,
   `GenerationHints`, `get_media_registries` / dispatch-generalized media resolution,
   and anticipatory affordance quotas.
