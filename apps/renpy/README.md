@@ -27,16 +27,31 @@ poetry run pytest apps/renpy/tests
 Install a Ren'Py SDK separately. The SDK is intentionally not vendored and not
 part of Poetry dependencies.
 
-Run these from the repo root so StoryTangl picks up the checked-in
-`settings.toml` and `worlds/` directory:
+For the current mac demo, vendor the Python dependencies with a host Python
+3.12 interpreter first. This keeps the Ren'Py side in-process without trying to
+teach the embedded SDK Python how to install packages:
 
 ```bash
 export RENPY_SDK=/path/to/renpy-sdk
-"$RENPY_SDK/renpy.sh" apps/renpy/project lint
-"$RENPY_SDK/renpy.sh" apps/renpy/project test
-"$RENPY_SDK/renpy.sh" apps/renpy/project
+python3.12 apps/renpy/scripts/vendor_python_packages.py
 ```
+
+Then run the mac app-bundle executable from the repo root so StoryTangl picks
+up the checked-in `settings.toml` and `worlds/` directory:
+
+```bash
+export RENPY_SDK=/path/to/renpy-sdk
+apps/renpy/scripts/run_macos.sh lint
+apps/renpy/scripts/run_macos.sh test
+apps/renpy/scripts/run_macos.sh
+```
+
+`renpy.sh` in the 8.5.2 mac SDK bundle currently looks for unsuffixed binaries
+under `lib/py3-mac-universal/`, while the actual executables live in
+`renpy.app/Contents/MacOS/`, so the wrapper script above uses the working path.
+
+The vendored `game/python-packages/` tree is ignored by git. Re-run the vendor
+step whenever the StoryTangl dependency set changes.
 
 The Ren'Py CLI is useful for local smoke coverage, but it stays outside default
 CI for this demo.
-

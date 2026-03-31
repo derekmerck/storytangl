@@ -26,6 +26,7 @@ Repository    = "https://github.com/tangldev/storytangl"
 
 [tool.poetry.scripts]
 "tangl-info" = "tangl.cl_utils.info:main"
+"tangl-admin" = "tangl.admin.__main__:main"
 "tangl-cli" = "tangl.cli.__main__:main"
 "tangl-serve" = "tangl.rest.__main__:main"
 "tangl-docs" = "sphinx.cmd.build:main"
@@ -66,6 +67,12 @@ myst-parser = {version="^4.0.0", optional = true}
 furo = {version="^2024.8.6", optional = true}
 sphinx-markdown-builder = {version="^0.6.8", optional=true}
 linkify-it-py = {version="^2.0.3", optional=true}
+typer = "^0.12.5"
+# Temporary compatibility pin: typer 0.12.5 mis-parses value-taking options
+# with click 8.3.x in our `tangl-admin` utility, so keep click on 8.1.8 until
+# that upstream behavior is resolved and we can safely unpin.
+click = "8.1.8"
+click = "8.1.8"
 
 [tool.poetry.extras]
 # These are what pip install storytangl[extras] uses

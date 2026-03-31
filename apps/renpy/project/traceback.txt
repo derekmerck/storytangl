@@ -1,0 +1,36 @@
+﻿I'm sorry, but an uncaught exception occurred.
+
+While running game code:
+  File "game/script.rpy", line 20, in script
+    init python:
+  File "game/script.rpy", line 23, in <module>
+    from tangl.renpy import RenPySessionBridge
+ModuleNotFoundError: No module named 'pydantic'
+
+-- Full Traceback ------------------------------------------------------------
+
+Traceback (most recent call last):
+  File "game/script.rpy", line 20, in script
+    init python:
+  File "renpy/ast.py", line 1187, in execute
+    renpy.python.py_exec_bytecode(self.code.bytecode, self.hide, store=self.store)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "renpy/python.py", line 1273, in py_exec_bytecode
+    exec(bytecode, globals, locals)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "game/script.rpy", line 23, in <module>
+    from tangl.renpy import RenPySessionBridge
+  File "/Users/derek/dev/storytangl-exp/apps/renpy/src/tangl/renpy/__init__.py", line 3, in <module>
+    from .bridge import RenPySessionBridge
+  File "/Users/derek/dev/storytangl-exp/apps/renpy/src/tangl/renpy/bridge.py", line 9, in <module>
+    from tangl.core import BaseFragment
+  File "/Users/derek/dev/storytangl-exp/engine/src/tangl/core/__init__.py", line 60, in <module>
+    from .entity import Entity
+  File "/Users/derek/dev/storytangl-exp/engine/src/tangl/core/entity.py", line 7, in <module>
+    from pydantic import Field
+ModuleNotFoundError: No module named 'pydantic'
+
+macOS-26.2-arm64-arm-64bit arm64
+Ren'Py 8.5.2.26010301
+StoryTangl Ren'Py Demo 
+Tue Mar 31 15:27:29 2026
