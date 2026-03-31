@@ -377,6 +377,41 @@ then materialized into a concrete artifact. Both produce journal fragments that
 the service layer transforms for client delivery. The media package establishes
 the dispatch-backed adapt/create pattern that prose-adjacent systems can reuse.
 
+### Shared Transient Composition Pattern
+
+Media and prose now each have one concrete example of a broader pattern:
+
+`assembled namespace + request-specific context -> transient microconcept -> materialized output`
+
+- **Dialog / prose** currently uses `DialogMuBlock` during post-merge
+  `compose_journal` rewriting.
+- **Media** currently uses `MediaShotPlan` during pre-provision `adapt_spec()`
+  before a `MediaRIT` is created or a worker job is dispatched.
+
+This similarity is real, but the lifecycle seam is different enough that the
+engine does **not** currently define one shared runtime abstraction for both.
+Dialog composition rewrites already-emitted fragments. Media composition
+assembles a generation recipe before provisioning. Treating both as the same
+dispatch surface too early would blur an important boundary between
+story/journal work and media/provisioning work.
+
+The design commitment for now is therefore narrower:
+
+- keep the namespace as the raw scoped input surface,
+- keep transient microconcepts such as `DialogMuBlock` and `MediaShotPlan`
+  local to the subsystem and phase that owns them,
+- and defer any shared "request-scoped contributor" or nested/DAG dispatch
+  abstraction until at least one more concrete workflow proves the common
+  pressure.
+
+One likely future pressure is request-specific enrichment. Dialog already binds
+speaker-facing media payloads by calling entity hooks such as
+`adapt_look_media_spec(...)` with context like `media_role="dialog_im"` and
+speaker attitude. Media currently still leans more heavily on namespace
+snapshots. If multiple consumers begin performing the same late-bound
+entity-method calls with different request contexts, that is the moment a
+general request-scoped contribution protocol will have earned its complexity.
+
 ### Indirection Through Content-Addressed Inventory
 
 The `MediaRIT` layer exists so that narrative structure never carries raw media

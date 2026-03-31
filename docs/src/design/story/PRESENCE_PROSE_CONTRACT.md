@@ -47,6 +47,12 @@ subsystem yet.
 - That dialog rewrite can now bind speakers through the gathered namespace and
   attach speaker-facing presentation hints plus optional `dialog_im` media
   payloads sourced from presence-aware actors.
+- That dialog path is now architecturally parallel to the media path, but not
+  identical to it: dialog uses a post-merge transient microconcept
+  (`DialogMuBlock`) in `compose_journal`, while media uses a pre-provision
+  transient microconcept (`MediaShotPlan`) during `adapt_spec()`. Both are
+  request-scoped composition over gathered namespace, but they intentionally
+  remain separate seams for now.
 
 That split still matters, but the current direction is now more specific:
 narrator-facing epistemic bookkeeping lives on the story concepts it is about,
@@ -198,6 +204,12 @@ The current first pass now includes:
 6. Those attributed dialog fragments can now carry resolved speaker identity,
    style hints, and optional look-derived `dialog_im` payloads when the speaker
    object exposes the relevant hooks.
+7. A broader unification with media is intentionally deferred. If prose,
+   dialog, and media all converge on the same pattern of invoking
+   request-specific entity contribution hooks against the gathered namespace,
+   the next step should be a small shared contribution protocol or typed
+   request object, not an eager generalization of `compose_journal` into a
+   nested or DAG-style dispatch framework.
 
 If this grows beyond concept-local bookkeeping later, the next phase should
 decide whether to build:
