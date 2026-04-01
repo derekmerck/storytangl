@@ -1,31 +1,10 @@
 from __future__ import annotations
 
-from pydantic import Field
-
-from tangl.mechanics.presence.look import (
-    BodyPhenotype,
-    EyeColor,
-    HairColor,
-    HairStyle,
-    Look,
-    SkinTone,
-)
-from tangl.mechanics.presence.look.look import HasLook
 from tangl.story import Actor
 
 
-class RenPyGuide(Actor, HasLook):
-    """Guide actor with simple dialog styling and visual presence data."""
-
-    look: Look = Field(
-        default_factory=lambda: Look(
-            hair_color=HairColor.DARK,
-            hair_style=HairStyle.MESSY,
-            eye_color=EyeColor.GRAY,
-            skin_tone=SkinTone.OLIVE,
-            body_phenotype=BodyPhenotype.FIT,
-        )
-    )
+class RenPyGuide(Actor):
+    """Guide actor with simple dialog styling for the Ren'Py demo."""
 
     def goes_by(self, alias: str) -> bool:
         normalized = alias.strip().casefold()

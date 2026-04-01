@@ -16,18 +16,15 @@ from tangl.journal.fragments import (
     MediaFragment,
 )
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-from tangl.service import (
-    RuntimeEnvelope,
-    RuntimeInfo,
-    ServiceManager,
-    build_service_manager,
-)
+from tangl.persistence import PersistenceManagerFactory
 from tangl.service.media import (
     MediaContentProfile,
     MediaPendingPolicy,
     MediaRenderProfile,
     media_fragment_to_payload,
 )
+from tangl.service.response import RuntimeEnvelope, RuntimeInfo
+from tangl.service.service_manager import ServiceManager
 from tangl.utils.sanitize_str import sanitize_str
 
 from .models import RenPyChoice, RenPyLine, RenPyMediaOp, RenPyTurn
@@ -86,7 +83,9 @@ class RenPySessionBridge:
         user_secret: str | None = None,
         media_render_profile: MediaRenderProfile | None = None,
     ) -> None:
-        self.service_manager = service_manager or build_service_manager()
+        self.service_manager = service_manager or ServiceManager(
+            PersistenceManagerFactory.native_in_mem()
+        )
         self.user_id = user_id
         self.user_secret = user_secret
         self.ledger_id: UUID | None = None

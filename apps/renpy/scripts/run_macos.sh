@@ -10,5 +10,11 @@ if [ -z "${RENPY_SDK:-}" ]; then
     exit 1
 fi
 
+if [ -x "$RENPY_SDK/renpy-local.app/Contents/MacOS/renpy" ]; then
+    RENPY_BIN="$RENPY_SDK/renpy-local.app/Contents/MacOS/renpy"
+else
+    RENPY_BIN="$RENPY_SDK/renpy.app/Contents/MacOS/renpy"
+fi
+
 cd "$REPO_ROOT"
-exec "$RENPY_SDK/renpy.app/Contents/MacOS/renpy" "$REPO_ROOT/apps/renpy/project" "$@"
+exec "$RENPY_BIN" "$REPO_ROOT/apps/renpy/project" "$@"

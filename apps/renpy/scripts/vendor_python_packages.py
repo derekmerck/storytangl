@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -13,19 +14,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--python",
         default="python3.12",
-        help="Host Python 3.12 interpreter used to run pip. Default: python3.12",
+        help="Host Python 3.12 interpreter whose site-packages will be copied. Default: python3.12",
     )
     parser.add_argument(
         "--target",
         type=Path,
         default=Path("apps/renpy/project/game/python-packages"),
-        help="Directory that will receive vendored packages.",
+        help="Directory that will receive copied packages.",
     )
     parser.add_argument(
         "--repo-root",
         type=Path,
         default=Path(__file__).resolve().parents[3],
-        help="StoryTangl repository root to install from.",
+        help="StoryTangl repository root that will be added to a local .pth file.",
     )
     parser.add_argument(
         "--keep-existing",
@@ -64,19 +65,6 @@ def _check_python(binary: str) -> None:
             "Use a Python 3.12 interpreter for vendoring native dependencies."
         )
 
-    pip_cmd = [binary, "-m", "pip", "--version"]
-    try:
-        subprocess.run(
-            pip_cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(
-            f"Host interpreter {binary!r} does not have a working pip: {exc.stderr.strip()}"
-        ) from exc
-
 
 def _clear_target(target: Path) -> None:
     if not target.exists():
@@ -91,11 +79,59 @@ def _clear_target(target: Path) -> None:
             child.unlink()
 
 
+def _resolve_site_packages(binary: str) -> Path:
+    site_cmd = [
+        binary,
+        "-c",
+        "import json, site; print(json.dumps(site.getsitepackages()))",
+    ]
+    result = subprocess.run(
+        site_cmd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    entries = json.loads(result.stdout.strip())
+    for entry in entries:
+        path = Path(entry)
+        if path.exists():
+            return path
+    raise SystemExit(f"Could not resolve a site-packages directory for {binary!r}.")
+
+
+def _copy_dependency_tree(source: Path, target: Path) -> None:
+    for child in source.iterdir():
+        if child.name == "__pycache__":
+            continue
+        if child.name.startswith("storytangl"):
+            continue
+        destination = target / child.name
+        if child.is_dir():
+            shutil.copytree(child, destination, dirs_exist_ok=True)
+        else:
+            shutil.copy2(child, destination)
+
+
+def _write_local_pth(repo_root: Path, target: Path) -> None:
+    pth_path = target / "storytangl_local.pth"
+    pth_path.write_text(
+        "\n".join(
+            [
+                str((repo_root / "apps/renpy/src").resolve()),
+                str((repo_root / "engine/src").resolve()),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
     target = args.target.resolve()
     python = _resolve_python(args.python)
+    site_packages = _resolve_site_packages(python)
 
     _check_python(python)
 
@@ -103,20 +139,10 @@ def main() -> int:
     if not args.keep_existing:
         _clear_target(target)
 
-    install_cmd = [
-        python,
-        "-m",
-        "pip",
-        "install",
-        "--upgrade",
-        "--target",
-        str(target),
-        str(repo_root),
-    ]
-
     print(f"Vendoring StoryTangl demo dependencies into {target}")
-    print("Running:", " ".join(install_cmd))
-    subprocess.run(install_cmd, check=True)
+    print(f"Copying dependencies from {site_packages}")
+    _copy_dependency_tree(site_packages, target)
+    _write_local_pth(repo_root, target)
     print("Done.")
     return 0
 

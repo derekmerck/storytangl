@@ -62,7 +62,13 @@ story_media =   "@path /app/data/media/"    # user/story media files
 cache_data =    "@path /app/cache/"         # file loc shelve and pickle cache data
 system_media =  "@path /app/media/sys/"     # shared/system media
 
+[service.caches]
+shelved = true                          # file-backed shelve caches for media/lang helpers
+
 # Backend persistence services
+[service.apis.sqlite]
+enabled = true                          # sqlite storage backend, disabled automatically if sqlite3 is unavailable
+
 [service.apis.redis]
 enabled = false                         # kv data storage backend, req for redis-persistence
 token = "<tok>"

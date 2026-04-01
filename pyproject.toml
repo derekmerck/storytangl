@@ -72,7 +72,6 @@ typer = "^0.12.5"
 # with click 8.3.x in our `tangl-admin` utility, so keep click on 8.1.8 until
 # that upstream behavior is resolved and we can safely unpin.
 click = "8.1.8"
-click = "8.1.8"
 
 [tool.poetry.extras]
 # These are what pip install storytangl[extras] uses
