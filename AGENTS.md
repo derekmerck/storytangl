@@ -187,6 +187,12 @@ full type map and rationale.**
 - `apps/` and `worlds/`: optional entry points and sample content.
 - `docs/`: Sphinx documentation sources.
 
+## Orientation bundles
+- If the runtime has `repomix` installed, you may use curated opt-in bundles for broad repo orientation or cross-cutting work instead of scanning the whole repo ad hoc.
+- Generate them with `python3 scripts/repomix_bundle.py --list` and then request only the smallest relevant bundle such as `foundation`, `service-persistence`, `mechanics-media-prose`, `apps`, or `docs-index`.
+- Generated outputs live under `tmp/repomix/`. You may consult pre-generated bundles there when present, but regenerate them if the task touches changed areas or the bundle appears stale.
+- Treat bundles as orientation aids, not source of truth. Read and edit the real repository files before making code changes.
+
 ## Coding style
 - Target **Python 3.13**. Use `from __future__ import annotations` for forward
   references.
