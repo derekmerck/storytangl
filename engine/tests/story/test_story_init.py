@@ -15,7 +15,8 @@ import pytest
 from tangl.loaders import WorldBundle, WorldCompiler
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.resource_manager import ResourceManager
-from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.persistence import PersistenceManagerFactory
+from tangl.service import build_service_manager
 from tangl.service.user.user import User
 from tangl.story import InitMode, World
 from tangl.story.concepts import Actor, Location, Role, Setting
@@ -94,6 +95,56 @@ def test_lazy_mode_materializes_entry_and_ancestor_only() -> None:
     assert location_nodes == []
     assert graph.initial_cursor_id == block_nodes[0].uid
     assert any("action destination unresolved" in warning for warning in result.report.warnings)
+
+
+def test_ledger_from_story_graph_defaults_to_story_initial_cursor() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("run_lazy", init_mode=InitMode.LAZY)
+
+    ledger = Ledger.from_graph(result.graph)
+
+    assert result.graph.factory is world
+    assert result.graph.world is world
+    assert ledger.cursor_id == result.graph.initial_cursor_id
+    assert ledger.cursor is result.graph.get(result.graph.initial_cursor_id)
+
+
+def test_story_graph_roundtrip_preserves_world_factory_identity() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("story_roundtrip", init_mode=InitMode.EAGER)
+
+    payload = result.graph.unstructure()
+    restored = type(result.graph).structure(payload)
+
+    assert "world" not in payload
+    assert restored.factory is world
+    assert restored.world is world
+    assert restored.world.find_template("intro.start") is world.find_template("intro.start")
+
+
+def test_create_story_preserves_seed_entry_ids_when_explicit_entries_are_cleared() -> None:
+    world = World.from_script_data(script_data=_base_script())
+    world.force_set("entry_template_ids", [])
+
+    result = world.create_story("seed_entry_story", init_mode=InitMode.LAZY)
+
+    assert result.graph.initial_cursor_id is not None
+    assert result.graph.initial_cursor_ids == [result.graph.initial_cursor_id]
+    assert result.entry_ids == [result.graph.initial_cursor_id]
+
+
+@pytest.mark.parametrize("init_mode", [InitMode.LAZY, InitMode.EAGER])
+def test_create_story_uses_direct_world_fields_when_bundle_is_cleared(init_mode: InitMode) -> None:
+    world = World.from_script_data(script_data=_base_script())
+    world.force_set("bundle", None)
+
+    result = world.create_story(f"bundleless_{init_mode.value}", init_mode=init_mode)
+
+    assert result.graph.factory is world
+    assert result.graph.initial_cursor_id is not None
+    assert result.source_map == world.source_map
+    assert result.codec_state == world.codec_state
+    assert result.codec_id == world.codec_id
 
 
 def test_freeze_shape_requires_eager_mode() -> None:
@@ -244,7 +295,9 @@ def test_eager_mode_prelink_selection_is_deterministic() -> None:
     world_a = World.from_script_data(script_data=script)
     result_a = world_a.create_story("run_det_a", init_mode=InitMode.EAGER)
 
-    world_b = World.from_script_data(script_data=script)
+    script_b = dict(script)
+    script_b["label"] = "story_demo_second"
+    world_b = World.from_script_data(script_data=script_b)
     result_b = world_b.create_story("run_det_b", init_mode=InitMode.EAGER)
 
     role_a = next(Selector(has_kind=Role).filter(result_a.graph.values()))
@@ -382,12 +435,11 @@ scenes:
     compiled = WorldCompiler().compile(bundle)
 
     assert isinstance(compiled, World)
-    assert compiled.domain is not None
     assert compiled.assets is not None
     assert compiled.resources is not None
     assert compiled.templates is compiled.bundle.template_registry
-    assert "DomainCharacter" in compiled.domain.class_registry
-    assert compiled.domain.dispatch_registry in compiled.get_authorities()
+    assert "DomainCharacter" in compiled.class_registry
+    assert compiled.dispatch in compiled.get_authorities()
     result = compiled.create_story("loader_story", init_mode=InitMode.LAZY)
     assert result.graph.initial_cursor_id is not None
     assert result.codec_id in {"near_native", "near_native_yaml"}
@@ -426,23 +478,22 @@ def test_story_materializer_wires_inventory_media_without_wrapping_direct_media(
     assert "dependency_id" not in start.media[2]
 
 
-def test_runtime_controller_create_story_with_world_param() -> None:
+def test_service_manager_create_story_with_world_param() -> None:
     world = World.from_script_data(script_data=_base_script())
-    controller = RuntimeController()
+    manager = build_service_manager(PersistenceManagerFactory.native_in_mem())
     user = User(label="test-user")
+    manager.persistence.save(user)
 
-    result = controller.create_story(
-        user=user,
+    result = manager.create_story(
+        user_id=user.uid,
         world_id=world.label,
         world=world,
         init_mode=InitMode.EAGER.value,
         story_label="svc_story",
     )
 
-    assert result.status == "ok"
     assert result.cursor_id is not None
-    assert result.details is not None
-    assert result.details.get("world_id") == world.label
+    assert result.metadata.get("world_id") == world.label
 
 
 def test_story_graph_authorities_include_story_and_world_authorities() -> None:
@@ -458,6 +509,24 @@ def test_story_graph_authorities_include_story_and_world_authorities() -> None:
     authorities = result.graph.get_authorities()
     assert story_dispatch in authorities
     assert world_authority in authorities
+
+
+def test_story_init_does_not_create_story_media_until_needed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    story_media_root = tmp_path / "story_media"
+
+    monkeypatch.setattr(
+        "tangl.media.story_media.get_story_media_dir",
+        lambda story_id=None: story_media_root if story_id is None else story_media_root / str(story_id),
+    )
+
+    world = World.from_script_data(script_data=_base_script())
+    result = world.create_story("no_media_story", init_mode=InitMode.LAZY)
+
+    assert result.graph.story_resources is None
+    assert not story_media_root.exists()
 
 
 def test_story_graph_template_lineage_is_nearest_first() -> None:
@@ -506,7 +575,7 @@ def test_story_graph_template_scope_groups_follow_lineage_order() -> None:
     lineage = [
         templ_id
         for templ_id in graph.template_lineage_by_entity_id.get(cursor.uid, [])
-        if graph.factory.get(templ_id) is not None
+        if graph.template_registry is not None and graph.template_registry.get(templ_id) is not None
     ]
     group_heads = [getattr(group[0], "uid", None) for group in groups if group]
     assert group_heads[: len(lineage)] == lineage
@@ -525,13 +594,6 @@ def test_world_template_lookup_facade_finds_templates() -> None:
 
 
 def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
-    @dataclass(slots=True)
-    class _TemplateScopeFacet:
-        extra_template_registry: TemplateRegistry
-
-        def get_template_scope_groups(self, *, caller=None, graph=None):
-            return [self.extra_template_registry.values()]
-
     base_world = World.from_script_data(script_data=_base_script())
     extra_registry = TemplateRegistry(label="world_extra_templates")
     extra_template = EntityTemplate(
@@ -542,9 +604,10 @@ def test_world_template_scope_groups_are_included_in_runtime_scope() -> None:
     _ = extra_template
 
     world = World(
-        label=base_world.label,
+        label=f"{base_world.label}.scope",
         bundle=base_world.bundle,
-        templates=_TemplateScopeFacet(extra_template_registry=extra_registry),
+        templates=base_world.bundle.template_registry,
+        extra_template_registries=[extra_registry],
     )
     result = world.create_story("scope_world_story", init_mode=InitMode.EAGER)
     cursor = result.graph.get(result.graph.initial_cursor_id)

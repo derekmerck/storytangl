@@ -1,0 +1,6 @@
+label: credential_gate
+scripts: script.yaml
+domain_module: credential_gate.domain
+metadata:
+  title: "Credential Gate"
+  description: "A staged checkpoint proof for the credentials loop."

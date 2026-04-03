@@ -1,0 +1,45 @@
+label: bag_rps_pit
+
+metadata:
+  title: "Bag RPS Pit"
+  description: "A tiny authored proof for aggregate-force contests."
+  start_at: pit.entrance
+
+scenes:
+  pit:
+    title: "Bag RPS Pit"
+    blocks:
+      entrance:
+        content: |
+          Colored stones rattle in a lacquered bowl while the pit champion waits
+          for you to commit your force.
+        actions:
+          - text: "Enter the pit"
+            successor: challenge
+
+      challenge:
+        kind: "bag_rps_pit.domain.BagRpsPitBlock"
+        content: |
+          The champion tips a single paper token onto the felt and dares you to
+          answer with weight instead of style.
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          The champion's bowl empties first, and the crowd shifts to your side.
+        actions:
+          - text: "Reset the bowls"
+            successor: entrance
+
+      defeat:
+        content: |
+          Your reserve thins out and the pit closes over you.
+        actions:
+          - text: "Try again"
+            successor: entrance

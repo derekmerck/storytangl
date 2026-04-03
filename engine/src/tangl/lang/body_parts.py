@@ -3,6 +3,7 @@ from typing import Self
 from enum import Enum, auto, IntFlag, KEEP, CONFORM, Flag
 
 from tangl.utils.enum_plus import EnumPlusMixin
+from tangl.utils.tag_values import get_tag_values
 
 class BodyRegion(EnumPlusMixin, Enum):
     """A coarse body region enum."""
@@ -135,12 +136,13 @@ class BodyPart(EnumPlusMixin, IntFlag):
         we can treat both prefixes as producing BodyPart values and
         simply OR them together.
         """
-        if not hasattr(item, "get_tag_kv"):
+        tags = getattr(item, "tags", None)
+        if tags is None:
             return None
 
         mask = BodyPart(0)
         for prefix in ("part", "region"):
-            parts = item.get_tag_kv(prefix=prefix, enum_type=BodyPart)
+            parts = get_tag_values(tags, prefix=prefix, value_type=BodyPart)
             if parts:
                 for p in parts:
                     mask |= p

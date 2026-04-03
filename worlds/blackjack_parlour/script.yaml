@@ -1,0 +1,46 @@
+label: blackjack_parlour
+
+metadata:
+  title: "Blackjack Parlour"
+  description: "A crooked croupier offers a single dramatic hand."
+  start_at: parlour.entrance
+
+scenes:
+  parlour:
+    title: "Blackjack Parlour"
+    blocks:
+      entrance:
+        content: |
+          Velvet curtains swallow the room. A lone croupier taps the table and
+          invites you to test your nerve.
+        actions:
+          - text: "Take the offered hand"
+            successor: challenge
+
+      challenge:
+        kind: "blackjack_parlour.domain.BlackjackBlock"
+        content: |
+          The croupier peels one card toward you and lets the next flash under a
+          lacquered nail. "One hand," they say. "Make it count."
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          The croupier exhales through their nose and slides the chips over with
+          reluctant respect.
+        actions:
+          - text: "Leave while you're ahead"
+            successor: entrance
+
+      defeat:
+        content: |
+          The croupier gathers the cards and your pride in the same tidy sweep.
+        actions:
+          - text: "Ask for another hand"
+            successor: entrance

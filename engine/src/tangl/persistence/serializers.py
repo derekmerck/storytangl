@@ -67,6 +67,17 @@ class PickleSerializationHandler:
 class JsonSerializationHandler:
     # Requires a flat text storage backend
 
+    type_key = "__tangl_type__"
+    bytes_type = "bytes"
+    hex_key = "hex"
+
+    @classmethod
+    def encode_bytes(cls, value: bytes | bytearray | memoryview) -> dict[str, str]:
+        return {
+            cls.type_key: cls.bytes_type,
+            cls.hex_key: bytes(value).hex(),
+        }
+
     class MyJsonEncoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, set):
@@ -78,10 +89,7 @@ class JsonSerializationHandler:
             elif isinstance(o, UUID):
                 return o.hex
             elif isinstance(o, (bytes, bytearray, memoryview)):
-                # Represent binary as a hex string, e.g. for content_hash
-                # content_hash knows how to read hex, so this works without a decoder
-                # for general binary data, would probably want to use base64
-                return o.hex()
+                return JsonSerializationHandler.encode_bytes(o)
             try:
                 return super().default(o)  # Attempt to serialize using super class
             except TypeError:
@@ -94,14 +102,25 @@ class JsonSerializationHandler:
 
     @staticmethod
     def decode_object_hook(obj):
+        if (
+            obj.get(JsonSerializationHandler.type_key) == JsonSerializationHandler.bytes_type
+            and set(obj.keys()) == {JsonSerializationHandler.type_key, JsonSerializationHandler.hex_key}
+            and isinstance(obj.get(JsonSerializationHandler.hex_key), str)
+        ):
+            return bytes.fromhex(obj[JsonSerializationHandler.hex_key])
+
         for key, value in obj.items():
+            if not isinstance(value, str):
+                continue
             try:
                 obj[key] = datetime.fromisoformat(value)
-            except (TypeError, ValueError):
-                try:
-                    obj[key] = UUID(value)
-                except (ValueError, AttributeError, TypeError):
-                    pass
+                continue
+            except ValueError:
+                pass
+            try:
+                obj[key] = UUID(value)
+            except (ValueError, AttributeError, TypeError):
+                pass
         return obj
 
     @classmethod

@@ -7,7 +7,7 @@ import pytest
 from tangl.journal.media import MediaFragment
 from tangl.media import system_media
 from tangl.media.media_resource.media_dependency import MediaDep
-from tangl.service.controllers.runtime_controller import RuntimeController
+from tangl.service.media import media_fragment_to_payload
 from tangl.vm import AnonymousEdge, Frame, ResolutionPhase as P
 
 from media.helpers import MediaWorld, build_world_with_logo_media_block
@@ -59,14 +59,13 @@ def test_system_media_fallback(tmp_path, monkeypatch):
     _run_planning(frame, block)
 
     media_dep = next(edge for edge in block.edges_out() if isinstance(edge, MediaDep))
-    assert media_dep.destination is not None
+    assert media_dep.successor is not None
     assert media_dep.scope == "sys"
 
     fragments = _run_journal(frame, block)
     media_frag = next(frag for frag in fragments if isinstance(frag, MediaFragment))
 
-    controller = RuntimeController()
-    result = controller._dereference_media(media_frag, world_id=str(world.label))
+    result = media_fragment_to_payload(media_frag, world_id=str(world.label))
 
     assert result["scope"] == "sys"
     assert result["url"].startswith("/media/sys/")
@@ -99,6 +98,6 @@ def test_world_media_preferred_over_system(tmp_path, monkeypatch):
     _run_planning(frame, block)
 
     media_dep = next(edge for edge in block.edges_out() if isinstance(edge, MediaDep))
-    assert media_dep.destination is not None
+    assert media_dep.successor is not None
     assert media_dep.scope == "world"
-    assert getattr(media_dep.destination, "path", None) == world_asset
+    assert getattr(media_dep.successor, "path", None) == world_asset

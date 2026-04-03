@@ -17,8 +17,7 @@ Identity and lookup
 -------------------
 
 .. autoclass:: tangl.core.Entity
-.. autoclass:: tangl.core.entity.Selectable
 .. autoclass:: tangl.core.Selector
 .. autoclass:: tangl.core.Registry
 .. autoclass:: tangl.core.Singleton
-.. autoclass:: tangl.core.singleton.InheritingSingleton
+.. autoclass:: tangl.core.InstanceInheritance

@@ -13,10 +13,23 @@ Usage:
 """
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 from typing import Iterator
 from uuid import UUID
+
+try:
+    from tangl.config import settings
+except ImportError:
+    settings = {}
+
+try:
+    import sqlite3
+    HAS_SQLITE = True
+except ImportError:
+    sqlite3 = object
+    HAS_SQLITE = False
+    if settings:
+        settings.service.apis.sqlite.enabled = False
 
 from tangl.type_hints import FlatData
 
@@ -43,6 +56,11 @@ class SQLiteStorage:
     """
     
     def __init__(self, path: str | Path = ":memory:", binary_rw: bool = False):
+        if settings and not settings.service.apis.sqlite.enabled:
+            raise RuntimeError("SQLite backend not enabled")
+        if not HAS_SQLITE:
+            raise ImportError
+
         self.path = str(path)
         self.binary_rw = binary_rw
         self._persistent_conn: sqlite3.Connection | None = None

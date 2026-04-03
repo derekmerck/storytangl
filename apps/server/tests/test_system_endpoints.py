@@ -19,9 +19,8 @@ def test_system_get_key(client):
     assert response.status_code == 200
     update = response.json()
     print( update )
-    # todo: namedtuple response doesn't preserve attrib names, json is a list
-    assert update[0] == key_for_secret(settings.client.secret)
-    assert update[1] == settings.client.secret
+    assert update["api_key"] == key_for_secret(settings.client.secret)
+    assert update["user_secret"] == settings.client.secret
 
 def test_system_list_worlds(client):
     response = client.get(f"system/worlds")

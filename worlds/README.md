@@ -9,6 +9,16 @@ World bundles for the StoryTangl narrative engine.
 
 See [reference/README.md](reference/README.md) for details.
 
+### logic_demo/
+**Logic Demo** - Native YAML finite-state-machine showcase with parity, half
+adder, and full adder machines.
+
+See [logic_demo/README.md](logic_demo/README.md) for details.
+
+### twine_logic_demo/
+**Twine Logic Demo** - The same state-machine idea authored in Twee/Twine and
+decoded through the built-in Twine codec.
+
 ## Creating a New World
 
 ### Quick Start

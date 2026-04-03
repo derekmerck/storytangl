@@ -10,11 +10,15 @@
 > (no version suffix).
 >
 > The static media pipeline (file-based assets through to service-layer payload
-> resolution) is wired and tested. The generative creator pipeline now has real
-> sync/async lifecycle infrastructure plus a deterministic in-process checker
-> harness, but external worker-backed forges are still provisional. This note
-> describes the implemented architecture and the design commitments for the
-> still-evolving creator layer.
+> resolution) is wired and tested. File-backed `MediaRIT` inventory loading can
+> cache the resolved content hash through `utils.shelved2`, keyed by source
+> path plus file stat, so repeat indexing does not reread unchanged files. That
+> cache is optional and can be disabled globally with
+> `service.caches.shelved = false` for constrained runtimes. The generative
+> creator pipeline now has real sync/async lifecycle infrastructure plus a
+> deterministic in-process checker harness and a first real ComfyUI worker
+> backend. This note describes the implemented
+> architecture and the design commitments for the still-evolving creator layer.
 >
 > The package-level architecture is canonical here. Broader design documents
 > under `docs/src/design/` remain useful for subsystem history, rationale, and
@@ -81,6 +85,7 @@ tangl.media
 ├── Creators       → media_creators/
 │                  → media_creators/media_spec.py             (MediaSpec, MediaResolutionClass, on_adapt_media_spec, on_create_media)
 │                  → media_creators/checker_forge/            (deterministic in-process harness)
+│                  → media_creators/comfy_forge/              (ComfyUI worker backend + workflow spec)
 │                  → media_creators/svg_forge/                (SVG composition, partial)
 │                  → media_creators/stable_forge/             (Stable Diffusion adapters, partial)
 │                  → media_creators/tts_forge/                (text-to-speech adapters, stub/partial)
@@ -180,7 +185,7 @@ document) and provides:
 - **Lifecycle metadata** — status, worker/job info, timestamps, persistence policy
 - **Spec provenance** — adapted/executed spec payloads and hashes for generated media
 
-`MediaRIT` extends `RegistryAware` and `ContentAddressable`. It does *not*
+`MediaRIT` extends `RegistryAware` and `HasContent`. It does *not*
 extend `GraphItem`; RITs can live in registries outside any graph. When a media
 dependency is resolved, the accepted RIT may be copied into the story graph as a
 graph-local entity, but inventory-scoped registries remain the authoritative
@@ -309,15 +314,29 @@ first forge that handles the spec type wins.
 | Forge | Media type | Status |
 |-------|------------|--------|
 | `checker_forge` | IMAGE | Active deterministic harness used to prove sync/async pipeline slices |
+| `comfy_forge` | IMAGE | Active ComfyUI backend with workflow-backed specs, async dispatch, and optional `FAST_SYNC` creation |
 | `svg_forge` | VECTOR | Partial — group/transform/viewbox infrastructure exists |
 | `stable_forge` | IMAGE | Partial — API client and spec model exist |
 | `tts_forge` | AUDIO | Partial/stub — API clients exist, worker-backed flow deferred |
 | `raster_forge` | IMAGE | Stub |
 
-The creator pipeline will continue to change as worker-backed forges take final
-shape. The stable commitments are the dispatch pattern, the two-phase
-adapt→create contract, and the use of story-scoped generated RITs as the
-topological satisfaction point for media deps.
+The creator pipeline will continue to change as richer worker-backed forges and
+named spec registries take final shape. The stable commitments are the dispatch
+pattern, the two-phase adapt→create contract, and the use of story-scoped
+generated RITs as the topological satisfaction point for media deps. The
+current Comfy worker endpoint is resolved through one shared settings helper;
+today that helper reads `content.apis.stableforge.comfy_workers[0]`, but that
+Dynaconf layout is intentionally treated as an implementation detail.
+`ComfySpec` keeps the stable-aligned authored fields (`prompt`, `n_prompt`,
+`model`, `seed`, `sampler`, `iterations`, `dims`) and materializes a concrete
+workflow into `adapted_spec` before either async dispatch or `FAST_SYNC`
+creation. As of March 30, 2026, the Comfy adaptation path also uses a small
+transient `MediaShotPlan` microconcept during `adapt_spec()`: the gathered
+runtime namespace is copied into media-private scratch state, small shot
+defaults such as `shot_type="portrait"` or `shot_type="establishing"` are
+resolved there, and the resulting plan is then mapped back onto `ComfySpec`
+before workflow materialization. This keeps backend workflow assembly
+mechanical while preserving the existing dispatch-backed adapt→create contract.
 
 
 ### Dispatch and Phase Hooks (`dispatch.py`, `dispatch_handlers.py`, `phase_hooks.py`)
@@ -359,6 +378,41 @@ Both follow the same pattern: authored intent is adapted to runtime context,
 then materialized into a concrete artifact. Both produce journal fragments that
 the service layer transforms for client delivery. The media package establishes
 the dispatch-backed adapt/create pattern that prose-adjacent systems can reuse.
+
+### Shared Transient Composition Pattern
+
+Media and prose now each have one concrete example of a broader pattern:
+
+`assembled namespace + request-specific context -> transient microconcept -> materialized output`
+
+- **Dialog / prose** currently uses `DialogMuBlock` during post-merge
+  `compose_journal` rewriting.
+- **Media** currently uses `MediaShotPlan` during pre-provision `adapt_spec()`
+  before a `MediaRIT` is created or a worker job is dispatched.
+
+This similarity is real, but the lifecycle seam is different enough that the
+engine does **not** currently define one shared runtime abstraction for both.
+Dialog composition rewrites already-emitted fragments. Media composition
+assembles a generation recipe before provisioning. Treating both as the same
+dispatch surface too early would blur an important boundary between
+story/journal work and media/provisioning work.
+
+The design commitment for now is therefore narrower:
+
+- keep the namespace as the raw scoped input surface,
+- keep transient microconcepts such as `DialogMuBlock` and `MediaShotPlan`
+  local to the subsystem and phase that owns them,
+- and defer any shared "request-scoped contributor" or nested/DAG dispatch
+  abstraction until at least one more concrete workflow proves the common
+  pressure.
+
+One likely future pressure is request-specific enrichment. Dialog already binds
+speaker-facing media payloads by calling entity hooks such as
+`adapt_look_media_spec(...)` with context like `media_role="dialog_im"` and
+speaker attitude. Media currently still leans more heavily on namespace
+snapshots. If multiple consumers begin performing the same late-bound
+entity-method calls with different request contexts, that is the moment a
+general request-scoped contribution protocol will have earned its complexity.
 
 ### Indirection Through Content-Addressed Inventory
 

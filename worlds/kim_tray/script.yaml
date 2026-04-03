@@ -1,0 +1,45 @@
+label: kim_tray
+
+metadata:
+  title: "Kim Tray"
+  description: "A tiny authored proof for the shared picking kernel."
+  start_at: tray_room.entrance
+
+scenes:
+  tray_room:
+    title: "Kim Tray"
+    blocks:
+      entrance:
+        content: |
+          A velvet tray waits beneath a shaded lamp, every object arranged as if
+          it expects to be remembered.
+        actions:
+          - text: "Study the tray"
+            successor: challenge
+
+      challenge:
+        kind: "kim_tray.domain.KimTrayBlock"
+        content: |
+          The host lets you look for a breath, then palms one trinket away with
+          a practiced smile.
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          "Exactly," the host says, pleased that you noticed the absence.
+        actions:
+          - text: "Reset the tray"
+            successor: entrance
+
+      defeat:
+        content: |
+          The host tilts the tray back toward you and lets the answer sting.
+        actions:
+          - text: "Look again"
+            successor: entrance

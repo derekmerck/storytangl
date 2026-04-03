@@ -23,6 +23,11 @@ class EmptyRecord(Record):
     pass
 
 
+class LabelSortedRecord(SimpleRecord):
+    def sort_key(self) -> str:
+        return self.label or ""
+
+
 class TestRecordCreation:
     def test_create_with_content(self) -> None:
         record = SimpleRecord(content="foo")
@@ -171,6 +176,13 @@ class TestOrderedRegistryBasics:
         reg.extend([a, b])
         assert list(reg.find_all(Selector(has_tags={"x"}))) == [a]
 
+    def test_last_rejects_kwargs_lookup(self) -> None:
+        reg = OrderedRegistry()
+        reg.append(SimpleRecord(content="a"))
+
+        with pytest.raises(TypeError):
+            reg.last(label="a")
+
     def test_append_out_of_order_sorts_correctly(self) -> None:
         reg = OrderedRegistry()
         a = SimpleRecord(content="a", seq=3)
@@ -298,3 +310,19 @@ class TestOrderedRegistryGetSlice:
         before = len(reg)
         _ = list(reg.get_slice(start_key=2, stop_key=3))
         assert len(reg) == before
+
+
+class TestOrderedRegistryMarkers:
+    def test_markers_follow_seq_even_when_records_sort_by_other_keys(self) -> None:
+        reg = OrderedRegistry()
+        reg.extend(
+            [
+                LabelSortedRecord(label="z", content="first", seq=1),
+                LabelSortedRecord(label="a", content="second", seq=5),
+            ]
+        )
+
+        reg.set_marker("latest")
+
+        assert reg.markers["_"]["latest"] == 6
+        assert reg._next_marker_seq(1) == 6

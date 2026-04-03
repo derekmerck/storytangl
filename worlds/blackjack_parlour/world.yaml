@@ -1,0 +1,6 @@
+label: blackjack_parlour
+scripts: script.yaml
+domain_module: blackjack_parlour.domain
+metadata:
+  title: "Blackjack Parlour"
+  description: "Take one narratively loaded hand of blackjack."

@@ -88,3 +88,13 @@ def extract_all_choices():
 @pytest.fixture(scope="session")
 def extract_fragments():
     return extract_fragments_
+
+
+@pytest.fixture(autouse=True)
+def clear_story_world_instances() -> None:
+    """Keep story world singletons isolated between tests."""
+    from tangl.story import World
+
+    World.clear_instances()
+    yield
+    World.clear_instances()

@@ -52,7 +52,7 @@ class Region(Singleton):
     @classmethod
     def _convert_subtypes(cls, data):
         def _resolve_subtype(label):
-            if x := Subtype.find_instance(label=label):
+            if x := Subtype.get_instance(label):
                 return x
             else:
                 return Subtype(label=label)
@@ -100,7 +100,7 @@ class Country(Singleton):
     def _convert_subtypes(cls, data):
 
         def _resolve_subtype(label):
-            if x := Subtype.find_instance(label=label):
+            if x := Subtype.get_instance(label):
                 return x
             else:
                 return Subtype(label=label)
@@ -119,7 +119,7 @@ class Country(Singleton):
             if not isinstance(subtype, str):
                 raise TypeError('subtype must be str or Subtype')
             key = f"{self.label}_{subtype}"
-            if x := NameBank.find_instance(label=key):
+            if x := NameBank.get_instance(key):
                 return x
         return NameBank.get_instance(self.label)
 

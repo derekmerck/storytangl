@@ -112,15 +112,6 @@ class OrderedRegistry(Registry[OrderedEntity]):
 
     markers: dict[str, dict[str, int]] = Field(default_factory=dict)
 
-    @property
-    def data(self) -> dict[Any, OrderedEntity]:
-        """Legacy alias for ``members``."""
-        return self.members
-
-    @data.setter
-    def data(self, value: dict[Any, OrderedEntity]) -> None:
-        self.members = value
-
     def append(self, record: OrderedEntity) -> None:
         """Append one ordered entity to the registry."""
         self.add(record)
@@ -144,27 +135,19 @@ class OrderedRegistry(Registry[OrderedEntity]):
         key_fn = sort_key or (lambda member: member.sort_key())
         return max(key_fn(member) for member in self.members.values())
 
-    @property
-    def max_seq(self) -> int:
-        """Legacy compatibility alias for highest observed ``seq``."""
-        if not self.members:
-            return -1
-        values: list[int] = []
-        for member in self.members.values():
-            seq = getattr(member, "seq", -1)
-            try:
-                values.append(int(seq))
-            except (TypeError, ValueError):
-                values.append(-1)
-        return max(values, default=-1)
-
     def add_record(self, record: OrderedEntity) -> None:
         """Legacy compatibility helper used by stream-oriented call sites."""
         self.append(record)
 
-    def last(self, **criteria: Any) -> OrderedEntity | None:
+    def _last_seq(self) -> int | None:
+        """Return the highest record sequence, or ``None`` when empty."""
+        last_item = self.last()
+        return int(last_item.seq) if last_item is not None else None
+
+    def last(self, selector: Selector | None = None) -> OrderedEntity | None:
         """Return the last matching item by ``seq``."""
-        results = list(self.find_all(**criteria))
+        selector = self._ensure_selector(selector)
+        results = list(self.find_all(selector=selector))
         if not results:
             return None
         return max(results, key=lambda item: int(getattr(item, "seq", -1)))
@@ -179,7 +162,6 @@ class OrderedRegistry(Registry[OrderedEntity]):
         start_seq: Any = None,
         end_seq: Any = None,
         predicate: Callable[[OrderedEntity], bool] | None = None,
-        **criteria: Any,
     ) -> Iterator[OrderedEntity]:
         """Yield members where ``start_key <= sort_key(member) < stop_key``.
 
@@ -201,7 +183,7 @@ class OrderedRegistry(Registry[OrderedEntity]):
                 return False
             return True
 
-        selector = self._normalize_selector(selector, **criteria) or Selector()
+        selector = self._ensure_selector(selector) or Selector()
         base_predicate = selector.predicate
 
         def combined_predicate(member: OrderedEntity) -> bool:
@@ -225,7 +207,8 @@ class OrderedRegistry(Registry[OrderedEntity]):
         overwrite: bool = False,
     ) -> None:
         """Set/update a named stream marker (legacy compatibility)."""
-        marker_seq = self.max_seq + 1 if marker_seq is None else marker_seq
+        next_seq = self._last_seq()
+        marker_seq = (next_seq + 1 if next_seq is not None else 0) if marker_seq is None else marker_seq
         marker_bucket = self.markers.setdefault(marker_type, {})
         if not overwrite and marker_name in marker_bucket:
             raise KeyError(f"Marker {marker_name} already exists")
@@ -233,19 +216,22 @@ class OrderedRegistry(Registry[OrderedEntity]):
 
     def _next_marker_seq(self, start_seq: int, marker_type: str = "_") -> int:
         """Return next marker seq of same type, or stream end."""
+        max_seq = self._last_seq()
+        stream_end = max_seq + 1 if max_seq is not None else 0
         marker_bucket = self.markers.get(marker_type, {})
         if not marker_bucket:
-            return self.max_seq + 1
+            return stream_end
         next_seqs = sorted(seq for seq in marker_bucket.values() if seq > start_seq)
-        return next_seqs[0] if next_seqs else self.max_seq + 1
+        return next_seqs[0] if next_seqs else stream_end
 
     def get_section(
         self,
         marker_name: str,
         marker_type: str = "_",
-        **criteria: Any,
+        selector: Selector | None = None,
     ) -> Iterator[OrderedEntity]:
         """Yield records in [marker, next-marker) for a marker namespace."""
+        selector = self._ensure_selector(selector)
         marker_bucket = self.markers.get(marker_type) or {}
         if not marker_bucket:
             raise KeyError(f"{marker_name}@{marker_type} not found")
@@ -258,7 +244,7 @@ class OrderedRegistry(Registry[OrderedEntity]):
             start_seq = marker_bucket[marker_name]
 
         end_seq = self._next_marker_seq(start_seq, marker_type)
-        return self.get_slice(start_seq=start_seq, end_seq=end_seq, **criteria)
+        return self.get_slice(start_seq=start_seq, end_seq=end_seq, selector=selector)
 
     def remove(self, *_args: Any, **_kwargs: Any) -> None:
         """Disallow removal to preserve append-only history semantics."""

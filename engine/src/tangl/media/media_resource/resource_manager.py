@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 import logging
 
-from tangl.core import Behavior
+from tangl.core import Behavior, Selector
 from tangl.media.media_resource.media_resource_registry import MediaResourceRegistry
 from tangl.media.media_resource.media_resource_inv_tag import MediaResourceInventoryTag as MediaRIT
 
@@ -106,10 +106,10 @@ class ResourceManager:
 
     def get_rit(self, alias: str) -> Optional[MediaRIT]:
         """Return the resource tagged by ``alias`` or ``None`` if missing."""
-        rit = self.registry.find_one(label=alias)
+        rit = self.registry.find_one(Selector(label=alias))
         if rit is not None:
             return rit
-        rit = self.registry.find_one(has_identifier=alias)
+        rit = self.registry.find_one(Selector.from_identifier(alias))
         if rit is not None:
             return rit
 

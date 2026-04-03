@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timedelta
 
@@ -14,7 +15,8 @@ def test_round_trip(serializer):
         # Problematic types
         'uid': uuid.uuid4(),
         'dt': datetime.now(),
-        'set': {'fishbowl', 'bowling-ball'}
+        'set': {'fishbowl', 'bowling-ball'},
+        'blob': b'\x12\x34\xab\xcd',
     }
 
     flat = serializer.serialize(unstructured)
@@ -32,3 +34,19 @@ def test_round_trip(serializer):
 
     # Assertion to verify that the deserialized data is equivalent to the original
     assert unflat == unstructured
+
+
+def test_json_bytes_round_trip_uses_explicit_tagged_shape() -> None:
+    payload = {"blob": b"\x12\x34\xab\xcd"}
+
+    flat = JsonSerializationHandler.serialize(payload)
+    wire = json.loads(flat)
+    unflat = JsonSerializationHandler.deserialize(flat)
+
+    assert wire == {
+        "blob": {
+            "__tangl_type__": "bytes",
+            "hex": "1234abcd",
+        }
+    }
+    assert unflat == payload

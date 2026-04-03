@@ -13,15 +13,15 @@ if TYPE_CHECKING:
 
 @with_default_category("World")
 class WorldController(CommandSet):
-    """World inspection commands powered by the service gateway."""
+    """World inspection commands powered by the service manager."""
 
     _cmd: StoryTanglCLI
 
-    def _call_endpoint(self, endpoint: str, **params):
-        return self._cmd.call_endpoint(endpoint, **params)
+    def _call_service(self, method_name: str, **params):
+        return self._cmd.call_service(method_name, **params)
 
     def do_worlds(self, _: str | None = None) -> None:  # noqa: ARG002 - cmd2 interface
-        worlds = self._call_endpoint("WorldController.list_worlds")
+        worlds = self._call_service("list_worlds")
         self._cmd.poutput(pformat(worlds))
 
     world_parser = argparse.ArgumentParser()
@@ -29,7 +29,7 @@ class WorldController(CommandSet):
 
     @with_argparser(world_parser)
     def do_world_info(self, args: argparse.Namespace) -> None:
-        info = self._call_endpoint("WorldController.get_world_info", world_id=args.world)
+        info = self._call_service("get_world_info", world_id=args.world)
         self._cmd.poutput(pformat(info))
 
     script_path_parser = argparse.ArgumentParser()
@@ -40,8 +40,8 @@ class WorldController(CommandSet):
         import yaml
 
         script_data = yaml.safe_load(args.script_path.read_text())
-        result = self._call_endpoint(
-            "WorldController.load_world",
+        result = self._call_service(
+            "load_world",
             script_data=script_data,
         )
 
@@ -64,10 +64,3 @@ class WorldController(CommandSet):
         title_text = title or world_label or "<unknown>"
         out = f"Loaded world: {title_text}"
         self._cmd.poutput(pformat(out))
-
-    create_story_parser = argparse.ArgumentParser()
-    create_story_parser.add_argument("world_id", type=str, help="World id to create")
-
-    # def do_create_story(self, world_id: str):
-    #     result = self._cmd.call_endpoint("WorldController.create_story", world_id=world_id)
-    #     self._cmd.poutput(pformat(result))

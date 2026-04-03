@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from tangl.core import Selector
 from tangl.story import MenuBlock
 from tangl.story.fabula import StoryCompiler, World
 from tangl.story.fabula.types import StoryInitResult
@@ -184,11 +185,11 @@ class TestBareNextResolution:
         edges_from_a = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         ]
         assert len(edges_from_a) == 1
-        assert edges_from_a[0].destination_id == block_b.uid
+        assert edges_from_a[0].successor_id == block_b.uid
 
     def test_bare_continue_resolves_to_next_block(self) -> None:
         data = {
@@ -211,11 +212,11 @@ class TestBareNextResolution:
         edges_from_a = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         ]
         assert len(edges_from_a) == 1
-        assert edges_from_a[0].destination_id == block_b.uid
+        assert edges_from_a[0].successor_id == block_b.uid
 
     def test_mixed_explicit_and_bare_actions(self) -> None:
         data = {
@@ -246,10 +247,10 @@ class TestBareNextResolution:
         edges_from_a = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         ]
-        destinations = {edge.destination_id for edge in edges_from_a}
+        destinations = {edge.successor_id for edge in edges_from_a}
         assert block_b.uid in destinations
         assert block_c.uid in destinations
         assert len(edges_from_a) == 2
@@ -279,11 +280,11 @@ class TestBareNextResolution:
         edges_from_a = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         ]
         assert len(edges_from_a) == 1
-        assert edges_from_a[0].destination_id == block_c.uid
+        assert edges_from_a[0].successor_id == block_c.uid
 
     def test_next_alias_resolves_to_named_target(self) -> None:
         data = {
@@ -308,11 +309,11 @@ class TestBareNextResolution:
         edge = next(
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         )
 
-        assert edge.destination_id == block_b.uid
+        assert edge.successor_id == block_b.uid
         assert getattr(edge, "text", "") == "Go forward"
 
     def test_bare_action_on_last_block_stays_unresolved(self) -> None:
@@ -350,8 +351,8 @@ class TestBareNextResolution:
         edges_from_a = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         ]
         assert len(edges_from_a) == 0
 
@@ -377,11 +378,11 @@ class TestBareNextResolution:
         edges_from_a = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_a.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_a.uid
         ]
         assert len(edges_from_a) == 1
-        assert edges_from_a[0].destination_id == block_c.uid
+        assert edges_from_a[0].successor_id == block_c.uid
 
 
 class TestAnonymousBlocks:
@@ -403,7 +404,7 @@ class TestAnonymousBlocks:
 
         bundle = _compile(data)
         labels = {template.get_label() for template in bundle.template_registry.members.values()}
-        anon_zero = bundle.template_registry.find_one(has_identifier="s._anon_0")
+        anon_zero = bundle.template_registry.find_one(Selector.from_identifier("s._anon_0"))
 
         assert "s.start" in labels
         assert "s._anon_0" in labels
@@ -443,21 +444,21 @@ class TestAnonymousBlocks:
         edges_door = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_door.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_door.uid
         ]
-        destinations = {edge.destination_id for edge in edges_door}
+        destinations = {edge.successor_id for edge in edges_door}
         assert block_anon0.uid in destinations
         assert block_leave.uid in destinations
 
         edges_anon0 = [
             member
             for member in members
-            if getattr(member, "destination_id", None) is not None
-            and getattr(member, "source_id", None) == block_anon0.uid
+            if getattr(member, "successor_id", None) is not None
+            and getattr(member, "predecessor_id", None) == block_anon0.uid
         ]
         assert len(edges_anon0) == 1
-        assert edges_anon0[0].destination_id == block_anon1.uid
+        assert edges_anon0[0].successor_id == block_anon1.uid
 
 
 class TestInitTimeOverride:
@@ -573,7 +574,7 @@ class TestMenuBlockScaffold:
             }
         )
 
-        menu_template = bundle.template_registry.find_one(has_identifier="s.hub")
+        menu_template = bundle.template_registry.find_one(Selector.from_identifier("s.hub"))
         assert menu_template is not None
         assert isinstance(menu_template.payload, MenuBlock)
         assert menu_template.payload.menu_items == {

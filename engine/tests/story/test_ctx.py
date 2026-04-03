@@ -1,4 +1,4 @@
-"""Contract tests for ``tangl.story.ctx`` protocols."""
+"""Contract tests for story runtime helpers built on ``PhaseCtx``."""
 
 from __future__ import annotations
 
@@ -6,9 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tangl.core import TemplateRegistry
-from tangl.story.ctx import StoryRuntimeCtx
-from tangl.story.fabula.materializer import StoryMaterializer, _PrelinkCtx
+from tangl.story.fabula.materializer import StoryMaterializer
 from tangl.story.story_graph import StoryGraph
 from tangl.vm import Requirement
 from tangl.vm.resolution_phase import ResolutionPhase
@@ -16,51 +14,44 @@ from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.traversable import TraversableNode
 
 
-def test_prelink_ctx_satisfies_story_runtime_protocol() -> None:
+def test_phase_ctx_covers_story_runtime_surface() -> None:
     graph = StoryGraph(locals={"gold": 7})
     node = TraversableNode(label="start")
     graph.add(node)
-    templates = TemplateRegistry()
-
-    ctx = _PrelinkCtx(
+    ctx = PhaseCtx(
         graph=graph,
-        template_registry=templates,
         cursor_id=node.uid,
         correlation_id="story-prelink",
         meta={"phase": "prelink"},
     )
 
-    assert isinstance(ctx, StoryRuntimeCtx)
     assert ctx.cursor is node
-    assert ctx.get_story_locals() == {"gold": 7}
+    assert graph.get_story_locals() == {"gold": 7}
     assert ctx.get_meta() == {"phase": "prelink"}
     assert ctx.get_location_entity_groups()
-    assert ctx.get_template_scope_groups()
 
 
-def test_prelink_ctx_derives_child_phase_ctx() -> None:
+def test_materializer_preview_ctx_derives_from_phase_ctx() -> None:
     graph = StoryGraph(locals={"gold": 7})
     source = TraversableNode(label="start")
-    child = TraversableNode(label="child")
     graph.add(source)
-    graph.add(child)
-    templates = TemplateRegistry()
-    ctx = _PrelinkCtx(
+    ctx = PhaseCtx(
         graph=graph,
-        template_registry=templates,
         cursor_id=source.uid,
         correlation_id="story-prelink",
         meta={"phase": "prelink"},
     )
+    materializer = StoryMaterializer()
 
-    child_ctx = ctx.derive(
-        cursor_id=child.uid,
-        meta_overrides={"request_ctx_path": "story.child"},
+    child_ctx = materializer._make_preview_requirement_ctx(
+        graph=graph,
+        request_ctx_path="story.child",
+        _ctx=ctx,
     )
 
     assert isinstance(child_ctx, PhaseCtx)
     assert child_ctx.graph is graph
-    assert child_ctx.cursor_id == child.uid
+    assert child_ctx.cursor_id is None
     assert child_ctx.step == 0
     assert child_ctx.current_phase is ResolutionPhase.INIT
     assert child_ctx.correlation_id == "story-prelink"

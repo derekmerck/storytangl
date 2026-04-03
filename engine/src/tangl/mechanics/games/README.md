@@ -3,16 +3,28 @@ Game Mechanics
 
 Game mechanics model various complex interactions that can be wrapped in interactive GameBlocks. The framework follows the common handler/component pattern.
 
-The GameHandler encapsulates all functionality into just a few public api calls:
+See also: ``GAME_MECHANICS_DESIGN.md`` for the broader family taxonomy, the
+round-vs-turn model, and the future game shapes this package is meant to host.
 
-- `setup_game`
-- `get_possible_moves`
-- `handle_player_move`
-- `check_game_status`
+The ``GameHandler`` encapsulates the shared rule surface:
+
+- `setup`
+- `get_available_moves`
+- `receive_move`
+- `evaluate`
+
+Concrete games can optionally refine the shared VM presentation hooks too:
+
+- `get_move_label`
+- `build_round_notes`
+- `get_journal_fragments`
 
 The Game component class itself is only responsible for managing and dumping state when required, such as for assigning namespace variables to evaluate win conditions at higher levels.
 
 Games progress over "rounds", to distinguish them from story "turns".  One turn of the base story structure (i.e., one block) may comprise multiple games with multiple rounds.
+
+Implemented reference kernels currently include ``RpsGame`` / ``RpslsGame``,
+``BlackjackGame``, ``NimGame``, ``KimGame``, and ``CredentialsGame``.
 
 Types of Games
 --------------
@@ -76,6 +88,8 @@ block = RpsBlock.create_game_block(
 
 1. **PREREQS** – first-visit setup via ``setup_game_on_first_visit``.
 2. **PLANNING** – available moves become self-loop ``Action`` objects.
+   Old dynamic game actions are cleared before each rebuild so the block's move
+   list reflects current state instead of accumulating duplicates.
 3. **UPDATE** – selected move processed by the handler, mutating game state.
 4. **JOURNAL** – human-readable fragments describing the round and score.
 5. **CONTEXT** – predicate namespace exposes ``game_won``/``game_lost`` flags.
@@ -108,14 +122,14 @@ recognizable continuation point until terminal conditions route it onward. See
 
 ## Creating New Games
 
-1. Subclass ``Game`` and implement scoring/round resolution.
-2. Subclass ``GameHandler`` with ``get_available_moves`` and ``receive_move``
-   (or ``resolve_round``) that updates the game instance.
+1. Subclass ``Game`` and implement the state you want to project to namespace or journal.
+2. Subclass ``GameHandler`` with ``get_available_moves`` and ``resolve_round``
+   plus optional move-label or journal hooks when the default text is not enough.
 3. Create a story block with ``HasGame`` and configure the classes at the subclass
    or instance level.
 4. Optionally customize exit destinations via the factory.
-5. Add tests under ``engine/tests/mechanics/games`` to cover move flows and
-   VM integration.
+5. Add tests under ``engine/tests/mechanics/games`` to cover move flows,
+   VM integration, and any exported namespace or round-note state.
 
 ## Pattern Recognition
 

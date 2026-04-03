@@ -64,6 +64,7 @@ def register_system_handlers(clean_vm_dispatch):
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)
     on_gather_ns(sh.contribute_runtime_user_context)
+    on_gather_ns(sh.contribute_visit_stats)
     on_validate(sh.validate_successor_exists)
     on_prereqs(sh.descend_into_container)
     on_prereqs(sh.follow_triggered_prereqs)
@@ -236,6 +237,40 @@ class TestContributeRuntimeUserContext:
         assert ns["user"] is user
         assert ns["user_id"] == "user-4"
         assert ns["rank"] == "gm"
+
+
+class TestContributeVisitStats:
+    def test_gather_ns_includes_generic_visit_stats(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        runtime_ctx = SimpleNamespace(
+            graph=g,
+            cursor=b,
+            get_meta=lambda: {"cursor_history": [a.uid, b.uid, b.uid]},
+            get_authorities=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+        )
+
+        ns = do_gather_ns(b, ctx=runtime_ctx)
+
+        assert ns["node_visited"] is True
+        assert ns["node_num_visits"] == 2
+        assert ns["node_steps_since"] == 0
+        assert ns["node_completed"] is True
+        assert ns["is_first_visit"] is False
+
+    def test_gather_ns_defaults_visit_stats_without_history(self, ctx) -> None:
+        g = Graph()
+        node = _node(g, label="n")
+
+        ns = do_gather_ns(node, ctx=ctx)
+
+        assert ns["node_visited"] is False
+        assert ns["node_num_visits"] == 0
+        assert ns["node_steps_since"] == -1
+        assert ns["node_completed"] is False
+        assert ns["is_first_visit"] is False
 
 
 # ============================================================================

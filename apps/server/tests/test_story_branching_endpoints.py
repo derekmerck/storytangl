@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 
 from tangl.config import settings
 from tangl.rest.app import app
-from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
+from tangl.rest.dependencies import reset_service_state_for_testing
+from tangl.rest.dependencies_gateway import get_service_manager, reset_service_manager_for_testing
 from tangl.service.user.user import User
 from tangl.story.fabula.world import World
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
@@ -21,19 +22,20 @@ BRANCHING_SCRIPT = (
 
 @pytest.fixture()
 def branching_story_client() -> tuple[TestClient, dict[str, str]]:
-    reset_orchestrator_for_testing()
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
     World.clear_instances()
 
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
     secret = settings.client.secret
     user_id = uuid_for_secret(secret)
 
     user = User(uid=user_id)
     user.set_secret(secret)
-    orchestrator.persistence.save(user)
+    service_manager.persistence.save(user)
 
     script_data = yaml.safe_load(BRANCHING_SCRIPT.read_text())
-    orchestrator.execute("WorldController.load_world", script_data=script_data)
+    service_manager.load_world(script_data=script_data)
 
     client = TestClient(app, base_url="http://test/api/v2/")
     headers = {"X-API-Key": key_for_secret(secret)}
@@ -43,7 +45,8 @@ def branching_story_client() -> tuple[TestClient, dict[str, str]]:
     finally:
         client.close()
         World.clear_instances()
-        reset_orchestrator_for_testing()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()
 
 
 def _fragment_contains(fragments: list[dict[str, object]], text: str) -> bool:

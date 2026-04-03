@@ -14,6 +14,7 @@ See also
    glossary
 
    story/philosophy
+   SIMPLIFICATION_SPEC
 
    core/CONTENT_ADDRESSABLE
    core/DEREF_DESIGN

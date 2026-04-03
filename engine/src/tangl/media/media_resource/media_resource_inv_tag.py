@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 
-from tangl.core import ContentAddressable, RegistryAware
+from tangl.core import HasContent, RegistryAware
 from tangl.core.bases import Hash, is_identifier
 from tangl.media.media_data_type import MediaDataType
 from tangl.utils.hashing import compute_data_hash
@@ -49,7 +49,7 @@ class MediaPersistencePolicy(str, Enum):
     EXTERNAL_REFERENCE = "external_reference"
 
 
-class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
+class MediaResourceInventoryTag(RegistryAware, HasContent):
     """
     MediaResourceInventoryTags track data resources, in-mem or on disk.
 
@@ -208,13 +208,20 @@ class MediaResourceInventoryTag(RegistryAware, ContentAddressable):
     @shelved(fn="rits")
     @staticmethod
     def _from_path(cls, path: Path) -> MediaResourceInventoryTag:
-        return cls(path=path)
+        record = cls(path=path)
+        record.preset_content_hash = record._resolve_content_hash()
+        return record
 
     @classmethod
-    def from_source(cls, item: Path) -> Self:
+    def from_source(cls, item: Path | str) -> Self:
         if isinstance(item, (Path, str)):
-            mtime = item.stat().st_mtime
-            return cls._from_path(cls, item, check_value=mtime)
+            path = Path(item)
+            stat = path.stat()
+            return cls._from_path(
+                cls,
+                path,
+                check_value=(stat.st_mtime_ns, stat.st_size),
+            )
         raise NotImplementedError("Can only load from file paths currently")
 
     @classmethod

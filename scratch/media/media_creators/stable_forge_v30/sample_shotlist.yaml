@@ -1,0 +1,95 @@
+# There are 3 parts to a shotlist spec:
+# - shot_types are _templates_
+# - vars map named roles, locs, assets to params
+# - shots are individual and macro rules for generating the complete shotlist
+---
+shot_types:
+
+  establish:
+    prompt: "{{ open }}, {{ 'interior' if 'int' in uid else 'exterior' }}, {{ where }} {{ how }} {{ style }} {{ close }}"
+    open: establishing shot
+    style: (steampunk:0.9), concept art, photorealistic # volumetric lighting #media
+    # where: # place
+    # how: # modifiers, i.e., dark and stormy
+    neg_prompt: "{{ neg_open }} {{ neg }} {{ neg_close }}"
+    neg_close: fog
+
+    model_hash: protogen58
+    sampler: euler_a
+    steps: 20
+    dims: [512, 384]  # landscape
+
+  narrative:
+    prompt: "{{ open }} {{ who }} {{ doing }} {{ where }} {{ how }} {{ style }} {{ close }}"
+    open: "photo of"
+    who: "{{ age }} ({{ actor }}:0.9) wearing {{ outfit }} with {{ hair }}"
+    style: (steampunk:0.9), charcuso, intricate detail, photorealistic, volumetric lighting # media
+    # where: # place
+    how: smirking # expression/modifier
+    neg_prompt: "{{ neg_open }} {{ neg }} {{ neg_close }}"
+    neg_close: close up, hands
+
+    dims: [384, 512]  # portrait
+    sampler: euler_a
+    steps: 25
+    cfg: 5
+
+  id-photos:
+    # -> "id_photo_jane_doe_red_hair_ABC123.png"
+    uid: "id-photo-{{ who }}-{{ hair_length }}-{{ hair_color }}-{{ skin_color }}{{ '-glasses' if glasses }}"
+    prompt: >
+      stunning color photo portrait of ({{who}}), [{{hair_length}} {{hair_color}} hair, {{skin_color}} skin{{ ', wearing glasses' if glasses }}], head and shoulders facing the camera directly, looking at viewer, neutral expressionless, unobstructed, light simple background, highres, chiaroscuro, dlsr
+    hair_length: [short, long]
+    hair_color:  [blonde, dark, red]
+    skin_color:  [fair, dark]
+    glasses:     [yes, no]
+    who:         [jane doe, john doe]
+
+    neg_prompt: >
+      anime 3d cg cartoon lowres old wrinkled
+
+    model_hash: deliberate2
+    dims: [384, 448]
+    sampler: euler_a
+    steps: 25
+    cfg: 5
+
+    hires_fix:
+      scale: 2.0
+      denoise: 0.6
+
+    ctrlnet:
+      image: id_photo2_openpose.png
+      processor:
+      model_name: openpose
+      weight: 0.9
+      guidance: 1.0
+      guidance_end: 0.8
+
+shot_vars:
+  roles:
+    katya:
+      outfit: short blue dress and black bolero jacket
+      hair: navy hair, shaved sides, punk hairstyle, goth makeup
+
+  locs:
+    lab-int:
+      where: cluttered but clean research lab, beakers, scientific apparatus
+
+shot_configs:
+
+  establishing-lab-int: {}
+  katya-office:
+    uid: "{{ role }}-office"
+    outfit: business_suit
+    where: a library office with a large wooden desk and many books on shelves
+  katya-lab:
+    outfit: white labcoat
+  katya-party:
+    where: at a crowded, elegant party
+
+  establishing-dress-shop-int:
+    where: a fancy dress shop, department store
+
+  id-photos: {}
+

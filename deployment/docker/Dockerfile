@@ -38,7 +38,7 @@ RUN poetry run python -m sphinx.cmd.build -b html docs docs/html
 FROM node:lts-alpine AS app_builder
 
 WORKDIR /app
-COPY ./web/package.json ./web/yarn.lock ./
+COPY ./apps/web/package.json ./apps/web/yarn.lock ./
 
 # required for node-gyp _only_ on arm64, crashes on x86-64
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
@@ -47,7 +47,7 @@ RUN if [ "$(uname -m)" = "aarch64" ]; then \
 
 RUN yarn install --frozen-lockfile
 
-COPY ./web .
+COPY ./apps/web .
 RUN yarn build
 
 # Stage 5: Runtime image

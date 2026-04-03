@@ -1,6 +1,6 @@
 # Core / VM / Story / Service Simplification Tracker
 
-Status: Waves 0-6 Complete (updated 2026-03-10)
+Status: Waves 0-7 Complete (updated 2026-03-22)
 
 ## Goal
 
@@ -458,3 +458,17 @@ an extension of the six-wave simplification program:
 2. Keep favoring cognitive overhead reduction over line-count-only churn.
 3. Record any future cleanup as discrete maintenance notes rather than
    reopening Wave 6 implicitly.
+- Canonicalized runtime context usage around `PhaseCtx`; story's `_PrelinkCtx`
+  and protocol layering are retired from the live engine.
+- Removed VM discovery hook families for template scope groups, token catalogs,
+  and media inventories; those lookups now flow through world/factory authority
+  methods.
+- Unified JOURNAL fragment handling on `BaseFragment` / journal fragments and
+  removed `tangl.vm.fragments`.
+- Removed story's `on_gather_content` seam and the remaining VM/story alias
+  exports tied to the retired compatibility layer.
+
+Acceptance gates:
+
+- `engine/tests/vm`
+- `engine/tests/story`

@@ -8,13 +8,14 @@ from fastapi.testclient import TestClient
 from tangl.config import settings
 from tangl.core import Selector
 from tangl.rest.app import app
-from tangl.rest.dependencies import get_orchestrator, reset_orchestrator_for_testing
+from tangl.rest.dependencies import reset_service_state_for_testing
 from tangl.rest.dependencies_gateway import (
-    get_service_gateway,
-    reset_service_gateway_for_testing,
+    get_service_manager,
+    reset_service_manager_for_testing,
 )
+from tangl.service import ServiceAccess
+from tangl.service.service_method import get_service_method_spec
 from tangl.service.user.user import User
-from tangl.service.api_endpoint import AccessLevel
 from tangl.story.fabula.world import World
 from tangl.story.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
@@ -119,15 +120,15 @@ def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str
     world_label = _write_story_bundle(tmp_path)
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
-    reset_orchestrator_for_testing()
-    reset_service_gateway_for_testing()
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
     World.clear_instances()
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
     secret = settings.client.secret
     user_id = uuid_for_secret(secret)
     user = User(uid=user_id)
     user.set_secret(secret)
-    orchestrator.persistence.save(user)
+    service_manager.persistence.save(user)
 
     client = TestClient(app, base_url="http://test/api/v2/")
     headers = {"X-API-Key": key_for_secret(secret)}
@@ -136,8 +137,8 @@ def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str
     finally:
         client.close()
         World.clear_instances()
-        reset_service_gateway_for_testing()
-        reset_orchestrator_for_testing()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()
 
 
 def test_story_rest_envelope_flow(
@@ -153,17 +154,16 @@ def test_story_rest_envelope_flow(
     )
     assert create.status_code == 200
     created = create.json()
-    assert created.get("status") == "ok"
-    assert isinstance(created.get("envelope"), dict)
-    create_fragments = created["envelope"].get("fragments", [])
+    assert isinstance(created.get("fragments"), list)
+    create_fragments = created.get("fragments", [])
     assert isinstance(create_fragments, list)
 
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
     user_id = uuid_for_secret(settings.client.secret)
-    user = orchestrator.persistence.get(user_id)
+    user = service_manager.persistence.get(user_id)
     assert user is not None
     assert user.current_ledger_id is not None
-    ledger = orchestrator.persistence.get(user.current_ledger_id)
+    ledger = service_manager.persistence.get(user.current_ledger_id)
     assert ledger is not None
     start = ledger.cursor
     choice = next(start.edges_out(Selector(has_kind=Action, trigger_phase=None)))
@@ -215,6 +215,8 @@ def test_story_rest_envelope_flow(
 def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_user(
     story_client: tuple[TestClient, dict[str, str], str],
 ) -> None:
+    from dataclasses import replace
+
     client, headers, world_label = story_client
     create = client.post(
         "story/story/create",
@@ -223,17 +225,22 @@ def test_story_info_returns_403_when_endpoint_is_restricted_for_non_privileged_u
     )
     assert create.status_code == 200
 
-    gateway = get_service_gateway()
-    binding = gateway.orchestrator._endpoints["RuntimeController.get_story_info"]
-    previous_level = binding.endpoint.access_level
-    binding.endpoint.access_level = AccessLevel.RESTRICTED
+    service_manager = get_service_manager()
+    method = service_manager.get_story_info.__func__
+    previous_spec = get_service_method_spec(method)
+    assert previous_spec is not None
+    setattr(
+        method,
+        "_service_method_spec",
+        replace(previous_spec, access=ServiceAccess.DEV),
+    )
     try:
         response = client.get("story/info", headers=headers)
         assert response.status_code == 403
         detail = response.json().get("detail", "")
         assert "Access denied" in detail
     finally:
-        binding.endpoint.access_level = previous_level
+        setattr(method, "_service_method_spec", previous_spec)
 
 
 def test_story_info_returns_world_authored_projected_sections(
@@ -243,15 +250,15 @@ def test_story_info_returns_world_authored_projected_sections(
     world_label = _write_story_bundle(tmp_path, with_projector=True)
     monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
 
-    reset_orchestrator_for_testing()
-    reset_service_gateway_for_testing()
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
     World.clear_instances()
     secret = settings.client.secret
     user_id = uuid_for_secret(secret)
-    orchestrator = get_orchestrator()
+    service_manager = get_service_manager()
     user = User(uid=user_id)
     user.set_secret(secret)
-    orchestrator.persistence.save(user)
+    service_manager.persistence.save(user)
 
     client = TestClient(app, base_url="http://test/api/v2/")
     headers = {"X-API-Key": key_for_secret(secret)}
@@ -275,5 +282,5 @@ def test_story_info_returns_world_authored_projected_sections(
     finally:
         client.close()
         World.clear_instances()
-        reset_service_gateway_for_testing()
-        reset_orchestrator_for_testing()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()

@@ -7,6 +7,7 @@ import pickle
 import pytest
 from pydantic import Field, ValidationError
 
+from tangl.core import Selector
 from tangl.core.singleton import InstanceInheritance, Singleton
 
 
@@ -73,6 +74,15 @@ class TestSingletonRegistry:
         SimpleSingleton(label="hero")
         SimpleSingleton.clear_instances()
         assert not SimpleSingleton.has_instance("hero")
+
+    def test_find_instance_uses_selector(self) -> None:
+        instance = SimpleSingleton(label="hero")
+        assert SimpleSingleton.find_instance(Selector(label="hero")) is instance
+
+    def test_find_instance_rejects_kwargs_lookup(self) -> None:
+        SimpleSingleton(label="hero")
+        with pytest.raises(TypeError):
+            SimpleSingleton.find_instance(label="hero")
 
 
 class TestSingletonIdentityAndSerialization:

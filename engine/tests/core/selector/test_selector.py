@@ -33,6 +33,14 @@ class MagicSword(Weapon):
     element: str = "fire"
 
 
+class OpaqueEntity(Entity):
+    guard_unstructure = True
+
+
+class Link(Entity):
+    target: Entity | None = None
+
+
 class TestSelectorConstruction:
     def test_empty_selector_matches_anything(self) -> None:
         assert Selector().matches(Entity())
@@ -142,6 +150,19 @@ class TestSelectorMatching:
         assert entity.label_rev == ""
         assert Selector(label_rev="").matches(entity)
 
+    def test_match_entity_reference_by_uid_without_deep_value_compare(self) -> None:
+        target = OpaqueEntity(label="target")
+        link = Link(target=target)
+
+        assert Selector(target=target).matches(link)
+
+    def test_match_entity_reference_negative_by_uid(self) -> None:
+        left = OpaqueEntity(label="left")
+        right = OpaqueEntity(label="right")
+        link = Link(target=left)
+
+        assert not Selector(target=right).matches(link)
+
 
 class TestSelectorFilter:
     def test_filter_returns_matching(self) -> None:
@@ -210,6 +231,16 @@ class TestSelectorComposition:
         selector = Selector(predicate=lambda e: e.label == "a")
         updated = selector.with_criteria(label="a")
         assert updated.matches(Entity(label="a"))
+
+    def test_chain_or_preserves_base_criteria_when_narrowed(self) -> None:
+        selector = Selector.chain_or(
+            Selector(label="flamebrand"),
+            Selector(label="frostbite"),
+        ).with_criteria(has_kind=Weapon, magic=True)
+
+        assert selector.matches(Weapon(label="flamebrand", magic=True))
+        assert not selector.matches(Weapon(label="flamebrand", magic=False))
+        assert not selector.matches(Entity(label="flamebrand"))
 
 
 class TestSelectorInteropWithEntity:

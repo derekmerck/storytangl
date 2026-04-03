@@ -1,65 +1,23 @@
 """
 .. currentmodule:: tangl.service
 
-Service orchestration surface between applications and the narrative engine.
+Canonical service API for StoryTangl.
 
-Conceptual layers
------------------
+The service nucleus is manager-first:
 
-1. Gateway and transport adaptation
-
-   - :class:`ServiceGateway` executes tokenized :class:`ServiceOperation`
-     requests with inbound/outbound hooks and render profiles.
-   - :class:`GatewayRestAdapter` normalizes transport calls (auth resolution,
-     request envelopes) onto the gateway.
-   - :func:`build_service_gateway` wires a configured gateway from a
-     persistence manager.
-
-2. Orchestration
-
-   - :class:`Orchestrator` maps endpoint names to controller methods,
-     hydrates ``User``, ``Ledger``, and ``Frame`` dependencies from type
-     hints, and manages persistence writeback.
-   - :class:`ApiEndpoint` decorates controller methods with access level,
-     method type, response type, and resource binding metadata.
-
-3. Controllers
-
-   - :class:`~controllers.RuntimeController` — story session lifecycle
-     (create, advance, query, drop).
-   - :class:`~controllers.WorldController` — world catalog and loading.
-   - :class:`~controllers.UserController` — user CRUD and authentication.
-   - :class:`~controllers.SystemController` — health and diagnostics.
-
-4. Response and auth primitives
-
-   - :class:`RuntimeInfo`, :class:`RuntimeEnvelope`, :class:`InfoModel`,
-     and domain info models define the native response vocabulary.
-   - :class:`UserAuthInfo` and :func:`user_id_by_key` handle API key
-     resolution.
-   - :class:`ServiceError` and subclasses map domain errors to response
-     codes.
-
-Design intent
--------------
-``tangl.service`` is the **only** interface between applications and the engine.
-Transport layers (CLI, REST, future GraphQL) call the gateway or orchestrator;
-controllers contain domain logic; the engine layers below (core, vm, story)
-never import from service.
+1. :class:`ServiceManager` exposes the explicit public method surface.
+2. :func:`service_method` attaches bounded metadata for access, context,
+   writeback, blocking behavior, and optional capability tags.
+3. Typed response models in :mod:`tangl.service.response` remain the canonical
+   payload vocabulary.
+4. :class:`RemoteServiceManager` optionally fulfills the same public manager
+   contract through the REST API.
 """
 
-from .api_endpoint import (
-    AccessLevel,
-    ApiEndpoint,
-    EndpointPolicy,
-    HasApiEndpoints,
-    MethodType,
-    ResourceBinding,
-    ResponseType,
-    WritebackMode,
-)
+from __future__ import annotations
+
 from .auth import UserAuthInfo, user_id_by_key
-from .bootstrap import build_service_gateway
+from .bootstrap import build_service_manager
 from .exceptions import (
     AccessDeniedError,
     AuthMismatchError,
@@ -68,10 +26,6 @@ from .exceptions import (
     ServiceError,
     ValidationError,
 )
-from .gateway import GatewayExecuteOptions, ServiceGateway
-from .operations import ServiceOperation
-from .orchestrator import ExecuteOptions, Orchestrator
-from .rest_adapter import GatewayRequest, GatewayRestAdapter
 from .response import (
     BadgeListValue,
     FragmentStream,
@@ -98,60 +52,63 @@ from .response import (
     WorldSceneList,
     coerce_runtime_info,
 )
+from .remote_service_manager import RemoteServiceManager
+from .service_manager import ServiceManager, ServiceSession
+from .service_method import (
+    BlockingMode,
+    ServiceAccess,
+    ServiceContext,
+    ServiceMethodSpec,
+    ServiceWriteback,
+    get_service_method_spec,
+    service_method,
+)
 from .story_info import DefaultStoryInfoProjector, StoryInfoProjector
 from .world_registry import WorldRegistry
 
-
 __all__ = [
     "AccessDeniedError",
-    "AccessLevel",
-    "ApiEndpoint",
     "AuthMismatchError",
     "BadgeListValue",
-    "EndpointPolicy",
-    "ExecuteOptions",
+    "BlockingMode",
+    "DefaultStoryInfoProjector",
     "FragmentStream",
-    "GatewayRequest",
-    "GatewayRestAdapter",
-    "GatewayExecuteOptions",
-    "HasApiEndpoints",
     "InfoModel",
     "InvalidOperationError",
     "ItemListValue",
     "KvListValue",
     "MediaNative",
-    "MethodType",
     "NativeResponse",
-    "Orchestrator",
     "PrimitiveValue",
     "ProjectedItem",
     "ProjectedKVItem",
     "ProjectedSection",
     "ProjectedState",
     "ResourceNotFoundError",
-    "RuntimeInfo",
+    "RemoteServiceManager",
     "RuntimeEnvelope",
-    "ResponseType",
-    "ResourceBinding",
+    "RuntimeInfo",
     "ScalarValue",
     "SectionValue",
+    "ServiceAccess",
+    "ServiceContext",
     "ServiceError",
-    "ServiceGateway",
-    "ServiceOperation",
+    "ServiceManager",
+    "ServiceMethodSpec",
+    "ServiceSession",
+    "ServiceWriteback",
+    "StoryInfoProjector",
     "SystemInfo",
     "TableValue",
-    "StoryInfoProjector",
-    "DefaultStoryInfoProjector",
     "UserAuthInfo",
     "UserInfo",
     "UserSecret",
     "ValidationError",
     "WorldInfo",
-    "WorldList",
     "WorldRegistry",
-    "WorldSceneList",
-    "WritebackMode",
-    "build_service_gateway",
+    "build_service_manager",
     "coerce_runtime_info",
+    "get_service_method_spec",
+    "service_method",
     "user_id_by_key",
 ]

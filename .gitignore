@@ -5,6 +5,8 @@
 !test_hash_secret.py
 *.local*
 /codex-skills/
+/sdks/*
+!/sdks/.gitignore
 
 # temporary
 dump*

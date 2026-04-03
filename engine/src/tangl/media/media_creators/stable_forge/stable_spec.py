@@ -30,6 +30,7 @@ class StableSpec(MediaSpec):
     sampler: str = None
     iterations: int = None
     dims: tuple[int, int] = None
+    shot_type: str = None
 
     @classmethod
     def get_creation_service(cls):
@@ -43,3 +44,4 @@ class StableSpec(MediaSpec):
 
 
 StableSpec.render_prompts._behavior.wants_caller_kind = StableSpec
+StableSpec.render_prompts._behavior.wants_exact_kind = False

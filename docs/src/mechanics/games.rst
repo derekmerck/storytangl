@@ -53,6 +53,11 @@ Creating new games
    configure ``_game_class`` and ``_game_handler_class`` (or override via
    ``create_game_block``).
 4. Wire exit destinations through the factory to route victory/defeat/draw states.
-5. Add integration tests under ``engine/tests/story/mechanics/games`` to validate
+5. Add integration tests under ``engine/tests/mechanics/games`` to validate
    move flows and predicate-driven exits.
 
+See also
+--------
+
+For the broader family taxonomy and future-shape note, see the code-adjacent
+design doc at ``engine/src/tangl/mechanics/games/GAME_MECHANICS_DESIGN.md``.

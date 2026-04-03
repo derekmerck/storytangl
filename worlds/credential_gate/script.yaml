@@ -1,0 +1,45 @@
+label: credential_gate
+
+metadata:
+  title: "Credential Gate"
+  description: "Inspect a traveler, review the packet, and choose a disposition."
+  start_at: gate.entrance
+
+scenes:
+  gate:
+    title: "Credential Gate"
+    blocks:
+      entrance:
+        content: |
+          The checkpoint shutters rattle in the wind while the next traveler
+          sets a thin packet on the counter.
+        actions:
+          - text: "Open the gate ledger"
+            successor: challenge
+
+      challenge:
+        kind: "credential_gate.domain.CredentialGateBlock"
+        content: |
+          The packet looks almost correct at first glance, which is exactly what
+          makes it worth a closer review.
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          The ruling lands cleanly, and the gate line lurches forward around it.
+        actions:
+          - text: "Reset the desk"
+            successor: entrance
+
+      defeat:
+        content: |
+          The desk feels suddenly smaller when the wrong call reaches it.
+        actions:
+          - text: "Try again"
+            successor: entrance

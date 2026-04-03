@@ -34,13 +34,13 @@ from typing import Callable, Iterator
 import pytest
 
 from tangl.core import Graph
+from tangl.journal.fragments import ContentFragment
 from tangl.vm.dispatch import (
     dispatch as vm_dispatch,
     on_journal,
     on_update,
     on_validate,
 )
-from tangl.vm.fragments import ContentFragment
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.frame import Frame
 from tangl.vm.runtime.ledger import Ledger

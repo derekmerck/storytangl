@@ -31,7 +31,7 @@ for m in members:
 **When this happens**:
 - `subgraph.members` → `Iterator[GraphItem]`
 - `node.edges_in()` → `Iterator[Edge]`
-- `registry.find_all(**criteria)` → `Iterator[Entity]`
+- `registry.find_all(Selector(...))` → `Iterator[Entity]`
 - `node.ancestors()` → `Iterator[Subgraph]`
 
 **Debug logging trap**:
@@ -76,7 +76,7 @@ node = Node(label="test")  # No graph
 
 ```python
 # ❌ Bug: record has no graph
-record = stream.find_one(is_instance=Event)
+record = stream.find_one(Selector(is_instance=Event))
 entity = record.origin  # AttributeError: no 'origin' property
 
 # ✅ Correct: pass registry explicitly

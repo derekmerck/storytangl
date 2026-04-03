@@ -3,10 +3,8 @@ from __future__ import annotations
 """VM phase handlers for game mechanics integration."""
 
 import logging
-from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
-from tangl.core import CallReceipt, Selector
 from tangl.mechanics.games import GamePhase, GameResult, RoundResult
 from tangl.vm import (
     ResolutionPhase as P,
@@ -17,10 +15,7 @@ from tangl.vm import (
     on_provision,
     on_update,
 )
-from tangl.vm.dispatch import vm_dispatch
-from tangl.core.behavior import HandlerPriority as Prio
-from tangl.story.dispatch import on_gather_content
-from tangl.vm.dispatch import dispatch as vm_dispatch
+from tangl.vm.dispatch import dispatch
 
 from .has_game import HasGame
 
@@ -30,6 +25,42 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # todo: should probably register these on story dispatch instead of vm
+
+
+def _has_tags(value: Any, *tags: str) -> bool:
+    actual = getattr(value, "tags", set()) or set()
+    return set(tags).issubset(actual)
+
+
+def _clear_dynamic_game_actions(cursor: HasGame, *, ctx: Context) -> None:
+    from tangl.core import Selector
+    from tangl.story import Action
+
+    graph = getattr(cursor, "graph", None)
+    if graph is None:
+        return
+
+    for edge in list(cursor.edges_out(Selector(has_kind=Action, trigger_phase=None))):
+        if _has_tags(edge, "dynamic", "fanout", "game"):
+            graph.remove(edge.uid, _ctx=ctx)
+
+
+def _build_game_actions(cursor: HasGame) -> list[Any]:
+    from tangl.story import Action
+
+    actions: list[Action] = []
+    for move in cursor.game_handler.get_available_moves(cursor.game):
+        actions.append(
+            Action(
+                graph=cursor.graph,
+                predecessor_id=cursor.uid,
+                successor_id=cursor.uid,
+                label=cursor.game_handler.get_move_label(cursor.game, move),
+                payload={"move": move},
+                tags={"dynamic", "fanout", "game"},
+            )
+        )
+    return actions
 
 
 def _ctx_frame(ctx: Any) -> Any | None:
@@ -73,7 +104,7 @@ def _ctx_selected_payload(ctx: Any) -> Any:
     return None
 
 
-@vm_dispatch.register(task=P.PREREQS, caller=HasGame)
+@dispatch.register(task=P.PREREQS, caller=HasGame)
 @on_prereqs(wants_caller_kind=HasGame, wants_exact_kind=False)
 def setup_game_on_first_visit(
     cursor: HasGame | None = None,
@@ -118,7 +149,7 @@ def setup_game_on_first_visit(
     return None
 
 
-@vm_dispatch.register(task=P.PLANNING, caller=HasGame)
+@dispatch.register(task=P.PLANNING, caller=HasGame)
 @on_provision(wants_caller_kind=HasGame, wants_exact_kind=False)
 def provision_game_moves(
     cursor: HasGame | None = None,
@@ -150,6 +181,8 @@ def provision_game_moves(
 
     runtime_planning = getattr(ctx, "current_phase", None) == P.PLANNING
 
+    _clear_dynamic_game_actions(cursor, ctx=ctx)
+
     if cursor.game.phase != GamePhase.READY:
         if runtime_planning:
             logger.debug(
@@ -171,17 +204,7 @@ def provision_game_moves(
         logger.warning("No available moves at %s despite READY phase", cursor.get_label())
         return None if runtime_planning else []
 
-    actions: list[Action] = []
-    for move in moves:
-        actions.append(
-            Action(
-                graph=cursor.graph,
-                source_id=cursor.uid,
-                destination_id=cursor.uid,
-                label=f"Play {move}",
-                payload={"move": move},
-            )
-        )
+    actions = _build_game_actions(cursor)
 
     logger.debug("Provisioned %s move actions at %s", len(actions), cursor.get_label())
     # VM PLANNING handlers are side-effect-only: returning non-None results
@@ -192,7 +215,7 @@ def provision_game_moves(
     return actions
 
 
-@vm_dispatch.register(task=P.UPDATE, caller=HasGame)
+@dispatch.register(task=P.UPDATE, caller=HasGame)
 @on_update(wants_caller_kind=HasGame, wants_exact_kind=False)
 def process_game_move(
     cursor: HasGame | None = None,
@@ -263,10 +286,19 @@ def process_game_move(
     if isinstance(ns_inflight, set):
         ns_inflight.clear()
 
+    _clear_dynamic_game_actions(cursor, ctx=ctx)
+    if cursor.game.phase == GamePhase.READY and not cursor.game.result.is_terminal:
+        actions = _build_game_actions(cursor)
+        logger.debug(
+            "Refreshed %s game actions after update at %s",
+            len(actions),
+            cursor.get_label(),
+        )
+
     return None
 
 
-@vm_dispatch.register(task=P.JOURNAL, caller=HasGame)
+@dispatch.register(task=P.JOURNAL, caller=HasGame)
 @on_journal(wants_caller_kind=HasGame, wants_exact_kind=False)
 def generate_game_journal(
     cursor: HasGame | None = None,
@@ -301,6 +333,15 @@ def generate_game_journal(
         logger.debug("No last_round available for journal at %s", cursor.get_label())
         return []
 
+    custom_fragments = cursor.game_handler.get_journal_fragments(cursor.game)
+    if custom_fragments is not None:
+        logger.debug(
+            "Generated %s tailored journal fragments for %s",
+            len(custom_fragments),
+            cursor.get_label(),
+        )
+        return custom_fragments
+
     fragments: list[ContentFragment] = []
 
     fragments.append(
@@ -328,7 +369,7 @@ def generate_game_journal(
     return fragments
 
 
-@vm_dispatch.register(task="get_ns", caller=HasGame)
+@dispatch.register(task="get_ns", caller=HasGame)
 @on_gather_ns(wants_caller_kind=HasGame, wants_exact_kind=False)
 def inject_game_context(
     cursor: HasGame | None = None,
@@ -355,57 +396,15 @@ def inject_game_context(
     if not isinstance(cursor, HasGame):
         return {}
 
-    return {
-        "game_phase": cursor.game.phase.value,
-        "game_round": cursor.game.round,
-        "game_won": cursor.game.result == GameResult.WIN,
-        "game_lost": cursor.game.result == GameResult.LOSE,
-        "game_draw": cursor.game.result == GameResult.DRAW,
-        "game_in_progress": cursor.game.result == GameResult.IN_PROCESS,
-    }
-
-
-@on_gather_content(caller=HasGame, priority=Prio.FIRST)
-def game_gather_content(cursor: HasGame, *, ctx: Context, **kwargs: Any):
-    """
-    Generate game journal content via ``generate_journal`` subdispatch.
-
-    Runs with FIRST priority so blocks embedding games prefer the game's
-    generated journal content over inline block content. Returns either a
-    string (for post-processing) or a list of fragments produced by
-    ``generate_journal`` handlers.
-    """
-
-    if not isinstance(cursor, HasGame):
-        return None
-
-    game = getattr(cursor, "game", None)
-    if game is None:
-        return None
-
-    with_subdispatch = getattr(ctx, "with_subdispatch", None)
-    subdispatch = with_subdispatch() if callable(with_subdispatch) else nullcontext(ctx)
-    with subdispatch:
-        game_receipts = vm_dispatch.dispatch(
-            caller=game,
-            task="generate_journal",
-            ctx=ctx,
-        )
-
-    content = CallReceipt.first_result(*game_receipts)
-
-    if content:
-        return content
-
-    # Fallback: custom game journal handlers may register on the VM
-    # phase bus during migration away from legacy vm_dispatch tasks.
-    vm_receipts = list(
-        vm_dispatch.execute_all(
-            task="generate_journal",
-            call_kwargs={"caller": game},
-            ctx=ctx,
-            selector=Selector(caller_kind=type(game)),
-        )
+    namespace = cursor.game.to_namespace()
+    namespace.update(
+        {
+            "game_phase": cursor.game.phase.value,
+            "game_round": cursor.game.round,
+            "game_won": cursor.game.result == GameResult.WIN,
+            "game_lost": cursor.game.result == GameResult.LOSE,
+            "game_draw": cursor.game.result == GameResult.DRAW,
+            "game_in_progress": cursor.game.result == GameResult.IN_PROCESS,
+        }
     )
-    vm_content = CallReceipt.first_result(*vm_receipts)
-    return vm_content if vm_content else None
+    return namespace

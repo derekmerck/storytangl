@@ -42,6 +42,19 @@ class TestBaseModelPlus:
         setattr(Demo.meth, "magic", True)
         assert list(Demo._match_methods(magic=True)) == ["meth"]
 
+    def test_match_methods_respects_subclass_overrides(self) -> None:
+        class Parent(BaseModelPlus):
+            def marked(self) -> int:
+                return 1
+
+        setattr(Parent.marked, "magic", True)
+
+        class Child(Parent):
+            def marked(self) -> int:
+                return 2
+
+        assert list(Child._match_methods(magic=True)) == []
+
     def test_schema_matches_combines_fields_and_methods(self) -> None:
         class Demo(BaseModelPlus):
             ident: int = Field(3, json_schema_extra={"is_identifier": True})
@@ -62,6 +75,7 @@ class TestBaseModelPlus:
         model = Frozen(x=1)
         model.force_set("x", 7)
         assert model.x == 7
+        assert model.model_dump(exclude_unset=True) == {"x": 7}
 
 
 class TestIdentifierDecorator:

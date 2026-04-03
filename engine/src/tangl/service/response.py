@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import namedtuple
 from datetime import datetime
 from typing import Annotated, Any, Literal, Mapping, Optional, Self, TypeAlias
 from uuid import UUID
@@ -77,12 +76,12 @@ class RuntimeInfo(InfoModel):
         )
 
 
-class RuntimeEnvelope(BaseModel):
+class RuntimeEnvelope(InfoModel):
     """Ordered-fragment runtime payload for vm/story clients."""
 
     cursor_id: UUID | None = None
     step: int | None = None
-    fragments: list[dict[str, Any]] = Field(default_factory=list)
+    fragments: list[BaseFragment] = Field(default_factory=list)
     last_redirect: dict[str, Any] | None = None
     redirect_trace: list[dict[str, Any]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -127,7 +126,12 @@ class UserInfo(InfoModel):
         )
 
 
-UserSecret = namedtuple("UserSecret", ["api_key", "user_secret", "user_id"], defaults=(None,))
+class UserSecret(InfoModel):
+    """API-key material returned for user bootstrap and secret rotation."""
+
+    api_key: str
+    user_secret: str
+    user_id: UUID | None = None
 
 
 class WorldInfo(InfoModel):
@@ -282,7 +286,7 @@ def coerce_runtime_info(value: Any) -> RuntimeInfo | None:
 
 FragmentStream: TypeAlias = list[BaseFragment]
 MediaNative: TypeAlias = MediaFragment
-NativeResponse: TypeAlias = FragmentStream | InfoModel | RuntimeInfo | MediaNative
+NativeResponse: TypeAlias = FragmentStream | RuntimeEnvelope | InfoModel | RuntimeInfo | MediaNative
 
 __all__ = [
     "BadgeListValue",

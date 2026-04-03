@@ -38,6 +38,15 @@ persistence = "native_in_mem"           # native objects in memory, ephemeral
 #persistence = "bson_file"               # bson binary files
 #persistence = "bson_mongo"              # bson binary in db
 
+[service.manager]
+backend = "local"                       # local service manager or remote REST relay
+
+[service.remote]
+api_url = ""                            # remote REST api root, e.g. https://host/api/v2
+api_key = ""                            # optional bound remote API key
+secret = ""                             # optional bound secret resolved to api_key
+timeout_s = 5.0                         # request timeout in seconds
+
 # URLs for integrated REST service
 [service.rest]
 api_url =   "https://localhost:8000/api/v2"  # rest server root
@@ -53,7 +62,13 @@ story_media =   "@path /app/data/media/"    # user/story media files
 cache_data =    "@path /app/cache/"         # file loc shelve and pickle cache data
 system_media =  "@path /app/media/sys/"     # shared/system media
 
+[service.caches]
+shelved = true                          # file-backed shelve caches for media/lang helpers
+
 # Backend persistence services
+[service.apis.sqlite]
+enabled = true                          # sqlite storage backend, disabled automatically if sqlite3 is unavailable
+
 [service.apis.redis]
 enabled = false                         # kv data storage backend, req for redis-persistence
 token = "<tok>"

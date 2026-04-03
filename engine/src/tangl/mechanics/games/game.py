@@ -10,11 +10,11 @@ and the local enums/strategies.
 Must derive from entity to use with dispatch tho.
 """
 from __future__ import annotations
-from typing import Any, Callable, ClassVar, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import ConfigDict, Field
 
 from tangl.core import Entity
 from .enums import GamePhase, GameResult, RoundResult
@@ -119,7 +119,7 @@ class Game(Entity, Generic[Move]):
     # Configuration (not reset)
     scoring_n: int = 3
     scoring_strategy: str = "best_of_n"
-    opponent_strategy: str = "random"
+    opponent_strategy: str | None = "random"
     opponent_revision_strategy: str | None = None
     
     # Pre-selected opponent move (reset each round or on setup)
@@ -152,32 +152,36 @@ class Game(Entity, Generic[Move]):
     # ─────────────────────────────────────────────────────────────────────
     
     @classmethod
-    def _get_reset_fields(cls) -> dict[str, Any]:
+    def _get_reset_fields(cls) -> dict[str, tuple[Any, Callable[[], Any] | None]]:
         """
         Collect fields marked with reset_field=True and their defaults.
-        
+
         Walks the MRO to collect from all parent classes.
         """
-        reset_fields = {}
+        reset_fields: dict[str, tuple[Any, Callable[[], Any] | None]] = {}
         for klass in cls.__mro__:
             if not hasattr(klass, "model_fields"):
                 continue
             for name, field_info in klass.model_fields.items():
                 extra = field_info.json_schema_extra or {}
                 if extra.get("reset_field"):
-                    reset_fields[name] = field_info.default
+                    reset_fields[name] = (
+                        field_info.default,
+                        field_info.default_factory,
+                    )
         return reset_fields
     
     def reset(self) -> None:
         """
         Reset all fields marked with reset_field=True to their defaults.
-        
+
         Called by GameHandler.setup() to initialize/reinitialize game state.
         """
         reset_values = self._get_reset_fields()
-        for name, default in reset_values.items():
-            setattr(self, name, default)
-        
+        for name, (default, default_factory) in reset_values.items():
+            value = default_factory() if default_factory is not None else default
+            setattr(self, name, value)
+
         # Re-initialize mutable defaults
         self.score = {"player": 0, "opponent": 0}
         self.history = []

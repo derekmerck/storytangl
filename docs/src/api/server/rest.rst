@@ -4,13 +4,13 @@ tangl.rest
 ==========
 
 The REST server is the transport-facing wrapper around
-:class:`tangl.service.ServiceGateway`.
+:class:`tangl.service.ServiceManager`.
 
 - :mod:`tangl.rest.app` is the outer FastAPI application.
 - :mod:`tangl.rest.api_server` is mounted at ``/api/v2``.
 - The mounted API's OpenAPI document is served at ``/api/v2/openapi.json``.
-- Use :doc:`../service/operations` for gateway/controller semantics; use this
-  page for HTTP route inventory and app bootstrap details.
+- Use :doc:`../service/operations` for service-method semantics; use this page
+  for HTTP route inventory and app bootstrap details.
 
 .. rubric:: Related design docs
 

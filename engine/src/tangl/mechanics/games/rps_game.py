@@ -14,7 +14,7 @@ import random
 from pydantic import Field
 
 from tangl.journal.fragments import ContentFragment
-from tangl.vm.dispatch import dispatch as vm_dispatch
+from tangl.vm.dispatch import dispatch
 
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord
@@ -88,6 +88,9 @@ class RpsGameHandler(SimpleGameHandler[RpsGame]):
             # Opponent wins
             game.score["opponent"] += 1
             return RoundResult.LOSE
+
+    def get_journal_fragments(self, game: RpsGame) -> list[ContentFragment] | None:
+        return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +235,9 @@ class RpslsGameHandler(SimpleGameHandler[RpslsGame]):
             game.score["opponent"] += 1
             return RoundResult.LOSE
 
+    def get_journal_fragments(self, game: RpslsGame) -> list[ContentFragment] | None:
+        return _round_journal_fragments(game, verb_templates=RPSLS_VERB_TEMPLATES)
+
 
 @opponent_strategies.register("rpsls_random")
 def _rpsls_random(game: RpslsGame, **ctx) -> RpslsMove:
@@ -277,6 +283,9 @@ def _round_journal_fragments(
 
     player_move: MoveT = last_round.player_move
     opponent_move: MoveT | None = last_round.opponent_move
+    fragments.append(ContentFragment(content=f"You played {player_move.value}."))
+    if opponent_move is not None:
+        fragments.append(ContentFragment(content=f"Opponent played {opponent_move.value}."))
 
     if opponent_move is None:
         narrative = "Opponent forfeited."
@@ -326,7 +335,7 @@ def _round_journal_fragments(
     return fragments
 
 
-@vm_dispatch.register(
+@dispatch.register(
     task="generate_journal",
     wants_caller_kind=RpsGame,
     wants_exact_kind=False,
@@ -347,7 +356,7 @@ def rps_generate_journal(
     return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
 
 
-@vm_dispatch.register(
+@dispatch.register(
     task="generate_journal",
     wants_caller_kind=RpslsGame,
     wants_exact_kind=False,

@@ -23,6 +23,7 @@ PersistenceManagerName = Literal[
     "pickle_redis",
     "pickle_sqlite_file",
     "pickle_sqlite_in_mem",
+    "json_redis",
     "json_file",
     "json_sqlite_in_mem",
     "json_sqlite_file",
@@ -165,6 +166,8 @@ class PersistenceManagerFactory:
     def pickle_sqlite(manager_cls: Type[ManagerT] = PersistenceManager,
                       base_path: Path = None,
                       structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+        if settings and not settings.service.apis.sqlite.enabled:
+            raise ImportError
         if base_path is None:
             path = ":memory:"
         else:
@@ -215,6 +218,8 @@ class PersistenceManagerFactory:
     def json_sqlite(manager_cls: Type[ManagerT] = PersistenceManager,
                     base_path: Path = None,
                     structuring: Type[StructuringHandler] = StructuringHandler) -> ManagerT:
+        if settings and not settings.service.apis.sqlite.enabled:
+            raise ImportError
         if base_path is None:
             path = ":memory:"
         else:

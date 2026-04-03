@@ -157,6 +157,16 @@ class TestEntityTemplateMaterialize:
         templ = EntityTemplate(payload=Scene(label="scene-a"))
         assert templ.materialize(preserve_uid=True).uid == templ.payload.uid
 
+    def test_materialize_stamps_templ_hash_when_uid_is_fresh(self) -> None:
+        templ = EntityTemplate(payload=Scene(label="scene-a"))
+        ent = templ.materialize()
+        assert ent.templ_hash == templ.content_hash()
+
+    def test_materialize_preserve_uid_does_not_add_fresh_templ_hash(self) -> None:
+        templ = EntityTemplate(payload=Scene(label="scene-a"))
+        ent = templ.materialize(preserve_uid=True)
+        assert ent.templ_hash is None
+
     def test_materialize_with_updates(self) -> None:
         templ = EntityTemplate(payload=Scene(label="scene-a"))
         ent = templ.materialize(label="scene-b")

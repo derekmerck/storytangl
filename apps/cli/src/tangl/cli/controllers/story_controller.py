@@ -86,7 +86,7 @@ def _projected_section_lines(section: dict[str, Any]) -> list[str]:
 
 @with_default_category("Story")
 class StoryController(CommandSet):
-    """Story commands backed by :class:`tangl.service.controllers.RuntimeController`."""
+    """Story commands backed by :class:`tangl.service.ServiceManager`."""
 
     _cmd: StoryTanglCLI
 
@@ -145,8 +145,10 @@ class StoryController(CommandSet):
             if ftype == "block":
                 embedded = getattr(fragment, "choices", None) or []
                 for choice_frag in embedded:
-                    uid = getattr(choice_frag, "source_id", None) or getattr(
-                        choice_frag, "uid", None
+                    uid = (
+                        getattr(choice_frag, "edge_id", None)
+                        or getattr(choice_frag, "source_id", None)
+                        or getattr(choice_frag, "uid", None)
                     )
                     label = (
                         getattr(choice_frag, "label", None)
@@ -168,7 +170,11 @@ class StoryController(CommandSet):
                         )
 
             elif ftype == "choice":
-                uid = getattr(fragment, "source_id", None) or getattr(fragment, "uid", None)
+                uid = (
+                    getattr(fragment, "edge_id", None)
+                    or getattr(fragment, "source_id", None)
+                    or getattr(fragment, "uid", None)
+                )
                 label = (
                     getattr(fragment, "label", None)
                     or getattr(fragment, "content", "")
@@ -190,8 +196,16 @@ class StoryController(CommandSet):
 
         return choices
 
-    def _call_endpoint(self, endpoint: str, **params: Any) -> Any:
-        return self._cmd.call_endpoint(endpoint, **params)
+    def _call_service(self, method_name: str, **params: Any) -> Any:
+        return self._cmd.call_service(method_name, **params)
+
+    def _apply_runtime_envelope(self, envelope: Any) -> None:
+        metadata = getattr(envelope, "metadata", None) or {}
+        ledger_id_value = metadata.get("ledger_id")
+        if ledger_id_value is not None:
+            self._cmd.set_ledger(UUID(str(ledger_id_value)))
+        self._current_story_update = list(getattr(envelope, "fragments", []) or [])
+        self._current_choices = self._load_choices_from_fragments()
 
     # ------------------------------------------------------------------
     # commands
@@ -210,35 +224,15 @@ class StoryController(CommandSet):
         if args.label:
             kwargs["story_label"] = args.label
 
-        result = self._call_endpoint("RuntimeController.create_story", **kwargs)
-        if getattr(result, "status", None) == "error":
-            self._cmd.perror(result.message or "Failed to create story")
-            return
+        result = self._call_service("create_story", **kwargs)
+        self._apply_runtime_envelope(result)
 
-        details = getattr(result, "details", None) or {}
-        ledger_obj = details.get("ledger")
-        ledger_id_value = details.get("ledger_id")
-        ledger_id = UUID(ledger_id_value) if ledger_id_value is not None else None
-
-        if ledger_obj is not None and getattr(self._cmd, "persistence", None) is not None:
-            self._cmd.persistence.save(ledger_obj)
-
-        if ledger_id is not None:
-            self._cmd.set_ledger(ledger_id)
-
-        title = details.get("title") or "<unknown>"
-        cursor_label = details.get("cursor_label") or "<unknown>"
+        title = args.world_id
+        ledger_id = self._cmd.ledger_id
 
         self._cmd.poutput(f"\nCreated story: {title}")
-        self._cmd.poutput(f"Starting at: {cursor_label}")
         if ledger_id is not None:
             self._cmd.poutput(f"Ledger ID: {ledger_id}\n")
-
-        fragments = self._call_endpoint(
-            "RuntimeController.get_journal_entries",
-            limit=10,
-        )
-        self._current_story_update = list(fragments)
 
         if self._current_story_update:
             self._cmd.poutput("--- Story Begins ---")
@@ -246,7 +240,6 @@ class StoryController(CommandSet):
                 self._cmd.poutput(_fragment_text(fragment))
             self._cmd.poutput()
 
-        self._current_choices = self._load_choices_from_fragments()
         if self._current_choices:
             self._cmd.poutput("Choices:")
             active_index = 1
@@ -268,12 +261,8 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        fragments = self._call_endpoint(
-            "RuntimeController.get_journal_entries",
-            limit=10,
-        )
-        self._current_story_update = list(fragments)
-        self._current_choices = self._load_choices_from_fragments()
+        result = self._call_service("get_story_update", limit=10)
+        self._apply_runtime_envelope(result)
         self._render_current_story_update()
 
     choose_parser = argparse.ArgumentParser()
@@ -297,16 +286,11 @@ class StoryController(CommandSet):
             return
 
         choice = active_choices[index - 1]
-        self._call_endpoint(
-            "RuntimeController.resolve_choice",
+        result = self._call_service(
+            "resolve_choice",
             choice_id=choice.uid,
         )
-        fragments = self._call_endpoint(
-            "RuntimeController.get_journal_entries",
-            limit=10,
-        )
-        self._current_story_update = list(fragments)
-        self._current_choices = self._load_choices_from_fragments()
+        self._apply_runtime_envelope(result)
         self._render_current_story_update()
 
     drop_story_parser = argparse.ArgumentParser()
@@ -323,8 +307,8 @@ class StoryController(CommandSet):
             return
 
         try:
-            result = self._call_endpoint(
-                "RuntimeController.drop_story",
+            result = self._call_service(
+                "drop_story",
                 archive=bool(args.archive),
             )
         except ValueError as exc:
@@ -369,7 +353,7 @@ class StoryController(CommandSet):
         if not self._require_story_context():
             return
 
-        info = self._call_endpoint("RuntimeController.get_story_info")
+        info = self._call_service("get_story_info")
         if hasattr(info, "model_dump"):
             payload = info.model_dump()
         elif isinstance(info, dict):

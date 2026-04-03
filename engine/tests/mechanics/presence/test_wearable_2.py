@@ -26,7 +26,15 @@ def wearables():
     dress = WearableType(label='dress', covers={BodyRegion.LOWER, BodyRegion.UPPER}, noun='dress')
     exclusive_dress = WearableType(label='exclusive_dress', from_ref='dress', tags={'exclusive'})
 
-    yield Wearable(label='coat'), Wearable(label='shirt'), Wearable(label='pants'), Wearable(label='socks'), Wearable(label="shoes"), Wearable(label='dress'), Wearable(label='exclusive_dress')
+    yield (
+        Wearable(token_from='coat'),
+        Wearable(token_from='shirt'),
+        Wearable(token_from='pants'),
+        Wearable(token_from='socks'),
+        Wearable(token_from="shoes"),
+        Wearable(token_from='dress'),
+        Wearable(token_from='exclusive_dress'),
+    )
 
     # teardown - restore wearables to original state
     WearableType.clear_instances()
@@ -50,7 +58,7 @@ def test_wearable_type(load_wearable_types):
 
     coat_type = WearableType.get_instance('coat')
     print( coat_type )
-    coat_inst = Wearable(label='coat')
+    coat_inst = Wearable(token_from='coat')
     print( coat_inst )
 
     shirt_type = WearableType.get_instance('shirt')
@@ -70,7 +78,8 @@ def test_wearable_from_ref(wearables):
     assert exclusive_dress.noun == "dress"
 
     # todo: implement from_ref
-    green_pants = Wearable(label="green_pants",
+    green_pants = Wearable(token_from="pants",
+                           label="green_pants",
                            color="green",
                            from_ref="pants")
     assert green_pants.color == "green"
@@ -152,19 +161,19 @@ def test_wearable_plural_default():
 ## Setup for tests
 @pytest.fixture
 def alt_wearables():
-    tshirt = Wearable(label='shirt',
+    tshirt = Wearable(token_from='shirt',
                       nouns=["tshirt"],
                       layer=WearableLayer.INNER,
                       adjectives=['soft'],
                       covers={BodyRegion.TOP})
-    jeans = Wearable(label='pants',
+    jeans = Wearable(token_from='pants',
                      nouns=["jeans"],
                      color="blue",
                      plural=True,
                      quantifiers=['pair of'],
                      adjectives=['worn'],
                      layer=WearableLayer.OUTER, covers={BodyRegion.BOTTOM})
-    jacket = Wearable(label='coat',
+    jacket = Wearable(token_from='coat',
                       nouns=["jacket"],
                       color=['dark'],
                       adjectives=['fancy'],

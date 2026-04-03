@@ -15,6 +15,8 @@ Conceptual layers
 2. Traversal contracts
 
    - :class:`TraversableNode` / :class:`TraversableEdge` define cursor movement.
+   - :class:`TraversableGraph` carries traversal entry metadata for factory-built graphs.
+   - :class:`TraversableGraphFactory` materializes traversal-ready graphs from templates.
    - :mod:`tangl.vm.traversal` provides pure history/call-stack queries.
 
 3. Provisioning
@@ -74,6 +76,7 @@ from .traversable import (
     assert_traversal_contracts,
     validate_traversal_contracts,
 )
+from .factory import TraversableGraph, TraversableGraphFactory
 from .traversal import (
     count_turns,
     get_call_depth,
@@ -92,20 +95,14 @@ from .runtime import Frame, Ledger
 
 # Provides:
 # - journal fragment records
-from .fragments import Fragment
+from tangl.core import BaseFragment as Fragment
 from .replay import Event, Patch
 
 # Provides:
 # - phase bus hooks
 from .dispatch import (
     do_compose_journal,
-    do_get_media_inventories,
-    do_get_template_scope_groups,
-    do_get_token_catalogs,
     on_compose_journal,
-    on_get_media_inventories,
-    on_get_template_scope_groups,
-    on_get_token_catalogs,
     on_finalize,
     on_gather_ns,
     on_journal,
@@ -116,7 +113,7 @@ from .dispatch import (
     on_update,
     on_validate,
 )
-from .ctx import VmDispatchCtx, VmPhaseCtx, VmResolverCtx
+from .ctx import VmPhaseCtx
 from . import system_handlers  # noqa: F401  # register default vm hooks
 from tangl.core import CallReceipt as BuildReceipt, Record as PlanningReceipt
 
@@ -146,6 +143,8 @@ __all__ = [
     "ViabilityResult",
     "CloneProvisioner",
     "TraversableEdge",
+    "TraversableGraph",
+    "TraversableGraphFactory",
     "TraversableNode",
     "Patch",
     "Event",
@@ -162,9 +161,6 @@ __all__ = [
     "on_finalize",
     "on_compose_journal",
     "on_gather_ns",
-    "on_get_media_inventories",
-    "on_get_template_scope_groups",
-    "on_get_token_catalogs",
     "on_journal",
     "on_postreqs",
     "on_prereqs",
@@ -172,20 +168,7 @@ __all__ = [
     "on_resolve",
     "on_update",
     "on_validate",
-    "do_get_media_inventories",
-    "do_get_template_scope_groups",
-    "do_get_token_catalogs",
     "steps_since_last_visit",
     "validate_traversal_contracts",
-    "VmDispatchCtx",
     "VmPhaseCtx",
-    "VmResolverCtx",
 ]
-
-# Compatibility aliases — importable but not in __all__.
-# ChoiceEdge: used by tangl.mechanics.games.has_game and several test files
-# Context: was used by apps/server/tests (now migrated)
-# ProvisioningPolicy: legacy spelling of ProvisionPolicy
-ChoiceEdge = TraversableEdge
-Context = VmPhaseCtx
-ProvisioningPolicy = ProvisionPolicy

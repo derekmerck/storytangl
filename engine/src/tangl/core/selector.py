@@ -114,6 +114,10 @@ class Selector(BaseModel, extra="allow"):
             if callable(attrib_value):
                 if not attrib_value(target_val):
                     return False
+            elif isinstance(attrib_value, Entity) and isinstance(target_val, Entity):
+                # Entity-valued criteria are identity matches, not deep value matches.
+                if attrib_value.uid != target_val.uid:
+                    return False
             elif attrib_value != target_val:
                 return False
         return True
@@ -170,3 +174,26 @@ class Selector(BaseModel, extra="allow"):
     def from_kind(cls, kind: Type[ET]) -> Self:
         """Build ``Selector(has_kind=kind)``."""
         return cls(has_kind=kind)
+
+    @classmethod
+    def chain_or(cls, *selectors: Selector) -> Selector:
+        """Return a ChainedOrSelector.
+
+        Example:
+            >>> class P(Entity):
+            ...     foo: str = "bar"
+            >>> s = Selector.chain_or(Selector(foo="bar"), Selector(foo="baz"))
+            >>> s.matches(P())
+            True
+            >>> s.matches(P(foo="baz"))
+            True
+        """
+        class ChainedOrSelector(Selector):
+            selectors: tuple[Selector, ...]
+
+            def matches(self, entity: Entity) -> bool:
+                if not super().matches(entity):
+                    return False
+                return any(selector.matches(entity) for selector in self.selectors)
+
+        return ChainedOrSelector(selectors=selectors)
