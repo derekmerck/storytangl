@@ -1,0 +1,6 @@
+label: colony_loop
+scripts: script.yaml
+domain_module: colony_loop.domain
+metadata:
+  title: "Colony Loop"
+  description: "An incremental shell that spikes into a Bag-RPS colony raid."

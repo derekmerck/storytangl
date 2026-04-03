@@ -1,0 +1,46 @@
+label: incremental_yard
+
+metadata:
+  title: "Incremental Yard"
+  description: "A tiny authored proof for the incremental shell."
+  start_at: yard.entrance
+
+scenes:
+  yard:
+    title: "Incremental Yard"
+    blocks:
+      entrance:
+        content: |
+          A bare yard waits for orders: one worker, a scrap heap, and just
+          enough room to turn a cycle into momentum.
+        actions:
+          - text: "Run the yard"
+            successor: challenge
+
+      challenge:
+        kind: "incremental_yard.domain.IncrementalYardBlock"
+        content: |
+          You need enough scrap to raise a signal fire before the mood in camp
+          sours.
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      victory:
+        content: |
+          The signal catches and the camp finally answers with hope instead of
+          doubt.
+        actions:
+          - text: "Reset the yard"
+            successor: entrance
+
+      defeat:
+        content: |
+          The yard stalls out before anything lasting can be built.
+        actions:
+          - text: "Try again"
+            successor: entrance

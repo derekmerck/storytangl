@@ -114,6 +114,10 @@ class Selector(BaseModel, extra="allow"):
             if callable(attrib_value):
                 if not attrib_value(target_val):
                     return False
+            elif isinstance(attrib_value, Entity) and isinstance(target_val, Entity):
+                # Entity-valued criteria are identity matches, not deep value matches.
+                if attrib_value.uid != target_val.uid:
+                    return False
             elif attrib_value != target_val:
                 return False
         return True

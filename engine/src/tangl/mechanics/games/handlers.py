@@ -27,6 +27,42 @@ logger = logging.getLogger(__name__)
 # todo: should probably register these on story dispatch instead of vm
 
 
+def _has_tags(value: Any, *tags: str) -> bool:
+    actual = getattr(value, "tags", set()) or set()
+    return set(tags).issubset(actual)
+
+
+def _clear_dynamic_game_actions(cursor: HasGame, *, ctx: Context) -> None:
+    from tangl.core import Selector
+    from tangl.story import Action
+
+    graph = getattr(cursor, "graph", None)
+    if graph is None:
+        return
+
+    for edge in list(cursor.edges_out(Selector(has_kind=Action, trigger_phase=None))):
+        if _has_tags(edge, "dynamic", "fanout", "game"):
+            graph.remove(edge.uid, _ctx=ctx)
+
+
+def _build_game_actions(cursor: HasGame) -> list[Any]:
+    from tangl.story import Action
+
+    actions: list[Action] = []
+    for move in cursor.game_handler.get_available_moves(cursor.game):
+        actions.append(
+            Action(
+                graph=cursor.graph,
+                predecessor_id=cursor.uid,
+                successor_id=cursor.uid,
+                label=cursor.game_handler.get_move_label(cursor.game, move),
+                payload={"move": move},
+                tags={"dynamic", "fanout", "game"},
+            )
+        )
+    return actions
+
+
 def _ctx_frame(ctx: Any) -> Any | None:
     """Return legacy frame from context when available."""
     return getattr(ctx, "_frame", None)
@@ -145,6 +181,8 @@ def provision_game_moves(
 
     runtime_planning = getattr(ctx, "current_phase", None) == P.PLANNING
 
+    _clear_dynamic_game_actions(cursor, ctx=ctx)
+
     if cursor.game.phase != GamePhase.READY:
         if runtime_planning:
             logger.debug(
@@ -166,17 +204,7 @@ def provision_game_moves(
         logger.warning("No available moves at %s despite READY phase", cursor.get_label())
         return None if runtime_planning else []
 
-    actions: list[Action] = []
-    for move in moves:
-        actions.append(
-            Action(
-                graph=cursor.graph,
-                predecessor_id=cursor.uid,
-                successor_id=cursor.uid,
-                label=f"Play {move}",
-                payload={"move": move},
-            )
-        )
+    actions = _build_game_actions(cursor)
 
     logger.debug("Provisioned %s move actions at %s", len(actions), cursor.get_label())
     # VM PLANNING handlers are side-effect-only: returning non-None results
@@ -258,6 +286,15 @@ def process_game_move(
     if isinstance(ns_inflight, set):
         ns_inflight.clear()
 
+    _clear_dynamic_game_actions(cursor, ctx=ctx)
+    if cursor.game.phase == GamePhase.READY and not cursor.game.result.is_terminal:
+        actions = _build_game_actions(cursor)
+        logger.debug(
+            "Refreshed %s game actions after update at %s",
+            len(actions),
+            cursor.get_label(),
+        )
+
     return None
 
 
@@ -295,6 +332,15 @@ def generate_game_journal(
     if not last_round:
         logger.debug("No last_round available for journal at %s", cursor.get_label())
         return []
+
+    custom_fragments = cursor.game_handler.get_journal_fragments(cursor.game)
+    if custom_fragments is not None:
+        logger.debug(
+            "Generated %s tailored journal fragments for %s",
+            len(custom_fragments),
+            cursor.get_label(),
+        )
+        return custom_fragments
 
     fragments: list[ContentFragment] = []
 
@@ -350,11 +396,15 @@ def inject_game_context(
     if not isinstance(cursor, HasGame):
         return {}
 
-    return {
-        "game_phase": cursor.game.phase.value,
-        "game_round": cursor.game.round,
-        "game_won": cursor.game.result == GameResult.WIN,
-        "game_lost": cursor.game.result == GameResult.LOSE,
-        "game_draw": cursor.game.result == GameResult.DRAW,
-        "game_in_progress": cursor.game.result == GameResult.IN_PROCESS,
-    }
+    namespace = cursor.game.to_namespace()
+    namespace.update(
+        {
+            "game_phase": cursor.game.phase.value,
+            "game_round": cursor.game.round,
+            "game_won": cursor.game.result == GameResult.WIN,
+            "game_lost": cursor.game.result == GameResult.LOSE,
+            "game_draw": cursor.game.result == GameResult.DRAW,
+            "game_in_progress": cursor.game.result == GameResult.IN_PROCESS,
+        }
+    )
+    return namespace

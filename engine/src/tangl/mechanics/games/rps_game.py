@@ -89,6 +89,9 @@ class RpsGameHandler(SimpleGameHandler[RpsGame]):
             game.score["opponent"] += 1
             return RoundResult.LOSE
 
+    def get_journal_fragments(self, game: RpsGame) -> list[ContentFragment] | None:
+        return _round_journal_fragments(game, verb_templates=RPS_VERB_TEMPLATES)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Opponent strategies for RPS
@@ -232,6 +235,9 @@ class RpslsGameHandler(SimpleGameHandler[RpslsGame]):
             game.score["opponent"] += 1
             return RoundResult.LOSE
 
+    def get_journal_fragments(self, game: RpslsGame) -> list[ContentFragment] | None:
+        return _round_journal_fragments(game, verb_templates=RPSLS_VERB_TEMPLATES)
+
 
 @opponent_strategies.register("rpsls_random")
 def _rpsls_random(game: RpslsGame, **ctx) -> RpslsMove:
@@ -277,6 +283,9 @@ def _round_journal_fragments(
 
     player_move: MoveT = last_round.player_move
     opponent_move: MoveT | None = last_round.opponent_move
+    fragments.append(ContentFragment(content=f"You played {player_move.value}."))
+    if opponent_move is not None:
+        fragments.append(ContentFragment(content=f"Opponent played {opponent_move.value}."))
 
     if opponent_move is None:
         narrative = "Opponent forfeited."

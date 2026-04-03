@@ -1,0 +1,87 @@
+label: colony_loop
+
+metadata:
+  title: "Colony Loop"
+  description: "A composite proof for shell-plus-spike game composition."
+  start_at: colony.entrance
+
+scenes:
+  colony:
+    title: "Colony Loop"
+    blocks:
+      entrance:
+        content: |
+          The queen's chamber hums with hunger. You have one worker, a little
+          food, and just enough force to imagine taking tribute from the next nest over.
+        actions:
+          - text: "Tend the colony"
+            successor: shell
+
+      shell:
+        kind: "colony_loop.domain.ColonyShellBlock"
+        content: |
+          The colony waits for orders: feed the queen, promote a guard, or risk
+          a raid on the rival nest.
+        actions:
+          - text: "Challenge the rival nest"
+            successor: contest
+        continues:
+          - successor: victory
+            trigger: last
+            predicate: game_won
+          - successor: defeat
+            trigger: last
+            predicate: game_lost
+
+      contest:
+        kind: "colony_loop.domain.ColonyContestBlock"
+        content: |
+          The rival nest answers your posture with a single paper-thin spy line.
+        continues:
+          - successor: raid_won
+            trigger: last
+            predicate: game_won
+          - successor: raid_lost
+            trigger: last
+            predicate: game_lost
+          - successor: raid_draw
+            trigger: last
+            predicate: game_draw
+
+      raid_won:
+        kind: "colony_loop.domain.ColonyVictoryAftermathBlock"
+        content: |
+          The rival line buckles. Their scraps and obligations are yours now.
+        actions:
+          - text: "Return to the queen"
+            successor: shell
+
+      raid_lost:
+        kind: "colony_loop.domain.ColonyDefeatAftermathBlock"
+        content: |
+          The raid goes thin and bad. You limp home with fewer fighters than you sent.
+        actions:
+          - text: "Return to the queen"
+            successor: shell
+
+      raid_draw:
+        kind: "colony_loop.domain.ColonyDrawAftermathBlock"
+        content: |
+          The raid resolves in bruising parity. Neither nest gives way.
+        actions:
+          - text: "Return to the queen"
+            successor: shell
+
+      victory:
+        content: |
+          Tribute starts to flow, and the queen settles into the rare luxury of satisfaction.
+        actions:
+          - text: "Reset the colony"
+            successor: entrance
+
+      defeat:
+        content: |
+          The queen's appetite outruns the colony and the whole loop caves inward.
+        actions:
+          - text: "Try again"
+            successor: entrance

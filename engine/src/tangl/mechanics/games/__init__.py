@@ -74,6 +74,32 @@ from .handlers import (
     provision_game_moves,
     setup_game_on_first_visit,
 )
+from .blackjack_game import BlackjackGame, BlackjackGameHandler, BlackjackMove, PlayingCard
+from .nim_game import NimGame, NimGameHandler
+from .aggregate_force_game import (
+    AggregateForceGame,
+    AggregateForceGameHandler,
+    ForceCommitMove,
+)
+from .bag_rps_game import BagRpsGame, BagRpsGameHandler
+from .incremental_game import (
+    BuildSpec,
+    IncrementalGame,
+    IncrementalGameHandler,
+    IncrementalMove,
+    PromotionSpec,
+    TaskSpec,
+)
+from .corridor_game import CorridorGame, CorridorGameHandler, CorridorMove, TwentyTwoGame, TwentyTwoGameHandler
+from .siege_rps_game import SiegeRpsGame, SiegeRpsGameHandler
+from .picking_game import PickingGame, PickingGameHandler, PickingMove
+from .kim_game import KimGame, KimGameHandler, KimMove
+from .credentials_game import (
+    CredentialDisposition,
+    CredentialsGame,
+    CredentialsGameHandler,
+    CredentialsMove,
+)
 
 
 __all__ = [
@@ -91,6 +117,41 @@ __all__ = [
     "StrategyRegistry",
     "opponent_strategies",
     "scoring_strategies",
+    # Reference games
+    "BlackjackGame",
+    "BlackjackGameHandler",
+    "BlackjackMove",
+    "PlayingCard",
+    "NimGame",
+    "NimGameHandler",
+    "AggregateForceGame",
+    "AggregateForceGameHandler",
+    "ForceCommitMove",
+    "BagRpsGame",
+    "BagRpsGameHandler",
+    "TaskSpec",
+    "BuildSpec",
+    "PromotionSpec",
+    "IncrementalGame",
+    "IncrementalGameHandler",
+    "IncrementalMove",
+    "CorridorGame",
+    "CorridorGameHandler",
+    "CorridorMove",
+    "TwentyTwoGame",
+    "TwentyTwoGameHandler",
+    "SiegeRpsGame",
+    "SiegeRpsGameHandler",
+    "PickingGame",
+    "PickingGameHandler",
+    "PickingMove",
+    "KimGame",
+    "KimGameHandler",
+    "KimMove",
+    "CredentialsGame",
+    "CredentialsGameHandler",
+    "CredentialsMove",
+    "CredentialDisposition",
     # Dispatch
     "HasGame",
     "generate_game_journal",

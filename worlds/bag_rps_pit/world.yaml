@@ -1,0 +1,6 @@
+label: bag_rps_pit
+scripts: script.yaml
+domain_module: bag_rps_pit.domain
+metadata:
+  title: "Bag RPS Pit"
+  description: "Commit a small reserve of force and deplete the pit champion."
