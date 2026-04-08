@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable, Optional, Protocol
 
 from ..definition.stat_system import StatSystemDefinition
-from ..effects.modifier_stack import aggregate_modifiers
+from ..effects.modifier_stack import ModifierTotals, aggregate_modifiers
 from ..effects.situational import SituationalEffect
 from ..handlers.base import StatHandler
 from ..handlers.probit import ProbitStatHandler
@@ -26,6 +27,86 @@ class HasWalletLike(Protocol):
     def spend(self, cost: dict[str, int]) -> None: ...
 
     def earn(self, reward: dict[str, int]) -> None: ...
+
+
+@dataclass(frozen=True)
+class ResolutionSnapshot:
+    """Resolved task inputs after all challenge math is applied."""
+
+    domain: str | None
+    handler: type[StatHandler]
+    competency: float
+    difficulty: float
+    context_bonus: float
+    dominance_bonus: float
+    modifier_totals: ModifierTotals
+    effective_competency: float
+    effective_difficulty: float
+    delta: float
+
+
+def inspect_resolution(
+    task: Task,
+    entity: HasStats,
+    *,
+    system: Optional[StatSystemDefinition] = None,
+    effects: Iterable[SituationalEffect] = (),
+    context_tags: Iterable[str] | None = None,
+    dominance_attacker_domain: Optional[str] = None,
+    dominance_defender_domain: Optional[str] = None,
+    handler: type[StatHandler] | None = None,
+) -> ResolutionSnapshot:
+    """
+    Return a structured view of the resolved task inputs.
+
+    This is the inspectable seam underneath :func:`compute_delta` and
+    :func:`resolve_task`.
+    """
+    system = system or entity.stat_system
+
+    domain = task.infer_domain(system)
+    competency = entity.compute_competency(domain)
+    difficulty = task.get_difficulty(domain=domain, system=system)
+
+    dominance_bonus = 0.0
+    if dominance_attacker_domain and dominance_defender_domain:
+        dominance_bonus = system.get_dominance(
+            dominance_attacker_domain,
+            dominance_defender_domain,
+        )
+
+    context_tag_set = set(context_tags or ())
+    context_bonus = 0.0
+    for tag in context_tag_set:
+        context_bonus += system.get_context_bonus(tag, domain or "")
+
+    final_handler = handler or (
+        (entity.stats.get(domain).handler if domain and domain in entity.stats else None)
+        or ProbitStatHandler
+    )
+
+    modifier_totals = aggregate_modifiers(
+        effects,
+        tags=context_tag_set,
+        stat_name=domain,
+        handler=final_handler,
+    )
+
+    effective_competency = competency + context_bonus + modifier_totals.clamped_competency
+    effective_difficulty = difficulty - dominance_bonus + modifier_totals.clamped_difficulty
+
+    return ResolutionSnapshot(
+        domain=domain,
+        handler=final_handler,
+        competency=competency,
+        difficulty=difficulty,
+        context_bonus=context_bonus,
+        dominance_bonus=dominance_bonus,
+        modifier_totals=modifier_totals,
+        effective_competency=effective_competency,
+        effective_difficulty=effective_difficulty,
+        delta=effective_competency - effective_difficulty,
+    )
 
 
 def compute_delta(
@@ -63,59 +144,17 @@ def compute_delta(
     This function does **not** sample an Outcome. That is done by
     `resolve_task`.
     """
-    system = system or entity.stat_system
-
-    # Determine domain
-    domain = task.infer_domain(system)
-
-    # Base competency (may average intrinsic+domain)
-    competency = entity.compute_competency(domain)
-
-    # Base difficulty
-    difficulty = task.get_difficulty(domain=domain, system=system)
-
-    # Dominance: attacker vs defender, if given
-    dominance_bonus = 0.0
-    if dominance_attacker_domain and dominance_defender_domain:
-        dominance_bonus = system.get_dominance(
-            dominance_attacker_domain,
-            dominance_defender_domain,
-        )
-
-    # Context bonuses: treat as competency bonuses
-    context_tags = set(context_tags or ())
-    context_bonus = 0.0
-    for tag in context_tags:
-        context_bonus += system.get_context_bonus(tag, domain or "")
-
-    # Situational effects
-    handler = handler or (
-        # If domain has a Stat with a handler, use that
-        (entity.stats.get(domain).handler if domain and domain in entity.stats else None)
-        or ProbitStatHandler
-    )
-
-    modifier_totals = aggregate_modifiers(
-        effects,
-        tags=context_tags,
-        stat_name=domain,
+    snapshot = inspect_resolution(
+        task,
+        entity,
+        system=system,
+        effects=effects,
+        context_tags=context_tags,
+        dominance_attacker_domain=dominance_attacker_domain,
+        dominance_defender_domain=dominance_defender_domain,
         handler=handler,
     )
-
-    # Effective values
-    effective_competency = (
-        competency
-        + context_bonus
-        + modifier_totals.clamped_competency
-    )
-    effective_difficulty = (
-        difficulty
-        # Positive dominance makes task easier → reduces difficulty
-        - dominance_bonus
-        + modifier_totals.clamped_difficulty
-    )
-
-    return effective_competency - effective_difficulty
+    return snapshot.delta
 
 
 def resolve_task(
@@ -179,7 +218,7 @@ def resolve_task(
         effective_tags = task.tags
     else:
         effective_tags = context_tags
-    delta = compute_delta(
+    snapshot = inspect_resolution(
         task,
         entity,
         system=system,
@@ -190,15 +229,8 @@ def resolve_task(
         handler=handler,
     )
 
-    # Choose handler
-    domain = task.infer_domain(system)
-    final_handler: type[StatHandler] = handler or (
-        (entity.stats.get(domain).handler if domain and domain in entity.stats else None)
-        or ProbitStatHandler
-    )
-
     # Likelihood and outcome
-    p_success = final_handler.likelihood(delta)
+    p_success = snapshot.handler.likelihood(snapshot.delta)
     outcome = sample_outcome(p_success, roll=roll)
 
     # Apply reward after resolution if requested

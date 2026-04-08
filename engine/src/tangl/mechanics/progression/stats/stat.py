@@ -34,23 +34,42 @@ class Stat(BaseModel):
     handler: ClassVar[type[StatHandler]] = ProbitStatHandler
 
     def __init__(self, value: ValueLike = 10.0, **data):
-        fv = self._normalize_value(value)
+        fv = self.normalize_value(value)
         super().__init__(fv=fv, **data)
 
     @classmethod
-    def _normalize_value(cls, value: ValueLike) -> float:
+    def normalize_value(
+        cls,
+        value: ValueLike,
+        *,
+        handler: type[StatHandler] | None = None,
+    ) -> float:
+        active_handler = handler or cls.handler
+
         if isinstance(value, Quality):
-            return cls.handler.fv_from_qv(value.value)
+            return active_handler.fv_from_qv(value.value)
 
         if isinstance(value, str):
             quality = Quality.from_name(value)
-            return cls.handler.fv_from_qv(quality.value)
+            return active_handler.fv_from_qv(quality.value)
 
         if isinstance(value, int) and 1 <= value <= 5:
-            return cls.handler.fv_from_qv(value)
+            return active_handler.fv_from_qv(value)
 
         # Otherwise treat as fv
         return float(value)
+
+    @classmethod
+    def from_value(
+        cls,
+        value: ValueLike,
+        *,
+        handler: type[StatHandler] | None = None,
+    ) -> "Stat":
+        if handler is None or handler is cls.handler:
+            return cls(value)
+
+        return cls(value).with_handler(handler)
 
     # Derived representations -------------------------------------------------
 

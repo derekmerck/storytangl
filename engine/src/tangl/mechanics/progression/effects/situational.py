@@ -38,6 +38,10 @@ class SituationalEffect(BaseModel):
         Additive adjustment to difficulty (delta = competency - difficulty).
     - `competency_modifier`:
         Additive adjustment to competency.
+    - `domain_override`:
+        Optional remap for the tested challenge domain.
+    - `cost_currency_remap` / `reward_currency_remap`:
+        Optional narrow remaps for challenge costs or payouts.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -49,6 +53,9 @@ class SituationalEffect(BaseModel):
 
     difficulty_modifier: float = 0.0
     competency_modifier: float = 0.0
+    domain_override: str | None = None
+    cost_currency_remap: dict[str, str] = Field(default_factory=dict)
+    reward_currency_remap: dict[str, str] = Field(default_factory=dict)
 
     def applies(
         self,
