@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tangl.mechanics.progression.presets.registry import all_presets, get_preset
-from tangl.mechanics.progression.presets import cyberpunk, fantasy  # noqa: F401
+from tangl.mechanics.progression.presets import adventure, cyberpunk, fantasy  # noqa: F401
 
 
 def test_fantasy_presets_registered_and_shape():
@@ -34,3 +34,14 @@ def test_cyberpunk_preset_registered_and_theme():
     assert cp5.complexity == 5
 
     assert cp5.dominance_matrix
+
+
+def test_adventure_preset_registered_and_shape():
+    presets = all_presets()
+    assert "adventure2" in presets
+
+    adventure2 = get_preset("adventure2")
+    assert adventure2.theme == "adventure"
+    assert adventure2.complexity == 2
+    assert adventure2.stat_names == ["strength", "magic"]
+    assert set(adventure2.currencies) == {"stamina", "mana"}

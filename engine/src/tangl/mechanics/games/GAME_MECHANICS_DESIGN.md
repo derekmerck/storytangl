@@ -1,6 +1,6 @@
 # Game Mechanics Design
 
-**Status:** CURRENT REFERENCE + FUTURE FAMILY NOTE  
+**Status:** CURRENT REFERENCE + ACTIVE FAMILY EXPANSION  
 **Scope:** the `tangl.mechanics.games` family, its Layer 3 VM integration, and the
 future game shapes still worth preserving as design intent  
 **Canonical runtime surface:** `Game`, `GameHandler`, `HasGame`, package handlers,
@@ -38,6 +38,9 @@ The current games package revolves around a small, stable contract:
 - **`Game`** holds state, score/history, and lightweight serialization-friendly data
 - **`GameHandler`** is the rule object that sets up a game, offers moves, receives
   moves, resolves rounds, and evaluates terminal state
+- **optional handler hooks** like `get_move_label()`, `build_round_notes()`, and
+  `get_journal_fragments()` let concrete games project richer choices and narration
+  without bypassing the shared VM handlers
 - **`HasGame`** is the author-facing facade that attaches a game to a story node
 - **package handlers** connect games to VM PREREQS, PLANNING, UPDATE, JOURNAL,
   and CONTEXT phases
@@ -122,6 +125,39 @@ even though only part of it is implemented today.
 This taxonomy is more useful than a deep inheritance tree. It gives the family
 a vocabulary for future expansion without forcing premature abstraction.
 
+It is also meant to be **compositional**. The goal is not to produce an
+exhaustive list of named genres, but to identify a small number of reusable
+interaction kernels and then describe more complex games as lifts, variants, or
+combinations of those kernels.
+
+In spirit, this follows the same intuition as some game-theoretic and
+computational taxonomies: richer interactions are often easier to reason about
+when reduced to combinations of simpler forms rather than treated as wholly new
+species.
+
+One additional family note is worth calling out explicitly: the old scratch
+`twentytwo` spike pointed toward a **shared-threshold corridor contest** that
+lifts blackjack-like push-your-luck into a contested ordered-token form. See
+`CORRIDOR_CONTEST_DESIGN.md` for that progression and why it probably wants a
+generic corridor kernel before any fully multi-axis implementation.
+
+The same scratch tree also contained an important lift in the other direction:
+`bag_rps` treated classic RPS as an **aggregate-force token contest** where each
+player chose both *what kind* of force to commit and *how much* of it to commit
+from a reserve. That is a useful reference for the jump from atomic move games
+to mixed-composition contests.
+
+And at the next tier up, some authored systems are not one kernel at all but
+explicit **composite loops**: an outer incremental or strategic shell with
+inner contest spikes whose outcomes feed back into progression. See
+`COMPOSITE_GAME_LOOPS_DESIGN.md` for that family shape.
+
+Credentials deserves special mention here. It is best understood as a **stacked
+picking-game composition**: per-document inspection, packet-level consistency
+checking, then final disposition under changing context. See
+`CREDENTIALS_LOOP_DESIGN.md` for the live-facing summary and
+`docs/src/notes/CREDENTIALS_INTERACTION.md` for the longer background note.
+
 ---
 
 ## What Is Implemented Today
@@ -129,12 +165,25 @@ a vocabulary for future expansion without forcing premature abstraction.
 The current package already proves the family shape:
 
 - simple competitive games are real, not hypothetical
+- solo card pressure works through blackjack
+- token depletion works through nim
+- light picking and inspection loops work through Kim's Game and credentials
 - self-loop move provisioning works in the VM
 - journaling and predicate exposure work end to end
+- dynamic game actions are rebuilt per planning pass rather than accumulating
 - outcome exits route cleanly through authored story blocks
 
-The clearest reference example remains the RPS family and its integrated world
-fixture. That reference is sufficient to keep the current architecture honest.
+Concrete reference members now include:
+
+- **RPS / RPSLS** for simple competitive rounds
+- **Blackjack** for hidden information, author-biased dealing, and house-policy play
+- **Nim** for shrinking shared state and state-dependent legal move generation
+- **Kim's Game** for inspect/reveal/guess picking loops
+- **Credentials** for inspect/reveal/disposition loops that can later host richer
+  nested structures
+
+The authored `rps_tavern` and `blackjack_parlour` bundles keep the family tied to
+real story traversal rather than isolated core tests.
 
 ---
 
@@ -143,12 +192,44 @@ fixture. That reference is sufficient to keep the current architecture honest.
 The longer design note contained several future directions that still seem
 valuable, even though they are not commitments:
 
-- **token games** such as Nim or marker-exchange contests
-- **picking/verification games** such as inspection or credential checks
-- **card games** with ordered hands, decks, and discard logic
+- **larger token games** such as marker-exchange contests beyond one-heap Nim
+- **richer picking/verification games** such as multi-stage credential checks
+- **larger card games** with fuller deck, discard, or betting structures
 - **incremental games** where generators or resources evolve over rounds
 - **aggregate-force or winding-RPS battles** where the interesting part is the
   composition of a hand or force rather than one atomic throw
+
+That last category is worth being explicit about. The scratch `bag_rps` idea was:
+
+- each player has a bag of assorted R/P/S tokens
+- a move commits both a dominant flavor and an amount of force
+- mixed forces can cancel into ties in ways that one-token RPS cannot
+
+Examples from that pattern:
+
+- two `rock` can tie one `paper`
+- `paper + scissors` can tie one `rock`
+- `paper + scissors` can still lose to two `rock`
+
+That is a meaningful family lift: classic RPS becomes a token-allocation and
+composition contest rather than a single-symbol comparison.
+
+The same family also admits an **asymmetric challenge-response** form, sketched
+in scratch `siege_rps`:
+
+- an attacker declares posture and force
+- a defender must meet or beat that commitment with a combination from reserve
+- matching can preserve initiative for the attacker
+- beating can flip initiative to the defender
+- the real objective is reserve depletion and positional exhaustion over time
+
+That gives the aggregate-force family at least two distinct archetypes:
+
+- **simultaneous pooled comparison** such as `bag_rps`
+- **asymmetric pressure ladder** such as `siege_rps`
+
+Useful balance knobs in that second form include reserve depth, reserve width,
+initiative advantage, reinforcement cost, and posture-dependent payout.
 
 These are worth keeping because they stress different aspects of the family:
 
@@ -175,6 +256,10 @@ Games are not an island. The most promising crossover points are:
 The important design constraint is that these remain explicit integrations.
 Game handlers should ask for the inputs they need; they should not quietly
 smuggle writeback or progression logic into opaque side effects.
+
+This matters even more for composite shell-and-spike loops. Those should be
+built as explicit combinations of simpler kernels rather than as monolithic
+special cases.
 
 ---
 

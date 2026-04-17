@@ -33,6 +33,14 @@ class MagicSword(Weapon):
     element: str = "fire"
 
 
+class OpaqueEntity(Entity):
+    guard_unstructure = True
+
+
+class Link(Entity):
+    target: Entity | None = None
+
+
 class TestSelectorConstruction:
     def test_empty_selector_matches_anything(self) -> None:
         assert Selector().matches(Entity())
@@ -141,6 +149,19 @@ class TestSelectorMatching:
         entity = ReversibleEntity()
         assert entity.label_rev == ""
         assert Selector(label_rev="").matches(entity)
+
+    def test_match_entity_reference_by_uid_without_deep_value_compare(self) -> None:
+        target = OpaqueEntity(label="target")
+        link = Link(target=target)
+
+        assert Selector(target=target).matches(link)
+
+    def test_match_entity_reference_negative_by_uid(self) -> None:
+        left = OpaqueEntity(label="left")
+        right = OpaqueEntity(label="right")
+        link = Link(target=left)
+
+        assert not Selector(target=right).matches(link)
 
 
 class TestSelectorFilter:

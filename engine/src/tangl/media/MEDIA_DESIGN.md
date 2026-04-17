@@ -10,12 +10,14 @@
 > (no version suffix).
 >
 > The static media pipeline (file-based assets through to service-layer payload
-> resolution) is wired and tested. File-backed `MediaRIT` inventory loading
-> caches the resolved content hash through `utils.shelved2`, keyed by source
-> path plus file stat, so repeat indexing does not reread unchanged files. The
-> generative creator pipeline now has real sync/async lifecycle infrastructure
-> plus a deterministic in-process checker harness and a first real ComfyUI
-> worker backend. This note describes the implemented
+> resolution) is wired and tested. File-backed `MediaRIT` inventory loading can
+> cache the resolved content hash through `utils.shelved2`, keyed by source
+> path plus file stat, so repeat indexing does not reread unchanged files. That
+> cache is optional and can be disabled globally with
+> `service.caches.shelved = false` for constrained runtimes. The generative
+> creator pipeline now has real sync/async lifecycle infrastructure plus a
+> deterministic in-process checker harness and a first real ComfyUI worker
+> backend. This note describes the implemented
 > architecture and the design commitments for the still-evolving creator layer.
 >
 > The package-level architecture is canonical here. Broader design documents

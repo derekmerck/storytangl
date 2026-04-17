@@ -1,6 +1,5 @@
 import os
 import hashlib
-import shelve
 from functools import wraps
 from pathlib import Path
 import atexit
@@ -10,6 +9,16 @@ import logging
 from tangl.config import settings
 
 try:
+    import dbm
+except ImportError:  # pragma: no cover
+    dbm = None
+
+try:
+    import shelve
+except ImportError:  # pragma: no cover
+    shelve = None
+
+try:
     cache_dir: Path = settings.service.paths.cache_data
 except AttributeError:  # pragma: no cover
     cache_dir: Path = Path.cwd() / "shelf"
@@ -17,9 +26,13 @@ except AttributeError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
-os.makedirs(cache_dir, exist_ok=True)
+SHELVED_CACHE_ENABLED = bool(settings.get("service.caches.shelved", True))
+SHELVED_BACKEND_AVAILABLE = shelve is not None and dbm is not None
 
-opened_shelves: dict[str, shelve.Shelf] = {}
+if SHELVED_CACHE_ENABLED:
+    os.makedirs(cache_dir, exist_ok=True)
+
+opened_shelves: dict[str, object] = {}
 shelf_locks: dict[str, threading.Lock] = {}
 
 hit_count = 0
@@ -66,11 +79,22 @@ def shelved(fn, keep_open=True, skip_if_not_cached=False):
         @wraps(f)
         def cache(*args, check_value=None):
             global opened_shelves, shelf_locks, hit_count, miss_count
+
+            if not SHELVED_CACHE_ENABLED or not SHELVED_BACKEND_AVAILABLE:
+                if skip_if_not_cached:
+                    raise CacheMissError(f"Cache disabled for shelf: {fn}")
+                return f(*args)
+
             key = generate_key(*args)
 
             if str(fn) not in opened_shelves:
                 fp = cache_dir / fn
-                opened_shelves[str(fn)] = shelve.open(str(fp), 'c')
+                try:
+                    opened_shelves[str(fn)] = shelve.open(str(fp), 'c')
+                except dbm.error:
+                    logger.warning("resetting corrupt shelf %s", fp)
+                    clear_shelf(str(fn))
+                    opened_shelves[str(fn)] = shelve.open(str(fp), 'c')
                 shelf_locks[str(fn)] = threading.Lock()
 
             with shelf_locks[str(fn)]:
@@ -112,8 +136,10 @@ def clear_shelf(fn: str):
         del opened_shelves[str(fn)]
         del shelf_locks[str(fn)]
 
-    matches = list(cache_dir.glob( f"{fn}.*" ))
+    matches = [cache_dir / fn, *cache_dir.glob(f"{fn}.*")]
     for fp in matches:
+        if not fp.exists():
+            continue
         logger.warning( f'removing {fp}')
         os.remove(fp)
     # raise RuntimeError(f"No such shelf {fn}")

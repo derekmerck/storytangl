@@ -1,6 +1,6 @@
 from __future__ import annotations
 
 from .task import Task
-from .resolution import compute_delta, resolve_task
+from .resolution import ResolutionSnapshot, compute_delta, inspect_resolution, resolve_task
 
-__all__ = ["Task", "resolve_task", "compute_delta"]
+__all__ = ["Task", "ResolutionSnapshot", "resolve_task", "compute_delta", "inspect_resolution"]

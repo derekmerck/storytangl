@@ -11,12 +11,14 @@ This separation allows:
 """
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, ClassVar, Type, Any
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Type, TypeVar
 
 from .enums import GamePhase, GameResult, RoundResult
 from .game import Game, RoundRecord, Move
 from .strategies import opponent_strategies, scoring_strategies
 
+if TYPE_CHECKING:
+    from tangl.core import BaseFragment
 
 GameT = TypeVar("GameT", bound=Game)
 
@@ -92,6 +94,45 @@ class GameHandler(ABC, Generic[GameT]):
         - Append to game.history (handled by receive_move)
         """
         raise NotImplementedError
+
+    def get_move_label(self, game: GameT, move: Move) -> str:
+        """
+        Return a human-readable label for a move action.
+
+        Concrete games may override this when a move is a richer object than a
+        simple enum or scalar.
+        """
+        move_name = getattr(move, "label", None)
+        if isinstance(move_name, str) and move_name:
+            return move_name
+
+        move_value = getattr(move, "value", move)
+        return f"Play {move_value}"
+
+    def build_round_notes(
+        self,
+        game: GameT,
+        player_move: Move,
+        opponent_move: Move | None,
+        round_result: RoundResult,
+    ) -> dict[str, Any] | None:
+        """
+        Build additional round metadata for audit and projection.
+
+        Subclasses can override this to expose richer state to journal
+        renderers and namespace helpers without introducing parallel round
+        types.
+        """
+        return None
+
+    def get_journal_fragments(self, game: GameT) -> list[BaseFragment] | None:
+        """
+        Return tailored journal fragments for the latest round.
+
+        Returning ``None`` tells the package JOURNAL handler to fall back to the
+        generic round summary.
+        """
+        return None
     
     # ─────────────────────────────────────────────────────────────────────
     # Lifecycle methods
@@ -109,12 +150,12 @@ class GameHandler(ABC, Generic[GameT]):
         game.reset()
         game.phase = GamePhase.READY
         game.round = 0
-        
-        # Pre-select opponent move (the "tell")
-        self._preselect_opponent_move(game)
-        
+
         # Hook for subclass initialization
         self.on_setup(game)
+
+        # Pre-select opponent move (the "tell")
+        self._preselect_opponent_move(game)
     
     def on_setup(self, game: GameT) -> None:
         """
@@ -155,13 +196,20 @@ class GameHandler(ABC, Generic[GameT]):
         
         # Apply game rules
         round_result = self.resolve_round(game, player_move, opponent_move)
-        
+        round_notes = self.build_round_notes(
+            game,
+            player_move,
+            opponent_move,
+            round_result,
+        )
+
         # Record history
         record = RoundRecord(
             round_number=game.round,
             player_move=player_move,
             opponent_move=opponent_move,
             result=round_result,
+            notes=round_notes,
         )
         game.history.append(record)
         

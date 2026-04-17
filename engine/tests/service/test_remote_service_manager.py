@@ -194,7 +194,15 @@ class TestRemoteTransportAndAuth:
                     {
                         "api_key": "new-key",
                         "user_secret": "new-secret",
+                    },
+                ),
+                StubResponse(
+                    200,
+                    {
                         "user_id": str(user_id),
+                        "user_secret": "new-secret",
+                        "created_dt": "2026-01-01T00:00:00",
+                        "worlds_played": [],
                     },
                 ),
                 StubResponse(200, _runtime_envelope_payload()),
@@ -208,6 +216,10 @@ class TestRemoteTransportAndAuth:
         assert created.details == {"user_id": str(user_id)}
         assert envelope.metadata["world_id"] == "demo_world"
         assert session.calls[1]["headers"] == {
+            "X-API-Key": "new-key",
+            "api-key": "new-key",
+        }
+        assert session.calls[2]["headers"] == {
             "X-API-Key": "new-key",
             "api-key": "new-key",
         }

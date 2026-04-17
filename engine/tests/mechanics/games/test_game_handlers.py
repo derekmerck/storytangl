@@ -140,6 +140,24 @@ class TestProvisioningHandler:
         assert all(action.successor_id == game_block.uid for action in actions)
         assert all(action.payload == {"move": move} for action, move in zip(actions, ["win", "lose", "draw"]))
 
+    def test_provisioning_replaces_previous_dynamic_game_actions(
+        self,
+        game_graph: Graph,
+        game_block: GameBlock,
+    ):
+        frame = make_frame(game_graph, game_block.uid)
+        ctx = make_ctx(frame)
+
+        game_block.game.phase = GamePhase.READY
+
+        first = provision_game_moves(game_block, ctx=ctx)
+        second = provision_game_moves(game_block, ctx=ctx)
+        actions = [edge for edge in game_block.edges_out() if isinstance(edge, Action)]
+
+        assert len(first) == 3
+        assert len(second) == 3
+        assert len(actions) == 3
+
     def test_no_moves_when_not_ready(self, game_graph: Graph, game_block: GameBlock):
         frame = make_frame(game_graph, game_block.uid)
         ctx = make_ctx(frame)
