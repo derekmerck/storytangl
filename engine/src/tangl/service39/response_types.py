@@ -15,7 +15,7 @@ from .job_type import JobType
 ResponseType: TypeAlias = Literal["info", "runtime", "content", "media"]
 
 class Response(BaseModel):
-    # discriminated union key
+    # discriminated union key for automatic typed-response generation
     response_type: ResponseType
 
 ##############################
@@ -26,17 +26,16 @@ ContentFormat: TypeAlias = Literal["native", "json", "xml", "md"]
 
 class ContentResponse(Response):
     content: Any
-    content_fmt: ContentFormat
+    content_format: ContentFormat
     response_type: Literal["content"] = "content"
 
 MediaFormat: TypeAlias = Literal["native", "b64", "xml", "url", "path"]
 MediaType: TypeAlias = Literal["png", "svg", "mp3", "mp4"]
 
-class MediaResponse(Response):
+class InlineMedia(BaseModel):
     media: Any
-    media_fmt: MediaFormat
+    media_format: MediaFormat
     media_type: MediaType
-    response_type: Literal["content"] = "media"
 
     @field_serializer("media")
     @classmethod
@@ -48,6 +47,9 @@ class MediaResponse(Response):
             # path or already json/xml
             return media
         raise TypeError(f"Unsupported media type {type(media)}")
+
+class MediaResponse(Response, InlineMedia):
+    response_type: Literal["media"] = "media"
 
 
 ##############################
@@ -96,27 +98,32 @@ class InfoResponse(Response):
     info_type: InfoType
     entity_id: int
 
-from collections import namedtuple
+class InlineAchievement(BaseModel):
+    # These are references to system-level token catalogs defined by loaded worlds
+    world_id: str
+    achievement_id: str
+    world_name: str
+    achievement_name: str
+    achievement_media: InlineMedia
 
-# These are references to system-level token catalogs defined by loaded worlds
-Achievement = namedtuple("Achievement", ["label", "when", "media", "world"])
+class UserAchievement(InlineAchievement):
+    when: datetime
 
 class UserInfoResponse(InfoResponse):
     info_type: Literal["user"] = "user"
 
+    # metadata
     name: str
     creation_time: datetime
+    last_seen: datetime
+
     current_story: str  # user.current_story.world.get_title()
     current_story_turn: int
-    last_seen: datetime
 
     total_num_stories: int
     total_num_turns: int
     # By world id
-    achievements: dict[Identifier, list[Achievement]]
-
-    earliest_story: datetime
-    latest_story: datetime
+    achievements: dict[Identifier, list[UserAchievement]]
 
 class StoryInfoResponse(InfoResponse):
     info_type: Literal["story"] = "story"
@@ -125,19 +132,28 @@ class StoryInfoResponse(InfoResponse):
 class WorldInfoResponse(InfoResponse):
     info_type: Literal["world"] = "world"
 
-    name: str
+    # metadata
+    world_id: str
     version: str
+    title: str
+    author: str
     genre: str
     desc: str
-    world_info_media: MediaResponse
+    copyright: str
+    info_media: InlineMedia
+
+    # computed from bundle
     node_count: int
     complexity: int
+    media_types: list[MediaType]
 
+    # derived from usage patterns
     num_world_users: int
     num_world_stories: int
     num_world_completed_stories: int
     total_num_world_turns: int
-    user_discovered_world_achievements: list[Achievement]  # with count of each
+    user_discovered_world_achievements: list[InlineAchievement]  # with earliest and count of each
+
     earliest_story: datetime
     latest_story: datetime
 
@@ -148,18 +164,19 @@ class SystemInfoResponse(InfoResponse):
     version: str
     api_url: str
     doc_url: str
+    info_media: InlineMedia
 
-    sys_info_media: MediaResponse
-
+    # computed from bundles
     num_worlds: int
     world_ids: list[str]   # call world/get_info(world_id) for details on each
     default_world: str     # default for new user
 
+    # derived from usage patterns
     num_users: int
     num_stories: int
     num_completed_stories: int
     total_num_turns: int
-    all_user_discovered_achievements: list[Achievement]  # with count of each
+    all_user_discovered_achievements: list[InlineAchievement]  # with earliest and count of each
 
     earliest_story: datetime
     latest_story: datetime
