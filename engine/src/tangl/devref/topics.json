@@ -1,0 +1,152 @@
+[
+  {
+    "topic_id": "entity",
+    "display_name": "Entity",
+    "aliases": ["entities", "tangl.core.Entity", "tangl.core.entity.Entity"],
+    "layer": "core",
+    "short_description": "Universal graph-managed base type with value-based equality and structuring hooks.",
+    "related_topic_ids": ["selector", "registry", "graph", "singleton", "template"]
+  },
+  {
+    "topic_id": "selector",
+    "display_name": "Selector",
+    "aliases": ["selection", "selectors", "tangl.core.Selector", "tangl.core.selector.Selector"],
+    "layer": "core",
+    "short_description": "Composable predicate used for typed entity lookup across registries and graphs.",
+    "related_topic_ids": ["entity", "registry", "graph", "dispatch"]
+  },
+  {
+    "topic_id": "registry",
+    "display_name": "Registry",
+    "aliases": ["registries", "RegistryAware", "tangl.core.Registry", "tangl.core.registry.Registry"],
+    "layer": "core",
+    "short_description": "Indexed ownership container and lookup surface for entities.",
+    "related_topic_ids": ["entity", "selector", "graph", "dispatch"]
+  },
+  {
+    "topic_id": "graph",
+    "display_name": "Graph",
+    "aliases": ["graphs", "node", "edge", "subgraph", "HierarchicalNode", "tangl.core.Graph"],
+    "layer": "core",
+    "short_description": "Topology-aware registry for nodes, edges, hierarchical groups, and graph traversal shape.",
+    "related_topic_ids": ["entity", "registry", "factory", "template", "traversal"]
+  },
+  {
+    "topic_id": "singleton",
+    "display_name": "Singleton",
+    "aliases": ["singletons", "singleton tokens", "InstanceInheritance", "tangl.core.Singleton"],
+    "layer": "core",
+    "short_description": "Identity-by-label entity pattern used for durable references and token delegates.",
+    "related_topic_ids": ["entity", "token", "template", "factory"]
+  },
+  {
+    "topic_id": "token",
+    "display_name": "Token",
+    "aliases": ["tokens", "TokenCatalog", "tangl.core.Token", "singleton token"],
+    "layer": "core",
+    "short_description": "Mutable graph node wrapper around immutable singleton referents.",
+    "related_topic_ids": ["singleton", "entity", "graph", "provisioning"]
+  },
+  {
+    "topic_id": "dispatch",
+    "display_name": "Dispatch",
+    "aliases": [
+      "behavior registry",
+      "BehaviorRegistry",
+      "dispatch hooks",
+      "core.dispatch",
+      "vm.dispatch"
+    ],
+    "layer": "core",
+    "short_description": "Canonical behavior registration and hook execution mechanism across core and VM.",
+    "related_topic_ids": ["selector", "registry", "phase_ctx", "frame", "ledger"]
+  },
+  {
+    "topic_id": "factory",
+    "display_name": "Factory",
+    "aliases": ["GraphFactory", "TraversableGraphFactory", "factories", "factory templates"],
+    "layer": "core",
+    "short_description": "Deterministic graph materialization authority attached to built graphs.",
+    "related_topic_ids": ["graph", "template", "dispatch", "traversal", "ledger"]
+  },
+  {
+    "topic_id": "template",
+    "display_name": "Template",
+    "aliases": ["EntityTemplate", "TemplateRegistry", "templates", "materialize"],
+    "layer": "core",
+    "short_description": "Canonical authored-data-to-runtime-entity path for graph materialization.",
+    "related_topic_ids": ["entity", "graph", "factory", "provisioning"]
+  },
+  {
+    "topic_id": "runtime_op",
+    "display_name": "RuntimeOp",
+    "aliases": ["runtime ops", "Predicate", "Effect", "runtime expressions"],
+    "layer": "core",
+    "short_description": "Safe expression primitives used by higher layers for predicates and effects.",
+    "related_topic_ids": ["dispatch", "traversal", "phase_ctx"]
+  },
+  {
+    "topic_id": "phase_ctx",
+    "display_name": "PhaseCtx",
+    "aliases": ["phase ctx", "phase context", "VmPhaseCtx", "tangl.vm.runtime.frame.PhaseCtx"],
+    "layer": "vm",
+    "short_description": "Per-hop execution context for phase dispatch, namespace gathering, and authority lookup.",
+    "related_topic_ids": ["frame", "ledger", "dispatch", "provisioning", "traversal"]
+  },
+  {
+    "topic_id": "frame",
+    "display_name": "Frame",
+    "aliases": ["frames", "follow_edge", "resolve_choice", "tangl.vm.runtime.frame.Frame"],
+    "layer": "vm",
+    "short_description": "One choice-resolution driver for phase execution and redirect chaining.",
+    "related_topic_ids": ["phase_ctx", "ledger", "dispatch", "traversal", "resolution_phase"]
+  },
+  {
+    "topic_id": "ledger",
+    "display_name": "Ledger",
+    "aliases": ["ledgers", "cursor", "journal", "call stack", "tangl.vm.runtime.ledger.Ledger"],
+    "layer": "vm",
+    "short_description": "Persistent runtime state holder for cursor position, history, journal, and replay artifacts.",
+    "related_topic_ids": ["frame", "phase_ctx", "replay", "traversal", "resolution_phase"]
+  },
+  {
+    "topic_id": "resolution_phase",
+    "display_name": "ResolutionPhase",
+    "aliases": ["phases", "phase bus", "VALIDATE", "PLANNING", "UPDATE", "JOURNAL"],
+    "layer": "vm",
+    "short_description": "Causal phase ordering that structures validation, planning, updates, journal output, and finalization.",
+    "related_topic_ids": ["frame", "ledger", "dispatch", "traversal"]
+  },
+  {
+    "topic_id": "traversal",
+    "display_name": "Traversal",
+    "aliases": ["TraversableNode", "TraversableEdge", "graph traversal", "entry resolution"],
+    "layer": "vm",
+    "short_description": "Cursor movement contracts, hierarchical traversal, and traversal metadata over graphs.",
+    "related_topic_ids": ["graph", "frame", "ledger", "factory", "resolution_phase"]
+  },
+  {
+    "topic_id": "provisioning",
+    "display_name": "Provisioning",
+    "aliases": ["Resolver", "Requirement", "Dependency", "ProvisionOffer", "planning"],
+    "layer": "vm",
+    "short_description": "Frontier dependency satisfaction and scope-aware offer resolution during planning.",
+    "related_topic_ids": ["phase_ctx", "frame", "factory", "template", "token"]
+  },
+  {
+    "topic_id": "replay",
+    "display_name": "Replay",
+    "aliases": ["Patch", "Event", "StepRecord", "DiffReplayEngine"],
+    "layer": "vm",
+    "short_description": "Replay and rollback artifacts used to describe deterministic runtime evolution.",
+    "related_topic_ids": ["ledger", "frame", "resolution_phase"]
+  },
+  {
+    "topic_id": "journal",
+    "display_name": "Journal",
+    "aliases": ["journal fragments", "BaseFragment", "JOURNAL", "compose journal"],
+    "layer": "core",
+    "short_description": "Narrative output fragment surface emitted during the JOURNAL phase.",
+    "related_topic_ids": ["ledger", "resolution_phase", "dispatch", "replay"]
+  }
+]

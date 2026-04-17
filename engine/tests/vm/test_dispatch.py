@@ -4,6 +4,11 @@ Organized by concept:
 - Hook registration: on_* decorators
 - Hook execution: do_* functions with aggregation
 - Namespace gathering: two-phase ``do_gather_ns`` behavior
+
+.. storytangl-topic::
+   :topics: dispatch, phase_ctx
+   :facets: tests
+   :relation: tests
 """
 
 from __future__ import annotations

@@ -5,6 +5,11 @@ Organized by concept:
 - Call stack: push_call / pop_call
 - Frame creation: get_frame produces a Frame with shared state
 - Choice resolution: resolve_choice delegates to frame and syncs state
+
+.. storytangl-topic::
+   :topics: ledger, frame, resolution_phase
+   :facets: tests
+   :relation: tests
 """
 
 from __future__ import annotations

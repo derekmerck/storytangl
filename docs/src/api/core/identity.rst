@@ -5,6 +5,11 @@ tangl.core identity
 
 Identity, selection, and registry primitives used throughout the engine.
 
+.. storytangl-topic::
+   :topics: entity, selector, registry, singleton
+   :facets: api
+   :relation: documents
+
 .. rubric:: Related design docs
 
 - :doc:`../../design/core/DEREF_DESIGN`
