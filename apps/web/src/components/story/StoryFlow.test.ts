@@ -4,9 +4,8 @@ import { nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { http, HttpResponse } from 'msw'
 
-import { server } from '@tests/setup'
+import { HttpResponse, http, server } from '@tests/setup'
 import { mockBlock1, mockBlock2 } from '@tests/mocks/mockData'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'

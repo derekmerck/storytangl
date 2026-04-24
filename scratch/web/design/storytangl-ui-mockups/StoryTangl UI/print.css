@@ -1,0 +1,87 @@
+/* Print-mode overrides — activated by body.print-mode */
+
+body.print-mode {
+  background: #fbf9f1 !important;
+}
+
+body.print-mode .rail,
+body.print-mode .tweaks {
+  display: none !important;
+}
+
+body.print-mode .paper {
+  background-image: none !important;
+}
+
+body.print-mode .page {
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+/* Each print section becomes a page */
+body.print-mode .print-page {
+  width: 100%;
+  padding: 18mm 14mm;
+  break-after: page;
+  page-break-after: always;
+}
+body.print-mode .print-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+body.print-mode .print-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 1.5px solid var(--rule-strong);
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+}
+body.print-mode .print-head .idx {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+body.print-mode .print-head h2 {
+  font-family: var(--serif);
+  font-size: 20px;
+  margin: 0;
+  font-weight: 600;
+}
+body.print-mode .print-head .sub {
+  font-family: var(--hand);
+  color: var(--accent);
+  font-size: 16px;
+  margin-left: auto;
+}
+
+body.print-mode .device {
+  box-shadow: none !important;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+body.print-mode .frame {
+  box-shadow: none !important;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Force backgrounds/colors in print */
+body.print-mode * {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+@page {
+  size: landscape;
+  margin: 0.4cm;
+}
+
+@media print {
+  html, body { background: #fbf9f1 !important; }
+  .rail, .tweaks { display: none !important; }
+  .paper { background-image: none !important; }
+}

@@ -192,6 +192,16 @@ full type map and rationale.**
 - Generate them with `python3 scripts/repomix_bundle.py --list` and then request only the smallest relevant bundle such as `foundation`, `service-persistence`, `mechanics-media-prose`, `apps`, or `docs-index`.
 - Generated outputs live under `tmp/repomix/`. You may consult pre-generated bundles there when present, but regenerate them if the task touches changed areas or the bundle appears stale.
 - Treat bundles as orientation aids, not source of truth. Read and edit the real repository files before making code changes.
+- For topic-focused reorientation, build the local developer reference index with
+  `poetry run tangl-devref build`, then use `tangl-devref find`, `map`, or `pack`
+  for compact context around concepts such as `phase_ctx`, `provisioning`, or
+  `journal`. The index lives under `tmp/devref/` and is disposable.
+- The legacy `scripts/dump_code.py` script predates the curated Repomix bundles;
+  prefer `repomix_bundle.py` or `tangl-devref` unless you specifically need the
+  older dump format.
+- The Sphinx smoke test builds docs into pytest's temporary directory. Do not
+  assume `docs/_build/` exists after the test suite; run an explicit docs build
+  if a local server needs static HTML at the configured service path.
 
 ## Coding style
 - Target **Python 3.13**. Use `from __future__ import annotations` for forward

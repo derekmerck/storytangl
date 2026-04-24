@@ -109,6 +109,10 @@ class TestBlackjackIntegration:
         graph = Graph(label="blackjack_labels")
         block = graph.add_node(kind=BlackjackBlock, label="table")
         block.game_handler.setup(block.game)
+        block.game.player_hand = [_card(7, "h"), _card(8, "s")]
+        block.game.dealer_hand = [_card(6, "d"), _card(10, "c")]
+        block.game.card_deck = [_card(2, "c"), _card(10, "d")]
+        block.game.player_stood = False
 
         frame = Frame(graph=graph, cursor=block)
         ctx = frame._make_ctx()
@@ -134,6 +138,7 @@ class TestBlackjackIntegration:
         )
         block.game.deal_bias = "player_advantage"
         block.game_handler.setup(block.game)
+        block.game.card_deck = [_card(10, "c")]
 
         intro_to_table = ChoiceEdge(
             graph=graph,

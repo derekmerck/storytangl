@@ -3,10 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { http, HttpResponse } from 'msw'
 
 import StoryStatus from './StoryStatus.vue'
-import { server } from '@tests/setup'
+import { HttpResponse, http, server } from '@tests/setup'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
