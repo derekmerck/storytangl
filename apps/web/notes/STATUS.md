@@ -9,8 +9,8 @@
 
 The web client is a useful development interface, but the old v3.7-era
 "production ready" and "MVP complete" language was stale. The engine and
-service contracts have continued to evolve, and the client fixtures lag behind
-the canonical v38 response shapes.
+service contracts have continued to evolve, and the client is now oriented
+toward canonical v38 `RuntimeEnvelope` and `ProjectedState` response shapes.
 
 This stabilization pass repairs the current Vitest/MSW harness while preserving
 the existing `happy-dom` setup. Issue #224 now tracks the direct-fragment
@@ -25,15 +25,20 @@ renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
 - MSW remains the local mock mechanism for client-side tests and development.
 - The current test harness now installs a memory `localStorage` surface before
   MSW is loaded, which keeps `happy-dom` viable for this pass.
+- Story flow now renders `RuntimeEnvelope.fragments` directly through a fragment
+  registry, scene shells, and small fragment widgets. The old
+  `JournalStoryUpdate[]` path remains only as a narrow compatibility adapter.
 
 ## Open Work
 
-- Continue splitting the first direct-fragment renderer into smaller widgets.
-- Recheck story update, projected status, media, world info, and system info
-  assumptions against backend response models.
-- Expand integration coverage after fixture data is trustworthy.
+- Promote `zone` and `token` fragments from generic fallback into real widgets.
+- Add at least one more canonical interaction fixture, such as a credential
+  packet, token pool, or simple resource-spend turn.
+- Recheck world/system/user metadata assumptions against backend response
+  models.
 - Audit loading states, error display, mobile layout, and accessibility.
-- Refresh component and fixture documentation as the contract settles.
+- Add browser E2E only after the direct fragment widgets settle enough that the
+  tests will not cement a transitional shape.
 
 ## Guidance
 

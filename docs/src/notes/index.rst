@@ -9,6 +9,7 @@ state of the codebase without defining the canonical architecture.
 
    ASSET_COLLECTION_DESIGN
    CREDENTIALS_INTERACTION
+   interaction_vocabulary_review_appendix
    MU_AFFORDANCES
    SANDBOX_FANOUT_DESIGN
    media_resurrection_plan
