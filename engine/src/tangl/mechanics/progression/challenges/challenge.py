@@ -162,11 +162,19 @@ class StatChallenge(BaseModel):
         tags: set[str] | None = None,
     ) -> Task:
         """Compile this challenge to a low-level task."""
+        resolved_domain = domain if domain is not None else self.domain
+        resolved_difficulty = (
+            difficulty
+            if difficulty is not None
+            else self.normalized_difficulty(handler=handler, domain=domain)
+        )
+        resolved_cost = cost if cost is not None else self.cost
+        resolved_tags = tags if tags is not None else self.tags
         return Task(
             name=self.name,
-            domain=domain or self.domain,
-            difficulty=difficulty or self.normalized_difficulty(handler=handler, domain=domain),
-            cost=dict(cost or self.cost),
+            domain=resolved_domain,
+            difficulty=resolved_difficulty,
+            cost=dict(resolved_cost),
             reward={},
-            tags=set(tags or self.tags),
+            tags=set(resolved_tags),
         )

@@ -155,16 +155,18 @@ class DevRefDatabase:
         values = tuple(source_paths)
         if not values:
             return
-        placeholders = ", ".join("?" for _ in values)
         with self.connect() as conn:
-            conn.execute(
-                f"DELETE FROM artifacts WHERE source_path IN ({placeholders})",
-                values,
-            )
-            conn.execute(
-                f"DELETE FROM symbols WHERE source_path IN ({placeholders})",
-                values,
-            )
+            for index in range(0, len(values), 900):
+                chunk = values[index : index + 900]
+                placeholders = ", ".join("?" for _ in chunk)
+                conn.execute(
+                    f"DELETE FROM artifacts WHERE source_path IN ({placeholders})",
+                    chunk,
+                )
+                conn.execute(
+                    f"DELETE FROM symbols WHERE source_path IN ({placeholders})",
+                    chunk,
+                )
 
     def upsert_topics(self, topics: list[TopicDefinition], *, normalize_alias) -> None:
         with self.connect() as conn:

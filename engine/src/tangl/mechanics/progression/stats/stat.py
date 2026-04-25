@@ -69,7 +69,8 @@ class Stat(BaseModel):
         if handler is None or handler is cls.handler:
             return cls(value)
 
-        return cls(value).with_handler(handler)
+        fv = cls.normalize_value(value, handler=handler)
+        return cls(fv).with_handler(handler)
 
     # Derived representations -------------------------------------------------
 

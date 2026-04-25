@@ -64,7 +64,7 @@ See `FRAGMENT_STREAM_CONTRACT.md` for the detailed client-facing contract.
 ## ResponseType.RUNTIME
 
 **Use when:** Endpoint returns a runtime/status envelope rather than plain
-metadata or narrative fragments. This is for acknowledgement/control operations
+metadata or narrative fragments. This is for acknowledgment/control operations
 that do not return a story fragment batch.
 
 **Return type:** `RuntimeInfo`
@@ -118,7 +118,7 @@ Does endpoint return narrative fragments?
 
 Does endpoint mutate state?
   YES → RUNTIME_ENVELOPE if it advances story and returns fragments
-        RUNTIME if it is acknowledgement/status only
+        RUNTIME if it is acknowledgment/status only
   NO ↓
 
 Does endpoint return media/assets?

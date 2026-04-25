@@ -54,7 +54,7 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('You enter a dark room.')
   })
 
-  it('renders HTML content in content fragments', () => {
+  it('escapes HTML content in content fragments', () => {
     const fragments: Record<string, StoryFragment> = {
       content: {
         uid: 'content',
@@ -66,7 +66,8 @@ describe('StoryBlock', () => {
 
     const wrapper = mountBlock(fragments, ['content'])
 
-    expect(wrapper.html()).toContain('<strong>bold</strong>')
+    expect(wrapper.text()).toContain('<p>Paragraph with <strong>bold</strong> text</p>')
+    expect(wrapper.html()).not.toContain('<strong>bold</strong>')
   })
 
   it('renders media fragments using canonical content URLs', () => {

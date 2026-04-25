@@ -9,6 +9,7 @@ import hashlib
 import importlib
 import inspect
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,8 @@ from .models import (
 from .storage import DevRefDatabase
 from .topics import load_topics, topic_registry_hash
 
+
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_DB_PATH = REPO_ROOT / "tmp" / "devref" / "devref.sqlite3"
@@ -313,6 +316,11 @@ def _import_module(module_name: str) -> Any | None:
     try:
         return importlib.import_module(module_name)
     except Exception:
+        logger.debug(
+            "Skipping live import during devref indexing: %s",
+            module_name,
+            exc_info=True,
+        )
         return None
 
 
@@ -342,11 +350,21 @@ def extract_python_source(
     path: Path,
     source_hash: str,
     repo_root: Path,
+    *,
+    live_imports: bool = False,
 ) -> tuple[list[ExtractedArtifact], list[ExtractedSymbol]]:
     """Extract module overview/test artifacts and public symbols from Python source."""
 
-    text = path.read_text(encoding="utf-8")
-    tree = ast.parse(text)
+    try:
+        text = path.read_text(encoding="utf-8")
+        tree = ast.parse(text)
+    except (SyntaxError, UnicodeDecodeError) as exc:
+        logger.warning(
+            "Skipping unreadable Python source during devref indexing: %s (%s)",
+            path,
+            exc,
+        )
+        return [], []
     module_name = module_name_for_path(path, repo_root)
     module_doc = ast.get_docstring(tree, clean=False) or ""
     artifacts: list[ExtractedArtifact] = []
@@ -381,7 +399,7 @@ def extract_python_source(
     if module_name is None or "tests" in path.parts:
         return artifacts, symbols
 
-    module = _import_module(module_name)
+    module = _import_module(module_name) if live_imports else None
     source_path = path.relative_to(repo_root).as_posix()
     for node in tree.body:
         if not isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -394,7 +412,12 @@ def extract_python_source(
             if symbol_obj is not None and hasattr(symbol_obj, "__qualname__")
             else f"{module_name}.{node.name}"
         )
-        summary = _summary_for_object(symbol_obj, ast.get_docstring(node, clean=False) or "") if symbol_obj is not None else summarize_text(ast.get_docstring(node, clean=False) or "")
+        docstring = ast.get_docstring(node, clean=False) or ""
+        summary = (
+            _summary_for_object(symbol_obj, docstring)
+            if symbol_obj is not None
+            else summarize_text(docstring)
+        )
         symbol = ExtractedSymbol(
             qualified_name=qualified_name,
             symbol_kind="class" if isinstance(node, ast.ClassDef) else "function",
@@ -470,11 +493,18 @@ def extract_source_file(
     path: Path,
     source_hash: str,
     repo_root: Path,
+    *,
+    live_imports: bool = False,
 ) -> tuple[list[ExtractedArtifact], list[ExtractedSymbol]]:
     """Extract all supported artifacts and symbols from one source path."""
 
     if path.suffix.lower() == ".py":
-        return extract_python_source(path, source_hash, repo_root)
+        return extract_python_source(
+            path,
+            source_hash,
+            repo_root,
+            live_imports=live_imports,
+        )
     return extract_text_source(path, source_hash, repo_root), []
 
 
@@ -714,6 +744,7 @@ def build_index(
     repo_root: str | Path | None = None,
     db_path: str | Path | None = None,
     incremental: bool = True,
+    live_imports: bool = False,
 ) -> BuildReport:
     """Build or refresh the developer topic reference SQLite index."""
 
@@ -771,7 +802,12 @@ def build_index(
     source_lookup = {path.relative_to(repo_root_path).as_posix(): path for path in source_paths}
     for source_key in changed_paths:
         path = source_lookup[source_key]
-        artifacts, symbols = extract_source_file(path, manifest[source_key], repo_root_path)
+        artifacts, symbols = extract_source_file(
+            path,
+            manifest[source_key],
+            repo_root_path,
+            live_imports=live_imports,
+        )
         extracted_artifacts.extend(artifacts)
         extracted_symbols.extend(symbols)
 

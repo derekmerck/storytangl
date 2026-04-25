@@ -226,7 +226,8 @@ describe('StoryFlow', () => {
     const wrapper = mountFlow()
     await flushPromises()
 
-    expect(wrapper.html()).toContain('<p>Legacy text</p>')
+    expect(wrapper.text()).toContain('<p>Legacy text</p>')
+    expect(wrapper.html()).not.toContain('<p>Legacy text</p>')
     expect(wrapper.text()).toContain('Legacy choice')
   })
 

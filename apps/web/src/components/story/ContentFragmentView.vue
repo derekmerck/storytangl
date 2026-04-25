@@ -10,6 +10,6 @@ defineProps<{
 
 <template>
   <v-card-text :class="contentClass(fragment)">
-    <div v-html="fragmentText(fragment.content)" />
+    <div>{{ fragmentText(fragment.content) }}</div>
   </v-card-text>
 </template>

@@ -21,13 +21,21 @@ const apiBase = (import.meta.env?.VITE_DEFAULT_API_URL ?? 'http://localhost:8000
 
 type UserWorldRequest = { uid?: string }
 type UserSecretRequest = { secret?: string }
+type StoryDoRequest = { choice_id?: unknown; payload?: unknown }
 
 export const handlers = [
   http.get(`${apiBase}/story/update`, () => {
     return HttpResponse.json(crossroadsRuntimeEnvelope)
   }),
 
-  http.post(`${apiBase}/story/do`, async () => {
+  http.post(`${apiBase}/story/do`, async ({ request }) => {
+    const body = (await request.json()) as StoryDoRequest | null
+    if (typeof body?.choice_id !== 'string') {
+      return HttpResponse.json(
+        { error: 'story action payload requires choice_id' },
+        { status: 400 },
+      )
+    }
     return HttpResponse.json(crossroadsNextRuntimeEnvelope)
   }),
 

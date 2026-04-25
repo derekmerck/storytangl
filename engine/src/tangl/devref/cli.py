@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 import yaml
+from pydantic import BaseModel
 
 from .builder import DEFAULT_DB_PATH, build_index
 from .query import build_context_pack, get_topic_map, search_topics
@@ -38,8 +39,8 @@ FormatOption = Annotated[
 ]
 
 
-def _render(value: object, *, output_format: str) -> None:
-    payload = value.model_dump(mode="python") if hasattr(value, "model_dump") else value
+def _render(value: BaseModel | dict[str, object], *, output_format: str) -> None:
+    payload = value.model_dump(mode="python") if isinstance(value, BaseModel) else value
     if output_format == "json":
         typer.echo(json.dumps(payload, indent=2, sort_keys=False))
         return

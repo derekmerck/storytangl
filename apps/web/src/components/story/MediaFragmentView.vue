@@ -18,6 +18,7 @@ const url = computed(() => {
   const value = mediaContentUrl(props.fragment)
   return value ? remapURL(value) : undefined
 })
+const showPlaceholder = computed(() => isPendingMedia(props.fragment) || !url.value)
 const placeholderClasses = computed(() => [
   'media-placeholder',
   { 'media-placeholder--small': props.compact },
@@ -27,7 +28,7 @@ const placeholderClasses = computed(() => [
 <template>
   <div :class="['media-frame', { 'media-frame--compact': compact }]">
     <div
-      v-if="isPendingMedia(fragment)"
+      v-if="showPlaceholder"
       :class="placeholderClasses"
       data-testid="pending-media"
     >

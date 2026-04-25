@@ -10,6 +10,10 @@ from .builder import DEFAULT_DB_PATH
 from .query import build_context_pack, get_topic_map, search_topics
 
 
+class ParseError(Exception):
+    """Raised when a framed JSON-RPC message cannot be parsed."""
+
+
 def _json_response(request_id: Any, result: Any) -> dict[str, Any]:
     return {
         "jsonrpc": "2.0",
@@ -104,6 +108,10 @@ class DevRefMcpServer:
     def handle_request(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         method = payload.get("method")
         request_id = payload.get("id")
+        is_notification = "id" not in payload or request_id is None
+
+        if is_notification:
+            return None
 
         if method == "initialize":
             return _json_response(
@@ -117,8 +125,6 @@ class DevRefMcpServer:
                     },
                 },
             )
-        if method == "notifications/initialized":
-            return None
         if method == "ping":
             return _json_response(request_id, {})
         if method == "tools/list":
@@ -154,13 +160,22 @@ def _read_message(stream) -> dict[str, Any] | None:
             return None
         if line in (b"\r\n", b"\n"):
             break
-        name, _, value = line.decode("utf-8").partition(":")
+        try:
+            name, _, value = line.decode("utf-8").partition(":")
+        except UnicodeDecodeError as exc:
+            raise ParseError("Invalid JSON-RPC header") from exc
         headers[name.strip().lower()] = value.strip()
-    length = int(headers.get("content-length", "0"))
+    try:
+        length = int(headers.get("content-length", "0"))
+    except ValueError as exc:
+        raise ParseError("Invalid Content-Length header") from exc
     if length <= 0:
         return None
     body = stream.read(length)
-    return json.loads(body.decode("utf-8"))
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ParseError("Invalid JSON-RPC payload") from exc
 
 
 def _write_message(stream, payload: dict[str, Any]) -> None:
@@ -175,7 +190,11 @@ def main() -> None:
 
     server = DevRefMcpServer()
     while True:
-        payload = _read_message(sys.stdin.buffer)
+        try:
+            payload = _read_message(sys.stdin.buffer)
+        except ParseError:
+            _write_message(sys.stdout.buffer, _json_error(None, -32700, "Parse error"))
+            continue
         if payload is None:
             break
         response = server.handle_request(payload)

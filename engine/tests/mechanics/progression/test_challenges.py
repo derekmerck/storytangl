@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tangl.mechanics.progression.challenges import (
     ChallengePayout,
     StatChallenge,
@@ -91,6 +93,26 @@ def test_challenge_normalizes_quality_like_difficulty_inputs():
     )
 
     assert quality_difficulty == tier_difficulty == name_difficulty
+
+
+def test_challenge_to_task_honors_empty_overrides():
+    challenge = StatChallenge(
+        domain="strength",
+        difficulty="high",
+        cost={"stamina": 2},
+        tags={"#combat"},
+    )
+
+    task = challenge.to_task(
+        handler=Stat.handler,
+        difficulty={"magic": 8.0},
+        cost={},
+        tags=set(),
+    )
+
+    assert task.difficulty == {"magic": 8.0}
+    assert task.cost == {}
+    assert task.tags == set()
 
 
 def test_resolve_challenge_outcome_is_monotone_for_fixed_roll():
@@ -284,3 +306,16 @@ def test_domain_and_wallet_remaps_are_applied_via_effects():
     assert result.cost_paid == {"mana": 1}
     assert "mana" in result.payout_granted
     assert actor.wallet["mana"] >= 3
+
+
+def test_situational_effect_remaps_are_immutable_and_serializable():
+    effect = SituationalEffect(cost_currency_remap={"stamina": "mana"})
+    default_effect = SituationalEffect()
+
+    with pytest.raises(TypeError):
+        effect.cost_currency_remap["stamina"] = "gold"
+    with pytest.raises(TypeError):
+        default_effect.cost_currency_remap["stamina"] = "mana"
+
+    assert effect.model_dump()["cost_currency_remap"] == {"stamina": "mana"}
+    assert effect.model_copy(deep=True).cost_currency_remap == {"stamina": "mana"}

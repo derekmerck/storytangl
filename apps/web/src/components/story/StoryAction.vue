@@ -10,10 +10,11 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  doAction: [uid: string, payload?: unknown]
+  doAction: [edgeId: string, payload?: unknown]
 }>()
 
 const inputValue = ref('')
+const scalarAcceptInputs = new Set(['text', 'string', 'number', 'integer', 'quantity'])
 
 const choiceId = computed(() => props.choice.edge_id ?? props.choice.uid)
 const available = computed(() => props.choice.available !== false && props.choice.active !== false)
@@ -30,12 +31,16 @@ const iconName = computed(() => {
   return icon.startsWith('mdi-') ? icon : `mdi-${icon}`
 })
 const acceptsInput = computed(() => {
-  const input = props.choice.accepts?.input ?? props.choice.accepts?.kind
-  return typeof input === 'string' ? input : undefined
+  const input = props.choice.accepts?.input
+  return typeof input === 'string' && scalarAcceptInputs.has(input) ? input : undefined
 })
 const hasFreeformInput = computed(() => Boolean(props.choice.accepts && acceptsInput.value))
 const inputType = computed(() => {
-  return acceptsInput.value === 'integer' || acceptsInput.value === 'quantity' ? 'number' : 'text'
+  return acceptsInput.value === 'integer' ||
+    acceptsInput.value === 'quantity' ||
+    acceptsInput.value === 'number'
+    ? 'number'
+    : 'text'
 })
 const placeholder = computed(() => {
   const value = props.choice.accepts?.placeholder
@@ -63,15 +68,32 @@ const buttonStyle = computed<Record<string, string | number> | undefined>(() => 
   return entries.length ? Object.fromEntries(entries) : undefined
 })
 
-const coerceInputPayload = (): unknown => {
+type CoercedPayload =
+  | { ok: true; value: unknown }
+  | { ok: false }
+
+const coerceInputPayload = (): CoercedPayload => {
   if (!hasFreeformInput.value) {
-    return props.choice.payload
+    return { ok: true, value: props.choice.payload }
+  }
+
+  if (inputValue.value === '') {
+    return { ok: false }
   }
 
   let value: unknown = inputValue.value
   if (inputType.value === 'number') {
     const parsed = Number(inputValue.value)
-    value = Number.isNaN(parsed) ? inputValue.value : parsed
+    if (Number.isNaN(parsed)) {
+      return { ok: false }
+    }
+    if (
+      (minValue.value !== undefined && parsed < minValue.value) ||
+      (maxValue.value !== undefined && parsed > maxValue.value)
+    ) {
+      return { ok: false }
+    }
+    value = parsed
   }
 
   const payloadType = props.choice.accepts?.payload_type
@@ -80,16 +102,20 @@ const coerceInputPayload = (): unknown => {
   }
 
   if (isRecord(props.choice.payload) && isRecord(value)) {
-    return { ...props.choice.payload, ...value }
+    return { ok: true, value: { ...props.choice.payload, ...value } }
   }
-  return value
+  return { ok: true, value }
 }
 
 const handleClick = () => {
   if (!available.value || busy.value) {
     return
   }
-  emit('doAction', choiceId.value, coerceInputPayload())
+  const payload = coerceInputPayload()
+  if (!payload.ok) {
+    return
+  }
+  emit('doAction', choiceId.value, payload.value)
 }
 </script>
 

@@ -78,7 +78,7 @@ const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefine
             {{ dialog.line.who }}
             <span v-if="dialog.line.how">({{ dialog.line.how }})</span>
           </div>
-          <div v-html="fragmentText(dialog.line.content)" />
+          <div>{{ fragmentText(dialog.line.content) }}</div>
           <div
             v-for="media in dialog.media.filter((item) => mediaRole(item) !== 'avatar_im')"
             :key="media.uid"

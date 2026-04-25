@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Sphinx directive for invisible StoryTangl developer-topic annotations."""
+
+from __future__ import annotations
 
 from docutils import nodes
 from docutils.parsers.rst import Directive, directives

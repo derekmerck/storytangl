@@ -128,4 +128,48 @@ describe('StoryAction', () => {
       { offer_silver: 12 },
     ])
   })
+
+  it('does not treat structured token accepts as freeform input', () => {
+    const tokenChoice: ChoiceStoryFragment = {
+      uid: 'action_tokens',
+      fragment_type: 'choice',
+      text: 'Play a card',
+      accepts: {
+        kind: 'tokens',
+        min: 1,
+        max: 1,
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: tokenChoice })
+
+    expect(wrapper.find('input').exists()).toBe(false)
+  })
+
+  it('does not emit blank or out-of-range numeric freeform payloads', async () => {
+    const freeformChoice: ChoiceStoryFragment = {
+      uid: 'action_freeform',
+      fragment_type: 'choice',
+      text: 'Haggle',
+      accepts: {
+        payload_type: 'offer_silver',
+        input: 'integer',
+        min: 1,
+        max: 63,
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: freeformChoice })
+
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('input').setValue('0')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('input').setValue('64')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+  })
 })

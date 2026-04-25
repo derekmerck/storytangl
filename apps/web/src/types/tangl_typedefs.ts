@@ -45,7 +45,7 @@ export type JournalMediaItems = JournalMediaItem[]
 export type JournalMediaDict = Partial<Record<MediaRole, JournalMediaItem>>
 
 /**
- * Runtime acknowledgement and story-session summary payloads returned by the API.
+ * Runtime acknowledgment and story-session summary payloads returned by the API.
  */
 export interface RuntimeInfo {
   status: string

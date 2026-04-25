@@ -3,7 +3,7 @@ Probit-d20
 
 **Probit-d20** is a generic "rules-light" rpg stat system with intuitive ability and challenge ranks tied to the statistical normal distribution.
 
-See also: `STAT_CHALLENGE_DESIGN.md` for the incremental plan to turn the
+See also: `STAT_CHALLENGE_DESIGN.rst` for the incremental plan to turn the
 existing stat/task primitives into authored narrative challenges.
 
 Current supported seams include:

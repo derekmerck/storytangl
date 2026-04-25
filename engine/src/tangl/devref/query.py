@@ -75,13 +75,21 @@ def _topic_matches(terms: list[str]) -> list[TopicHit]:
     return sorted(hits, key=lambda item: (-item.score, item.display_name))
 
 
+def _quote_fts_term(term: str) -> str:
+    escaped = term.replace('"', '""')
+    return f'"{escaped}"'
+
+
 def _fts_scores(db: DevRefDatabase, terms: list[str]) -> dict[int, float]:
     if not terms:
         return {}
     meta = db.get_meta()
     if meta.get("used_fts") != "1":
         return {}
-    query = " ".join(terms)
+    safe_terms = [_quote_fts_term(term) for term in terms if term]
+    if not safe_terms:
+        return {}
+    query = " ".join(safe_terms)
     rows = db.load_rows(
         """
         SELECT artifact_id, bm25(artifact_fts) AS rank

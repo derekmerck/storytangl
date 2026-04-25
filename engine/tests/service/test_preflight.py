@@ -8,6 +8,12 @@ import pytest
 
 from tangl.service.response import PreflightReport
 from tangl.service.service_manager import ServiceManager
+from tangl.service.world_registry import (
+    clear_manual_worlds,
+    iter_manual_worlds,
+    register_manual_world,
+)
+from tangl.story.fabula import World
 
 
 def _write_clean_world(root: Path) -> str:
@@ -157,3 +163,23 @@ def test_preflight_world_rejects_unknown_world(tmp_path: Path, monkeypatch) -> N
 
     with pytest.raises(ValueError, match="Unknown world: missing"):
         ServiceManager().preflight_world(world_id="missing")
+
+
+def test_preflight_world_accepts_manual_world(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
+    snapshot = dict(iter_manual_worlds())
+    clear_manual_worlds()
+    try:
+        register_manual_world(World(label="manual_world"))
+
+        report = ServiceManager().preflight_world(world_id="manual_world")
+    finally:
+        clear_manual_worlds()
+        for world in snapshot.values():
+            register_manual_world(world)
+
+    assert report == PreflightReport(
+        world_id="manual_world",
+        status="ok",
+        diagnostics=[],
+    )

@@ -102,7 +102,7 @@ defineProps<{
 
 // Type an emit
 const emit = defineEmits<{
-  doAction: [uid: string, payload?: any]
+  doAction: [edgeId: string, payload?: unknown]
 }>()
 
 // Type a ref

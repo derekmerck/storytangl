@@ -144,9 +144,16 @@
   {
     "topic_id": "journal",
     "display_name": "Journal",
-    "aliases": ["journal fragments", "BaseFragment", "JOURNAL", "compose journal"],
-    "layer": "core",
-    "short_description": "Narrative output fragment surface emitted during the JOURNAL phase.",
+    "aliases": [
+      "journal fragments",
+      "BaseFragment",
+      "JOURNAL",
+      "compose journal",
+      "tangl.journal",
+      "tangl.journal.fragments"
+    ],
+    "layer": "journal",
+    "short_description": "Narrative output module and fragment surface emitted during the JOURNAL phase.",
     "related_topic_ids": ["ledger", "resolution_phase", "dispatch", "replay"]
   }
 ]

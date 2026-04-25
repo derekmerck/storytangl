@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from tangl.devref.mcp import DevRefMcpServer
+from io import BytesIO
+
+import pytest
+
+from tangl.devref.mcp import DevRefMcpServer, ParseError, _read_message
 from tangl.devref.query import build_context_pack, get_topic_map, search_topics
 
 
@@ -45,3 +49,23 @@ def test_mcp_handle_request_lists_tools(devref_db_path) -> None:
         "get_topic_map",
         "build_context_pack",
     ]
+
+
+def test_mcp_unknown_notification_does_not_respond(devref_db_path) -> None:
+    server = DevRefMcpServer(db_path=str(devref_db_path))
+
+    assert server.handle_request({"jsonrpc": "2.0", "method": "unknown"}) is None
+
+
+def test_mcp_read_message_rejects_bad_content_length() -> None:
+    stream = BytesIO(b"Content-Length: nope\r\n\r\n{}")
+
+    with pytest.raises(ParseError):
+        _read_message(stream)
+
+
+def test_mcp_read_message_rejects_bad_json() -> None:
+    stream = BytesIO(b"Content-Length: 1\r\n\r\n{")
+
+    with pytest.raises(ParseError):
+        _read_message(stream)

@@ -3,6 +3,18 @@ from __future__ import annotations
 from tangl.devref.query import build_context_pack, get_topic_map, search_topics
 
 
+FACET_ORDER: dict[str, int] = {
+    "overview": 0,
+    "design": 1,
+    "api": 2,
+    "code": 3,
+    "tests": 4,
+    "demos": 5,
+    "governance": 6,
+    "notes": 7,
+}
+
+
 def test_entity_search_prefers_overview_before_code_or_tests(devref_db_path) -> None:
     response = search_topics("entity", db_path=devref_db_path, limit=8)
 
@@ -38,8 +50,14 @@ def test_ledger_and_phase_ctx_context_packs_preserve_facet_order(devref_db_path)
     assert phase_ctx_pack.items
     ledger_facets = [item.facet for item in ledger_pack.items]
     phase_ctx_facets = [item.facet for item in phase_ctx_pack.items]
-    assert ledger_facets == sorted(ledger_facets, key=lambda facet: {"overview": 0, "design": 1, "api": 2, "code": 3, "tests": 4, "demos": 5, "governance": 6, "notes": 7}[facet])
-    assert phase_ctx_facets == sorted(phase_ctx_facets, key=lambda facet: {"overview": 0, "design": 1, "api": 2, "code": 3, "tests": 4, "demos": 5, "governance": 6, "notes": 7}[facet])
+    assert ledger_facets == sorted(ledger_facets, key=FACET_ORDER.__getitem__)
+    assert phase_ctx_facets == sorted(phase_ctx_facets, key=FACET_ORDER.__getitem__)
+
+
+def test_search_quotes_fts_terms_with_reserved_characters(devref_db_path) -> None:
+    response = search_topics('phase-ctx "ledger"', db_path=devref_db_path, limit=5)
+
+    assert response.query == 'phase-ctx "ledger"'
 
 
 def test_get_topic_map_returns_related_topics_and_artifacts(devref_db_path) -> None:

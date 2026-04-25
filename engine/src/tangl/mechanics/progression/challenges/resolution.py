@@ -60,7 +60,7 @@ def _derive_effective_domain(
 
 def _remap_wallet(
     wallet_map: Mapping[str, int],
-    remap_chain: Iterable[dict[str, str]],
+    remap_chain: Iterable[Mapping[str, str]],
 ) -> dict[str, int]:
     remapped = dict(wallet_map)
     for remap in remap_chain:

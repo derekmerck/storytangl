@@ -108,3 +108,32 @@ def test_build_index_incremental_detects_changed_source(tmp_path) -> None:
     assert report.build_mode == "incremental"
     assert report.changed_sources == 1
     assert response.artifacts[0].summary.lower().startswith("updated entity overview")
+
+
+def test_build_index_skips_import_side_effects_and_bad_python(tmp_path) -> None:
+    repo_root = _mini_repo(tmp_path)
+    db_path = tmp_path / "mini.sqlite3"
+    marker_path = tmp_path / "imported.txt"
+    _write(
+        repo_root / "engine" / "src" / "tangl" / "core" / "side_effect.py",
+        f'''
+"""Side effect module."""
+
+from pathlib import Path
+
+Path({str(marker_path)!r}).write_text("imported", encoding="utf-8")
+
+class SideEffect:
+    """Indexable without running module import side effects."""
+'''.strip()
+        + "\n",
+    )
+    _write(
+        repo_root / "engine" / "src" / "tangl" / "core" / "bad.py",
+        "def broken(:\n",
+    )
+
+    report = build_index(repo_root=repo_root, db_path=db_path, incremental=False)
+
+    assert report.symbols > 0
+    assert not marker_path.exists()

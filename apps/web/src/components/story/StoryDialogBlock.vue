@@ -40,7 +40,7 @@ const textStyle = computed<Record<string, string | number> | undefined>(() => {
         <div v-if="dialog_block.label" class="text-body-2 font-weight-medium mb-1">
           {{ dialog_block.label }}
         </div>
-        <div class="text-body-2" :style="textStyle" v-html="dialog_block.text" />
+        <div class="text-body-2" :style="textStyle">{{ dialog_block.text }}</div>
       </v-col>
     </v-row>
   </v-col>

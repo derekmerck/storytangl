@@ -1,9 +1,8 @@
 # Interaction Vocabulary Review Appendix
 
 > Status: Non-normative source notes
-> Sources: `/Users/derek/Desktop/agent_comments_on_interactivity.md` and
-> `/Users/derek/Desktop/storytangl_game_mechanics_survey.md`, reviewed during
-> the April 2026 fragment-renderer design pass.
+> Sources: prior interaction-vocabulary review notes, reviewed during the
+> April 2026 fragment-renderer design pass.
 
 This appendix preserves the useful pressure from the interaction vocabulary
 review without making every brainstormed mechanism part of the current contract.

@@ -642,6 +642,12 @@ class ServiceManager:
         registry = WorldRegistry()
         bundle = registry.bundles.get(world_id)
         if bundle is None:
+            if world_id in dict(iter_manual_worlds()):
+                return PreflightReport(
+                    world_id=world_id,
+                    status="ok",
+                    diagnostics=[],
+                )
             raise ValueError(f"Unknown world: {world_id}")
 
         world = registry.compiler.compile(bundle)

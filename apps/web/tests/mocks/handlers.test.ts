@@ -31,6 +31,19 @@ describe('MSW Handlers', () => {
     expect(response.data.fragments[0]).toHaveProperty('uid')
   })
 
+  it('rejects legacy /story/do payloads without choice_id', async () => {
+    await expect(
+      axios.post('/story/do', {
+        uid: 'action_uid',
+        passback: null,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        status: 400,
+      },
+    })
+  })
+
   it('returns world list on /system/worlds', async () => {
     const response = await axios.get('/system/worlds')
     expect(Array.isArray(response.data)).toBe(true)

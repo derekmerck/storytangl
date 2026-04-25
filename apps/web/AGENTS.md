@@ -23,17 +23,20 @@ Components follow this pattern:
 ```vue
 <script setup lang="ts">
 // 1. Imports
-import { ref, computed } from 'vue'
-import type { PropType } from 'vue'
+import { computed, ref } from 'vue'
+
+import { useGlobal } from '@/composables/globals'
+import type { StoryFragment } from '@/types'
+import { fragmentText } from './fragmentUtils'
 
 // 2. Props with types
 const props = defineProps<{
-  block: JournalStoryUpdate
+  fragment: StoryFragment
 }>()
 
 // 3. Emits with typed payloads
 const emit = defineEmits<{
-  doAction: [uid: string, payload?: any]
+  doAction: [edgeId: string, payload?: unknown]
 }>()
 
 // 4. Composables
@@ -43,7 +46,7 @@ const { $http } = useGlobal()
 const loading = ref(false)
 
 // 6. Computed properties
-const hasMedia = computed(() => props.block.media?.length > 0)
+const content = computed(() => fragmentText(props.fragment.content))
 
 // 7. Methods
 function handleClick() {
@@ -54,7 +57,7 @@ function handleClick() {
 <template>
   <!-- Vuetify components with utility classes -->
   <v-card class="pa-4">
-    <v-card-text v-html="block.text" />
+    <v-card-text>{{ content }}</v-card-text>
   </v-card>
 </template>
 

@@ -189,11 +189,11 @@ App.vue
 1. User clicks `StoryAction` button
 2. Event bubbles up: `StoryAction` → `StoryBlock` → `StoryFlow`
 3. `StoryFlow` calls API via `$http`
-4. Server returns `JournalStoryUpdate[]`
-5. `StoryFlow` processes media URLs and creates media dictionaries
-6. New blocks appended to reactive array
-7. Vue re-renders with new blocks
-8. Auto-scroll to latest block
+4. Server returns a `RuntimeEnvelope`
+5. `StoryFlow` indexes fragments and applies control updates
+6. New scene shells are appended to reactive state
+7. Vue re-renders with fragment widgets
+8. Auto-scroll to latest scene
 
 ### State Management
 - **Pinia Store** (`src/store/index.ts`)
@@ -364,13 +364,9 @@ See main project LICENSE file.
 
 ## 🎉 Summary
 
-**The web client MVP is essentially complete!** All core components from the legacy codebase have been successfully ported and modernized with:
-- Modern Vue 3 + TypeScript architecture
-- Comprehensive testing infrastructure
-- Development-friendly tooling
-- Clean, maintainable codebase
-
-**Next priorities:** Fill testing gaps, polish UX, and prepare for production deployment.
+The web client is a working development surface for the StoryTangl engine, but
+it is not yet a production MVP. See **Project Status** above and the current
+fragment-renderer roadmap for the stabilization work still in flight.
 
 ---
 

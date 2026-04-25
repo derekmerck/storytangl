@@ -81,6 +81,8 @@ class GrowthHandler(ABC):
 
     @staticmethod
     def _outcome_weight(outcome: Outcome) -> float:
+        """Weight growth so worse outcomes teach more than easy successes."""
+
         return {
             Outcome.DISASTER: 1.0,
             Outcome.FAILURE: 0.85,
