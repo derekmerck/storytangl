@@ -18,13 +18,13 @@ describe('MSW Handlers', () => {
     expect(response.data).toHaveProperty('fragments')
     expect(Array.isArray(response.data.fragments)).toBe(true)
     expect(response.data.fragments[0]).toHaveProperty('uid')
-    expect(response.data.fragments[0]).toHaveProperty('text')
+    expect(response.data.fragments[0]).toHaveProperty('fragment_type')
   })
 
   it('returns a runtime envelope on /story/do', async () => {
     const response = await axios.post('/story/do', {
-      uid: 'action_uid',
-      passback: null,
+      choice_id: 'action_uid',
+      payload: null,
     })
     expect(response.data).toHaveProperty('fragments')
     expect(Array.isArray(response.data.fragments)).toBe(true)

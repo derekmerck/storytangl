@@ -1,10 +1,12 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  crossroadsNextRuntimeEnvelope,
+  crossroadsProjectedState,
+  crossroadsRuntimeEnvelope,
+} from '@tests/fixtures'
+import {
   mockActions,
-  mockBlock1,
-  mockBlock2,
-  mockStatus,
   mockSystemInfo,
   mockUpdatedSecretResponse,
   mockUserSecretResponse,
@@ -22,19 +24,11 @@ type UserSecretRequest = { secret?: string }
 
 export const handlers = [
   http.get(`${apiBase}/story/update`, () => {
-    return HttpResponse.json({
-      cursor_id: 'cursor-1',
-      step: 1,
-      fragments: [mockBlock1, mockBlock2],
-    })
+    return HttpResponse.json(crossroadsRuntimeEnvelope)
   }),
 
   http.post(`${apiBase}/story/do`, async () => {
-    return HttpResponse.json({
-      cursor_id: 'cursor-1',
-      step: 2,
-      fragments: [mockBlock1],
-    })
+    return HttpResponse.json(crossroadsNextRuntimeEnvelope)
   }),
 
   http.get(`${apiBase}/story/actions`, () => {
@@ -46,7 +40,7 @@ export const handlers = [
   }),
 
   http.get(`${apiBase}/story/info`, () => {
-    return HttpResponse.json(mockStatus)
+    return HttpResponse.json(crossroadsProjectedState)
   }),
 
   http.get(`${apiBase}/world/:worldId/info`, ({ params }) => {

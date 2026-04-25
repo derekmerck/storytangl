@@ -2,263 +2,149 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 
 import StoryBlock from './StoryBlock.vue'
-import type { DialogBlock, JournalAction, JournalStoryUpdate, MediaRole } from '@/types'
+import type {
+  ControlStoryFragment,
+  GroupStoryFragment,
+  RuntimeEnvelope,
+  StoryFragment,
+  StorySceneModel,
+  UserEventStoryFragment,
+} from '@/types'
 import { useGlobal } from '@/composables/globals'
+import {
+  fragmentRefId,
+  fragmentText,
+  isControlFragment,
+  isGroupFragment,
+  isRecord,
+  isUserEventFragment,
+  normalizeEnvelope,
+} from './fragmentUtils'
 
-const { $http, $debug, $verbose, remapURL, makeMediaDict } = useGlobal()
+const { $http, $debug, $verbose } = useGlobal()
 const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
 
-type UnknownRecord = Record<string, unknown>
-const MEDIA_ROLES: readonly MediaRole[] = [
-  'none',
-  'image',
-  'narrative_im',
-  'info_im',
-  'logo_im',
-  'portrait_im',
-  'avatar_im',
-  'dialog_im',
-  'cover_im',
-  'audio',
-  'voice_over',
-  'dialog_vo',
-  'music',
-  'sfx',
-  'video',
-  'animation',
-]
-const MEDIA_ROLE_SET: ReadonlySet<MediaRole> = new Set(MEDIA_ROLES)
-
-const blocks = ref<JournalStoryUpdate[]>([])
-const blockRefs = ref<InstanceType<typeof StoryBlock>[]>([])
-const blockCounter = ref(0)
+const fragmentRegistry = ref<Record<string, StoryFragment>>({})
+const scenes = ref<StorySceneModel[]>([])
+const userEvents = ref<UserEventStoryFragment[]>([])
+const sceneRefs = ref<InstanceType<typeof StoryBlock>[]>([])
+const sceneCounter = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 
-const remapMediaArray = (media?: JournalStoryUpdate['media']) => {
-  if (!Array.isArray(media)) {
-    return media
-  }
+const isSceneGroup = (fragment: StoryFragment): fragment is GroupStoryFragment =>
+  isGroupFragment(fragment) && fragment.group_type === 'scene'
 
-  return media.map((item) => ({
-    ...item,
-    url: item.url ? remapURL(item.url) : item.url,
-  }))
-}
+const visibleFragmentIds = (fragments: StoryFragment[]): string[] =>
+  fragments
+    .filter((fragment) => !isControlFragment(fragment) && !isUserEventFragment(fragment))
+    .map((fragment) => fragment.uid)
 
-const cloneActions = (actions?: JournalAction[]) =>
-  actions?.map((action) => ({ ...action })) ?? []
-
-const processDialog = (dialog?: DialogBlock[]): DialogBlock[] => {
-  if (!Array.isArray(dialog)) {
-    return []
-  }
-
-  return dialog.map((item) => {
-    const processed: DialogBlock = {
-      ...item,
-      media: remapMediaArray(item.media),
-    }
-
-    if (processed.media) {
-      processed.media_dict = makeMediaDict(processed)
-    }
-
-    return processed
-  })
-}
-
-const processBlock = (incoming: JournalStoryUpdate): JournalStoryUpdate => {
-  blockCounter.value += 1
-
-  const processed: JournalStoryUpdate = {
-    ...incoming,
-    key: `${incoming.uid}-${blockCounter.value}`,
-    media: remapMediaArray(incoming.media),
-    actions: cloneActions(incoming.actions),
-  }
-
-  if (processed.media) {
-    processed.media_dict = makeMediaDict(processed)
-  }
-
-  if (incoming.dialog) {
-    processed.dialog = processDialog(incoming.dialog)
-  }
-
-  return processed
-}
-
-const isRecord = (value: unknown): value is UnknownRecord =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const isMediaRole = (value: unknown): value is MediaRole =>
-  typeof value === 'string' && MEDIA_ROLE_SET.has(value as MediaRole)
-
-const isLegacyBlock = (value: unknown): value is JournalStoryUpdate => {
-  if (!isRecord(value)) {
-    return false
-  }
-  return (
-    value.fragment_type === 'block' ||
-    Array.isArray(value.actions) ||
-    Array.isArray(value.dialog) ||
-    typeof value.text === 'string' ||
-    typeof value.title === 'string'
-  )
-}
-
-const normalizeFragmentStream = (fragments: unknown[]): JournalStoryUpdate[] => {
-  const normalized: JournalStoryUpdate[] = []
-
-  let current: JournalStoryUpdate | null = null
-  let counter = 0
-  const openBlock = () => {
-    if (current === null) {
-      counter += 1
-      current = {
-        uid: `story-${counter}`,
-        text: '',
-        actions: [],
-        media: [],
-      }
-    }
-    return current
-  }
-  const closeBlock = () => {
-    if (current === null) {
-      return
-    }
-    if (
-      current.text ||
-      (current.actions && current.actions.length > 0) ||
-      (current.media && current.media.length > 0)
-    ) {
-      normalized.push(current)
-    }
-    current = null
-  }
-
-  for (const fragment of fragments) {
-    if (!isRecord(fragment)) {
-      continue
-    }
-
-    const kind = String(fragment.fragment_type ?? '')
-    if (kind === 'block' && isLegacyBlock(fragment)) {
-      closeBlock()
-      normalized.push(fragment)
-      continue
-    }
-
-    if (kind === 'content') {
-      const block = openBlock()
-      const content = typeof fragment.content === 'string' ? fragment.content : ''
-      block.text = block.text ? `${block.text}\n${content}` : content
-      if (fragment.uid) {
-        block.uid = String(fragment.uid)
-      }
-      continue
-    }
-
-    if (kind === 'choice') {
-      const block = openBlock()
-      if (fragment.uid) {
-        block.uid = String(fragment.uid)
-      }
-      const edgeId = fragment.edge_id ?? fragment.uid
-      if (!edgeId) {
-        continue
-      }
-      const text = String(fragment.text ?? fragment.label ?? 'Continue')
-      const actions = block.actions ? [...block.actions] : []
-      actions.push({ uid: String(edgeId), text } as JournalAction)
-      block.actions = actions
-      continue
-    }
-
-    if (kind === 'media') {
-      const block = openBlock()
-      if (fragment.uid) {
-        block.uid = String(fragment.uid)
-      }
-      const payload = isRecord(fragment.payload) ? fragment.payload : {}
-      const rawUrl = fragment.url ?? fragment.src ?? payload.url ?? payload.src
-      const url = typeof rawUrl === 'string' ? rawUrl : undefined
-      const rawData = fragment.data ?? payload.data
-      const roleValue = fragment.media_role ?? payload.media_role
-      const role = isMediaRole(roleValue) ? roleValue : 'narrative_im'
-
-      if (url === undefined && rawData === undefined) {
-        continue
-      }
-
-      const media = block.media ? [...block.media] : []
-      media.push({
-        media_role: role,
-        ...(url ? { url } : {}),
-        ...(rawData !== undefined ? { data: rawData } : {}),
-      })
-      block.media = media
-      continue
-    }
-  }
-
-  closeBlock()
-  return normalized
-}
-
-const normalizePayload = (payload: unknown): JournalStoryUpdate[] => {
-  if (Array.isArray(payload)) {
-    if (payload.every((item) => isLegacyBlock(item))) {
-      return payload as JournalStoryUpdate[]
-    }
-    return normalizeFragmentStream(payload)
-  }
-
-  if (!isRecord(payload)) {
-    return []
-  }
-
-  if (Array.isArray(payload.fragments)) {
-    const fragments = payload.fragments
-    if (fragments.every((item) => isLegacyBlock(item))) {
-      return fragments as JournalStoryUpdate[]
-    }
-    return normalizeFragmentStream(fragments)
-  }
-
-  const envelope = payload.envelope
-  if (isRecord(envelope) && Array.isArray(envelope.fragments)) {
-    return normalizeFragmentStream(envelope.fragments)
-  }
-
-  return []
-}
-
-const handleResponse = async (payload: JournalStoryUpdate[]) => {
-  if (!Array.isArray(payload) || payload.length === 0) {
+const applyControlFragment = (
+  registry: Record<string, StoryFragment>,
+  fragment: ControlStoryFragment,
+) => {
+  const refId = fragmentRefId(fragment)
+  if (!refId) {
     return
   }
 
-  if (payload[0]?.label) {
-    blocks.value = []
-    blockCounter.value = 0
+  if (fragment.fragment_type === 'delete') {
+    delete registry[refId]
+    return
   }
 
-  const processedBlocks = payload.map((block) => processBlock(block))
-  const startingIndex = blocks.value.length
+  if (!isRecord(fragment.payload)) {
+    return
+  }
 
-  blocks.value.push(...processedBlocks)
+  const existing = registry[refId]
+  registry[refId] = {
+    ...(existing ?? { uid: refId, fragment_type: fragment.ref_type ?? fragment.reference_type ?? 'content' }),
+    ...fragment.payload,
+    uid: refId,
+    fragment_type:
+      typeof fragment.payload.fragment_type === 'string'
+        ? fragment.payload.fragment_type
+        : (existing?.fragment_type ?? fragment.ref_type ?? fragment.reference_type ?? 'content'),
+  } as StoryFragment
+}
+
+const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]): StorySceneModel[] => {
+  const sceneGroups = renderFragments.filter(isSceneGroup)
+  const groups = sceneGroups.length > 0 ? sceneGroups : []
+
+  if (groups.length > 0) {
+    return groups.map((group) => {
+      sceneCounter.value += 1
+      return {
+        key: `${group.uid}-${sceneCounter.value}`,
+        uid: group.uid,
+        memberIds: [...group.member_ids],
+      }
+    })
+  }
+
+  const memberIds = visibleFragmentIds(renderFragments)
+  if (memberIds.length === 0) {
+    return []
+  }
+
+  sceneCounter.value += 1
+  return [
+    {
+      key: `scene-${envelope.step ?? sceneCounter.value}-${sceneCounter.value}`,
+      uid: `scene-${envelope.step ?? sceneCounter.value}`,
+      memberIds,
+    },
+  ]
+}
+
+const applyEnvelope = async (envelope: RuntimeEnvelope) => {
+  const nextRegistry = { ...fragmentRegistry.value }
+  const renderFragments: StoryFragment[] = []
+  const eventFragments: UserEventStoryFragment[] = []
+
+  for (const fragment of envelope.fragments) {
+    if (isControlFragment(fragment)) {
+      applyControlFragment(nextRegistry, fragment)
+      continue
+    }
+
+    nextRegistry[fragment.uid] = fragment
+    renderFragments.push(fragment)
+
+    if (isUserEventFragment(fragment)) {
+      eventFragments.push(fragment as UserEventStoryFragment)
+    }
+  }
+
+  fragmentRegistry.value = nextRegistry
+  userEvents.value.push(...eventFragments)
+
+  const newScenes = buildScenes(envelope, renderFragments)
+  if (newScenes.length === 0) {
+    return
+  }
+
+  const startingIndex = scenes.value.length
+  scenes.value.push(...newScenes)
 
   await nextTick(() => {
-    const target = blockRefs.value[startingIndex]
+    const target = sceneRefs.value[startingIndex]
     const element = target?.$el as HTMLElement | undefined
-
     element?.scrollIntoView({ behavior: startingIndex ? 'smooth' : 'auto' })
   })
+}
+
+const handlePayload = async (payload: unknown, fallbackPrefix: string) => {
+  const envelope = normalizeEnvelope(payload, { fallbackPrefix })
+  if (envelope === null) {
+    return
+  }
+  await applyEnvelope(envelope)
 }
 
 const fetchInitialBlocks = async () => {
@@ -266,7 +152,7 @@ const fetchInitialBlocks = async () => {
     loading.value = true
     error.value = null
     const response = await $http.value.get<unknown>(`${storyRoutePrefix}/update`)
-    await handleResponse(normalizePayload(response.data))
+    await handlePayload(response.data, 'initial-fragment')
   } catch (err) {
     console.error('Failed to fetch initial story.', err)
     error.value = 'Failed to load story. Please refresh the page.'
@@ -277,11 +163,7 @@ const fetchInitialBlocks = async () => {
 
 onMounted(fetchInitialBlocks)
 
-const doAction = async (
-  _block: JournalStoryUpdate,
-  actionUid: string,
-  payload?: unknown,
-) => {
+const doAction = async (actionUid: string, payload?: unknown) => {
   try {
     loading.value = true
     error.value = null
@@ -289,7 +171,7 @@ const doAction = async (
       choice_id: actionUid,
       payload,
     })
-    await handleResponse(normalizePayload(response.data))
+    await handlePayload(response.data, `action-${scenes.value.length + 1}`)
   } catch (err) {
     console.error('Failed to execute action.', err)
     error.value = 'Failed to execute action. Please try again.'
@@ -320,18 +202,37 @@ const doAction = async (
       {{ error }}
     </v-alert>
 
+    <div
+      v-for="event in userEvents"
+      :key="event.uid"
+      class="mb-3"
+      data-testid="user-event"
+      role="status"
+      aria-live="polite"
+    >
+      <v-alert density="compact" type="info" variant="tonal">
+        <strong v-if="event.event_type">{{ event.event_type }}:</strong>
+        {{ fragmentText(event.content) }}
+      </v-alert>
+    </div>
+
     <StoryBlock
-      v-for="block in blocks"
-      :key="block.key"
-      ref="blockRefs"
-      :block="block"
+      v-for="scene in scenes"
+      :key="scene.key"
+      ref="sceneRefs"
+      :scene="scene"
+      :fragments="fragmentRegistry"
+      :disabled="loading"
       @doAction="doAction"
     />
 
     <v-card v-if="debugEnabled" class="mt-4">
       <v-card-item>
         <v-card border>
-          <v-card-text class="text-caption">Blocks: {{ blocks }}</v-card-text>
+          <v-card-text class="text-caption">
+            Scenes: {{ scenes }}
+            Fragments: {{ fragmentRegistry }}
+          </v-card-text>
         </v-card>
       </v-card-item>
     </v-card>

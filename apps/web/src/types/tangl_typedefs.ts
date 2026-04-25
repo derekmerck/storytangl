@@ -243,3 +243,122 @@ export type JournalEntry = JournalStoryUpdate[]
 export type StoryStatus = ProjectedState
 export type WorldSceneList = JournalKVItem[]
 export type WorldList = JournalKVItem[]
+
+export type FragmentId = string
+
+export interface PresentationHints {
+  style_name?: string | null
+  style_tags?: string[]
+  style_dict?: StyleHints
+  icon?: string | null
+  [key: string]: unknown
+}
+
+export interface BaseStoryFragment {
+  uid: FragmentId
+  fragment_type: string
+  content?: unknown
+  origin_id?: string | null
+  step?: number | null
+  tags?: string[]
+  [key: string]: unknown
+}
+
+export interface ContentStoryFragment extends BaseStoryFragment {
+  fragment_type: 'content'
+  content?: unknown
+  source_id?: string | null
+  content_format?: string | null
+  format?: string | null
+  hints?: PresentationHints | null
+  presentation_hints?: PresentationHints | null
+}
+
+export interface AttributedStoryFragment extends BaseStoryFragment {
+  fragment_type: 'attributed'
+  who: string
+  how: string
+  media: string
+  content?: unknown
+  hints?: PresentationHints | null
+}
+
+export interface MediaStoryFragment extends BaseStoryFragment {
+  fragment_type: 'media'
+  content?: unknown
+  content_format?: 'url' | 'data' | 'xml' | 'json' | 'rit' | string
+  media_role?: MediaRole | string | null
+  scope?: string | null
+  staging_hints?: Record<string, unknown> | null
+  generation_status?: string | null
+  url?: string
+  src?: string
+  data?: unknown
+  text?: string
+}
+
+export interface GroupStoryFragment extends BaseStoryFragment {
+  fragment_type: 'group' | 'dialog'
+  group_type?: string | null
+  member_ids: FragmentId[]
+}
+
+export interface KvStoryFragment extends BaseStoryFragment {
+  fragment_type: 'kv'
+  content: Array<[string, PrimitiveValue | unknown]>
+  hints?: PresentationHints | null
+}
+
+export interface ChoiceStoryFragment extends BaseStoryFragment {
+  fragment_type: 'choice'
+  edge_id?: FragmentId | null
+  text: string
+  available?: boolean
+  active?: boolean | null
+  unavailable_reason?: string | null
+  blockers?: Array<Record<string, unknown>> | null
+  accepts?: Record<string, unknown> | null
+  ui_hints?: Record<string, unknown> | null
+  payload?: unknown
+}
+
+export interface ControlStoryFragment extends BaseStoryFragment {
+  fragment_type: 'update' | 'delete'
+  ref_type?: string
+  ref_id?: FragmentId
+  reference_type?: string
+  reference_id?: FragmentId
+  payload?: Record<string, unknown> | null
+}
+
+export interface UserEventStoryFragment extends BaseStoryFragment {
+  fragment_type: 'user_event'
+  event_type?: string | null
+  content?: unknown
+}
+
+export type StoryFragment =
+  | ContentStoryFragment
+  | AttributedStoryFragment
+  | MediaStoryFragment
+  | GroupStoryFragment
+  | KvStoryFragment
+  | ChoiceStoryFragment
+  | ControlStoryFragment
+  | UserEventStoryFragment
+  | BaseStoryFragment
+
+export interface RuntimeEnvelope {
+  cursor_id?: string | null
+  step?: number | null
+  fragments: StoryFragment[]
+  last_redirect?: Record<string, unknown> | null
+  redirect_trace?: Array<Record<string, unknown>>
+  metadata?: Record<string, unknown>
+}
+
+export interface StorySceneModel {
+  key: string
+  uid: FragmentId
+  memberIds: FragmentId[]
+}

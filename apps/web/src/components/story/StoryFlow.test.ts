@@ -1,12 +1,15 @@
-import { beforeAll, beforeEach, afterEach, afterAll, describe, it, expect, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
 import { HttpResponse, http, server } from '@tests/setup'
-import { mockBlock1, mockBlock2 } from '@tests/mocks/mockData'
+import {
+  crossroadsNextRuntimeEnvelope,
+  crossroadsRuntimeEnvelope,
+} from '@tests/fixtures'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 const vuetify = createVuetify({ components, directives })
@@ -47,7 +50,7 @@ const mountFlow = () =>
   })
 
 describe('StoryFlow', () => {
-  it('shows a loading indicator while fetching initial blocks', async () => {
+  it('shows a loading indicator while fetching the initial envelope', async () => {
     let resolveResponse!: () => void
     let notifyHandlerReady!: () => void
     const handlerInvoked = new Promise<void>((resolve) => {
@@ -58,7 +61,7 @@ describe('StoryFlow', () => {
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
         new Promise((resolve) => {
           notifyHandlerReady()
-          resolveResponse = () => resolve(HttpResponse.json([mockBlock1, mockBlock2]))
+          resolveResponse = () => resolve(HttpResponse.json(crossroadsRuntimeEnvelope))
         }),
       ),
     )
@@ -70,84 +73,72 @@ describe('StoryFlow', () => {
     await handlerInvoked
     await flushPromises()
     await nextTick()
-    await flushPromises()
-    await nextTick()
 
     expect(vm.loading).toBe(true)
     expect(wrapper.find('[data-testid="storyflow-progress"]').exists()).toBe(true)
 
     resolveResponse()
-
-    await new Promise((resolve) => setTimeout(resolve, 0))
     await flushPromises()
     await nextTick()
-    await (component.vm as any).$nextTick?.()
 
     expect(vm.loading).toBe(false)
-
-    await new Promise<void>((resolve, reject) => {
-      const start = Date.now()
-      const check = () => {
-        if (!wrapper.find('[data-testid="storyflow-progress"]').exists()) {
-          resolve()
-          return
-        }
-
-        if (Date.now() - start > 1000) {
-          reject(new Error('progress indicator still visible'))
-          return
-        }
-
-        setTimeout(check, 10)
-      }
-
-      check()
-    })
   })
 
-  it('fetches and renders initial blocks on mount', async () => {
+  it('fetches and renders scene groups on mount', async () => {
     const wrapper = mountFlow()
     await flushPromises()
 
-    const blocks = wrapper.findAllComponents(StoryBlock)
-    expect(blocks.length).toBeGreaterThan(0)
+    const scenes = wrapper.findAllComponents(StoryBlock)
+    expect(scenes).toHaveLength(1)
+    expect(wrapper.text()).toContain('Rain drums on the thatch')
+    expect(wrapper.text()).toContain('Pay the forty silver')
   })
 
-  it('normalizes runtime envelope fragments into display blocks', async () => {
+  it('renders canonical media fragments and remaps media URLs', async () => {
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    const imgs = wrapper.findAllComponents({ name: 'VImg' })
+    const srcs = imgs.map((img) => String(img.props('src')))
+
+    expect(srcs.some((src) => src === 'http://localhost:8000/media/world/tangl_world/stranger_booth.svg')).toBe(true)
+  })
+
+  it('renders locked choices, freeform choices, pending media, kv, and user events', async () => {
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Requires Sleight of Hand')
+    expect(wrapper.find('input').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('late evening')
+    expect(wrapper.find('[data-testid="user-event"]').exists()).toBe(true)
+  })
+
+  it('applies control updates against the fragment registry', async () => {
     server.use(
       http.get(`${DEFAULT_API_URL}/story/update`, () =>
         HttpResponse.json({
           cursor_id: 'cursor-1',
           step: 1,
           fragments: [
-            { fragment_type: 'content', content: 'From envelope' },
-            { fragment_type: 'choice', edge_id: 'choice-1', text: 'Continue' },
-          ],
-        }),
-      ),
-    )
-
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const block = wrapper.findComponent(StoryBlock)
-    expect(block.exists()).toBe(true)
-    expect((block.props('block') as any).text).toContain('From envelope')
-    expect((block.props('block') as any).actions?.[0]?.text).toBe('Continue')
-  })
-
-  it('normalizes canonical media fragments and remaps media URLs', async () => {
-    server.use(
-      http.get(`${DEFAULT_API_URL}/story/update`, () =>
-        HttpResponse.json({
-          cursor_id: 'cursor-1',
-          step: 1,
-          fragments: [
-            { fragment_type: 'content', content: 'With media' },
             {
-              fragment_type: 'media',
-              media_role: 'narrative_im',
-              url: '/media/world/tangl_world/scene.svg',
+              uid: 'scene',
+              fragment_type: 'group',
+              group_type: 'scene',
+              member_ids: ['content'],
+            },
+            {
+              uid: 'content',
+              fragment_type: 'content',
+              content: 'Before update',
+            },
+            {
+              uid: 'ctrl',
+              fragment_type: 'update',
+              ref_type: 'content',
+              ref_id: 'content',
+              payload: { content: 'After update' },
             },
           ],
         }),
@@ -157,130 +148,86 @@ describe('StoryFlow', () => {
     const wrapper = mountFlow()
     await flushPromises()
 
-    const block = wrapper.findComponent(StoryBlock)
-    expect(block.exists()).toBe(true)
-    expect((block.props('block') as any).media?.[0]?.url).toBe(
-      'http://localhost:8000/media/world/tangl_world/scene.svg',
+    expect(wrapper.text()).toContain('After update')
+    expect(wrapper.text()).not.toContain('Before update')
+  })
+
+  it('calls the API on doAction and appends returned scenes', async () => {
+    server.use(
+      http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
+        const body = await request.json()
+        expect(body).toEqual({
+          choice_id: 'edge-1',
+          payload: { offer_silver: 12 },
+        })
+        return HttpResponse.json(crossroadsNextRuntimeEnvelope)
+      }),
     )
-    expect((block.props('block') as any).media_dict?.narrative_im?.url).toBe(
-      'http://localhost:8000/media/world/tangl_world/scene.svg',
-    )
-  })
 
-  it('assigns unique keys to blocks', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const blocks = wrapper.findAllComponents(StoryBlock)
-    const keys = blocks.map((b) => (b.props('block') as any).key)
-    const uniqueKeys = new Set(keys)
-    expect(keys.length).toBe(uniqueKeys.size)
-  })
-
-  it('remaps media URLs in blocks', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const block = wrapper
-      .findAllComponents(StoryBlock)
-      .map((b) => b.props('block') as typeof mockBlock1)
-      .find((b) => b.media_dict?.narrative_im)
-
-    if (block?.media_dict?.narrative_im) {
-      expect(block.media_dict.narrative_im.url).toMatch(/^http/)
-    }
-  })
-
-  it('creates media_dict for blocks with media', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const block = wrapper
-      .findAllComponents(StoryBlock)
-      .map((b) => b.props('block') as typeof mockBlock1)
-      .find((b) => Array.isArray(b.media) && b.media.length > 0)
-
-    if (block) {
-      expect(block.media_dict).toBeDefined()
-    }
-  })
-
-  it('remaps URLs in dialog block media', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const block = wrapper
-      .findAllComponents(StoryBlock)
-      .map((b) => b.props('block') as typeof mockBlock2)
-      .find((b) => b.dialog?.some((dialog) => dialog.media_dict?.avatar_im))
-
-    if (block) {
-      const dialog = block.dialog?.find((d) => d.media_dict?.avatar_im)
-      if (dialog?.media_dict?.avatar_im) {
-        expect(dialog.media_dict.avatar_im.url).toMatch(/^http/)
-      }
-    }
-  })
-
-  it('clears blocks and resets when label is present', async () => {
     const wrapper = mountFlow()
     await flushPromises()
 
     const initialCount = wrapper.findAllComponents(StoryBlock).length
-    expect(initialCount).toBeGreaterThan(0)
+    const firstScene = wrapper.findComponent(StoryBlock)
+    await firstScene.vm.$emit('doAction', 'edge-1', { offer_silver: 12 })
+    await flushPromises()
 
+    const scenes = wrapper.findAllComponents(StoryBlock)
+    expect(scenes.length).toBeGreaterThan(initialCount)
+    expect(wrapper.text()).toContain('The stranger slides the folded vellum')
+  })
+
+  it('handles unknown fragment types with visible fallbacks', async () => {
     server.use(
-      http.post(`${DEFAULT_API_URL}/story/do`, () =>
-        HttpResponse.json([
-          { ...mockBlock1, uid: 'reset-block', label: 'Reset scene', text: 'New beginning' },
-        ]),
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json({
+          cursor_id: 'cursor-1',
+          step: 1,
+          fragments: [
+            {
+              uid: 'mystery',
+              fragment_type: 'dice_roll',
+              content: { value: 6 },
+            },
+          ],
+        }),
       ),
     )
 
-    const firstBlock = wrapper.findComponent(StoryBlock)
-    await firstBlock.vm.$emit('doAction', firstBlock.props('block'), 'action_uid', null)
+    const wrapper = mountFlow()
     await flushPromises()
 
-    const blocks = wrapper.findAllComponents(StoryBlock)
-    expect(blocks).toHaveLength(1)
-    const [onlyBlock] = blocks
-    expect(onlyBlock).toBeDefined()
-    expect((onlyBlock!.props('block') as any).uid).toBe('reset-block')
+    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('dice_roll')
   })
 
-  it('calls API on doAction and appends new blocks', async () => {
+  it('keeps referenced choice state visible for decision legibility', async () => {
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Show a card from your hand')
+    expect(wrapper.text()).toContain('zone')
+    expect(wrapper.text()).toContain('Rust map card')
+  })
+
+  it('adapts legacy JournalStoryUpdate arrays through a narrow compatibility path', async () => {
     server.use(
-      http.post(`${DEFAULT_API_URL}/story/do`, () =>
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
         HttpResponse.json([
-          mockBlock1,
-          { ...mockBlock2, uid: 'fresh-block', text: 'Another branch' },
+          {
+            uid: 'legacy-block',
+            text: '<p>Legacy text</p>',
+            actions: [{ uid: 'legacy-choice', text: 'Legacy choice' }],
+          },
         ]),
       ),
     )
 
     const wrapper = mountFlow()
     await flushPromises()
-    const initialCount = wrapper.findAllComponents(StoryBlock).length
 
-    const firstBlock = wrapper.findComponent(StoryBlock)
-    await firstBlock.vm.$emit('doAction', firstBlock.props('block'), 'action_uid', null)
-    await flushPromises()
-
-    const blocks = wrapper.findAllComponents(StoryBlock)
-    expect(blocks.length).toBeGreaterThan(initialCount)
-  })
-
-  it('increments block counter for each new block', async () => {
-    const wrapper = mountFlow()
-    await flushPromises()
-
-    const keys = wrapper
-      .findAllComponents(StoryBlock)
-      .map((component) => (component.props('block') as any).key as string)
-
-    keys.forEach((key) => {
-      expect(key).toMatch(/-\d+$/)
-    })
+    expect(wrapper.html()).toContain('<p>Legacy text</p>')
+    expect(wrapper.text()).toContain('Legacy choice')
   })
 
   it('handles API errors gracefully', async () => {
