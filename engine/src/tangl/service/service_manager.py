@@ -20,8 +20,10 @@ from tangl.vm.runtime.ledger import Ledger
 
 from .exceptions import AuthMismatchError
 from ._user_support import parse_bool_flag, parse_datetime_field
+from .diagnostics import diagnostics_from_codec_state, diagnostics_from_compile_issues
 from .media import resolve_world_media
 from .response import (
+    PreflightReport,
     ProjectedState,
     RuntimeEnvelope,
     RuntimeInfo,
@@ -627,6 +629,38 @@ class ServiceManager:
         metadata.setdefault("title", world.label)
         metadata.setdefault("author", "Unknown")
         return WorldInfo(label=world.label, **metadata)
+
+    @service_method(
+        access=ServiceAccess.PUBLIC,
+        context=ServiceContext.WORLD,
+        writeback=ServiceWriteback.NONE,
+        operation_id="world.preflight",
+    )
+    def preflight_world(self, *, world_id: str) -> PreflightReport:
+        """Compile one discovered world bundle and return authoring diagnostics."""
+
+        registry = WorldRegistry()
+        bundle = registry.bundles.get(world_id)
+        if bundle is None:
+            if world_id in dict(iter_manual_worlds()):
+                return PreflightReport(
+                    world_id=world_id,
+                    status="ok",
+                    diagnostics=[],
+                )
+            raise ValueError(f"Unknown world: {world_id}")
+
+        world = registry.compiler.compile(bundle)
+        diagnostics = [
+            *diagnostics_from_codec_state(world.bundle.codec_state),
+            *diagnostics_from_compile_issues(world.bundle.issues),
+        ]
+        status = "error" if any(item.severity == "error" for item in diagnostics) else "ok"
+        return PreflightReport(
+            world_id=world_id,
+            status=status,
+            diagnostics=diagnostics,
+        )
 
     @service_method(
         access=ServiceAccess.PUBLIC,

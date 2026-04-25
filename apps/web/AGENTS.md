@@ -23,17 +23,20 @@ Components follow this pattern:
 ```vue
 <script setup lang="ts">
 // 1. Imports
-import { ref, computed } from 'vue'
-import type { PropType } from 'vue'
+import { computed, ref } from 'vue'
+
+import { useGlobal } from '@/composables/globals'
+import type { StoryFragment } from '@/types'
+import { fragmentText } from './fragmentUtils'
 
 // 2. Props with types
 const props = defineProps<{
-  block: JournalStoryUpdate
+  fragment: StoryFragment
 }>()
 
 // 3. Emits with typed payloads
 const emit = defineEmits<{
-  doAction: [uid: string, payload?: any]
+  doAction: [edgeId: string, payload?: unknown]
 }>()
 
 // 4. Composables
@@ -43,7 +46,7 @@ const { $http } = useGlobal()
 const loading = ref(false)
 
 // 6. Computed properties
-const hasMedia = computed(() => props.block.media?.length > 0)
+const content = computed(() => fragmentText(props.fragment.content))
 
 // 7. Methods
 function handleClick() {
@@ -54,7 +57,7 @@ function handleClick() {
 <template>
   <!-- Vuetify components with utility classes -->
   <v-card class="pa-4">
-    <v-card-text v-html="block.text" />
+    <v-card-text>{{ content }}</v-card-text>
   </v-card>
 </template>
 
@@ -124,8 +127,12 @@ describe('MyComponent', () => {
 - See `notes/DOCUMENTATION.md` for full documentation strategy
 
 ## Core abstractions to understand
-- **JournalStoryUpdate**: narrative block with text, media, and actions
-- **JournalAction**: clickable action button with uid and optional payload
+- **RuntimeEnvelope**: canonical story response with ordered `fragments`
+- **StoryFragment**: direct client view of backend journal fragments
+- **StorySceneModel**: lightweight scene shell pointing at fragment ids
+- **JournalStoryUpdate**: legacy block shape accepted only at the API boundary
+- **ChoiceFragment**: clickable or input-bearing choice with `edge_id`, `accepts`,
+  and optional `ui_hints`
 - **MediaRole**: semantic role for media (narrative_im, avatar_im, etc.)
 - **StoryStatus**: projected current-state sections for sidebar display
 - **useGlobal()**: composable providing $http, remapURL, makeMediaDict utilities
@@ -140,23 +147,27 @@ App.vue (root)
 ├── v-navigation-drawer (sidebar)
 │   └── StoryStatus (status display)
 └── v-main (content area)
-    └── StoryFlow (block container)
-        └── StoryBlock (repeated)
-            ├── StoryDialogBlock (optional, repeated)
-            └── StoryAction (repeated)
+    └── StoryFlow (fragment registry + scene container)
+        └── StoryBlock (scene shell, repeated)
+            ├── fragment renderers
+            └── StoryAction (choice fragment, repeated)
 ```
 
 ## Data flow pattern
 1. User clicks action button
-2. StoryAction emits `doAction(uid, payload)`
+2. StoryAction emits `doAction(edge_id, payload)`
 3. StoryBlock passes event up
 4. StoryFlow catches event
 5. StoryFlow calls API via axios
-6. Server returns a runtime envelope whose `fragments` become `JournalStoryUpdate[]`
-7. StoryFlow processes media URLs
-8. StoryFlow appends blocks to reactive array
-9. Vue reactivity updates DOM
-10. Browser auto-scrolls to new content
+6. Server returns a `RuntimeEnvelope`
+7. StoryFlow normalizes only envelope boundaries and stores fragments by `uid`
+8. `group_type="scene"` fragments create scene shells that reference member ids
+9. StoryBlock renders content/media/group/kv/choice/user-event fragments directly
+10. Browser auto-scrolls to new scenes
+
+Legacy `JournalStoryUpdate[]` responses are converted once in `fragmentUtils.ts`
+so older mocks can still load during transition. New widgets and tests should
+target `RuntimeEnvelope.fragments` directly.
 
 ## State management with Pinia
 ```typescript

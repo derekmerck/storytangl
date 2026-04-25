@@ -3,6 +3,17 @@ Probit-d20
 
 **Probit-d20** is a generic "rules-light" rpg stat system with intuitive ability and challenge ranks tied to the statistical normal distribution.
 
+See also: `STAT_CHALLENGE_DESIGN.rst` for the incremental plan to turn the
+existing stat/task primitives into authored narrative challenges.
+
+Current supported seams include:
+
+- low-level `Task`, `compute_delta()`, `inspect_resolution()`, and `resolve_task()`
+- authored one-shot `StatChallenge` plus `resolve_challenge()`
+- structured `ChallengeResult` output and projection helpers
+- explicit modifier donors for effects and tags
+- baseline growth handlers and the small `Adventure2` preset
+
 Any task can be converted into a probit (probability unit) for success and resolved with a uniform random sampler, like dice rolls, coin tosses, or card draws.  d20 is particularly easy to map onto the normal distribution $N(10,3)$, which inspired the name.
 
 Alternatively, 4d6-4 generates a decent approximation of $N(10,3)$ in a pinch when using probit is undesirable.

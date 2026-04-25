@@ -102,7 +102,7 @@ defineProps<{
 
 // Type an emit
 const emit = defineEmits<{
-  doAction: [uid: string, payload?: any]
+  doAction: [edgeId: string, payload?: unknown]
 }>()
 
 // Type a ref
@@ -133,19 +133,31 @@ it('handles custom response', async () => {
 
 ```
 // Story types
-JournalStoryUpdate {
-  uid: string
-  text?: string
-  media?: JournalMediaItems
-  actions?: JournalAction[]
-  dialog?: StyledJournalItem[]
+RuntimeEnvelope {
+  cursor_id?: string | null
+  step?: number | null
+  fragments: StoryFragment[]
 }
 
-JournalAction {
+StoryFragment {
   uid: string
+  fragment_type: string
+  content?: unknown
+}
+
+ChoiceStoryFragment {
+  fragment_type: 'choice'
+  edge_id?: string | null
   text: string
-  icon?: string
-  payload?: string
+  available?: boolean
+  accepts?: Record<string, unknown> | null
+  ui_hints?: Record<string, unknown> | null
+}
+
+GroupStoryFragment {
+  fragment_type: 'group' | 'dialog'
+  group_type?: string | null
+  member_ids: string[]
 }
 
 // Media types
@@ -155,10 +167,11 @@ MediaRole =
   | 'narrative_vox' | 'character_vox'
   | 'music' | 'sound_fx'
 
-JournalMediaItem {
+MediaStoryFragment {
+  fragment_type: 'media'
   media_role: MediaRole
-  url?: string
-  data?: unknown
+  content_format?: 'url' | 'data' | 'xml' | 'json' | 'rit' | string
+  content?: unknown
 }
 ```
 

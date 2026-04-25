@@ -5,6 +5,7 @@ from typing import Dict, Iterable, Mapping, Optional
 from pydantic import BaseModel, ConfigDict
 
 from ..definition.stat_system import StatSystemDefinition
+from ..handlers import get_handler_cls
 from ..stats.stat import Stat
 
 
@@ -70,10 +71,11 @@ class HasStats(BaseModel):
         """
         overrides = overrides or {}
         stats: Dict[str, Stat] = {}
+        handler_cls = get_handler_cls(stat_system.handler)
 
         for sdef in stat_system.stats:
             value = overrides.get(sdef.name, base_fv)
-            stats[sdef.name] = Stat(value)
+            stats[sdef.name] = Stat.from_value(value, handler=handler_cls)
 
         return cls(stat_system=stat_system, stats=stats, **extra)
 
@@ -87,7 +89,8 @@ class HasStats(BaseModel):
 
     def set_stat(self, name: str, value: float | int | str) -> None:
         """Set or create a Stat by name using Stat's flexible constructor."""
-        self.stats[name] = Stat(value)
+        handler_cls = get_handler_cls(self.stat_system.handler)
+        self.stats[name] = Stat.from_value(value, handler=handler_cls)
 
     def iter_stats(self, names: Optional[Iterable[str]] = None):
         """Iterate over (name, Stat) pairs; optionally constrained to a subset of names."""

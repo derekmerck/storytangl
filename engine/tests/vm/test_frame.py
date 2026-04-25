@@ -5,6 +5,11 @@ Organized by concept:
 - Frame.follow_edge: pipeline execution, entry_phase skipping
 - Frame.resolve_choice: redirect chaining, return stack, recursion guard
 - Frame.goto_node: forced jump
+
+.. storytangl-topic::
+   :topics: frame, phase_ctx
+   :facets: tests
+   :relation: tests
 """
 
 from __future__ import annotations

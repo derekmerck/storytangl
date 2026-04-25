@@ -1,96 +1,107 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import ContentFragmentView from './ContentFragmentView.vue'
+import GroupFragmentView from './GroupFragmentView.vue'
+import KvFragmentView from './KvFragmentView.vue'
+import MediaFragmentView from './MediaFragmentView.vue'
 import StoryAction from './StoryAction.vue'
-import StoryDialogBlock from './StoryDialogBlock.vue'
-import type { JournalStoryUpdate, JournalAction, DialogBlock } from '@/types'
+import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
+import type { ChoiceStoryFragment, StoryFragment, StorySceneModel } from '@/types'
 import { useGlobal } from '@/composables/globals'
+import {
+  isChoiceFragment,
+  isGroupFragment,
+  isMediaFragment,
+} from './fragmentUtils'
 
-/**
- * StoryBlock - renders a narrative block including dialog, media, and actions.
- */
 const props = defineProps<{
-  block: JournalStoryUpdate
+  scene: StorySceneModel
+  fragments: Record<string, StoryFragment>
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
-  doAction: [block: JournalStoryUpdate, uid: string, passback?: unknown]
+  doAction: [uid: string, payload?: unknown]
 }>()
 
 const { $debug, $verbose } = useGlobal()
 
-const actions = computed<JournalAction[]>(() => props.block.actions ?? [])
-const hasActions = computed(() => actions.value.length > 0)
-const hasDialog = computed(() => (props.block.dialog?.length ?? 0) > 0)
-
-const narrativeMedia = computed(() => {
-  if (props.block.media_dict?.narrative_im) {
-    return props.block.media_dict.narrative_im
-  }
-
-  return props.block.media?.find((item) => item.media_role === 'narrative_im') ?? null
-})
-
-const hasLandscapeImage = computed(() => narrativeMedia.value?.orientation === 'landscape')
-const hasInlineImage = computed(() => Boolean(narrativeMedia.value) && !hasLandscapeImage.value)
-const imageColumnSize = computed(() => (narrativeMedia.value?.orientation === 'portrait' ? 4 : 5))
-
-const shouldShowText = computed(() => Boolean(props.block.text) && !hasDialog.value)
-
-const dialogBlocks = computed<DialogBlock[]>(() => props.block.dialog ?? [])
-
+const sceneMembers = computed(() =>
+  props.scene.memberIds
+    .map((id) => props.fragments[id])
+    .filter((fragment): fragment is StoryFragment => Boolean(fragment)),
+)
+const choices = computed<ChoiceStoryFragment[]>(() =>
+  sceneMembers.value.filter(isChoiceFragment),
+)
+const flowMembers = computed(() =>
+  sceneMembers.value.filter(
+    (fragment) =>
+      !isChoiceFragment(fragment) &&
+      fragment.fragment_type !== 'update' &&
+      fragment.fragment_type !== 'delete' &&
+      fragment.fragment_type !== 'user_event',
+  ),
+)
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 
-const handleAction = (uid: string, passback?: unknown) => {
-  emit('doAction', props.block, uid, passback)
+const handleAction = (uid: string, payload?: unknown) => {
+  emit('doAction', uid, payload)
 }
 </script>
 
 <template>
-  <v-card class="mb-4">
-    <v-card-item v-if="hasLandscapeImage" class="mx-5 mt-5">
-      <v-parallax :src="narrativeMedia?.url" cover height="50vh" scale="0.5" />
-    </v-card-item>
-
-    <v-card-title v-if="block.title" class="subtitle mx-5 mt-5">
-      {{ block.title }}
-    </v-card-title>
-
+  <v-card class="mb-4 story-scene" data-testid="story-scene">
     <v-card-item>
-      <v-row align="stretch" justify="center">
-        <v-col>
-          <v-card-text v-if="shouldShowText" v-html="block.text" />
+      <div v-for="fragment in flowMembers" :key="fragment.uid" class="fragment-row">
+        <ContentFragmentView
+          v-if="fragment.fragment_type === 'content'"
+          :fragment="fragment"
+        />
 
-          <v-row v-if="hasDialog" class="g-0">
-            <StoryDialogBlock v-for="dialog in dialogBlocks" :key="dialog.uid" :dialog_block="dialog" />
-          </v-row>
+        <MediaFragmentView v-else-if="isMediaFragment(fragment)" :fragment="fragment" />
 
-          <v-card-actions v-if="hasActions">
-            <v-row dense>
-              <StoryAction v-for="action in actions" :key="action.uid" :action="action" @doAction="handleAction" />
-            </v-row>
-          </v-card-actions>
-        </v-col>
+        <GroupFragmentView
+          v-else-if="isGroupFragment(fragment)"
+          :group="fragment"
+          :fragments="fragments"
+        />
 
-        <v-col
-          v-if="hasInlineImage"
-          cols="12"
-          :md="imageColumnSize"
-          class="mr-5"
-          order="first"
-          order-md="last"
-        >
-          <v-img :src="narrativeMedia?.url" :style="{ maxHeight: '70vh' }" cover />
-        </v-col>
-      </v-row>
+        <KvFragmentView v-else-if="fragment.fragment_type === 'kv'" :fragment="fragment" />
+
+        <UnknownFragmentFallback v-else :fragment="fragment" />
+      </div>
+
+      <v-card-actions v-if="choices.length > 0" role="group" aria-label="choices">
+        <v-row dense>
+          <StoryAction
+            v-for="choice in choices"
+            :key="choice.uid"
+            :choice="choice"
+            :disabled="disabled"
+            @doAction="handleAction"
+          />
+        </v-row>
+      </v-card-actions>
     </v-card-item>
 
     <v-card-item v-if="debugEnabled">
       <v-card border>
         <v-card-text class="text-caption">
-          Block: {{ block }}
+          Scene: {{ scene }}
         </v-card-text>
       </v-card>
     </v-card-item>
   </v-card>
 </template>
+
+<style scoped>
+.story-scene {
+  overflow: hidden;
+}
+
+.fragment-row + .fragment-row {
+  margin-top: 10px;
+}
+</style>

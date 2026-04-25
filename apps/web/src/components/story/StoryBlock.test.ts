@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
@@ -6,189 +6,191 @@ import * as directives from 'vuetify/directives'
 
 import StoryBlock from './StoryBlock.vue'
 import StoryAction from './StoryAction.vue'
-import StoryDialogBlock from './StoryDialogBlock.vue'
-import type { JournalStoryUpdate } from '@/types'
+import type { StoryFragment, StorySceneModel } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
-const mountBlock = (block: JournalStoryUpdate) =>
+const buildScene = (memberIds: string[]): StorySceneModel => ({
+  key: 'scene-1',
+  uid: 'scene-1',
+  memberIds,
+})
+
+const mountBlock = (fragments: Record<string, StoryFragment>, memberIds: string[]) =>
   mount(StoryBlock, {
-    props: { block },
+    props: {
+      scene: buildScene(memberIds),
+      fragments,
+    },
     global: {
       plugins: [vuetify],
       components: {
         StoryAction,
-        StoryDialogBlock,
       },
     },
   })
 
 describe('StoryBlock', () => {
-  let simpleBlock: JournalStoryUpdate
-
   beforeEach(() => {
-    // Ensure tests run in non-verbose mode, otherwise 'notContains'
-    // will pick up debug info
     vi.stubEnv('VITE_DEBUG', 'false')
     vi.stubEnv('VITE_VERBOSE', 'false')
-    simpleBlock = {
-      uid: 'block_1',
-      text: 'You enter a dark room.',
-    }
   })
 
   afterEach(() => {
     vi.unstubAllEnvs()
   })
 
-  it('renders block text', () => {
-    const wrapper = mountBlock(simpleBlock)
+  it('renders content fragments', () => {
+    const fragments: Record<string, StoryFragment> = {
+      content: {
+        uid: 'content',
+        fragment_type: 'content',
+        content: 'You enter a dark room.',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['content'])
+
     expect(wrapper.text()).toContain('You enter a dark room.')
   })
 
-  it('renders title when provided', () => {
-    const blockWithTitle: JournalStoryUpdate = {
-      uid: 'block_2',
-      title: 'Chapter 1',
-      text: 'The story begins...',
-    }
-
-    const wrapper = mountBlock(blockWithTitle)
-    expect(wrapper.text()).toContain('Chapter 1')
-    expect(wrapper.text()).toContain('The story begins...')
-  })
-
-  it('renders HTML in text field', () => {
-    const blockWithHTML: JournalStoryUpdate = {
-      uid: 'block_3',
-      text: '<p>Paragraph with <strong>bold</strong> text</p>',
-    }
-
-    const wrapper = mountBlock(blockWithHTML)
-    expect(wrapper.html()).toContain('<strong>bold</strong>')
-  })
-
-  it('renders landscape image when orientation is landscape', () => {
-    const blockWithLandscape: JournalStoryUpdate = {
-      uid: 'block_4',
-      text: 'A vast landscape...',
-      media_dict: {
-        narrative_im: {
-          media_role: 'narrative_im',
-          url: 'https://example.com/landscape.jpg',
-          orientation: 'landscape',
-        },
+  it('escapes HTML content in content fragments', () => {
+    const fragments: Record<string, StoryFragment> = {
+      content: {
+        uid: 'content',
+        fragment_type: 'content',
+        content: '<p>Paragraph with <strong>bold</strong> text</p>',
+        content_format: 'html',
       },
     }
 
-    const wrapper = mountBlock(blockWithLandscape)
-    expect(wrapper.find('.v-parallax').exists()).toBe(true)
+    const wrapper = mountBlock(fragments, ['content'])
+
+    expect(wrapper.text()).toContain('<p>Paragraph with <strong>bold</strong> text</p>')
+    expect(wrapper.html()).not.toContain('<strong>bold</strong>')
   })
 
-  it('renders portrait image inline when orientation is portrait', () => {
-    const blockWithPortrait: JournalStoryUpdate = {
-      uid: 'block_5',
-      text: 'A tall tower...',
-      media_dict: {
-        narrative_im: {
-          media_role: 'narrative_im',
-          url: 'https://example.com/portrait.jpg',
-          orientation: 'portrait',
-        },
+  it('renders media fragments using canonical content URLs', () => {
+    const fragments: Record<string, StoryFragment> = {
+      media: {
+        uid: 'media',
+        fragment_type: 'media',
+        content: 'https://example.com/portrait.svg',
+        content_format: 'url',
+        media_role: 'narrative_im',
+        staging_hints: { media_shape: 'portrait' },
       },
     }
 
-    const wrapper = mountBlock(blockWithPortrait)
+    const wrapper = mountBlock(fragments, ['media'])
     const img = wrapper.findComponent({ name: 'VImg' })
+
     expect(img.exists()).toBe(true)
-    expect(img.props('src')).toBe('https://example.com/portrait.jpg')
+    expect(img.props('src')).toBe('https://example.com/portrait.svg')
   })
 
-  it('renders square image inline when orientation is square', () => {
-    const blockWithSquare: JournalStoryUpdate = {
-      uid: 'block_6',
-      text: 'An artifact...',
-      media_dict: {
-        narrative_im: {
-          media_role: 'narrative_im',
-          url: 'https://example.com/square.jpg',
-          orientation: 'square',
-        },
+  it('renders pending RIT media placeholders', () => {
+    const fragments: Record<string, StoryFragment> = {
+      media: {
+        uid: 'media',
+        fragment_type: 'media',
+        content: 'gen:portrait',
+        content_format: 'rit',
+        media_role: 'dialog_im',
       },
     }
 
-    const wrapper = mountBlock(blockWithSquare)
-    const img = wrapper.findComponent({ name: 'VImg' })
-    expect(img.exists()).toBe(true)
+    const wrapper = mountBlock(fragments, ['media'])
+
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('gen:portrait')
   })
 
-  it('renders dialog blocks when present', () => {
-    const blockWithDialog: JournalStoryUpdate = {
-      uid: 'block_7',
-      dialog: [
-        { uid: 'dialog-1', text: 'Hello!', label: 'Guard' },
-        { uid: 'dialog-2', text: 'Who goes there?', label: 'Guard' },
-      ],
+  it('renders dialog groups from attributed and media fragments', () => {
+    const fragments: Record<string, StoryFragment> = {
+      dialog: {
+        uid: 'dialog',
+        fragment_type: 'group',
+        group_type: 'dialog',
+        member_ids: ['line', 'avatar'],
+      },
+      line: {
+        uid: 'line',
+        fragment_type: 'attributed',
+        who: 'Guard',
+        how: 'stern',
+        media: 'speech',
+        content: 'Who goes there?',
+      },
+      avatar: {
+        uid: 'avatar',
+        fragment_type: 'media',
+        content: 'https://example.com/avatar.svg',
+        content_format: 'url',
+        media_role: 'avatar_im',
+      },
     }
 
-    const wrapper = mountBlock(blockWithDialog)
-    const dialogs = wrapper.findAllComponents(StoryDialogBlock)
-    expect(dialogs).toHaveLength(2)
+    const wrapper = mountBlock(fragments, ['dialog'])
+
+    expect(wrapper.text()).toContain('Guard')
+    expect(wrapper.text()).toContain('Who goes there?')
+    expect(wrapper.find('.v-avatar').exists()).toBe(true)
   })
 
-  it('renders text when no dialog present', () => {
-    const wrapper = mountBlock(simpleBlock)
-    const cardText = wrapper.find('.v-card-text')
-    expect(cardText.exists()).toBe(true)
-    expect(cardText.html()).toContain('You enter a dark room.')
-  })
-
-  it('does not render text when dialog is present', () => {
-    const blockWithDialog: JournalStoryUpdate = {
-      uid: 'block_8',
-      text: 'This should not appear',
-      dialog: [{ uid: 'dialog-3', text: 'Dialog takes precedence' }],
+  it('renders kv fragments as scene status', () => {
+    const fragments: Record<string, StoryFragment> = {
+      kv: {
+        uid: 'kv',
+        fragment_type: 'kv',
+        content: [
+          ['time', 'late'],
+          ['coin', 63],
+        ],
+      },
     }
 
-    const wrapper = mountBlock(blockWithDialog)
-    expect(wrapper.text()).not.toContain('This should not appear')
+    const wrapper = mountBlock(fragments, ['kv'])
+
+    expect(wrapper.text()).toContain('time')
+    expect(wrapper.text()).toContain('63')
   })
 
-  it('renders actions when provided', () => {
-    const blockWithActions: JournalStoryUpdate = {
-      uid: 'block_9',
-      text: 'What do you do?',
-      actions: [
-        { uid: 'action_1', text: 'Go north' },
-        { uid: 'action_2', text: 'Go south' },
-      ],
+  it('renders choices and emits selected edge ids', async () => {
+    const fragments: Record<string, StoryFragment> = {
+      content: {
+        uid: 'content',
+        fragment_type: 'content',
+        content: 'Choose:',
+      },
+      choice: {
+        uid: 'choice',
+        fragment_type: 'choice',
+        edge_id: 'edge-1',
+        text: 'Continue',
+      },
     }
 
-    const wrapper = mountBlock(blockWithActions)
-    const actions = wrapper.findAllComponents(StoryAction)
-    expect(actions).toHaveLength(2)
-  })
-
-  it('emits doAction when action is clicked', async () => {
-    const blockWithActions: JournalStoryUpdate = {
-      uid: 'block_10',
-      text: 'Choose:',
-      actions: [{ uid: 'action_1', text: 'Choice 1' }],
-    }
-
-    const wrapper = mountBlock(blockWithActions)
+    const wrapper = mountBlock(fragments, ['content', 'choice'])
     const action = wrapper.findComponent(StoryAction)
-    await action.vm.$emit('doAction', 'action_1', null)
+    await action.vm.$emit('doAction', 'edge-1', undefined)
 
-    const emissions = wrapper.emitted('doAction')
-    expect(emissions).toBeTruthy()
-    const [blockArg, uidArg, passbackArg] = emissions![0] as [
-      JournalStoryUpdate,
-      string,
-      unknown,
-    ]
-    expect(blockArg).toEqual(blockWithActions)
-    expect(uidArg).toBe('action_1')
-    expect(passbackArg).toBeNull()
+    expect(wrapper.text()).toContain('Continue')
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge-1', undefined])
+  })
+
+  it('renders unknown fragments as fallbacks', () => {
+    const fragments: Record<string, StoryFragment> = {
+      weird: {
+        uid: 'weird',
+        fragment_type: 'dice_roll',
+        content: { value: 6 },
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['weird'])
+
+    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('dice_roll')
   })
 })

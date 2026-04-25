@@ -296,6 +296,47 @@ class TestRemoteResponseHydration:
             "render_profile": "raw",
         }
 
+    def test_unknown_fragment_payloads_survive_remote_decode(self) -> None:
+        user_id = uuid4()
+        payload = {
+            "cursor_id": str(uuid4()),
+            "step": 4,
+            "fragments": [
+                {
+                    "fragment_type": "token",
+                    "token_id": "rust-map-card",
+                    "content": "Rust map card",
+                },
+                {
+                    "content": {"value": 6},
+                },
+                "raw-fragment",
+            ],
+            "metadata": {},
+        }
+        session = RecordingSession([StubResponse(200, payload)])
+        manager = RemoteServiceManager(
+            "https://example.test/api/v2",
+            api_key="bound-key",
+            session=session,
+        )
+        manager._bound_user_id = user_id
+
+        envelope = manager.get_story_update(user_id=user_id)
+
+        assert len(envelope.fragments) == 3
+        assert all(isinstance(fragment, BaseFragment) for fragment in envelope.fragments)
+        assert envelope.fragments[0].fragment_type == "token"
+        assert envelope.fragments[0].content == {
+            "fragment_type": "token",
+            "token_id": "rust-map-card",
+            "content": "Rust map card",
+        }
+        assert envelope.fragments[1].fragment_type == "unknown"
+        assert envelope.fragments[1].content == {"content": {"value": 6}}
+        assert envelope.fragments[2].fragment_type == "unknown"
+        assert envelope.fragments[2].content == "raw-fragment"
+
     def test_drop_story_reassembles_flattened_runtime_info_details(self) -> None:
         user_id = uuid4()
         session = RecordingSession(

@@ -29,6 +29,7 @@ extensions = [
     'sphinx_markdown_builder',
     'myst_parser',
     'service_api_docs',
+    'storytangl_topic',
 ]
 
 OFFLINE_MODE = os.environ.get("STORYTANGL_OFFLINE", "").lower() in {"1", "true", "yes"}

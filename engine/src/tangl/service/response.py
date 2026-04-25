@@ -11,6 +11,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue as PydanticJsonValue,
     ValidationError,
     field_serializer,
     model_validator,
@@ -138,6 +139,29 @@ class WorldInfo(InfoModel):
     label: str
     title: str | None = None
     author: str | None = None
+
+
+JsonValue: TypeAlias = PydanticJsonValue
+
+
+class AuthoringDiagnostic(InfoModel):
+    """Common service-facing shape for authoring integrity diagnostics."""
+
+    phase: Literal["decode", "compile", "runtime"]
+    severity: Literal["error", "warning"]
+    code: str
+    message: str
+    source: dict[str, JsonValue] | None = None
+    subject_label: str | None = None
+    details: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class PreflightReport(InfoModel):
+    """Non-mutating world authoring-integrity report."""
+
+    world_id: str
+    status: Literal["ok", "error"]
+    diagnostics: list[AuthoringDiagnostic] = Field(default_factory=list)
 
 
 class WorldList(KvFragment):
@@ -289,6 +313,7 @@ MediaNative: TypeAlias = MediaFragment
 NativeResponse: TypeAlias = FragmentStream | RuntimeEnvelope | InfoModel | RuntimeInfo | MediaNative
 
 __all__ = [
+    "AuthoringDiagnostic",
     "BadgeListValue",
     "FragmentStream",
     "InfoModel",
@@ -296,6 +321,7 @@ __all__ = [
     "KvListValue",
     "MediaNative",
     "NativeResponse",
+    "PreflightReport",
     "PrimitiveValue",
     "ProjectedItem",
     "ProjectedKVItem",

@@ -93,6 +93,42 @@ def _write_story_bundle(root: Path, *, with_projector: bool = False) -> str:
     return "story_demo"
 
 
+def _write_lossy_story_bundle(root: Path) -> str:
+    world_dir = root / "lossy_story"
+    world_dir.mkdir()
+    (world_dir / "world.yaml").write_text(
+        "\n".join(
+            [
+                "label: lossy_story",
+                "codec: twine",
+                "scripts: story.twee",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (world_dir / "story.twee").write_text(
+        "\n".join(
+            [
+                ":: StoryTitle",
+                "Lossy Story",
+                "",
+                ":: StoryData",
+                '{"start":"Begin","format":"Twine 2","format-version":"2.0"}',
+                "",
+                ":: Begin",
+                '<<display "End">>',
+                "<<if $torch>>Lit<<endif>>",
+                "[[Go->End]]",
+                "",
+                ":: End",
+                "Done.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return "lossy_story"
+
+
 def _session_value(payload: dict[str, object], key: str) -> object | None:
     sections = payload.get("sections")
     if not isinstance(sections, list):
@@ -139,6 +175,57 @@ def story_client(tmp_path: Path, monkeypatch) -> tuple[TestClient, dict[str, str
         World.clear_instances()
         reset_service_manager_for_testing()
         reset_service_state_for_testing()
+
+
+def test_world_preflight_rest_returns_clean_report(
+    story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, _headers, world_label = story_client
+
+    response = client.get(f"world/{world_label}/preflight")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["world_id"] == world_label
+    assert payload["status"] == "ok"
+    assert payload["diagnostics"] == []
+
+
+def test_world_preflight_rest_returns_decode_diagnostics(tmp_path: Path, monkeypatch) -> None:
+    world_label = _write_lossy_story_bundle(tmp_path)
+    monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
+
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
+    World.clear_instances()
+    client = TestClient(app, base_url="http://test/api/v2/")
+    try:
+        response = client.get(f"world/{world_label}/preflight")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["world_id"] == world_label
+        assert payload["status"] == "ok"
+        diagnostics = payload["diagnostics"]
+        assert diagnostics
+        assert {item["phase"] for item in diagnostics} == {"decode"}
+        assert {item["severity"] for item in diagnostics} == {"warning"}
+        assert any(item["code"].startswith("decode:unsupported_feature") for item in diagnostics)
+    finally:
+        client.close()
+        World.clear_instances()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()
+
+
+def test_world_preflight_rest_returns_404_for_unknown_world(
+    story_client: tuple[TestClient, dict[str, str], str],
+) -> None:
+    client, _headers, _world_label = story_client
+
+    response = client.get("world/missing_world/preflight")
+
+    assert response.status_code == 404
 
 
 def test_story_rest_envelope_flow(

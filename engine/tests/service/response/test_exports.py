@@ -5,6 +5,7 @@ from __future__ import annotations
 
 def test_service_response_types_importable() -> None:
     from tangl.service.response import (
+        AuthoringDiagnostic,
         BadgeListValue,
         FragmentStream,
         InfoModel,
@@ -12,6 +13,7 @@ def test_service_response_types_importable() -> None:
         KvListValue,
         MediaNative,
         NativeResponse,
+        PreflightReport,
         ProjectedSection,
         ProjectedState,
         RuntimeEnvelope,
@@ -23,12 +25,14 @@ def test_service_response_types_importable() -> None:
     from tangl.service.story_info import DefaultStoryInfoProjector, StoryInfoProjector
 
     assert BadgeListValue is not None
+    assert AuthoringDiagnostic is not None
     assert FragmentStream is not None
     assert InfoModel is not None
     assert ItemListValue is not None
     assert KvListValue is not None
     assert MediaNative is not None
     assert NativeResponse is not None
+    assert PreflightReport is not None
     assert ProjectedSection is not None
     assert ProjectedState is not None
     assert RuntimeEnvelope is not None
@@ -44,6 +48,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
     import tangl.service as service
 
     expected = {
+        "AuthoringDiagnostic",
         "BadgeListValue",
         "BlockingMode",
         "DefaultStoryInfoProjector",
@@ -53,6 +58,7 @@ def test_service_package_exports_include_manager_first_contract() -> None:
         "KvListValue",
         "MediaNative",
         "NativeResponse",
+        "PreflightReport",
         "PrimitiveValue",
         "ProjectedItem",
         "ProjectedKVItem",

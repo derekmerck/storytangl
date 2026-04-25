@@ -29,7 +29,7 @@ class Quality(IntEnum):
     @classmethod
     def from_name(cls, name: str) -> "Quality":
         """Resolve a case-insensitive name or alias to a Quality."""
-        key = name.strip().upper()
+        key = name.strip().upper().replace("-", "_").replace(" ", "_")
         # Optional simple synonyms
         aliases = {
             "AVERAGE": "MID",

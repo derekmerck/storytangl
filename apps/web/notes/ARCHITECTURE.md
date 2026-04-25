@@ -15,17 +15,18 @@
 │  │                                        │                   │ │
 │  │                    ┌───────────────────┴─────────────┐     │ │
 │  │                    │      StoryFlow                  │     │ │
-│  │                    │  - Manages block list           │     │ │
+│  │                    │  - Manages fragment registry    │     │ │
+│  │                    │  - Builds scene shells          │     │ │
 │  │                    │  - Handles API calls            │     │ │
 │  │                    │  - Auto-scrolls                 │     │ │
 │  │                    └───────────────────┬─────────────┘     │ │
 │  │                                        │                   │ │
 │  │                    ┌───────────────────▼─────────────┐     │ │
-│  │                    │     StoryBlock (repeated)       │     │ │
-│  │                    │  - Text content                 │     │ │
-│  │                    │  - Media display                │     │ │
-│  │                    │  - Dialog blocks                │     │ │
-│  │                    │  - Action buttons               │     │ │
+│  │                    │     StoryBlock (scene shell)    │     │ │
+│  │                    │  - Content fragments            │     │ │
+│  │                    │  - Media fragments              │     │ │
+│  │                    │  - Group fragments              │     │ │
+│  │                    │  - Choice fragments             │     │ │
 │  │                    └───────────────────┬─────────────┘     │ │
 │  │                                        │                   │ │
 │  │                    ┌───────────────────▼─────────────┐     │ │
@@ -221,25 +222,25 @@ apps/web/
 
 User clicks action button:
   │
-  ├─► StoryAction.vue emits 'doAction' with (uid, payload)
+  ├─► StoryAction.vue emits 'doAction' with (edge_id, payload)
   │
   ├─► StoryBlock.vue catches event, passes up
   │
   ├─► StoryFlow.vue catches event
   │     │
-  │     ├─► Calls axios.post('/story/do', {uid, payload})
+  │     ├─► Calls axios.post('/story/do', {choice_id, payload})
   │     │
-  │     ├─► Receives JournalStoryUpdate[]
+  │     ├─► Receives RuntimeEnvelope
   │     │
-  │     ├─► Processes media URLs with remapURL()
+  │     ├─► Stores fragments by uid
   │     │
-  │     ├─► Transforms media[] → media_dict{}
+  │     ├─► Applies update/delete control fragments
   │     │
-  │     ├─► Appends new blocks to blocks[]
+  │     ├─► Creates scene shells from group_type='scene'
   │     │
   │     └─► Vue reactivity updates DOM
   │
-  └─► StoryBlock components render new content
+  └─► StoryBlock renders scene member fragments directly
         │
         └─► Browser auto-scrolls to new content
 
@@ -252,8 +253,9 @@ User clicks action button:
   - Server manages state, game logic, content
 
 ✓ Fragment-based streaming
-  - Server returns journal fragments
-  - Client accumulates and displays
+  - Server returns RuntimeEnvelope.fragments
+  - Client accumulates fragments in a uid registry
+  - Scene groups decide which fragments appear together
   - Allows for complex narrative flows
 
 ✓ Media role system

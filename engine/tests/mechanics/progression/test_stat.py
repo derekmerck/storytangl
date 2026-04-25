@@ -66,3 +66,11 @@ def test_stat_with_handler_switch():
 
     # Tier may change because mapping differs
     assert s_lin.handler is LinearStatHandler
+
+
+def test_stat_from_value_uses_requested_handler_for_quality_inputs():
+    stat = Stat.from_value(Quality.HIGH, handler=LinearStatHandler)
+
+    assert stat.handler is LinearStatHandler
+    assert stat.fv == LinearStatHandler.fv_from_qv(Quality.HIGH.value)
+    assert stat.qv == Quality.HIGH.value

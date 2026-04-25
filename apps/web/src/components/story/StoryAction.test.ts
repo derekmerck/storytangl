@@ -5,64 +5,68 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
 import StoryAction from './StoryAction.vue'
-import type { JournalAction } from '@/types'
+import type { ChoiceStoryFragment } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
-const mountWithVuetify = (props: { action: JournalAction }) =>
+const mountWithVuetify = (props: { choice: ChoiceStoryFragment; disabled?: boolean }) =>
   mount(StoryAction, {
     props,
     global: {
       plugins: [vuetify],
     },
-  })
+})
 
 describe('StoryAction', () => {
-  const mockAction: JournalAction = {
+  const mockChoice: ChoiceStoryFragment = {
     uid: 'action_123',
+    fragment_type: 'choice',
+    edge_id: 'edge_123',
     text: 'Make a choice',
   }
 
-  it('renders action text', () => {
-    const wrapper = mountWithVuetify({ action: mockAction })
+  it('renders choice text', () => {
+    const wrapper = mountWithVuetify({ choice: mockChoice })
     expect(wrapper.text()).toContain('Make a choice')
   })
 
-  it('emits doAction event with uid when clicked', async () => {
-    const wrapper = mountWithVuetify({ action: mockAction })
+  it('emits doAction event with edge id when clicked', async () => {
+    const wrapper = mountWithVuetify({ choice: mockChoice })
 
     await wrapper.find('button').trigger('click')
 
     expect(wrapper.emitted('doAction')).toBeTruthy()
-    expect(wrapper.emitted('doAction')![0]).toEqual(['action_123', undefined])
+    expect(wrapper.emitted('doAction')![0]).toEqual(['edge_123', undefined])
   })
 
   it('renders icon when provided', () => {
-    const actionWithIcon: JournalAction = {
+    const choiceWithIcon: ChoiceStoryFragment = {
       uid: 'action_icon',
+      fragment_type: 'choice',
       text: 'Happy choice',
-      icon: 'emoticon-happy',
+      ui_hints: { icon: 'emoticon-happy' },
     }
 
-    const wrapper = mountWithVuetify({ action: actionWithIcon })
+    const wrapper = mountWithVuetify({ choice: choiceWithIcon })
 
     expect(wrapper.find('.v-icon').exists()).toBe(true)
   })
 
   it('does not render icon when not provided', () => {
-    const wrapper = mountWithVuetify({ action: mockAction })
+    const wrapper = mountWithVuetify({ choice: mockChoice })
 
     expect(wrapper.find('.v-icon').exists()).toBe(false)
   })
 
-  it('emits doAction with passback when provided', async () => {
-    const actionWithPassback: JournalAction = {
+  it('emits doAction with payload when provided', async () => {
+    const choiceWithPayload: ChoiceStoryFragment = {
       uid: 'action_pb',
+      fragment_type: 'choice',
       text: 'Choice',
-      passback: { data: 'value' },
+      payload: { data: 'value' },
     }
 
-    const wrapper = mountWithVuetify({ action: actionWithPassback })
+    const wrapper = mountWithVuetify({ choice: choiceWithPayload })
 
     await wrapper.find('button').trigger('click')
 
@@ -70,15 +74,102 @@ describe('StoryAction', () => {
   })
 
   it('applies custom styles when provided', () => {
-    const styledAction: JournalAction = {
+    const styledChoice: ChoiceStoryFragment = {
       uid: 'action_styled',
+      fragment_type: 'choice',
       text: 'Styled',
       style: { color: 'red' },
     }
 
-    const wrapper = mountWithVuetify({ action: styledAction })
+    const wrapper = mountWithVuetify({ choice: styledChoice })
 
     const button = wrapper.find('button')
     expect(button.attributes('style')).toContain('color')
+  })
+
+  it('renders locked choices with reason and does not emit', async () => {
+    const lockedChoice: ChoiceStoryFragment = {
+      uid: 'action_locked',
+      fragment_type: 'choice',
+      text: 'Sneak away',
+      available: false,
+      unavailable_reason: 'Requires stealth',
+    }
+
+    const wrapper = mountWithVuetify({ choice: lockedChoice })
+
+    expect(wrapper.text()).toContain('Requires stealth')
+    expect(wrapper.find('button').attributes('aria-disabled')).toBe('true')
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+  })
+
+  it('emits freeform payloads using accepts payload_type', async () => {
+    const freeformChoice: ChoiceStoryFragment = {
+      uid: 'action_freeform',
+      fragment_type: 'choice',
+      text: 'Haggle',
+      accepts: {
+        payload_type: 'offer_silver',
+        input: 'integer',
+        min: 1,
+        max: 63,
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: freeformChoice })
+    await wrapper.find('input').setValue('12')
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'action_freeform',
+      { offer_silver: 12 },
+    ])
+  })
+
+  it('does not treat structured token accepts as freeform input', () => {
+    const tokenChoice: ChoiceStoryFragment = {
+      uid: 'action_tokens',
+      fragment_type: 'choice',
+      text: 'Play a card',
+      accepts: {
+        kind: 'tokens',
+        min: 1,
+        max: 1,
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: tokenChoice })
+
+    expect(wrapper.find('input').exists()).toBe(false)
+  })
+
+  it('does not emit blank or out-of-range numeric freeform payloads', async () => {
+    const freeformChoice: ChoiceStoryFragment = {
+      uid: 'action_freeform',
+      fragment_type: 'choice',
+      text: 'Haggle',
+      accepts: {
+        payload_type: 'offer_silver',
+        input: 'integer',
+        min: 1,
+        max: 63,
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: freeformChoice })
+
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('input').setValue('0')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('input').setValue('64')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
   })
 })

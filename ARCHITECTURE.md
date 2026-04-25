@@ -48,6 +48,12 @@ functions, and associative collections.
 
 ### Entity (`core/entity.py`)
 
+```{storytangl-topic}
+:topics: entity
+:facets: overview
+:relation: documents
+```
+
 The universal base type. Everything managed by the graph is an Entity.
 
 - Has a UUID (`uid`), an optional string `label`, and an optional `tags` set.
@@ -193,6 +199,12 @@ A `Record` wrapping a prototype Entity payload.
 
 ### Behavior & Dispatch (`core/behavior.py`, `core/dispatch.py`)
 
+```{storytangl-topic}
+:topics: dispatch
+:facets: overview
+:relation: documents
+```
+
 - **Behavior** — a callable wrapper with priority, dispatch layer, and
   optional caller-kind filtering. Returns a `CallReceipt`.
 - **BehaviorRegistry** — a registry of behaviors. `chain_execute_all`
@@ -276,6 +288,12 @@ The pipeline at each cursor position is:
 7. **POSTREQS** — continuation redirect, if any
 
 ### PhaseCtx (`vm/runtime/frame.py`)
+
+```{storytangl-topic}
+:topics: phase_ctx
+:facets: overview
+:relation: documents
+```
 
 The ONE concrete context type for phase execution.
 

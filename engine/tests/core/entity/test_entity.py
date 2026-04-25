@@ -1,4 +1,10 @@
-"""Contract tests for ``tangl.core.entity.Entity``."""
+"""Contract tests for ``tangl.core.entity.Entity``.
+
+.. storytangl-topic::
+   :topics: entity
+   :facets: tests
+   :relation: tests
+"""
 
 from __future__ import annotations
 

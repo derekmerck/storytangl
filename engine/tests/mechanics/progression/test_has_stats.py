@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tangl.mechanics.progression.definition import CanonicalSlot, StatDef, StatSystemDefinition
 from tangl.mechanics.progression.entity.has_stats import HasStats
+from tangl.mechanics.progression.handlers.linear import LinearStatHandler
 from tangl.mechanics.progression.measures import Quality
 from tangl.mechanics.progression.stats.stat import Stat
 
@@ -113,3 +114,23 @@ def test_dynamic_attribute_access_and_missing():
         pass
     else:
         raise AssertionError("Expected AttributeError for unknown attribute")
+
+
+def test_from_system_uses_declared_handler():
+    system = StatSystemDefinition(
+        name="linear_test",
+        theme="test",
+        complexity=1,
+        handler="linear",
+        stats=[
+            StatDef(
+                name="body",
+                is_intrinsic=True,
+                canonical_slot=CanonicalSlot.PHYSICAL,
+            ),
+        ],
+    )
+
+    entity = HasStats.from_system(system, overrides={"body": 4.0})
+    assert entity.body.handler is LinearStatHandler
+    assert entity.body.quality is Quality.VERY_POOR

@@ -3,10 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import { http, HttpResponse } from 'msw'
 
 import StoryStatus from './StoryStatus.vue'
-import { server } from '@tests/setup'
+import { HttpResponse, http, server } from '@tests/setup'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
@@ -38,24 +37,25 @@ describe('StoryStatus', () => {
     const wrapper = mountStatus()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Session')
-    expect(wrapper.text()).toContain('Dark Forest')
+    expect(wrapper.text()).toContain('Purse')
+    expect(wrapper.text()).toContain('silver')
   })
 
   it('renders projected section titles and values', async () => {
     const wrapper = mountStatus()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Cursor')
-    expect(wrapper.text()).toContain('Journal size')
+    expect(wrapper.text()).toContain('Wounds')
+    expect(wrapper.text()).toContain('Sound')
+    expect(wrapper.text()).toContain('Satchel')
   })
 
   it('renders custom section kinds generically', async () => {
     const wrapper = mountStatus()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Flags')
-    expect(wrapper.text()).toContain('torch_lit, met_guide')
+    expect(wrapper.text()).toContain('Conditions')
+    expect(wrapper.text()).toContain('rain-soaked, hungry, hunted')
   })
 
   it('handles empty status payload', async () => {

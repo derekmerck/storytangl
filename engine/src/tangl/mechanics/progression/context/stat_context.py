@@ -5,6 +5,7 @@ from typing import Dict, Mapping, Optional
 from pydantic import BaseModel, ConfigDict
 
 from ..definition.stat_system import StatSystemDefinition
+from ..handlers import get_handler_cls
 from ..stats.stat import Stat
 
 
@@ -43,7 +44,8 @@ class StatContext(BaseModel):
         """
         overrides = overrides or {}
         stats: Dict[str, Stat] = {}
+        handler_cls = get_handler_cls(self.stat_system.handler)
         for sdef in self.stat_system.stats:
             value = overrides.get(sdef.name, base_fv)
-            stats[sdef.name] = Stat(value)
+            stats[sdef.name] = Stat.from_value(value, handler=handler_cls)
         return stats

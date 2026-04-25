@@ -1,8 +1,29 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from copy import deepcopy
 from typing import FrozenSet, Iterable, Optional, Set
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class _FrozenStrMap(dict[str, str]):
+    def _blocked(self, *_args, **_kwargs) -> None:
+        raise TypeError("frozen mapping is immutable")
+
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = _blocked
+
+    def copy(self) -> dict[str, str]:
+        return dict(self)
+
+    def __copy__(self) -> "_FrozenStrMap":
+        return type(self)(self)
+
+    def __deepcopy__(self, memo) -> "_FrozenStrMap":
+        return type(self)(
+            (deepcopy(key, memo), deepcopy(value, memo))
+            for key, value in self.items()
+        )
 
 
 class SituationalEffect(BaseModel):
@@ -38,6 +59,10 @@ class SituationalEffect(BaseModel):
         Additive adjustment to difficulty (delta = competency - difficulty).
     - `competency_modifier`:
         Additive adjustment to competency.
+    - `domain_override`:
+        Optional remap for the tested challenge domain.
+    - `cost_currency_remap` / `reward_currency_remap`:
+        Optional narrow remaps for challenge costs or payouts.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -49,6 +74,20 @@ class SituationalEffect(BaseModel):
 
     difficulty_modifier: float = 0.0
     competency_modifier: float = 0.0
+    domain_override: str | None = None
+    cost_currency_remap: Mapping[str, str] = Field(
+        default_factory=dict,
+        validate_default=True,
+    )
+    reward_currency_remap: Mapping[str, str] = Field(
+        default_factory=dict,
+        validate_default=True,
+    )
+
+    @field_validator("cost_currency_remap", "reward_currency_remap", mode="after")
+    @classmethod
+    def _freeze_remap(cls, value: Mapping[str, str]) -> Mapping[str, str]:
+        return _FrozenStrMap(value)
 
     def applies(
         self,

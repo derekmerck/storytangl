@@ -27,6 +27,7 @@ from .exceptions import (
     ValidationError,
 )
 from .response import (
+    AuthoringDiagnostic,
     BadgeListValue,
     FragmentStream,
     InfoModel,
@@ -34,6 +35,7 @@ from .response import (
     KvListValue,
     MediaNative,
     NativeResponse,
+    PreflightReport,
     PrimitiveValue,
     ProjectedItem,
     ProjectedKVItem,
@@ -69,6 +71,7 @@ from .world_registry import WorldRegistry
 __all__ = [
     "AccessDeniedError",
     "AuthMismatchError",
+    "AuthoringDiagnostic",
     "BadgeListValue",
     "BlockingMode",
     "DefaultStoryInfoProjector",
@@ -79,6 +82,7 @@ __all__ = [
     "KvListValue",
     "MediaNative",
     "NativeResponse",
+    "PreflightReport",
     "PrimitiveValue",
     "ProjectedItem",
     "ProjectedKVItem",

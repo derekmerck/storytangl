@@ -1,159 +1,123 @@
-# StoryTangl Web Client (v3.7)
+# StoryTangl Web Client
 
-Modern Vue 3 + TypeScript web interface for StoryTangl narrative engine, resurrected from legacy codebase and rebuilt with current best practices.
+Modern Vue 3 + TypeScript web interface for the StoryTangl narrative engine.
 
-## 🎯 Project Status
+## Project Status
 
-**Current Phase:** MVP Feature Complete - Testing & Polish
+**Current Phase:** v38-era client stabilization
 
-The core application is **functionally complete** for basic story interaction. All essential components from the legacy web client have been successfully ported and modernized.
+The web client is useful for development and narrative-engine inspection, but it is
+not a production-ready MVP. The v38 engine/service surface has moved faster than
+these notes, fixtures, and mock payloads. This pass repairs the Vitest/MSW
+harness enough for the current suites to collect and run while keeping the richer
+canonical fixture rewrite deferred to issue #224.
 
 ---
 
-## ✅ Completed Infrastructure
+## Current Infrastructure
 
 ### Core Setup
-- ✅ Vue 3.5 + Composition API
-- ✅ Vuetify 3.7 with Material Design Icons
-- ✅ TypeScript strict mode
-- ✅ Vite 5 build system
-- ✅ MSW v2 for API mocking (dev mode only)
-- ✅ Vitest + Vue Test Utils
-- ✅ ESLint + Prettier
-- ✅ Path aliases (@/*)
+- Vue 3.5 + Composition API
+- Vuetify 3.7 with Material Design Icons
+- TypeScript strict mode
+- Vite 5 build system
+- happy-dom Vitest environment
+- MSW v2 for API mocking
+- Vue Test Utils
+- ESLint + Prettier
+- Path aliases (`@/*`)
 
 ### Global Utilities
-- ✅ `useGlobal()` composable
+- `useGlobal()` composable
   - Axios HTTP client with interceptors
-  - `remapURL()` - URL resolution for media
-  - `makeMediaDict()` - media array transformation
+  - `remapURL()` URL resolution for media
+  - `makeMediaDict()` media array transformation
   - Debug/verbose flags from environment
-- ✅ Pinia store for global state
+- Pinia store for global state
   - World selection
   - User authentication (API keys)
   - World info caching
 
 ### Type System
-- ✅ Complete TypeScript definitions
-- ✅ Types match backend Pydantic models
-- ✅ `tangl_typedefs.ts` - core narrative types
-- ✅ Environment variable typing
+- TypeScript definitions exist for the legacy/current client contract.
+- Some fixtures and mocks still need to be reconciled with the canonical v38
+  service payloads tracked by #224.
+- `tangl_typedefs.ts` carries core narrative types.
+- Environment variable typing is present.
 
 ---
 
-## ✅ Completed Components
+## Component Inventory
 
 ### Layout Components
 | Component | Status | Tests | Notes |
 |-----------|--------|-------|-------|
-| `App.vue` | ✅ | Manual | Main layout with responsive drawer |
-| `AppNavbar.vue` | ✅ | ✅ | Top bar with menus |
-| `AppFooter.vue` | ✅ | - | Simple footer |
+| `App.vue` | Maintained | Manual | Main layout with responsive drawer |
+| `AppNavbar.vue` | Maintained | Basic | Top bar with menus |
+| `AppFooter.vue` | Maintained | - | Simple footer; version defaults intentionally unchanged here |
 
 ### Story Components
 | Component | Status | Tests | Notes |
 |-----------|--------|-------|-------|
-| `StoryFlow.vue` | ✅ | ✅ | Block container, API calls, auto-scroll |
-| `StoryBlock.vue` | ✅ | ✅ | Text, media, dialog, actions |
-| `StoryAction.vue` | ✅ | ✅ | Clickable choice buttons |
-| `StoryDialogBlock.vue` | ✅ | ✅ | Character dialog with media |
-| `StoryStatus.vue` | ✅ | - | Sidebar status display (key/value) |
+| `StoryFlow.vue` | Maintained | Yes | Block container, API calls, auto-scroll |
+| `StoryBlock.vue` | Maintained | Yes | Text, media, dialog, actions |
+| `StoryAction.vue` | Maintained | Basic | Clickable choice buttons |
+| `StoryDialogBlock.vue` | Maintained | Basic | Character dialog with media |
+| `StoryStatus.vue` | Maintained | Basic | Sidebar status display |
 
 ### Dialog Components
 | Component | Status | Tests | Notes |
 |-----------|--------|-------|-------|
-| `WorldInfo.vue` | ✅ | - | World metadata modal |
-| `SystemInfo.vue` | ✅ | - | System/engine info modal |
-| `SecretDialog.vue` | ✅ | - | User authentication |
+| `WorldInfo.vue` | Maintained | Basic | World metadata modal |
+| `SystemInfo.vue` | Maintained | Basic | System/engine info modal |
+| `SecretDialog.vue` | Maintained | Basic | User authentication |
 
 ---
 
-## 🚧 Known Gaps & Polish Items
+## Known Gaps
 
-### Missing Features (Non-Critical)
-- ⏸️ **ApiDialog.vue** - Change API host (dev-only feature, low priority)
-- ⏸️ **Custom branding** - BrandTangl icon component (cosmetic)
-- ⏸️ **Keyboard shortcuts** - Not in legacy, but would be nice
-- ⏸️ **Accessibility audit** - ARIA labels, focus management
+### Harness and Fixtures
+- The current pass keeps `happy-dom` and minimally repairs the MSW setup.
+- Canonical v38 fixture design and richer mock/story payload coverage are
+  tracked by #224.
+- Tests should assert user-visible behavior and service contract shape rather
+  than legacy implementation details.
 
-### Testing Gaps
-- ⚠️ **StoryAction.test.ts** - Needs comprehensive tests
-- ⚠️ **StoryDialogBlock.test.ts** - Needs comprehensive tests
-- ⚠️ **StoryStatus.test.ts** - Needs tests
-- ⚠️ **Dialog components** - Need basic tests
-- ⚠️ **Integration tests** - Full user flow tests
-
-### Polish & UX
-- ⚠️ **Loading states** - More granular feedback
-- ⚠️ **Error boundaries** - Better error handling UI
-- ⚠️ **Mobile responsive** - Some layout quirks
-- ⚠️ **Media optimization** - Lazy loading, placeholders
-- ⚠️ **Animations** - Smooth transitions
+### Product and UX
+- API-host switching, custom branding, keyboard shortcuts, and a full
+  accessibility audit remain open design/product work.
+- Loading states, error surfaces, mobile layout, and media behavior need a
+  focused polish pass after the test harness is trustworthy.
 
 ### Documentation
-- ⚠️ **Component READMEs** - Usage examples for complex components
-- ⚠️ **Storybook** - Interactive component showcase (optional)
-- ⚠️ **API client docs** - How to extend endpoints
+- Component notes, API-client notes, and fixture recipes should be updated as
+  the #224 work lands.
 
 ---
 
-## 📋 Roadmap: What's Left
+## Roadmap
 
-### Phase 1: Testing (Current Priority)
-**Goal:** Achieve 80%+ test coverage on all components
+### Phase 1: Harness and Fixtures
+**Goal:** Trust the local web test suite again.
 
-- [ ] Write tests for `StoryAction.vue`
-- [ ] Write tests for `StoryDialogBlock.vue`
-- [ ] Write tests for `StoryStatus.vue`
-- [ ] Write tests for dialog components (WorldInfo, SystemInfo, SecretDialog)
-- [ ] Write integration tests for full story flow
-- [ ] Add E2E tests with Playwright (optional)
+- [x] Repair happy-dom/MSW setup enough for current suites to run.
+- [ ] Replace ad hoc mock payloads with canonical v38 fixtures (#224).
+- [ ] Add/adjust integration tests around current service envelopes.
 
-**Estimated:** 1-2 days
+### Phase 2: Client Contract Review
+**Goal:** Align UI data assumptions with the engine/service v38 contract.
 
----
+- [ ] Review story update, projected status, media, world info, and system info
+  payloads against backend response models.
+- [ ] Remove stale legacy-only assumptions.
+- [ ] Keep fixture data close to real authoring/runtime examples.
 
-### Phase 2: Polish & UX (Next)
-**Goal:** Production-ready user experience
+### Phase 3: Polish and Documentation
+**Goal:** Make the client pleasant and maintainable once the contract is stable.
 
-- [ ] Improve loading states and spinners
-- [ ] Add error boundaries and fallback UI
-- [ ] Audit mobile responsiveness
-- [ ] Add smooth transitions/animations
-- [ ] Optimize media loading (lazy load images)
-- [ ] Keyboard navigation support
-- [ ] Basic accessibility audit
-
-**Estimated:** 2-3 days
-
----
-
-### Phase 3: Documentation (Then)
-**Goal:** Make codebase easy to maintain and extend
-
-- [ ] Document component architecture
-- [ ] Add JSDoc comments to all exports
-- [ ] Create component usage examples
-- [ ] Document common patterns
-- [ ] API client extension guide
-- [ ] Consider adding Storybook (optional)
-
-**Estimated:** 1-2 days
-
----
-
-### Phase 4: Advanced Features (Future)
-**Goal:** Beyond MVP scope
-
-- [ ] Vue Router for multi-page navigation
-- [ ] Save/load game state
-- [ ] Character sheets / inventory UI
-- [ ] Settings panel (theme, text size, etc)
-- [ ] Achievement system UI
-- [ ] Replay/history browsing
-- [ ] Social features (if applicable)
-
-**Estimated:** TBD based on requirements
+- [ ] Improve loading and error states.
+- [ ] Audit mobile and accessibility behavior.
+- [ ] Document common component and fixture patterns.
 
 ---
 
@@ -225,11 +189,11 @@ App.vue
 1. User clicks `StoryAction` button
 2. Event bubbles up: `StoryAction` → `StoryBlock` → `StoryFlow`
 3. `StoryFlow` calls API via `$http`
-4. Server returns `JournalStoryUpdate[]`
-5. `StoryFlow` processes media URLs and creates media dictionaries
-6. New blocks appended to reactive array
-7. Vue re-renders with new blocks
-8. Auto-scroll to latest block
+4. Server returns a `RuntimeEnvelope`
+5. `StoryFlow` indexes fragments and applies control updates
+6. New scene shells are appended to reactive state
+7. Vue re-renders with fragment widgets
+8. Auto-scroll to latest scene
 
 ### State Management
 - **Pinia Store** (`src/store/index.ts`)
@@ -400,13 +364,9 @@ See main project LICENSE file.
 
 ## 🎉 Summary
 
-**The web client MVP is essentially complete!** All core components from the legacy codebase have been successfully ported and modernized with:
-- Modern Vue 3 + TypeScript architecture
-- Comprehensive testing infrastructure
-- Development-friendly tooling
-- Clean, maintainable codebase
-
-**Next priorities:** Fill testing gaps, polish UX, and prepare for production deployment.
+The web client is a working development surface for the StoryTangl engine, but
+it is not yet a production MVP. See **Project Status** above and the current
+fragment-renderer roadmap for the stabilization work still in flight.
 
 ---
 

@@ -6,6 +6,11 @@ tangl.vm.dispatch
 Dispatch decorators and handler entrypoints that allow higher layers to
 contribute runtime, provisioning, and replay behavior.
 
+.. storytangl-topic::
+   :topics: dispatch, phase_ctx, resolution_phase
+   :facets: api
+   :relation: documents
+
 .. rubric:: Related design docs
 
 - :doc:`../../design/planning/PROVISIONING_BEHAVIOR`

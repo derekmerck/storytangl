@@ -6,6 +6,11 @@ tangl.core dispatch
 Behavior and dispatch primitives that higher layers use to register and execute
 hooks.
 
+.. storytangl-topic::
+   :topics: dispatch
+   :facets: api
+   :relation: documents
+
 .. rubric:: Related design docs
 
 - :doc:`../../design/core/HOOK_REF`
