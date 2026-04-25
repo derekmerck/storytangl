@@ -6,6 +6,7 @@ import GroupFragmentView from './GroupFragmentView.vue'
 import KvFragmentView from './KvFragmentView.vue'
 import MediaFragmentView from './MediaFragmentView.vue'
 import StoryAction from './StoryAction.vue'
+import TokenFragmentView from './TokenFragmentView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
 import type { ChoiceStoryFragment, StoryFragment, StorySceneModel } from '@/types'
 import { useGlobal } from '@/composables/globals'
@@ -13,6 +14,7 @@ import {
   isChoiceFragment,
   isGroupFragment,
   isMediaFragment,
+  isTokenFragment,
 } from './fragmentUtils'
 
 const props = defineProps<{
@@ -69,6 +71,8 @@ const handleAction = (uid: string, payload?: unknown) => {
         />
 
         <KvFragmentView v-else-if="fragment.fragment_type === 'kv'" :fragment="fragment" />
+
+        <TokenFragmentView v-else-if="isTokenFragment(fragment)" :fragment="fragment" />
 
         <UnknownFragmentFallback v-else :fragment="fragment" />
       </div>

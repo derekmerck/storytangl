@@ -206,7 +206,9 @@ describe('StoryFlow', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Show a card from your hand')
-    expect(wrapper.text()).toContain('zone')
+    expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Traveler hand')
     expect(wrapper.text()).toContain('Rust map card')
   })
 

@@ -156,6 +156,98 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('63')
   })
 
+  it('renders zone groups with token labels and state', () => {
+    const fragments: Record<string, StoryFragment> = {
+      zone: {
+        uid: 'zone',
+        fragment_type: 'group',
+        group_type: 'zone',
+        zone_role: 'player_hand',
+        member_ids: ['token'],
+        hints: { label_text: 'Traveler hand' },
+      },
+      token: {
+        uid: 'token',
+        fragment_type: 'token',
+        token_id: 'rust-map-card',
+        content: 'Rust map card',
+        display_state: 'face_up',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['zone'])
+
+    expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Traveler hand')
+    expect(wrapper.text()).toContain('Rust map card')
+    expect(wrapper.text()).toContain('face up')
+  })
+
+  it('renders empty zones without falling back to unknown group text', () => {
+    const fragments: Record<string, StoryFragment> = {
+      zone: {
+        uid: 'zone',
+        fragment_type: 'group',
+        group_type: 'zone',
+        zone_role: 'discard',
+        member_ids: [],
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['zone'])
+
+    expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="empty-zone"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('discard')
+    expect(wrapper.text()).toContain('Empty')
+    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(false)
+  })
+
+  it('keeps fallback rendering for unsupported zone members', () => {
+    const fragments: Record<string, StoryFragment> = {
+      zone: {
+        uid: 'zone',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['clock'],
+        hints: { label_text: 'Countdown' },
+      },
+      clock: {
+        uid: 'clock',
+        fragment_type: 'clock',
+        content: 'three ticks',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['zone'])
+
+    expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Countdown')
+    expect(wrapper.text()).toContain('clock')
+    expect(wrapper.text()).toContain('three ticks')
+  })
+
+  it('renders standalone token fragments', () => {
+    const fragments: Record<string, StoryFragment> = {
+      token: {
+        uid: 'token',
+        fragment_type: 'token',
+        token_id: 'lantern-token',
+        kind: 'tool',
+        label: 'Brass lantern',
+        display_state: 'ready',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['token'])
+
+    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Brass lantern')
+    expect(wrapper.text()).toContain('ready')
+  })
+
   it('renders choices and emits selected edge ids', async () => {
     const fragments: Record<string, StoryFragment> = {
       content: {
