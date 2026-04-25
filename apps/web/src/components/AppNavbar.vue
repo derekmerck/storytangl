@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
+import type { CSSProperties } from 'vue'
 
 import WorldInfo from '@/components/dialogs/WorldInfo.vue'
 import SystemInfo from '@/components/dialogs/SystemInfo.vue'
@@ -57,6 +58,13 @@ const openGuide = () => {
   const resolved = remapURL(target)
   window.open(resolved, 'StoryTangl User Guide')
 }
+
+const worldStyle = (world: WorldList[number]): CSSProperties => {
+  const style = world.style ?? world.style_dict
+  return style && typeof style === 'object' && !Array.isArray(style)
+    ? (style as CSSProperties)
+    : {}
+}
 </script>
 
 <template>
@@ -78,7 +86,7 @@ const openGuide = () => {
             :key="world.key"
             @click="selectWorld(world.key)"
           >
-            <v-list-item-title :style="(world.style ?? world.style_dict) as Record<string, string | number>">
+            <v-list-item-title :style="worldStyle(world)">
               {{ world.value }}
             </v-list-item-title>
           </v-list-item>

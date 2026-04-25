@@ -246,21 +246,27 @@ def test_render_block_emits_choice_payload_accepts_and_ui_hints() -> None:
     end = Block(label="end")
     graph.add(start)
     graph.add(end)
-    graph.add(
-        Action(
-            predecessor_id=start.uid,
-            successor_id=end.uid,
-            text="Pick a color",
-            accepts={"type": "string", "enum": ["red", "blue", "green"]},
-            ui_hints={"widget": "select", "framework": "vuetify"},
-        )
+    action = Action(
+        predecessor_id=start.uid,
+        successor_id=end.uid,
+        text="Pick a color",
+        accepts={"type": "string", "enum": ["red", "blue", "green"]},
+        ui_hints={"widget": "select", "framework": "vuetify"},
     )
+    graph.add(action)
 
     fragments = render_block(caller=start, ctx=_ctx_with_ns())
     assert fragments is not None
     choice = next(fragment for fragment in fragments if isinstance(fragment, ChoiceFragment))
+    payload = choice.model_dump(mode="json")
+
+    assert choice.edge_id == action.uid
     assert choice.accepts == {"type": "string", "enum": ["red", "blue", "green"]}
     assert choice.ui_hints == {"widget": "select", "framework": "vuetify"}
+    assert payload["fragment_type"] == "choice"
+    assert payload["edge_id"] == str(action.uid)
+    assert payload["accepts"] == {"type": "string", "enum": ["red", "blue", "green"]}
+    assert payload["ui_hints"] == {"widget": "select", "framework": "vuetify"}
 
 
 def test_render_block_compatibility_facade_merges_split_handlers() -> None:
@@ -766,3 +772,40 @@ def test_render_block_media_emits_placeholder_for_unresolved_inventory_without_f
     assert fragments[0].content["source_kind"] == "inventory"
     assert fragments[0].content["unresolved_reason"] == "no_offers"
     assert fragments[0].content["resolution_meta"] == {"alternatives": []}
+
+
+def test_render_block_media_emits_placeholder_for_unresolved_potential_without_fallback() -> None:
+    graph = StoryGraph()
+    block = Block(
+        label="start",
+        media=[
+            {
+                "name": "dream_portrait",
+                "source_kind": "potential",
+                "kind": "image",
+                "media_role": "avatar_im",
+                "scope": "story",
+                "subject": "guide",
+                "facet": "look",
+            }
+        ],
+    )
+    graph.add(block)
+
+    fragments = render_block_media(caller=block, ctx=_ctx_with_ns())
+
+    assert fragments is not None
+    assert len(fragments) == 1
+    assert isinstance(fragments[0], JournalMediaFragment)
+    assert fragments[0].fragment_type == "media"
+    assert fragments[0].content_format == "json"
+    assert fragments[0].media_role == "avatar_im"
+    assert fragments[0].scope == "story"
+    assert fragments[0].content_type.value == "image"
+    assert fragments[0].content == {
+        "name": "dream_portrait",
+        "source_kind": "potential",
+        "unresolved_reason": "unsupported_media_spec",
+        "facet": "look",
+        "subject": "guide",
+    }

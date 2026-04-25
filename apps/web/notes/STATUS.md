@@ -13,8 +13,8 @@ service contracts have continued to evolve, and the client fixtures lag behind
 the canonical v38 response shapes.
 
 This stabilization pass repairs the current Vitest/MSW harness while preserving
-the existing `happy-dom` setup. The broader fixture rewrite, including canonical
-mock payloads and richer scenario fixtures, is tracked by #224.
+the existing `happy-dom` setup. Issue #224 now tracks the direct-fragment
+renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
 
 ## Working Areas
 
@@ -28,7 +28,7 @@ mock payloads and richer scenario fixtures, is tracked by #224.
 
 ## Open Work
 
-- Align fixtures and mocks with the canonical v38 service envelopes (#224).
+- Continue splitting the first direct-fragment renderer into smaller widgets.
 - Recheck story update, projected status, media, world info, and system info
   assumptions against backend response models.
 - Expand integration coverage after fixture data is trustworthy.
