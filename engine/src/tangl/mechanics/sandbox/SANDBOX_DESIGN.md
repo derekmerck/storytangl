@@ -83,7 +83,9 @@ Initial rule families:
 - inventory-carried actions
 - inventory plus local target combinations
 
-Only the first family needs to exist in the initial package spike.
+The first package spike implements linked-location movement, wait, and
+selectable scheduled events. Object, actor, inventory, forced-event redirect,
+and parser/client matching rules remain later slices.
 
 ### World Time And Schedule
 
@@ -191,7 +193,7 @@ First acceptance tests:
 - movement choices are generated from `links`
 - target entry availability gates `inside_cave`
 - `wait` advances `world_turn`
-- a scheduled event matches only at the requested time and location
+- a selectable scheduled event matches only at the requested time and location
 - an inventory item plus a local object can generate an interaction choice
 - the interaction uses call/return and mutates state
 - all output remains normal journal fragments and `ChoiceFragment`s

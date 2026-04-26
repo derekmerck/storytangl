@@ -9,13 +9,19 @@ from pydantic import Field
 from tangl.core import contribute_ns
 from tangl.story import MenuBlock
 
+from .schedule import ScheduledEvent
+
 
 class SandboxLocation(MenuBlock):
     """A visitable dynamic hub with location links."""
 
     links: dict[str, str] = Field(default_factory=dict)
+    scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     sandbox_scope: str | None = None
     location_name: str = ""
+    wait_enabled: bool = True
+    wait_text: str = "Wait"
+    wait_turn_delta: int = 1
 
     @contribute_ns
     def provide_sandbox_location_symbols(self) -> dict[str, Any]:

@@ -6,9 +6,10 @@ from typing import Any
 
 from tangl.core import Selector
 from tangl.story import Action
-from tangl.vm import on_provision
+from tangl.vm import TraversableNode, on_provision, on_update
 
 from .location import SandboxLocation
+from .time import advance_world_turn, current_world_time
 
 
 def _has_tags(value: Any, *tags: str) -> bool:
@@ -16,39 +17,77 @@ def _has_tags(value: Any, *tags: str) -> bool:
     return set(tags).issubset(actual)
 
 
-def _clear_dynamic_sandbox_actions(location: SandboxLocation, *, ctx: Any) -> None:
+def _clear_dynamic_sandbox_actions(
+    location: SandboxLocation,
+    *,
+    action_kind: str,
+    ctx: Any,
+) -> None:
     graph = getattr(location, "graph", None)
     if graph is None:
         return
 
     for edge in list(location.edges_out(Selector(has_kind=Action, trigger_phase=None))):
-        if _has_tags(edge, "dynamic", "sandbox", "movement"):
+        if _has_tags(edge, "dynamic", "sandbox", action_kind):
             graph.remove(edge.uid, _ctx=ctx)
 
 
-def _resolve_location_ref(location: SandboxLocation, target_ref: str) -> SandboxLocation | None:
+def _resolve_ref(
+    location: SandboxLocation,
+    target_ref: str,
+    *,
+    kind: type[TraversableNode],
+) -> TraversableNode | None:
     graph = getattr(location, "graph", None)
     if graph is None:
         return None
 
-    candidates = list(graph.find_all(Selector.from_identifier(target_ref)))
-    candidates = [candidate for candidate in candidates if isinstance(candidate, SandboxLocation)]
+    candidates = [
+        candidate
+        for candidate in graph.find_all(Selector.from_identifier(target_ref))
+        if isinstance(candidate, kind)
+    ]
     if not candidates and "." not in target_ref:
         scoped_ref = f"{location.sandbox_scope}.{target_ref}" if location.sandbox_scope else None
         if scoped_ref:
             candidates = [
                 candidate
                 for candidate in graph.find_all(Selector.from_identifier(scoped_ref))
-                if isinstance(candidate, SandboxLocation)
+                if isinstance(candidate, kind)
             ]
     if not candidates:
         return None
     return sorted(candidates, key=lambda item: graph.path_dist(location, item))[0]
 
 
+def _resolve_location_ref(location: SandboxLocation, target_ref: str) -> SandboxLocation | None:
+    target = _resolve_ref(location, target_ref, kind=SandboxLocation)
+    return target if isinstance(target, SandboxLocation) else None
+
+
+def _resolve_traversable_ref(location: SandboxLocation, target_ref: str) -> TraversableNode | None:
+    return _resolve_ref(location, target_ref, kind=TraversableNode)
+
+
 def _movement_text(direction: str, target: SandboxLocation) -> str:
     target_name = target.location_name or target.get_label()
     return f"Go {direction} to {target_name}"
+
+
+def _selected_payload(ctx: Any) -> Any:
+    payload = getattr(ctx, "selected_payload", None)
+    if payload is not None:
+        return payload
+
+    selected_edge = getattr(ctx, "selected_edge", None)
+    if selected_edge is not None:
+        return getattr(selected_edge, "payload", None)
+
+    incoming_edge = getattr(ctx, "incoming_edge", None)
+    if incoming_edge is not None:
+        return getattr(incoming_edge, "payload", None)
+
+    return None
 
 
 @on_provision(
@@ -65,7 +104,7 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
     if graph is None or bool(getattr(graph, "frozen_shape", False)):
         return None
 
-    _clear_dynamic_sandbox_actions(caller, ctx=ctx)
+    _clear_dynamic_sandbox_actions(caller, action_kind="movement", ctx=ctx)
 
     for direction, target_ref in sorted(caller.links.items()):
         target = _resolve_location_ref(caller, target_ref)
@@ -84,4 +123,95 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
                 "target": target.get_label(),
             },
         )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_wait(*, caller, ctx, **_kw):
+    """Project a normal self-loop wait action for sandbox locations."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision or not caller.wait_enabled:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="wait", ctx=ctx)
+
+    Action(
+        registry=graph,
+        label=f"sandbox_wait_{caller.get_label()}",
+        predecessor_id=caller.uid,
+        successor_id=caller.uid,
+        text=caller.wait_text,
+        payload={
+            "sandbox_action": "wait",
+            "turn_delta": caller.wait_turn_delta,
+        },
+        tags={"dynamic", "sandbox", "wait"},
+        ui_hints={"source": "sandbox_wait"},
+    )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
+    """Project matching scheduled events into normal dynamic actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="event", ctx=ctx)
+
+    world_time = current_world_time(caller)
+    location_label = caller.get_label()
+    for index, event in enumerate(caller.scheduled_events):
+        if not event.matches(world_time, location=location_label):
+            continue
+        target = _resolve_traversable_ref(caller, event.target)
+        if target is None:
+            continue
+        Action(
+            registry=graph,
+            label=f"sandbox_event_{caller.get_label()}_{index}",
+            predecessor_id=caller.uid,
+            successor_id=target.uid,
+            text=event.action_text(),
+            tags={"dynamic", "sandbox", "event"},
+            ui_hints={
+                "source": "sandbox_schedule",
+                "event": event.label,
+                "target": target.get_label(),
+            },
+        )
+    return None
+
+
+@on_update(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def advance_sandbox_time_on_wait(*, caller, ctx, **_kw):
+    """Advance sandbox world time when the selected action is wait."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+
+    payload = _selected_payload(ctx)
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("sandbox_action") != "wait":
+        return None
+
+    advance_world_turn(caller, int(payload.get("turn_delta", 1)))
     return None

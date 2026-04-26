@@ -66,3 +66,14 @@ class Schedule(BaseModel):
                 actors_present=actors_present,
             )
         ]
+
+
+class ScheduledEvent(ScheduleEntry):
+    """A schedule-gated selectable event projected as a normal action."""
+
+    target: str
+    text: str = ""
+
+    def action_text(self) -> str:
+        """Return player-facing text for this scheduled event."""
+        return self.text or self.label or self.target

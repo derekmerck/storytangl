@@ -12,9 +12,16 @@ Current first-pass surface:
 
 - `SandboxLocation`: a thin `MenuBlock` facade with location links.
 - `WorldTime`: deterministic derived time from `world_turn`.
-- `ScheduleEntry` / `Schedule`: small schedule matching primitives.
+- `ScheduleEntry` / `Schedule` / `ScheduledEvent`: small schedule matching
+  primitives.
 - `project_sandbox_location_links`: planning handler that projects movement
   links into normal dynamic actions.
+- `project_sandbox_wait`: planning handler that projects wait as a normal
+  self-loop choice.
+- `project_sandbox_scheduled_events`: planning handler that projects matching
+  scheduled events as normal dynamic actions.
+- `advance_sandbox_time_on_wait`: update handler that advances sandbox-local
+  time when a wait choice is selected.
 
 The older `scratch/mechanics/sandbox` code remains prior art. Mine it for
 calendar, schedule, mobile-actor, and event ideas, but do not promote it

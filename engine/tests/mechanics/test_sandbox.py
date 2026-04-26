@@ -8,13 +8,15 @@ from tangl.mechanics.sandbox import (
     SandboxLocation,
     Schedule,
     ScheduleEntry,
+    ScheduledEvent,
     WorldTime,
     advance_world_turn,
     current_world_time,
 )
-from tangl.story import Action
+from tangl.story import Action, Block
 from tangl.story.fragments import ChoiceFragment
 from tangl.story.system_handlers import render_block_choices
+from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
@@ -50,6 +52,14 @@ def _dynamic_sandbox_actions(location: SandboxLocation) -> list[Action]:
         edge
         for edge in location.edges_out(Selector(has_kind=Action, trigger_phase=None))
         if {"dynamic", "sandbox", "movement"}.issubset(getattr(edge, "tags", set()) or set())
+    ]
+
+
+def _dynamic_sandbox_actions_with_tag(location: SandboxLocation, tag: str) -> list[Action]:
+    return [
+        edge
+        for edge in location.edges_out(Selector(has_kind=Action, trigger_phase=None))
+        if {"dynamic", "sandbox", tag}.issubset(getattr(edge, "tags", set()) or set())
     ]
 
 
@@ -149,3 +159,83 @@ def test_target_location_availability_gates_generated_movement_choice() -> None:
     west = next(choice for choice in choices if choice.text == "Go west to Cave Entrance")
 
     assert west.available is True
+
+
+def test_sandbox_location_projects_wait_choice() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.locals["world_turn"] = 0
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    waits = _dynamic_sandbox_actions_with_tag(road, "wait")
+    assert len(waits) == 1
+    assert waits[0].text == "Wait"
+    assert waits[0].successor is road
+    assert waits[0].payload == {"sandbox_action": "wait", "turn_delta": 1}
+
+
+def test_wait_choice_advances_world_turn_through_ledger() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.locals["world_turn"] = 0
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+    wait = _dynamic_sandbox_actions_with_tag(road, "wait")[0]
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    ledger.resolve_choice(wait.uid, choice_payload=wait.payload)
+
+    assert ledger.cursor is road
+    assert road.locals["world_turn"] == 1
+
+
+def test_scheduled_event_projects_only_at_matching_location_and_time() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    traveler = Block(label="traveler_arrives", content="A traveler waves from the road.")
+    graph.add(traveler)
+    road.locals["world_turn"] = 1
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="traveler",
+            location="road",
+            period=3,
+            target="traveler_arrives",
+            text="Talk to traveler",
+        )
+    ]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+
+    road.locals["world_turn"] = 2
+    ctx._ns_cache.clear()
+    do_provision(road, ctx=ctx)
+    events = _dynamic_sandbox_actions_with_tag(road, "event")
+
+    assert len(events) == 1
+    assert events[0].text == "Talk to traveler"
+    assert events[0].successor is traveler
+
+
+def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    traveler = Block(label="traveler_arrives", content="A traveler waves from the road.")
+    graph.add(traveler)
+    road.locals["world_turn"] = 2
+    road.scheduled_events = [
+        ScheduledEvent(
+            label="traveler",
+            location="road",
+            period=3,
+            target="traveler_arrives",
+            text="Talk to traveler",
+        )
+    ]
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+
+    fragments = render_block_choices(caller=road, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+
+    assert any(choice.text == "Talk to traveler" and choice.available for choice in choices)
