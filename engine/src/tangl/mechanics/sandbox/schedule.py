@@ -73,7 +73,32 @@ class ScheduledEvent(ScheduleEntry):
 
     target: str
     text: str = ""
+    activation: str | None = None
+    once: bool = False
+    return_to_location: bool = False
 
     def action_text(self) -> str:
         """Return player-facing text for this scheduled event."""
         return self.text or self.label or self.target
+
+
+class ScheduledPresence(ScheduleEntry):
+    """A schedule-gated actor presence declaration."""
+
+    actor: str
+
+    def matches(
+        self,
+        world_time: WorldTime,
+        *,
+        location: str | None = None,
+        actors_present: Iterable[str] = (),
+    ) -> bool:
+        """Return whether this declaration places its actor in the context."""
+        payload = self.model_copy(update={"actor": None})
+        return ScheduleEntry.matches(
+            payload,
+            world_time,
+            location=location,
+            actors_present=actors_present,
+        )

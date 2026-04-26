@@ -58,11 +58,13 @@ class WorldTime(BaseModel):
 
 
 def get_world_turn(source: Any) -> int:
-    """Return ``source.locals['world_turn']`` as an integer, defaulting to zero."""
-    locals_ = getattr(source, "locals", None)
-    if not isinstance(locals_, dict):
-        return 0
-    return int(locals_.get("world_turn", 0))
+    """Return the nearest scoped ``world_turn`` as an integer, defaulting to zero."""
+    candidates = getattr(source, "ancestors", [source])
+    for candidate in candidates:
+        locals_ = getattr(candidate, "locals", None)
+        if isinstance(locals_, dict) and "world_turn" in locals_:
+            return int(locals_["world_turn"])
+    return 0
 
 
 def current_world_time(source: Any) -> WorldTime:

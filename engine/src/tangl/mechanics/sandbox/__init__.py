@@ -7,14 +7,17 @@ from .handlers import (
     project_sandbox_wait,
 )
 from .location import SandboxLocation
-from .schedule import Schedule, ScheduleEntry, ScheduledEvent
+from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
+from .scope import SandboxScope
 from .time import WorldTime, advance_world_turn, current_world_time, get_world_turn
 
 __all__ = [
     "SandboxLocation",
+    "SandboxScope",
     "Schedule",
     "ScheduleEntry",
     "ScheduledEvent",
+    "ScheduledPresence",
     "WorldTime",
     "advance_sandbox_time_on_wait",
     "advance_world_turn",

@@ -6,9 +6,11 @@ from typing import Any
 
 from tangl.core import Selector
 from tangl.story import Action
-from tangl.vm import TraversableNode, on_provision, on_update
+from tangl.vm import ResolutionPhase, TraversableNode, on_provision, on_update
 
 from .location import SandboxLocation
+from .schedule import ScheduledEvent, ScheduledPresence
+from .scope import SandboxScope
 from .time import advance_world_turn, current_world_time
 
 
@@ -27,7 +29,7 @@ def _clear_dynamic_sandbox_actions(
     if graph is None:
         return
 
-    for edge in list(location.edges_out(Selector(has_kind=Action, trigger_phase=None))):
+    for edge in list(location.edges_out(Selector(has_kind=Action))):
         if _has_tags(edge, "dynamic", "sandbox", action_kind):
             graph.remove(edge.uid, _ctx=ctx)
 
@@ -72,6 +74,93 @@ def _resolve_traversable_ref(location: SandboxLocation, target_ref: str) -> Trav
 def _movement_text(direction: str, target: SandboxLocation) -> str:
     target_name = target.location_name or target.get_label()
     return f"Go {direction} to {target_name}"
+
+
+def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
+    ancestors = getattr(location, "ancestors", [location])
+    return [scope for scope in ancestors if isinstance(scope, SandboxScope)]
+
+
+def _nearest_scope_value(location: SandboxLocation, field_name: str, default: Any) -> Any:
+    local_value = getattr(location, field_name)
+    if local_value is not None:
+        return local_value
+    for scope in _sandbox_scopes(location):
+        scope_value = getattr(scope, field_name)
+        if scope_value is not None:
+            return scope_value
+    return default
+
+
+def _scheduled_events(location: SandboxLocation, ctx: Any) -> list[ScheduledEvent]:
+    events: list[ScheduledEvent] = []
+    for scope in reversed(_sandbox_scopes(location)):
+        events.extend(scope.scheduled_events)
+    events.extend(location.scheduled_events)
+    events.extend(_provider_scheduled_events(location, ctx=ctx))
+    return events
+
+
+def _scheduled_presence(location: SandboxLocation) -> list[ScheduledPresence]:
+    presence: list[ScheduledPresence] = []
+    for scope in reversed(_sandbox_scopes(location)):
+        presence.extend(scope.scheduled_presence)
+    return presence
+
+
+def _actors_present(location: SandboxLocation) -> list[str]:
+    world_time = current_world_time(location)
+    location_label = location.get_label()
+    actors: list[str] = []
+    for entry in _scheduled_presence(location):
+        if entry.matches(world_time, location=location_label):
+            actors.append(entry.actor)
+    return actors
+
+
+def _time_owner(location: SandboxLocation) -> Any:
+    for candidate in getattr(location, "ancestors", [location]):
+        if isinstance(candidate, SandboxScope):
+            return candidate
+    return location
+
+
+def _target_visited(target: TraversableNode) -> bool:
+    return bool(target.locals.get("_visited", False))
+
+
+def _concept_providers(location: SandboxLocation, ctx: Any) -> list[Any]:
+    ns = ctx.get_ns(location)
+    providers = list(ns.values())
+    for key in ("roles", "settings"):
+        value = ns.get(key)
+        if isinstance(value, dict):
+            providers.extend(value.values())
+    return providers
+
+
+def _provider_scheduled_events(location: SandboxLocation, *, ctx: Any) -> list[ScheduledEvent]:
+    events: list[ScheduledEvent] = []
+    seen_provider_ids: set[int] = set()
+    ns = ctx.get_ns(location)
+    for provider in _concept_providers(location, ctx):
+        provider_id = id(provider)
+        if provider_id in seen_provider_ids:
+            continue
+        seen_provider_ids.add(provider_id)
+
+        get_sandbox_events = getattr(provider, "get_sandbox_events", None)
+        if not callable(get_sandbox_events):
+            continue
+
+        provided = get_sandbox_events(caller=location, ctx=ctx, ns=ns)
+        if provided is None:
+            continue
+        for event in provided:
+            if not isinstance(event, ScheduledEvent):
+                raise TypeError("get_sandbox_events must yield ScheduledEvent instances")
+            events.append(event)
+    return events
 
 
 def _selected_payload(ctx: Any) -> Any:
@@ -134,7 +223,8 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
     """Project a normal self-loop wait action for sandbox locations."""
     if not isinstance(caller, SandboxLocation):
         return None
-    if not caller.auto_provision or not caller.wait_enabled:
+    wait_enabled = bool(_nearest_scope_value(caller, "wait_enabled", True))
+    if not caller.auto_provision or not wait_enabled:
         return None
     graph = getattr(caller, "graph", None)
     if graph is None or bool(getattr(graph, "frozen_shape", False)):
@@ -142,15 +232,17 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
 
     _clear_dynamic_sandbox_actions(caller, action_kind="wait", ctx=ctx)
 
+    wait_text = str(_nearest_scope_value(caller, "wait_text", "Wait"))
+    turn_delta = int(_nearest_scope_value(caller, "wait_turn_delta", 1))
     Action(
         registry=graph,
         label=f"sandbox_wait_{caller.get_label()}",
         predecessor_id=caller.uid,
         successor_id=caller.uid,
-        text=caller.wait_text,
+        text=wait_text,
         payload={
             "sandbox_action": "wait",
-            "turn_delta": caller.wait_turn_delta,
+            "turn_delta": turn_delta,
         },
         tags={"dynamic", "sandbox", "wait"},
         ui_hints={"source": "sandbox_wait"},
@@ -176,17 +268,26 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
 
     world_time = current_world_time(caller)
     location_label = caller.get_label()
-    for index, event in enumerate(caller.scheduled_events):
-        if not event.matches(world_time, location=location_label):
+    actors_present = _actors_present(caller)
+    for index, event in enumerate(_scheduled_events(caller, ctx)):
+        if not event.matches(
+            world_time,
+            location=location_label,
+            actors_present=actors_present,
+        ):
             continue
         target = _resolve_traversable_ref(caller, event.target)
         if target is None:
+            continue
+        if event.once and _target_visited(target):
             continue
         Action(
             registry=graph,
             label=f"sandbox_event_{caller.get_label()}_{index}",
             predecessor_id=caller.uid,
             successor_id=target.uid,
+            trigger_phase=Action.trigger_phase_from_activation(event.activation),
+            return_phase=ResolutionPhase.UPDATE if event.return_to_location else None,
             text=event.action_text(),
             tags={"dynamic", "sandbox", "event"},
             ui_hints={
@@ -213,5 +314,5 @@ def advance_sandbox_time_on_wait(*, caller, ctx, **_kw):
     if payload.get("sandbox_action") != "wait":
         return None
 
-    advance_world_turn(caller, int(payload.get("turn_delta", 1)))
+    advance_world_turn(_time_owner(caller), int(payload.get("turn_delta", 1)))
     return None

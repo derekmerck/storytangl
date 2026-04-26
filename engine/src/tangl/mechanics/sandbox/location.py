@@ -19,9 +19,9 @@ class SandboxLocation(MenuBlock):
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     sandbox_scope: str | None = None
     location_name: str = ""
-    wait_enabled: bool = True
-    wait_text: str = "Wait"
-    wait_turn_delta: int = 1
+    wait_enabled: bool | None = None
+    wait_text: str | None = None
+    wait_turn_delta: int | None = None
 
     @contribute_ns
     def provide_sandbox_location_symbols(self) -> dict[str, Any]:

@@ -50,8 +50,18 @@ A sandbox scope is a bounded group of related scene-locations. It behaves like a
 chapter: locations inside it share namespace, time, schedules, and projection
 rules.
 
-The scope may later become an explicit authoring object. For the first spike,
-ordinary graph ancestry plus `sandbox_scope` labels are enough.
+`SandboxScope` is now the first explicit version of that idea. It is a
+chapter-like ancestor that donates sandbox rules to child locations through the
+same ancestor namespace/hierarchy pattern that scenes already use for child
+blocks.
+
+Current scope donations:
+
+- shared `world_turn`
+- wait defaults
+- selectable scheduled events
+- scheduled presence
+- concept-provider events
 
 ### Sandbox Location
 
@@ -84,8 +94,32 @@ Initial rule families:
 - inventory plus local target combinations
 
 The first package spike implements linked-location movement, wait, and
-selectable scheduled events. Object, actor, inventory, forced-event redirect,
+selectable scheduled events. It also introduces `SandboxScope` for scope-level
+wait/event/presence donation. Object, actor, inventory, forced-event redirect,
 and parser/client matching rules remain later slices.
+
+The generated wait action intentionally mirrors the `tangl.mechanics.games`
+self-loop move pattern. Both use an ordinary dynamic `Action`, a self-loop
+successor, selected payload during UPDATE, and the normal ledger/journal
+pipeline. The syntax can vary by mechanic family, but the re-entrant provider
+pattern is shared.
+
+Selectable and triggered scheduled events can also use existing call/return and
+visit history directly. An `activation` value maps to the same trigger phase as
+authored story actions. A `return_to_location` event is projected as a normal
+`Action` with `return_phase=UPDATE`; when the target scene finishes, the frame
+returns to the originating location. A `once` event is not projected after its
+target has generic VM `_visited` state. This covers scope-level "first time in
+this sandbox" beats without a sandbox ledger or custom flag system: donate the
+same once-only event to every child location, target a shared orientation block,
+trigger it on entry, and let target visit history suppress future projections.
+
+Concepts can originate events too. The sandbox projector discovers providers
+from the gathered namespace and calls `get_sandbox_events(caller, ctx, ns)` on
+providers that opt in. This keeps the relationship simple: actors, locations,
+settings, roles, and token assets remain normal concept providers, but can
+donate normal sandbox `ScheduledEvent`s when their local type or instance state
+notices the right surrounding namespace.
 
 ### World Time And Schedule
 
@@ -188,12 +222,24 @@ At `world_turn == 2`, if the player is at `road`, a traveler event appears.
 If forced, it is an ordinary redirect. If selectable, it is an ordinary dynamic
 choice.
 
+Scope-level once event:
+
+The scope donates `Take in your surroundings` to all four locations. The event
+targets an `orientation` block, returns to the originating location, and is
+projected only while `orientation` has not been visited. Selecting it from any
+location marks the shared target visited, so the event disappears everywhere in
+the scope.
+
 First acceptance tests:
 
 - movement choices are generated from `links`
 - target entry availability gates `inside_cave`
 - `wait` advances `world_turn`
 - a selectable scheduled event matches only at the requested time and location
+- a scope-level once event can be selected from any location, return, and then
+  disappear everywhere
+- a role/provider concept can donate a sandbox event through the gathered
+  namespace
 - an inventory item plus a local object can generate an interaction choice
 - the interaction uses call/return and mutates state
 - all output remains normal journal fragments and `ChoiceFragment`s

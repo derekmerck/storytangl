@@ -6,17 +6,20 @@ from tangl.core import Graph, Selector
 from tangl.core.runtime_op import Predicate
 from tangl.mechanics.sandbox import (
     SandboxLocation,
+    SandboxScope,
     Schedule,
     ScheduleEntry,
     ScheduledEvent,
+    ScheduledPresence,
     WorldTime,
     advance_world_turn,
     current_world_time,
 )
 from tangl.story import Action, Block
+from tangl.story.concepts import Actor, Role
 from tangl.story.fragments import ChoiceFragment
 from tangl.story.system_handlers import render_block_choices
-from tangl.vm import Ledger
+from tangl.vm import Ledger, Requirement
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
@@ -50,7 +53,7 @@ def _sandbox_graph() -> tuple[Graph, SandboxLocation, SandboxLocation, SandboxLo
 def _dynamic_sandbox_actions(location: SandboxLocation) -> list[Action]:
     return [
         edge
-        for edge in location.edges_out(Selector(has_kind=Action, trigger_phase=None))
+        for edge in location.edges_out(Selector(has_kind=Action))
         if {"dynamic", "sandbox", "movement"}.issubset(getattr(edge, "tags", set()) or set())
     ]
 
@@ -58,7 +61,7 @@ def _dynamic_sandbox_actions(location: SandboxLocation) -> list[Action]:
 def _dynamic_sandbox_actions_with_tag(location: SandboxLocation, tag: str) -> list[Action]:
     return [
         edge
-        for edge in location.edges_out(Selector(has_kind=Action, trigger_phase=None))
+        for edge in location.edges_out(Selector(has_kind=Action))
         if {"dynamic", "sandbox", tag}.issubset(getattr(edge, "tags", set()) or set())
     ]
 
@@ -239,3 +242,225 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
     choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
 
     assert any(choice.text == "Talk to traveler" and choice.available for choice in choices)
+
+
+def test_scope_donates_wait_to_child_locations() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        wait_text="Pass time",
+        wait_turn_delta=2,
+        locals={"world_turn": 0},
+    )
+    road = SandboxLocation(label="road", location_name="Road")
+    peer = SandboxLocation(label="peer", location_name="Peer", wait_enabled=False)
+    graph.add(scope)
+    graph.add(road)
+    graph.add(peer)
+    scope.add_child(road)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+    wait = _dynamic_sandbox_actions_with_tag(road, "wait")[0]
+
+    assert wait.text == "Pass time"
+    assert wait.payload == {"sandbox_action": "wait", "turn_delta": 2}
+
+    do_provision(peer, ctx=PhaseCtx(graph=graph, cursor_id=peer.uid))
+    assert _dynamic_sandbox_actions_with_tag(peer, "wait") == []
+
+
+def test_scope_wait_advances_shared_scope_time() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope", wait_turn_delta=2, locals={"world_turn": 0})
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    scope.add_child(road)
+    scope.add_child(building)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+    do_provision(road, ctx=ctx)
+    wait = _dynamic_sandbox_actions_with_tag(road, "wait")[0]
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+
+    ledger.resolve_choice(wait.uid, choice_payload=wait.payload)
+
+    assert scope.locals["world_turn"] == 2
+    assert current_world_time(building).turn == 2
+    assert "world_turn" not in road.locals
+
+
+def test_scope_scheduled_event_is_donated_to_matching_child_location() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 2},
+        scheduled_events=[
+            ScheduledEvent(
+                label="traveler",
+                location="road",
+                period=3,
+                target="traveler_arrives",
+                text="Talk to traveler",
+            )
+        ],
+    )
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    traveler = Block(label="traveler_arrives", content="A traveler waves from the road.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(traveler)
+    scope.add_child(road)
+    scope.add_child(building)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+
+    road_events = _dynamic_sandbox_actions_with_tag(road, "event")
+    building_events = _dynamic_sandbox_actions_with_tag(building, "event")
+    assert [event.text for event in road_events] == ["Talk to traveler"]
+    assert building_events == []
+
+
+def test_scope_once_event_triggers_on_entry_returns_and_suppresses_after_target_visit() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        scheduled_events=[
+            ScheduledEvent(
+                label="first_entry",
+                target="orientation",
+                text="Take in your surroundings",
+                activation="first",
+                once=True,
+                return_to_location=True,
+            )
+        ],
+    )
+    road = SandboxLocation(label="road", location_name="Road", links={"east": "building"})
+    building = SandboxLocation(label="building", location_name="Building", links={"west": "road"})
+    cave_entrance = SandboxLocation(label="cave_entrance", location_name="Cave Entrance")
+    inside_cave = SandboxLocation(label="inside_cave", location_name="Inside Cave")
+    start = Block(label="start", content="Begin.")
+    orientation = Block(label="orientation", content="You get your bearings.")
+    graph.add(scope)
+    graph.add(start)
+    graph.add(road)
+    graph.add(building)
+    graph.add(cave_entrance)
+    graph.add(inside_cave)
+    graph.add(orientation)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(cave_entrance)
+    scope.add_child(inside_cave)
+    enter_road = Action(
+        registry=graph,
+        label="enter_road",
+        predecessor_id=start.uid,
+        successor_id=road.uid,
+        text="Enter sandbox",
+    )
+
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    ledger.resolve_choice(enter_road.uid)
+
+    assert ledger.cursor is road
+    assert orientation.locals["_visited"] is True
+    assert road.locals["_visited"] is True
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+    assert _dynamic_sandbox_actions_with_tag(building, "event") == []
+
+
+def test_scope_presence_can_gate_scheduled_events() -> None:
+    graph = Graph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 2},
+        scheduled_presence=[
+            ScheduledPresence(
+                label="traveler_presence",
+                actor="traveler",
+                location="road",
+                period=3,
+            )
+        ],
+        scheduled_events=[
+            ScheduledEvent(
+                label="traveler_chat",
+                actor="traveler",
+                location="road",
+                period=3,
+                target="traveler_arrives",
+                text="Talk to traveler",
+            )
+        ],
+    )
+    road = SandboxLocation(label="road", location_name="Road")
+    traveler = Block(label="traveler_arrives", content="A traveler waves from the road.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(traveler)
+    scope.add_child(road)
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+    assert [event.text for event in _dynamic_sandbox_actions_with_tag(road, "event")] == [
+        "Talk to traveler"
+    ]
+
+    scope.scheduled_presence = []
+    do_provision(road, ctx=ctx)
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
+
+
+def test_role_provider_can_donate_sandbox_events() -> None:
+    class HelpfulActor(Actor):
+        def get_sandbox_events(self, *, caller, ctx, ns):
+            if not ns.get("can_pause", True):
+                return []
+            return [
+                ScheduledEvent(
+                    label="repair_armor",
+                    target="armor_repair",
+                    text=f"Ask {self.name} to fix your armor",
+                    return_to_location=True,
+                )
+            ]
+
+    graph = Graph(label="barn_dance")
+    scope = SandboxScope(label="barn_dance_scope")
+    road = SandboxLocation(label="dance_floor", location_name="Dance Floor")
+    repair = Block(label="armor_repair", content="Aria tightens the straps.")
+    aria = HelpfulActor(label="aria", name="Aria")
+    role = Role(
+        label="friend",
+        predecessor_id=scope.uid,
+        requirement=Requirement(has_kind=Actor, hard_requirement=False),
+    )
+    graph.add(scope)
+    graph.add(road)
+    graph.add(repair)
+    graph.add(aria)
+    graph.add(role)
+    scope.add_child(road)
+    role.set_provider(aria)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    events = _dynamic_sandbox_actions_with_tag(road, "event")
+
+    assert [event.text for event in events] == ["Ask Aria to fix your armor"]
+    assert events[0].successor is repair
+    assert events[0].return_phase is not None
+
+    road.locals["can_pause"] = False
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
