@@ -20,6 +20,7 @@ mechanism-level provisioning rules in :mod:`tangl.vm`.
 """
 
 from .actor import Actor
+from .asset import AssetType, AssetWallet, CountableAsset
 from .location import Location
 from .narrator_knowledge import EntityKnowledge, HasNarratorKnowledge, get_narrator_key
 from .role import Role
@@ -27,6 +28,9 @@ from .setting import Setting
 
 __all__ = [
     "Actor",
+    "AssetType",
+    "AssetWallet",
+    "CountableAsset",
     "EntityKnowledge",
     "HasNarratorKnowledge",
     "Location",

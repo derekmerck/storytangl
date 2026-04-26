@@ -10,7 +10,7 @@ from tangl.utils.enum_plus import EnumPlusMixin
 from tangl.lang.helpers.pattern import is_plural
 from tangl.lang.body_parts import BodyRegion
 from tangl.core import Token
-from .asset_type import AssetType
+from tangl.story.concepts.asset import AssetType
 from .enums import WearableLayer, WearableState
 
 logger = logging.getLogger(__name__)
