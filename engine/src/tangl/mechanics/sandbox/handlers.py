@@ -2,16 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Protocol, runtime_checkable
 
 from tangl.core import Selector
 from tangl.story import Action
-from tangl.vm import ResolutionPhase, TraversableNode, on_provision, on_update
+from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
 
 from .location import SandboxLocation
 from .schedule import ScheduledEvent, ScheduledPresence
 from .scope import SandboxScope
 from .time import advance_world_turn, current_world_time
+
+
+@runtime_checkable
+class SandboxEventProvider(Protocol):
+    """Concept provider that can donate sandbox events."""
+
+    def get_sandbox_events(
+        self,
+        *,
+        caller: SandboxLocation,
+        ctx: VmPhaseCtx,
+        ns: Mapping[str, Any],
+    ) -> list[ScheduledEvent] | None:
+        """Return sandbox events available from this provider."""
+        ...
 
 
 def _has_tags(value: Any, *tags: str) -> bool:
@@ -82,11 +98,11 @@ def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
 
 
 def _nearest_scope_value(location: SandboxLocation, field_name: str, default: Any) -> Any:
-    local_value = getattr(location, field_name)
+    local_value = getattr(location, field_name, None)
     if local_value is not None:
         return local_value
     for scope in _sandbox_scopes(location):
-        scope_value = getattr(scope, field_name)
+        scope_value = getattr(scope, field_name, None)
         if scope_value is not None:
             return scope_value
     return default
@@ -149,11 +165,10 @@ def _provider_scheduled_events(location: SandboxLocation, *, ctx: Any) -> list[S
             continue
         seen_provider_ids.add(provider_id)
 
-        get_sandbox_events = getattr(provider, "get_sandbox_events", None)
-        if not callable(get_sandbox_events):
+        if not isinstance(provider, SandboxEventProvider):
             continue
 
-        provided = get_sandbox_events(caller=location, ctx=ctx, ns=ns)
+        provided = provider.get_sandbox_events(caller=location, ctx=ctx, ns=ns)
         if provided is None:
             continue
         for event in provided:

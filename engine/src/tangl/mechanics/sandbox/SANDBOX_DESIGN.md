@@ -105,14 +105,17 @@ pipeline. The syntax can vary by mechanic family, but the re-entrant provider
 pattern is shared.
 
 Selectable and triggered scheduled events can also use existing call/return and
-visit history directly. An `activation` value maps to the same trigger phase as
-authored story actions. A `return_to_location` event is projected as a normal
-`Action` with `return_phase=UPDATE`; when the target scene finishes, the frame
-returns to the originating location. A `once` event is not projected after its
-target has generic VM `_visited` state. This covers scope-level "first time in
-this sandbox" beats without a sandbox ledger or custom flag system: donate the
-same once-only event to every child location, target a shared orientation block,
-trigger it on entry, and let target visit history suppress future projections.
+visit history directly. `activation` is the authored timing hint copied from
+story actions: unset means a normal visible choice, `first` maps to a PREREQS
+redirect before the current node journals, and `last` maps to a POSTREQS
+continue after the current node journals. `return_to_location` is orthogonal to
+activation; it is projected as a normal `Action` with `return_phase=UPDATE`, so
+when the target scene finishes, the frame returns to the originating location.
+A `once` event is not projected after its target has generic VM `_visited`
+state. This covers scope-level "first time in this sandbox" beats without a
+sandbox ledger or custom flag system: donate the same once-only event to every
+child location, target a shared orientation block, trigger it on entry, and let
+target visit history suppress future projections.
 
 Concepts can originate events too. The sandbox projector discovers providers
 from the gathered namespace and calls `get_sandbox_events(caller, ctx, ns)` on
@@ -240,8 +243,6 @@ First acceptance tests:
   disappear everywhere
 - a role/provider concept can donate a sandbox event through the gathered
   namespace
-- an inventory item plus a local object can generate an interaction choice
-- the interaction uses call/return and mutates state
 - all output remains normal journal fragments and `ChoiceFragment`s
 - replay of the same choices reaches the same state
 

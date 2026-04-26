@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
-from pydantic import BaseModel
+from tangl.core.bases import BaseModelPlus
 
 
-class WorldTime(BaseModel):
+class HasMutableLocals(Protocol):
+    """Object exposing mutable local state."""
+
+    locals: dict[str, Any] | None
+
+
+class HasWorldTurnScope(HasMutableLocals, Protocol):
+    """Object whose ancestry can contain scoped world time."""
+
+    ancestors: list["HasWorldTurnScope"]
+
+
+class WorldTime(BaseModelPlus):
     """Derived calendar view over a monotonically increasing world turn."""
 
     turn: int = 0
@@ -57,26 +69,25 @@ class WorldTime(BaseModel):
         )
 
 
-def get_world_turn(source: Any) -> int:
+def get_world_turn(source: HasWorldTurnScope) -> int:
     """Return the nearest scoped ``world_turn`` as an integer, defaulting to zero."""
-    candidates = getattr(source, "ancestors", [source])
-    for candidate in candidates:
-        locals_ = getattr(candidate, "locals", None)
+    for candidate in source.ancestors:
+        locals_ = candidate.locals
         if isinstance(locals_, dict) and "world_turn" in locals_:
             return int(locals_["world_turn"])
     return 0
 
 
-def current_world_time(source: Any) -> WorldTime:
+def current_world_time(source: HasWorldTurnScope) -> WorldTime:
     """Return the current derived `WorldTime` for a graph or node-like object."""
     return WorldTime.from_turn(get_world_turn(source))
 
 
-def advance_world_turn(source: Any, delta: int = 1) -> int:
+def advance_world_turn(source: HasMutableLocals, delta: int = 1) -> int:
     """Increment ``source.locals['world_turn']`` and return the updated value."""
     if delta < 0:
         raise ValueError("delta must be non-negative")
-    locals_ = getattr(source, "locals", None)
+    locals_ = source.locals
     if not isinstance(locals_, dict):
         raise TypeError("source must expose a mutable locals dict")
     next_turn = int(locals_.get("world_turn", 0)) + delta
