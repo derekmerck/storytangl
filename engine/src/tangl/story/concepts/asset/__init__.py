@@ -6,11 +6,16 @@ resources, and ``AssetWallet`` stores fungible counts.
 """
 
 from .asset_type import AssetType, CountableAsset, Fungible
+from .holder import HasAssets
+from .transaction import AssetTransactionManager, AssetTransactionResult
 from .wallet import AssetWallet
 
 __all__ = [
     "AssetType",
+    "AssetTransactionManager",
+    "AssetTransactionResult",
     "AssetWallet",
     "CountableAsset",
     "Fungible",
+    "HasAssets",
 ]

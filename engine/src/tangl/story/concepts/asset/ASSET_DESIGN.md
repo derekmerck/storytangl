@@ -1,6 +1,6 @@
 # tangl.story.concepts.asset - Design Notes
 
-> Status: Initial vocabulary slice.
+> Status: Initial vocabulary and holder slice.
 
 ## Position
 
@@ -12,14 +12,30 @@ This package currently defines:
 - `AssetType`: a singleton definition for tokenizable, lightly stateful assets.
 - `CountableAsset`: a fungible asset definition tracked by quantity.
 - `AssetWallet`: a compact counter for fungible assets.
+- `HasAssets`: a story-level facet for nodes that hold wallet counts and
+  nominate discrete asset tokens into namespaces.
+- `AssetTransactionManager`: a small preflight-and-mutate service for transfers
+  between `HasAssets` holders.
 
 Discrete assets should be represented as `Token[AssetTypeSubclass]`. The
 singleton describes the platonic item, while the token holds graph-local state.
 
+## Holder Model
+
+`HasAssets` is the current holder surface. It publishes:
+
+- `asset_holder`: the holder itself;
+- `asset_wallet` and `wallet`: the fungible wallet;
+- `assets` and `inv`: the holder's nominated discrete asset tokens.
+
+Those symbols are intentionally ordinary namespace contributions, so roles,
+settings, sandbox scopes, and other story machinery can prefix or inspect them
+without learning a separate inventory engine.
+
 ## Deferred Relationship Model
 
-`CanHoldAssets` is intentionally not implemented in this slice. The intended
-shape is:
+The current `HasAssets.assets` map is a lightweight staging surface. The later
+relationship-backed shape is:
 
 - locations, actors, players, containers, and other story nodes may opt in as
   asset holders;
@@ -33,10 +49,11 @@ as asset-only code. The old `Associating` and `Connection` scratch designs are
 better prior art for relationship preflight and acceptance than for inventory
 storage itself.
 
-## Deferred Transaction Model
+## Transaction Model
 
-The transaction manager should validate a complete transfer before mutating
-wallets or graph links. Once validated, it can:
+`AssetTransactionManager` validates a complete transfer before mutating wallets
+or holder asset maps. Once the graph relationship model exists, the same manager
+can:
 
 - move discrete asset tokens by updating holding/ownership links;
 - debit and credit `AssetWallet` counts;
