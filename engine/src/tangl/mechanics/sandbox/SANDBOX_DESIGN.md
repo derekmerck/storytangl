@@ -158,6 +158,36 @@ Some generated choices can be diagnostic:
 That response feels like parser failure, but it is still normal StoryTangl
 traversal.
 
+### Research Direction: Parser Input As Affordance-Field Rasterization
+
+Traditional parser IF is input-order. It starts with the player command and
+casts it into the world, asking which object/action it intersects. This is
+roughly ray tracing: the command is the ray, grammar provides the ray model,
+and world state is queried after syntax has been inferred.
+
+Sandbox can invert that direction into an object-order pipeline. The current
+world state first projects meaningful affordances into an interaction buffer:
+movement actions, object actions, inventory actions, hidden parser-only
+actions, unavailable-but-recognizable actions, diagnostic responses, and global
+commands. Each projected affordance contributes command signatures and match
+metadata. The player command then samples this affordance field.
+
+Resolution becomes a compositing problem:
+
+- choose the strongest affordance fragment;
+- report ambiguity when fragments overlap;
+- report unavailability when the best match has unsatisfied requirements;
+- report unknown input when nothing covers the command.
+
+This reframes parser IF as a renderer over state-generated affordances rather
+than an interpreter that owns semantic meaning. The world decides what can be
+meant; the parser chooses among projected meanings.
+
+This is not part of the first sandbox implementation. It is a useful research
+frame for later parser-like clients, debug affordance views, and legacy IF
+imports where we want parser play to remain a UI projection over ordinary
+StoryTangl choices.
+
 ---
 
 ## What Is Out Of Scope For The First Spike
