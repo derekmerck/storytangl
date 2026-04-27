@@ -89,5 +89,9 @@ class AssetTransactionManager:
         result = self.can_transfer_countable(giver, receiver, asset_label, amount)
         if not result.accepted:
             raise ValueError(result.reason or "asset transaction rejected")
-        giver.wallet.spend({asset_label: amount})
-        receiver.wallet.gain({asset_label: amount})
+        giver.spend_countable(asset_label, amount)
+        try:
+            receiver.gain_countable(asset_label, amount)
+        except Exception:
+            giver.gain_countable(asset_label, amount)
+            raise

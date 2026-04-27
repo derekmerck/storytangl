@@ -39,12 +39,9 @@ def _clear_dynamic_sandbox_actions(
     location: SandboxLocation,
     *,
     action_kind: str,
-    ctx: Any,
+    ctx: VmPhaseCtx,
 ) -> None:
-    graph = getattr(location, "graph", None)
-    if graph is None:
-        return
-
+    graph = location.graph
     for edge in list(location.edges_out(Selector(has_kind=Action))):
         if _has_tags(edge, "dynamic", "sandbox", action_kind):
             graph.remove(edge.uid, _ctx=ctx)
@@ -178,20 +175,8 @@ def _provider_scheduled_events(location: SandboxLocation, *, ctx: Any) -> list[S
     return events
 
 
-def _selected_payload(ctx: Any) -> Any:
-    payload = getattr(ctx, "selected_payload", None)
-    if payload is not None:
-        return payload
-
-    selected_edge = getattr(ctx, "selected_edge", None)
-    if selected_edge is not None:
-        return getattr(selected_edge, "payload", None)
-
-    incoming_edge = getattr(ctx, "incoming_edge", None)
-    if incoming_edge is not None:
-        return getattr(incoming_edge, "payload", None)
-
-    return None
+def _selected_payload(ctx: VmPhaseCtx) -> Any:
+    return ctx.selected_payload
 
 
 @on_provision(

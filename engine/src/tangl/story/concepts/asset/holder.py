@@ -29,7 +29,7 @@ class HasAssets(HasNamespace):
         self.assets[self._asset_key(asset, label)] = asset
 
     def get_asset(self, label: str) -> Token | None:
-        """Return a held asset by holder key, token label, or token reference."""
+        """Return a held asset by holder key, token label, or token_from."""
         if label in self.assets:
             return self.assets[label]
         for asset in self.assets.values():
@@ -53,7 +53,8 @@ class HasAssets(HasNamespace):
         for label, item in list(self.assets.items()):
             if item is asset:
                 return self.assets.pop(label)
-        raise KeyError(asset.get_label() or asset.token_from)
+        key = asset.get_label() or asset.token_from or repr(asset)
+        raise KeyError(f"Unknown asset: {key}")
 
     def can_give_asset(self, asset: Token, receiver: "HasAssets | None" = None) -> bool:
         """Return whether this holder is willing and able to give a discrete asset."""
@@ -82,8 +83,16 @@ class HasAssets(HasNamespace):
         giver: "HasAssets | None" = None,
     ) -> bool:
         """Return whether this holder can receive a fungible asset count."""
-        _ = (asset_label, amount, giver)
+        _ = (asset_label, giver)
         return amount >= 0
+
+    def spend_countable(self, asset_label: str, amount: int) -> None:
+        """Spend a fungible asset count from this holder."""
+        self.wallet.spend({asset_label: amount})
+
+    def gain_countable(self, asset_label: str, amount: int) -> None:
+        """Gain a fungible asset count for this holder."""
+        self.wallet.gain({asset_label: amount})
 
     @contribute_ns
     def provide_asset_symbols(self) -> Mapping[str, object]:

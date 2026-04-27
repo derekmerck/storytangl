@@ -21,6 +21,7 @@ class WeaponType(AssetType):
 class AssetHolder(Entity, HasAssets):
     accepted_assets: set[str] = Field(default_factory=set)
     accepted_counts: set[str] = Field(default_factory=set)
+    countable_events: list[str] = Field(default_factory=list)
 
     def can_receive_asset(self, asset: Token, giver: HasAssets | None = None) -> bool:
         _ = giver
@@ -34,6 +35,20 @@ class AssetHolder(Entity, HasAssets):
     ) -> bool:
         _ = (amount, giver)
         return not self.accepted_counts or asset_label in self.accepted_counts
+
+    def spend_countable(self, asset_label: str, amount: int) -> None:
+        super().spend_countable(asset_label, amount)
+        self.countable_events.append(f"spent:{amount}:{asset_label}")
+
+    def gain_countable(self, asset_label: str, amount: int) -> None:
+        super().gain_countable(asset_label, amount)
+        self.countable_events.append(f"gained:{amount}:{asset_label}")
+
+
+class RejectingGainHolder(AssetHolder):
+    def gain_countable(self, asset_label: str, amount: int) -> None:
+        _ = (asset_label, amount)
+        raise RuntimeError("receiver failed")
 
 
 @pytest.fixture(autouse=True)
@@ -110,6 +125,16 @@ def test_asset_wallet_spend_is_atomic_when_short() -> None:
     assert wallet["arrows"] == 2
 
 
+def test_asset_wallet_spend_rejects_negative_amounts() -> None:
+    wallet = AssetWallet()
+    wallet.gain(gold=10)
+
+    with pytest.raises(ValueError, match="Cannot spend negative amount"):
+        wallet.spend(gold=-1)
+
+    assert wallet["gold"] == 10
+
+
 def test_asset_wallet_total_value_and_description() -> None:
     CountableAsset(label="gold", value=1.0)
     CountableAsset(label="gems", value=10.0)
@@ -182,6 +207,8 @@ def test_transaction_manager_moves_countable_assets_after_preflight() -> None:
     assert result.accepted
     assert giver.wallet["gold"] == 13
     assert receiver.wallet["gold"] == 7
+    assert giver.countable_events == ["spent:7:gold"]
+    assert receiver.countable_events == ["gained:7:gold"]
 
 
 def test_transaction_manager_rejects_countable_assets_without_mutation() -> None:
@@ -194,5 +221,18 @@ def test_transaction_manager_rejects_countable_assets_without_mutation() -> None
 
     assert not result.accepted
     assert result.reason == "receiver cannot receive countable asset"
+    assert giver.wallet["gold"] == 20
+    assert receiver.wallet["gold"] == 0
+
+
+def test_transaction_manager_rolls_back_countable_spend_if_receive_fails() -> None:
+    giver = AssetHolder(label="giver")
+    receiver = RejectingGainHolder(label="receiver", accepted_counts={"gold"})
+    manager = AssetTransactionManager()
+    giver.wallet.gain(gold=20)
+
+    with pytest.raises(RuntimeError, match="receiver failed"):
+        manager.transfer_countable(giver, receiver, "gold", 7)
+
     assert giver.wallet["gold"] == 20
     assert receiver.wallet["gold"] == 0

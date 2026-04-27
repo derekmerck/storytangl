@@ -48,10 +48,17 @@ class AssetWallet(BaseModelPlus):
     def spend(self, assets: Mapping[str, int] | None = None, **kwargs: int) -> None:
         """Deduct asset counts, raising without mutation if any count is short."""
         cost = dict(assets or {}) | kwargs
+        negative = [
+            label
+            for label, amount in cost.items()
+            if amount < 0
+        ]
+        if negative:
+            raise ValueError(f"Cannot spend negative amount for: {', '.join(sorted(negative))}")
         missing = [
             label
             for label, amount in cost.items()
-            if amount < 0 or self.amounts.get(label, 0) < amount
+            if self.amounts.get(label, 0) < amount
         ]
         if missing:
             raise ValueError(f"Insufficient assets: {', '.join(sorted(missing))}")

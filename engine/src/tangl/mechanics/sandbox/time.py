@@ -71,6 +71,9 @@ class WorldTime(BaseModelPlus):
 
 def get_world_turn(source: HasWorldTurnScope) -> int:
     """Return the nearest scoped ``world_turn`` as an integer, defaulting to zero."""
+    locals_ = source.locals
+    if isinstance(locals_, dict) and "world_turn" in locals_:
+        return int(locals_["world_turn"])
     for candidate in source.ancestors:
         locals_ = candidate.locals
         if isinstance(locals_, dict) and "world_turn" in locals_:
