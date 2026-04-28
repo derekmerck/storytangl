@@ -14,6 +14,8 @@ Current first-pass surface:
   locations and exposes a lightweight player asset holder.
 - `SandboxLocation`: a `MenuBlock` facade with location links, simple local
   lockables, and held assets.
+- `SandboxExit`: an optional structured link declaration for custom egress
+  text while preserving the simple `direction -> target` table form.
 - `SandboxInventory`: a ready-at-hand `HasAssets` holder used by sandbox scopes
   for player inventory in the first slice.
 - `SandboxLockable`: a tiny local fixture for locked doors, grates, and similar
@@ -23,7 +25,8 @@ Current first-pass surface:
   schedule matching primitives.
 - `project_sandbox_location_links`: planning handler that projects movement
   links into normal dynamic actions, unless a manual action already covers that
-  direction/target.
+  target. Direction aliases such as `n`, `s`, `e`, `w`, `u`, and `d` are
+  normalized into canonical UI hints while preserving the raw authored key.
 - `project_sandbox_asset_actions`: planning handler that projects present assets
   as take/read choices and player-held assets as drop choices.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
@@ -55,6 +58,11 @@ player inventory. Generated take/drop actions call the normal
 text. This is enough for keys, lamps, leaflets, and treasures in a toy
 Adventure-like subset while leaving graph-backed ownership relations for a
 later asset slice.
+
+Base sandbox links are explicit and one-way. Do not infer reverse exits here:
+old IF maps often use one-way travel, weird loops, and conditional returns. A
+future `GridSandbox` specialization can add RPG-map-style symmetric adjacency
+defaults for tile or grid worlds without changing the base sandbox contract.
 
 Concept providers can opt in by exposing `get_sandbox_events(caller, ctx, ns)`.
 The sandbox projector discovers those providers from the gathered namespace, so

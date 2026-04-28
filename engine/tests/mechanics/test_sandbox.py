@@ -7,6 +7,7 @@ import pytest
 from tangl.core import Graph, Selector, Token
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.mechanics.sandbox import (
+    SandboxExit,
     SandboxLocation,
     SandboxLockable,
     SandboxScope,
@@ -17,6 +18,7 @@ from tangl.mechanics.sandbox import (
     WorldTime,
     advance_world_turn,
     current_world_time,
+    normalize_sandbox_direction,
 )
 from tangl.story import Action, Block, StoryGraph
 from tangl.story.concepts import Actor, Role
@@ -143,6 +145,41 @@ def test_sandbox_location_links_project_normal_actions() -> None:
     }
     assert all(action.successor is not None for action in actions)
     assert all(action.ui_hints["source"] == "sandbox_link" for action in actions)
+
+
+def test_sandbox_location_links_normalize_direction_aliases() -> None:
+    assert normalize_sandbox_direction("n") == "north"
+    assert normalize_sandbox_direction("U") == "up"
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.links = {"n": "building", "u": "cave_entrance"}
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    actions = _dynamic_sandbox_actions(road)
+    assert {action.text for action in actions} == {
+        "Go north to Building",
+        "Go up to Cave Entrance",
+    }
+    hints = {action.ui_hints["raw_direction"]: action.ui_hints["direction"] for action in actions}
+    assert hints == {"n": "north", "u": "up"}
+
+
+def test_sandbox_structured_exit_can_override_choice_text() -> None:
+    graph, road, _building, _cave_entrance = _sandbox_graph()
+    road.links = {
+        "in": SandboxExit(target="building", text="Enter the building"),
+        "out": {"target": "cave_entrance", "text": "Leave for the cave"},
+    }
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    actions = _dynamic_sandbox_actions(road)
+    assert {action.text for action in actions} == {
+        "Enter the building",
+        "Leave for the cave",
+    }
 
 
 def test_manual_location_action_suppresses_generated_link_choice() -> None:

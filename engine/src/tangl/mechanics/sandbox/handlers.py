@@ -12,7 +12,7 @@ from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
 from tangl.vm.dispatch import on_gather_ns
 
-from .location import SandboxLocation
+from .location import SandboxExit, SandboxLocation, normalize_sandbox_direction
 from .schedule import ScheduledEvent, ScheduledPresence
 from .scope import SandboxScope
 from .time import advance_world_turn, current_world_time
@@ -120,9 +120,28 @@ def _resolve_traversable_ref(location: SandboxLocation, target_ref: str) -> Trav
     return _resolve_ref(location, target_ref, kind=TraversableNode)
 
 
-def _movement_text(direction: str, target: SandboxLocation) -> str:
+def _exit_spec(value: str | SandboxExit | Mapping[str, Any]) -> SandboxExit:
+    if isinstance(value, SandboxExit):
+        return value
+    if isinstance(value, Mapping):
+        return SandboxExit.model_validate(value)
+    return SandboxExit(target=value)
+
+
+def _movement_text(
+    direction: str,
+    target: SandboxLocation,
+    exit_spec: SandboxExit | None = None,
+) -> str:
+    if exit_spec is not None and exit_spec.text:
+        return exit_spec.text
+    canonical = normalize_sandbox_direction(direction)
     target_name = target.location_name or target.get_label()
-    return f"Go {direction} to {target_name}"
+    if canonical == "in":
+        return f"Enter {target_name}"
+    if canonical == "out":
+        return f"Exit to {target_name}"
+    return f"Go {canonical} to {target_name}"
 
 
 def _has_manual_link_action(
@@ -324,22 +343,25 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
 
     _clear_dynamic_sandbox_actions(caller, action_kind="movement", ctx=ctx)
 
-    for direction, target_ref in sorted(caller.links.items()):
-        target = _resolve_location_ref(caller, target_ref)
+    for raw_direction, link in sorted(caller.links.items()):
+        exit_spec = _exit_spec(link)
+        direction = normalize_sandbox_direction(raw_direction)
+        target = _resolve_location_ref(caller, exit_spec.target)
         if target is None:
             continue
         if _has_manual_link_action(caller, target=target):
             continue
         Action(
             registry=graph,
-            label=f"sandbox_move_{caller.get_label()}_{direction}",
+            label=f"sandbox_move_{caller.get_label()}_{raw_direction}",
             predecessor_id=caller.uid,
             successor_id=target.uid,
-            text=_movement_text(direction, target),
+            text=_movement_text(raw_direction, target, exit_spec),
             tags={"dynamic", "sandbox", "movement"},
             ui_hints={
                 "source": "sandbox_link",
                 "direction": direction,
+                "raw_direction": raw_direction,
                 "target": target.get_label(),
             },
         )

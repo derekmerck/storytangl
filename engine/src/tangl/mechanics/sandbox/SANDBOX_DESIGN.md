@@ -73,6 +73,7 @@ like a `Block` and place-like for movement and presence.
 For now, `SandboxLocation` is a thin `MenuBlock` facade with:
 
 - `links`: direction to target-location reference
+- optional `SandboxExit` values for per-link text overrides
 - `sandbox_scope`: optional shared scope label
 - held assets through the story-level `HasAssets` facet
 - location namespace such as `current_location`
@@ -81,6 +82,19 @@ Movement is not modeled as exit availability. Linked targets use normal entry
 availability. If a linked location is currently unavailable, the generated
 movement choice is unavailable for the same reason any ordinary StoryTangl
 choice is unavailable.
+
+Link keys are author/import vocabulary, not graph semantics. The sandbox
+projector normalizes common aliases (`n`, `s`, `e`, `w`, `u`, `d`, `in`, `out`)
+into canonical `ui_hints["direction"]` values, preserves the original key as
+`ui_hints["raw_direction"]`, and still accepts the compact
+`{"n": "forest"}` table form. A structured `SandboxExit(target="building",
+text="Enter the building")` can override display text without changing the
+underlying edge model.
+
+The base sandbox does not infer reverse links. Colossal Cave-style maps often
+contain one-way passages, loops, blocked returns, and asymmetric text. A future
+`GridSandbox` specialization can intentionally provide symmetric adjacency
+defaults for RPG-map or tile-map travel.
 
 ### Projection Rules
 

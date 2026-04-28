@@ -13,6 +13,37 @@ from tangl.story.concepts.asset import HasAssets
 from .schedule import ScheduledEvent
 
 
+SANDBOX_DIRECTION_ALIASES = {
+    "n": "north",
+    "s": "south",
+    "e": "east",
+    "w": "west",
+    "ne": "northeast",
+    "nw": "northwest",
+    "se": "southeast",
+    "sw": "southwest",
+    "u": "up",
+    "d": "down",
+    "enter": "in",
+    "inside": "in",
+    "exit": "out",
+    "outside": "out",
+}
+
+
+def normalize_sandbox_direction(direction: str) -> str:
+    """Return the canonical sandbox direction for a link key."""
+    normalized = direction.strip().lower().replace(" ", "_")
+    return SANDBOX_DIRECTION_ALIASES.get(normalized, normalized)
+
+
+class SandboxExit(BaseModel):
+    """Structured egress declaration for sandbox location links."""
+
+    target: str
+    text: str | None = None
+
+
 class SandboxLockable(BaseModel):
     """Minimal lockable local fixture projected into sandbox choices."""
 
@@ -32,7 +63,7 @@ class SandboxLockable(BaseModel):
 class SandboxLocation(HasAssets, MenuBlock):
     """A visitable dynamic hub with location links and present assets."""
 
-    links: dict[str, str] = Field(default_factory=dict)
+    links: dict[str, str | SandboxExit] = Field(default_factory=dict)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     lockables: list[SandboxLockable] = Field(default_factory=list)
     sandbox_scope: str | None = None

@@ -9,12 +9,13 @@ from .handlers import (
     project_sandbox_unlocks,
     project_sandbox_wait,
 )
-from .location import SandboxLocation, SandboxLockable
+from .location import SandboxExit, SandboxLocation, SandboxLockable, normalize_sandbox_direction
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
 from .scope import SandboxInventory, SandboxScope
 from .time import WorldTime, advance_world_turn, current_world_time, get_world_turn
 
 __all__ = [
+    "SandboxExit",
     "SandboxInventory",
     "SandboxLocation",
     "SandboxLockable",
@@ -34,4 +35,5 @@ __all__ = [
     "project_sandbox_scheduled_events",
     "project_sandbox_unlocks",
     "project_sandbox_wait",
+    "normalize_sandbox_direction",
 ]
