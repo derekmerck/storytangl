@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  review_details: false
+  poem: false
+
+  path_filters:
+    - "!scratch/**"
+    - "!tmp/**"
+    - "!docs/src/notes/migration/**"
+    - "!**/*.lock"
+    - "!**/yarn.lock"
+    - "!engine/src/tangl/mechanics/demographics/resources/**"
+
+  path_instructions:
+    - path: "engine/src/tangl/**"
+      instructions: |
+        Prioritize correctness, type integrity, layer boundaries, and conceptual fit with ARCHITECTURE.md and AGENTS.md.
+        Do not request defensive getattr/hasattr/isinstance guards when the typed interface already guarantees the shape.
+        Avoid style-only suggestions unless they point to a real maintainability or behavior issue.
+
+    - path: "engine/tests/**"
+      instructions: |
+        Prioritize missing behavioral coverage, wrong assumptions, and fixture clarity.
+        Do not flag ordinary pytest patterns, direct assertions, or intentionally narrow regression tests as issues.
+
+    - path: "apps/web/**"
+      instructions: |
+        Prioritize fragment contract behavior, Vue component state, accessibility, and tests that exercise user-visible interaction.
+        Do not request a return to unified legacy display blocks when independent fragments are the intended runtime contract.
+
+    - path: "docs/**"
+      instructions: |
+        Review for stale architectural claims, broken references, and conceptual drift.
+        Avoid grammar-only comments unless wording is misleading.

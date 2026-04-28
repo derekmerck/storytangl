@@ -15,6 +15,7 @@ Handler Inventory
 -----------------
 **gather_ns** (namespace):
 - ``contribute_runtime_baseline`` — inject ``cursor`` / ``graph`` symbols
+- ``contribute_selected_edge_context`` — inject selected-edge endpoint symbols
 - ``contribute_locals`` — inject ``caller.locals`` dict
 - ``contribute_satisfied_deps`` — inject label→provider for satisfied deps
 
@@ -26,6 +27,7 @@ Handler Inventory
 - ``follow_triggered_prereqs`` — first available edge with trigger_phase=PREREQS
 
 **apply_update** (UPDATE):
+- ``apply_selected_edge_effects`` — apply chosen edge effects to destination namespace
 - ``apply_runtime_effects`` — apply node runtime effects to scoped namespace
 - ``mark_visited`` — set ``caller.locals['_visited'] = True``, increment visit count
 
@@ -80,7 +82,7 @@ from .dispatch import (
 )
 from .resolution_phase import ResolutionPhase
 from .traversal import get_visit_count, is_first_visit, steps_since_last_visit
-from .traversable import TraversableNode, TraversableEdge, AnonymousEdge
+from .traversable import HasEffects, TraversableNode, TraversableEdge, AnonymousEdge
 
 if TYPE_CHECKING:
     from .runtime.frame import PhaseCtx
@@ -117,6 +119,69 @@ def contribute_runtime_baseline(*, caller, ctx, **kw):
     if graph is not None:
         result["graph"] = graph
     return result or None
+
+
+def _history_predecessor(*, caller, ctx) -> object | None:
+    """Resolve the prior cursor from context history when edge data is absent."""
+    graph = getattr(ctx, "graph", None)
+    history = _ctx_cursor_history(ctx)
+    if graph is None or not history:
+        return None
+    caller_uid = getattr(caller, "uid", None)
+    for node_id in reversed(history[:-1]):
+        if caller_uid is not None and node_id == caller_uid:
+            continue
+        return graph.get(node_id)
+    return None
+
+
+def _edge_endpoint(selected_edge: object, *, attr: str, id_attr: str, ctx) -> object | None:
+    """Resolve an edge endpoint even if a dynamic edge was removed this pass."""
+    endpoint = getattr(selected_edge, attr, None)
+    if endpoint is not None:
+        return endpoint
+    graph = getattr(ctx, "graph", None)
+    endpoint_id = getattr(selected_edge, id_attr, None)
+    if graph is not None and endpoint_id is not None:
+        return graph.get(endpoint_id)
+    return None
+
+
+@on_gather_ns(
+    wants_caller_kind=TraversableNode,
+    wants_exact_kind=False,
+    priority=Priority.FIRST,
+)
+def contribute_selected_edge_context(*, caller, ctx, **kw):
+    """Inject selected-edge endpoint shortcuts for runtime expressions."""
+    _ = kw
+    selected_edge = ctx.selected_edge
+    if selected_edge is None:
+        return None
+
+    predecessor = _edge_endpoint(
+        selected_edge,
+        attr="predecessor",
+        id_attr="predecessor_id",
+        ctx=ctx,
+    ) or _history_predecessor(
+        caller=caller,
+        ctx=ctx,
+    )
+    successor = _edge_endpoint(
+        selected_edge,
+        attr="successor",
+        id_attr="successor_id",
+        ctx=ctx,
+    ) or caller
+    result: dict[str, object] = {"_edge": selected_edge}
+    if predecessor is not None:
+        result["_p"] = predecessor
+        result["_predecessor"] = predecessor
+    if successor is not None:
+        result["_s"] = successor
+        result["_successor"] = successor
+    return result
 
 
 @on_gather_ns(wants_caller_kind=TraversableNode, wants_exact_kind=False)
@@ -302,6 +367,15 @@ def follow_triggered_prereqs(*, caller, ctx, **kw):
 # ---------------------------------------------------------------------------
 # UPDATE — mutate state for arrival
 # ---------------------------------------------------------------------------
+
+@on_update
+def apply_selected_edge_effects(*, caller, ctx, **kw):
+    """Apply selected-edge UPDATE effects to the arrival node namespace."""
+    selected_edge = ctx.selected_edge
+    if isinstance(selected_edge, HasEffects):
+        selected_edge.apply_effects_to(caller, phase=ResolutionPhase.UPDATE, ctx=ctx)
+    return None
+
 
 @on_update
 def apply_runtime_effects(*, caller, ctx, **kw):

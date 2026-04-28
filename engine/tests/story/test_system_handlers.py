@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from tangl.core import BehaviorRegistry, DispatchLayer, Graph, TemplateRegistry
-from tangl.core.runtime_op import Predicate
+from tangl.core.runtime_op import Effect, Predicate
 from tangl.prose.dialog import DialogMuBlock
 from tangl.journal.fragments import AttributedFragment, GroupFragment, PresentationHints
 from tangl.journal.media import MediaFragment as JournalMediaFragment
@@ -27,7 +27,7 @@ from tangl.story.system_handlers import (
     render_block_media,
 )
 from tangl.vm.dispatch import do_journal
-from tangl.vm import Dependency, Requirement
+from tangl.vm import Dependency, Ledger, Requirement
 from tangl.vm.runtime.frame import PhaseCtx
 
 
@@ -147,6 +147,70 @@ def test_render_block_emits_content_media_and_choice_fragments() -> None:
     assert len(choices) == 1
     assert choices[0].available is True
     assert choices[0].unavailable_reason is None
+
+
+def test_render_block_emits_selected_action_journal_text_before_block_content() -> None:
+    graph = Graph()
+    start = Block(label="start")
+    room = Block(label="room", content="You are back in the room.")
+    graph.add(start)
+    graph.add(room)
+    action = Action(
+        predecessor_id=start.uid,
+        successor_id=room.uid,
+        text="Unlock door",
+        journal_text="The key turns with a click. The door unlocks.",
+    )
+    graph.add(action)
+    ctx = SimpleNamespace(
+        selected_edge=action,
+        get_ns=lambda _caller: {},
+    )
+
+    fragments = render_block(caller=room, ctx=ctx)
+
+    assert fragments is not None
+    content = [fragment.content for fragment in fragments if isinstance(fragment, ContentFragment)]
+    assert content[:2] == [
+        "The key turns with a click. The door unlocks.",
+        "You are back in the room.",
+    ]
+
+
+def test_reentrant_action_effect_updates_room_before_journal() -> None:
+    graph = StoryGraph()
+    room = Block(
+        label="room",
+        content="The door is {door_status}.",
+        locals={"door_locked": True, "door_status": "locked", "player_inv": {"key"}},
+    )
+    graph.add(room)
+    action = Action(
+        predecessor_id=room.uid,
+        successor_id=room.uid,
+        text="Unlock door",
+        availability=[Predicate(expr="door_locked and 'key' in player_inv")],
+        effects=[
+            Effect(expr="door_locked = False"),
+            Effect(expr="door_status = 'unlocked'"),
+        ],
+        journal_text="The key turns with a click. The door unlocks.",
+    )
+    graph.add(action)
+    ledger = Ledger(graph=graph, cursor_id=room.uid)
+
+    ledger.resolve_choice(action.uid)
+
+    assert room.locals["door_locked"] is False
+    content = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert content[:2] == [
+        "The key turns with a click. The door unlocks.",
+        "The door is unlocked.",
+    ]
 
 
 def test_render_block_choice_unavailable_reason_missing_successor() -> None:

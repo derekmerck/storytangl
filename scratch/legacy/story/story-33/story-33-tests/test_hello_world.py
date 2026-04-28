@@ -3,7 +3,7 @@ import logging
 from tangl33.core import Graph, Node, Edge, EdgeKind, Domain, Journal, CursorDriver
 from tangl33.story import register_base_capabilities
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def test_hello_world():

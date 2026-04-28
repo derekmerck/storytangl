@@ -162,7 +162,12 @@ class HasEffects(BaseModelPlus):
 
     def _sync_locals(self, ns: StringMap) -> None:
         """Write updated namespace values back to ``self.locals`` when present."""
-        local_store = getattr(self, "locals", None)
+        self._sync_target_locals(self, ns)
+
+    @staticmethod
+    def _sync_target_locals(target: object, ns: StringMap) -> None:
+        """Write updated namespace values back to ``target.locals`` when present."""
+        local_store = getattr(target, "locals", None)
         if not isinstance(local_store, MutableMapping):
             return
         for key in list(local_store.keys()):
@@ -236,6 +241,7 @@ class HasEffects(BaseModelPlus):
         resolved_rand = _resolve_rand(rand=rand, ctx=ctx)
         for effect in matching:
             effect.apply(target_ns, rand=resolved_rand)
+        self._sync_target_locals(other, target_ns)
         return target_ns
 
 
@@ -600,7 +606,7 @@ class TraversableNode(HasAvailability, HasEffects, HasState, HierarchicalNode):
 # TraversableEdge
 # ---------------------------------------------------------------------------
 
-class TraversableEdge(Edge):
+class TraversableEdge(HasAvailability, HasEffects, Edge):
     """Directed edge with traversal metadata for the phase pipeline.
 
     Why
@@ -721,30 +727,37 @@ class TraversableEdge(Edge):
         self.set_successor(value)
 
     def available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
-        """Availability check delegated to the successor node.
+        """Return ``True`` when edge and successor availability both pass.
 
         Judgment call
         -------------
-        Edges do not carry separate guard registries in v38. Edge availability
-        delegates to successor node availability so a single guard model can
-        gate both auto-redirect and explicit traversal.
+        Edges can carry activation guards for action-specific preconditions
+        such as "the player has a key".  Successor availability still gates
+        entry into the destination, so location/scene entry conditions remain
+        authored on the target node.  Edge availability is predecessor/source
+        relative; edge effects are applied later to the successor/arrival
+        namespace by the UPDATE phase handler.
         """
         successor = self.successor
         if successor is None:
             return False
         rand = _resolve_rand(rand=None, ctx=ctx)
+        predecessor = self.predecessor
+        edge_ns = ns
+        if edge_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
+            edge_ns = ctx.get_ns(predecessor or successor)
+
+        if self.predicate:
+            resolved_ns = edge_ns or {}
+            if not bool(resolved_ns.get(self.predicate)):
+                return False
+
+        if not HasAvailability.available(self, ns=edge_ns, ctx=ctx, rand=rand):
+            return False
+
         successor_ns = ns
         if successor_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
             successor_ns = ctx.get_ns(successor)
-
-        if self.predicate:
-            predicate_ns = ns
-            if predicate_ns is None and ctx is not None and hasattr(ctx, "get_ns"):
-                predicate_basis = self.predecessor or successor
-                predicate_ns = ctx.get_ns(predicate_basis)
-            resolved_ns = predicate_ns or {}
-            if not bool(resolved_ns.get(self.predicate)):
-                return False
 
         if not hasattr(successor, "available"):
             return True

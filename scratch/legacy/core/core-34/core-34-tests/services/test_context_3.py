@@ -4,7 +4,7 @@ import logging
 from tangl.core.entity import Entity
 from tangl.core.services import on_gather_context, HasContext
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 class MyEntity(HasContext):
 

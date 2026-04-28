@@ -258,6 +258,7 @@ export interface BaseStoryFragment {
   uid: FragmentId
   fragment_type: string
   content?: unknown
+  label?: string | null
   origin_id?: string | null
   step?: number | null
   tags?: string[]
@@ -301,6 +302,19 @@ export interface GroupStoryFragment extends BaseStoryFragment {
   fragment_type: 'group' | 'dialog'
   group_type?: string | null
   member_ids: FragmentId[]
+  hints?: PresentationHints | null
+  presentation_hints?: PresentationHints | null
+  zone_role?: string | null
+}
+
+export interface TokenStoryFragment extends BaseStoryFragment {
+  fragment_type: 'token'
+  token_id?: FragmentId | null
+  kind?: string | null
+  display_state?: string | null
+  zone_ref?: FragmentId | null
+  hints?: PresentationHints | null
+  presentation_hints?: PresentationHints | null
 }
 
 export interface KvStoryFragment extends BaseStoryFragment {
@@ -342,6 +356,7 @@ export type StoryFragment =
   | AttributedStoryFragment
   | MediaStoryFragment
   | GroupStoryFragment
+  | TokenStoryFragment
   | KvStoryFragment
   | ChoiceStoryFragment
   | ControlStoryFragment

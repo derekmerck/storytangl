@@ -6,7 +6,7 @@ from tangl.core.entity import Registry, Graph, Entity
 from tangl.core.entity.entity import match_logger
 from tangl.core.solver.provisioner import EntityTemplate, TemplateProvider, HasRequirement
 
-match_logger.setLevel(logging.DEBUG)
+# match_logger.setLevel(logging.DEBUG)
 
 class MockEntity(Entity):
     name: str

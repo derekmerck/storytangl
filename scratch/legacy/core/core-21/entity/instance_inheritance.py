@@ -5,7 +5,7 @@ from pydantic import model_validator
 from ..singleton import SingletonEntity
 
 logger = logging.getLogger("tangl.singleton.ref")
-logger.setLevel(level=logging.DEBUG)
+# logger.setLevel(level=logging.DEBUG)
 
 class InheritingSingleton:
     """
@@ -40,5 +40,4 @@ class InheritingSingleton:
                 data.setdefault( field_name, getattr( ref, field_name ))
 
         return data
-
 

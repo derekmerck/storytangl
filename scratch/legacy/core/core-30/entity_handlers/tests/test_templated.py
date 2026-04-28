@@ -9,7 +9,7 @@ from tangl.core.entity import Entity
 from tangl.core.entity.handlers import SelfFactoringModel
 from tangl.core.entity.handlers import HasTemplates, TemplateHandler
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 
 class TestTemplatedEntity(HasTemplates, Entity, metaclass=SelfFactoringModel):

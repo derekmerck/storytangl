@@ -63,8 +63,11 @@ are using it systematically.
 
 ### Incubating
 
-- **Sandbox**: now understood as schedule + namespace + fanout + redirects rather
-  than a separate traversal subsystem.
+- **Sandbox**: first-pass package surface now exists. It is understood as
+  dynamic scene-location hubs plus time/schedule/presence vocabulary, built on
+  ordinary `MenuBlock`, `Fanout`, `Action`, target availability, journal, ledger,
+  and replay machinery rather than a separate traversal subsystem. See
+  `sandbox/SANDBOX_DESIGN.md`.
 - **Credentials**: expected to compose game kernels, asset collections, render, and
   writeback rather than porting the legacy package wholesale.
 

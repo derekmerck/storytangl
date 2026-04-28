@@ -12,6 +12,7 @@ import { fragmentText, isMediaFragment, mediaContentUrl } from './fragmentUtils'
 import { mediaRole } from './fragmentViewUtils'
 import MediaFragmentView from './MediaFragmentView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
+import ZoneFragmentView from './ZoneFragmentView.vue'
 
 type DialogLine = {
   line: AttributedStoryFragment
@@ -89,6 +90,12 @@ const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefine
         </div>
       </div>
     </div>
+
+    <ZoneFragmentView
+      v-else-if="groupType === 'zone'"
+      :group="group"
+      :fragments="fragments"
+    />
 
     <div v-else-if="groupType === 'status_sidecar'" class="kv-strip">
       <span v-for="member in groupMembers" :key="member.uid">

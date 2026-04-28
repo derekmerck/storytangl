@@ -1,3 +1,24 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:69c97ee69266260a89e02e08df20ead37c70ed16b5b79d838ba7a1a56a868dd2
-size 1406
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#20314a" />
+      <stop offset="100%" stop-color="#0f1724" />
+    </linearGradient>
+    <linearGradient id="window" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0c36a" />
+      <stop offset="100%" stop-color="#a95d21" />
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#sky)" />
+  <rect x="120" y="120" width="1040" height="480" rx="28" fill="#251d1a" />
+  <rect x="200" y="170" width="360" height="250" rx="16" fill="url(#window)" opacity="0.92" />
+  <rect x="720" y="170" width="360" height="250" rx="16" fill="url(#window)" opacity="0.92" />
+  <rect x="610" y="150" width="60" height="350" fill="#3b2c23" />
+  <rect x="190" y="470" width="900" height="70" rx="14" fill="#4e372a" />
+  <rect x="520" y="420" width="240" height="140" rx="18" fill="#7e4d21" />
+  <circle cx="640" cy="390" r="52" fill="#f6a84c" opacity="0.88" />
+  <path d="M225 185 L240 320" stroke="#d6eef7" stroke-width="5" opacity="0.35" />
+  <path d="M280 200 L295 335" stroke="#d6eef7" stroke-width="4" opacity="0.25" />
+  <path d="M770 190 L786 330" stroke="#d6eef7" stroke-width="5" opacity="0.35" />
+  <path d="M840 210 L856 350" stroke="#d6eef7" stroke-width="4" opacity="0.25" />
+</svg>

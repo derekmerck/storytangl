@@ -1,3 +1,18 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3060010b4408532bc7f75a1c5e3840071ffce196d992462aef61441fb78d8160
-size 1030
+<svg xmlns="http://www.w3.org/2000/svg" width="540" height="960" viewBox="0 0 540 960">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#253140" />
+      <stop offset="100%" stop-color="#10161f" />
+    </linearGradient>
+  </defs>
+  <rect width="540" height="960" rx="36" fill="url(#bg)" />
+  <circle cx="270" cy="270" r="118" fill="#d6ab8b" />
+  <path d="M152 265 C172 128 368 110 392 258 C354 180 214 170 152 265 Z" fill="#16181d" />
+  <rect x="180" y="370" width="180" height="210" rx="80" fill="#d6ab8b" />
+  <path d="M96 878 C118 640 424 640 444 878 Z" fill="#364b5f" />
+  <path d="M170 590 L270 700 L370 590 Z" fill="#233140" />
+  <circle cx="226" cy="276" r="10" fill="#515965" />
+  <circle cx="314" cy="276" r="10" fill="#515965" />
+  <path d="M230 338 Q270 360 310 338" fill="none" stroke="#9c5d4f" stroke-width="8" stroke-linecap="round" />
+  <rect x="56" y="72" width="428" height="816" rx="28" fill="none" stroke="#f0d49a" stroke-width="10" opacity="0.5" />
+</svg>

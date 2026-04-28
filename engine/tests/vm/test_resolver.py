@@ -115,6 +115,8 @@ class _ResolverCtx:
         self.correlation_id = None
         self.logger = None
         self.meta = dict(meta or {})
+        self.incoming_edge = None
+        self.incoming_payload = None
         self.selected_edge = None
         self.selected_payload = None
         self._authorities = list(authorities or [])

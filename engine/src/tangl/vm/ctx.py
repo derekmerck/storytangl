@@ -24,6 +24,7 @@ class VmPhaseCtx(DispatchCtx, Protocol):
     correlation_id: UUID | str | None
     logger: Any | None
     meta: Mapping[str, Any] | None
+    incoming_edge: Any | None
     selected_edge: Any | None
     selected_payload: Any
 

@@ -124,13 +124,17 @@ class _SafeFormatDict(dict):
 
 def _render_block_content(block: Block, *, ctx) -> str:
     """Best-effort templating for block content against the gathered namespace."""
-    content = block.content or ""
+    return _render_text(block.content or "", source=block, ctx=ctx)
+
+
+def _render_text(content: str, *, source: object, ctx) -> str:
+    """Best-effort templating for journal text against the gathered namespace."""
     if not content:
         return ""
     if ctx is None or not hasattr(ctx, "get_ns"):
         return content
     try:
-        ns = dict(ctx.get_ns(block))
+        ns = dict(ctx.get_ns(source))
         return content.format_map(_SafeFormatDict(ns))
     except Exception:
         return content
@@ -471,6 +475,20 @@ def _render_facet_media(
 
 
 @on_journal(priority=Priority.EARLY)
+def render_selected_action_journal(*, caller, ctx, **_kw):
+    """Render one-shot journal text attached to the selected story action."""
+    selected_edge = getattr(ctx, "selected_edge", None)
+    if not isinstance(selected_edge, Action):
+        return None
+    if not selected_edge.journal_text:
+        return None
+    content = _render_text(selected_edge.journal_text, source=caller, ctx=ctx)
+    if content:
+        return ContentFragment(content=content, source_id=selected_edge.uid)
+    return None
+
+
+@on_journal(priority=Priority.EARLY)
 def render_block_content(*, caller, ctx, **_kw):
     """Render block narrative text into content fragments."""
     if not isinstance(caller, Block):
@@ -627,6 +645,7 @@ def render_block(*, caller, ctx, **_kw):
         return None
 
     fragments = _merge_fragment_batches(
+        render_selected_action_journal(caller=caller, ctx=ctx),
         render_block_content(caller=caller, ctx=ctx),
         render_block_media(caller=caller, ctx=ctx),
         render_block_choices(caller=caller, ctx=ctx),

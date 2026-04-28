@@ -123,8 +123,8 @@ webuiapi = "^0.9.17"  # sd auto1111 api
 
 [tool.pytest.ini_options]
 xfail_strict = true  # identify xpasses
-log_cli = true
-log_cli_level = "DEBUG"
+# log_cli = true
+# log_cli_level = "DEBUG"
 testpaths = [
     "engine/src/tangl/core",
     "engine/src/tangl/vm",
