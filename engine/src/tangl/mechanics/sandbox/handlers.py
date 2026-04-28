@@ -74,7 +74,14 @@ def _resolve_ref(
             ]
     if not candidates:
         return None
-    return sorted(candidates, key=lambda item: graph.path_dist(location, item))[0]
+    return sorted(
+        candidates,
+        key=lambda item: (
+            distance
+            if (distance := graph.path_dist(location, item)) is not None
+            else float("inf")
+        ),
+    )[0]
 
 
 def _resolve_location_ref(location: SandboxLocation, target_ref: str) -> SandboxLocation | None:
@@ -107,7 +114,7 @@ def _nearest_scope_value(location: SandboxLocation, field_name: str, default: An
     return default
 
 
-def _scheduled_events(location: SandboxLocation, ctx: Any) -> list[ScheduledEvent]:
+def _scheduled_events(location: SandboxLocation, ctx: VmPhaseCtx) -> list[ScheduledEvent]:
     events: list[ScheduledEvent] = []
     for scope in reversed(_sandbox_scopes(location)):
         events.extend(scope.scheduled_events)
@@ -144,7 +151,7 @@ def _target_visited(target: TraversableNode) -> bool:
     return bool(target.locals.get("_visited", False))
 
 
-def _concept_providers(location: SandboxLocation, ctx: Any) -> list[Any]:
+def _concept_providers(location: SandboxLocation, ctx: VmPhaseCtx) -> list[Any]:
     ns = ctx.get_ns(location)
     providers = list(ns.values())
     for key in ("roles", "settings"):
@@ -154,7 +161,11 @@ def _concept_providers(location: SandboxLocation, ctx: Any) -> list[Any]:
     return providers
 
 
-def _provider_scheduled_events(location: SandboxLocation, *, ctx: Any) -> list[ScheduledEvent]:
+def _provider_scheduled_events(
+    location: SandboxLocation,
+    *,
+    ctx: VmPhaseCtx,
+) -> list[ScheduledEvent]:
     events: list[ScheduledEvent] = []
     seen_provider_ids: set[int] = set()
     ns = ctx.get_ns(location)
@@ -360,7 +371,7 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             predecessor_id=caller.uid,
             successor_id=target.uid,
             trigger_phase=Action.trigger_phase_from_activation(event.activation),
-            return_phase=ResolutionPhase.UPDATE if event.return_to_location else None,
+            return_phase=ResolutionPhase.PLANNING if event.return_to_location else None,
             text=event.action_text(),
             tags={"dynamic", "sandbox", "event"},
             ui_hints={
@@ -387,5 +398,11 @@ def advance_sandbox_time_on_wait(*, caller, ctx, **_kw):
     if payload.get("sandbox_action") != "wait":
         return None
 
-    advance_world_turn(_time_owner(caller), int(payload.get("turn_delta", 1)))
+    try:
+        turn_delta = int(payload.get("turn_delta", 1))
+    except (TypeError, ValueError):
+        turn_delta = 1
+    if turn_delta < 0:
+        return None
+    advance_world_turn(_time_owner(caller), turn_delta)
     return None

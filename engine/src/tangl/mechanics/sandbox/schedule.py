@@ -57,13 +57,14 @@ class Schedule(BaseModel):
         actors_present: Iterable[str] = (),
     ) -> list[ScheduleEntry]:
         """Return entries matching the supplied time and context."""
+        present = tuple(actors_present)
         return [
             entry
             for entry in self.entries
             if entry.matches(
                 world_time,
                 location=location,
-                actors_present=actors_present,
+                actors_present=present,
             )
         ]
 

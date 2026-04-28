@@ -50,7 +50,11 @@ class AssetTransactionManager:
         if not result.accepted or result.asset is None:
             raise ValueError(result.reason or "asset transaction rejected")
         moved = giver.remove_asset(result.asset)
-        receiver.add_asset(moved)
+        try:
+            receiver.add_asset(moved)
+        except Exception:
+            giver.add_asset(moved)
+            raise
         return moved
 
     def can_transfer_countable(

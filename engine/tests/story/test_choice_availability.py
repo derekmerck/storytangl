@@ -104,7 +104,7 @@ class TestAvailableChoices:
         assert fragments and fragments[0].available is True
 
     def test_satisfied_action_predicate_makes_choice_available(self) -> None:
-        graph, start, _end, action = _graph_with_choice()
+        _graph, start, _end, action = _graph_with_choice()
         action.availability = [Predicate(expr="'key' in player_inv")]
         ctx = _simple_ctx({"player_inv": {"key"}})
 
@@ -157,7 +157,7 @@ class TestPredicateGating:
         assert fragments and fragments[0].available is False
 
     def test_failing_action_predicate_marks_choice_unavailable(self) -> None:
-        graph, start, _end, action = _graph_with_choice()
+        _graph, start, _end, action = _graph_with_choice()
         action.availability = [Predicate(expr="'key' in player_inv")]
         ctx = _simple_ctx({"player_inv": set()})
 

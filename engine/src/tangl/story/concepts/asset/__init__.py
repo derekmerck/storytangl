@@ -13,9 +13,9 @@ from .transaction import AssetTransactionManager, AssetTransactionResult
 from .wallet import AssetWallet
 
 __all__ = [
-    "AssetType",
     "AssetTransactionManager",
     "AssetTransactionResult",
+    "AssetType",
     "AssetWallet",
     "CountableAsset",
     "Fungible",

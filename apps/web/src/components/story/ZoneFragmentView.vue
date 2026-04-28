@@ -37,10 +37,6 @@ const members = computed(() =>
     .map((id) => props.fragments[id])
     .filter((fragment): fragment is StoryFragment => Boolean(fragment)),
 )
-const tokenMembers = computed(() => members.value.filter(isTokenFragment))
-const fallbackMembers = computed(() =>
-  members.value.filter((member) => !isTokenFragment(member)),
-)
 </script>
 
 <template>
@@ -55,14 +51,9 @@ const fallbackMembers = computed(() =>
     </header>
 
     <div v-if="members.length > 0" class="zone-members" role="list">
-      <TokenFragmentView
-        v-for="member in tokenMembers"
-        :key="member.uid"
-        :fragment="member"
-        role="listitem"
-      />
-      <UnknownFragmentFallback
-        v-for="member in fallbackMembers"
+      <component
+        :is="isTokenFragment(member) ? TokenFragmentView : UnknownFragmentFallback"
+        v-for="member in members"
         :key="member.uid"
         :fragment="member"
         role="listitem"

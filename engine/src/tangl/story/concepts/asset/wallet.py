@@ -71,10 +71,14 @@ class AssetWallet(BaseModelPlus):
 
     def total_value(self, asset_types: Mapping[str, CountableAsset] | None = None) -> float:
         """Return aggregate value for known countable asset definitions."""
-        known = asset_types or {
-            asset.label: asset
-            for asset in CountableAsset.all_instances()
-        }
+        known = (
+            asset_types
+            if asset_types is not None
+            else {
+                asset.label: asset
+                for asset in CountableAsset.all_instances()
+            }
+        )
         return sum(
             amount * known[label].value
             for label, amount in self.amounts.items()

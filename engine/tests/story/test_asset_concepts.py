@@ -51,6 +51,12 @@ class RejectingGainHolder(AssetHolder):
         raise RuntimeError("receiver failed")
 
 
+class RejectingAssetHolder(AssetHolder):
+    def add_asset(self, asset: Token, *, label: str | None = None) -> None:
+        _ = (asset, label)
+        raise RuntimeError("receiver failed")
+
+
 @pytest.fixture(autouse=True)
 def _clear_asset_singletons() -> None:
     WeaponType.clear_instances()
@@ -143,6 +149,7 @@ def test_asset_wallet_total_value_and_description() -> None:
     wallet.gain(gold=5, gems=2)
 
     assert wallet.total_value() == 25.0
+    assert wallet.total_value({}) == 0.0
     assert wallet.describe() == "5 gold, 2 gems"
 
 
@@ -191,6 +198,21 @@ def test_transaction_manager_rejects_discrete_asset_without_mutation() -> None:
 
     assert not result.accepted
     assert result.reason == "receiver cannot receive asset"
+    assert giver.has_asset("sword")
+    assert not receiver.has_asset("sword")
+
+
+def test_transaction_manager_rolls_back_discrete_asset_if_receive_fails() -> None:
+    WeaponType(label="sword")
+    sword = Token[WeaponType](token_from="sword")
+    giver = AssetHolder(label="giver")
+    receiver = RejectingAssetHolder(label="receiver")
+    manager = AssetTransactionManager()
+    giver.add_asset(sword)
+
+    with pytest.raises(RuntimeError, match="receiver failed"):
+        manager.give_asset(giver, receiver, "sword")
+
     assert giver.has_asset("sword")
     assert not receiver.has_asset("sword")
 
