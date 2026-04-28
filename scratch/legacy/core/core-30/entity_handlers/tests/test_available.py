@@ -7,7 +7,7 @@ from tangl.core.entity import Entity
 from tangl.core.entity.handlers import Lockable, AvailabilityHandler
 
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 TestLockableEntity = type('TestLockableEntity', (Lockable, Entity), {} )
 
@@ -49,4 +49,3 @@ def test_force_unlock():
     assert node.locked, "Should be able to relock"
     assert node.forced, "Should still be forced"
     assert node.available(), "Should remain available even if relocked"
-

@@ -8,7 +8,7 @@ from pydantic import Field
 from tangl.entity import Entity
 from tangl.entity.mixins import Templated, TemplateHandler
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 
 class TestTemplatedEntity(Entity):

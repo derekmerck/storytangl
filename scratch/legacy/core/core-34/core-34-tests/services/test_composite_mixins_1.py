@@ -6,7 +6,7 @@ import pytest
 from tangl.core.entity import Entity
 from tangl.core.services import *
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 TestCompositeEntity = type('TestNamespaceEntity', (Renderable, Satisfiable, HasEffects, Entity), {} )
 TestCompositeNode = type('TestNamespaceNode', (Renderable, Satisfiable, HasEffects, Entity), {} )

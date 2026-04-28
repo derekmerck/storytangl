@@ -3,7 +3,7 @@ from tangl33.story import StoryNode, CharacterStrategy
 from tangl33.service.mini_cli import run_story
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 def create_sample_story():
     """Create a tiny sample story to test the system."""

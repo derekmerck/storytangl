@@ -7,7 +7,7 @@ import pytest
 from tangl.core.behavior import Handler, HasHandlers, HandlerRegistry
 from tangl.core.entity import Entity
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 on_handle = HandlerRegistry(label="handle")
 

@@ -6,7 +6,7 @@ import pytest
 from tangl.core import Entity, Available, HasConditions
 
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 TestLockableEntity = type('TestLockableEntity', (Available, Entity), {} )
 TestConditionalLockableEntity = type('TestConditionalLockableEntity', (Available, HasConditions, Entity), {} )
@@ -101,4 +101,3 @@ def test_force_unlock():
     assert node.locked, "Should be able to relock"
     assert node.forced, "Should still be forced"
     assert node.available(), "Should remain available even if relocked"
-

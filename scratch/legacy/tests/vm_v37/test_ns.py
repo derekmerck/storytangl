@@ -48,7 +48,7 @@ def test_get_ns(NodeL, SubgraphL, GraphL):
     ns = do_get_ns(n, ctx=ctx)
 
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.DEBUG)
     logger.debug(ns)
 
     assert ns == {'g_layer': 'present', 'sg_layer': 'present', 'n_layer': 'present'}

@@ -1,5 +1,5 @@
 import logging
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 from tangl.story.episode import Block
 from tangl.story.story_graph import StoryGraph
