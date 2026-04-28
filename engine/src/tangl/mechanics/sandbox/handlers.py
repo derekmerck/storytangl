@@ -6,8 +6,10 @@ from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from tangl.core import Selector
+from tangl.core.runtime_op import Effect, Predicate
 from tangl.story import Action
 from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
+from tangl.vm.dispatch import on_gather_ns
 
 from .location import SandboxLocation
 from .schedule import ScheduledEvent, ScheduledPresence
@@ -179,6 +181,39 @@ def _selected_payload(ctx: VmPhaseCtx) -> Any:
     return ctx.selected_payload
 
 
+def _sandbox_inventory(location: SandboxLocation) -> set[str]:
+    inventory: set[str] = set()
+    for scope in reversed(getattr(location, "ancestors", [location])):
+        locals_ = getattr(scope, "locals", {})
+        if not isinstance(locals_, Mapping):
+            continue
+        for key in ("player_inv", "inventory", "inv"):
+            value = locals_.get(key)
+            if isinstance(value, str):
+                inventory.add(value)
+                continue
+            try:
+                inventory.update(str(item) for item in value or ())
+            except TypeError:
+                continue
+    return inventory
+
+
+@on_gather_ns(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
+    """Publish simple sandbox inventory helpers for generated action predicates."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    inventory = frozenset(_sandbox_inventory(caller))
+    return {
+        "sandbox_inventory": inventory,
+        "sandbox_has_key": lambda key: str(key) in inventory,
+    }
+
+
 @on_provision(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -210,6 +245,44 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
                 "source": "sandbox_link",
                 "direction": direction,
                 "target": target.get_label(),
+            },
+        )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_unlocks(*, caller, ctx, **_kw):
+    """Project locked local objects into ordinary unlock actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="unlock", ctx=ctx)
+
+    for lockable in caller.lockables:
+        if not lockable.locked:
+            continue
+        Action(
+            registry=graph,
+            label=f"sandbox_unlock_{caller.get_label()}_{lockable.label}",
+            predecessor_id=caller.uid,
+            successor_id=caller.uid,
+            text=lockable.action_text(),
+            availability=[Predicate(expr=f"sandbox_has_key({lockable.key!r})")],
+            effects=[Effect(expr=f"_s.unlock_lockable({lockable.label!r})")],
+            journal_text=lockable.unlock_text,
+            tags={"dynamic", "sandbox", "unlock"},
+            ui_hints={
+                "source": "sandbox_lockable",
+                "target": lockable.label,
+                "key": lockable.key,
             },
         )
     return None

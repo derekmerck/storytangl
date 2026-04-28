@@ -98,11 +98,11 @@ Initial rule families:
 Sandbox choices can distinguish "offer this action" from "this action is
 currently activatable" without new sandbox state. For example, a locked door
 or nearby key can project `Unlock door` while the door is locked. The action's
-edge-local availability can require `'key' in player.inv`, and its edge-local
-effects can unlock the target context before it journals. If the key is
-missing, the choice remains a normal unavailable `ChoiceFragment`; if the key
-is present, the action can be a self-loop with a one-shot `journal_text` such
-as "The key turns with a click. The door unlocks."
+edge-local availability can require `sandbox_has_key("key")`, and its
+edge-local effects can unlock the target context before it journals. If the
+key is missing, the choice remains a normal unavailable `ChoiceFragment`; if
+the key is present, the action can be a self-loop with a one-shot
+`journal_text` such as "The key turns with a click. The door unlocks."
 
 The current runtime convention is intentionally narrow:
 
@@ -128,10 +128,11 @@ Do not treat this as a predecessor namespace overlay. Component-injected helper
 functions from the predecessor scope are future work if we find real repeated
 need for them.
 
-The first package spike implements linked-location movement, wait, and
-selectable scheduled events. It also introduces `SandboxScope` for scope-level
-wait/event/presence donation. Object, actor, inventory, forced-event redirect,
-and parser/client matching rules remain later slices.
+The first package spike implements linked-location movement, wait, selectable
+scheduled events, concept-provider events, and local lockable unlock choices.
+It also introduces `SandboxScope` for scope-level wait/event/presence donation.
+Richer object, actor, inventory, forced-event redirect, and parser/client
+matching rules remain later slices.
 
 The generated wait action intentionally mirrors the `tangl.mechanics.games`
 self-loop move pattern. Both use an ordinary dynamic `Action`, a self-loop

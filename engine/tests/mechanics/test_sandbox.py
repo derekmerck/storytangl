@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from tangl.core import Graph, Selector
-from tangl.core.runtime_op import Predicate
+from tangl.core.runtime_op import Effect, Predicate
 from tangl.mechanics.sandbox import (
     SandboxLocation,
+    SandboxLockable,
     SandboxScope,
     Schedule,
     ScheduleEntry,
@@ -15,9 +16,9 @@ from tangl.mechanics.sandbox import (
     advance_world_turn,
     current_world_time,
 )
-from tangl.story import Action, Block
+from tangl.story import Action, Block, StoryGraph
 from tangl.story.concepts import Actor, Role
-from tangl.story.fragments import ChoiceFragment
+from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block_choices
 from tangl.vm import Ledger, Requirement
 from tangl.vm.dispatch import do_provision
@@ -242,6 +243,74 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
     choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
 
     assert any(choice.text == "Talk to traveler" and choice.available for choice in choices)
+
+
+def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
+    graph, _road, _building, cave_entrance = _sandbox_graph()
+    cave_entrance.lockables = [
+        SandboxLockable(
+            label="grate",
+            name="grate",
+            key="keys",
+            unlock_text="The key turns with a click. The grate unlocks.",
+        )
+    ]
+    cave_entrance.locals["player_inv"] = set()
+    ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
+
+    do_provision(cave_entrance, ctx=ctx)
+
+    unlocks = _dynamic_sandbox_actions_with_tag(cave_entrance, "unlock")
+    assert [action.text for action in unlocks] == ["Unlock grate"]
+    assert unlocks[0].successor is cave_entrance
+    assert unlocks[0].journal_text == "The key turns with a click. The grate unlocks."
+
+    fragments = render_block_choices(caller=cave_entrance, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+    unlock = next(choice for choice in choices if choice.text == "Unlock grate")
+    assert unlock.available is False
+    assert unlock.unavailable_reason == "guard_failed_or_unavailable"
+
+
+def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    cave_entrance = SandboxLocation(
+        label="cave_entrance",
+        location_name="Cave Entrance",
+        content="The grate is {grate_state}.",
+        locals={"player_inv": {"keys"}, "grate_state": "locked"},
+        lockables=[
+            SandboxLockable(
+                label="grate",
+                name="grate",
+                key="keys",
+                unlock_text="The key turns with a click. The grate unlocks.",
+            )
+        ],
+    )
+    graph.add(cave_entrance)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
+    do_provision(cave_entrance, ctx=ctx)
+    unlock = _dynamic_sandbox_actions_with_tag(cave_entrance, "unlock")[0]
+    unlock.effects.append(Effect(expr="grate_state = 'unlocked'"))
+    ledger = Ledger.from_graph(graph, entry_id=cave_entrance.uid)
+
+    ledger.resolve_choice(unlock.uid)
+
+    assert cave_entrance.lockables[0].locked is False
+    assert cave_entrance.locals["grate_state"] == "unlocked"
+    content = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert content[:2] == [
+        "The key turns with a click. The grate unlocks.",
+        "The grate is unlocked.",
+    ]
+
+    do_provision(cave_entrance, ctx=PhaseCtx(graph=graph, cursor_id=cave_entrance.uid))
+    assert _dynamic_sandbox_actions_with_tag(cave_entrance, "unlock") == []
 
 
 def test_scope_donates_wait_to_child_locations() -> None:

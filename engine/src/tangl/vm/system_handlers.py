@@ -135,6 +135,18 @@ def _history_predecessor(*, caller, ctx) -> object | None:
     return None
 
 
+def _edge_endpoint(selected_edge: object, *, attr: str, id_attr: str, ctx) -> object | None:
+    """Resolve an edge endpoint even if a dynamic edge was removed this pass."""
+    endpoint = getattr(selected_edge, attr, None)
+    if endpoint is not None:
+        return endpoint
+    graph = getattr(ctx, "graph", None)
+    endpoint_id = getattr(selected_edge, id_attr, None)
+    if graph is not None and endpoint_id is not None:
+        return graph.get(endpoint_id)
+    return None
+
+
 @on_gather_ns(
     wants_caller_kind=TraversableNode,
     wants_exact_kind=False,
@@ -147,11 +159,21 @@ def contribute_selected_edge_context(*, caller, ctx, **kw):
     if selected_edge is None:
         return None
 
-    predecessor = getattr(selected_edge, "predecessor", None) or _history_predecessor(
+    predecessor = _edge_endpoint(
+        selected_edge,
+        attr="predecessor",
+        id_attr="predecessor_id",
+        ctx=ctx,
+    ) or _history_predecessor(
         caller=caller,
         ctx=ctx,
     )
-    successor = getattr(selected_edge, "successor", None)
+    successor = _edge_endpoint(
+        selected_edge,
+        attr="successor",
+        id_attr="successor_id",
+        ctx=ctx,
+    ) or caller
     result: dict[str, object] = {"_edge": selected_edge}
     if predecessor is not None:
         result["_p"] = predecessor

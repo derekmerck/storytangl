@@ -12,7 +12,10 @@ Current first-pass surface:
 
 - `SandboxScope`: a chapter-like ancestor that donates sandbox rules to child
   locations.
-- `SandboxLocation`: a thin `MenuBlock` facade with location links.
+- `SandboxLocation`: a thin `MenuBlock` facade with location links and simple
+  local lockables.
+- `SandboxLockable`: a tiny local fixture for locked doors, grates, and similar
+  objects that can project unlock choices.
 - `WorldTime`: deterministic derived time from `world_turn`.
 - `ScheduleEntry` / `Schedule` / `ScheduledEvent` / `ScheduledPresence`: small
   schedule matching primitives.
@@ -22,6 +25,9 @@ Current first-pass surface:
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects matching
   scheduled events and concept-provider events as normal dynamic actions.
+- `project_sandbox_unlocks`: planning handler that projects locked local objects
+  as self-loop unlock choices with normal edge availability, effects, and
+  selected-action journal text.
 - `advance_sandbox_time_on_wait`: update handler that advances sandbox-local
   time when a wait choice is selected.
 
