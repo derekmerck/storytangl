@@ -3,6 +3,7 @@
 from .handlers import (
     advance_sandbox_time_on_wait,
     contribute_sandbox_inventory_helpers,
+    project_sandbox_asset_actions,
     project_sandbox_location_links,
     project_sandbox_scheduled_events,
     project_sandbox_unlocks,
@@ -10,10 +11,11 @@ from .handlers import (
 )
 from .location import SandboxLocation, SandboxLockable
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
-from .scope import SandboxScope
+from .scope import SandboxInventory, SandboxScope
 from .time import WorldTime, advance_world_turn, current_world_time, get_world_turn
 
 __all__ = [
+    "SandboxInventory",
     "SandboxLocation",
     "SandboxLockable",
     "SandboxScope",
@@ -27,6 +29,7 @@ __all__ = [
     "contribute_sandbox_inventory_helpers",
     "current_world_time",
     "get_world_turn",
+    "project_sandbox_asset_actions",
     "project_sandbox_location_links",
     "project_sandbox_scheduled_events",
     "project_sandbox_unlocks",

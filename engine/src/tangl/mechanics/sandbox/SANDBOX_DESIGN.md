@@ -74,6 +74,7 @@ For now, `SandboxLocation` is a thin `MenuBlock` facade with:
 
 - `links`: direction to target-location reference
 - `sandbox_scope`: optional shared scope label
+- held assets through the story-level `HasAssets` facet
 - location namespace such as `current_location`
 
 Movement is not modeled as exit availability. Linked targets use normal entry
@@ -129,10 +130,19 @@ functions from the predecessor scope are future work if we find real repeated
 need for them.
 
 The first package spike implements linked-location movement, wait, selectable
-scheduled events, concept-provider events, and local lockable unlock choices.
-It also introduces `SandboxScope` for scope-level wait/event/presence donation.
-Richer object, actor, inventory, forced-event redirect, and parser/client
-matching rules remain later slices.
+scheduled events, concept-provider events, local lockable unlock choices, and a
+minimal asset-presence projection. It also introduces `SandboxScope` for
+scope-level wait/event/presence donation and a lightweight `player_assets`
+holder.
+
+The asset projection follows the same rule as movement projection: the current
+hub donates choices from locally declared tables/state. Location-held assets can
+project `Take X` and `Read X`; player-held assets can project `Drop X`; carried
+assets can satisfy generated action availability such as `Unlock grate`.
+Take/drop effects use the story asset transaction manager, not ad hoc locals.
+This is enough for the toy Adventure subset's keys, lamp, leaflet, and
+treasures. Richer object ontologies, containers/supporters, quantities, actor
+inventory, and parser/client matching remain later slices.
 
 The generated wait action intentionally mirrors the `tangl.mechanics.games`
 self-loop move pattern. Both use an ordinary dynamic `Action`, a self-loop
@@ -145,8 +155,9 @@ visit history directly. `activation` is the authored timing hint copied from
 story actions: unset means a normal visible choice, `first` maps to a PREREQS
 redirect before the current node journals, and `last` maps to a POSTREQS
 continue after the current node journals. `return_to_location` is orthogonal to
-activation; it is projected as a normal `Action` with `return_phase=UPDATE`, so
-when the target scene finishes, the frame returns to the originating location.
+activation; it is projected as a normal `Action` with `return_phase=PLANNING`,
+so when the target scene finishes, the frame returns to the originating
+location and reprojects dynamic choices before journaling that location.
 A `once` event is not projected after its target has generic VM `_visited`
 state. This covers scope-level "first time in this sandbox" beats without a
 sandbox ledger or custom flag system: donate the same once-only event to every

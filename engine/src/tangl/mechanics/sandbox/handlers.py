@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
-from tangl.core import Selector
+from tangl.core import Selector, Token
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.story import Action
+from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
 from tangl.vm.dispatch import on_gather_ns
 
@@ -35,6 +36,32 @@ class SandboxEventProvider(Protocol):
 def _has_tags(value: Any, *tags: str) -> bool:
     actual = getattr(value, "tags", set()) or set()
     return set(tags).issubset(actual)
+
+
+def _asset_key(asset: Token) -> str:
+    return asset.get_label() or asset.token_from
+
+
+def _asset_name(asset: Token) -> str:
+    value = getattr(asset, "name", None)
+    if isinstance(value, str) and value:
+        return value
+    return _asset_key(asset).replace("_", " ")
+
+
+def _asset_portable(asset: Token) -> bool:
+    return bool(getattr(asset, "portable", True))
+
+
+def _asset_read_text(asset: Token) -> str | None:
+    value = getattr(asset, "read_text", None)
+    if isinstance(value, str) and value:
+        return value
+    if bool(getattr(asset, "readable", False)):
+        describe = getattr(asset, "describe", None)
+        if callable(describe):
+            return str(describe())
+    return None
 
 
 def _clear_dynamic_sandbox_actions(
@@ -98,6 +125,19 @@ def _movement_text(direction: str, target: SandboxLocation) -> str:
     return f"Go {direction} to {target_name}"
 
 
+def _has_manual_link_action(
+    location: SandboxLocation,
+    *,
+    target: SandboxLocation,
+) -> bool:
+    for edge in location.edges_out(Selector(has_kind=Action)):
+        if _has_tags(edge, "dynamic", "sandbox", "movement"):
+            continue
+        if edge.successor is target:
+            return True
+    return False
+
+
 def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
     ancestors = getattr(location, "ancestors", [location])
     return [scope for scope in ancestors if isinstance(scope, SandboxScope)]
@@ -147,6 +187,33 @@ def _time_owner(location: SandboxLocation) -> Any:
     return location
 
 
+def _player_asset_holder(location: SandboxLocation) -> HasAssets | None:
+    for candidate in getattr(location, "ancestors", [location]):
+        player_assets = getattr(candidate, "player_assets", None)
+        if isinstance(player_assets, HasAssets):
+            return player_assets
+        locals_ = getattr(candidate, "locals", {})
+        if isinstance(locals_, Mapping):
+            for key in ("player_assets", "player", "player_inv_holder"):
+                value = locals_.get(key)
+                if isinstance(value, HasAssets):
+                    return value
+    return None
+
+
+def _asset_inventory(holder: HasAssets | None) -> set[str]:
+    if holder is None:
+        return set()
+    labels: set[str] = set()
+    for key, asset in holder.assets.items():
+        labels.add(str(key))
+        labels.add(str(asset.token_from))
+        label = asset.get_label()
+        if label:
+            labels.add(str(label))
+    return labels
+
+
 def _target_visited(target: TraversableNode) -> bool:
     return bool(target.locals.get("_visited", False))
 
@@ -193,7 +260,7 @@ def _selected_payload(ctx: VmPhaseCtx) -> Any:
 
 
 def _sandbox_inventory(location: SandboxLocation) -> set[str]:
-    inventory: set[str] = set()
+    inventory: set[str] = _asset_inventory(_player_asset_holder(location))
     for scope in reversed(getattr(location, "ancestors", [location])):
         locals_ = getattr(scope, "locals", {})
         if not isinstance(locals_, Mapping):
@@ -210,6 +277,20 @@ def _sandbox_inventory(location: SandboxLocation) -> set[str]:
     return inventory
 
 
+def _take_asset(location: SandboxLocation, asset_label: str) -> Token:
+    player_assets = _player_asset_holder(location)
+    if player_assets is None:
+        raise ValueError("sandbox location has no player asset holder")
+    return AssetTransactionManager().give_asset(location, player_assets, asset_label)
+
+
+def _drop_asset(location: SandboxLocation, asset_label: str) -> Token:
+    player_assets = _player_asset_holder(location)
+    if player_assets is None:
+        raise ValueError("sandbox location has no player asset holder")
+    return AssetTransactionManager().give_asset(player_assets, location, asset_label)
+
+
 @on_gather_ns(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -222,6 +303,8 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
     return {
         "sandbox_inventory": inventory,
         "sandbox_has_key": lambda key: str(key) in inventory,
+        "sandbox_take_asset": lambda asset_label: _take_asset(caller, str(asset_label)),
+        "sandbox_drop_asset": lambda asset_label: _drop_asset(caller, str(asset_label)),
     }
 
 
@@ -245,6 +328,8 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
         target = _resolve_location_ref(caller, target_ref)
         if target is None:
             continue
+        if _has_manual_link_action(caller, target=target):
+            continue
         Action(
             registry=graph,
             label=f"sandbox_move_{caller.get_label()}_{direction}",
@@ -257,6 +342,68 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
                 "direction": direction,
                 "target": target.get_label(),
             },
+        )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_asset_actions(*, caller, ctx, **_kw):
+    """Project present and carried assets into ordinary sandbox actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="asset", ctx=ctx)
+
+    for asset_label, asset in sorted(caller.assets.items()):
+        asset_name = _asset_name(asset)
+        if _asset_portable(asset):
+            Action(
+                registry=graph,
+                label=f"sandbox_take_{caller.get_label()}_{asset_label}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=f"Take {asset_name}",
+                effects=[Effect(expr=f"sandbox_take_asset({asset_label!r})")],
+                journal_text="Taken.",
+                tags={"dynamic", "sandbox", "asset", "take"},
+                ui_hints={"source": "sandbox_asset", "verb": "take", "asset": asset_label},
+            )
+        read_text = _asset_read_text(asset)
+        if read_text:
+            Action(
+                registry=graph,
+                label=f"sandbox_read_{caller.get_label()}_{asset_label}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=f"Read {asset_name}",
+                journal_text=read_text,
+                tags={"dynamic", "sandbox", "asset", "read"},
+                ui_hints={"source": "sandbox_asset", "verb": "read", "asset": asset_label},
+            )
+
+    player_assets = _player_asset_holder(caller)
+    if player_assets is None:
+        return None
+    for asset_label, asset in sorted(player_assets.assets.items()):
+        asset_name = _asset_name(asset)
+        Action(
+            registry=graph,
+            label=f"sandbox_drop_{caller.get_label()}_{asset_label}",
+            predecessor_id=caller.uid,
+            successor_id=caller.uid,
+            text=f"Drop {asset_name}",
+            effects=[Effect(expr=f"sandbox_drop_asset({asset_label!r})")],
+            journal_text="Dropped.",
+            tags={"dynamic", "sandbox", "asset", "drop"},
+            ui_hints={"source": "sandbox_asset", "verb": "drop", "asset": asset_label},
         )
     return None
 

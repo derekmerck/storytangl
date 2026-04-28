@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from tangl.core import contribute_ns
 from tangl.story import MenuBlock
+from tangl.story.concepts.asset import HasAssets
 
 from .schedule import ScheduledEvent
 
@@ -28,8 +29,8 @@ class SandboxLockable(BaseModel):
         return self.unlock_action_text or f"Unlock {target_name}"
 
 
-class SandboxLocation(MenuBlock):
-    """A visitable dynamic hub with location links."""
+class SandboxLocation(HasAssets, MenuBlock):
+    """A visitable dynamic hub with location links and present assets."""
 
     links: dict[str, str] = Field(default_factory=dict)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)

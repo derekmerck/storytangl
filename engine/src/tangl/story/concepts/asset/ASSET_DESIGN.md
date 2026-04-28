@@ -38,7 +38,9 @@ The current `HasAssets.assets` map is a lightweight staging surface. The later
 relationship-backed shape is:
 
 - locations, actors, players, containers, and other story nodes may opt in as
-  asset holders;
+  asset holders; the sandbox package now uses this directly by making
+  `SandboxLocation` a holder and `SandboxScope.player_assets` a lightweight
+  ready-at-hand holder;
 - fungible assets live in a wallet on the holder;
 - discrete assets are graph nodes linked by an ownership or holding relation;
 - inventory affordances are projected from the current cursor namespace plus
@@ -89,13 +91,13 @@ experiments, not a complete inventory system.
   changes atomically. The trade manager should build on a batched transaction
   plan that validates every leg before mutating anything.
 - `HasAssets` nominates `inv` and `assets` into local namespaces, but there is
-  no story-level `Player`/avatar concept yet. Sandbox tests can use any
-  `HasAssets` provider as a player stand-in, then promote a real player/avatar
-  concept once the namespace policy is clearer.
+  no story-level `Player`/avatar concept yet. Sandbox currently uses
+  `SandboxScope.player_assets` as the explicit player stand-in; promote a real
+  player/avatar concept once the namespace policy is clearer.
 - Ambiguity is deferred. Multiple matching keys, multiple lockable objects,
   quantities, and parser-style disambiguation should remain UI/compiler
   concerns until a concrete sandbox example demands them.
-- Sandbox integration should start with one narrow affordance: a held key token
-  plus a present lockable concept projects a normal `Action` such as
-  "Unlock door". The action can mutate lock state directly or jump-and-return
-  through an authored unlock block.
+- Sandbox integration now has a first narrow affordance set: location-held
+  tokens project take/read choices, player-held tokens project drop choices, and
+  held key tokens satisfy generated unlock actions. The next asset slice should
+  replace holder-local maps with a relationship-backed holding subgraph.
