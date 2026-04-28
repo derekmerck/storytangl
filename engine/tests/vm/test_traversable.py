@@ -364,6 +364,21 @@ class TestTraversableNodeContainer:
         provider.apply_effects_to(object(), ctx=ctx)
         assert host_ns["gold"] == 15
 
+    def test_apply_effects_to_syncs_target_locals(self) -> None:
+        g = Graph()
+        provider = _node(
+            g,
+            label="provider",
+            effects=[TraversableEffect(expr="door_locked = False")],
+        )
+        target = _node(g, label="target")
+        target.locals = {"door_locked": True}
+        ctx = SimpleNamespace(get_ns=lambda _: {"door_locked": True}, random=None)
+
+        provider.apply_effects_to(target, ctx=ctx)
+
+        assert target.locals["door_locked"] is False
+
     def test_available_for_uses_other_namespace(self) -> None:
         g = Graph()
         req = _node(
@@ -511,6 +526,36 @@ class TestTraversableEdge:
         b = _node(g, label="b", availability=[Predicate(expr="False")])
         e = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
         assert e.available() is False
+
+    def test_availability_checks_edge_conditions_against_predecessor_scope(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            availability=[Predicate(expr="'key' in player_inv")],
+        )
+
+        ctx = SimpleNamespace(get_ns=lambda node: {"player_inv": {"key"}} if node is a else {})
+
+        assert e.available(ctx=ctx) is True
+
+    def test_edge_availability_can_disable_otherwise_reachable_successor(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        e = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            availability=[Predicate(expr="'key' in player_inv")],
+        )
+
+        ctx = SimpleNamespace(get_ns=lambda node: {"player_inv": set()} if node is a else {})
+
+        assert e.available(ctx=ctx) is False
 
 
 # ============================================================================

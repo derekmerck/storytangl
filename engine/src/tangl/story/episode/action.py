@@ -23,6 +23,7 @@ class Action(TraversableEdge):
     payload: Any = None
     accepts: dict[str, Any] | None = None
     ui_hints: dict[str, Any] | None = None
+    journal_text: str | None = None
 
     @classmethod
     def trigger_phase_from_activation(cls, activation: str | None) -> ResolutionPhase | None:

@@ -32,6 +32,8 @@ The current v38 architecture already has most of the sandbox substrate:
 - Planning-time handlers project dynamic `Action` edges.
 - `ChoiceFragment` carries availability, blockers, accepted payload shape, and
   UI hints.
+- `Action`/`TraversableEdge` can carry edge-local availability and effects,
+  which gives generated choices their own activation conditions and mutations.
 - `TraversableEdge.return_phase` supports jump-and-return interactions.
 - Target-node availability expresses entry gating.
 - Namespace gathering exposes caller, ancestor, role, setting, graph, and world
@@ -92,6 +94,39 @@ Initial rule families:
 - present actor/object actions
 - inventory-carried actions
 - inventory plus local target combinations
+
+Sandbox choices can distinguish "offer this action" from "this action is
+currently activatable" without new sandbox state. For example, a locked door
+or nearby key can project `Unlock door` while the door is locked. The action's
+edge-local availability can require `'key' in player.inv`, and its edge-local
+effects can unlock the target context before it journals. If the key is
+missing, the choice remains a normal unavailable `ChoiceFragment`; if the key
+is present, the action can be a self-loop with a one-shot `journal_text` such
+as "The key turns with a click. The door unlocks."
+
+The current runtime convention is intentionally narrow:
+
+- action availability is evaluated against the source/predecessor scope;
+- action effects apply to the target/successor scope after cursor movement;
+- re-entrant actions work because source and target are the same location.
+
+That covers "unlock the door here and journal here" and "enter the next scene
+with `attacked_from_above = True`." It does not yet provide a source-side
+departure effect for "leave the door behind you unlocked." If that need becomes
+common, add an explicit departure-effect surface rather than overloading the
+arrival-relative `effects` list.
+
+For simple source-side state, selected-edge effect namespaces expose endpoint
+objects as `_predecessor` / `_p` and `_successor` / `_s`. This is enough for
+an arrival-relative action to intentionally update the place it came from:
+
+```python
+_p.locals["door_locked"] = False
+```
+
+Do not treat this as a predecessor namespace overlay. Component-injected helper
+functions from the predecessor scope are future work if we find real repeated
+need for them.
 
 The first package spike implements linked-location movement, wait, and
 selectable scheduled events. It also introduces `SandboxScope` for scope-level

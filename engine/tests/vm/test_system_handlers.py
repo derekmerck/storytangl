@@ -61,6 +61,7 @@ def register_system_handlers(clean_vm_dispatch):
     # Re-register each handler explicitly
     from tangl.vm.dispatch import on_gather_ns, on_validate, on_prereqs, on_update, on_postreqs
     on_gather_ns(sh.contribute_runtime_baseline)
+    on_gather_ns(sh.contribute_selected_edge_context)
     on_gather_ns(sh.contribute_locals)
     on_gather_ns(sh.contribute_satisfied_deps)
     on_gather_ns(sh.contribute_runtime_user_context)
@@ -68,6 +69,7 @@ def register_system_handlers(clean_vm_dispatch):
     on_validate(sh.validate_successor_exists)
     on_prereqs(sh.descend_into_container)
     on_prereqs(sh.follow_triggered_prereqs)
+    on_update(sh.apply_selected_edge_effects)
     on_update(sh.apply_runtime_effects)
     on_update(sh.mark_visited)
     on_postreqs(sh.follow_triggered_postreqs)
@@ -76,6 +78,7 @@ def register_system_handlers(clean_vm_dispatch):
 @pytest.fixture
 def ctx() -> SimpleNamespace:
     return SimpleNamespace(
+        selected_edge=None,
         get_authorities=lambda: [vm_dispatch],
         get_inline_behaviors=lambda: [],
     )
@@ -117,6 +120,7 @@ class TestContributeRuntimeBaseline:
         baseline_ctx = SimpleNamespace(
             graph=g,
             cursor=node,
+            selected_edge=None,
             get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
         )
@@ -169,6 +173,47 @@ class TestContributeRuntimeBaseline:
         ns = do_gather_ns(block, ctx=ctx)
         assert ns["companion"] is child_provider
 
+    def test_selected_edge_context_includes_endpoint_shortcuts(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge = _edge(g, predecessor_id=a.uid, successor_id=b.uid)
+        edge_ctx = SimpleNamespace(
+            graph=g,
+            cursor=b,
+            selected_edge=edge,
+            get_authorities=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+            get_meta=lambda: {"cursor_history": [a.uid, b.uid]},
+        )
+
+        ns = do_gather_ns(b, ctx=edge_ctx)
+
+        assert ns["_edge"] is edge
+        assert ns["_p"] is a
+        assert ns["_predecessor"] is a
+        assert ns["_s"] is b
+        assert ns["_successor"] is b
+
+    def test_selected_edge_context_can_fallback_to_cursor_history(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge = AnonymousEdge(successor=b)
+        edge_ctx = SimpleNamespace(
+            graph=g,
+            cursor=b,
+            selected_edge=edge,
+            get_authorities=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+            get_meta=lambda: {"cursor_history": [a.uid, b.uid]},
+        )
+
+        ns = do_gather_ns(b, ctx=edge_ctx)
+
+        assert ns["_p"] is a
+        assert ns["_s"] is b
+
 
 class TestContributeRuntimeUserContext:
     def test_reads_user_and_user_id_from_ctx_meta(self) -> None:
@@ -189,6 +234,7 @@ class TestContributeRuntimeUserContext:
         runtime_ctx = SimpleNamespace(
             graph=g,
             cursor=node,
+            selected_edge=None,
             get_meta=lambda: {"user": user, "user_id": user.uid},
             get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
@@ -207,6 +253,7 @@ class TestContributeRuntimeUserContext:
         runtime_ctx = SimpleNamespace(
             graph=g,
             cursor=node,
+            selected_edge=None,
             get_meta=lambda: {"user": user, "user_id": user.uid},
             get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
@@ -227,6 +274,7 @@ class TestContributeRuntimeUserContext:
         runtime_ctx = SimpleNamespace(
             graph=g,
             cursor=node,
+            selected_edge=None,
             get_meta=lambda: {"user": user, "user_id": user.uid},
             get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
@@ -247,6 +295,7 @@ class TestContributeVisitStats:
         runtime_ctx = SimpleNamespace(
             graph=g,
             cursor=b,
+            selected_edge=None,
             get_meta=lambda: {"cursor_history": [a.uid, b.uid, b.uid]},
             get_authorities=lambda: [vm_dispatch],
             get_inline_behaviors=lambda: [],
@@ -400,6 +449,56 @@ class TestFollowTriggeredPrereqs:
 
 
 class TestMarkVisited:
+    def test_apply_selected_edge_effects_to_arrival_namespace(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        b = _node(g, label="b")
+        edge = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            effects=[Effect(expr="door_locked = False")],
+        )
+        node_ns = {"door_locked": True}
+        effect_ctx = SimpleNamespace(
+            selected_edge=edge,
+            get_ns=lambda _caller: node_ns,
+        )
+
+        sh.apply_selected_edge_effects(caller=b, ctx=effect_ctx)
+
+        assert node_ns["door_locked"] is False
+
+    def test_selected_edge_effect_can_mutate_predecessor_via_shortcut(self) -> None:
+        g = Graph()
+        a = _node(g, label="a")
+        a.locals = {"door_locked": True}
+        b = _node(g, label="b")
+        b.locals = {"entered_from": ""}
+        edge = _edge(
+            g,
+            predecessor_id=a.uid,
+            successor_id=b.uid,
+            effects=[
+                Effect(expr="_p.locals['door_locked'] = False"),
+                Effect(expr="entered_from = _p.label"),
+            ],
+        )
+        effect_ctx = SimpleNamespace(
+            graph=g,
+            cursor=b,
+            selected_edge=edge,
+            get_authorities=lambda: [vm_dispatch],
+            get_inline_behaviors=lambda: [],
+            get_meta=lambda: {"cursor_history": [a.uid, b.uid]},
+            get_ns=lambda node: do_gather_ns(node, ctx=effect_ctx),
+        )
+
+        sh.apply_selected_edge_effects(caller=b, ctx=effect_ctx)
+
+        assert a.locals["door_locked"] is False
+        assert b.locals["entered_from"] == "a"
+
     def test_apply_runtime_effects(self, ctx) -> None:
         g = Graph()
         node = _node(g, label="n", effects=[Effect(expr="score = score + 1")])

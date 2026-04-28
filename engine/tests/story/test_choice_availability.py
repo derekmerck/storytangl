@@ -103,6 +103,15 @@ class TestAvailableChoices:
 
         assert fragments and fragments[0].available is True
 
+    def test_satisfied_action_predicate_makes_choice_available(self) -> None:
+        graph, start, _end, action = _graph_with_choice()
+        action.availability = [Predicate(expr="'key' in player_inv")]
+        ctx = _simple_ctx({"player_inv": {"key"}})
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].available is True
+
     def test_choice_text_is_forwarded(self) -> None:
         graph, start, _end, _action = _graph_with_choice()
         ctx = _simple_ctx()
@@ -146,6 +155,16 @@ class TestPredicateGating:
         fragments = render_block_choices(caller=start, ctx=ctx)
 
         assert fragments and fragments[0].available is False
+
+    def test_failing_action_predicate_marks_choice_unavailable(self) -> None:
+        graph, start, _end, action = _graph_with_choice()
+        action.availability = [Predicate(expr="'key' in player_inv")]
+        ctx = _simple_ctx({"player_inv": set()})
+
+        fragments = render_block_choices(caller=start, ctx=ctx)
+
+        assert fragments and fragments[0].available is False
+        assert fragments[0].unavailable_reason == "guard_failed_or_unavailable"
 
     def test_failing_predicate_reason_code(self) -> None:
         graph, start, _end, _action = _graph_with_choice(guard_expr="has_key")

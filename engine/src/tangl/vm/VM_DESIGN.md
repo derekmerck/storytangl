@@ -158,10 +158,45 @@ Wraps core's `Edge` with phase-control fields:
 - `return_phase` — marks this edge as a *call*. The frame pushes it onto the return
   stack before following. When the callee pipeline reaches a terminal, the frame pops
   the stack and follows `get_return_edge()` back to the predecessor at `return_phase`.
+- `availability` — edge-local activation guards evaluated against the
+  predecessor scope before successor entry availability is checked.
+- `effects` — edge-local runtime effects applied to the successor/arrival
+  node's namespace during UPDATE before node-local arrival effects fire.
 
 **Call/return semantics are edge properties, not graph structure.** One edge UUID in the
 graph serves as the call bookmark — there is no separate return-edge data structure.
 `get_return_edge()` constructs an `AnonymousEdge` pointing back to the predecessor.
+
+**Edge availability is action activation, not destination entry.** A door can publish
+an "unlock door" action while locked, make that action activatable only when a key is
+in the current scope, apply `door_locked = False` as an edge effect, and return to the
+same location. The destination location's own availability still expresses whether
+the cursor may enter that destination at all.
+
+**Current edge effects are arrival-relative.** This makes a selected edge useful as
+semantic sugar for "take this action, mutate the target context, then journal there."
+For a re-entrant self-loop the source and target namespace are the same, so an unlock
+action naturally updates the current location before it journals again. A separate
+departure-relative effect surface may be needed later for actions that mutate the
+source context while leaving it, such as "leave the west door unlocked behind you."
+That should be explicit rather than inferred from the same `effects` list, because
+edge direction otherwise becomes ambiguous.
+
+**Selected-edge namespace shortcuts.** During traversal, the gathered namespace
+includes `_edge`, `_predecessor` / `_p`, and `_successor` / `_s` when a selected edge
+is known. `_p` primarily comes from the selected edge's predecessor, with cursor
+history as a fallback for anonymous edges. This is intentionally an object shortcut,
+not a predecessor namespace overlay. It lets an arrival-relative effect deliberately
+reach back to the source node:
+
+```python
+_p.locals["door_locked"] = False
+locals["entered_from"] = _p.label
+```
+
+If authored effects need the predecessor's fully assembled helper namespace later
+for component-injected functions, add `_predecessor_ns` as an explicit contract with
+clear sync-back semantics.
 
 #### AnonymousEdge
 
@@ -188,9 +223,10 @@ edges.
 **`HasEffects`** — list of `TraversableEffect` instances partitioned and applied by
 phase. `apply_effects(phase, ctx)` applies matching effects to own namespace.
 `apply_effects_to(other, phase, ctx)` applies to another entity's namespace for
-dependency link/unlink hooks. `_sync_locals(ns)` writes changed namespace values back
-to `self.locals` — this is a node concern, not a `RuntimeOp` concern: `RuntimeOp`
-knows only about the namespace dict.
+edge selection and dependency link/unlink hooks. `_sync_locals(ns)` writes changed
+namespace values back to `self.locals`, and `apply_effects_to(...)` mirrors that
+sync to the target's `locals` when present. This is an entity concern, not a
+`RuntimeOp` concern: `RuntimeOp` knows only about the namespace dict.
 
 **`TraversableEffect`** — wraps `core.Effect` with a `trigger_phase` field (default
 `UPDATE`). The wrapper pattern follows the established ladder:
