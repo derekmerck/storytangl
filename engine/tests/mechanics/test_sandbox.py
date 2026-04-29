@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import Field
 
 from tangl.core import Graph, Selector, Token
 from tangl.core.runtime_op import Effect, Predicate
@@ -11,6 +12,7 @@ from tangl.mechanics.sandbox import (
     SandboxLocation,
     SandboxLockable,
     SandboxScope,
+    SandboxVisibilityRule,
     Schedule,
     ScheduleEntry,
     ScheduledEvent,
@@ -35,6 +37,10 @@ class SandboxItemType(AssetType):
     portable: bool = True
     readable: bool = False
     read_text: str | None = None
+    light_source: bool = False
+    lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
+    turn_on_text: str | None = None
+    turn_off_text: str | None = None
 
 
 @pytest.fixture(autouse=True)
@@ -145,6 +151,10 @@ def test_sandbox_location_links_project_normal_actions() -> None:
     }
     assert all(action.successor is not None for action in actions)
     assert all(action.ui_hints["source"] == "sandbox_link" for action in actions)
+    assert all(action.ui_hints["contribution"] == "movement" for action in actions)
+    assert all(action.ui_hints["source_kind"] == "location" for action in actions)
+    assert all(action.ui_hints["source_label"] == "road" for action in actions)
+    assert all(action.ui_hints["scope"] == "tiny_cave" for action in actions)
 
 
 def test_sandbox_location_links_normalize_direction_aliases() -> None:
@@ -466,6 +476,106 @@ def test_location_assets_project_take_read_and_drop_actions() -> None:
 
     assert building.has_asset("keys")
     assert not scope.player_assets.has_asset("keys")
+
+
+def test_darkness_rule_substitutes_journal_and_suppresses_local_asset_actions() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(
+        label="dark_cave",
+        location_name="Dark Cave",
+        content="A glittering nugget rests here.",
+    )
+    start = Block(label="start", content="Begin.")
+    SandboxItemType(label="nugget", name="nugget")
+    nugget = Token[SandboxItemType](token_from="nugget", label="nugget")
+    cave.add_asset(nugget)
+    graph.add(scope)
+    graph.add(start)
+    graph.add(cave)
+    graph.add(nugget)
+    scope.add_child(cave)
+    enter_cave = Action(
+        registry=graph,
+        label="enter_cave",
+        predecessor_id=start.uid,
+        successor_id=cave.uid,
+        text="Enter cave",
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=cave.uid)
+
+    do_provision(cave, ctx=ctx)
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    ledger.resolve_choice(enter_cave.uid)
+
+    content = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert content == ["It is now pitch dark."]
+    assert _dynamic_sandbox_actions_with_tag(cave, "asset") == []
+
+
+def test_carried_lamp_restores_dark_location_detail_and_asset_affordances() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(
+        label="dark_cave",
+        location_name="Dark Cave",
+        content="A glittering nugget rests here.",
+    )
+    SandboxItemType(
+        label="lamp",
+        name="lamp",
+        light_source=True,
+        turn_on_text="Your lamp is now on.",
+    )
+    SandboxItemType(label="nugget", name="nugget")
+    lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
+    nugget = Token[SandboxItemType](token_from="nugget", label="nugget")
+    scope.player_assets.add_asset(lamp)
+    cave.add_asset(nugget)
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(lamp)
+    graph.add(nugget)
+    scope.add_child(cave)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave.uid)
+
+    do_provision(cave, ctx=ctx)
+    dark_actions = _dynamic_sandbox_actions_with_tag(cave, "asset")
+    assert [action.text for action in dark_actions] == ["Turn on lamp"]
+
+    turn_on = dark_actions[0]
+    ledger = Ledger(graph=graph, cursor_id=cave.uid)
+    ledger.resolve_choice(turn_on.uid)
+
+    assert lamp.lit is True
+    content = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert content[:2] == ["Your lamp is now on.", "A glittering nugget rests here."]
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+    lit_actions = _dynamic_sandbox_actions_with_tag(cave, "asset")
+    assert {action.text for action in lit_actions} == {
+        "Drop lamp",
+        "Take nugget",
+        "Turn off lamp",
+    }
 
 
 def test_scope_donates_wait_to_child_locations() -> None:

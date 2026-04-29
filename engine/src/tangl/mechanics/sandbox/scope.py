@@ -11,6 +11,7 @@ from tangl.story.concepts.asset import HasAssets
 from tangl.vm import TraversableNode
 
 from .schedule import ScheduledEvent, ScheduledPresence
+from .visibility import SandboxVisibilityRule
 
 
 class SandboxInventory(HasAssets):
@@ -22,6 +23,7 @@ class SandboxScope(TraversableNode):
 
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     scheduled_presence: list[ScheduledPresence] = Field(default_factory=list)
+    visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     player_assets: SandboxInventory = Field(default_factory=SandboxInventory)
     wait_enabled: bool | None = True
     wait_text: str | None = "Wait"

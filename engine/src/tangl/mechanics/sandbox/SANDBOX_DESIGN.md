@@ -42,6 +42,45 @@ The current v38 architecture already has most of the sandbox substrate:
 The sandbox package should add reusable rules and schedule/time vocabulary, not
 a second VM.
 
+### General Contribution Pattern
+
+Affordance projection is a general StoryTangl pattern, not a sandbox-only
+mechanism.
+
+At the VM/story boundary, containers already push scoped facts into namespace
+and authorities, while nodes, edges, fragments, and handlers pull on those facts
+through dependencies, predicates, render context, and phase hooks. A scene that
+publishes roles, settings, stage props, or assets is already turning parent
+context into child affordances.
+
+Sandbox specializes that broader push/pull pattern for location-centered
+exploration:
+
+- location links become movement choices;
+- present assets become take/read choices;
+- carried assets become drop/use/light choices;
+- fixtures become place-bound interactions;
+- schedules and presence become time/location-sensitive events;
+- visibility rules become projection filters over journal and local choices.
+
+The important runtime truth is the contribution surface, not the authoring
+category. Entity categories such as location, asset, fixture, actor, companion,
+weather, or debug overlay remain useful authoring vocabulary. At runtime, the
+question is: what does this scoped concept contribute, suppress, or expose for
+the current phase?
+
+For now sandbox keeps this as local mechanics code. Promotion candidates, once
+a second non-sandbox consumer appears:
+
+- a general provenance/receipt shape for phase outputs;
+- story-level projection filters over journal and choices;
+- a broader scoped contribution provider that can return actions, journal
+  fragments, suppressions, or schedules.
+
+Do not promote location-specific vocabulary such as exits, lockables, darkness,
+or player inventory into VM. Those are sandbox/story-mechanics specializations
+of the broader contribution pattern.
+
 ---
 
 ## What Sandbox Adds
@@ -91,6 +130,22 @@ into canonical `ui_hints["direction"]` values, preserves the original key as
 text="Enter the building")` can override display text without changing the
 underlying edge model.
 
+Structured exits can also express two common compressed-IF cases without a new
+engine primitive:
+
+```yaml
+slit_streambed:
+  exits:
+    down: { kind: message, journal: "You don't fit through a two-inch slit!" }
+outside_grate:
+  exits:
+    down: { through: grate, to: below_grate }
+```
+
+A message exit is a self-loop action with selected-action journal text. A
+`through` exit is a normal movement action whose edge availability checks that
+the named local fixture is open.
+
 The base sandbox does not infer reverse links. Colossal Cave-style maps often
 contain one-way passages, loops, blocked returns, and asymmetric text. A future
 `GridSandbox` specialization can intentionally provide symmetric adjacency
@@ -109,6 +164,7 @@ Initial rule families:
 - present actor/object actions
 - inventory-carried actions
 - inventory plus local target combinations
+- openable/lockable local fixtures
 
 Sandbox choices can distinguish "offer this action" from "this action is
 currently activatable" without new sandbox state. For example, a locked door
@@ -157,6 +213,46 @@ Take/drop effects use the story asset transaction manager, not ad hoc locals.
 This is enough for the toy Adventure subset's keys, lamp, leaflet, and
 treasures. Richer object ontologies, containers/supporters, quantities, actor
 inventory, and parser/client matching remain later slices.
+
+Local fixture projection is similarly narrow. `SandboxLockable` remains the
+first-spike name, but it now carries enough fixture state for the Adventure
+grate pattern: locked/unlocked, open/closed, openable, key, and journal text.
+Locked fixtures project `Unlock X`; openable fixtures project `Open X` or
+`Close X`; `through` exits can require that fixture to be open. This is enough
+for the key/grate demo without promoting a full fixture ontology yet.
+
+### Visibility Projection
+
+Darkness is not primarily a movement constraint. It is a projection rule over
+what the location can truthfully reveal.
+
+Adventure-style darkness affects:
+
+- location journal detail;
+- visible local assets and fixture affordances;
+- which carried tools remain actionable;
+- later parser noun resolution, diagnostics, and movement risk.
+
+The first implementation keeps that shape narrow. A `SandboxScope` or
+`SandboxLocation` can carry `SandboxVisibilityRule`s. The default darkness rule
+is active when the current location is not lit and the player has no lit light
+source:
+
+```text
+not sandbox_location_lit
+not sandbox_has_lit_light_source()
+```
+
+When active, it produces a `SandboxProjectionState` that can suppress the
+location description, suppress local asset actions, suppress local fixture
+actions, and substitute a journal fragment such as "It is now pitch dark."
+
+This is intentionally a projection filter, not a new action model. The location
+still journals through normal fragments, and the generated actions are still
+ordinary `Action` edges. Carried light-source assets continue to project
+turn-on/turn-off self-loop choices while darkness is active, so "lamp restores
+room detail" is modeled as asset state changing the projection state on the
+next render.
 
 The generated wait action intentionally mirrors the `tangl.mechanics.games`
 self-loop move pattern. Both use an ordinary dynamic `Action`, a self-loop
@@ -249,6 +345,93 @@ frame for later parser-like clients, debug affordance views, and legacy IF
 imports where we want parser play to remain a UI projection over ordinary
 StoryTangl choices.
 
+### Research Direction: Semantic Story Compression
+
+A faithful source port is not the primary goal of the Adventure sandbox work.
+The more interesting goal is semantic compression: recovering the playable
+shape and feel of a legacy interactive story while factoring repeated behavior
+into reusable sandbox capabilities and narrow world-authority handlers.
+
+In this framing, the original source is a dense artifact containing room text,
+parser vocabulary, object facts, procedural special cases, scoring logic, and
+historical implementation constraints. The StoryTangl port does not need to
+preserve those constraints bit-for-bit. It should preserve the player's
+experienced affordance structure: where the player can go, what they can
+notice, what they can carry, what gates progress, what hazards matter, and what
+kinds of actions the world invites.
+
+The compact IR should therefore describe world facts and trait-bearing entities
+rather than copy behavior into every object declaration. Traits and components
+are semantic handles that sandbox handlers and world authorities can recognize:
+
+```yaml
+assets:
+  brass_lamp:
+    name: brass lamp
+    traits: [portable, switchable, provides_light, requires_charge]
+    initial: { location: building }
+    charge: 330
+
+fixtures:
+  grate:
+    name: steel grate
+    traits: [fixture, door, openable, lockable]
+    key: keys
+    connects: { outside_grate: below_grate }
+```
+
+Here `portable`, `switchable`, `provides_light`, `requires_charge`,
+`openable`, and `lockable` are not bespoke mini-programs copied into each
+object. They are invitations for generic sandbox contributors or
+world-specific authority handlers to publish take/drop, light, timer,
+open/close, lock/unlock, warning, scoring, or diagnostic affordances.
+
+This keeps the authoring surface small:
+
+- locations and exits as data;
+- assets, fixtures, mobs, and world concepts as trait-bearing entities;
+- common behavior generated from reusable traits;
+- unusual behavior supplied by narrow world-authority handlers;
+- parser and choice UIs rendered from the same projected choices.
+
+The compression claim is not that every original command response survives.
+The claim is that most of the recognizable story/game morphology survives after
+factoring the source into reusable semantic patterns.
+
+Possible measurements:
+
+- source LOC or word count vs. compact IR plus handler LOC;
+- percentage of rooms, exits, items, and fixtures represented;
+- percentage of walkthrough actions supported;
+- percentage of core puzzle dependencies represented;
+- subjective feel coverage from playtesting;
+- number of reusable sandbox capabilities extracted.
+
+This positions StoryTangl as more than an IF interchange format. It becomes a
+tool for identifying, compressing, and reusing the semantic structures of
+interactive stories.
+
+The current hand-compiled demo fixture is intentionally tiny. It normalizes the
+high-level Adventure slice into locations, simple/string exits, message exits,
+fixture-gated exits, portable assets, a light source, and one shared openable
+lockable grate. The walkthrough exercises:
+
+```text
+road -> building
+take keys
+take brass_lamp
+turn on brass_lamp
+road -> valley -> slit_streambed -> outside_grate
+unlock grate
+open grate
+down -> below_grate
+west -> cobble_crawl
+```
+
+The point is not that the schema is final. The point is to keep an executable
+pressure fixture while negotiating which schema choices are authoring sugar,
+which are generic sandbox traits, and which require world-specific authorities.
+
 ---
 
 ## What Is Out Of Scope For The First Spike
@@ -295,6 +478,7 @@ inventory = []
 grate_locked = true
 grate_open = false
 lamp_lit = false
+inside_cave.light = false
 ```
 
 Objects:
@@ -307,8 +491,23 @@ Objects:
 Entry availability:
 
 ```text
-inside_cave.available = grate_open and lamp_lit
+inside_cave.available = grate_open
 ```
+
+Visibility:
+
+```text
+scope.visibility_rules = [darkness]
+darkness.when = not location.light and not player_has_lit_light_source
+darkness.suppress_location_description = true
+darkness.suppress_asset_affordances = true
+darkness.suppress_fixture_affordances = true
+```
+
+The player can enter `inside_cave` after opening the grate, but without a lit
+lamp the journal says only that it is pitch dark and local object choices are
+hidden. The carried lamp still offers `Turn on lamp`; after it is lit, normal
+room text and local object affordances return.
 
 Scheduled event:
 
@@ -328,6 +527,7 @@ First acceptance tests:
 
 - movement choices are generated from `links`
 - target entry availability gates `inside_cave`
+- fixture-gated exits stay unavailable until the fixture is opened
 - `wait` advances `world_turn`
 - a selectable scheduled event matches only at the requested time and location
 - a scope-level once event can be selected from any location, return, and then
@@ -341,17 +541,20 @@ First acceptance tests:
 
 ## Legacy IF Import Direction
 
-Colossal Cave and Zork should layer on top of this model by extracting tables:
+Colossal Cave and Zork should layer on top of this model by extracting compact
+world facts:
 
 - locations and links
 - object placement
 - object state
+- object traits/components
 - schedule/presence rules
 - generated choice rules
 - diagnostic response rules
 - scoring rules
 - original text artifacts
 
-Ports should not require a new engine. They may require richer data extraction,
-more projection rules, and transient actor support for entities such as pirates,
-trolls, and grues.
+Ports should not require a new engine or a giant faithful reimplementation of
+every source routine. They may require richer data extraction, more projection
+rules, world-specific authority handlers, and transient actor support for
+entities such as pirates, trolls, and grues.

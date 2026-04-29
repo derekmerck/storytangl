@@ -6,16 +6,24 @@ from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from tangl.core import Selector, Token
+from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
+from tangl.journal.fragments import ContentFragment
 from tangl.story import Action
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
-from tangl.vm.dispatch import on_gather_ns
+from tangl.vm.dispatch import on_compose_journal, on_gather_ns
 
-from .location import SandboxExit, SandboxLocation, normalize_sandbox_direction
+from .location import (
+    SandboxExit,
+    SandboxLocation,
+    SandboxLockable,
+    normalize_sandbox_direction,
+)
 from .schedule import ScheduledEvent, ScheduledPresence
 from .scope import SandboxScope
 from .time import advance_world_turn, current_world_time
+from .visibility import SandboxProjectionState, SandboxVisibilityRule
 
 
 @runtime_checkable
@@ -62,6 +70,28 @@ def _asset_read_text(asset: Token) -> str | None:
         if callable(describe):
             return str(describe())
     return None
+
+
+def _asset_lit(asset: Token) -> bool:
+    return bool(getattr(asset, "lit", False))
+
+
+def _asset_is_light_source(asset: Token) -> bool:
+    return bool(getattr(asset, "light_source", False))
+
+
+def _asset_turn_on_text(asset: Token) -> str:
+    value = getattr(asset, "turn_on_text", None)
+    if isinstance(value, str) and value:
+        return value
+    return f"Your {_asset_name(asset)} is now on."
+
+
+def _asset_turn_off_text(asset: Token) -> str:
+    value = getattr(asset, "turn_off_text", None)
+    if isinstance(value, str) and value:
+        return value
+    return f"Your {_asset_name(asset)} is now off."
 
 
 def _clear_dynamic_sandbox_actions(
@@ -124,7 +154,10 @@ def _exit_spec(value: str | SandboxExit | Mapping[str, Any]) -> SandboxExit:
     if isinstance(value, SandboxExit):
         return value
     if isinstance(value, Mapping):
-        return SandboxExit.model_validate(value)
+        payload = dict(value)
+        if "journal" in payload and "journal_text" not in payload:
+            payload["journal_text"] = payload.pop("journal")
+        return SandboxExit.model_validate(payload)
     return SandboxExit(target=value)
 
 
@@ -144,6 +177,13 @@ def _movement_text(
     return f"Go {canonical} to {target_name}"
 
 
+def _message_exit_text(direction: str, exit_spec: SandboxExit) -> str:
+    if exit_spec.text:
+        return exit_spec.text
+    canonical = normalize_sandbox_direction(direction)
+    return f"Go {canonical}"
+
+
 def _has_manual_link_action(
     location: SandboxLocation,
     *,
@@ -160,6 +200,34 @@ def _has_manual_link_action(
 def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
     ancestors = getattr(location, "ancestors", [location])
     return [scope for scope in ancestors if isinstance(scope, SandboxScope)]
+
+
+def _sandbox_scope_label(location: SandboxLocation) -> str:
+    for scope in _sandbox_scopes(location):
+        return scope.get_label()
+    return location.sandbox_scope or location.get_label()
+
+
+def _sandbox_contribution_hints(
+    location: SandboxLocation,
+    *,
+    source: str,
+    contribution: str,
+    source_label: str | None = None,
+    source_kind: str | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    hints: dict[str, Any] = {
+        "source": source,
+        "contribution": contribution,
+        "scope": _sandbox_scope_label(location),
+    }
+    if source_label is not None:
+        hints["source_label"] = source_label
+    if source_kind is not None:
+        hints["source_kind"] = source_kind
+    hints.update(extra)
+    return hints
 
 
 def _nearest_scope_value(location: SandboxLocation, field_name: str, default: Any) -> Any:
@@ -206,6 +274,31 @@ def _time_owner(location: SandboxLocation) -> Any:
     return location
 
 
+def _visibility_rules(location: SandboxLocation) -> list[SandboxVisibilityRule]:
+    rules: list[SandboxVisibilityRule] = []
+    for scope in reversed(_sandbox_scopes(location)):
+        rules.extend(scope.visibility_rules)
+    rules.extend(location.visibility_rules)
+    return rules
+
+
+def _lockable_by_label(location: SandboxLocation, label: str) -> SandboxLockable | None:
+    for lockable in location.lockables:
+        if lockable.label == label:
+            return lockable
+    return None
+
+
+def _lockable_locked(location: SandboxLocation, label: str) -> bool:
+    lockable = _lockable_by_label(location, label)
+    return bool(lockable and lockable.locked)
+
+
+def _lockable_open(location: SandboxLocation, label: str) -> bool:
+    lockable = _lockable_by_label(location, label)
+    return bool(lockable and lockable.open)
+
+
 def _player_asset_holder(location: SandboxLocation) -> HasAssets | None:
     for candidate in getattr(location, "ancestors", [location]):
         player_assets = getattr(candidate, "player_assets", None)
@@ -231,6 +324,51 @@ def _asset_inventory(holder: HasAssets | None) -> set[str]:
         if label:
             labels.add(str(label))
     return labels
+
+
+def _holder_has_lit_light_source(holder: HasAssets | None) -> bool:
+    if holder is None:
+        return False
+    return any(
+        _asset_is_light_source(asset) and _asset_lit(asset)
+        for asset in holder.assets.values()
+    )
+
+
+def _location_lit(location: SandboxLocation) -> bool:
+    if location.light:
+        return True
+    traits = getattr(location, "traits", set()) or set()
+    if "light" in traits or "lit" in traits:
+        return True
+    return bool(location.locals.get("light", False))
+
+
+def _visibility_ns(location: SandboxLocation, ctx: VmPhaseCtx) -> dict[str, Any]:
+    player_assets = _player_asset_holder(location)
+    ns = dict(ctx.get_ns(location))
+    ns.update(
+        {
+            "location": location,
+            "player_assets": player_assets,
+            "sandbox_location_lit": _location_lit(location),
+            "sandbox_has_lit_light_source": lambda: _holder_has_lit_light_source(
+                player_assets
+            ),
+        }
+    )
+    return ns
+
+
+def _projection_state(location: SandboxLocation, ctx: VmPhaseCtx) -> SandboxProjectionState:
+    state = SandboxProjectionState()
+    ns = _visibility_ns(location, ctx)
+    for rule in _visibility_rules(location):
+        if rule.active_in(ns):
+            state = rule.apply_to(state)
+    if state.journal_text is None and state.suppress_location_description:
+        state.journal_text = location.dark_text
+    return state
 
 
 def _target_visited(target: TraversableNode) -> bool:
@@ -310,6 +448,17 @@ def _drop_asset(location: SandboxLocation, asset_label: str) -> Token:
     return AssetTransactionManager().give_asset(player_assets, location, asset_label)
 
 
+def _set_asset_lit(location: SandboxLocation, asset_label: str, lit: bool) -> Token:
+    player_assets = _player_asset_holder(location)
+    if player_assets is None:
+        raise ValueError("sandbox location has no player asset holder")
+    asset = player_assets.get_asset(asset_label)
+    if asset is None:
+        raise KeyError(asset_label)
+    setattr(asset, "lit", lit)
+    return asset
+
+
 @on_gather_ns(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -322,8 +471,20 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
     return {
         "sandbox_inventory": inventory,
         "sandbox_has_key": lambda key: str(key) in inventory,
+        "sandbox_fixture_locked": lambda label: _lockable_locked(caller, str(label)),
+        "sandbox_fixture_open": lambda label: _lockable_open(caller, str(label)),
         "sandbox_take_asset": lambda asset_label: _take_asset(caller, str(asset_label)),
         "sandbox_drop_asset": lambda asset_label: _drop_asset(caller, str(asset_label)),
+        "sandbox_turn_on_asset": lambda asset_label: _set_asset_lit(
+            caller,
+            str(asset_label),
+            True,
+        ),
+        "sandbox_turn_off_asset": lambda asset_label: _set_asset_lit(
+            caller,
+            str(asset_label),
+            False,
+        ),
     }
 
 
@@ -346,24 +507,58 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
     for raw_direction, link in sorted(caller.links.items()):
         exit_spec = _exit_spec(link)
         direction = normalize_sandbox_direction(raw_direction)
+        if exit_spec.kind == "message":
+            Action(
+                registry=graph,
+                label=f"sandbox_move_{caller.get_label()}_{raw_direction}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=_message_exit_text(raw_direction, exit_spec),
+                journal_text=exit_spec.journal_text or "",
+                tags={"dynamic", "sandbox", "movement"},
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_link",
+                    contribution="movement",
+                    source_label=caller.get_label(),
+                    source_kind="location",
+                    direction=direction,
+                    raw_direction=raw_direction,
+                    kind="message",
+                ),
+            )
+            continue
+        if exit_spec.target is None:
+            continue
         target = _resolve_location_ref(caller, exit_spec.target)
         if target is None:
             continue
         if _has_manual_link_action(caller, target=target):
             continue
+        availability = []
+        if exit_spec.through:
+            availability.append(
+                Predicate(expr=f"sandbox_fixture_open({exit_spec.through!r})")
+            )
         Action(
             registry=graph,
             label=f"sandbox_move_{caller.get_label()}_{raw_direction}",
             predecessor_id=caller.uid,
             successor_id=target.uid,
             text=_movement_text(raw_direction, target, exit_spec),
+            availability=availability,
             tags={"dynamic", "sandbox", "movement"},
-            ui_hints={
-                "source": "sandbox_link",
-                "direction": direction,
-                "raw_direction": raw_direction,
-                "target": target.get_label(),
-            },
+            ui_hints=_sandbox_contribution_hints(
+                caller,
+                source="sandbox_link",
+                contribution="movement",
+                source_label=caller.get_label(),
+                source_kind="location",
+                direction=direction,
+                raw_direction=raw_direction,
+                target=target.get_label(),
+                through=exit_spec.through,
+            ),
         )
     return None
 
@@ -383,50 +578,106 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="asset", ctx=ctx)
+    projection_state = _projection_state(caller, ctx)
 
-    for asset_label, asset in sorted(caller.assets.items()):
-        asset_name = _asset_name(asset)
-        if _asset_portable(asset):
-            Action(
-                registry=graph,
-                label=f"sandbox_take_{caller.get_label()}_{asset_label}",
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
-                text=f"Take {asset_name}",
-                effects=[Effect(expr=f"sandbox_take_asset({asset_label!r})")],
-                journal_text="Taken.",
-                tags={"dynamic", "sandbox", "asset", "take"},
-                ui_hints={"source": "sandbox_asset", "verb": "take", "asset": asset_label},
-            )
-        read_text = _asset_read_text(asset)
-        if read_text:
-            Action(
-                registry=graph,
-                label=f"sandbox_read_{caller.get_label()}_{asset_label}",
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
-                text=f"Read {asset_name}",
-                journal_text=read_text,
-                tags={"dynamic", "sandbox", "asset", "read"},
-                ui_hints={"source": "sandbox_asset", "verb": "read", "asset": asset_label},
-            )
+    if not projection_state.suppress_asset_affordances:
+        for asset_label, asset in sorted(caller.assets.items()):
+            asset_name = _asset_name(asset)
+            if _asset_portable(asset):
+                Action(
+                    registry=graph,
+                    label=f"sandbox_take_{caller.get_label()}_{asset_label}",
+                    predecessor_id=caller.uid,
+                    successor_id=caller.uid,
+                    text=f"Take {asset_name}",
+                    effects=[Effect(expr=f"sandbox_take_asset({asset_label!r})")],
+                    journal_text="Taken.",
+                    tags={"dynamic", "sandbox", "asset", "take"},
+                    ui_hints=_sandbox_contribution_hints(
+                        caller,
+                        source="sandbox_asset",
+                        contribution="take",
+                        source_label=asset_label,
+                        source_kind="asset",
+                        verb="take",
+                        asset=asset_label,
+                    ),
+                )
+            read_text = _asset_read_text(asset)
+            if read_text:
+                Action(
+                    registry=graph,
+                    label=f"sandbox_read_{caller.get_label()}_{asset_label}",
+                    predecessor_id=caller.uid,
+                    successor_id=caller.uid,
+                    text=f"Read {asset_name}",
+                    journal_text=read_text,
+                    tags={"dynamic", "sandbox", "asset", "read"},
+                    ui_hints=_sandbox_contribution_hints(
+                        caller,
+                        source="sandbox_asset",
+                        contribution="read",
+                        source_label=asset_label,
+                        source_kind="asset",
+                        verb="read",
+                        asset=asset_label,
+                    ),
+                )
 
     player_assets = _player_asset_holder(caller)
     if player_assets is None:
         return None
     for asset_label, asset in sorted(player_assets.assets.items()):
         asset_name = _asset_name(asset)
-        Action(
-            registry=graph,
-            label=f"sandbox_drop_{caller.get_label()}_{asset_label}",
-            predecessor_id=caller.uid,
-            successor_id=caller.uid,
-            text=f"Drop {asset_name}",
-            effects=[Effect(expr=f"sandbox_drop_asset({asset_label!r})")],
-            journal_text="Dropped.",
-            tags={"dynamic", "sandbox", "asset", "drop"},
-            ui_hints={"source": "sandbox_asset", "verb": "drop", "asset": asset_label},
-        )
+        if _asset_is_light_source(asset):
+            lit = _asset_lit(asset)
+            Action(
+                registry=graph,
+                label=f"sandbox_light_{caller.get_label()}_{asset_label}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=f"Turn {'off' if lit else 'on'} {asset_name}",
+                effects=[
+                    Effect(
+                        expr=(
+                            f"sandbox_turn_off_asset({asset_label!r})"
+                            if lit
+                            else f"sandbox_turn_on_asset({asset_label!r})"
+                        )
+                    )
+                ],
+                journal_text=_asset_turn_off_text(asset) if lit else _asset_turn_on_text(asset),
+                tags={"dynamic", "sandbox", "asset", "light"},
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_asset",
+                    contribution="light",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    verb="turn_off" if lit else "turn_on",
+                    asset=asset_label,
+                ),
+            )
+        if not projection_state.suppress_asset_affordances:
+            Action(
+                registry=graph,
+                label=f"sandbox_drop_{caller.get_label()}_{asset_label}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=f"Drop {asset_name}",
+                effects=[Effect(expr=f"sandbox_drop_asset({asset_label!r})")],
+                journal_text="Dropped.",
+                tags={"dynamic", "sandbox", "asset", "drop"},
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_asset",
+                    contribution="drop",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    verb="drop",
+                    asset=asset_label,
+                ),
+            )
     return None
 
 
@@ -445,6 +696,8 @@ def project_sandbox_unlocks(*, caller, ctx, **_kw):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="unlock", ctx=ctx)
+    if _projection_state(caller, ctx).suppress_fixture_affordances:
+        return None
 
     for lockable in caller.lockables:
         if not lockable.locked:
@@ -459,11 +712,78 @@ def project_sandbox_unlocks(*, caller, ctx, **_kw):
             effects=[Effect(expr=f"_s.unlock_lockable({lockable.label!r})")],
             journal_text=lockable.unlock_text,
             tags={"dynamic", "sandbox", "unlock"},
-            ui_hints={
-                "source": "sandbox_lockable",
-                "target": lockable.label,
-                "key": lockable.key,
-            },
+            ui_hints=_sandbox_contribution_hints(
+                caller,
+                source="sandbox_lockable",
+                contribution="unlock",
+                source_label=lockable.label,
+                source_kind="fixture",
+                target=lockable.label,
+                key=lockable.key,
+            ),
+        )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_fixture_actions(*, caller, ctx, **_kw):
+    """Project openable local fixtures into ordinary sandbox actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="fixture", ctx=ctx)
+    if _projection_state(caller, ctx).suppress_fixture_affordances:
+        return None
+
+    for lockable in caller.lockables:
+        if not lockable.openable:
+            continue
+        if lockable.open:
+            Action(
+                registry=graph,
+                label=f"sandbox_close_{caller.get_label()}_{lockable.label}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=lockable.close_text_label(),
+                effects=[Effect(expr=f"_s.close_lockable({lockable.label!r})")],
+                journal_text=lockable.close_text,
+                tags={"dynamic", "sandbox", "fixture", "close"},
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_lockable",
+                    contribution="close",
+                    source_label=lockable.label,
+                    source_kind="fixture",
+                    target=lockable.label,
+                ),
+            )
+            continue
+        Action(
+            registry=graph,
+            label=f"sandbox_open_{caller.get_label()}_{lockable.label}",
+            predecessor_id=caller.uid,
+            successor_id=caller.uid,
+            text=lockable.open_text_label(),
+            availability=[Predicate(expr=f"not sandbox_fixture_locked({lockable.label!r})")],
+            effects=[Effect(expr=f"_s.open_lockable({lockable.label!r})")],
+            journal_text=lockable.open_text,
+            tags={"dynamic", "sandbox", "fixture", "open"},
+            ui_hints=_sandbox_contribution_hints(
+                caller,
+                source="sandbox_lockable",
+                contribution="open",
+                source_label=lockable.label,
+                source_kind="fixture",
+                target=lockable.label,
+            ),
         )
     return None
 
@@ -498,7 +818,13 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
             "turn_delta": turn_delta,
         },
         tags={"dynamic", "sandbox", "wait"},
-        ui_hints={"source": "sandbox_wait"},
+        ui_hints=_sandbox_contribution_hints(
+            caller,
+            source="sandbox_wait",
+            contribution="wait",
+            source_label=_sandbox_scope_label(caller),
+            source_kind="scope",
+        ),
     )
     return None
 
@@ -543,11 +869,15 @@ def project_sandbox_scheduled_events(*, caller, ctx, **_kw):
             return_phase=ResolutionPhase.PLANNING if event.return_to_location else None,
             text=event.action_text(),
             tags={"dynamic", "sandbox", "event"},
-            ui_hints={
-                "source": "sandbox_schedule",
-                "event": event.label,
-                "target": target.get_label(),
-            },
+            ui_hints=_sandbox_contribution_hints(
+                caller,
+                source="sandbox_schedule",
+                contribution="event",
+                source_label=event.label or event.target,
+                source_kind="schedule",
+                event=event.label,
+                target=target.get_label(),
+            ),
         )
     return None
 
@@ -575,3 +905,40 @@ def advance_sandbox_time_on_wait(*, caller, ctx, **_kw):
         return None
     advance_world_turn(_time_owner(caller), turn_delta)
     return None
+
+
+@on_compose_journal(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+    priority=Priority.LATE,
+)
+def compose_sandbox_visibility_journal(*, caller, ctx, fragments, **_kw):
+    """Substitute sandbox journal text when visibility rules suppress detail."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    projection_state = _projection_state(caller, ctx)
+    if not projection_state.suppress_location_description:
+        return None
+    if not projection_state.journal_text:
+        return None
+
+    composed: list[Any] = []
+    replaced = False
+    for fragment in fragments:
+        if (
+            isinstance(fragment, ContentFragment)
+            and getattr(fragment, "source_id", None) == caller.uid
+            and not replaced
+        ):
+            composed.append(
+                ContentFragment(content=projection_state.journal_text, source_id=caller.uid)
+            )
+            replaced = True
+            continue
+        composed.append(fragment)
+    if not replaced:
+        composed.insert(
+            0,
+            ContentFragment(content=projection_state.journal_text, source_id=caller.uid),
+        )
+    return composed
