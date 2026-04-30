@@ -35,6 +35,12 @@ ADVENTURE_SANDBOX_SLICE: dict[str, Any] = {
     "scope": {
         "id": "cave",
         "state": {"world_turn": 0},
+        "visibility": {
+            "darkness_text": (
+                "It is now pitch dark. If you proceed you will likely fall "
+                "into a pit."
+            )
+        },
         "materialization": {
             "policy": "mixed",
             "stable": {
@@ -249,7 +255,7 @@ def _sandbox_actions(location: SandboxLocation) -> list[Action]:
     return [
         edge
         for edge in location.edges_out(Selector(has_kind=Action))
-        if {"dynamic", "sandbox"}.issubset(getattr(edge, "tags", set()) or set())
+        if {"dynamic", "sandbox"}.issubset(edge.tags)
     ]
 
 

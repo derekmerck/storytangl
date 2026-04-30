@@ -41,6 +41,8 @@ class SandboxItemType(AssetType):
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
     turn_on_text: str | None = None
     turn_off_text: str | None = None
+    take_text: str | None = None
+    drop_text: str | None = None
 
 
 @pytest.fixture(autouse=True)
@@ -80,7 +82,7 @@ def _dynamic_sandbox_actions(location: SandboxLocation) -> list[Action]:
     return [
         edge
         for edge in location.edges_out(Selector(has_kind=Action))
-        if {"dynamic", "sandbox", "movement"}.issubset(getattr(edge, "tags", set()) or set())
+        if {"dynamic", "sandbox", "movement"}.issubset(edge.tags)
     ]
 
 
@@ -88,7 +90,7 @@ def _dynamic_sandbox_actions_with_tag(location: SandboxLocation, tag: str) -> li
     return [
         edge
         for edge in location.edges_out(Selector(has_kind=Action))
-        if {"dynamic", "sandbox", tag}.issubset(getattr(edge, "tags", set()) or set())
+        if {"dynamic", "sandbox", tag}.issubset(edge.tags)
     ]
 
 
@@ -336,7 +338,6 @@ def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
             unlock_text="The key turns with a click. The grate unlocks.",
         )
     ]
-    cave_entrance.locals["player_inv"] = set()
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
 
     do_provision(cave_entrance, ctx=ctx)
@@ -355,11 +356,12 @@ def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
 
 def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> None:
     graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
     cave_entrance = SandboxLocation(
         label="cave_entrance",
         location_name="Cave Entrance",
         content="The grate is {grate_state}.",
-        locals={"player_inv": {"keys"}, "grate_state": "locked"},
+        locals={"grate_state": "locked"},
         lockables=[
             SandboxLockable(
                 label="grate",
@@ -369,7 +371,13 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
             )
         ],
     )
+    SandboxItemType(label="keys", name="keys")
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    scope.player_assets.add_asset(keys)
+    graph.add(scope)
     graph.add(cave_entrance)
+    graph.add(keys)
+    scope.add_child(cave_entrance)
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
     do_provision(cave_entrance, ctx=ctx)
     unlock = _dynamic_sandbox_actions_with_tag(cave_entrance, "unlock")[0]

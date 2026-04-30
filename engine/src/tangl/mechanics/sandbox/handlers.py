@@ -42,57 +42,80 @@ class SandboxEventProvider(Protocol):
         ...
 
 
-def _has_tags(value: Any, *tags: str) -> bool:
-    actual = getattr(value, "tags", set()) or set()
-    return set(tags).issubset(actual)
+class TaggedEntity(Protocol):
+    """Entity surface for tag-based dynamic sandbox cleanup."""
+
+    tags: set[Any]
 
 
-def _asset_key(asset: Token) -> str:
+class SandboxAssetSurface(Protocol):
+    """Token surface expected by sandbox asset affordance projection."""
+
+    token_from: str
+    name: str
+    portable: bool
+    readable: bool
+    read_text: str | None
+    light_source: bool
+    lit: bool
+    turn_on_text: str | None
+    turn_off_text: str | None
+    take_text: str | None
+    drop_text: str | None
+
+    def get_label(self) -> str | None:
+        """Return the graph/token label."""
+        ...
+
+
+def _has_tags(value: TaggedEntity, *tags: str) -> bool:
+    return set(tags).issubset(value.tags or set())
+
+
+def _asset_key(asset: SandboxAssetSurface) -> str:
     return asset.get_label() or asset.token_from
 
 
-def _asset_name(asset: Token) -> str:
-    value = getattr(asset, "name", None)
-    if isinstance(value, str) and value:
-        return value
+def _asset_name(asset: SandboxAssetSurface) -> str:
+    if asset.name:
+        return asset.name
     return _asset_key(asset).replace("_", " ")
 
 
-def _asset_portable(asset: Token) -> bool:
-    return bool(getattr(asset, "portable", True))
+def _asset_portable(asset: SandboxAssetSurface) -> bool:
+    return asset.portable
 
 
-def _asset_read_text(asset: Token) -> str | None:
-    value = getattr(asset, "read_text", None)
-    if isinstance(value, str) and value:
-        return value
-    if bool(getattr(asset, "readable", False)):
-        describe = getattr(asset, "describe", None)
-        if callable(describe):
-            return str(describe())
-    return None
+def _asset_read_text(asset: SandboxAssetSurface) -> str | None:
+    return asset.read_text if asset.readable else None
 
 
-def _asset_lit(asset: Token) -> bool:
-    return bool(getattr(asset, "lit", False))
+def _asset_lit(asset: SandboxAssetSurface) -> bool:
+    return asset.lit
 
 
-def _asset_is_light_source(asset: Token) -> bool:
-    return bool(getattr(asset, "light_source", False))
+def _asset_is_light_source(asset: SandboxAssetSurface) -> bool:
+    return asset.light_source
 
 
-def _asset_turn_on_text(asset: Token) -> str:
-    value = getattr(asset, "turn_on_text", None)
-    if isinstance(value, str) and value:
-        return value
+def _asset_turn_on_text(asset: SandboxAssetSurface) -> str:
+    if asset.turn_on_text:
+        return asset.turn_on_text
     return f"Your {_asset_name(asset)} is now on."
 
 
-def _asset_turn_off_text(asset: Token) -> str:
-    value = getattr(asset, "turn_off_text", None)
-    if isinstance(value, str) and value:
-        return value
+def _asset_turn_off_text(asset: SandboxAssetSurface) -> str:
+    if asset.turn_off_text:
+        return asset.turn_off_text
     return f"Your {_asset_name(asset)} is now off."
+
+
+def _asset_take_text(asset: SandboxAssetSurface) -> str:
+    return asset.take_text or "Taken."
+
+
+def _asset_drop_text(asset: SandboxAssetSurface) -> str:
+    return asset.drop_text or "Dropped."
 
 
 def _clear_dynamic_sandbox_actions(
@@ -199,8 +222,7 @@ def _has_manual_link_action(
 
 
 def _sandbox_scopes(location: SandboxLocation) -> list[SandboxScope]:
-    ancestors = getattr(location, "ancestors", [location])
-    return [scope for scope in ancestors if isinstance(scope, SandboxScope)]
+    return [scope for scope in location.ancestors if isinstance(scope, SandboxScope)]
 
 
 def _sandbox_scope_label(location: SandboxLocation) -> str:
@@ -231,15 +253,31 @@ def _sandbox_contribution_hints(
     return hints
 
 
-def _nearest_scope_value(location: SandboxLocation, field_name: str, default: Any) -> Any:
-    local_value = getattr(location, field_name, None)
-    if local_value is not None:
-        return local_value
+def _nearest_wait_enabled(location: SandboxLocation) -> bool:
+    if location.wait_enabled is not None:
+        return location.wait_enabled
     for scope in _sandbox_scopes(location):
-        scope_value = getattr(scope, field_name, None)
-        if scope_value is not None:
-            return scope_value
-    return default
+        if scope.wait_enabled is not None:
+            return scope.wait_enabled
+    return True
+
+
+def _nearest_wait_text(location: SandboxLocation) -> str:
+    if location.wait_text is not None:
+        return location.wait_text
+    for scope in _sandbox_scopes(location):
+        if scope.wait_text is not None:
+            return scope.wait_text
+    return "Wait"
+
+
+def _nearest_wait_turn_delta(location: SandboxLocation) -> int:
+    if location.wait_turn_delta is not None:
+        return location.wait_turn_delta
+    for scope in _sandbox_scopes(location):
+        if scope.wait_turn_delta is not None:
+            return scope.wait_turn_delta
+    return 1
 
 
 def _scheduled_events(location: SandboxLocation, ctx: VmPhaseCtx) -> list[ScheduledEvent]:
@@ -295,7 +333,7 @@ def _mob_affordance_tag(label: str) -> str | None:
 
 
 def _time_owner(location: SandboxLocation) -> Any:
-    for candidate in getattr(location, "ancestors", [location]):
+    for candidate in location.ancestors:
         if isinstance(candidate, SandboxScope):
             return candidate
     return location
@@ -327,16 +365,9 @@ def _lockable_open(location: SandboxLocation, label: str) -> bool:
 
 
 def _player_asset_holder(location: SandboxLocation) -> HasAssets | None:
-    for candidate in getattr(location, "ancestors", [location]):
-        player_assets = getattr(candidate, "player_assets", None)
-        if isinstance(player_assets, HasAssets):
-            return player_assets
-        locals_ = getattr(candidate, "locals", {})
-        if isinstance(locals_, Mapping):
-            for key in ("player_assets", "player", "player_inv_holder"):
-                value = locals_.get(key)
-                if isinstance(value, HasAssets):
-                    return value
+    for candidate in location.ancestors:
+        if isinstance(candidate, SandboxScope):
+            return candidate.player_assets
     return None
 
 
@@ -364,9 +395,6 @@ def _holder_has_lit_light_source(holder: HasAssets | None) -> bool:
 
 def _location_lit(location: SandboxLocation) -> bool:
     if location.light:
-        return True
-    traits = getattr(location, "traits", set()) or set()
-    if "light" in traits or "lit" in traits:
         return True
     return bool(location.locals.get("light", False))
 
@@ -444,21 +472,7 @@ def _selected_payload(ctx: VmPhaseCtx) -> Any:
 
 
 def _sandbox_inventory(location: SandboxLocation) -> set[str]:
-    inventory: set[str] = _asset_inventory(_player_asset_holder(location))
-    for scope in reversed(getattr(location, "ancestors", [location])):
-        locals_ = getattr(scope, "locals", {})
-        if not isinstance(locals_, Mapping):
-            continue
-        for key in ("player_inv", "inventory", "inv"):
-            value = locals_.get(key)
-            if isinstance(value, str):
-                inventory.add(value)
-                continue
-            try:
-                inventory.update(str(item) for item in value or ())
-            except TypeError:
-                continue
-    return inventory
+    return _asset_inventory(_player_asset_holder(location))
 
 
 def _take_asset(location: SandboxLocation, asset_label: str) -> Token:
@@ -482,7 +496,7 @@ def _set_asset_lit(location: SandboxLocation, asset_label: str, lit: bool) -> To
     asset = player_assets.get_asset(asset_label)
     if asset is None:
         raise KeyError(asset_label)
-    setattr(asset, "lit", lit)
+    asset.lit = lit
     return asset
 
 
@@ -636,7 +650,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                     successor_id=caller.uid,
                     text=f"Take {asset_name}",
                     effects=[Effect(expr=f"sandbox_take_asset({asset_label!r})")],
-                    journal_text="Taken.",
+                    journal_text=_asset_take_text(asset),
                     tags={"dynamic", "sandbox", "asset", "take"},
                     ui_hints=_sandbox_contribution_hints(
                         caller,
@@ -711,7 +725,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 successor_id=caller.uid,
                 text=f"Drop {asset_name}",
                 effects=[Effect(expr=f"sandbox_drop_asset({asset_label!r})")],
-                journal_text="Dropped.",
+                journal_text=_asset_drop_text(asset),
                 tags={"dynamic", "sandbox", "asset", "drop"},
                 ui_hints=_sandbox_contribution_hints(
                     caller,
@@ -899,8 +913,7 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
     """Project a normal self-loop wait action for sandbox locations."""
     if not isinstance(caller, SandboxLocation):
         return None
-    wait_enabled = bool(_nearest_scope_value(caller, "wait_enabled", True))
-    if not caller.auto_provision or not wait_enabled:
+    if not caller.auto_provision or not _nearest_wait_enabled(caller):
         return None
     graph = getattr(caller, "graph", None)
     if graph is None or bool(getattr(graph, "frozen_shape", False)):
@@ -908,8 +921,8 @@ def project_sandbox_wait(*, caller, ctx, **_kw):
 
     _clear_dynamic_sandbox_actions(caller, action_kind="wait", ctx=ctx)
 
-    wait_text = str(_nearest_scope_value(caller, "wait_text", "Wait"))
-    turn_delta = int(_nearest_scope_value(caller, "wait_turn_delta", 1))
+    wait_text = _nearest_wait_text(caller)
+    turn_delta = _nearest_wait_turn_delta(caller)
     Action(
         registry=graph,
         label=f"sandbox_wait_{caller.get_label()}",
@@ -1030,7 +1043,7 @@ def compose_sandbox_visibility_journal(*, caller, ctx, fragments, **_kw):
     for fragment in fragments:
         if (
             isinstance(fragment, ContentFragment)
-            and getattr(fragment, "source_id", None) == caller.uid
+            and fragment.source_id == caller.uid
             and not replaced
         ):
             composed.append(

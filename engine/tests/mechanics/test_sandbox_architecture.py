@@ -90,7 +90,7 @@ def _sandbox_actions(location: SandboxLocation) -> list[Action]:
     return [
         edge
         for edge in location.edges_out(Selector(has_kind=Action))
-        if {"dynamic", "sandbox"}.issubset(getattr(edge, "tags", set()) or set())
+        if {"dynamic", "sandbox"}.issubset(edge.tags)
     ]
 
 

@@ -1,6 +1,6 @@
 # Sandbox Mechanics Design
 
-**Status:** ASPIRATIONAL DESIGN NOTE + FIRST SPIKE CONTRACT
+**Status:** IMPLEMENTED FIRST-SPIKE + ASPIRATIONAL DESIGN NOTE
 **Scope:** `tangl.mechanics.sandbox`
 **Prior art:** `docs/src/notes/SANDBOX_FANOUT_DESIGN.md`,
 `scratch/mechanics/sandbox/*`
@@ -17,6 +17,13 @@ actors, world time, schedules, and local rules.
 The generated choices are normal `Action` edges. They use normal target
 availability, effects, call/return, journal fragments, choice diagnostics,
 ledger history, and replay.
+
+The current implementation covers the first-spike path: sandbox scopes,
+locations, generated movement/message exits, held asset affordances, lockable
+fixture affordances, visibility/darkness projection, scheduled wait/events,
+basic mob projection, and a compact Adventure-style compiler fixture. Parser
+matching, relationship-backed inventory, hybrid lazy materialization, and full
+legacy IF extraction remain research or follow-up work.
 
 Parser UI is optional. It does not create actions. It only maps user text to
 the closest current choice, diagnostic choice, or no match.

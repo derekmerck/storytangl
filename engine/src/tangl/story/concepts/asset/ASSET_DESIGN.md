@@ -1,6 +1,6 @@
 # tangl.story.concepts.asset - Design Notes
 
-> Status: Initial vocabulary and holder slice.
+> Status: Implemented vocabulary, holder, transaction, and sandbox integration slice.
 
 ## Position
 

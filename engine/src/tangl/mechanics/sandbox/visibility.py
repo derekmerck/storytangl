@@ -33,7 +33,7 @@ class SandboxVisibilityRule(BaseModel):
             Predicate(expr="not sandbox_has_lit_light_source()"),
         ]
     )
-    journal_text: str = "It is now pitch dark. If you proceed you will likely fall into a pit."
+    journal_text: str = "It is pitch dark."
     suppress_location_description: bool = True
     suppress_asset_affordances: bool = True
     suppress_fixture_affordances: bool = True

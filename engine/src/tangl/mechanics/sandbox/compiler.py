@@ -30,6 +30,8 @@ class SandboxCompiledAssetType(AssetType):
     charge: int | None = Field(default=None, json_schema_extra={"instance_var": True})
     turn_on_text: str | None = None
     turn_off_text: str | None = None
+    take_text: str | None = None
+    drop_text: str | None = None
 
 
 class SandboxSourceSpec(BaseModel):
@@ -61,11 +63,20 @@ class SandboxMaterializationSpec(BaseModel):
     notes: str = ""
 
 
+class SandboxScopeVisibilitySpec(BaseModel):
+    """Scope-level visibility phrasing for compact sandbox slices."""
+
+    darkness_text: str = "It is pitch dark."
+
+
 class SandboxScopeSpec(BaseModel):
     """Authored sandbox scope data."""
 
     id: str
     state: dict[str, Any] = Field(default_factory=dict)
+    visibility: SandboxScopeVisibilitySpec = Field(
+        default_factory=SandboxScopeVisibilitySpec
+    )
     materialization: SandboxMaterializationSpec = Field(
         default_factory=SandboxMaterializationSpec
     )
@@ -92,6 +103,13 @@ class SandboxDescriptionSpec(BaseModel):
     present: str | None = None
     nearby: str | None = None
     examine: str | None = None
+    take: str | None = None
+    drop: str | None = None
+    turn_on: str | None = None
+    turn_off: str | None = None
+    unlock: str | None = None
+    open: str | None = None
+    close: str | None = None
 
 
 class SandboxExitSpec(BaseModel):
@@ -317,12 +335,7 @@ class SandboxSliceCompiler:
             label=spec.scope.id,
             locals=dict(spec.scope.state),
             visibility_rules=[
-                SandboxVisibilityRule(
-                    journal_text=(
-                        "It is now pitch dark. If you proceed you will likely fall "
-                        "into a pit."
-                    )
-                )
+                SandboxVisibilityRule(journal_text=spec.scope.visibility.darkness_text)
             ],
         )
 
@@ -419,8 +432,10 @@ class SandboxSliceCompiler:
             lit=bool(state.get("lit", False)),
             charge=state.get("charge"),
             read_text=spec.descriptions.examine,
-            turn_on_text=f"Your {spec.name} is now on.",
-            turn_off_text=f"Your {spec.name} is now off.",
+            turn_on_text=spec.descriptions.turn_on or f"Your {spec.name} is now on.",
+            turn_off_text=spec.descriptions.turn_off or f"Your {spec.name} is now off.",
+            take_text=spec.descriptions.take,
+            drop_text=spec.descriptions.drop,
         )
 
     def _compile_fixtures(
@@ -440,9 +455,12 @@ class SandboxSliceCompiler:
                 locked=bool(state.get("locked", False)),
                 open=bool(state.get("open", False)),
                 openable="openable" in traits,
-                unlock_text=f"The key turns with a click. The {label} unlocks.",
-                open_text=f"The {label} opens.",
-                close_text=f"The {label} closes.",
+                unlock_text=(
+                    fixture_spec.descriptions.unlock
+                    or f"The key turns with a click. The {label} unlocks."
+                ),
+                open_text=fixture_spec.descriptions.open or f"The {label} opens.",
+                close_text=fixture_spec.descriptions.close or f"The {label} closes.",
             )
             for location_label in fixture_spec.initial.locations:
                 self._require_location(
