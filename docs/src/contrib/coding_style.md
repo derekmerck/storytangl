@@ -123,7 +123,43 @@ presentation (renderers, web/UI)
 - Overgrown classes; mix responsibilities → extract helpers.
 - Implicit IO in `core`/`vm`.
 
-## 15) Dereferencing & Resolution Patterns
+## 15) Architectural grooming review
+
+StoryTangl evolves through repeated implementation cycles. Some code is
+load-bearing architecture; some is scaffolding left over from an earlier cycle.
+Grooming work should make that distinction clearer.
+
+When reviewing changes, look for architectural drift:
+
+- **Duplicate mechanisms** — code that bypasses an existing primitive such as
+  `Selector`, `BehaviorRegistry.chain_execute_all`, `PhaseCtx.derive`,
+  `EntityTemplate.materialize`, provisioning offers/resolvers, or journal
+  fragments.
+- **Wrong-layer ownership** — policy or domain behavior in a lower layer, or
+  reusable generic machinery trapped in an upper layer.
+- **Parallel runtime paths** — new registries, dispatch loops, context types,
+  fragment hierarchies, resolver flows, parser loops, or output channels that
+  compete with the canonical path.
+- **Unjustified compatibility** — shims, aliases, fallback paths, or defensive
+  probes without a named persistence, interop, or migration consumer.
+- **Privileged domain packages** — sandbox, mechanics, media, loaders, and app
+  adapters should remain clients of the architecture unless a design note
+  explicitly promotes a concept into the engine kernel.
+
+A grooming change should do at least one of the following:
+
+1. delete a concept;
+2. unify competing concepts;
+3. move a concept to the layer that owns it;
+4. strengthen an invariant;
+5. simplify a repeated construction pattern;
+6. make the intended public pattern easier to learn.
+
+Avoid taste-only churn. If a change only makes code look nicer but does not
+improve correctness, conceptual fit, maintainability, or learnability, defer
+it.
+
+## 16) Dereferencing & Resolution Patterns
 
 StoryTangl maintains strict separation between identity (UUIDs) and references (resolved objects). This enables serialization, event sourcing, and watched access patterns.
 

@@ -19,8 +19,10 @@ reviews:
     - path: "engine/src/tangl/**"
       instructions: |
         Prioritize correctness, type integrity, layer boundaries, and conceptual fit with ARCHITECTURE.md and AGENTS.md.
+        Watch for architectural drift: duplicated mechanisms where an existing StoryTangl primitive should be used; policy or domain-specific behavior leaking into lower layers; generic/shared mechanisms trapped too high in the stack; new parallel registries, dispatch loops, context types, fragment models, resolver paths, parser loops, or output channels; compatibility shims, fallback paths, or defensive probes without a named boundary or consumer; and sandbox/mechanics/media/loader code becoming privileged engine semantics instead of optional domain vocabulary.
         Do not request defensive getattr/hasattr/isinstance guards when the typed interface already guarantees the shape.
-        Avoid style-only suggestions unless they point to a real maintainability or behavior issue.
+        Avoid style-only suggestions unless they point to a real maintainability, behavior, layering, or conceptual-fit issue.
+        Prefer comments that identify the violated design pressure and suggest the canonical existing mechanism.
 
     - path: "engine/tests/**"
       instructions: |
