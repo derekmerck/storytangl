@@ -10,6 +10,7 @@ from tangl.core import contribute_ns
 from tangl.story.concepts.asset import HasAssets
 from tangl.vm import TraversableNode
 
+from .mob import SandboxMob
 from .schedule import ScheduledEvent, ScheduledPresence
 from .visibility import SandboxVisibilityRule
 
@@ -23,6 +24,7 @@ class SandboxScope(TraversableNode):
 
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     scheduled_presence: list[ScheduledPresence] = Field(default_factory=list)
+    mobs: list[SandboxMob] = Field(default_factory=list)
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     player_assets: SandboxInventory = Field(default_factory=SandboxInventory)
     wait_enabled: bool | None = True
@@ -35,6 +37,7 @@ class SandboxScope(TraversableNode):
         return {
             "sandbox_scope": self.get_label(),
             "sandbox_scope_node": self,
+            "sandbox_mobs": {mob.get_label(): mob for mob in self.mobs},
             "player_assets": self.player_assets,
             "player_inv": self.player_assets.assets,
         }

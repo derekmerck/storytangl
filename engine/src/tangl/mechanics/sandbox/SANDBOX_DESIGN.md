@@ -42,6 +42,30 @@ The current v38 architecture already has most of the sandbox substrate:
 The sandbox package should add reusable rules and schedule/time vocabulary, not
 a second VM.
 
+### Architectural Legitimacy Guardrail
+
+The small size of the first sandbox implementation is a useful pressure-test of
+StoryTangl's lower layers, but it should remain suspicious until audited. A
+compact sandbox package is healthy only if it is adding adventure-game meaning,
+not smuggling in traversal, provisioning, dispatch, ledger, graph, or journal
+semantics that belong below it.
+
+The legitimacy line is:
+
+- rooms/locations compile to ordinary story nodes;
+- exits and local interactions compile to ordinary `Action` edges;
+- assets remain story asset tokens and holders;
+- mobs remain actor-like graph concepts;
+- visibility and scheduling run through normal phase hooks;
+- output remains journal fragments;
+- parser-like input, when added, selects among projected choices.
+
+Sandbox must not grow a `SandboxLedger`, `SandboxFrame`, `SandboxDispatch`,
+`SandboxFragment`, `SandboxResolver`, or private phase loop. Lower layers must
+not import sandbox. If a pattern becomes useful outside sandbox, promote the
+generic part intentionally; do not let sandbox become the engine's privileged
+room/item/action path by accident.
+
 ### General Contribution Pattern
 
 Affordance projection is a general StoryTangl pattern, not a sandbox-only
@@ -202,8 +226,8 @@ need for them.
 The first package spike implements linked-location movement, wait, selectable
 scheduled events, concept-provider events, local lockable unlock choices, and a
 minimal asset-presence projection. It also introduces `SandboxScope` for
-scope-level wait/event/presence donation and a lightweight `player_assets`
-holder.
+scope-level wait/event/presence donation, a lightweight `player_assets` holder,
+and stable `SandboxMob` nodes for simple present actors.
 
 The asset projection follows the same rule as movement projection: the current
 hub donates choices from locally declared tables/state. Location-held assets can
@@ -220,6 +244,15 @@ grate pattern: locked/unlocked, open/closed, openable, key, and journal text.
 Locked fixtures project `Unlock X`; openable fixtures project `Open X` or
 `Close X`; `through` exits can require that fixture to be open. This is enough
 for the key/grate demo without promoting a full fixture ontology yet.
+
+Mob projection is the first answer to offscreen actors. `SandboxMob` is a
+graph-backed actor-like concept with a stable sandbox `location`, mutable
+`state`, optional present/nearby text, and a small affordance list. The current
+projector only checks co-location: if `mob.location == current_location`, the
+mob can add present journal text and self-loop choices. Those choices can mutate
+mob state through normal `Effect` execution. This proves the "pirate has a
+runtime home" shape without adding movement AI, schedule/pathing, combat,
+inventory-bearing mobs, or lazy dialog scene generation yet.
 
 ### Visibility Projection
 
@@ -431,6 +464,107 @@ west -> cobble_crawl
 The point is not that the schema is final. The point is to keep an executable
 pressure fixture while negotiating which schema choices are authoring sugar,
 which are generic sandbox traits, and which require world-specific authorities.
+
+`SandboxSliceCompiler` is the current mechanics-level compiler boundary for
+that pressure fixture. It mirrors the broader compiler split in miniature:
+
+- validate compact sandbox IR with typed schema models;
+- lower normalized facts into runtime sandbox/story objects;
+- preserve coarse `source_map` and `codec_state` inputs for later loader work;
+- stop short of claiming to be a codec or world-bundle compiler.
+
+This should stay aligned with the current loader/compiler architecture and the
+Car Wars passages example:
+
+- `StoryCodec` implementations own source-format cleanup, extraction, and
+  source-specific shims;
+- `WorldCompiler` owns bundle orchestration, codec registration, domain module
+  loading, and world assembly;
+- `StoryCompiler` owns near-native story data to template-bundle lowering;
+- mechanics-level compilers such as `SandboxSliceCompiler` may validate and
+  lower a shared intermediate form while it is still incubating;
+- world-specific behavior belongs in domain authorities or registered handlers,
+  not in the compact IR itself.
+
+In Car Wars terms, the aligned pattern is `CarWarsPassagesCodec` plus a local
+compiler that registers that codec. Older bridge-style passage script managers
+are useful prior art but should not be copied as the long-term shape.
+
+The intended future layering is:
+
+```text
+source-specific codec/extractor
+  -> compact sandbox slice IR
+  -> SandboxSliceCompiler
+  -> StoryTangl world-bundle/compiler integration
+```
+
+This keeps source-format decisions local to codecs and keeps the shared layer
+focused on reusable semantic facts: locations, exits, assets, fixtures, mobs,
+traits, schedules, and contribution hooks.
+
+### Stable Runtime Identity And Offscreen Simulation
+
+StoryTangl's just-in-time story creation remains a strength: a branch, scene,
+or prop does not need to become runtime graph state until the story actually
+needs it. Sandbox adds one important pressure against pure laziness. A
+scheduled or mobile offscreen concept needs somewhere to live before the player
+observes it.
+
+For example, a wounded pirate can flee to a lair the player has never visited,
+or a dwarf can move through a cave room that has not yet journaled. If the
+sandbox clock can make claims about that actor's state or location, then the
+actor and its current location need stable runtime identity. A template is not
+enough; the scheduler needs a node address to park or move the actor.
+
+The compact IR therefore has a materialization hint:
+
+```yaml
+scope:
+  id: cave
+  materialization:
+    policy: mixed
+    stable:
+      locations: [cobble_crawl, pirate_lair]
+      assets: [brass_lamp]
+      fixtures: [grate]
+      mobs: [wounded_pirate]
+
+locations:
+  cobble_crawl:
+    name: In Cobble Crawl
+    runtime_identity: { stable: true }
+```
+
+This is not a new graph primitive. It is an author/compiler signal that some
+concepts must be materialized before first observation because other runtime
+systems can refer to them. The current `SandboxSliceCompiler` is allowed to be
+fully eager and already materializes all declared locations, assets, and
+fixtures. That is enough for the hand-compiled Adventure pressure fixture.
+
+The later interesting shape is hybrid materialization. Stable sandbox facts can
+be eager while optional narrative expansions stay lazy. For example, the pirate
+and his current resting location may need stable runtime identity so schedules,
+presence hints, and inventory can refer to him. A dialog scene with the pirate
+does not need to exist until the player chooses to talk; at that moment a
+handler/compiler can create a scene shaped by the pirate's injury, fear,
+hostility, prior gifts, and the current location.
+
+A future world-bundle compiler can use the same materialization signal to
+choose which concepts are pre-materialized inside an otherwise lazy graph.
+
+Likely inference rules:
+
+- locations referenced by scheduled mobs or events need stable runtime identity;
+- mobs with pathing, schedules, inventory, or mutable state need stable runtime
+  identity;
+- holders of mutable offscreen assets need stable runtime identity;
+- fixtures referenced by `through` exits need stable shared identity;
+- timed assets or fixtures need stable identity if their clocks tick while
+  offscreen.
+
+This keeps offscreen simulation explicit without giving up StoryTangl's normal
+ability to provision ordinary narrative branches on demand.
 
 ---
 

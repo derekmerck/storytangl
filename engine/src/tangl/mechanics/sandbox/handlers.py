@@ -20,6 +20,7 @@ from .location import (
     SandboxLockable,
     normalize_sandbox_direction,
 )
+from .mob import SandboxMob
 from .schedule import ScheduledEvent, ScheduledPresence
 from .scope import SandboxScope
 from .time import advance_world_turn, current_world_time
@@ -267,6 +268,25 @@ def _actors_present(location: SandboxLocation) -> list[str]:
     return actors
 
 
+def _sandbox_mobs(location: SandboxLocation) -> list[SandboxMob]:
+    mobs: list[SandboxMob] = []
+    for scope in reversed(_sandbox_scopes(location)):
+        mobs.extend(scope.mobs)
+    return mobs
+
+
+def _present_mobs(location: SandboxLocation) -> list[SandboxMob]:
+    location_label = location.get_label()
+    return [mob for mob in _sandbox_mobs(location) if mob.present_at(location_label)]
+
+
+def _mob_by_label(location: SandboxLocation, label: str) -> SandboxMob | None:
+    for mob in _sandbox_mobs(location):
+        if mob.get_label() == label:
+            return mob
+    return None
+
+
 def _time_owner(location: SandboxLocation) -> Any:
     for candidate in getattr(location, "ancestors", [location]):
         if isinstance(candidate, SandboxScope):
@@ -459,6 +479,18 @@ def _set_asset_lit(location: SandboxLocation, asset_label: str, lit: bool) -> To
     return asset
 
 
+def _set_mob_state(
+    location: SandboxLocation,
+    mob_label: str,
+    state_key: str,
+    value: Any,
+) -> Any:
+    mob = _mob_by_label(location, mob_label)
+    if mob is None:
+        raise KeyError(mob_label)
+    return mob.set_state_value(state_key, value)
+
+
 @on_gather_ns(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -484,6 +516,12 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
             caller,
             str(asset_label),
             False,
+        ),
+        "sandbox_set_mob_state": lambda mob_label, state_key, value: _set_mob_state(
+            caller,
+            str(mob_label),
+            str(state_key),
+            value,
         ),
     }
 
@@ -792,6 +830,61 @@ def project_sandbox_fixture_actions(*, caller, ctx, **_kw):
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
 )
+def project_sandbox_mob_actions(*, caller, ctx, **_kw):
+    """Project present mob affordances into ordinary sandbox actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="mob", ctx=ctx)
+    if _projection_state(caller, ctx).suppress_location_description:
+        return None
+
+    for mob in _present_mobs(caller):
+        mob_label = mob.get_label()
+        for affordance in mob.affordances:
+            effects = [
+                Effect(
+                    expr=(
+                        f"sandbox_set_mob_state({mob_label!r}, "
+                        f"{state_key!r}, {state_value!r})"
+                    )
+                )
+                for state_key, state_value in affordance.state_effects.items()
+            ]
+            Action(
+                registry=graph,
+                label=(
+                    f"sandbox_mob_{caller.get_label()}_{mob_label}_"
+                    f"{affordance.label}"
+                ),
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=affordance.text,
+                effects=effects,
+                journal_text=affordance.journal_text,
+                tags={"dynamic", "sandbox", "mob", affordance.label},
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_mob",
+                    contribution="mob",
+                    source_label=mob_label,
+                    source_kind="mob",
+                    mob=mob_label,
+                    action=affordance.label,
+                ),
+            )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
 def project_sandbox_wait(*, caller, ctx, **_kw):
     """Project a normal self-loop wait action for sandbox locations."""
     if not isinstance(caller, SandboxLocation):
@@ -942,3 +1035,25 @@ def compose_sandbox_visibility_journal(*, caller, ctx, fragments, **_kw):
             ContentFragment(content=projection_state.journal_text, source_id=caller.uid),
         )
     return composed
+
+
+@on_compose_journal(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+    priority=Priority.NORMAL,
+)
+def compose_sandbox_mob_journal(*, caller, ctx, fragments, **_kw):
+    """Append visible present-mob journal fragments to sandbox locations."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if _projection_state(caller, ctx).suppress_location_description:
+        return None
+
+    additions = [
+        ContentFragment(content=mob.present_text, source_id=mob.uid)
+        for mob in _present_mobs(caller)
+        if mob.present_text
+    ]
+    if not additions:
+        return None
+    return [*fragments, *additions]

@@ -5,19 +5,19 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pydantic import Field
 
-from tangl.core import Selector, Token
+from tangl.core import Selector
 from tangl.mechanics.sandbox import (
-    SandboxExit,
+    SandboxCompiledAssetType,
+    SandboxCompiledSlice,
     SandboxLocation,
-    SandboxLockable,
-    SandboxScope,
-    SandboxVisibilityRule,
+    SandboxMaterializationSpec,
+    SandboxMob,
+    SandboxSliceCompiler,
+    SandboxSliceSpec,
 )
 from tangl.story import Action, StoryGraph
-from tangl.story.concepts.asset import AssetType
-from tangl.story.fragments import ChoiceFragment
+from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block_choices
 from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
@@ -32,7 +32,20 @@ ADVENTURE_SANDBOX_SLICE: dict[str, Any] = {
         "path": "advent_punyinform.inf",
         "stance": "feel_preserving_compression",
     },
-    "scope": {"id": "cave", "state": {"world_turn": 0}},
+    "scope": {
+        "id": "cave",
+        "state": {"world_turn": 0},
+        "materialization": {
+            "policy": "mixed",
+            "stable": {
+                "locations": ["cobble_crawl"],
+                "assets": ["brass_lamp"],
+                "fixtures": ["grate"],
+                "mobs": ["wounded_pirate"],
+            },
+            "notes": "Pirate-style offscreen state needs stable runtime homes.",
+        },
+    },
     "locations": {
         "road": {
             "name": "End of Road",
@@ -138,6 +151,7 @@ ADVENTURE_SANDBOX_SLICE: dict[str, Any] = {
         "cobble_crawl": {
             "name": "In Cobble Crawl",
             "traits": ["dark", "dwarfroom"],
+            "runtime_identity": {"stable": True},
             "descriptions": {
                 "lit": (
                     "You are crawling over cobbles in a low passage. There is a "
@@ -187,123 +201,41 @@ ADVENTURE_SANDBOX_SLICE: dict[str, Any] = {
             },
         },
     },
+    "mobs": {
+        "wounded_pirate": {
+            "name": "wounded pirate",
+            "kind": "mobile_actor",
+            "traits": ["mobile", "audible_nearby", "can_carry"],
+            "initial": {
+                "location": "cobble_crawl",
+                "state": {"hp": 3, "injured": True, "hostile": False},
+            },
+            "descriptions": {
+                "present": "A wounded pirate leans against the wall, watching you.",
+                "nearby": "You hear someone breathing raggedly nearby.",
+            },
+            "contributes": {
+                "affordances": {
+                    "help": {
+                        "text": "Make sure the wounded pirate is okay",
+                        "journal": (
+                            "The pirate eyes you suspiciously, but accepts your help."
+                        ),
+                        "state": {"helped": True, "hostile": False},
+                    }
+                }
+            },
+            "runtime_identity": {"stable": True},
+        },
+    },
 }
-
-
-class AdventureItemType(AssetType):
-    """Test asset type used by the hand-compiled Adventure slice."""
-
-    name: str = ""
-    kind: str = ""
-    portable: bool = True
-    light_source: bool = False
-    lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
-    charge: int | None = Field(default=None, json_schema_extra={"instance_var": True})
-    turn_on_text: str | None = None
-    turn_off_text: str | None = None
 
 
 @pytest.fixture(autouse=True)
 def _clear_adventure_item_types() -> None:
-    AdventureItemType.clear_instances()
+    SandboxCompiledAssetType.clear_instances()
     yield
-    AdventureItemType.clear_instances()
-
-
-def _compile_adventure_slice(
-    spec: dict[str, Any],
-) -> tuple[
-    StoryGraph,
-    SandboxScope,
-    dict[str, SandboxLocation],
-    dict[str, Token],
-    dict[str, SandboxLockable],
-]:
-    graph = StoryGraph(label=spec["id"])
-    scope = SandboxScope(
-        label=spec["scope"]["id"],
-        locals=dict(spec["scope"].get("state", {})),
-        visibility_rules=[
-            SandboxVisibilityRule(
-                journal_text="It is now pitch dark. If you proceed you will likely fall into a pit."
-            )
-        ],
-    )
-    graph.add(scope)
-
-    locations: dict[str, SandboxLocation] = {}
-    for label, payload in spec["locations"].items():
-        descriptions = payload.get("descriptions", {})
-        traits = set(payload.get("traits", ()))
-        location = SandboxLocation(
-            label=label,
-            location_name=payload["name"],
-            sandbox_scope=scope.get_label(),
-            light="light" in traits,
-            content=descriptions.get("lit") or descriptions.get("look", ""),
-            dark_text=descriptions.get("dark"),
-        )
-        location.links = {
-            direction: _compile_exit(exit_spec)
-            for direction, exit_spec in payload.get("exits", {}).items()
-        }
-        graph.add(location)
-        scope.add_child(location)
-        locations[label] = location
-
-    assets: dict[str, Token] = {}
-    for label, payload in spec["assets"].items():
-        traits = set(payload.get("traits", ()))
-        initial = payload.get("initial", {})
-        state = initial.get("state", {})
-        AdventureItemType(
-            label=label,
-            name=payload["name"],
-            kind=payload.get("kind", ""),
-            portable="portable" in traits,
-            light_source="provides_light" in traits,
-            lit=bool(state.get("lit", False)),
-            charge=state.get("charge"),
-            turn_on_text=f"Your {payload['name']} is now on.",
-            turn_off_text=f"Your {payload['name']} is now off.",
-        )
-        asset = Token[AdventureItemType](token_from=label, label=label)
-        graph.add(asset)
-        locations[initial["location"]].add_asset(asset)
-        assets[label] = asset
-
-    fixtures: dict[str, SandboxLockable] = {}
-    for label, payload in spec["fixtures"].items():
-        traits = set(payload.get("traits", ()))
-        state = payload.get("initial", {}).get("state", {})
-        fixture = SandboxLockable(
-            label=label,
-            name=payload["name"],
-            key=payload.get("key", "key"),
-            locked=bool(state.get("locked", False)),
-            open=bool(state.get("open", False)),
-            openable="openable" in traits,
-            unlock_text="The key turns with a click. The grate unlocks.",
-            open_text="The grate opens.",
-            close_text="The grate closes.",
-        )
-        for location_label in payload.get("initial", {}).get("locations", ()):
-            locations[location_label].lockables.append(fixture)
-        fixtures[label] = fixture
-
-    return graph, scope, locations, assets, fixtures
-
-
-def _compile_exit(payload: str | dict[str, Any]) -> str | SandboxExit:
-    if isinstance(payload, str):
-        return payload
-    if payload.get("kind") == "message":
-        return SandboxExit(kind="message", journal_text=payload["journal"])
-    return SandboxExit(
-        target=payload["to"],
-        through=payload.get("through"),
-        text=payload.get("text"),
-    )
+    SandboxCompiledAssetType.clear_instances()
 
 
 def _provision_current(ledger: Ledger) -> SandboxLocation:
@@ -327,7 +259,9 @@ def _choose(ledger: Ledger, **hints: str) -> Action:
         if all(action.ui_hints.get(key) == value for key, value in hints.items()):
             ledger.resolve_choice(action.uid, choice_payload=action.payload)
             return action
-    raise AssertionError(f"No sandbox action at {location.get_label()} matched {hints!r}")
+    raise AssertionError(
+        f"No sandbox action at {location.get_label()} matched {hints!r}"
+    )
 
 
 def _choice_fragments(location: SandboxLocation, graph: StoryGraph) -> list[ChoiceFragment]:
@@ -340,10 +274,72 @@ def _choice_fragments(location: SandboxLocation, graph: StoryGraph) -> list[Choi
     ]
 
 
-def test_adventure_slice_hand_compiles_core_walkthrough() -> None:
-    graph, _scope, locations, assets, fixtures = _compile_adventure_slice(
-        ADVENTURE_SANDBOX_SLICE
+def test_adventure_slice_schema_validates() -> None:
+    spec = SandboxSliceCompiler.validate_ir(ADVENTURE_SANDBOX_SLICE)
+
+    assert isinstance(spec, SandboxSliceSpec)
+    assert spec.locations["outside_grate"].exits["down"].through == "grate"
+    assert spec.locations["building"].exits["in"].kind == "message"
+    assert spec.scope.materialization.policy == "mixed"
+    assert spec.scope.materialization.stable.locations == ["cobble_crawl"]
+    assert spec.scope.materialization.stable.mobs == ["wounded_pirate"]
+    assert spec.locations["cobble_crawl"].runtime_identity.stable is True
+    assert spec.mobs["wounded_pirate"].initial.location == "cobble_crawl"
+    assert spec.mobs["wounded_pirate"].runtime_identity.stable is True
+
+
+def test_adventure_slice_compiler_preserves_provenance_inputs() -> None:
+    compiled = SandboxSliceCompiler().compile(
+        ADVENTURE_SANDBOX_SLICE,
+        source_map={"source_refs": ADVENTURE_SANDBOX_SLICE["source"]},
+        codec_state={"codec_id": "compact_sandbox_slice"},
     )
+
+    assert isinstance(compiled, SandboxCompiledSlice)
+    assert isinstance(compiled.materialization, SandboxMaterializationSpec)
+    assert isinstance(compiled.mobs["wounded_pirate"], SandboxMob)
+    assert compiled.materialization.stable.assets == ["brass_lamp"]
+    assert compiled.source_map["source_refs"]["kind"] == "punyinform"
+    assert compiled.codec_state["codec_id"] == "compact_sandbox_slice"
+
+
+def test_adventure_slice_stable_mob_projects_only_when_present() -> None:
+    compiled = SandboxSliceCompiler().compile(ADVENTURE_SANDBOX_SLICE)
+    road = compiled.locations["road"]
+    cobble = compiled.locations["cobble_crawl"]
+    pirate = compiled.mobs["wounded_pirate"]
+
+    assert pirate.location == "cobble_crawl"
+    assert pirate.state["injured"] is True
+    assert pirate.uid is not None
+
+    do_provision(road, ctx=PhaseCtx(graph=compiled.graph, cursor_id=road.uid))
+    assert [
+        action
+        for action in _sandbox_actions(road)
+        if action.ui_hints.get("mob") == "wounded_pirate"
+    ] == []
+
+    cobble.light = True
+    do_provision(cobble, ctx=PhaseCtx(graph=compiled.graph, cursor_id=cobble.uid))
+    mob_actions = [
+        action
+        for action in _sandbox_actions(cobble)
+        if action.ui_hints.get("mob") == "wounded_pirate"
+    ]
+
+    assert [action.text for action in mob_actions] == [
+        "Make sure the wounded pirate is okay"
+    ]
+
+
+def test_adventure_slice_compiler_runs_core_walkthrough() -> None:
+    compiled = SandboxSliceCompiler().compile(ADVENTURE_SANDBOX_SLICE)
+    graph = compiled.graph
+    locations = compiled.locations
+    assets = compiled.assets
+    fixtures = compiled.fixtures
+    mobs = compiled.mobs
     ledger = Ledger.from_graph(graph, entry_id=locations["road"].uid)
 
     _choose(ledger, contribution="movement", direction="east")
@@ -370,6 +366,16 @@ def test_adventure_slice_hand_compiles_core_walkthrough() -> None:
     _choose(ledger, contribution="movement", direction="west")
 
     assert ledger.cursor is locations["cobble_crawl"]
+    content = [
+        fragment.content
+        for fragment in ledger.get_journal()
+        if isinstance(fragment, ContentFragment)
+    ]
+    assert "A wounded pirate leans against the wall, watching you." in content
+
+    _choose(ledger, contribution="mob", mob="wounded_pirate", action="help")
+
     assert assets["brass_lamp"].lit is True
     assert fixtures["grate"].locked is False
     assert fixtures["grate"].open is True
+    assert mobs["wounded_pirate"].state["helped"] is True

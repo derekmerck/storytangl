@@ -28,6 +28,10 @@ Current first-pass surface:
   for player inventory in the first slice.
 - `SandboxLockable`: a tiny local fixture for locked doors, grates, and similar
   objects that can project unlock choices.
+- `SandboxMob`: a graph-backed actor-like concept with stable location and
+  mutable state that can project affordances when present.
+- `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
+  trait-bearing sandbox facts into a runtime `StoryGraph` for pressure tests.
 - `SandboxVisibilityRule` / `SandboxProjectionState`: a small projection filter
   for rules such as darkness that change what a location can truthfully reveal.
 - `WorldTime`: deterministic derived time from `world_turn`.
@@ -41,6 +45,8 @@ Current first-pass surface:
   as take/read choices and player-held assets as drop choices.
 - `project_sandbox_fixture_actions`: planning handler that projects openable
   local fixtures as open/close choices.
+- `project_sandbox_mob_actions`: planning handler that projects present mob
+  affordances as ordinary self-loop choices.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects matching
@@ -88,14 +94,36 @@ affordances. Carried light-source assets still project a turn-on/turn-off
 self-loop action, so a lamp can restore normal room detail and object choices
 without treating darkness as a movement gate.
 
+Mob projection is currently presence-only. `SandboxScope.mobs` holds stable
+`SandboxMob` nodes, each parked at a sandbox location label. When the current
+location matches the mob's `location`, its present description can enrich the
+journal and its authored mob affordances become ordinary sandbox actions. This
+establishes a runtime home for offscreen actors without adding pathing,
+fleeing, combat, inventory-bearing actors, or lazy dialog scene generation yet.
+
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,
 world concepts, traits, and initial state; reusable sandbox handlers and narrow
 world authorities should turn those declarations into behavior. That keeps
 object declarations as semantic facts like `portable`, `lockable`,
 `provides_light`, or `requires_charge` rather than miniature behavior scripts.
-The first hand-compiled slice lives in
-`engine/tests/mechanics/test_sandbox_adventure_slice.py`.
+The first executable slice lives in
+`engine/tests/mechanics/test_sandbox_adventure_slice.py` and now runs through
+`SandboxSliceCompiler`. This compiler is intentionally below the full loader
+stack: future codecs can decode source formats into the compact slice schema,
+and later world-bundle integration can decide how much of this should become a
+shared story/world compiler layer.
+
+The compact schema can also declare materialization policy. The current sandbox
+slice compiler is allowed to be fully eager: declared locations, assets, and
+fixtures become real runtime objects immediately. That is the simplest fit for
+offscreen simulation, where a scheduled mob, parked actor, mutable treasure
+cache, or timed fixture needs a runtime home before the player observes it.
+Hints such as `scope.materialization.stable` and per-concept
+`runtime_identity.stable` name the concepts that must remain addressable if a
+future loader uses a hybrid policy. In that future shape, stable sandbox state
+can be eager while optional encounter/dialog scenes are created lazily from the
+current relationship and world state when the player invokes them.
 
 Base sandbox links are explicit and one-way. Do not infer reverse exits here:
 old IF maps often use one-way travel, weird loops, and conditional returns. A
