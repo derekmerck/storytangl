@@ -47,7 +47,7 @@ class SandboxVisibilityRule(BaseModel):
         return state.model_copy(
             update={
                 "active_rules": [*state.active_rules, self.label],
-                "journal_text": self.journal_text or state.journal_text,
+                "journal_text": self.journal_text,
                 "suppress_location_description": (
                     state.suppress_location_description
                     or self.suppress_location_description

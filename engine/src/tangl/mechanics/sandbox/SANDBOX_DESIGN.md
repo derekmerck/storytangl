@@ -503,21 +503,25 @@ This keeps source-format decisions local to codecs and keeps the shared layer
 focused on reusable semantic facts: locations, exits, assets, fixtures, mobs,
 traits, schedules, and contribution hooks.
 
-### Stable Runtime Identity And Offscreen Simulation
+### Current Materialization Contract
+
+`SandboxSliceCompiler` currently materializes all declared compact-slice
+locations, assets, fixtures, and mobs into a runtime `StoryGraph` immediately.
+That eager behavior is intentional for this mechanics-level pressure fixture:
+it gives offscreen simulated concepts, such as a parked wounded pirate or a
+shared grate fixture, stable runtime addresses without requiring the broader
+world-bundle loader to support hybrid provisioning yet.
+
+### Future RFC: Hybrid Materialization
 
 StoryTangl's just-in-time story creation remains a strength: a branch, scene,
 or prop does not need to become runtime graph state until the story actually
-needs it. Sandbox adds one important pressure against pure laziness. A
-scheduled or mobile offscreen concept needs somewhere to live before the player
-observes it.
+needs it. A future sandbox/world-bundle compiler should therefore support a
+hybrid policy: stable sandbox facts can be eager while optional narrative
+expansions stay lazy.
 
-For example, a wounded pirate can flee to a lair the player has never visited,
-or a dwarf can move through a cave room that has not yet journaled. If the
-sandbox clock can make claims about that actor's state or location, then the
-actor and its current location need stable runtime identity. A template is not
-enough; the scheduler needs a node address to park or move the actor.
-
-The compact IR therefore has a materialization hint:
+The compact IR already has materialization and stable runtime identity hints so
+that future compiler work has a named place to express this policy:
 
 ```yaml
 scope:
@@ -538,17 +542,12 @@ locations:
 
 This is not a new graph primitive. It is an author/compiler signal that some
 concepts must be materialized before first observation because other runtime
-systems can refer to them. The current `SandboxSliceCompiler` is allowed to be
-fully eager and already materializes all declared locations, assets, and
-fixtures. That is enough for the hand-compiled Adventure pressure fixture.
-
-The later interesting shape is hybrid materialization. Stable sandbox facts can
-be eager while optional narrative expansions stay lazy. For example, the pirate
-and his current resting location may need stable runtime identity so schedules,
-presence hints, and inventory can refer to him. A dialog scene with the pirate
-does not need to exist until the player chooses to talk; at that moment a
-handler/compiler can create a scene shaped by the pirate's injury, fear,
-hostility, prior gifts, and the current location.
+systems can refer to them. For example, the pirate and his current resting
+location may need stable runtime identity so schedules, presence hints, and
+inventory can refer to him. A dialog scene with the pirate does not need to
+exist until the player chooses to talk; at that moment a handler/compiler can
+create a scene shaped by the pirate's injury, fear, hostility, prior gifts, and
+the current location.
 
 A future world-bundle compiler can use the same materialization signal to
 choose which concepts are pre-materialized inside an otherwise lazy graph.

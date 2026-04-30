@@ -287,6 +287,13 @@ def _mob_by_label(location: SandboxLocation, label: str) -> SandboxMob | None:
     return None
 
 
+def _mob_affordance_tag(label: str) -> str | None:
+    normalized = label.strip().replace(" ", "_")
+    if not normalized:
+        return None
+    return f"affordance:{normalized}"
+
+
 def _time_owner(location: SandboxLocation) -> Any:
     for candidate in getattr(location, "ancestors", [location]):
         if isinstance(candidate, SandboxScope):
@@ -847,6 +854,9 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
     for mob in _present_mobs(caller):
         mob_label = mob.get_label()
         for affordance in mob.affordances:
+            affordance_tag = _mob_affordance_tag(affordance.label)
+            if affordance_tag is None:
+                continue
             effects = [
                 Effect(
                     expr=(
@@ -867,7 +877,7 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
                 text=affordance.text,
                 effects=effects,
                 journal_text=affordance.journal_text,
-                tags={"dynamic", "sandbox", "mob", affordance.label},
+                tags={"dynamic", "sandbox", "mob", affordance_tag},
                 ui_hints=_sandbox_contribution_hints(
                     caller,
                     source="sandbox_mob",

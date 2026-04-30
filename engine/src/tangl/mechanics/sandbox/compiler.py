@@ -22,7 +22,7 @@ class SandboxCompiledAssetType(AssetType):
 
     name: str = ""
     kind: str = ""
-    portable: bool = True
+    portable: bool = False
     readable: bool = False
     read_text: str | None = None
     light_source: bool = False
@@ -359,6 +359,22 @@ class SandboxSliceCompiler:
             return exit_spec
         return exit_spec.as_sandbox_exit()
 
+    def _require_location(
+        self,
+        locations: dict[str, SandboxLocation],
+        location_label: str,
+        *,
+        source_kind: str,
+        source_label: str,
+        relation: str,
+    ) -> SandboxLocation:
+        if location_label not in locations:
+            raise ValueError(
+                f"{source_kind} {source_label!r} {relation} unknown sandbox "
+                f"location {location_label!r}"
+            )
+        return locations[location_label]
+
     def _compile_assets(
         self,
         *,
@@ -373,7 +389,13 @@ class SandboxSliceCompiler:
             self._ensure_asset_type(label, asset_spec, traits, state)
             asset = Token[SandboxCompiledAssetType](token_from=label, label=label)
             graph.add(asset)
-            locations[asset_spec.initial.location].add_asset(asset)
+            self._require_location(
+                locations,
+                asset_spec.initial.location,
+                source_kind="Asset",
+                source_label=label,
+                relation="starts in",
+            ).add_asset(asset)
             assets[label] = asset
         return assets
 
@@ -392,6 +414,7 @@ class SandboxSliceCompiler:
             name=spec.name,
             kind=spec.kind,
             portable="portable" in traits,
+            readable="readable" in traits,
             light_source="provides_light" in traits,
             lit=bool(state.get("lit", False)),
             charge=state.get("charge"),
@@ -422,7 +445,13 @@ class SandboxSliceCompiler:
                 close_text=f"The {label} closes.",
             )
             for location_label in fixture_spec.initial.locations:
-                locations[location_label].lockables.append(fixture)
+                self._require_location(
+                    locations,
+                    location_label,
+                    source_kind="Fixture",
+                    source_label=label,
+                    relation="is placed in",
+                ).lockables.append(fixture)
             fixtures[label] = fixture
         return fixtures
 
@@ -437,11 +466,13 @@ class SandboxSliceCompiler:
         mobs: dict[str, SandboxMob] = {}
         for label, mob_spec in spec.mobs.items():
             initial = mob_spec.initial
-            if initial.location not in locations:
-                raise ValueError(
-                    f"Mob {label!r} starts in unknown sandbox location "
-                    f"{initial.location!r}"
-                )
+            self._require_location(
+                locations,
+                initial.location,
+                source_kind="Mob",
+                source_label=label,
+                relation="starts in",
+            )
             mob = SandboxMob(
                 label=label,
                 name=mob_spec.name,

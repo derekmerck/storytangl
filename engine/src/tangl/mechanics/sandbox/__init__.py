@@ -1,5 +1,7 @@
 """Sandbox mechanics: dynamic scene-location hubs over normal choices."""
 
+from __future__ import annotations
+
 from .compiler import (
     SandboxAssetSpec,
     SandboxCompiledAssetType,

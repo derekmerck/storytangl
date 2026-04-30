@@ -7,6 +7,7 @@ primitives rather than a shadow runtime.
 from __future__ import annotations
 
 import ast
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -51,8 +52,9 @@ ARCHITECTURE_SLICE = {
     "assets": {
         "lamp": {
             "name": "lamp",
-            "traits": ["portable"],
+            "traits": ["portable", "readable"],
             "initial": {"location": "road"},
+            "descriptions": {"examine": "The lamp is readable, somehow."},
         }
     },
     "mobs": {
@@ -137,6 +139,7 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert isinstance(compiled.scope, SandboxScope)
     assert isinstance(road, MenuBlock)
     assert isinstance(compiled.assets["lamp"], Token)
+    assert compiled.assets["lamp"].readable is True
     assert isinstance(compiled.mobs["guide"], SandboxMob)
     assert isinstance(compiled.mobs["guide"], Actor)
 
@@ -163,9 +166,40 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     )
     assert isinstance(mob_action, Action)
     assert mob_action.successor is cave
+    assert "affordance:greet" in mob_action.tags
 
     fragments = render_block(caller=cave, ctx=cave_ctx)
     assert any(
         isinstance(fragment, ContentFragment) and fragment.content == "The guide is here."
         for fragment in fragments or []
     )
+
+
+@pytest.mark.parametrize(
+    ("section", "expected"),
+    [
+        ("assets", "Asset 'lamp' starts in unknown sandbox location 'missing_room'"),
+        ("fixtures", "Fixture 'gate' is placed in unknown sandbox location 'missing_room'"),
+        ("mobs", "Mob 'guide' starts in unknown sandbox location 'missing_room'"),
+    ],
+)
+def test_sandbox_compiler_reports_unknown_placement_locations(
+    section: str,
+    expected: str,
+) -> None:
+    """Bad compact IR should fail with a compiler-shaped message, not KeyError."""
+    data = deepcopy(ARCHITECTURE_SLICE)
+    if section == "assets":
+        data["assets"]["lamp"]["initial"]["location"] = "missing_room"
+    elif section == "fixtures":
+        data["fixtures"] = {
+            "gate": {
+                "name": "gate",
+                "initial": {"locations": ["missing_room"]},
+            }
+        }
+    else:
+        data["mobs"]["guide"]["initial"]["location"] = "missing_room"
+
+    with pytest.raises(ValueError, match=expected):
+        SandboxSliceCompiler().compile(data)
