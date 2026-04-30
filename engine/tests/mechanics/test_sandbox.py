@@ -213,6 +213,27 @@ def test_manual_location_action_suppresses_generated_link_choice() -> None:
     assert {action.text for action in actions} == {"Go west to Cave Entrance"}
 
 
+def test_dynamic_nonmovement_action_does_not_suppress_generated_link_choice() -> None:
+    graph, road, building, _cave_entrance = _sandbox_graph()
+    Action(
+        registry=graph,
+        label="sandbox_event_enter_building",
+        predecessor_id=road.uid,
+        successor_id=building.uid,
+        text="Attend scheduled building event",
+        tags={"dynamic", "sandbox", "event"},
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
+
+    do_provision(road, ctx=ctx)
+
+    actions = _dynamic_sandbox_actions(road)
+    assert {action.text for action in actions} == {
+        "Go east to Building",
+        "Go west to Cave Entrance",
+    }
+
+
 def test_sandbox_movement_refresh_removes_stale_actions() -> None:
     graph, road, _building, _cave_entrance = _sandbox_graph()
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid)

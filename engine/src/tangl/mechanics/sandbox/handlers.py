@@ -216,7 +216,7 @@ def _has_manual_link_action(
     target: SandboxLocation,
 ) -> bool:
     for edge in location.edges_out(Selector(has_kind=Action)):
-        if _has_tags(edge, "dynamic", "sandbox", "movement"):
+        if _has_tags(edge, "dynamic"):
             continue
         if edge.successor is target:
             return True
