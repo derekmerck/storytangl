@@ -179,6 +179,8 @@ def _exit_spec(value: str | SandboxExit | Mapping[str, Any]) -> SandboxExit:
         return value
     if isinstance(value, Mapping):
         payload = dict(value)
+        if "to" in payload and "target" not in payload:
+            payload["target"] = payload.pop("to")
         if "journal" in payload and "journal_text" not in payload:
             payload["journal_text"] = payload.pop("journal")
         return SandboxExit.model_validate(payload)

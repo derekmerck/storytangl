@@ -201,10 +201,6 @@ ADVENTURE_SANDBOX_SLICE: dict[str, Any] = {
                 "state": {"locked": True, "open": False},
             },
             "key": "keys",
-            "connects": {
-                "outside_grate": "below_grate",
-                "below_grate": "outside_grate",
-            },
         },
     },
     "mobs": {
@@ -292,6 +288,61 @@ def test_adventure_slice_schema_validates() -> None:
     assert spec.locations["cobble_crawl"].runtime_identity.stable is True
     assert spec.mobs["wounded_pirate"].initial.location == "cobble_crawl"
     assert spec.mobs["wounded_pirate"].runtime_identity.stable is True
+
+
+def test_adventure_slice_compiler_rejects_unknown_exit_target() -> None:
+    data: dict[str, Any] = {
+        "id": "bad_exits",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {
+                "name": "Road",
+                "exits": {"north": "missing_room"},
+            },
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Location 'road' exit 'north' targets unknown sandbox location 'missing_room'",
+    ):
+        SandboxSliceCompiler().compile(data)
+
+
+def test_adventure_slice_compiler_rejects_conflicting_asset_type_reuse() -> None:
+    first: dict[str, Any] = {
+        "id": "first_keys",
+        "scope": {"id": "cave"},
+        "locations": {"building": {"name": "Building"}},
+        "assets": {
+            "keys": {
+                "name": "set of keys",
+                "traits": ["portable"],
+                "initial": {"location": "building"},
+            },
+        },
+    }
+    second: dict[str, Any] = {
+        "id": "second_keys",
+        "scope": {"id": "cave"},
+        "locations": {"building": {"name": "Building"}},
+        "assets": {
+            "keys": {
+                "name": "brass key",
+                "traits": ["portable"],
+                "initial": {"location": "building"},
+            },
+        },
+    }
+
+    compiler = SandboxSliceCompiler()
+    compiler.compile(first)
+
+    with pytest.raises(
+        ValueError,
+        match="Sandbox asset type 'keys' is already registered with a different definition",
+    ):
+        compiler.compile(second)
 
 
 def test_adventure_slice_compiler_preserves_provenance_inputs() -> None:

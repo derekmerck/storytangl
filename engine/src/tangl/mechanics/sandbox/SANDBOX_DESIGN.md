@@ -409,15 +409,18 @@ assets:
   brass_lamp:
     name: brass lamp
     traits: [portable, switchable, provides_light, requires_charge]
-    initial: { location: building }
-    charge: 330
+    initial:
+      location: building
+      state: { charge: 330 }
 
 fixtures:
   grate:
     name: steel grate
     traits: [fixture, door, openable, lockable]
+    initial:
+      locations: [outside_grate, below_grate]
+      state: { locked: true, open: false }
     key: keys
-    connects: { outside_grate: below_grate }
 ```
 
 Here `portable`, `switchable`, `provides_light`, `requires_charge`,

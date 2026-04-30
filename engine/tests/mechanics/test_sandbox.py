@@ -182,6 +182,7 @@ def test_sandbox_structured_exit_can_override_choice_text() -> None:
     road.links = {
         "in": SandboxExit(target="building", text="Enter the building"),
         "out": {"target": "cave_entrance", "text": "Leave for the cave"},
+        "down": {"to": "cave_entrance", "text": "Climb down"},
     }
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
 
@@ -191,6 +192,7 @@ def test_sandbox_structured_exit_can_override_choice_text() -> None:
     assert {action.text for action in actions} == {
         "Enter the building",
         "Leave for the cave",
+        "Climb down",
     }
 
 

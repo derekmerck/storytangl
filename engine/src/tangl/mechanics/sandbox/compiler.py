@@ -358,10 +358,21 @@ class SandboxSliceCompiler:
                 content=descriptions.lit or descriptions.look or descriptions.first or "",
                 dark_text=descriptions.dark,
             )
-            location.links = {
-                direction: self._compile_exit(exit_spec)
-                for direction, exit_spec in location_spec.exits.items()
-            }
+            links: dict[str, str | SandboxExit] = {}
+            for direction, exit_spec in location_spec.exits.items():
+                compiled_exit = self._compile_exit(exit_spec)
+                target_label = (
+                    compiled_exit
+                    if isinstance(compiled_exit, str)
+                    else compiled_exit.target
+                )
+                if target_label is not None and target_label not in spec.locations:
+                    raise ValueError(
+                        f"Location {label!r} exit {direction!r} targets unknown "
+                        f"sandbox location {target_label!r}"
+                    )
+                links[direction] = compiled_exit
+            location.links = links
             graph.add(location)
             scope.add_child(location)
             locations[label] = location
@@ -419,24 +430,46 @@ class SandboxSliceCompiler:
         traits: set[str],
         state: dict[str, Any],
     ) -> SandboxCompiledAssetType:
+        expected = self._asset_type_values(spec=spec, traits=traits, state=state)
         existing = SandboxCompiledAssetType.get_instance(label)
         if existing is not None:
+            current = {key: getattr(existing, key) for key in expected}
+            if current != expected:
+                raise ValueError(
+                    f"Sandbox asset type {label!r} is already registered with "
+                    "a different definition"
+                )
             return existing
         return SandboxCompiledAssetType(
             label=label,
-            name=spec.name,
-            kind=spec.kind,
-            portable="portable" in traits,
-            readable="readable" in traits,
-            light_source="provides_light" in traits,
-            lit=bool(state.get("lit", False)),
-            charge=state.get("charge"),
-            read_text=spec.descriptions.examine,
-            turn_on_text=spec.descriptions.turn_on or f"Your {spec.name} is now on.",
-            turn_off_text=spec.descriptions.turn_off or f"Your {spec.name} is now off.",
-            take_text=spec.descriptions.take,
-            drop_text=spec.descriptions.drop,
+            **expected,
         )
+
+    def _asset_type_values(
+        self,
+        *,
+        spec: SandboxAssetSpec,
+        traits: set[str],
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "name": spec.name,
+            "kind": spec.kind,
+            "portable": "portable" in traits,
+            "readable": "readable" in traits,
+            "light_source": "provides_light" in traits,
+            "lit": bool(state.get("lit", False)),
+            "charge": state.get("charge"),
+            "read_text": spec.descriptions.examine,
+            "turn_on_text": (
+                spec.descriptions.turn_on or f"Your {spec.name} is now on."
+            ),
+            "turn_off_text": (
+                spec.descriptions.turn_off or f"Your {spec.name} is now off."
+            ),
+            "take_text": spec.descriptions.take,
+            "drop_text": spec.descriptions.drop,
+        }
 
     def _compile_fixtures(
         self,
