@@ -1,22 +1,84 @@
 """Sandbox mechanics: dynamic scene-location hubs over normal choices."""
 
+from __future__ import annotations
+
+from .compiler import (
+    SandboxAssetSpec,
+    SandboxCompiledAssetType,
+    SandboxCompiledSlice,
+    SandboxDescriptionSpec,
+    SandboxExitSpec,
+    SandboxFixtureSpec,
+    SandboxInitialAssetSpec,
+    SandboxInitialFixtureSpec,
+    SandboxInitialMobSpec,
+    SandboxLocationSpec,
+    SandboxMaterializationSpec,
+    SandboxMobActionSpec,
+    SandboxMobContributionsSpec,
+    SandboxMobSpec,
+    SandboxRuntimeIdentitySpec,
+    SandboxScopeSpec,
+    SandboxSliceCompiler,
+    SandboxSliceSpec,
+    SandboxSourceSpec,
+    SandboxStableMaterializationSpec,
+)
 from .handlers import (
     advance_sandbox_time_on_wait,
+    compose_sandbox_visibility_journal,
+    compose_sandbox_mob_journal,
     contribute_sandbox_inventory_helpers,
+    project_sandbox_asset_actions,
+    project_sandbox_fixture_actions,
     project_sandbox_location_links,
+    project_sandbox_mob_actions,
     project_sandbox_scheduled_events,
     project_sandbox_unlocks,
     project_sandbox_wait,
 )
-from .location import SandboxLocation, SandboxLockable
+from .mob import SandboxMob, SandboxMobAffordance
+from .location import (
+    SandboxExit,
+    SandboxLocation,
+    SandboxLockable,
+    normalize_sandbox_direction,
+)
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
-from .scope import SandboxScope
+from .scope import SandboxInventory, SandboxScope
 from .time import WorldTime, advance_world_turn, current_world_time, get_world_turn
+from .visibility import SandboxProjectionState, SandboxVisibilityRule
 
 __all__ = [
+    "SandboxAssetSpec",
+    "SandboxCompiledAssetType",
+    "SandboxCompiledSlice",
+    "SandboxDescriptionSpec",
+    "SandboxExitSpec",
+    "SandboxExit",
+    "SandboxFixtureSpec",
+    "SandboxInventory",
+    "SandboxInitialAssetSpec",
+    "SandboxInitialFixtureSpec",
+    "SandboxInitialMobSpec",
     "SandboxLocation",
+    "SandboxLocationSpec",
     "SandboxLockable",
+    "SandboxMaterializationSpec",
+    "SandboxMob",
+    "SandboxMobActionSpec",
+    "SandboxMobAffordance",
+    "SandboxMobContributionsSpec",
+    "SandboxMobSpec",
+    "SandboxProjectionState",
+    "SandboxRuntimeIdentitySpec",
+    "SandboxScopeSpec",
     "SandboxScope",
+    "SandboxSliceCompiler",
+    "SandboxSliceSpec",
+    "SandboxSourceSpec",
+    "SandboxStableMaterializationSpec",
+    "SandboxVisibilityRule",
     "Schedule",
     "ScheduleEntry",
     "ScheduledEvent",
@@ -24,10 +86,16 @@ __all__ = [
     "WorldTime",
     "advance_sandbox_time_on_wait",
     "advance_world_turn",
+    "compose_sandbox_mob_journal",
+    "compose_sandbox_visibility_journal",
     "contribute_sandbox_inventory_helpers",
     "current_world_time",
     "get_world_turn",
+    "normalize_sandbox_direction",
+    "project_sandbox_asset_actions",
+    "project_sandbox_fixture_actions",
     "project_sandbox_location_links",
+    "project_sandbox_mob_actions",
     "project_sandbox_scheduled_events",
     "project_sandbox_unlocks",
     "project_sandbox_wait",

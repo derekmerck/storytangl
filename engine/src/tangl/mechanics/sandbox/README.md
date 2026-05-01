@@ -8,19 +8,45 @@ The package does not introduce a second interaction model. Sandbox locations
 generate ordinary StoryTangl `Action` choices from scoped state such as location
 links, present entities, inventory, world time, and schedules.
 
+Sandbox is a specialized instance of a broader StoryTangl pattern: scoped
+containers publish facts, children pull on those facts through dependencies and
+phase handlers, and the runtime renders the result as namespace entries,
+journal fragments, choices, effects, or projection filters. In this package the
+facts are location-centered: exits, assets, fixtures, light, schedules, and
+presence.
+
 Current first-pass surface:
 
 - `SandboxScope`: a chapter-like ancestor that donates sandbox rules to child
-  locations.
-- `SandboxLocation`: a thin `MenuBlock` facade with location links and simple
-  local lockables.
+  locations and exposes a lightweight player asset holder.
+- `SandboxLocation`: a `MenuBlock` facade with location links, simple local
+  lockables, and held assets.
+- `SandboxExit`: an optional structured link declaration for custom egress
+  text, message exits, and fixture-gated traversal while preserving the simple
+  `direction -> target` table form.
+- `SandboxInventory`: a ready-at-hand `HasAssets` holder used by sandbox scopes
+  for player inventory in the first slice.
 - `SandboxLockable`: a tiny local fixture for locked doors, grates, and similar
   objects that can project unlock choices.
+- `SandboxMob`: a graph-backed actor-like concept with stable location and
+  mutable state that can project affordances when present.
+- `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
+  trait-bearing sandbox facts into a runtime `StoryGraph` for pressure tests.
+- `SandboxVisibilityRule` / `SandboxProjectionState`: a small projection filter
+  for rules such as darkness that change what a location can truthfully reveal.
 - `WorldTime`: deterministic derived time from `world_turn`.
 - `ScheduleEntry` / `Schedule` / `ScheduledEvent` / `ScheduledPresence`: small
   schedule matching primitives.
 - `project_sandbox_location_links`: planning handler that projects movement
-  links into normal dynamic actions.
+  links into normal dynamic actions, unless a manual action already covers that
+  target. Direction aliases such as `n`, `s`, `e`, `w`, `u`, and `d` are
+  normalized into canonical UI hints while preserving the raw authored key.
+- `project_sandbox_asset_actions`: planning handler that projects present assets
+  as take/read choices and player-held assets as drop choices.
+- `project_sandbox_fixture_actions`: planning handler that projects openable
+  local fixtures as open/close choices.
+- `project_sandbox_mob_actions`: planning handler that projects present mob
+  affordances as ordinary self-loop choices.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects matching
@@ -28,6 +54,9 @@ Current first-pass surface:
 - `project_sandbox_unlocks`: planning handler that projects locked local objects
   as self-loop unlock choices with normal edge availability, effects, and
   selected-action journal text.
+- `compose_sandbox_visibility_journal`: compose handler that can substitute a
+  darkness-style journal fragment when projection rules suppress the location
+  description.
 - `advance_sandbox_time_on_wait`: update handler that advances sandbox-local
   time when a wait choice is selected.
 
@@ -36,16 +65,81 @@ pattern: planning creates a dynamic `Action`, the action targets the current
 node, selected payload is read during UPDATE, and normal ledger/journal behavior
 does the rest.
 
+Structured sandbox exits are still ordinary actions. A link such as
+`down: {through: grate, to: below_grate}` projects movement whose availability
+is gated by the local fixture's open state. A link such as
+`down: {kind: message, journal: "You don't fit!"}` projects a self-loop with
+selected-action journal text.
+
 Scheduled sandbox events use the same VM edges. An `activation` value maps to
 the same `Action` trigger phase used by authored story actions. A
-`return_to_location` event is just an `Action` with `return_phase=UPDATE`; a
+`return_to_location` event is just an `Action` with `return_phase=PLANNING`, so
+the return step reprojects the current location before journaling choices; a
 `once` event is suppressed after its target has been marked visited by the
 generic VM `mark_visited` handler.
+
+Asset projection is deliberately modest. Locations are `HasAssets` holders, and
+the nearest `SandboxScope.player_assets` holder stands in for ready-at-hand
+player inventory. Generated take/drop actions call the normal
+`AssetTransactionManager`; generated read actions emit selected-action journal
+text. This is enough for keys, lamps, leaflets, and treasures in a toy
+Adventure-like subset while leaving graph-backed ownership relations for a
+later asset slice.
+
+Visibility projection is also deliberately modest. A scope or location can
+carry `SandboxVisibilityRule`s. The default rule models Adventure-like darkness:
+when the location is not lit and the player has no lit light source, the rule
+substitutes a dark journal fragment and suppresses local asset/fixture
+affordances. Carried light-source assets still project a turn-on/turn-off
+self-loop action, so a lamp can restore normal room detail and object choices
+without treating darkness as a movement gate.
+
+Mob projection is currently presence-only. `SandboxScope.mobs` holds stable
+`SandboxMob` nodes, each parked at a sandbox location label. When the current
+location matches the mob's `location`, its present description can enrich the
+journal and its authored mob affordances become ordinary sandbox actions. This
+establishes a runtime home for offscreen actors without adding pathing,
+fleeing, combat, inventory-bearing actors, or lazy dialog scene generation yet.
+
+The Adventure import goal is semantic compression, not faithful emulation. A
+compact world schema should declare locations, exits, assets, fixtures, mobs,
+world concepts, traits, and initial state; reusable sandbox handlers and narrow
+world authorities should turn those declarations into behavior. That keeps
+object declarations as semantic facts like `portable`, `lockable`,
+`provides_light`, or `requires_charge` rather than miniature behavior scripts.
+The first executable slice lives in
+`engine/tests/mechanics/test_sandbox_adventure_slice.py` and now runs through
+`SandboxSliceCompiler`. This compiler is intentionally below the full loader
+stack: future codecs can decode source formats into the compact slice schema,
+and later world-bundle integration can decide how much of this should become a
+shared story/world compiler layer.
+
+The compact schema can also declare materialization policy. The current sandbox
+slice compiler is allowed to be fully eager: declared locations, assets, and
+fixtures become real runtime objects immediately. That is the simplest fit for
+offscreen simulation, where a scheduled mob, parked actor, mutable treasure
+cache, or timed fixture needs a runtime home before the player observes it.
+Hints such as `scope.materialization.stable` and per-concept
+`runtime_identity.stable` name the concepts that must remain addressable if a
+future loader uses a hybrid policy. In that future shape, stable sandbox state
+can be eager while optional encounter/dialog scenes are created lazily from the
+current relationship and world state when the player invokes them.
+
+Base sandbox links are explicit and one-way. Do not infer reverse exits here:
+old IF maps often use one-way travel, weird loops, and conditional returns. A
+future `GridSandbox` specialization can add RPG-map-style symmetric adjacency
+defaults for tile or grid worlds without changing the base sandbox contract.
 
 Concept providers can opt in by exposing `get_sandbox_events(caller, ctx, ns)`.
 The sandbox projector discovers those providers from the gathered namespace, so
 roles, settings, locations, actors, and asset tokens can donate choices without
 becoming sandbox-specific base classes.
+
+Generated sandbox actions carry provenance in `ui_hints`: the projection
+`source`, contribution kind, source label/kind, and sandbox scope. This is still
+local metadata rather than a general VM receipt model, but it keeps dynamic
+choices explainable and leaves a clear promotion path if non-sandbox systems
+need the same debug surface.
 
 The older `scratch/mechanics/sandbox` code remains prior art. Mine it for
 calendar, schedule, mobile-actor, and event ideas, but do not promote it
