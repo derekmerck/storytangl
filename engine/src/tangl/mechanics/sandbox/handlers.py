@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
-from tangl.core import Selector, Token
+from tangl.core import Graph, Selector, Token
 from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.fragments import ContentFragment
@@ -856,79 +856,71 @@ def project_sandbox_location_links(*, caller, ctx, **_kw):
     return None
 
 
-@on_provision(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
-)
-def project_sandbox_asset_actions(*, caller, ctx, **_kw):
-    """Project present and carried assets into ordinary sandbox actions."""
-    if not isinstance(caller, SandboxLocation):
-        return None
-    if not caller.auto_provision:
-        return None
-    graph = getattr(caller, "graph", None)
-    if graph is None or bool(getattr(graph, "frozen_shape", False)):
-        return None
+def _project_location_asset_actions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+) -> None:
+    for asset_label, asset in sorted(location.assets.items()):
+        asset_name = _asset_name(asset)
+        if _asset_portable(asset):
+            Action(
+                registry=graph,
+                label=f"sandbox_take_{location.get_label()}_{asset_label}",
+                predecessor_id=location.uid,
+                successor_id=location.uid,
+                text=f"Take {asset_name}",
+                effects=[Effect(expr=f"sandbox_take_asset({asset_label!r})")],
+                journal_text=_asset_take_text(asset),
+                tags={"dynamic", "sandbox", "asset", "take"},
+                ui_hints=_sandbox_contribution_hints(
+                    location,
+                    source="sandbox_asset",
+                    contribution="take",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    verb="take",
+                    asset=asset_label,
+                ),
+            )
+        read_text = _asset_read_text(asset)
+        if read_text:
+            Action(
+                registry=graph,
+                label=f"sandbox_read_{location.get_label()}_{asset_label}",
+                predecessor_id=location.uid,
+                successor_id=location.uid,
+                text=f"Read {asset_name}",
+                journal_text=read_text,
+                tags={"dynamic", "sandbox", "asset", "read"},
+                ui_hints=_sandbox_contribution_hints(
+                    location,
+                    source="sandbox_asset",
+                    contribution="read",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    verb="read",
+                    asset=asset_label,
+                ),
+            )
 
-    _clear_dynamic_sandbox_actions(caller, action_kind="asset", ctx=ctx)
-    projection_state = _projection_state(caller, ctx)
 
-    if not projection_state.suppress_asset_affordances:
-        for asset_label, asset in sorted(caller.assets.items()):
-            asset_name = _asset_name(asset)
-            if _asset_portable(asset):
-                Action(
-                    registry=graph,
-                    label=f"sandbox_take_{caller.get_label()}_{asset_label}",
-                    predecessor_id=caller.uid,
-                    successor_id=caller.uid,
-                    text=f"Take {asset_name}",
-                    effects=[Effect(expr=f"sandbox_take_asset({asset_label!r})")],
-                    journal_text=_asset_take_text(asset),
-                    tags={"dynamic", "sandbox", "asset", "take"},
-                    ui_hints=_sandbox_contribution_hints(
-                        caller,
-                        source="sandbox_asset",
-                        contribution="take",
-                        source_label=asset_label,
-                        source_kind="asset",
-                        verb="take",
-                        asset=asset_label,
-                    ),
-                )
-            read_text = _asset_read_text(asset)
-            if read_text:
-                Action(
-                    registry=graph,
-                    label=f"sandbox_read_{caller.get_label()}_{asset_label}",
-                    predecessor_id=caller.uid,
-                    successor_id=caller.uid,
-                    text=f"Read {asset_name}",
-                    journal_text=read_text,
-                    tags={"dynamic", "sandbox", "asset", "read"},
-                    ui_hints=_sandbox_contribution_hints(
-                        caller,
-                        source="sandbox_asset",
-                        contribution="read",
-                        source_label=asset_label,
-                        source_kind="asset",
-                        verb="read",
-                        asset=asset_label,
-                    ),
-                )
-
-    player_assets = _player_asset_holder(caller)
-    if player_assets is None:
-        return None
+def _project_carried_asset_actions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    player_assets: HasAssets,
+    projection_state: SandboxProjectionState,
+) -> None:
     for asset_label, asset in sorted(player_assets.assets.items()):
         asset_name = _asset_name(asset)
         if _asset_is_switchable(asset):
             lit = _asset_lit(asset)
             Action(
                 registry=graph,
-                label=f"sandbox_light_{caller.get_label()}_{asset_label}",
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
+                label=f"sandbox_light_{location.get_label()}_{asset_label}",
+                predecessor_id=location.uid,
+                successor_id=location.uid,
                 text=f"Turn {'off' if lit else 'on'} {asset_name}",
                 effects=[
                     Effect(
@@ -939,10 +931,12 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                         )
                     )
                 ],
-                journal_text=_asset_turn_off_text(asset) if lit else _asset_turn_on_text(asset),
+                journal_text=(
+                    _asset_turn_off_text(asset) if lit else _asset_turn_on_text(asset)
+                ),
                 tags={"dynamic", "sandbox", "asset", "light"},
                 ui_hints=_sandbox_contribution_hints(
-                    caller,
+                    location,
                     source="sandbox_asset",
                     contribution="light",
                     source_label=asset_label,
@@ -955,9 +949,9 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
             is_open = asset.container.is_open
             Action(
                 registry=graph,
-                label=f"sandbox_container_toggle_{caller.get_label()}_{asset_label}",
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
+                label=f"sandbox_container_toggle_{location.get_label()}_{asset_label}",
+                predecessor_id=location.uid,
+                successor_id=location.uid,
                 text=_asset_container_action_text(asset),
                 effects=[
                     Effect(
@@ -975,7 +969,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 ),
                 tags={"dynamic", "sandbox", "asset", "container"},
                 ui_hints=_sandbox_contribution_hints(
-                    caller,
+                    location,
                     source="sandbox_asset",
                     contribution="container",
                     source_label=asset_label,
@@ -984,30 +978,36 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                     asset=asset_label,
                 ),
             )
-        if not projection_state.suppress_asset_affordances:
-            Action(
-                registry=graph,
-                label=f"sandbox_drop_{caller.get_label()}_{asset_label}",
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
-                text=f"Drop {asset_name}",
-                effects=[Effect(expr=f"sandbox_drop_asset({asset_label!r})")],
-                journal_text=_asset_drop_text(asset),
-                tags={"dynamic", "sandbox", "asset", "drop"},
-                ui_hints=_sandbox_contribution_hints(
-                    caller,
-                    source="sandbox_asset",
-                    contribution="drop",
-                    source_label=asset_label,
-                    source_kind="asset",
-                    verb="drop",
-                    asset=asset_label,
-                ),
-            )
-    if projection_state.suppress_asset_affordances:
-        return None
+        if projection_state.suppress_asset_affordances:
+            continue
+        Action(
+            registry=graph,
+            label=f"sandbox_drop_{location.get_label()}_{asset_label}",
+            predecessor_id=location.uid,
+            successor_id=location.uid,
+            text=f"Drop {asset_name}",
+            effects=[Effect(expr=f"sandbox_drop_asset({asset_label!r})")],
+            journal_text=_asset_drop_text(asset),
+            tags={"dynamic", "sandbox", "asset", "drop"},
+            ui_hints=_sandbox_contribution_hints(
+                location,
+                source="sandbox_asset",
+                contribution="drop",
+                source_label=asset_label,
+                source_kind="asset",
+                verb="drop",
+                asset=asset_label,
+            ),
+        )
 
-    for fixture in caller.fixtures:
+
+def _project_fixture_container_actions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    player_assets: HasAssets,
+) -> None:
+    for fixture in location.fixtures:
         if fixture.container is None:
             continue
         for asset_label, asset in sorted(player_assets.assets.items()):
@@ -1015,11 +1015,11 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
             Action(
                 registry=graph,
                 label=(
-                    f"sandbox_put_{caller.get_label()}_{asset_label}_"
+                    f"sandbox_put_{location.get_label()}_{asset_label}_"
                     f"in_{fixture.label}"
                 ),
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
+                predecessor_id=location.uid,
+                successor_id=location.uid,
                 text=f"Put {asset_name} in {fixture.name or fixture.label}",
                 availability=[
                     Predicate(
@@ -1040,7 +1040,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 journal_text="Done.",
                 tags={"dynamic", "sandbox", "asset", "container", "put"},
                 ui_hints=_sandbox_contribution_hints(
-                    caller,
+                    location,
                     source="sandbox_fixture",
                     contribution="put",
                     source_label=fixture.label,
@@ -1056,11 +1056,11 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
             Action(
                 registry=graph,
                 label=(
-                    f"sandbox_take_{caller.get_label()}_{asset_label}_"
+                    f"sandbox_take_{location.get_label()}_{asset_label}_"
                     f"from_{fixture.label}"
                 ),
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
+                predecessor_id=location.uid,
+                successor_id=location.uid,
                 text=f"Take {asset_name} from {fixture.name or fixture.label}",
                 effects=[
                     Effect(
@@ -1073,7 +1073,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 journal_text=_asset_take_text(asset),
                 tags={"dynamic", "sandbox", "asset", "container", "take"},
                 ui_hints=_sandbox_contribution_hints(
-                    caller,
+                    location,
                     source="sandbox_fixture",
                     contribution="take_from_container",
                     source_label=fixture.label,
@@ -1083,6 +1083,13 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 ),
             )
 
+
+def _project_asset_container_actions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    player_assets: HasAssets,
+) -> None:
     for container_label, container_asset in sorted(player_assets.assets.items()):
         container = container_asset.container
         if container is None:
@@ -1095,11 +1102,11 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
             Action(
                 registry=graph,
                 label=(
-                    f"sandbox_put_{caller.get_label()}_{asset_label}_"
+                    f"sandbox_put_{location.get_label()}_{asset_label}_"
                     f"in_{container_label}"
                 ),
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
+                predecessor_id=location.uid,
+                successor_id=location.uid,
                 text=f"Put {asset_name} in {container_name}",
                 availability=[
                     Predicate(
@@ -1120,7 +1127,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 journal_text="Done.",
                 tags={"dynamic", "sandbox", "asset", "container", "put"},
                 ui_hints=_sandbox_contribution_hints(
-                    caller,
+                    location,
                     source="sandbox_asset",
                     contribution="put",
                     source_label=container_label,
@@ -1137,11 +1144,11 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
             Action(
                 registry=graph,
                 label=(
-                    f"sandbox_take_{caller.get_label()}_{asset_label}_"
+                    f"sandbox_take_{location.get_label()}_{asset_label}_"
                     f"from_{container_label}"
                 ),
-                predecessor_id=caller.uid,
-                successor_id=caller.uid,
+                predecessor_id=location.uid,
+                successor_id=location.uid,
                 text=f"Take {asset_name} from {container_name}",
                 effects=[
                     Effect(
@@ -1154,7 +1161,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                 journal_text=_asset_take_text(asset),
                 tags={"dynamic", "sandbox", "asset", "container", "take"},
                 ui_hints=_sandbox_contribution_hints(
-                    caller,
+                    location,
                     source="sandbox_asset",
                     contribution="take_from_container",
                     source_label=container_label,
@@ -1163,6 +1170,42 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
                     target=container_label,
                 ),
             )
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_asset_actions(*, caller, ctx, **_kw):
+    """Project present and carried assets into ordinary sandbox actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="asset", ctx=ctx)
+    projection_state = _projection_state(caller, ctx)
+
+    if not projection_state.suppress_asset_affordances:
+        _project_location_asset_actions(caller, graph=graph)
+
+    player_assets = _player_asset_holder(caller)
+    if player_assets is None:
+        return None
+    _project_carried_asset_actions(
+        caller,
+        graph=graph,
+        player_assets=player_assets,
+        projection_state=projection_state,
+    )
+    if projection_state.suppress_asset_affordances:
+        return None
+
+    _project_fixture_container_actions(caller, graph=graph, player_assets=player_assets)
+    _project_asset_container_actions(caller, graph=graph, player_assets=player_assets)
     return None
 
 
