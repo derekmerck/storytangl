@@ -10,6 +10,8 @@ They are not a separate inventory engine.
 This package currently defines:
 
 - `AssetType`: a singleton definition for tokenizable, lightly stateful assets.
+  It includes a small `traits` set for story/mechanics layers that need
+  semantic acceptance checks.
 - `CountableAsset`: a fungible asset definition tracked by quantity.
 - `AssetWallet`: a compact counter for fungible assets.
 - `HasAssets`: a story-level facet for nodes that hold wallet counts and
@@ -46,6 +48,11 @@ relationship-backed shape is:
 - inventory affordances are projected from the current cursor namespace plus
   ready-at-hand holders such as the player avatar.
 
+The sandbox package currently uses `ContainerFacet` as a mechanics-level
+holder/policy object for first-slice container behavior. That is intentionally
+not the final ownership model; it is a compact way to pressure-test transfer
+preflight before promoting container membership into graph relationships.
+
 The holding relation should be built as a general relationship mechanism, not
 as asset-only code. The old `Associating` and `Connection` scratch designs are
 better prior art for relationship preflight and acceptance than for inventory
@@ -77,9 +84,9 @@ The current slice is intentionally sufficient for sandbox affordance
 experiments, not a complete inventory system.
 
 - `HasAssets.assets` is a holder-local map, not yet a graph-backed ownership
-  subgraph. It is good enough for "player has key" checks, but not enough for
-  full persistence of container membership, room inventories, or ownership
-  history.
+  subgraph. It is good enough for "player has key" checks and first-slice
+  sandbox containers, but not enough for full persistence of room inventories
+  or ownership history.
 - Discrete transfers currently move tokens between holder maps. Slice 2 should
   replace or back this with a first-class holding relation so graph topology is
   the source of truth.

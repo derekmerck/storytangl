@@ -5,7 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from tangl.core import Token
+from tangl.story.concepts.asset import HasAssets
 
 
 class SwitchState(Protocol):
@@ -99,3 +102,53 @@ class LightSourceFacet(BaseModel):
         if self.requires_switch or switchable is not None:
             return is_on
         return True
+
+
+class ContainerFacet(HasAssets):
+    """Asset holder policy for simple sandbox containers."""
+
+    is_open: bool = True
+    max_items: int | None = None
+    accepts_traits: set[str] = Field(default_factory=set)
+    allow_nested_containers: bool = False
+    open_text: str = "Opened."
+    close_text: str = "Closed."
+    open_action_text: str = ""
+    close_action_text: str = ""
+
+    def can_open(self) -> bool:
+        """Return whether this container can currently open."""
+        return not self.is_open
+
+    def open(self) -> None:
+        """Mark this container open."""
+        self.is_open = True
+
+    def can_close(self) -> bool:
+        """Return whether this container can currently close."""
+        return self.is_open
+
+    def close(self) -> None:
+        """Mark this container closed."""
+        self.is_open = False
+
+    def can_accept_asset(self, asset: Token, *, current_count: int) -> bool:
+        """Return whether this container policy accepts the asset."""
+        if not self.is_open:
+            return False
+        if self.max_items is not None and current_count >= self.max_items:
+            return False
+        asset_traits = asset.traits
+        if not self.allow_nested_containers and "container" in asset_traits:
+            return False
+        return not self.accepts_traits or bool(self.accepts_traits & asset_traits)
+
+    def can_receive_asset(self, asset: Token, giver: HasAssets | None = None) -> bool:
+        """Return whether this container can receive a discrete asset."""
+        _ = giver
+        return self.can_accept_asset(asset, current_count=len(self.assets))
+
+    def can_give_asset(self, asset: Token, receiver: HasAssets | None = None) -> bool:
+        """Return whether this container can release a discrete asset."""
+        _ = receiver
+        return self.is_open and self.has_asset(asset)

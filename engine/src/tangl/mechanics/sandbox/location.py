@@ -7,11 +7,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from tangl.core import contribute_ns
+from tangl.core import Token, contribute_ns
 from tangl.story import MenuBlock
 from tangl.story.concepts.asset import HasAssets
 
-from .facets import LockableFacet, OpenableFacet
+from .facets import ContainerFacet, LockableFacet, OpenableFacet
 from .schedule import ScheduledEvent
 from .visibility import SandboxVisibilityRule
 
@@ -50,13 +50,14 @@ class SandboxExit(BaseModel):
     through: str | None = None
 
 
-class SandboxFixture(BaseModel):
+class SandboxFixture(HasAssets):
     """Place-bound sandbox fixture composed from typed capability facets."""
 
     label: str
     name: str = ""
     openable: OpenableFacet | None = None
     lockable: LockableFacet | None = None
+    container: ContainerFacet | None = None
 
     @property
     def locked(self) -> bool:
@@ -130,6 +131,28 @@ class SandboxFixture(BaseModel):
         if self.openable is None:
             raise ValueError(f"Fixture {self.label!r} is not openable")
         self.openable.close()
+
+    def container_accessible(self) -> bool:
+        """Return whether the fixture's container contents are reachable."""
+        if self.container is None:
+            return False
+        if self.locked:
+            return False
+        if self.openable is not None and not self.open:
+            return False
+        return True
+
+    def can_receive_asset(self, asset: Token, giver: HasAssets | None = None) -> bool:
+        """Return whether this fixture can receive a discrete asset."""
+        _ = giver
+        if self.container is None or not self.container_accessible():
+            return False
+        return self.container.can_accept_asset(asset, current_count=len(self.assets))
+
+    def can_give_asset(self, asset: Token, receiver: HasAssets | None = None) -> bool:
+        """Return whether this fixture can release a discrete asset."""
+        _ = receiver
+        return self.container_accessible() and self.has_asset(asset)
 
     @property
     def unlock_text(self) -> str:

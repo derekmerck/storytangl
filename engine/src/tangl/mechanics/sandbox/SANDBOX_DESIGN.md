@@ -242,8 +242,11 @@ project `Take X` and `Read X`; player-held assets can project `Drop X`; carried
 assets can satisfy generated action availability such as `Unlock grate`.
 Take/drop effects use the story asset transaction manager, not ad hoc locals.
 This is enough for the toy Adventure subset's keys, lamp, leaflet, and
-treasures. Richer object ontologies, containers/supporters, quantities, actor
-inventory, and parser/client matching remain later slices.
+treasures. Container support is intentionally first-slice only:
+`ContainerFacet` can hold discrete assets, enforce count/trait acceptance,
+gate access on open state, and reject nested containers. Richer object
+ontologies, supporters, quantities, actor inventory, and parser/client matching
+remain later slices.
 
 Local fixture projection is similarly narrow. `SandboxFixture` is a place-bound
 object composed from typed facets. `OpenableFacet` owns open/closed state and
@@ -252,6 +255,16 @@ unlock text. Locked fixtures project `Unlock X`; openable fixtures project
 `Open X` or `Close X`; `through` exits can require that fixture to be open.
 This is enough for the key/grate demo without promoting a full fixture ontology
 yet.
+
+Container projection follows the same rule. A fixture can carry a
+`ContainerFacet`, in which case the fixture acts as the holder and the facet
+acts as policy. The fixture's own lock/open state controls whether contents are
+reachable. Portable container assets carry their own `ContainerFacet`; their
+sub-inventory is exposed only while the facet is open. Both paths call
+`AssetTransactionManager`, so "put in" and "take from" are transfer preflight
+problems, not bespoke inventory mutation. For now nested containers are
+rejected by policy to avoid bag-in-bag ambiguity until a relationship-backed
+holding model exists.
 
 Mob projection is the first answer to offscreen actors. `SandboxMob` is a
 graph-backed actor-like concept with a stable sandbox `location`, mutable

@@ -28,8 +28,9 @@ Current first-pass surface:
   for player inventory in the first slice.
 - `SandboxFixture`: a place-bound object composed from typed facets such as
   `OpenableFacet` and `LockableFacet`.
-- `OpenableFacet` / `LockableFacet` / `SwitchableFacet` / `LightSourceFacet`:
-  runtime capability surfaces lowered from compact authoring traits.
+- `OpenableFacet` / `LockableFacet` / `SwitchableFacet` / `LightSourceFacet` /
+  `ContainerFacet`: runtime capability surfaces lowered from compact authoring
+  traits.
 - `SandboxMob`: a graph-backed actor-like concept with stable location and
   mutable state that can project affordances when present.
 - `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
@@ -87,6 +88,14 @@ player inventory. Generated take/drop actions call the normal
 text. This is enough for keys, lamps, leaflets, and treasures in a toy
 Adventure-like subset while leaving graph-backed ownership relations for a
 later asset slice.
+
+Container projection is the first transfer-preflight extension. A
+`ContainerFacet` can sit on a fixture or portable asset. Fixture containers use
+the fixture's open/locked state before exposing contents; portable containers
+carry their own open state. Generated put/take-from actions still move tokens
+through `AssetTransactionManager`, so capacity, trait acceptance, closed
+containers, and the current no-nested-containers rule are transaction policy
+rather than a second inventory path.
 
 Visibility projection is also deliberately modest. A scope or location can
 carry `SandboxVisibilityRule`s. The default rule models Adventure-like darkness:

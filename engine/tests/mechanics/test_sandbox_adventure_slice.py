@@ -190,6 +190,21 @@ ADVENTURE_SANDBOX_SLICE: dict[str, Any] = {
             },
             "descriptions": {"examine": "It is a shiny brass lamp."},
         },
+        "wicker_cage": {
+            "name": "wicker cage",
+            "kind": "container",
+            "traits": ["portable", "container"],
+            "initial": {
+                "location": "cobble_crawl",
+                "state": {"open": True},
+            },
+            "capacity": {"max_items": 1, "accepts_traits": ["tiny"]},
+            "descriptions": {
+                "examine": "It's a small wicker cage.",
+                "close": "The cage snaps shut.",
+                "open": "The cage opens.",
+            },
+        },
     },
     "fixtures": {
         "grate": {
@@ -286,6 +301,7 @@ def test_adventure_slice_schema_validates() -> None:
     assert spec.scope.materialization.stable.locations == ["cobble_crawl"]
     assert spec.scope.materialization.stable.mobs == ["wounded_pirate"]
     assert spec.locations["cobble_crawl"].runtime_identity.stable is True
+    assert spec.assets["wicker_cage"].capacity.accepts_traits == ["tiny"]
     assert spec.mobs["wounded_pirate"].initial.location == "cobble_crawl"
     assert spec.mobs["wounded_pirate"].runtime_identity.stable is True
 
@@ -355,6 +371,7 @@ def test_adventure_slice_compiler_preserves_provenance_inputs() -> None:
     assert isinstance(compiled, SandboxCompiledSlice)
     assert isinstance(compiled.materialization, SandboxMaterializationSpec)
     assert isinstance(compiled.mobs["wounded_pirate"], SandboxMob)
+    assert compiled.assets["wicker_cage"].container.max_items == 1
     assert compiled.materialization.stable.assets == ["brass_lamp"]
     assert compiled.source_map["source_refs"]["kind"] == "punyinform"
     assert compiled.codec_state["codec_id"] == "compact_sandbox_slice"

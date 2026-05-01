@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .compiler import (
     SandboxAssetSpec,
+    SandboxContainerSpec,
     SandboxCompiledAssetType,
     SandboxCompiledSlice,
     SandboxDescriptionSpec,
@@ -24,7 +25,13 @@ from .compiler import (
     SandboxSourceSpec,
     SandboxStableMaterializationSpec,
 )
-from .facets import LightSourceFacet, LockableFacet, OpenableFacet, SwitchableFacet
+from .facets import (
+    ContainerFacet,
+    LightSourceFacet,
+    LockableFacet,
+    OpenableFacet,
+    SwitchableFacet,
+)
 from .handlers import (
     advance_sandbox_time_on_wait,
     compose_sandbox_visibility_journal,
@@ -52,6 +59,7 @@ from .visibility import SandboxProjectionState, SandboxVisibilityRule
 
 __all__ = [
     "SandboxAssetSpec",
+    "SandboxContainerSpec",
     "SandboxCompiledAssetType",
     "SandboxCompiledSlice",
     "SandboxDescriptionSpec",
@@ -65,6 +73,7 @@ __all__ = [
     "SandboxInitialMobSpec",
     "SandboxLocation",
     "SandboxLocationSpec",
+    "ContainerFacet",
     "LightSourceFacet",
     "LockableFacet",
     "OpenableFacet",
