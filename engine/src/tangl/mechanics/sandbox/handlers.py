@@ -14,10 +14,11 @@ from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
 from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision, on_update
 from tangl.vm.dispatch import on_compose_journal, on_gather_ns
 
+from .facets import LightSourceFacet, SwitchableFacet
 from .location import (
     SandboxExit,
+    SandboxFixture,
     SandboxLocation,
-    SandboxLockable,
     normalize_sandbox_direction,
 )
 from .mob import SandboxMob
@@ -56,7 +57,8 @@ class SandboxAssetSurface(Protocol):
     portable: bool
     readable: bool
     read_text: str | None
-    light_source: bool
+    switchable: SwitchableFacet | None
+    light_source: LightSourceFacet | None
     lit: bool
     turn_on_text: str | None
     turn_off_text: str | None
@@ -94,8 +96,18 @@ def _asset_lit(asset: SandboxAssetSurface) -> bool:
     return asset.lit
 
 
-def _asset_is_light_source(asset: SandboxAssetSurface) -> bool:
-    return asset.light_source
+def _asset_is_switchable(asset: SandboxAssetSurface) -> bool:
+    return asset.switchable is not None
+
+
+def _asset_illuminates(asset: SandboxAssetSurface) -> bool:
+    return bool(
+        asset.light_source
+        and asset.light_source.illuminates(
+            is_on=asset.lit,
+            switchable=asset.switchable,
+        )
+    )
 
 
 def _asset_turn_on_text(asset: SandboxAssetSurface) -> str:
@@ -349,21 +361,38 @@ def _visibility_rules(location: SandboxLocation) -> list[SandboxVisibilityRule]:
     return rules
 
 
-def _lockable_by_label(location: SandboxLocation, label: str) -> SandboxLockable | None:
-    for lockable in location.lockables:
-        if lockable.label == label:
-            return lockable
+def _fixture_by_label(location: SandboxLocation, label: str) -> SandboxFixture | None:
+    for fixture in location.fixtures:
+        if fixture.label == label:
+            return fixture
     return None
 
 
-def _lockable_locked(location: SandboxLocation, label: str) -> bool:
-    lockable = _lockable_by_label(location, label)
-    return bool(lockable and lockable.locked)
+def _fixture_locked(location: SandboxLocation, label: str) -> bool:
+    fixture = _fixture_by_label(location, label)
+    return bool(fixture and fixture.locked)
 
 
-def _lockable_open(location: SandboxLocation, label: str) -> bool:
-    lockable = _lockable_by_label(location, label)
-    return bool(lockable and lockable.open)
+def _fixture_open(location: SandboxLocation, label: str) -> bool:
+    fixture = _fixture_by_label(location, label)
+    return bool(fixture and fixture.open)
+
+
+def _fixture_can_unlock(location: SandboxLocation, label: str) -> bool:
+    fixture = _fixture_by_label(location, label)
+    inventory = _sandbox_inventory(location)
+    return bool(fixture and fixture.can_unlock(has_key=lambda key: key in inventory))
+
+
+def _fixture_can_open(location: SandboxLocation, label: str) -> bool:
+    fixture = _fixture_by_label(location, label)
+    inventory = _sandbox_inventory(location)
+    return bool(fixture and fixture.can_open(has_key=lambda key: key in inventory))
+
+
+def _fixture_can_close(location: SandboxLocation, label: str) -> bool:
+    fixture = _fixture_by_label(location, label)
+    return bool(fixture and fixture.can_close())
 
 
 def _player_asset_holder(location: SandboxLocation) -> HasAssets | None:
@@ -389,10 +418,7 @@ def _asset_inventory(holder: HasAssets | None) -> set[str]:
 def _holder_has_lit_light_source(holder: HasAssets | None) -> bool:
     if holder is None:
         return False
-    return any(
-        _asset_is_light_source(asset) and _asset_lit(asset)
-        for asset in holder.assets.values()
-    )
+    return any(_asset_illuminates(asset) for asset in holder.assets.values())
 
 
 def _location_lit(location: SandboxLocation) -> bool:
@@ -498,7 +524,12 @@ def _set_asset_lit(location: SandboxLocation, asset_label: str, lit: bool) -> To
     asset = player_assets.get_asset(asset_label)
     if asset is None:
         raise KeyError(asset_label)
-    asset.lit = lit
+    if asset.switchable is None:
+        raise ValueError(f"Asset {asset_label!r} is not switchable")
+    if lit:
+        asset.switchable.switch_on(asset)
+    else:
+        asset.switchable.switch_off(asset)
     return asset
 
 
@@ -526,8 +557,20 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
     return {
         "sandbox_inventory": inventory,
         "sandbox_has_key": lambda key: str(key) in inventory,
-        "sandbox_fixture_locked": lambda label: _lockable_locked(caller, str(label)),
-        "sandbox_fixture_open": lambda label: _lockable_open(caller, str(label)),
+        "sandbox_fixture_locked": lambda label: _fixture_locked(caller, str(label)),
+        "sandbox_fixture_open": lambda label: _fixture_open(caller, str(label)),
+        "sandbox_fixture_can_unlock": lambda label: _fixture_can_unlock(
+            caller,
+            str(label),
+        ),
+        "sandbox_fixture_can_open": lambda label: _fixture_can_open(
+            caller,
+            str(label),
+        ),
+        "sandbox_fixture_can_close": lambda label: _fixture_can_close(
+            caller,
+            str(label),
+        ),
         "sandbox_take_asset": lambda asset_label: _take_asset(caller, str(asset_label)),
         "sandbox_drop_asset": lambda asset_label: _drop_asset(caller, str(asset_label)),
         "sandbox_turn_on_asset": lambda asset_label: _set_asset_lit(
@@ -690,7 +733,7 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
         return None
     for asset_label, asset in sorted(player_assets.assets.items()):
         asset_name = _asset_name(asset)
-        if _asset_is_light_source(asset):
+        if _asset_is_switchable(asset):
             lit = _asset_lit(asset)
             Action(
                 registry=graph,
@@ -760,27 +803,29 @@ def project_sandbox_unlocks(*, caller, ctx, **_kw):
     if _projection_state(caller, ctx).suppress_fixture_affordances:
         return None
 
-    for lockable in caller.lockables:
-        if not lockable.locked:
+    for fixture in caller.fixtures:
+        if not fixture.lockable or not fixture.locked:
             continue
         Action(
             registry=graph,
-            label=f"sandbox_unlock_{caller.get_label()}_{lockable.label}",
+            label=f"sandbox_unlock_{caller.get_label()}_{fixture.label}",
             predecessor_id=caller.uid,
             successor_id=caller.uid,
-            text=lockable.action_text(),
-            availability=[Predicate(expr=f"sandbox_has_key({lockable.key!r})")],
-            effects=[Effect(expr=f"_s.unlock_lockable({lockable.label!r})")],
-            journal_text=lockable.unlock_text,
+            text=fixture.action_text(),
+            availability=[
+                Predicate(expr=f"sandbox_fixture_can_unlock({fixture.label!r})")
+            ],
+            effects=[Effect(expr=f"_s.unlock_fixture({fixture.label!r})")],
+            journal_text=fixture.unlock_text,
             tags={"dynamic", "sandbox", "unlock"},
             ui_hints=_sandbox_contribution_hints(
                 caller,
-                source="sandbox_lockable",
+                source="sandbox_fixture",
                 contribution="unlock",
-                source_label=lockable.label,
+                source_label=fixture.label,
                 source_kind="fixture",
-                target=lockable.label,
-                key=lockable.key,
+                target=fixture.label,
+                key=fixture.key,
             ),
         )
     return None
@@ -804,46 +849,49 @@ def project_sandbox_fixture_actions(*, caller, ctx, **_kw):
     if _projection_state(caller, ctx).suppress_fixture_affordances:
         return None
 
-    for lockable in caller.lockables:
-        if not lockable.openable:
+    for fixture in caller.fixtures:
+        if fixture.openable is None:
             continue
-        if lockable.open:
+        if fixture.open:
             Action(
                 registry=graph,
-                label=f"sandbox_close_{caller.get_label()}_{lockable.label}",
+                label=f"sandbox_close_{caller.get_label()}_{fixture.label}",
                 predecessor_id=caller.uid,
                 successor_id=caller.uid,
-                text=lockable.close_text_label(),
-                effects=[Effect(expr=f"_s.close_lockable({lockable.label!r})")],
-                journal_text=lockable.close_text,
+                text=fixture.close_text_label(),
+                availability=[
+                    Predicate(expr=f"sandbox_fixture_can_close({fixture.label!r})")
+                ],
+                effects=[Effect(expr=f"_s.close_fixture({fixture.label!r})")],
+                journal_text=fixture.close_text,
                 tags={"dynamic", "sandbox", "fixture", "close"},
                 ui_hints=_sandbox_contribution_hints(
                     caller,
-                    source="sandbox_lockable",
+                    source="sandbox_fixture",
                     contribution="close",
-                    source_label=lockable.label,
+                    source_label=fixture.label,
                     source_kind="fixture",
-                    target=lockable.label,
+                    target=fixture.label,
                 ),
             )
             continue
         Action(
             registry=graph,
-            label=f"sandbox_open_{caller.get_label()}_{lockable.label}",
+            label=f"sandbox_open_{caller.get_label()}_{fixture.label}",
             predecessor_id=caller.uid,
             successor_id=caller.uid,
-            text=lockable.open_text_label(),
-            availability=[Predicate(expr=f"not sandbox_fixture_locked({lockable.label!r})")],
-            effects=[Effect(expr=f"_s.open_lockable({lockable.label!r})")],
-            journal_text=lockable.open_text,
+            text=fixture.open_text_label(),
+            availability=[Predicate(expr=f"sandbox_fixture_can_open({fixture.label!r})")],
+            effects=[Effect(expr=f"_s.open_fixture({fixture.label!r})")],
+            journal_text=fixture.open_text,
             tags={"dynamic", "sandbox", "fixture", "open"},
             ui_hints=_sandbox_contribution_hints(
                 caller,
-                source="sandbox_lockable",
+                source="sandbox_fixture",
                 contribution="open",
-                source_label=lockable.label,
+                source_label=fixture.label,
                 source_kind="fixture",
-                target=lockable.label,
+                target=fixture.label,
             ),
         )
     return None

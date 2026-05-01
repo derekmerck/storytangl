@@ -11,7 +11,8 @@ from tangl.core import Token
 from tangl.story import StoryGraph
 from tangl.story.concepts.asset import AssetType
 
-from .location import SandboxExit, SandboxLocation, SandboxLockable
+from .facets import LightSourceFacet, LockableFacet, OpenableFacet, SwitchableFacet
+from .location import SandboxExit, SandboxFixture, SandboxLocation
 from .mob import SandboxMob, SandboxMobAffordance
 from .scope import SandboxScope
 from .visibility import SandboxVisibilityRule
@@ -25,7 +26,8 @@ class SandboxCompiledAssetType(AssetType):
     portable: bool = False
     readable: bool = False
     read_text: str | None = None
-    light_source: bool = False
+    switchable: SwitchableFacet | None = None
+    light_source: LightSourceFacet | None = None
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
     charge: int | None = Field(default=None, json_schema_extra={"instance_var": True})
     turn_on_text: str | None = None
@@ -266,7 +268,7 @@ class SandboxCompiledSlice:
     scope: SandboxScope
     locations: dict[str, SandboxLocation]
     assets: dict[str, Token]
-    fixtures: dict[str, SandboxLockable]
+    fixtures: dict[str, SandboxFixture]
     mobs: dict[str, SandboxMob]
     materialization: SandboxMaterializationSpec = field(
         default_factory=SandboxMaterializationSpec
@@ -457,7 +459,12 @@ class SandboxSliceCompiler:
             "kind": spec.kind,
             "portable": "portable" in traits,
             "readable": "readable" in traits,
-            "light_source": "provides_light" in traits,
+            "switchable": SwitchableFacet() if "switchable" in traits else None,
+            "light_source": (
+                LightSourceFacet(requires_switch="switchable" in traits)
+                if "provides_light" in traits
+                else None
+            ),
             "lit": bool(state.get("lit", False)),
             "charge": state.get("charge"),
             "read_text": spec.descriptions.examine,
@@ -476,24 +483,39 @@ class SandboxSliceCompiler:
         *,
         locations: dict[str, SandboxLocation],
         spec: SandboxSliceSpec,
-    ) -> dict[str, SandboxLockable]:
-        fixtures: dict[str, SandboxLockable] = {}
+    ) -> dict[str, SandboxFixture]:
+        fixtures: dict[str, SandboxFixture] = {}
         for label, fixture_spec in spec.fixtures.items():
             traits = set(fixture_spec.traits)
             state = fixture_spec.initial.state
-            fixture = SandboxLockable(
+            fixture = SandboxFixture(
                 label=label,
                 name=fixture_spec.name,
-                key=fixture_spec.key,
-                locked=bool(state.get("locked", False)),
-                open=bool(state.get("open", False)),
-                openable="openable" in traits,
-                unlock_text=(
-                    fixture_spec.descriptions.unlock
-                    or f"The key turns with a click. The {label} unlocks."
+                lockable=(
+                    LockableFacet(
+                        key=fixture_spec.key,
+                        is_locked=bool(state.get("locked", False)),
+                        unlock_text=(
+                            fixture_spec.descriptions.unlock
+                            or f"The key turns with a click. The {label} unlocks."
+                        ),
+                    )
+                    if "lockable" in traits
+                    else None
                 ),
-                open_text=fixture_spec.descriptions.open or f"The {label} opens.",
-                close_text=fixture_spec.descriptions.close or f"The {label} closes.",
+                openable=(
+                    OpenableFacet(
+                        is_open=bool(state.get("open", False)),
+                        open_text=(
+                            fixture_spec.descriptions.open or f"The {label} opens."
+                        ),
+                        close_text=(
+                            fixture_spec.descriptions.close or f"The {label} closes."
+                        ),
+                    )
+                    if "openable" in traits
+                    else None
+                ),
             )
             for location_label in fixture_spec.initial.locations:
                 self._require_location(
@@ -502,7 +524,7 @@ class SandboxSliceCompiler:
                     source_kind="Fixture",
                     source_label=label,
                     relation="is placed in",
-                ).lockables.append(fixture)
+                ).fixtures.append(fixture)
             fixtures[label] = fixture
         return fixtures
 

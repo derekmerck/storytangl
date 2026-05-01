@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from tangl.core import contribute_ns
 from tangl.story import MenuBlock
 from tangl.story.concepts.asset import HasAssets
 
+from .facets import LockableFacet, OpenableFacet
 from .schedule import ScheduledEvent
 from .visibility import SandboxVisibilityRule
 
@@ -48,36 +50,107 @@ class SandboxExit(BaseModel):
     through: str | None = None
 
 
-class SandboxLockable(BaseModel):
-    """Minimal lockable local fixture projected into sandbox choices."""
+class SandboxFixture(BaseModel):
+    """Place-bound sandbox fixture composed from typed capability facets."""
 
     label: str
     name: str = ""
-    key: str = "key"
-    locked: bool = True
-    openable: bool = False
-    open: bool = False
-    unlock_text: str = "The key turns with a click. The lock opens."
-    unlock_action_text: str = ""
-    open_text: str = "Opened."
-    close_text: str = "Closed."
-    open_action_text: str = ""
-    close_action_text: str = ""
+    openable: OpenableFacet | None = None
+    lockable: LockableFacet | None = None
+
+    @property
+    def locked(self) -> bool:
+        """Return whether the fixture is currently locked."""
+        return bool(self.lockable and self.lockable.is_locked)
+
+    @property
+    def open(self) -> bool:
+        """Return whether the fixture is currently open."""
+        return bool(self.openable and self.openable.is_open)
+
+    @property
+    def key(self) -> str | None:
+        """Return the key label required by the lock, if any."""
+        if self.lockable is None:
+            return None
+        return self.lockable.key
 
     def action_text(self) -> str:
         """Return player-facing unlock action text."""
         target_name = self.name or self.label
-        return self.unlock_action_text or f"Unlock {target_name}"
+        if self.lockable and self.lockable.unlock_action_text:
+            return self.lockable.unlock_action_text
+        return f"Unlock {target_name}"
 
     def open_text_label(self) -> str:
         """Return player-facing open action text."""
         target_name = self.name or self.label
-        return self.open_action_text or f"Open {target_name}"
+        if self.openable and self.openable.open_action_text:
+            return self.openable.open_action_text
+        return f"Open {target_name}"
 
     def close_text_label(self) -> str:
         """Return player-facing close action text."""
         target_name = self.name or self.label
-        return self.close_action_text or f"Close {target_name}"
+        if self.openable and self.openable.close_action_text:
+            return self.openable.close_action_text
+        return f"Close {target_name}"
+
+    def can_unlock(self, *, has_key: Callable[[str], bool]) -> bool:
+        """Return whether the fixture can currently unlock."""
+        if self.lockable is None:
+            return False
+        return self.lockable.can_unlock(has_key=has_key)
+
+    def unlock(self) -> None:
+        """Unlock the fixture."""
+        if self.lockable is None:
+            raise ValueError(f"Fixture {self.label!r} is not lockable")
+        self.lockable.unlock()
+
+    def can_open(self, *, has_key: Callable[[str], bool]) -> bool:
+        """Return whether the fixture can currently open."""
+        _ = has_key
+        if self.openable is None:
+            return False
+        return self.openable.can_open(locked=self.locked)
+
+    def open_fixture(self) -> None:
+        """Open the fixture."""
+        if self.openable is None:
+            raise ValueError(f"Fixture {self.label!r} is not openable")
+        self.openable.open()
+
+    def can_close(self) -> bool:
+        """Return whether the fixture can currently close."""
+        return bool(self.openable and self.openable.can_close())
+
+    def close(self) -> None:
+        """Close the fixture."""
+        if self.openable is None:
+            raise ValueError(f"Fixture {self.label!r} is not openable")
+        self.openable.close()
+
+    @property
+    def unlock_text(self) -> str:
+        """Return journal text for unlocking."""
+        if self.lockable is None:
+            return ""
+        return self.lockable.unlock_text
+
+    @property
+    def open_text(self) -> str:
+        """Return journal text for opening."""
+        if self.openable is None:
+            return ""
+        return self.openable.open_text
+
+    @property
+    def close_text(self) -> str:
+        """Return journal text for closing."""
+        if self.openable is None:
+            return ""
+        return self.openable.close_text
 
 
 class SandboxLocation(HasAssets, MenuBlock):
@@ -85,7 +158,7 @@ class SandboxLocation(HasAssets, MenuBlock):
 
     links: dict[str, str | SandboxExit] = Field(default_factory=dict)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
-    lockables: list[SandboxLockable] = Field(default_factory=list)
+    fixtures: list[SandboxFixture] = Field(default_factory=list)
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     sandbox_scope: str | None = None
     location_name: str = ""
@@ -95,29 +168,30 @@ class SandboxLocation(HasAssets, MenuBlock):
     wait_text: str | None = None
     wait_turn_delta: int | None = None
 
-    def unlock_lockable(self, label: str) -> SandboxLockable:
-        """Unlock and return the named lockable object."""
-        for lockable in self.lockables:
-            if lockable.label == label:
-                lockable.locked = False
-                return lockable
-        raise KeyError(f"Unknown lockable: {label}")
+    def fixture_by_label(self, label: str) -> SandboxFixture:
+        """Return the named local fixture."""
+        for fixture in self.fixtures:
+            if fixture.label == label:
+                return fixture
+        raise KeyError(f"Unknown fixture: {label}")
 
-    def open_lockable(self, label: str) -> SandboxLockable:
-        """Open and return the named lockable object."""
-        for lockable in self.lockables:
-            if lockable.label == label:
-                lockable.open = True
-                return lockable
-        raise KeyError(f"Unknown lockable: {label}")
+    def unlock_fixture(self, label: str) -> SandboxFixture:
+        """Unlock and return the named fixture."""
+        fixture = self.fixture_by_label(label)
+        fixture.unlock()
+        return fixture
 
-    def close_lockable(self, label: str) -> SandboxLockable:
-        """Close and return the named lockable object."""
-        for lockable in self.lockables:
-            if lockable.label == label:
-                lockable.open = False
-                return lockable
-        raise KeyError(f"Unknown lockable: {label}")
+    def open_fixture(self, label: str) -> SandboxFixture:
+        """Open and return the named fixture."""
+        fixture = self.fixture_by_label(label)
+        fixture.open_fixture()
+        return fixture
+
+    def close_fixture(self, label: str) -> SandboxFixture:
+        """Close and return the named fixture."""
+        fixture = self.fixture_by_label(label)
+        fixture.close()
+        return fixture
 
     @contribute_ns
     def provide_sandbox_location_symbols(self) -> dict[str, Any]:
@@ -126,7 +200,7 @@ class SandboxLocation(HasAssets, MenuBlock):
             "current_location": self,
             "current_location_label": self.get_label(),
             "current_location_name": self.location_name or self.get_label(),
-            "sandbox_lockables": {lockable.label: lockable for lockable in self.lockables},
+            "sandbox_fixtures": {fixture.label: fixture for fixture in self.fixtures},
         }
         if self.sandbox_scope:
             payload["sandbox_scope"] = self.sandbox_scope

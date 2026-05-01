@@ -24,6 +24,7 @@ from .compiler import (
     SandboxSourceSpec,
     SandboxStableMaterializationSpec,
 )
+from .facets import LightSourceFacet, LockableFacet, OpenableFacet, SwitchableFacet
 from .handlers import (
     advance_sandbox_time_on_wait,
     compose_sandbox_visibility_journal,
@@ -40,8 +41,8 @@ from .handlers import (
 from .mob import SandboxMob, SandboxMobAffordance
 from .location import (
     SandboxExit,
+    SandboxFixture,
     SandboxLocation,
-    SandboxLockable,
     normalize_sandbox_direction,
 )
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
@@ -57,13 +58,16 @@ __all__ = [
     "SandboxExitSpec",
     "SandboxExit",
     "SandboxFixtureSpec",
+    "SandboxFixture",
     "SandboxInventory",
     "SandboxInitialAssetSpec",
     "SandboxInitialFixtureSpec",
     "SandboxInitialMobSpec",
     "SandboxLocation",
     "SandboxLocationSpec",
-    "SandboxLockable",
+    "LightSourceFacet",
+    "LockableFacet",
+    "OpenableFacet",
     "SandboxMaterializationSpec",
     "SandboxMob",
     "SandboxMobActionSpec",
@@ -83,6 +87,7 @@ __all__ = [
     "ScheduleEntry",
     "ScheduledEvent",
     "ScheduledPresence",
+    "SwitchableFacet",
     "WorldTime",
     "advance_sandbox_time_on_wait",
     "advance_world_turn",

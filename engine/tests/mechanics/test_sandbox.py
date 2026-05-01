@@ -8,15 +8,19 @@ from pydantic import Field
 from tangl.core import Graph, Selector, Token
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.mechanics.sandbox import (
+    LightSourceFacet,
+    LockableFacet,
+    OpenableFacet,
     SandboxExit,
+    SandboxFixture,
     SandboxLocation,
-    SandboxLockable,
     SandboxScope,
     SandboxVisibilityRule,
     Schedule,
     ScheduleEntry,
     ScheduledEvent,
     ScheduledPresence,
+    SwitchableFacet,
     WorldTime,
     advance_world_turn,
     current_world_time,
@@ -37,7 +41,8 @@ class SandboxItemType(AssetType):
     portable: bool = True
     readable: bool = False
     read_text: str | None = None
-    light_source: bool = False
+    switchable: SwitchableFacet | None = None
+    light_source: LightSourceFacet | None = None
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
     turn_on_text: str | None = None
     turn_off_text: str | None = None
@@ -353,12 +358,14 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
 
 def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
     graph, _road, _building, cave_entrance = _sandbox_graph()
-    cave_entrance.lockables = [
-        SandboxLockable(
+    cave_entrance.fixtures = [
+        SandboxFixture(
             label="grate",
             name="grate",
-            key="keys",
-            unlock_text="The key turns with a click. The grate unlocks.",
+            lockable=LockableFacet(
+                key="keys",
+                unlock_text="The key turns with a click. The grate unlocks.",
+            ),
         )
     ]
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
@@ -385,12 +392,14 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
         location_name="Cave Entrance",
         content="The grate is {grate_state}.",
         locals={"grate_state": "locked"},
-        lockables=[
-            SandboxLockable(
+        fixtures=[
+            SandboxFixture(
                 label="grate",
                 name="grate",
-                key="keys",
-                unlock_text="The key turns with a click. The grate unlocks.",
+                lockable=LockableFacet(
+                    key="keys",
+                    unlock_text="The key turns with a click. The grate unlocks.",
+                ),
             )
         ],
     )
@@ -409,7 +418,7 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
 
     ledger.resolve_choice(unlock.uid)
 
-    assert cave_entrance.lockables[0].locked is False
+    assert cave_entrance.fixtures[0].locked is False
     assert cave_entrance.locals["grate_state"] == "unlocked"
     content = [
         fragment.content
@@ -431,12 +440,14 @@ def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> Non
     cave_entrance = SandboxLocation(
         label="cave_entrance",
         location_name="Cave Entrance",
-        lockables=[
-            SandboxLockable(
+        fixtures=[
+            SandboxFixture(
                 label="grate",
                 name="grate",
-                key="keys",
-                unlock_text="The key turns with a click. The grate unlocks.",
+                lockable=LockableFacet(
+                    key="keys",
+                    unlock_text="The key turns with a click. The grate unlocks.",
+                ),
             )
         ],
     )
@@ -455,6 +466,29 @@ def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> Non
     unlock = next(choice for choice in choices if choice.text == "Unlock grate")
 
     assert unlock.available is True
+
+
+def test_openable_fixture_projects_without_lockable_facet() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    cave_entrance = SandboxLocation(
+        label="cave_entrance",
+        location_name="Cave Entrance",
+        fixtures=[
+            SandboxFixture(
+                label="hatch",
+                name="hatch",
+                openable=OpenableFacet(open_text="The hatch swings open."),
+            )
+        ],
+    )
+    graph.add(cave_entrance)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
+
+    do_provision(cave_entrance, ctx=ctx)
+
+    opens = _dynamic_sandbox_actions_with_tag(cave_entrance, "fixture")
+    assert [action.text for action in opens] == ["Open hatch"]
+    assert opens[0].journal_text == "The hatch swings open."
 
 
 def test_location_assets_project_take_read_and_drop_actions() -> None:
@@ -569,7 +603,8 @@ def test_carried_lamp_restores_dark_location_detail_and_asset_affordances() -> N
     SandboxItemType(
         label="lamp",
         name="lamp",
-        light_source=True,
+        switchable=SwitchableFacet(),
+        light_source=LightSourceFacet(),
         turn_on_text="Your lamp is now on.",
     )
     SandboxItemType(label="nugget", name="nugget")

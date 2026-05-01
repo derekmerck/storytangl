@@ -108,7 +108,7 @@ a second non-sandbox consumer appears:
 - a broader scoped contribution provider that can return actions, journal
   fragments, suppressions, or schedules.
 
-Do not promote location-specific vocabulary such as exits, lockables, darkness,
+Do not promote location-specific vocabulary such as exits, fixtures, darkness,
 or player inventory into VM. Those are sandbox/story-mechanics specializations
 of the broader contribution pattern.
 
@@ -245,12 +245,13 @@ This is enough for the toy Adventure subset's keys, lamp, leaflet, and
 treasures. Richer object ontologies, containers/supporters, quantities, actor
 inventory, and parser/client matching remain later slices.
 
-Local fixture projection is similarly narrow. `SandboxLockable` remains the
-first-spike name, but it now carries enough fixture state for the Adventure
-grate pattern: locked/unlocked, open/closed, openable, key, and journal text.
-Locked fixtures project `Unlock X`; openable fixtures project `Open X` or
-`Close X`; `through` exits can require that fixture to be open. This is enough
-for the key/grate demo without promoting a full fixture ontology yet.
+Local fixture projection is similarly narrow. `SandboxFixture` is a place-bound
+object composed from typed facets. `OpenableFacet` owns open/closed state and
+open/close text; `LockableFacet` owns locked/unlocked state, key policy, and
+unlock text. Locked fixtures project `Unlock X`; openable fixtures project
+`Open X` or `Close X`; `through` exits can require that fixture to be open.
+This is enough for the key/grate demo without promoting a full fixture ontology
+yet.
 
 Mob projection is the first answer to offscreen actors. `SandboxMob` is a
 graph-backed actor-like concept with a stable sandbox `location`, mutable
@@ -428,6 +429,8 @@ Here `portable`, `switchable`, `provides_light`, `requires_charge`,
 object. They are invitations for generic sandbox contributors or
 world-specific authority handlers to publish take/drop, light, timer,
 open/close, lock/unlock, warning, scoring, or diagnostic affordances.
+Traits are authoring compression; facets are the runtime shape; handlers
+project affordances; actions remain the VM contract.
 
 This keeps the authoring surface small:
 

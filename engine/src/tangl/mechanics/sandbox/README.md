@@ -20,14 +20,16 @@ Current first-pass surface:
 - `SandboxScope`: a chapter-like ancestor that donates sandbox rules to child
   locations and exposes a lightweight player asset holder.
 - `SandboxLocation`: a `MenuBlock` facade with location links, simple local
-  lockables, and held assets.
+  fixtures, and held assets.
 - `SandboxExit`: an optional structured link declaration for custom egress
   text, message exits, and fixture-gated traversal while preserving the simple
   `direction -> target` table form.
 - `SandboxInventory`: a ready-at-hand `HasAssets` holder used by sandbox scopes
   for player inventory in the first slice.
-- `SandboxLockable`: a tiny local fixture for locked doors, grates, and similar
-  objects that can project unlock choices.
+- `SandboxFixture`: a place-bound object composed from typed facets such as
+  `OpenableFacet` and `LockableFacet`.
+- `OpenableFacet` / `LockableFacet` / `SwitchableFacet` / `LightSourceFacet`:
+  runtime capability surfaces lowered from compact authoring traits.
 - `SandboxMob`: a graph-backed actor-like concept with stable location and
   mutable state that can project affordances when present.
 - `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
@@ -107,6 +109,9 @@ world concepts, traits, and initial state; reusable sandbox handlers and narrow
 world authorities should turn those declarations into behavior. That keeps
 object declarations as semantic facts like `portable`, `lockable`,
 `provides_light`, or `requires_charge` rather than miniature behavior scripts.
+Those traits are authoring compression: the compiler lowers them into typed
+runtime facets, and handlers project ordinary StoryTangl actions from the
+facets.
 The first executable slice lives in
 `engine/tests/mechanics/test_sandbox_adventure_slice.py` and now runs through
 `SandboxSliceCompiler`. This compiler is intentionally below the full loader
