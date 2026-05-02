@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .compiler import (
     SandboxAssetSpec,
+    SandboxContainerSpec,
     SandboxCompiledAssetType,
     SandboxCompiledSlice,
     SandboxDescriptionSpec,
@@ -24,6 +25,13 @@ from .compiler import (
     SandboxSourceSpec,
     SandboxStableMaterializationSpec,
 )
+from .facets import (
+    ContainerFacet,
+    LightSourceFacet,
+    LockableFacet,
+    OpenableFacet,
+    SwitchableFacet,
+)
 from .handlers import (
     advance_sandbox_time_on_wait,
     compose_sandbox_visibility_journal,
@@ -40,8 +48,8 @@ from .handlers import (
 from .mob import SandboxMob, SandboxMobAffordance
 from .location import (
     SandboxExit,
+    SandboxFixture,
     SandboxLocation,
-    SandboxLockable,
     normalize_sandbox_direction,
 )
 from .schedule import Schedule, ScheduleEntry, ScheduledEvent, ScheduledPresence
@@ -51,19 +59,24 @@ from .visibility import SandboxProjectionState, SandboxVisibilityRule
 
 __all__ = [
     "SandboxAssetSpec",
+    "SandboxContainerSpec",
     "SandboxCompiledAssetType",
     "SandboxCompiledSlice",
     "SandboxDescriptionSpec",
     "SandboxExitSpec",
     "SandboxExit",
     "SandboxFixtureSpec",
+    "SandboxFixture",
     "SandboxInventory",
     "SandboxInitialAssetSpec",
     "SandboxInitialFixtureSpec",
     "SandboxInitialMobSpec",
     "SandboxLocation",
     "SandboxLocationSpec",
-    "SandboxLockable",
+    "ContainerFacet",
+    "LightSourceFacet",
+    "LockableFacet",
+    "OpenableFacet",
     "SandboxMaterializationSpec",
     "SandboxMob",
     "SandboxMobActionSpec",
@@ -83,6 +96,7 @@ __all__ = [
     "ScheduleEntry",
     "ScheduledEvent",
     "ScheduledPresence",
+    "SwitchableFacet",
     "WorldTime",
     "advance_sandbox_time_on_wait",
     "advance_world_turn",

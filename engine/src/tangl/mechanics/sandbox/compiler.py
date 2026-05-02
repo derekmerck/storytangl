@@ -11,7 +11,14 @@ from tangl.core import Token
 from tangl.story import StoryGraph
 from tangl.story.concepts.asset import AssetType
 
-from .location import SandboxExit, SandboxLocation, SandboxLockable
+from .facets import (
+    ContainerFacet,
+    LightSourceFacet,
+    LockableFacet,
+    OpenableFacet,
+    SwitchableFacet,
+)
+from .location import SandboxExit, SandboxFixture, SandboxLocation
 from .mob import SandboxMob, SandboxMobAffordance
 from .scope import SandboxScope
 from .visibility import SandboxVisibilityRule
@@ -22,10 +29,16 @@ class SandboxCompiledAssetType(AssetType):
 
     name: str = ""
     kind: str = ""
+    traits: set[str] = Field(default_factory=set)
     portable: bool = False
     readable: bool = False
     read_text: str | None = None
-    light_source: bool = False
+    switchable: SwitchableFacet | None = None
+    light_source: LightSourceFacet | None = None
+    container: ContainerFacet | None = Field(
+        default=None,
+        json_schema_extra={"instance_var": True},
+    )
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
     charge: int | None = Field(default=None, json_schema_extra={"instance_var": True})
     turn_on_text: str | None = None
@@ -156,6 +169,14 @@ class SandboxInitialAssetSpec(BaseModel):
     state: dict[str, Any] = Field(default_factory=dict)
 
 
+class SandboxContainerSpec(BaseModel):
+    """Container capacity and acceptance hints for compact sandbox entities."""
+
+    max_items: int | None = None
+    accepts_traits: list[str] = Field(default_factory=list)
+    allow_nested_containers: bool = False
+
+
 class SandboxAssetSpec(BaseModel):
     """Authored compact sandbox asset."""
 
@@ -165,6 +186,7 @@ class SandboxAssetSpec(BaseModel):
     kind: str = ""
     traits: list[str] = Field(default_factory=list)
     initial: SandboxInitialAssetSpec
+    capacity: SandboxContainerSpec | None = None
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
@@ -188,6 +210,7 @@ class SandboxFixtureSpec(BaseModel):
     traits: list[str] = Field(default_factory=list)
     initial: SandboxInitialFixtureSpec = Field(default_factory=SandboxInitialFixtureSpec)
     key: str = "key"
+    capacity: SandboxContainerSpec | None = None
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
@@ -266,7 +289,7 @@ class SandboxCompiledSlice:
     scope: SandboxScope
     locations: dict[str, SandboxLocation]
     assets: dict[str, Token]
-    fixtures: dict[str, SandboxLockable]
+    fixtures: dict[str, SandboxFixture]
     mobs: dict[str, SandboxMob]
     materialization: SandboxMaterializationSpec = field(
         default_factory=SandboxMaterializationSpec
@@ -455,9 +478,21 @@ class SandboxSliceCompiler:
         return {
             "name": spec.name,
             "kind": spec.kind,
+            "traits": set(traits),
             "portable": "portable" in traits,
             "readable": "readable" in traits,
-            "light_source": "provides_light" in traits,
+            "switchable": SwitchableFacet() if "switchable" in traits else None,
+            "light_source": (
+                LightSourceFacet(requires_switch="switchable" in traits)
+                if "provides_light" in traits
+                else None
+            ),
+            "container": self._compile_container(
+                traits=traits,
+                state=state,
+                capacity=spec.capacity,
+                descriptions=spec.descriptions,
+            ),
             "lit": bool(state.get("lit", False)),
             "charge": state.get("charge"),
             "read_text": spec.descriptions.examine,
@@ -471,29 +506,71 @@ class SandboxSliceCompiler:
             "drop_text": spec.descriptions.drop,
         }
 
+    def _compile_container(
+        self,
+        *,
+        traits: set[str],
+        state: dict[str, Any],
+        capacity: SandboxContainerSpec | None,
+        descriptions: SandboxDescriptionSpec,
+    ) -> ContainerFacet | None:
+        if "container" not in traits:
+            return None
+        return ContainerFacet(
+            is_open=bool(state.get("open", True)),
+            max_items=capacity.max_items if capacity else None,
+            accepts_traits=set(capacity.accepts_traits if capacity else []),
+            allow_nested_containers=(
+                bool(capacity.allow_nested_containers) if capacity else False
+            ),
+            open_text=descriptions.open or "Opened.",
+            close_text=descriptions.close or "Closed.",
+        )
+
     def _compile_fixtures(
         self,
         *,
         locations: dict[str, SandboxLocation],
         spec: SandboxSliceSpec,
-    ) -> dict[str, SandboxLockable]:
-        fixtures: dict[str, SandboxLockable] = {}
+    ) -> dict[str, SandboxFixture]:
+        fixtures: dict[str, SandboxFixture] = {}
         for label, fixture_spec in spec.fixtures.items():
             traits = set(fixture_spec.traits)
             state = fixture_spec.initial.state
-            fixture = SandboxLockable(
+            fixture = SandboxFixture(
                 label=label,
                 name=fixture_spec.name,
-                key=fixture_spec.key,
-                locked=bool(state.get("locked", False)),
-                open=bool(state.get("open", False)),
-                openable="openable" in traits,
-                unlock_text=(
-                    fixture_spec.descriptions.unlock
-                    or f"The key turns with a click. The {label} unlocks."
+                lockable=(
+                    LockableFacet(
+                        key=fixture_spec.key,
+                        is_locked=bool(state.get("locked", False)),
+                        unlock_text=(
+                            fixture_spec.descriptions.unlock
+                            or f"The key turns with a click. The {label} unlocks."
+                        ),
+                    )
+                    if "lockable" in traits
+                    else None
                 ),
-                open_text=fixture_spec.descriptions.open or f"The {label} opens.",
-                close_text=fixture_spec.descriptions.close or f"The {label} closes.",
+                openable=(
+                    OpenableFacet(
+                        is_open=bool(state.get("open", False)),
+                        open_text=(
+                            fixture_spec.descriptions.open or f"The {label} opens."
+                        ),
+                        close_text=(
+                            fixture_spec.descriptions.close or f"The {label} closes."
+                        ),
+                    )
+                    if "openable" in traits
+                    else None
+                ),
+                container=self._compile_container(
+                    traits=traits,
+                    state=state,
+                    capacity=fixture_spec.capacity,
+                    descriptions=fixture_spec.descriptions,
+                ),
             )
             for location_label in fixture_spec.initial.locations:
                 self._require_location(
@@ -502,7 +579,7 @@ class SandboxSliceCompiler:
                     source_kind="Fixture",
                     source_label=label,
                     relation="is placed in",
-                ).lockables.append(fixture)
+                ).fixtures.append(fixture)
             fixtures[label] = fixture
         return fixtures
 

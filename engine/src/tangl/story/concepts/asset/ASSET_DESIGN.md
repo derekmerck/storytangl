@@ -10,6 +10,8 @@ They are not a separate inventory engine.
 This package currently defines:
 
 - `AssetType`: a singleton definition for tokenizable, lightly stateful assets.
+  It includes a small `traits` set for story/mechanics layers that need
+  semantic acceptance checks.
 - `CountableAsset`: a fungible asset definition tracked by quantity.
 - `AssetWallet`: a compact counter for fungible assets.
 - `HasAssets`: a story-level facet for nodes that hold wallet counts and
@@ -46,6 +48,44 @@ relationship-backed shape is:
 - inventory affordances are projected from the current cursor namespace plus
   ready-at-hand holders such as the player avatar.
 
+The sandbox package currently uses `ContainerFacet` as a mechanics-level
+holder/policy object for first-slice container behavior. That is intentionally
+not the final ownership model; it is a compact way to pressure-test transfer
+preflight before promoting container membership into graph relationships.
+
+### ContainerFacet Validation Criteria
+
+Keep `ContainerFacet` as an experimental mechanics-level holder until it proves
+the following against sandbox examples:
+
+- fixture containers and portable asset containers both use the same
+  `AssetTransactionManager` preflight path;
+- closed or locked containers reject receive/release attempts without partial
+  mutation;
+- count capacity, trait acceptance, and the current no-nested-containers rule
+  are expressible without special-case action code;
+- generated affordances can explain source, target, and rejection through
+  ordinary action availability and `ui_hints`;
+- the Adventure cage/chest pressure tests remain deterministic under replay.
+
+### Migration Plan
+
+The target model is a graph-relationship ownership/holding relation. Promote to
+that model once sandbox needs persisted container membership across broader
+graph operations, actor inventories, or nested/ambiguous containment. The
+migration should:
+
+1. Add a general holding relation with preflight/acceptance hooks, not an
+   asset-only edge type.
+2. Move `HasAssets.assets` storage behind that relation while preserving the
+   same `HasAssets` public holder methods.
+3. Teach `AssetTransactionManager` to mutate holding edges instead of holder
+   maps.
+4. Update sandbox container callers to use the relationship-backed holder
+   surface directly.
+5. Remove `ContainerFacet`'s holder-map responsibility, leaving only container
+   policy fields or deleting the facet if the relation owns all needed policy.
+
 The holding relation should be built as a general relationship mechanism, not
 as asset-only code. The old `Associating` and `Connection` scratch designs are
 better prior art for relationship preflight and acceptance than for inventory
@@ -77,9 +117,9 @@ The current slice is intentionally sufficient for sandbox affordance
 experiments, not a complete inventory system.
 
 - `HasAssets.assets` is a holder-local map, not yet a graph-backed ownership
-  subgraph. It is good enough for "player has key" checks, but not enough for
-  full persistence of container membership, room inventories, or ownership
-  history.
+  subgraph. It is good enough for "player has key" checks and first-slice
+  sandbox containers, but not enough for full persistence of room inventories
+  or ownership history.
 - Discrete transfers currently move tokens between holder maps. Slice 2 should
   replace or back this with a first-class holding relation so graph topology is
   the source of truth.

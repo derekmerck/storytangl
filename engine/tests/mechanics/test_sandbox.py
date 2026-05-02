@@ -8,15 +8,20 @@ from pydantic import Field
 from tangl.core import Graph, Selector, Token
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.mechanics.sandbox import (
+    ContainerFacet,
+    LightSourceFacet,
+    LockableFacet,
+    OpenableFacet,
     SandboxExit,
+    SandboxFixture,
     SandboxLocation,
-    SandboxLockable,
     SandboxScope,
     SandboxVisibilityRule,
     Schedule,
     ScheduleEntry,
     ScheduledEvent,
     ScheduledPresence,
+    SwitchableFacet,
     WorldTime,
     advance_world_turn,
     current_world_time,
@@ -24,7 +29,7 @@ from tangl.mechanics.sandbox import (
 )
 from tangl.story import Action, Block, StoryGraph
 from tangl.story.concepts import Actor, Role
-from tangl.story.concepts.asset import AssetType
+from tangl.story.concepts.asset import AssetTransactionManager, AssetType
 from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block_choices
 from tangl.vm import Ledger, Requirement
@@ -34,10 +39,16 @@ from tangl.vm.runtime.frame import PhaseCtx
 
 class SandboxItemType(AssetType):
     name: str = ""
+    traits: set[str] = Field(default_factory=set)
     portable: bool = True
     readable: bool = False
     read_text: str | None = None
-    light_source: bool = False
+    switchable: SwitchableFacet | None = None
+    light_source: LightSourceFacet | None = None
+    container: ContainerFacet | None = Field(
+        default=None,
+        json_schema_extra={"instance_var": True},
+    )
     lit: bool = Field(default=False, json_schema_extra={"instance_var": True})
     turn_on_text: str | None = None
     turn_off_text: str | None = None
@@ -353,12 +364,14 @@ def test_scheduled_event_renders_as_normal_choice_fragment() -> None:
 
 def test_locked_local_object_projects_unavailable_unlock_without_key() -> None:
     graph, _road, _building, cave_entrance = _sandbox_graph()
-    cave_entrance.lockables = [
-        SandboxLockable(
+    cave_entrance.fixtures = [
+        SandboxFixture(
             label="grate",
             name="grate",
-            key="keys",
-            unlock_text="The key turns with a click. The grate unlocks.",
+            lockable=LockableFacet(
+                key="keys",
+                unlock_text="The key turns with a click. The grate unlocks.",
+            ),
         )
     ]
     ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
@@ -385,12 +398,14 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
         location_name="Cave Entrance",
         content="The grate is {grate_state}.",
         locals={"grate_state": "locked"},
-        lockables=[
-            SandboxLockable(
+        fixtures=[
+            SandboxFixture(
                 label="grate",
                 name="grate",
-                key="keys",
-                unlock_text="The key turns with a click. The grate unlocks.",
+                lockable=LockableFacet(
+                    key="keys",
+                    unlock_text="The key turns with a click. The grate unlocks.",
+                ),
             )
         ],
     )
@@ -409,7 +424,7 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
 
     ledger.resolve_choice(unlock.uid)
 
-    assert cave_entrance.lockables[0].locked is False
+    assert cave_entrance.fixtures[0].locked is False
     assert cave_entrance.locals["grate_state"] == "unlocked"
     content = [
         fragment.content
@@ -423,6 +438,58 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
 
     do_provision(cave_entrance, ctx=PhaseCtx(graph=graph, cursor_id=cave_entrance.uid))
     assert _dynamic_sandbox_actions_with_tag(cave_entrance, "unlock") == []
+    lock = _dynamic_sandbox_actions_with_tag(cave_entrance, "lock")[0]
+
+    ledger.resolve_choice(lock.uid)
+
+    assert cave_entrance.fixtures[0].locked is True
+
+
+def test_open_fixture_cannot_lock_until_closed() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    cave_entrance = SandboxLocation(
+        label="cave_entrance",
+        location_name="Cave Entrance",
+        fixtures=[
+            SandboxFixture(
+                label="grate",
+                name="grate",
+                openable=OpenableFacet(is_open=True),
+                lockable=LockableFacet(key="keys", is_locked=False),
+            )
+        ],
+    )
+    SandboxItemType(label="keys", name="keys")
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    scope.player_assets.add_asset(keys)
+    graph.add(scope)
+    graph.add(cave_entrance)
+    graph.add(keys)
+    scope.add_child(cave_entrance)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
+
+    do_provision(cave_entrance, ctx=ctx)
+
+    lock = _dynamic_sandbox_actions_with_tag(cave_entrance, "lock")[0]
+    fragments = render_block_choices(caller=cave_entrance, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+    lock_choice = next(choice for choice in choices if choice.text == "Lock grate")
+
+    assert lock_choice.available is False
+    assert cave_entrance.fixtures[0].can_lock(has_key=lambda key: key == "keys") is False
+    with pytest.raises(ValueError, match="Fixture 'grate' cannot lock while open"):
+        cave_entrance.lock_fixture("grate")
+
+    ledger = Ledger.from_graph(graph, entry_id=cave_entrance.uid)
+    close = _dynamic_sandbox_actions_with_tag(cave_entrance, "close")[0]
+    ledger.resolve_choice(close.uid)
+
+    do_provision(cave_entrance, ctx=PhaseCtx(graph=graph, cursor_id=cave_entrance.uid))
+    closed_lock = _dynamic_sandbox_actions_with_tag(cave_entrance, "lock")[0]
+    ledger.resolve_choice(closed_lock.uid)
+
+    assert cave_entrance.fixtures[0].locked is True
 
 
 def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> None:
@@ -431,12 +498,14 @@ def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> Non
     cave_entrance = SandboxLocation(
         label="cave_entrance",
         location_name="Cave Entrance",
-        lockables=[
-            SandboxLockable(
+        fixtures=[
+            SandboxFixture(
                 label="grate",
                 name="grate",
-                key="keys",
-                unlock_text="The key turns with a click. The grate unlocks.",
+                lockable=LockableFacet(
+                    key="keys",
+                    unlock_text="The key turns with a click. The grate unlocks.",
+                ),
             )
         ],
     )
@@ -455,6 +524,29 @@ def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> Non
     unlock = next(choice for choice in choices if choice.text == "Unlock grate")
 
     assert unlock.available is True
+
+
+def test_openable_fixture_projects_without_lockable_facet() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    cave_entrance = SandboxLocation(
+        label="cave_entrance",
+        location_name="Cave Entrance",
+        fixtures=[
+            SandboxFixture(
+                label="hatch",
+                name="hatch",
+                openable=OpenableFacet(open_text="The hatch swings open."),
+            )
+        ],
+    )
+    graph.add(cave_entrance)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
+
+    do_provision(cave_entrance, ctx=ctx)
+
+    opens = _dynamic_sandbox_actions_with_tag(cave_entrance, "fixture")
+    assert [action.text for action in opens] == ["Open hatch"]
+    assert opens[0].journal_text == "The hatch swings open."
 
 
 def test_location_assets_project_take_read_and_drop_actions() -> None:
@@ -507,6 +599,255 @@ def test_location_assets_project_take_read_and_drop_actions() -> None:
 
     assert building.has_asset("keys")
     assert not scope.player_assets.has_asset("keys")
+
+
+def test_carried_readable_asset_projects_read_action() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    building = SandboxLocation(label="building", location_name="Building")
+    SandboxItemType(
+        label="leaflet",
+        name="leaflet",
+        readable=True,
+        read_text="Welcome to Adventure!",
+    )
+    leaflet = Token[SandboxItemType](token_from="leaflet", label="leaflet")
+    scope.player_assets.add_asset(leaflet)
+    graph.add(scope)
+    graph.add(building)
+    graph.add(leaflet)
+    scope.add_child(building)
+    ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
+
+    do_provision(building, ctx=ctx)
+
+    actions = _dynamic_sandbox_actions_with_tag(building, "asset")
+    read = next(action for action in actions if action.text == "Read leaflet")
+    assert read.journal_text == "Welcome to Adventure!"
+
+
+def test_fixture_container_accepts_matching_assets_through_preflight() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    building = SandboxLocation(
+        label="building",
+        location_name="Building",
+        fixtures=[
+            SandboxFixture(
+                label="basket",
+                name="basket",
+                container=ContainerFacet(max_items=1, accepts_traits={"tiny"}),
+            )
+        ],
+    )
+    SandboxItemType(label="keys", name="keys", traits={"tiny"})
+    SandboxItemType(label="lamp", name="lamp")
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
+    scope.player_assets.add_asset(keys)
+    scope.player_assets.add_asset(lamp)
+    graph.add(scope)
+    graph.add(building)
+    graph.add(keys)
+    graph.add(lamp)
+    scope.add_child(building)
+    ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
+
+    do_provision(building, ctx=ctx)
+    fragments = render_block_choices(caller=building, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+    put_keys = next(choice for choice in choices if choice.text == "Put keys in basket")
+    put_lamp = next(choice for choice in choices if choice.text == "Put lamp in basket")
+
+    assert put_keys.available is True
+    assert put_lamp.available is False
+
+    ledger = Ledger(graph=graph, cursor_id=building.uid)
+    action = next(
+        action
+        for action in _dynamic_sandbox_actions_with_tag(building, "put")
+        if action.text == "Put keys in basket"
+    )
+    ledger.resolve_choice(action.uid)
+
+    basket = building.fixture_by_label("basket")
+    assert basket.has_asset("keys")
+    assert not scope.player_assets.has_asset("keys")
+    assert scope.player_assets.has_asset("lamp")
+
+
+def test_closed_fixture_container_hides_contents_and_rejects_receive() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    chest = SandboxFixture(
+        label="chest",
+        name="chest",
+        openable=OpenableFacet(is_open=False),
+        container=ContainerFacet(is_open=False, accepts_traits={"tiny"}),
+    )
+    building = SandboxLocation(
+        label="building",
+        location_name="Building",
+        fixtures=[chest],
+    )
+    SandboxItemType(label="keys", name="keys", traits={"tiny"})
+    SandboxItemType(label="coin", name="coin", traits={"tiny"})
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    coin = Token[SandboxItemType](token_from="coin", label="coin")
+    scope.player_assets.add_asset(keys)
+    chest.add_asset(coin)
+    graph.add(scope)
+    graph.add(building)
+    graph.add(keys)
+    graph.add(coin)
+    scope.add_child(building)
+    ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
+
+    do_provision(building, ctx=ctx)
+    actions = _dynamic_sandbox_actions_with_tag(building, "container")
+    fragments = render_block_choices(caller=building, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+    put_keys = next(choice for choice in choices if choice.text == "Put keys in chest")
+
+    assert put_keys.available is False
+    assert "Take coin from chest" not in {action.text for action in actions}
+
+    fixture_actions = _dynamic_sandbox_actions_with_tag(building, "fixture")
+    open_chest = next(action for action in fixture_actions if action.text == "Open chest")
+    ledger = Ledger(graph=graph, cursor_id=building.uid)
+    ledger.resolve_choice(open_chest.uid)
+
+    assert chest.open is True
+    assert chest.container.is_open is True
+
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+    opened_actions = _dynamic_sandbox_actions_with_tag(building, "container")
+    fragments = render_block_choices(
+        caller=building,
+        ctx=PhaseCtx(graph=graph, cursor_id=building.uid),
+    )
+    opened_choices = [
+        fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)
+    ]
+    opened_put_keys = next(
+        choice for choice in opened_choices if choice.text == "Put keys in chest"
+    )
+
+    assert opened_put_keys.available is True
+    assert "Take coin from chest" in {action.text for action in opened_actions}
+
+
+def test_portable_container_rejects_nested_container_without_mutation() -> None:
+    SandboxItemType(
+        label="cage",
+        name="cage",
+        traits={"container"},
+        container=ContainerFacet(),
+    )
+    SandboxItemType(
+        label="bag",
+        name="bag",
+        traits={"container"},
+        container=ContainerFacet(),
+    )
+    cage = Token[SandboxItemType](token_from="cage", label="cage")
+    bag = Token[SandboxItemType](token_from="bag", label="bag")
+    holder = SandboxScope(label="tiny_cave_scope").player_assets
+    holder.add_asset(cage)
+    holder.add_asset(bag)
+
+    result = AssetTransactionManager().can_give_asset(holder, cage.container, "bag")
+
+    assert result.accepted is False
+    assert result.reason == "receiver cannot receive asset"
+    assert holder.has_asset("bag")
+    assert not cage.container.has_asset("bag")
+
+
+def test_portable_container_open_state_controls_contained_asset_projection() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    building = SandboxLocation(label="building", location_name="Building")
+    SandboxItemType(
+        label="cage",
+        name="cage",
+        traits={"container"},
+        container=ContainerFacet(close_text="The cage snaps shut."),
+    )
+    SandboxItemType(label="keys", name="keys", traits={"tiny"})
+    cage = Token[SandboxItemType](token_from="cage", label="cage")
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    cage.container.add_asset(keys)
+    scope.player_assets.add_asset(cage)
+    graph.add(scope)
+    graph.add(building)
+    graph.add(cage)
+    graph.add(keys)
+    scope.add_child(building)
+    ctx = PhaseCtx(graph=graph, cursor_id=building.uid)
+
+    do_provision(building, ctx=ctx)
+    open_actions = _dynamic_sandbox_actions_with_tag(building, "container")
+    assert "Take keys from cage" in {action.text for action in open_actions}
+
+    close_cage = next(action for action in open_actions if action.text == "Close cage")
+    ledger = Ledger(graph=graph, cursor_id=building.uid)
+    ledger.resolve_choice(close_cage.uid)
+
+    assert cage.container.is_open is False
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+    closed_actions = _dynamic_sandbox_actions_with_tag(building, "container")
+    assert "Take keys from cage" not in {action.text for action in closed_actions}
+    assert "Open cage" in {action.text for action in closed_actions}
+
+
+def test_light_source_inside_carried_container_can_be_reached_in_darkness() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        visibility_rules=[
+            SandboxVisibilityRule(journal_text="It is now pitch dark.")
+        ],
+    )
+    cave = SandboxLocation(label="dark_cave", location_name="Dark Cave")
+    SandboxItemType(
+        label="bag",
+        name="bag",
+        traits={"container"},
+        container=ContainerFacet(),
+    )
+    SandboxItemType(
+        label="lamp",
+        name="lamp",
+        switchable=SwitchableFacet(),
+        light_source=LightSourceFacet(),
+    )
+    bag = Token[SandboxItemType](token_from="bag", label="bag")
+    lamp = Token[SandboxItemType](token_from="lamp", label="lamp")
+    bag.container.add_asset(lamp)
+    scope.player_assets.add_asset(bag)
+    graph.add(scope)
+    graph.add(cave)
+    graph.add(bag)
+    graph.add(lamp)
+    scope.add_child(cave)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave.uid)
+
+    do_provision(cave, ctx=ctx)
+    actions = _dynamic_sandbox_actions_with_tag(cave, "container")
+
+    assert "Take lamp from bag" in {action.text for action in actions}
+
+    take_lamp = next(action for action in actions if action.text == "Take lamp from bag")
+    ledger = Ledger(graph=graph, cursor_id=cave.uid)
+    ledger.resolve_choice(take_lamp.uid)
+
+    assert scope.player_assets.has_asset("lamp")
+    assert not bag.container.has_asset("lamp")
+
+    do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
+    lit_actions = _dynamic_sandbox_actions_with_tag(cave, "asset")
+    assert "Turn on lamp" in {action.text for action in lit_actions}
 
 
 def test_darkness_rule_substitutes_journal_and_suppresses_local_asset_actions() -> None:
@@ -569,7 +910,8 @@ def test_carried_lamp_restores_dark_location_detail_and_asset_affordances() -> N
     SandboxItemType(
         label="lamp",
         name="lamp",
-        light_source=True,
+        switchable=SwitchableFacet(),
+        light_source=LightSourceFacet(),
         turn_on_text="Your lamp is now on.",
     )
     SandboxItemType(label="nugget", name="nugget")

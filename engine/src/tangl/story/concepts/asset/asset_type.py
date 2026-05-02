@@ -18,6 +18,7 @@ class AssetType(InstanceInheritance):
 
     value: float = 0.0
     description: str | None = None
+    traits: set[str] = Field(default_factory=set)
 
     def __init__(
         self,

@@ -20,14 +20,17 @@ Current first-pass surface:
 - `SandboxScope`: a chapter-like ancestor that donates sandbox rules to child
   locations and exposes a lightweight player asset holder.
 - `SandboxLocation`: a `MenuBlock` facade with location links, simple local
-  lockables, and held assets.
+  fixtures, and held assets.
 - `SandboxExit`: an optional structured link declaration for custom egress
   text, message exits, and fixture-gated traversal while preserving the simple
   `direction -> target` table form.
 - `SandboxInventory`: a ready-at-hand `HasAssets` holder used by sandbox scopes
   for player inventory in the first slice.
-- `SandboxLockable`: a tiny local fixture for locked doors, grates, and similar
-  objects that can project unlock choices.
+- `SandboxFixture`: a place-bound object composed from typed facets such as
+  `OpenableFacet` and `LockableFacet`.
+- `OpenableFacet` / `LockableFacet` / `SwitchableFacet` / `LightSourceFacet` /
+  `ContainerFacet`: runtime capability surfaces lowered from compact authoring
+  traits.
 - `SandboxMob`: a graph-backed actor-like concept with stable location and
   mutable state that can project affordances when present.
 - `SandboxSliceCompiler`: an experimental compact-slice compiler that lowers
@@ -86,6 +89,14 @@ text. This is enough for keys, lamps, leaflets, and treasures in a toy
 Adventure-like subset while leaving graph-backed ownership relations for a
 later asset slice.
 
+Container projection is the first transfer-preflight extension. A
+`ContainerFacet` can sit on a fixture or portable asset. Fixture containers use
+the fixture's open/locked state before exposing contents; portable containers
+carry their own open state. Generated put/take-from actions still move tokens
+through `AssetTransactionManager`, so capacity, trait acceptance, closed
+containers, and the current no-nested-containers rule are transaction policy
+rather than a second inventory path.
+
 Visibility projection is also deliberately modest. A scope or location can
 carry `SandboxVisibilityRule`s. The default rule models Adventure-like darkness:
 when the location is not lit and the player has no lit light source, the rule
@@ -107,6 +118,9 @@ world concepts, traits, and initial state; reusable sandbox handlers and narrow
 world authorities should turn those declarations into behavior. That keeps
 object declarations as semantic facts like `portable`, `lockable`,
 `provides_light`, or `requires_charge` rather than miniature behavior scripts.
+Those traits are authoring compression: the compiler lowers them into typed
+runtime facets, and handlers project ordinary StoryTangl actions from the
+facets.
 The first executable slice lives in
 `engine/tests/mechanics/test_sandbox_adventure_slice.py` and now runs through
 `SandboxSliceCompiler`. This compiler is intentionally below the full loader

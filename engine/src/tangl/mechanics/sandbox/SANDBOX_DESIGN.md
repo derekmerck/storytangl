@@ -108,7 +108,7 @@ a second non-sandbox consumer appears:
 - a broader scoped contribution provider that can return actions, journal
   fragments, suppressions, or schedules.
 
-Do not promote location-specific vocabulary such as exits, lockables, darkness,
+Do not promote location-specific vocabulary such as exits, fixtures, darkness,
 or player inventory into VM. Those are sandbox/story-mechanics specializations
 of the broader contribution pattern.
 
@@ -242,15 +242,41 @@ project `Take X` and `Read X`; player-held assets can project `Drop X`; carried
 assets can satisfy generated action availability such as `Unlock grate`.
 Take/drop effects use the story asset transaction manager, not ad hoc locals.
 This is enough for the toy Adventure subset's keys, lamp, leaflet, and
-treasures. Richer object ontologies, containers/supporters, quantities, actor
-inventory, and parser/client matching remain later slices.
+treasures. Container support is intentionally first-slice only:
+`ContainerFacet` can hold discrete assets, enforce count/trait acceptance,
+gate access on open state, and reject nested containers. Richer object
+ontologies, supporters, quantities, actor inventory, and parser/client matching
+remain later slices.
 
-Local fixture projection is similarly narrow. `SandboxLockable` remains the
-first-spike name, but it now carries enough fixture state for the Adventure
-grate pattern: locked/unlocked, open/closed, openable, key, and journal text.
-Locked fixtures project `Unlock X`; openable fixtures project `Open X` or
-`Close X`; `through` exits can require that fixture to be open. This is enough
-for the key/grate demo without promoting a full fixture ontology yet.
+Local fixture projection is similarly narrow. `SandboxFixture` is a place-bound
+object composed from typed facets. This is the shortest correct shape for the
+current slice because it avoids monolithic fixture variants such as
+openable-only, lockable-only, and openable+lockable while still supporting the
+second use case of containers. Implemented facet uses are:
+
+- `OpenableFacet` owns open/closed state and open/close text for the grate and
+  for openable fixture/container surfaces.
+- `LockableFacet` owns locked/unlocked state, key policy, and lock/unlock text
+  for the grate and any other concrete lockable fixture.
+- `ContainerFacet` owns first-slice container policy for fixture containers and
+  portable container assets.
+
+Implemented projection is still modest: locked fixtures project `Unlock X`;
+openable fixtures project `Open X` or `Close X`; `through` exits can require
+that fixture to be open; container facets project simple put/take-from choices
+through the asset transaction manager. Aspirational object work still includes
+richer object ontologies, supporters, quantities, actor inventory, and nested
+containers.
+
+Container projection follows the same rule. A fixture can carry a
+`ContainerFacet`, in which case the fixture acts as the holder and the facet
+acts as policy. The fixture's own lock/open state controls whether contents are
+reachable. Portable container assets carry their own `ContainerFacet`; their
+sub-inventory is exposed only while the facet is open. Both paths call
+`AssetTransactionManager`, so "put in" and "take from" are transfer preflight
+problems, not bespoke inventory mutation. For now nested containers are
+rejected by policy to avoid bag-in-bag ambiguity until a relationship-backed
+holding model exists.
 
 Mob projection is the first answer to offscreen actors. `SandboxMob` is a
 graph-backed actor-like concept with a stable sandbox `location`, mutable
@@ -428,6 +454,8 @@ Here `portable`, `switchable`, `provides_light`, `requires_charge`,
 object. They are invitations for generic sandbox contributors or
 world-specific authority handlers to publish take/drop, light, timer,
 open/close, lock/unlock, warning, scoring, or diagnostic affordances.
+Traits are authoring compression; facets are the runtime shape; handlers
+project affordances; actions remain the VM contract.
 
 This keeps the authoring surface small:
 
