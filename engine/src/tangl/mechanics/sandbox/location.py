@@ -120,12 +120,16 @@ class SandboxFixture(HasAssets):
         """Return whether the fixture can currently lock."""
         if self.lockable is None:
             return False
+        if self.openable is not None and self.openable.is_open:
+            return False
         return self.lockable.can_lock(has_key=has_key)
 
     def lock(self) -> None:
         """Lock the fixture."""
         if self.lockable is None:
             raise ValueError(f"Fixture {self.label!r} is not lockable")
+        if self.openable is not None and self.openable.is_open:
+            raise ValueError(f"Fixture {self.label!r} cannot lock while open")
         self.lockable.lock()
 
     def can_open(self, *, has_key: Callable[[str], bool]) -> bool:

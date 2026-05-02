@@ -445,6 +445,53 @@ def test_locked_local_object_unlocks_with_carried_key_and_stops_projecting() -> 
     assert cave_entrance.fixtures[0].locked is True
 
 
+def test_open_fixture_cannot_lock_until_closed() -> None:
+    graph = StoryGraph(label="tiny_cave")
+    scope = SandboxScope(label="tiny_cave_scope")
+    cave_entrance = SandboxLocation(
+        label="cave_entrance",
+        location_name="Cave Entrance",
+        fixtures=[
+            SandboxFixture(
+                label="grate",
+                name="grate",
+                openable=OpenableFacet(is_open=True),
+                lockable=LockableFacet(key="keys", is_locked=False),
+            )
+        ],
+    )
+    SandboxItemType(label="keys", name="keys")
+    keys = Token[SandboxItemType](token_from="keys", label="keys")
+    scope.player_assets.add_asset(keys)
+    graph.add(scope)
+    graph.add(cave_entrance)
+    graph.add(keys)
+    scope.add_child(cave_entrance)
+    ctx = PhaseCtx(graph=graph, cursor_id=cave_entrance.uid)
+
+    do_provision(cave_entrance, ctx=ctx)
+
+    lock = _dynamic_sandbox_actions_with_tag(cave_entrance, "lock")[0]
+    fragments = render_block_choices(caller=cave_entrance, ctx=ctx)
+    choices = [fragment for fragment in fragments or [] if isinstance(fragment, ChoiceFragment)]
+    lock_choice = next(choice for choice in choices if choice.text == "Lock grate")
+
+    assert lock_choice.available is False
+    assert cave_entrance.fixtures[0].can_lock(has_key=lambda key: key == "keys") is False
+    with pytest.raises(ValueError, match="Fixture 'grate' cannot lock while open"):
+        cave_entrance.lock_fixture("grate")
+
+    ledger = Ledger.from_graph(graph, entry_id=cave_entrance.uid)
+    close = _dynamic_sandbox_actions_with_tag(cave_entrance, "close")[0]
+    ledger.resolve_choice(close.uid)
+
+    do_provision(cave_entrance, ctx=PhaseCtx(graph=graph, cursor_id=cave_entrance.uid))
+    closed_lock = _dynamic_sandbox_actions_with_tag(cave_entrance, "lock")[0]
+    ledger.resolve_choice(closed_lock.uid)
+
+    assert cave_entrance.fixtures[0].locked is True
+
+
 def test_locked_local_object_unlocks_with_key_asset_in_player_inventory() -> None:
     graph = StoryGraph(label="tiny_cave")
     scope = SandboxScope(label="tiny_cave_scope")
