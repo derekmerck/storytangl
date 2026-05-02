@@ -249,12 +249,24 @@ ontologies, supporters, quantities, actor inventory, and parser/client matching
 remain later slices.
 
 Local fixture projection is similarly narrow. `SandboxFixture` is a place-bound
-object composed from typed facets. `OpenableFacet` owns open/closed state and
-open/close text; `LockableFacet` owns locked/unlocked state, key policy, and
-unlock text. Locked fixtures project `Unlock X`; openable fixtures project
-`Open X` or `Close X`; `through` exits can require that fixture to be open.
-This is enough for the key/grate demo without promoting a full fixture ontology
-yet.
+object composed from typed facets. This is the shortest correct shape for the
+current slice because it avoids monolithic fixture variants such as
+openable-only, lockable-only, and openable+lockable while still supporting the
+second use case of containers. Implemented facet uses are:
+
+- `OpenableFacet` owns open/closed state and open/close text for the grate and
+  for openable fixture/container surfaces.
+- `LockableFacet` owns locked/unlocked state, key policy, and lock/unlock text
+  for the grate and any other concrete lockable fixture.
+- `ContainerFacet` owns first-slice container policy for fixture containers and
+  portable container assets.
+
+Implemented projection is still modest: locked fixtures project `Unlock X`;
+openable fixtures project `Open X` or `Close X`; `through` exits can require
+that fixture to be open; container facets project simple put/take-from choices
+through the asset transaction manager. Aspirational object work still includes
+richer object ontologies, supporters, quantities, actor inventory, and nested
+containers.
 
 Container projection follows the same rule. A fixture can carry a
 `ContainerFacet`, in which case the fixture acts as the holder and the facet

@@ -49,7 +49,9 @@ class LockableFacet(BaseModel):
     is_locked: bool = True
     key: str | None = "key"
     unlock_text: str = "The key turns with a click. The lock opens."
+    lock_text: str = "The lock clicks shut."
     unlock_action_text: str = ""
+    lock_action_text: str = ""
 
     def can_unlock(self, *, has_key: Callable[[str], bool]) -> bool:
         """Return whether this facet can currently unlock."""
