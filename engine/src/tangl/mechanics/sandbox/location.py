@@ -83,6 +83,13 @@ class SandboxFixture(HasAssets):
             return self.lockable.unlock_action_text
         return f"Unlock {target_name}"
 
+    def lock_text_label(self) -> str:
+        """Return player-facing lock action text."""
+        target_name = self.name or self.label
+        if self.lockable and self.lockable.lock_action_text:
+            return self.lockable.lock_action_text
+        return f"Lock {target_name}"
+
     def open_text_label(self) -> str:
         """Return player-facing open action text."""
         target_name = self.name or self.label
@@ -109,6 +116,18 @@ class SandboxFixture(HasAssets):
             raise ValueError(f"Fixture {self.label!r} is not lockable")
         self.lockable.unlock()
 
+    def can_lock(self, *, has_key: Callable[[str], bool]) -> bool:
+        """Return whether the fixture can currently lock."""
+        if self.lockable is None:
+            return False
+        return self.lockable.can_lock(has_key=has_key)
+
+    def lock(self) -> None:
+        """Lock the fixture."""
+        if self.lockable is None:
+            raise ValueError(f"Fixture {self.label!r} is not lockable")
+        self.lockable.lock()
+
     def can_open(self, *, has_key: Callable[[str], bool]) -> bool:
         """Return whether the fixture can currently open."""
         _ = has_key
@@ -121,16 +140,20 @@ class SandboxFixture(HasAssets):
         if self.openable is None:
             raise ValueError(f"Fixture {self.label!r} is not openable")
         self.openable.open()
+        if self.container is not None:
+            self.container.open()
 
     def can_close(self) -> bool:
         """Return whether the fixture can currently close."""
         return bool(self.openable and self.openable.can_close())
 
-    def close(self) -> None:
+    def close_fixture(self) -> None:
         """Close the fixture."""
         if self.openable is None:
             raise ValueError(f"Fixture {self.label!r} is not openable")
         self.openable.close()
+        if self.container is not None:
+            self.container.close()
 
     def container_accessible(self) -> bool:
         """Return whether the fixture's container contents are reachable."""
@@ -139,6 +162,8 @@ class SandboxFixture(HasAssets):
         if self.locked:
             return False
         if self.openable is not None and not self.open:
+            return False
+        if self.openable is None and not self.container.is_open:
             return False
         return True
 
@@ -152,7 +177,9 @@ class SandboxFixture(HasAssets):
     def can_give_asset(self, asset: Token, receiver: HasAssets | None = None) -> bool:
         """Return whether this fixture can release a discrete asset."""
         _ = receiver
-        return self.container_accessible() and self.has_asset(asset)
+        if self.container is None or not self.container_accessible():
+            return False
+        return self.has_asset(asset)
 
     @property
     def unlock_text(self) -> str:
@@ -160,6 +187,13 @@ class SandboxFixture(HasAssets):
         if self.lockable is None:
             return ""
         return self.lockable.unlock_text
+
+    @property
+    def lock_text(self) -> str:
+        """Return journal text for locking."""
+        if self.lockable is None:
+            return ""
+        return self.lockable.lock_text
 
     @property
     def open_text(self) -> str:
@@ -204,6 +238,12 @@ class SandboxLocation(HasAssets, MenuBlock):
         fixture.unlock()
         return fixture
 
+    def lock_fixture(self, label: str) -> SandboxFixture:
+        """Lock and return the named fixture."""
+        fixture = self.fixture_by_label(label)
+        fixture.lock()
+        return fixture
+
     def open_fixture(self, label: str) -> SandboxFixture:
         """Open and return the named fixture."""
         fixture = self.fixture_by_label(label)
@@ -213,7 +253,7 @@ class SandboxLocation(HasAssets, MenuBlock):
     def close_fixture(self, label: str) -> SandboxFixture:
         """Close and return the named fixture."""
         fixture = self.fixture_by_label(label)
-        fixture.close()
+        fixture.close_fixture()
         return fixture
 
     @contribute_ns

@@ -414,6 +414,12 @@ def _fixture_can_unlock(location: SandboxLocation, label: str) -> bool:
     return bool(fixture and fixture.can_unlock(has_key=lambda key: key in inventory))
 
 
+def _fixture_can_lock(location: SandboxLocation, label: str) -> bool:
+    fixture = _fixture_by_label(location, label)
+    inventory = _sandbox_inventory(location)
+    return bool(fixture and fixture.can_lock(has_key=lambda key: key in inventory))
+
+
 def _fixture_can_open(location: SandboxLocation, label: str) -> bool:
     fixture = _fixture_by_label(location, label)
     inventory = _sandbox_inventory(location)
@@ -703,6 +709,10 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
             caller,
             str(label),
         ),
+        "sandbox_fixture_can_lock": lambda label: _fixture_can_lock(
+            caller,
+            str(label),
+        ),
         "sandbox_fixture_can_open": lambda label: _fixture_can_open(
             caller,
             str(label),
@@ -980,6 +990,26 @@ def _project_carried_asset_actions(
             )
         if projection_state.suppress_asset_affordances:
             continue
+        read_text = _asset_read_text(asset)
+        if read_text:
+            Action(
+                registry=graph,
+                label=f"sandbox_read_{location.get_label()}_{asset_label}",
+                predecessor_id=location.uid,
+                successor_id=location.uid,
+                text=f"Read {asset_name}",
+                journal_text=read_text,
+                tags={"dynamic", "sandbox", "asset", "read"},
+                ui_hints=_sandbox_contribution_hints(
+                    location,
+                    source="sandbox_asset",
+                    contribution="read",
+                    source_label=asset_label,
+                    source_kind="asset",
+                    verb="read",
+                    asset=asset_label,
+                ),
+            )
         Action(
             registry=graph,
             label=f"sandbox_drop_{location.get_label()}_{asset_label}",
@@ -1201,11 +1231,11 @@ def project_sandbox_asset_actions(*, caller, ctx, **_kw):
         player_assets=player_assets,
         projection_state=projection_state,
     )
+    _project_asset_container_actions(caller, graph=graph, player_assets=player_assets)
     if projection_state.suppress_asset_affordances:
         return None
 
     _project_fixture_container_actions(caller, graph=graph, player_assets=player_assets)
-    _project_asset_container_actions(caller, graph=graph, player_assets=player_assets)
     return None
 
 
@@ -1224,28 +1254,53 @@ def project_sandbox_unlocks(*, caller, ctx, **_kw):
         return None
 
     _clear_dynamic_sandbox_actions(caller, action_kind="unlock", ctx=ctx)
+    _clear_dynamic_sandbox_actions(caller, action_kind="lock", ctx=ctx)
     if _projection_state(caller, ctx).suppress_fixture_affordances:
         return None
 
     for fixture in caller.fixtures:
-        if not fixture.lockable or not fixture.locked:
+        if not fixture.lockable:
+            continue
+        if fixture.locked:
+            Action(
+                registry=graph,
+                label=f"sandbox_unlock_{caller.get_label()}_{fixture.label}",
+                predecessor_id=caller.uid,
+                successor_id=caller.uid,
+                text=fixture.action_text(),
+                availability=[
+                    Predicate(expr=f"sandbox_fixture_can_unlock({fixture.label!r})")
+                ],
+                effects=[Effect(expr=f"_s.unlock_fixture({fixture.label!r})")],
+                journal_text=fixture.unlock_text,
+                tags={"dynamic", "sandbox", "unlock"},
+                ui_hints=_sandbox_contribution_hints(
+                    caller,
+                    source="sandbox_fixture",
+                    contribution="unlock",
+                    source_label=fixture.label,
+                    source_kind="fixture",
+                    target=fixture.label,
+                    key=fixture.key,
+                ),
+            )
             continue
         Action(
             registry=graph,
-            label=f"sandbox_unlock_{caller.get_label()}_{fixture.label}",
+            label=f"sandbox_lock_{caller.get_label()}_{fixture.label}",
             predecessor_id=caller.uid,
             successor_id=caller.uid,
-            text=fixture.action_text(),
+            text=fixture.lock_text_label(),
             availability=[
-                Predicate(expr=f"sandbox_fixture_can_unlock({fixture.label!r})")
+                Predicate(expr=f"sandbox_fixture_can_lock({fixture.label!r})")
             ],
-            effects=[Effect(expr=f"_s.unlock_fixture({fixture.label!r})")],
-            journal_text=fixture.unlock_text,
-            tags={"dynamic", "sandbox", "unlock"},
+            effects=[Effect(expr=f"_s.lock_fixture({fixture.label!r})")],
+            journal_text=fixture.lock_text,
+            tags={"dynamic", "sandbox", "lock"},
             ui_hints=_sandbox_contribution_hints(
                 caller,
                 source="sandbox_fixture",
-                contribution="unlock",
+                contribution="lock",
                 source_label=fixture.label,
                 source_kind="fixture",
                 target=fixture.label,

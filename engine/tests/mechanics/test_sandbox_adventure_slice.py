@@ -372,9 +372,63 @@ def test_adventure_slice_compiler_preserves_provenance_inputs() -> None:
     assert isinstance(compiled.materialization, SandboxMaterializationSpec)
     assert isinstance(compiled.mobs["wounded_pirate"], SandboxMob)
     assert compiled.assets["wicker_cage"].container.max_items == 1
+    assert compiled.assets["wicker_cage"].container.accepts_traits == {"tiny"}
     assert compiled.materialization.stable.assets == ["brass_lamp"]
     assert compiled.source_map["source_refs"]["kind"] == "punyinform"
     assert compiled.codec_state["codec_id"] == "compact_sandbox_slice"
+
+
+def test_compiled_openable_fixture_container_opens_embedded_container() -> None:
+    data: dict[str, Any] = {
+        "id": "fixture_container",
+        "scope": {"id": "cave"},
+        "locations": {"building": {"name": "Building", "traits": ["light"]}},
+        "assets": {
+            "keys": {
+                "name": "keys",
+                "traits": ["portable", "tiny"],
+                "initial": {"location": "building"},
+            },
+        },
+        "fixtures": {
+            "chest": {
+                "name": "chest",
+                "traits": ["fixture", "container", "openable"],
+                "initial": {
+                    "locations": ["building"],
+                    "state": {"open": False},
+                },
+                "capacity": {"accepts_traits": ["tiny"]},
+            },
+        },
+    }
+    compiled = SandboxSliceCompiler().compile(data)
+    graph = compiled.graph
+    building = compiled.locations["building"]
+    chest = compiled.fixtures["chest"]
+    keys = compiled.assets["keys"]
+    building.remove_asset(keys)
+    compiled.scope.player_assets.add_asset(keys)
+
+    put_keys = next(
+        choice
+        for choice in _choice_fragments(building, graph)
+        if choice.text == "Put keys in chest"
+    )
+    assert put_keys.available is False
+
+    ledger = Ledger.from_graph(graph, entry_id=building.uid)
+    _choose(ledger, contribution="open", target="chest")
+
+    assert chest.open is True
+    assert chest.container.is_open is True
+
+    opened_put_keys = next(
+        choice
+        for choice in _choice_fragments(building, graph)
+        if choice.text == "Put keys in chest"
+    )
+    assert opened_put_keys.available is True
 
 
 def test_adventure_slice_stable_mob_projects_only_when_present() -> None:
