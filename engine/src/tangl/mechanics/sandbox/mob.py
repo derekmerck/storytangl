@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 
 from tangl.story.concepts import Actor
 
+from .schedule import Schedule
+from .time import WorldTime
+
 
 class SandboxMobAffordance(BaseModel):
     """Simple action a present sandbox mob can contribute."""
@@ -27,11 +30,25 @@ class SandboxMob(Actor):
     state: dict[str, Any] = Field(default_factory=dict)
     present_text: str | None = None
     nearby_text: str | None = None
+    schedule: Schedule = Field(default_factory=Schedule)
     affordances: list[SandboxMobAffordance] = Field(default_factory=list)
 
-    def present_at(self, location_label: str) -> bool:
+    def scheduled_location(self, world_time: WorldTime | None = None) -> str:
+        """Return the mob location implied by its current schedule."""
+        if world_time is None:
+            return self.location
+        for entry in self.schedule.entries:
+            if entry.location is not None and entry.matches_time(world_time):
+                return entry.location
+        return self.location
+
+    def present_at(
+        self,
+        location_label: str,
+        world_time: WorldTime | None = None,
+    ) -> bool:
         """Return whether this mob is currently in the given sandbox location."""
-        return self.location == location_label
+        return self.scheduled_location(world_time) == location_label
 
     def set_state_value(self, key: str, value: Any) -> Any:
         """Set and return one mutable mob state value."""

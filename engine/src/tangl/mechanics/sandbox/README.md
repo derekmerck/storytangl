@@ -105,12 +105,15 @@ affordances. Carried light-source assets still project a turn-on/turn-off
 self-loop action, so a lamp can restore normal room detail and object choices
 without treating darkness as a movement gate.
 
-Mob projection is currently presence-only. `SandboxScope.mobs` holds stable
-`SandboxMob` nodes, each parked at a sandbox location label. When the current
-location matches the mob's `location`, its present description can enrich the
-journal and its authored mob affordances become ordinary sandbox actions. This
-establishes a runtime home for offscreen actors without adding pathing,
-fleeing, combat, inventory-bearing actors, or lazy dialog scene generation yet.
+Mob projection is currently schedule/presence only. `SandboxScope.mobs` holds
+stable `SandboxMob` nodes, each with a fallback sandbox location label and an
+optional `Schedule`. At projection time the mob's effective location is derived
+from `WorldTime`; when that location matches the current sandbox location, its
+present description can enrich the journal and its authored mob affordances
+become ordinary sandbox actions. Scheduled mobs also count as present actors for
+scheduled-event gates. This establishes a runtime home for offscreen actors
+without adding pathing, fleeing, combat, inventory-bearing actors, or lazy dialog
+scene generation yet.
 
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,

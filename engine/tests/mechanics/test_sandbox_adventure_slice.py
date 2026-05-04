@@ -15,6 +15,7 @@ from tangl.mechanics.sandbox import (
     SandboxMob,
     SandboxSliceCompiler,
     SandboxSliceSpec,
+    WorldTime,
 )
 from tangl.story import Action, StoryGraph
 from tangl.story.fragments import ChoiceFragment, ContentFragment
@@ -459,6 +460,39 @@ def test_adventure_slice_stable_mob_projects_only_when_present() -> None:
     assert [action.text for action in mob_actions] == [
         "Make sure the wounded pirate is okay"
     ]
+
+
+def test_adventure_slice_compiler_lowers_mob_schedule_entries() -> None:
+    data: dict[str, Any] = {
+        "id": "scheduled_mob",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {"name": "Road"},
+            "building": {"name": "Building"},
+        },
+        "mobs": {
+            "pirate": {
+                "name": "pirate",
+                "initial": {"location": "road"},
+                "schedule": {
+                    "entries": [
+                        {"label": "road_watch", "location": "road", "period": 1},
+                        {
+                            "label": "building_watch",
+                            "location": "building",
+                            "period": 2,
+                        },
+                    ]
+                },
+            }
+        },
+    }
+
+    compiled = SandboxSliceCompiler().compile(data)
+    pirate = compiled.mobs["pirate"]
+
+    assert pirate.scheduled_location(WorldTime.from_turn(0)) == "road"
+    assert pirate.scheduled_location(WorldTime.from_turn(1)) == "building"
 
 
 def test_adventure_slice_compiler_runs_core_walkthrough() -> None:

@@ -15,6 +15,8 @@ from tangl.mechanics.sandbox import (
     SandboxExit,
     SandboxFixture,
     SandboxLocation,
+    SandboxMob,
+    SandboxMobAffordance,
     SandboxScope,
     SandboxVisibilityRule,
     Schedule,
@@ -149,6 +151,109 @@ def test_schedule_matches_time_location_and_presence() -> None:
     )
 
     assert [entry.label for entry in matches] == ["traveler"]
+
+
+def test_scheduled_mob_presence_follows_world_time() -> None:
+    graph = Graph(label="tiny_cave")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        present_text="A pirate watches you.",
+        schedule=Schedule(
+            entries=[
+                ScheduleEntry(label="road_watch", location="road", period=1),
+                ScheduleEntry(label="building_watch", location="building", period=2),
+            ]
+        ),
+        affordances=[
+            SandboxMobAffordance(
+                label="greet",
+                text="Greet the pirate",
+                journal_text="The pirate nods.",
+            )
+        ],
+    )
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 0},
+        mobs=[pirate],
+    )
+    road = SandboxLocation(label="road", location_name="Road")
+    building = SandboxLocation(label="building", location_name="Building")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(building)
+    graph.add(pirate)
+    scope.add_child(road)
+    scope.add_child(building)
+    scope.add_child(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+
+    assert [
+        action.text for action in _dynamic_sandbox_actions_with_tag(road, "mob")
+    ] == ["Greet the pirate"]
+    assert _dynamic_sandbox_actions_with_tag(building, "mob") == []
+
+    scope.locals["world_turn"] = 1
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(road, "mob") == []
+    assert [
+        action.text for action in _dynamic_sandbox_actions_with_tag(building, "mob")
+    ] == ["Greet the pirate"]
+
+
+def test_scheduled_mob_presence_can_gate_scheduled_events() -> None:
+    graph = Graph(label="tiny_cave")
+    pirate = SandboxMob(
+        label="pirate",
+        name="pirate",
+        location="road",
+        schedule=Schedule(
+            entries=[
+                ScheduleEntry(label="road_watch", location="road", period=1),
+                ScheduleEntry(label="building_watch", location="building", period=2),
+            ]
+        ),
+    )
+    scope = SandboxScope(
+        label="tiny_cave_scope",
+        locals={"world_turn": 0},
+        mobs=[pirate],
+        scheduled_events=[
+            ScheduledEvent(
+                label="pirate_chat",
+                actor="pirate",
+                location="road",
+                period=1,
+                target="pirate_arrives",
+                text="Talk to pirate",
+            )
+        ],
+    )
+    road = SandboxLocation(label="road", location_name="Road")
+    pirate_arrives = Block(label="pirate_arrives", content="The pirate waves.")
+    graph.add(scope)
+    graph.add(road)
+    graph.add(pirate)
+    graph.add(pirate_arrives)
+    scope.add_child(road)
+    scope.add_child(pirate)
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    assert [
+        event.text for event in _dynamic_sandbox_actions_with_tag(road, "event")
+    ] == ["Talk to pirate"]
+
+    scope.locals["world_turn"] = 1
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+
+    assert _dynamic_sandbox_actions_with_tag(road, "event") == []
 
 
 def test_sandbox_location_links_project_normal_actions() -> None:

@@ -347,6 +347,10 @@ def _actors_present(location: SandboxLocation) -> list[str]:
     for entry in _scheduled_presence(location):
         if entry.matches(world_time, location=location_label):
             actors.append(entry.actor)
+    for mob in _sandbox_mobs(location):
+        mob_label = mob.get_label()
+        if mob_label and mob.present_at(location_label, world_time):
+            actors.append(mob_label)
     return actors
 
 
@@ -358,8 +362,13 @@ def _sandbox_mobs(location: SandboxLocation) -> list[SandboxMob]:
 
 
 def _present_mobs(location: SandboxLocation) -> list[SandboxMob]:
+    world_time = current_world_time(location)
     location_label = location.get_label()
-    return [mob for mob in _sandbox_mobs(location) if mob.present_at(location_label)]
+    return [
+        mob
+        for mob in _sandbox_mobs(location)
+        if mob.present_at(location_label, world_time)
+    ]
 
 
 def _mob_by_label(location: SandboxLocation, label: str) -> SandboxMob | None:

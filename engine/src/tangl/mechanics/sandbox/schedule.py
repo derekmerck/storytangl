@@ -22,6 +22,14 @@ class ScheduleEntry(BaseModel):
     season: int | None = None
     year: int | None = None
 
+    def matches_time(self, world_time: WorldTime) -> bool:
+        """Return whether the entry's calendar fields match the supplied time."""
+        for field_name in ("period", "day", "day_of_month", "month", "season", "year"):
+            expected = getattr(self, field_name)
+            if expected is not None and getattr(world_time, field_name) != expected:
+                return False
+        return True
+
     def matches(
         self,
         world_time: WorldTime,
@@ -30,10 +38,8 @@ class ScheduleEntry(BaseModel):
         actors_present: Iterable[str] = (),
     ) -> bool:
         """Return whether this entry applies in the supplied context."""
-        for field_name in ("period", "day", "day_of_month", "month", "season", "year"):
-            expected = getattr(self, field_name)
-            if expected is not None and getattr(world_time, field_name) != expected:
-                return False
+        if not self.matches_time(world_time):
+            return False
 
         if self.location is not None and self.location != location:
             return False
