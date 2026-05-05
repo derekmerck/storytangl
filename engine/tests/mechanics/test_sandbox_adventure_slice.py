@@ -15,6 +15,7 @@ from tangl.mechanics.sandbox import (
     SandboxMob,
     SandboxSliceCompiler,
     SandboxSliceSpec,
+    WorldTime,
 )
 from tangl.story import Action, StoryGraph
 from tangl.story.fragments import ChoiceFragment, ContentFragment
@@ -325,6 +326,36 @@ def test_adventure_slice_compiler_rejects_unknown_exit_target() -> None:
         SandboxSliceCompiler().compile(data)
 
 
+def test_adventure_slice_compiler_rejects_unknown_mob_schedule_location() -> None:
+    data: dict[str, Any] = {
+        "id": "bad_mob_schedule",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {"name": "Road"},
+        },
+        "mobs": {
+            "pirate": {
+                "name": "pirate",
+                "initial": {"location": "road"},
+                "schedule": {
+                    "entries": [
+                        {"label": "vanish", "location": "missing_room", "period": 1},
+                    ]
+                },
+            }
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Mob 'pirate' schedule entry 'vanish' targets unknown sandbox "
+            "location 'missing_room'"
+        ),
+    ):
+        SandboxSliceCompiler().compile(data)
+
+
 def test_adventure_slice_compiler_rejects_conflicting_asset_type_reuse() -> None:
     first: dict[str, Any] = {
         "id": "first_keys",
@@ -459,6 +490,44 @@ def test_adventure_slice_stable_mob_projects_only_when_present() -> None:
     assert [action.text for action in mob_actions] == [
         "Make sure the wounded pirate is okay"
     ]
+
+
+def test_adventure_slice_compiler_lowers_mob_schedule_entries() -> None:
+    data: dict[str, Any] = {
+        "id": "scheduled_mob",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {"name": "Road"},
+            "building": {"name": "Building"},
+        },
+        "mobs": {
+            "pirate": {
+                "name": "pirate",
+                "initial": {"location": "road"},
+                "schedule": {
+                    "entries": [
+                        {"label": "road_watch", "location": "road", "period": 1},
+                        {
+                            "label": "building_watch",
+                            "location": "building",
+                            "period": 2,
+                        },
+                    ]
+                },
+            }
+        },
+    }
+
+    spec = SandboxSliceCompiler.validate_ir(data)
+    compiled = SandboxSliceCompiler().compile(spec)
+    pirate = compiled.mobs["pirate"]
+
+    assert pirate.schedule is not spec.mobs["pirate"].schedule
+    assert pirate.scheduled_location(WorldTime.from_turn(0)) == "road"
+    assert pirate.scheduled_location(WorldTime.from_turn(1)) == "building"
+
+    spec.mobs["pirate"].schedule.entries[1].location = "road"
+    assert pirate.scheduled_location(WorldTime.from_turn(1)) == "building"
 
 
 def test_adventure_slice_compiler_runs_core_walkthrough() -> None:

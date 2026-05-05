@@ -20,6 +20,7 @@ from .facets import (
 )
 from .location import SandboxExit, SandboxFixture, SandboxLocation
 from .mob import SandboxMob, SandboxMobAffordance
+from .schedule import Schedule
 from .scope import SandboxScope
 from .visibility import SandboxVisibilityRule
 
@@ -257,6 +258,7 @@ class SandboxMobSpec(BaseModel):
     kind: str = ""
     traits: list[str] = Field(default_factory=list)
     initial: SandboxInitialMobSpec
+    schedule: Schedule = Field(default_factory=Schedule)
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     contributes: SandboxMobContributionsSpec = Field(
         default_factory=SandboxMobContributionsSpec
@@ -601,6 +603,12 @@ class SandboxSliceCompiler:
                 source_label=label,
                 relation="starts in",
             )
+            for entry in mob_spec.schedule.entries:
+                if entry.location is not None and entry.location not in locations:
+                    raise ValueError(
+                        f"Mob {label!r} schedule entry {entry.label!r} targets "
+                        f"unknown sandbox location {entry.location!r}"
+                    )
             mob = SandboxMob(
                 label=label,
                 name=mob_spec.name,
@@ -612,6 +620,7 @@ class SandboxSliceCompiler:
                     mob_spec.descriptions.present or mob_spec.descriptions.ambient
                 ),
                 nearby_text=mob_spec.descriptions.nearby,
+                schedule=mob_spec.schedule.model_copy(deep=True),
                 affordances=[
                     action_spec.as_affordance(action_label)
                     for action_label, action_spec
