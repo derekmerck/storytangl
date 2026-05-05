@@ -30,9 +30,11 @@ rules and it does not execute rules locally.
 
 ## Client Capability Floor
 
-The gateway API is the only capability every client can be assumed to have.
-Every interaction shape must therefore degrade to text, numbered choices, and
-simple prompts.
+The gateway API is the only capability every client can be assumed to have:
+the service-facing create/update/resolve-choice and info-read operations
+described in `docs/src/design/service/FRAGMENT_STREAM_CONTRACT.md`. Every
+interaction shape must therefore degrade to text, numbered choices, and simple
+prompts.
 
 The CLI floor is:
 

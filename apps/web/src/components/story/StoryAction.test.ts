@@ -5,11 +5,15 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
 import StoryAction from './StoryAction.vue'
-import type { ChoiceStoryFragment } from '@/types'
+import type { ChoiceStoryFragment, StoryFragment } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
-const mountWithVuetify = (props: { choice: ChoiceStoryFragment; disabled?: boolean }) =>
+const mountWithVuetify = (props: {
+  choice: ChoiceStoryFragment
+  fragments?: Record<string, StoryFragment>
+  disabled?: boolean
+}) =>
   mount(StoryAction, {
     props,
     global: {
@@ -129,7 +133,7 @@ describe('StoryAction', () => {
     ])
   })
 
-  it('does not treat structured token accepts as freeform input', () => {
+  it('renders structured token accepts as token options', () => {
     const tokenChoice: ChoiceStoryFragment = {
       uid: 'action_tokens',
       fragment_type: 'choice',
@@ -138,12 +142,29 @@ describe('StoryAction', () => {
         kind: 'tokens',
         min: 1,
         max: 1,
+        constraints: { target_zone_ref: 'zone-hand' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-hand': {
+        uid: 'zone-hand',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['card'],
+      },
+      card: {
+        uid: 'card',
+        fragment_type: 'token',
+        token_id: 'rust-map-card',
+        content: 'Rust map card',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice })
+    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
 
-    expect(wrapper.find('input').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="choice-input-view"]').exists()).toBe(true)
+    expect(wrapper.find('.choice-token-option').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Rust map card')
   })
 
   it('does not emit blank or out-of-range numeric freeform payloads', async () => {
@@ -171,5 +192,95 @@ describe('StoryAction', () => {
     await wrapper.find('input').setValue('64')
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')).toBeUndefined()
+  })
+
+  it('emits text accepts payloads after validation passes', async () => {
+    const textChoice: ChoiceStoryFragment = {
+      uid: 'action_text',
+      fragment_type: 'choice',
+      text: 'Name your sword',
+      accepts: {
+        kind: 'text',
+        validators: [{ kind: 'length', min: 2, max: 12 }],
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: textChoice })
+
+    await wrapper.find('input').setValue('A')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('input').setValue('Hope')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')![0]).toEqual(['action_text', { text: 'Hope' }])
+  })
+
+  it('emits quantity accepts payloads after min/max validation passes', async () => {
+    const quantityChoice: ChoiceStoryFragment = {
+      uid: 'action_quantity',
+      fragment_type: 'choice',
+      text: 'Buy rations',
+      accepts: {
+        kind: 'quantity',
+        min: 1,
+        max: 3,
+        unit: 'ration',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: quantityChoice })
+
+    await wrapper.find('input').setValue('0')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('input').setValue('2')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'action_quantity',
+      { quantity: 2 },
+    ])
+  })
+
+  it('emits token accepts payloads from visible target-zone tokens', async () => {
+    const tokenChoice: ChoiceStoryFragment = {
+      uid: 'action_tokens',
+      fragment_type: 'choice',
+      edge_id: 'edge_tokens',
+      text: 'Take something',
+      accepts: {
+        kind: 'tokens',
+        min: 1,
+        max: 1,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['lamp-fragment'],
+      },
+      'lamp-fragment': {
+        uid: 'lamp-fragment',
+        fragment_type: 'token',
+        token_id: 'lamp',
+        content: 'brass lamp',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')).toBeUndefined()
+
+    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_tokens',
+      { token_ids: ['lamp'] },
+    ])
   })
 })

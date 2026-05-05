@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import type { ChoiceStoryFragment } from '@/types'
+import ChoiceInputView from './ChoiceInputView.vue'
+import type { ChoiceStoryFragment, StoryFragment } from '@/types'
 import { isRecord } from './fragmentUtils'
 
 const props = defineProps<{
   choice: ChoiceStoryFragment
+  fragments?: Record<string, StoryFragment>
   disabled?: boolean
 }>()
 
@@ -13,8 +15,8 @@ const emit = defineEmits<{
   doAction: [edgeId: string, payload?: unknown]
 }>()
 
-const inputValue = ref('')
-const scalarAcceptInputs = new Set(['text', 'string', 'number', 'integer', 'quantity'])
+const payloadValue = ref<unknown>(props.choice.payload)
+const payloadValid = ref(true)
 
 const choiceId = computed(() => props.choice.edge_id ?? props.choice.uid)
 const available = computed(() => props.choice.available !== false && props.choice.active !== false)
@@ -30,30 +32,17 @@ const iconName = computed(() => {
   }
   return icon.startsWith('mdi-') ? icon : `mdi-${icon}`
 })
-const acceptsInput = computed(() => {
-  const input = props.choice.accepts?.input
-  return typeof input === 'string' && scalarAcceptInputs.has(input) ? input : undefined
+const hasPayloadInput = computed(() => {
+  if (!props.choice.accepts) {
+    return false
+  }
+  const kind = props.choice.accepts.kind
+  if (typeof kind === 'string' && ['text', 'quantity', 'tokens'].includes(kind)) {
+    return true
+  }
+  return typeof props.choice.accepts.input === 'string'
 })
-const hasFreeformInput = computed(() => Boolean(props.choice.accepts && acceptsInput.value))
-const inputType = computed(() => {
-  return acceptsInput.value === 'integer' ||
-    acceptsInput.value === 'quantity' ||
-    acceptsInput.value === 'number'
-    ? 'number'
-    : 'text'
-})
-const placeholder = computed(() => {
-  const value = props.choice.accepts?.placeholder
-  return typeof value === 'string' ? value : ''
-})
-const minValue = computed(() => {
-  const value = props.choice.accepts?.min
-  return typeof value === 'number' ? value : undefined
-})
-const maxValue = computed(() => {
-  const value = props.choice.accepts?.max
-  return typeof value === 'number' ? value : undefined
-})
+const canCommit = computed(() => available.value && !busy.value && payloadValid.value)
 
 const buttonStyle = computed<Record<string, string | number> | undefined>(() => {
   const styleSource = props.choice.style ?? props.choice.style_dict
@@ -68,54 +57,16 @@ const buttonStyle = computed<Record<string, string | number> | undefined>(() => 
   return entries.length ? Object.fromEntries(entries) : undefined
 })
 
-type CoercedPayload =
-  | { ok: true; value: unknown }
-  | { ok: false }
-
-const coerceInputPayload = (): CoercedPayload => {
-  if (!hasFreeformInput.value) {
-    return { ok: true, value: props.choice.payload }
-  }
-
-  if (inputValue.value === '') {
-    return { ok: false }
-  }
-
-  let value: unknown = inputValue.value
-  if (inputType.value === 'number') {
-    const parsed = Number(inputValue.value)
-    if (Number.isNaN(parsed)) {
-      return { ok: false }
-    }
-    if (
-      (minValue.value !== undefined && parsed < minValue.value) ||
-      (maxValue.value !== undefined && parsed > maxValue.value)
-    ) {
-      return { ok: false }
-    }
-    value = parsed
-  }
-
-  const payloadType = props.choice.accepts?.payload_type
-  if (typeof payloadType === 'string' && payloadType) {
-    value = { [payloadType]: value }
-  }
-
-  if (isRecord(props.choice.payload) && isRecord(value)) {
-    return { ok: true, value: { ...props.choice.payload, ...value } }
-  }
-  return { ok: true, value }
+const handlePayloadChange = (payload: unknown, valid: boolean) => {
+  payloadValue.value = payload
+  payloadValid.value = valid
 }
 
 const handleClick = () => {
-  if (!available.value || busy.value) {
+  if (!canCommit.value) {
     return
   }
-  const payload = coerceInputPayload()
-  if (!payload.ok) {
-    return
-  }
-  emit('doAction', choiceId.value, payload.value)
+  emit('doAction', choiceId.value, payloadValue.value)
 }
 </script>
 
@@ -128,7 +79,7 @@ const handleClick = () => {
         color="primary"
         size="large"
         :style="buttonStyle"
-        :aria-disabled="!available || busy"
+        :aria-disabled="!canCommit"
         :data-hotkey="hotkey"
         @click="handleClick"
       >
@@ -137,19 +88,13 @@ const handleClick = () => {
         <span>{{ choice.text }}</span>
       </v-btn>
 
-      <v-text-field
-        v-if="hasFreeformInput"
-        v-model="inputValue"
-        class="choice-input"
-        density="compact"
-        hide-details
-        variant="outlined"
+      <ChoiceInputView
+        v-if="hasPayloadInput"
+        :choice="choice"
+        :fragments="fragments ?? {}"
         :disabled="!available || busy"
-        :type="inputType"
-        :min="minValue"
-        :max="maxValue"
-        :placeholder="placeholder"
-        @keydown.enter.prevent="handleClick"
+        @payload-change="handlePayloadChange"
+        @commit="handleClick"
       />
 
       <div v-if="!available && choice.unavailable_reason" class="choice-reason">
@@ -185,10 +130,6 @@ const handleClick = () => {
   min-width: 22px;
   padding: 3px 5px;
   text-align: center;
-}
-
-.choice-input {
-  max-width: 260px;
 }
 
 .choice-reason {
