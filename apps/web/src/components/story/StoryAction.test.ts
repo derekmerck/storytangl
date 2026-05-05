@@ -77,6 +77,27 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual(['action_pb', { data: 'value' }])
   })
 
+  it('refreshes payload when the same choice uid receives new payload props', async () => {
+    const choiceWithPayload: ChoiceStoryFragment = {
+      uid: 'action_pb',
+      fragment_type: 'choice',
+      text: 'Choice',
+      payload: { data: 'old' },
+    }
+
+    const wrapper = mountWithVuetify({ choice: choiceWithPayload })
+
+    await wrapper.setProps({
+      choice: {
+        ...choiceWithPayload,
+        payload: { data: 'new' },
+      },
+    })
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual(['action_pb', { data: 'new' }])
+  })
+
   it('applies custom styles when provided', () => {
     const styledChoice: ChoiceStoryFragment = {
       uid: 'action_styled',
@@ -104,6 +125,7 @@ describe('StoryAction', () => {
 
     expect(wrapper.text()).toContain('Requires stealth')
     expect(wrapper.find('button').attributes('aria-disabled')).toBe('true')
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
 
     await wrapper.find('button').trigger('click')
 
@@ -243,6 +265,25 @@ describe('StoryAction', () => {
     ])
   })
 
+  it('treats blank optional quantity accepts as empty rather than zero', async () => {
+    const quantityChoice: ChoiceStoryFragment = {
+      uid: 'action_quantity',
+      fragment_type: 'choice',
+      text: 'Buy optional rations',
+      accepts: {
+        kind: 'quantity',
+        required: false,
+        min: 1,
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: quantityChoice })
+
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual(['action_quantity', undefined])
+  })
+
   it('emits token accepts payloads from visible target-zone tokens', async () => {
     const tokenChoice: ChoiceStoryFragment = {
       uid: 'action_tokens',
@@ -281,6 +322,86 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual([
       'edge_tokens',
       { token_ids: ['lamp'] },
+    ])
+  })
+
+  it('clears stale token payload when a same-uid choice points at a new zone', async () => {
+    const tokenChoice: ChoiceStoryFragment = {
+      uid: 'action_tokens',
+      fragment_type: 'choice',
+      edge_id: 'edge_tokens',
+      text: 'Take something',
+      accepts: {
+        kind: 'tokens',
+        min: 1,
+        max: 1,
+        constraints: { target_zone_ref: 'zone-room' },
+      },
+    }
+    const fragments: Record<string, StoryFragment> = {
+      'zone-room': {
+        uid: 'zone-room',
+        fragment_type: 'group',
+        group_type: 'zone',
+        member_ids: ['lamp-fragment'],
+      },
+      'lamp-fragment': {
+        uid: 'lamp-fragment',
+        fragment_type: 'token',
+        token_id: 'lamp',
+        content: 'brass lamp',
+      },
+    }
+
+    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+
+    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'edge_tokens',
+      { token_ids: ['lamp'] },
+    ])
+
+    await wrapper.setProps({
+      choice: {
+        ...tokenChoice,
+        accepts: {
+          kind: 'tokens',
+          min: 1,
+          max: 1,
+          constraints: { target_zone_ref: 'zone-bag' },
+        },
+      },
+      fragments: {
+        'zone-bag': {
+          uid: 'zone-bag',
+          fragment_type: 'group',
+          group_type: 'zone',
+          member_ids: ['coin-fragment'],
+        },
+        'coin-fragment': {
+          uid: 'coin-fragment',
+          fragment_type: 'token',
+          token_id: 'coin',
+          content: 'silver coin',
+        },
+      },
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('silver coin')
+    expect(wrapper.text()).not.toContain('brass lamp')
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
+
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('doAction')!.length).toBe(1)
+
+    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('button').trigger('click')
+    const events = wrapper.emitted('doAction')!
+    expect(events[events.length - 1]).toEqual([
+      'edge_tokens',
+      { token_ids: ['coin'] },
     ])
   })
 })

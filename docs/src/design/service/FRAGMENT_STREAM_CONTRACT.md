@@ -214,7 +214,8 @@ Required fixture behaviors:
 - a realistic whole-turn `RuntimeEnvelope`
 - a realistic `ProjectedState`
 - locked choices with blockers
-- freeform, quantity, token, and raw-command payload contracts
+- freeform, quantity, and token payload contracts
+- raw-command payload contracts once interpretation choices land
 - group flattening and dialog grouping
 - unknown fragment fallback
 - pending media placeholders

@@ -26,6 +26,10 @@ type Validator = {
   case_sensitive?: unknown
 }
 
+type PreparedValidator = Validator & {
+  regex?: RegExp
+}
+
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments: Record<string, StoryFragment>
@@ -73,6 +77,19 @@ const required = computed(() => accepts.value.required !== false)
 const validators = computed<Validator[]>(() =>
   Array.isArray(accepts.value.validators) ? accepts.value.validators : [],
 )
+const preparedValidators = computed<PreparedValidator[]>(() =>
+  validators.value.map((validator) => {
+    if (validator.kind !== 'regex' || typeof validator.pattern !== 'string') {
+      return validator
+    }
+    const flags = typeof validator.flags === 'string' ? validator.flags : undefined
+    try {
+      return { ...validator, regex: new RegExp(validator.pattern, flags) }
+    } catch {
+      return validator
+    }
+  }),
+)
 
 const payloadKey = computed(() => {
   const payloadType = accepts.value.payload_type
@@ -96,15 +113,22 @@ const targetZone = computed<GroupStoryFragment | undefined>(() => {
   return fragment && isGroupFragment(fragment) ? fragment : undefined
 })
 
+const tokensByTokenId = computed(() => {
+  const tokens = new Map<string, TokenStoryFragment>()
+  for (const fragment of Object.values(props.fragments)) {
+    if (isTokenFragment(fragment) && fragment.token_id) {
+      tokens.set(fragment.token_id, fragment)
+    }
+  }
+  return tokens
+})
+
 const tokenByMemberId = (memberId: string): TokenStoryFragment | undefined => {
   const fragment = props.fragments[memberId]
   if (fragment && isTokenFragment(fragment)) {
     return fragment
   }
-  return Object.values(props.fragments).find(
-    (candidate): candidate is TokenStoryFragment =>
-      isTokenFragment(candidate) && candidate.token_id === memberId,
-  )
+  return tokensByTokenId.value.get(memberId)
 }
 
 const candidateTokens = computed<TokenStoryFragment[]>(() =>
@@ -126,12 +150,13 @@ const tokenLabel = (token: TokenStoryFragment): string => {
 }
 
 const tokenPayloadId = (token: TokenStoryFragment): string => token.token_id ?? token.uid
+const candidateTokenPayloadIds = computed(() => candidateTokens.value.map(tokenPayloadId))
 
 const validateText = (value: string): string | undefined => {
   if (required.value && value.trim() === '') {
     return 'Required'
   }
-  for (const validator of validators.value) {
+  for (const validator of preparedValidators.value) {
     if (validator.kind === 'length') {
       const min = numericValue(validator.min)
       const max = numericValue(validator.max)
@@ -142,15 +167,9 @@ const validateText = (value: string): string | undefined => {
         return `Use at most ${max} characters`
       }
     }
-    if (validator.kind === 'regex' && typeof validator.pattern === 'string') {
-      const flags = typeof validator.flags === 'string' ? validator.flags : undefined
-      let regex: RegExp
-      try {
-        regex = new RegExp(validator.pattern, flags)
-      } catch {
-        continue
-      }
-      if (!regex.test(value)) {
+    if (validator.kind === 'regex' && validator.regex) {
+      validator.regex.lastIndex = 0
+      if (!validator.regex.test(value)) {
         return stringValue(validator.message) ?? 'Does not match the expected pattern'
       }
     }
@@ -193,6 +212,9 @@ const quantityPayload = (): PayloadState => {
   if (required.value && inputValue.value === '') {
     return { valid: false, message: 'Required' }
   }
+  if (!required.value && inputValue.value === '') {
+    return { valid: true, payload: props.choice.payload }
+  }
   const quantity = Number(inputValue.value)
   if (!Number.isFinite(quantity) || !Number.isInteger(quantity)) {
     return { valid: false, message: 'Use a whole number' }
@@ -221,7 +243,7 @@ const tokenPayload = (): PayloadState => {
   if (selectedTokenIds.value.length > max) {
     return { valid: false, message: `Select at most ${max}` }
   }
-  return { valid: true, payload: { token_ids: selectedTokenIds.value } }
+  return { valid: true, payload: { token_ids: [...selectedTokenIds.value] } }
 }
 
 const payloadState = computed<PayloadState>(() => {
@@ -272,6 +294,14 @@ watch(
   payloadState,
   (state) => emit('payloadChange', state.payload, state.valid),
   { immediate: true },
+)
+
+watch(
+  [acceptsKind, targetZoneRef, candidateTokenPayloadIds],
+  () => {
+    inputValue.value = ''
+    selectedTokenIds.value = []
+  },
 )
 </script>
 

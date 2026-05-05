@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import ChoiceInputView from './ChoiceInputView.vue'
 import type { ChoiceStoryFragment, StoryFragment } from '@/types'
@@ -62,6 +62,15 @@ const handlePayloadChange = (payload: unknown, valid: boolean) => {
   payloadValid.value = valid
 }
 
+watch(
+  () => props.choice,
+  () => {
+    payloadValue.value = props.choice.payload
+    payloadValid.value = true
+  },
+  { deep: true },
+)
+
 const handleClick = () => {
   if (!canCommit.value) {
     return
@@ -79,6 +88,7 @@ const handleClick = () => {
         color="primary"
         size="large"
         :style="buttonStyle"
+        :disabled="!canCommit"
         :aria-disabled="!canCommit"
         :data-hotkey="hotkey"
         @click="handleClick"

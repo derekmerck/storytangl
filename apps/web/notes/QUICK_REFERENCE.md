@@ -190,7 +190,7 @@ MediaStoryFragment {
 `choice.accepts` describes the payload shape. Widgets are optional; the same
 contracts must degrade to a CLI prompt.
 
-```
+```typescript
 // plain choice button
 accepts: { kind: 'pick' }
 payload: {}
@@ -222,7 +222,7 @@ accepts: {
 }
 payload: { token_ids: ['rust-map-card'] }
 
-// raw command fallback
+// raw command fallback (deferred; submit to a reserved interpretation choice)
 accepts: { kind: 'raw_command' }
 payload: { text: 'take lamp' }
 ```

@@ -33,13 +33,12 @@ renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
 - The next interaction direction is payload-first: support text, quantity, and
   token inputs as explicit `choice.accepts` payloads before adding command-bar
   affordances.
+- `ChoiceInputView` handles current text, quantity, and token payload widgets,
+  with canonical quantity and sandbox fixtures in
+  `apps/web/tests/fixtures/payloadInteractions.ts`.
 
 ## Open Work
 
-- Add `ChoiceInputView` or equivalent handling for `accepts.kind` values:
-  `pick`, `text`, `quantity`, and `tokens`.
-- Add canonical quantity and sandbox-style fixtures that can still degrade to a
-  CLI: visible state, numbered choices, simple prompts, and explicit payloads.
 - Add raw command support after the payload widgets land. The command bar should
   submit to a reserved backend interpretation choice and use grammar hints only
   as optional UI assistance.
