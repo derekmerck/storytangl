@@ -137,6 +137,7 @@ RuntimeEnvelope {
   cursor_id?: string | null
   step?: number | null
   fragments: StoryFragment[]
+  metadata?: Record<string, unknown>
 }
 
 StoryFragment {
@@ -158,6 +159,15 @@ GroupStoryFragment {
   fragment_type: 'group' | 'dialog'
   group_type?: string | null
   member_ids: string[]
+  zone_role?: string | null
+}
+
+TokenStoryFragment {
+  fragment_type: 'token'
+  token_id?: string | null
+  kind?: string | null
+  display_state?: string | null
+  zone_ref?: string | null
 }
 
 // Media types
@@ -174,6 +184,52 @@ MediaStoryFragment {
   content?: unknown
 }
 ```
+
+## 🎛️ Interaction Payloads
+
+`choice.accepts` describes the payload shape. Widgets are optional; the same
+contracts must degrade to a CLI prompt.
+
+```
+// plain choice button
+accepts: { kind: 'pick' }
+payload: {}
+
+// freeform line
+accepts: {
+  kind: 'text',
+  placeholder: 'name',
+  validators: [{ kind: 'length', min: 2, max: 24 }]
+}
+payload: { text: 'Hopebreaker' }
+
+// integer quantity
+accepts: {
+  kind: 'quantity',
+  min: 1,
+  max: 7,
+  step: 1,
+  unit: 'coin'
+}
+payload: { quantity: 3 }
+
+// visible token selection
+accepts: {
+  kind: 'tokens',
+  min: 1,
+  max: 1,
+  constraints: { target_zone_ref: 'f-zone-player-hand' }
+}
+payload: { token_ids: ['rust-map-card'] }
+
+// raw command fallback
+accepts: { kind: 'raw_command' }
+payload: { text: 'take lamp' }
+```
+
+Command bars are backend-authoritative. Use grammar hints only for optional
+preview/autocomplete; when in doubt, submit raw text to the reserved
+`interpret_command` choice and render the returned envelope.
 
 ## 🌐 API Endpoints
 

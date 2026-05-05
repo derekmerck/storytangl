@@ -28,6 +28,24 @@ Do not collapse these four vocabularies:
 The renderer consumes interaction requests. It does not infer legal moves from
 rules and it does not execute rules locally.
 
+## Client Capability Floor
+
+The gateway API is the only capability every client can be assumed to have.
+Every interaction shape must therefore degrade to text, numbered choices, and
+simple prompts.
+
+The CLI floor is:
+
+- render prose and visible state as readable text
+- render choices in order, including locked choices and reasons
+- collect `text`, `quantity`, and visible `token` selections through prompts
+- submit the same `choice_id` plus payload that a rich widget submits
+- optionally submit raw command text to a reserved interpretation choice
+
+Web, Ren'Py, Godot, or tabletop-like clients may render richer controls, but
+those controls are affordances over the same visible fragments. They are not a
+client-side rules runtime.
+
 ## Core Terms
 
 ### Surface
@@ -109,6 +127,85 @@ state rather than burying them in prose. The handler owns arithmetic; the client
 shows current quantities, available purchases, unavailable reasons, and audit
 events.
 
+### Payload Contract
+
+`choice.accepts` describes the payload shape requested by an open affordance.
+It should stay explicit enough that a CLI can ask for the same value without a
+special widget library.
+
+Near-term accepted shapes:
+
+| `accepts.kind` | Payload | CLI rendering |
+| --- | --- | --- |
+| `pick` or absent | `{}` or no payload | numbered choice |
+| `text` | `{text: string}` | line prompt with optional validators |
+| `quantity` | `{quantity: int}` | integer prompt with min/max and reason text |
+| `tokens` | `{token_ids: string[]}` | numbered entries from a visible target zone |
+| `raw_command` | `{text: string}` | command prompt submitted to interpretation edge |
+
+Later, `compose` can combine those simple parts:
+
+```text
+accepts:
+  kind: compose
+  parts:
+    - role: amount
+      accepts: {kind: quantity, min: 1, max: 7, unit: coin}
+    - role: target
+      accepts:
+        kind: tokens
+        min: 1
+        max: 1
+        constraints: {target_zone_ref: z-room}
+```
+
+The corresponding payload should remain explicit:
+
+```text
+{
+  parts: {
+    amount: {quantity: 2},
+    target: {token_ids: ["guard"]}
+  }
+}
+```
+
+The client may enforce simple visible validators to avoid bad submissions, but
+backend validation is authoritative.
+
+### Command Resolution
+
+Classic IF-style command input is a second affordance over the visible action
+surface, not a requirement that every client embed a language parser.
+
+The preferred model is backend-authoritative:
+
+1. The runtime emits ordinary visible choices for the turn.
+2. If raw command input is authorized, the runtime also emits a reserved choice
+   such as `edge_id="interpret_command"` with `accepts.kind="raw_command"`.
+3. A client may render that choice as a command bar or as a CLI prompt.
+4. A capable client may use advisory grammar hints for autocomplete, preview,
+   and token highlighting.
+5. On submit, the backend resolves or rejects the command and returns a normal
+   `RuntimeEnvelope`.
+
+Grammar hints are optional and must be treated as denormalized convenience
+metadata derived from the visible turn surface. They must not contain hidden
+verbs, nouns, aliases, or targets.
+
+When a raw command does not advance the story, the backend should return a
+renderable feedback fragment. A future `interpretation` fragment can cover:
+
+- `ambiguous`
+- `unknown_verb`
+- `unknown_noun`
+- `blocked`
+- `impossible`
+- `validation_failed`
+
+A client without a dedicated interpretation renderer can show the message as
+ordinary content.
+
 ### Outcome
 
 Outcome is broader than win/lose/draw. A client may need to render success,
@@ -169,6 +266,8 @@ Examples:
 
 - A web card UI may render hand zones and selectable tokens.
 - A CLI may render the same zone as a numbered list and collect a token id.
+- A CLI command prompt may submit raw text to `interpret_command` without local
+  grammar support.
 - A Ren'Py view may show a menu plus a small status panel.
 - A client without zone support may show the unknown group fallback but should
   still let ordinary choices work.
@@ -181,6 +280,8 @@ but hints are advisory. `accepts` and blockers are the portable contract.
 The vocabulary should cover the current mechanics survey without creating a
 client-side rules runtime:
 
+- Classic sandbox IF: visible location state, exits, inventory, blocked actions,
+  command text, and backend interpretation feedback.
 - Rock-paper-scissors: simultaneous or staged commit, opponent tell, dominance
   relation, round result, best-of-N scoring.
 - Blackjack/21/22: deck, hand zones, hidden dealer state, hit/stand, threshold
@@ -200,12 +301,19 @@ to the client.
 
 The next web/client work should stay small and contract-driven:
 
-1. Promote `zone` and `token` from unknown fallback into real fragment widgets.
-2. Render token-selection `accepts` contracts against visible zone fragments.
-3. Keep unknown fragment fallback for unsupported future mechanics.
-4. Expand fixtures with one additional non-choice-dominant interaction, such as
-   a credential packet or simple token pool.
-5. Add browser E2E only after the direct fragment widgets are stable.
+1. Keep `zone` and `token` widgets small and generic; do not add game-specific
+   board logic to the client.
+2. Add `ChoiceInputView` for `pick`, `text`, `quantity`, and `tokens`.
+3. Add canonical fixtures for a quantity interaction and a small sandbox-like
+   turn with visible room/inventory zones.
+4. Add raw command input only after the payload widgets are tested. It should
+   submit to a reserved `raw_command` choice and fall back to backend
+   interpretation when no local hint is available.
+5. Add `interpretation` rendering after the backend shape exists; fallback to
+   content is acceptable before then.
+6. Add `compose` after the simple payload widgets are stable.
+7. Add browser E2E only after payload widgets and command feedback settle enough
+   that tests will not cement an interim UI shape.
 
 ## Non-Goals
 
