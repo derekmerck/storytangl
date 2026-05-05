@@ -250,7 +250,11 @@ def test_scheduled_mob_presence_can_gate_scheduled_events() -> None:
         event.text for event in _dynamic_sandbox_actions_with_tag(road, "event")
     ] == ["Talk to pirate"]
 
-    scope.locals["world_turn"] = 1
+    pirate.schedule = Schedule(
+        entries=[
+            ScheduleEntry(label="building_watch", location="building", period=1),
+        ]
+    )
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
     assert _dynamic_sandbox_actions_with_tag(road, "event") == []
