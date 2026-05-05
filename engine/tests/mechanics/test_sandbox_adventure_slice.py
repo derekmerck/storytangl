@@ -326,6 +326,36 @@ def test_adventure_slice_compiler_rejects_unknown_exit_target() -> None:
         SandboxSliceCompiler().compile(data)
 
 
+def test_adventure_slice_compiler_rejects_unknown_mob_schedule_location() -> None:
+    data: dict[str, Any] = {
+        "id": "bad_mob_schedule",
+        "scope": {"id": "cave"},
+        "locations": {
+            "road": {"name": "Road"},
+        },
+        "mobs": {
+            "pirate": {
+                "name": "pirate",
+                "initial": {"location": "road"},
+                "schedule": {
+                    "entries": [
+                        {"label": "vanish", "location": "missing_room", "period": 1},
+                    ]
+                },
+            }
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Mob 'pirate' schedule entry 'vanish' targets unknown sandbox "
+            "location 'missing_room'"
+        ),
+    ):
+        SandboxSliceCompiler().compile(data)
+
+
 def test_adventure_slice_compiler_rejects_conflicting_asset_type_reuse() -> None:
     first: dict[str, Any] = {
         "id": "first_keys",
@@ -488,10 +518,15 @@ def test_adventure_slice_compiler_lowers_mob_schedule_entries() -> None:
         },
     }
 
-    compiled = SandboxSliceCompiler().compile(data)
+    spec = SandboxSliceCompiler.validate_ir(data)
+    compiled = SandboxSliceCompiler().compile(spec)
     pirate = compiled.mobs["pirate"]
 
+    assert pirate.schedule is not spec.mobs["pirate"].schedule
     assert pirate.scheduled_location(WorldTime.from_turn(0)) == "road"
+    assert pirate.scheduled_location(WorldTime.from_turn(1)) == "building"
+
+    spec.mobs["pirate"].schedule.entries[1].location = "road"
     assert pirate.scheduled_location(WorldTime.from_turn(1)) == "building"
 
 

@@ -24,11 +24,17 @@ class ScheduleEntry(BaseModel):
 
     def matches_time(self, world_time: WorldTime) -> bool:
         """Return whether the entry's calendar fields match the supplied time."""
-        for field_name in ("period", "day", "day_of_month", "month", "season", "year"):
-            expected = getattr(self, field_name)
-            if expected is not None and getattr(world_time, field_name) != expected:
-                return False
-        return True
+        return (
+            (self.period is None or world_time.period == self.period)
+            and (self.day is None or world_time.day == self.day)
+            and (
+                self.day_of_month is None
+                or world_time.day_of_month == self.day_of_month
+            )
+            and (self.month is None or world_time.month == self.month)
+            and (self.season is None or world_time.season == self.season)
+            and (self.year is None or world_time.year == self.year)
+        )
 
     def matches(
         self,
