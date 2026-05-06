@@ -62,7 +62,8 @@ grouped without collapsing the turn back into one display block.
 
 ## Current Fragment Vocabulary
 
-Core reusable fragment types live in `tangl.journal.fragments`.
+Core reusable fragment types live in `tangl.journal.fragments`; active
+extension types preserve the same `BaseFragment` shape.
 
 | Fragment | Purpose |
 | --- | --- |
@@ -71,6 +72,7 @@ Core reusable fragment types live in `tangl.journal.fragments`.
 | `media` | Media reference or placeholder; service may dereference RITs. |
 | `choice` | Player-facing interaction offer backed by an `Action` edge. |
 | `group` | Relational overlay tying peer fragments together by id. |
+| `token` | Targetable piece or object rendered inside a zone. |
 | `kv` | Ordered key-value content for compact state/status surfaces. |
 | `update` / `delete` | Control fragments mutating an earlier registry entry. |
 | `user_event` | User-facing notification or client hint. |
@@ -78,6 +80,10 @@ Core reusable fragment types live in `tangl.journal.fragments`.
 Unknown fragment types are valid extension points. A client that cannot render a
 fragment type must keep the stream alive and show or stash a diagnostic fallback
 rather than failing the whole turn.
+
+Near-term command work may also introduce `interpretation`, a renderable
+feedback fragment for raw command attempts that do not advance the cursor. A
+client without a dedicated renderer may present its message as ordinary content.
 
 ## Choice Fragments
 
@@ -100,9 +106,26 @@ choice_id = choice.edge_id
 payload = renderer-collected payload, if any
 ```
 
-`accepts` is intentionally generic. It may describe a freeform value, a quantity
-range, a token selection, a target zone, or a future richer interaction shape.
-The handler remains the authority for validation and state change.
+`accepts` is intentionally generic. It describes the payload shape a renderer
+should collect, not the widget class a particular client must use. The handler
+remains the authority for validation and state change.
+
+Canonical near-term variants:
+
+| `accepts.kind` | Payload | Meaning |
+| --- | --- | --- |
+| absent or `pick` | `{}` or omitted | The edge id is the whole answer. |
+| `text` | `{text: string}` | Freeform line such as a name, password, note, or command. |
+| `quantity` | `{quantity: int}` | Integer amount with optional min/max/unit/cost hints. |
+| `tokens` | `{token_ids: string[]}` | Selection from a visible target zone. |
+| `raw_command` | `{text: string}` | Text submitted to a reserved interpretation edge. |
+
+`compose` may combine these later using role-keyed subpayloads. It should not be
+the first implementation target.
+
+A rich client may render sliders, steppers, token chips, autocomplete, or form
+groups. A CLI should be able to ask the same values as sequential prompts and
+submit the same payload.
 
 ## Media Fragments
 
@@ -129,6 +152,38 @@ placeholder. Clients should show that placeholder when no final URL/data exists.
 
 Groups may reference other groups. Clients may flatten those references for
 presentation, but the registry remains id-based.
+
+`group_type="zone"` is the current generic container for targetable token
+surfaces such as a hand, room contents, inventory, field, packet, or map. If a
+choice references `constraints.target_zone_ref`, that zone must be rendered or
+reachable in the current shell.
+
+## Command Resolution
+
+Natural-language command input is backend-authoritative. The client may offer
+affordances, but the backend resolves and validates.
+
+The portable shape is:
+
+```text
+choice:
+  edge_id: interpret_command
+  accepts: {kind: raw_command}
+
+commit:
+  choice_id: interpret_command
+  payload: {text: "take lamp"}
+```
+
+The backend either returns a `RuntimeEnvelope` with an advanced cursor or
+returns the same cursor with a renderable explanation, such as an
+`interpretation` fragment.
+
+Advisory grammar hints may help capable clients preview a command, highlight
+tokens, or show completions. Until there is a dedicated envelope field, such
+hints should travel under `metadata.grammar`. If promoted to a top-level
+`RuntimeEnvelope.grammar` field later, the semantics should stay the same:
+grammar is a visible-surface projection and never a security boundary.
 
 ## Decision Legibility
 
@@ -159,13 +214,15 @@ Required fixture behaviors:
 - a realistic whole-turn `RuntimeEnvelope`
 - a realistic `ProjectedState`
 - locked choices with blockers
-- freeform or structured choice payloads
+- freeform, quantity, and token payload contracts
+- raw-command payload contracts once interpretation choices land
 - group flattening and dialog grouping
 - unknown fragment fallback
 - pending media placeholders
 - control update/delete
 - user events
 - decision legibility checks for references from open choices
+- CLI-equivalent payload collection examples for every `accepts.kind`
 
-Browser E2E should be added only after the direct fragment renderer is stable
-enough that E2E coverage will not cement the retired block shape.
+Browser E2E should be added only after payload widgets and command feedback are
+stable enough that E2E coverage will not cement an interim UI shape.

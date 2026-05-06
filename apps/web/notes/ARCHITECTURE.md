@@ -222,7 +222,7 @@ apps/web/
 
 User clicks action button:
   │
-  ├─► StoryAction.vue emits 'doAction' with (edge_id, payload)
+  ├─► StoryAction.vue / ChoiceInputView emits 'doAction' with (edge_id, payload)
   │
   ├─► StoryBlock.vue catches event, passes up
   │
@@ -244,6 +244,15 @@ User clicks action button:
         │
         └─► Browser auto-scrolls to new content
 
+Payload-bearing choices follow the same path. `accepts.kind="text"` submits
+`{text}`, `quantity` submits `{quantity}`, and `tokens` submits `{token_ids}`.
+The backend validates every payload.
+
+Command bars are a later affordance over this same path. A command bar submits
+raw text to a reserved `raw_command` choice such as `interpret_command` unless
+the backend has already provided a safe resolved choice. Advisory grammar hints
+may improve preview/autocomplete, but they do not replace backend resolution.
+
 ═══════════════════════════════════════════════════════════════════
                     KEY DESIGN DECISIONS
 ═══════════════════════════════════════════════════════════════════
@@ -257,6 +266,12 @@ User clicks action button:
   - Client accumulates fragments in a uid registry
   - Scene groups decide which fragments appear together
   - Allows for complex narrative flows
+
+✓ CLI-compatible interaction contract
+  - Rich widgets collect the same payloads a CLI can prompt for
+  - Token choices reference visible zones
+  - Natural-language commands fall back to backend interpretation
+  - Client-side grammar hints are optional affordances, not rules
 
 ✓ Media role system
   - Backend tags media with semantic roles

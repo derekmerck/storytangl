@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { crossroadsRuntimeEnvelope } from './runtimeEnvelope'
+import {
+  buyQuantityRuntimeEnvelope,
+  crossroadsRuntimeEnvelope,
+  sandboxPayloadRuntimeEnvelope,
+} from '.'
 import type {
   ChoiceStoryFragment,
   GroupStoryFragment,
@@ -70,27 +74,51 @@ const renderableIdsByScene = (envelope: RuntimeEnvelope): Array<Set<string>> => 
 
 describe('runtime envelope fixtures', () => {
   it('keeps open choice references renderable in the current scene shell', () => {
-    const sceneRenderableIds = renderableIdsByScene(crossroadsRuntimeEnvelope)
+    const envelopes = [
+      crossroadsRuntimeEnvelope,
+      buyQuantityRuntimeEnvelope,
+      sandboxPayloadRuntimeEnvelope,
+    ]
     const referencedChoices: Array<{ choice: ChoiceStoryFragment; refs: string[] }> = []
 
-    for (const fragment of crossroadsRuntimeEnvelope.fragments) {
-      if (!isOpenChoice(fragment)) {
-        continue
+    for (const envelope of envelopes) {
+      const sceneRenderableIds = renderableIdsByScene(envelope)
+      const envelopeReferencedChoices: Array<{ choice: ChoiceStoryFragment; refs: string[] }> = []
+
+      for (const fragment of envelope.fragments) {
+        if (!isOpenChoice(fragment)) {
+          continue
+        }
+        const refs = collectReferenceIds(fragment.accepts?.constraints)
+        if (refs.length > 0) {
+          const entry = { choice: fragment, refs }
+          referencedChoices.push(entry)
+          envelopeReferencedChoices.push(entry)
+        }
       }
-      const refs = collectReferenceIds(fragment.accepts?.constraints)
-      if (refs.length > 0) {
-        referencedChoices.push({ choice: fragment, refs })
+
+      for (const { choice, refs } of envelopeReferencedChoices) {
+        const scene = sceneRenderableIds.find((ids) => ids.has(choice.uid))
+        expect(scene, `choice ${choice.uid} must be inside a scene group`).toBeDefined()
+        for (const ref of refs) {
+          expect(scene!.has(ref), `choice ${choice.uid} references hidden state ${ref}`).toBe(true)
+        }
       }
     }
 
     expect(referencedChoices).not.toHaveLength(0)
+  })
 
-    for (const { choice, refs } of referencedChoices) {
-      const scene = sceneRenderableIds.find((ids) => ids.has(choice.uid))
-      expect(scene, `choice ${choice.uid} must be inside a scene group`).toBeDefined()
-      for (const ref of refs) {
-        expect(scene!.has(ref), `choice ${choice.uid} references hidden state ${ref}`).toBe(true)
-      }
-    }
+  it('covers text, quantity, and token payload accepts', () => {
+    const kinds = new Set(
+      sandboxPayloadRuntimeEnvelope.fragments
+        .filter((fragment): fragment is ChoiceStoryFragment => fragment.fragment_type === 'choice')
+        .map((choice) => choice.accepts?.kind)
+        .filter((kind): kind is string => typeof kind === 'string'),
+    )
+
+    expect(kinds.has('text')).toBe(true)
+    expect(kinds.has('quantity')).toBe(true)
+    expect(kinds.has('tokens')).toBe(true)
   })
 })

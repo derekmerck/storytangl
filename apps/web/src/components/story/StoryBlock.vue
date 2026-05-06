@@ -83,6 +83,7 @@ const handleAction = (uid: string, payload?: unknown) => {
             v-for="choice in choices"
             :key="choice.uid"
             :choice="choice"
+            :fragments="fragments"
             :disabled="disabled"
             @doAction="handleAction"
           />

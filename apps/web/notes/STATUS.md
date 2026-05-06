@@ -28,17 +28,27 @@ renderer and contract coverage work around canonical `RuntimeEnvelope` fixtures.
 - Story flow now renders `RuntimeEnvelope.fragments` directly through a fragment
   registry, scene shells, and small fragment widgets. The old
   `JournalStoryUpdate[]` path remains only as a narrow compatibility adapter.
+- `zone` and `token` fragments now have real generic widgets, which gives
+  token-selection choices a visible surface to bind to.
+- The next interaction direction is payload-first: support text, quantity, and
+  token inputs as explicit `choice.accepts` payloads before adding command-bar
+  affordances.
+- `ChoiceInputView` handles current text, quantity, and token payload widgets,
+  with canonical quantity and sandbox fixtures in
+  `apps/web/tests/fixtures/payloadInteractions.ts`.
 
 ## Open Work
 
-- Promote `zone` and `token` fragments from generic fallback into real widgets.
-- Add at least one more canonical interaction fixture, such as a credential
-  packet, token pool, or simple resource-spend turn.
+- Add raw command support after the payload widgets land. The command bar should
+  submit to a reserved backend interpretation choice and use grammar hints only
+  as optional UI assistance.
+- Add `interpretation` rendering once the backend response shape exists; until
+  then, fallback text is acceptable.
 - Recheck world/system/user metadata assumptions against backend response
   models.
 - Audit loading states, error display, mobile layout, and accessibility.
-- Add browser E2E only after the direct fragment widgets settle enough that the
-  tests will not cement a transitional shape.
+- Add browser E2E only after payload widgets and command feedback settle enough
+  that tests will not cement a transitional shape.
 
 ## Guidance
 
