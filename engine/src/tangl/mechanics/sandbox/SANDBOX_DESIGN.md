@@ -280,16 +280,18 @@ holding model exists.
 
 Mob projection is the first answer to offscreen actors. `SandboxMob` is a
 graph-backed actor-like concept with a stable fallback sandbox `location`,
-optional `Schedule`, mutable `state`, optional present/nearby text, and a small
-affordance list. The current projector derives the mob's effective location from
-the current `WorldTime`: if a matching schedule entry names a location, that
-location wins; otherwise the mob remains at its fallback `location`. If the
-effective location matches the current sandbox location, the mob can add present
-journal text and self-loop choices. Those choices can mutate mob state through
-normal `Effect` execution. Scheduled mobs also satisfy actor-presence gates for
+optional `Schedule`, mutable `state`, optional present/nearby text, a small
+affordance list, and the story-level `HasAssets` facet. The current projector
+derives the mob's effective location from the current `WorldTime`: if a matching
+schedule entry names a location, that location wins; otherwise the mob remains
+at its fallback `location`. If the effective location matches the current
+sandbox location, the mob can add present journal text, self-loop choices, and
+simple player/mob asset transfer choices. Authored mob choices can mutate mob
+state through normal `Effect` execution, while asset transfers use the ordinary
+`AssetTransactionManager`. Scheduled mobs also satisfy actor-presence gates for
 scheduled events. This proves the "pirate has a runtime home" shape without
-adding movement AI, pathfinding, fleeing, combat, inventory-bearing mobs, or
-lazy dialog scene generation yet.
+adding movement AI, pathfinding, fleeing, combat, trade negotiation, or lazy
+dialog scene generation yet.
 
 ### Visibility Projection
 

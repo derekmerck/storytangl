@@ -166,7 +166,8 @@ class SandboxLocationSpec(BaseModel):
 class SandboxInitialAssetSpec(BaseModel):
     """Initial placement and state for one compiled asset."""
 
-    location: str
+    location: str | None = None
+    mob: str | None = None
     state: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -334,12 +335,17 @@ class SandboxSliceCompiler:
         graph.add(scope)
 
         locations = self._compile_locations(graph=graph, scope=scope, spec=spec)
-        assets = self._compile_assets(graph=graph, locations=locations, spec=spec)
         fixtures = self._compile_fixtures(locations=locations, spec=spec)
         mobs = self._compile_mobs(
             graph=graph,
             scope=scope,
             locations=locations,
+            spec=spec,
+        )
+        assets = self._compile_assets(
+            graph=graph,
+            locations=locations,
+            mobs=mobs,
             spec=spec,
         )
 
@@ -429,6 +435,7 @@ class SandboxSliceCompiler:
         *,
         graph: StoryGraph,
         locations: dict[str, SandboxLocation],
+        mobs: dict[str, SandboxMob],
         spec: SandboxSliceSpec,
     ) -> dict[str, Token]:
         assets: dict[str, Token] = {}
@@ -438,13 +445,30 @@ class SandboxSliceCompiler:
             self._ensure_asset_type(label, asset_spec, traits, state)
             asset = Token[SandboxCompiledAssetType](token_from=label, label=label)
             graph.add(asset)
-            self._require_location(
-                locations,
-                asset_spec.initial.location,
-                source_kind="Asset",
-                source_label=label,
-                relation="starts in",
-            ).add_asset(asset)
+            initial = asset_spec.initial
+            if initial.location is not None and initial.mob is not None:
+                raise ValueError(
+                    f"Asset {label!r} initial placement must choose location or mob"
+                )
+            if initial.mob is not None:
+                if initial.mob not in mobs:
+                    raise ValueError(
+                        f"Asset {label!r} starts on unknown sandbox mob "
+                        f"{initial.mob!r}"
+                    )
+                mobs[initial.mob].add_asset(asset)
+            elif initial.location is not None:
+                self._require_location(
+                    locations,
+                    initial.location,
+                    source_kind="Asset",
+                    source_label=label,
+                    relation="starts in",
+                ).add_asset(asset)
+            else:
+                raise ValueError(
+                    f"Asset {label!r} initial placement requires location or mob"
+                )
             assets[label] = asset
         return assets
 

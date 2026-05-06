@@ -700,6 +700,60 @@ def _set_mob_state(
     return mob.set_state_value(state_key, value)
 
 
+def _mob_can_receive_asset(
+    location: SandboxLocation,
+    mob_label: str,
+    asset_label: str,
+) -> bool:
+    mob = _mob_by_label(location, mob_label)
+    player_assets = _player_asset_holder(location)
+    if mob is None or player_assets is None:
+        return False
+    asset = player_assets.get_asset(asset_label)
+    return bool(asset and mob.can_receive_asset(asset, player_assets))
+
+
+def _mob_can_give_asset(
+    location: SandboxLocation,
+    mob_label: str,
+    asset_label: str,
+) -> bool:
+    mob = _mob_by_label(location, mob_label)
+    player_assets = _player_asset_holder(location)
+    if mob is None or player_assets is None:
+        return False
+    asset = mob.get_asset(asset_label)
+    return bool(asset and mob.can_give_asset(asset, player_assets))
+
+
+def _give_asset_to_mob(
+    location: SandboxLocation,
+    mob_label: str,
+    asset_label: str,
+) -> Token:
+    mob = _mob_by_label(location, mob_label)
+    if mob is None:
+        raise KeyError(mob_label)
+    player_assets = _player_asset_holder(location)
+    if player_assets is None:
+        raise ValueError("sandbox location has no player asset holder")
+    return AssetTransactionManager().give_asset(player_assets, mob, asset_label)
+
+
+def _take_asset_from_mob(
+    location: SandboxLocation,
+    mob_label: str,
+    asset_label: str,
+) -> Token:
+    mob = _mob_by_label(location, mob_label)
+    if mob is None:
+        raise KeyError(mob_label)
+    player_assets = _player_asset_holder(location)
+    if player_assets is None:
+        raise ValueError("sandbox location has no player asset holder")
+    return AssetTransactionManager().give_asset(mob, player_assets, asset_label)
+
+
 @on_gather_ns(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -796,6 +850,34 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
             str(mob_label),
             str(state_key),
             value,
+        ),
+        "sandbox_mob_can_receive_asset": (
+            lambda mob_label, asset_label: _mob_can_receive_asset(
+                caller,
+                str(mob_label),
+                str(asset_label),
+            )
+        ),
+        "sandbox_mob_can_give_asset": (
+            lambda mob_label, asset_label: _mob_can_give_asset(
+                caller,
+                str(mob_label),
+                str(asset_label),
+            )
+        ),
+        "sandbox_give_asset_to_mob": (
+            lambda mob_label, asset_label: _give_asset_to_mob(
+                caller,
+                str(mob_label),
+                str(asset_label),
+            )
+        ),
+        "sandbox_take_asset_from_mob": (
+            lambda mob_label, asset_label: _take_asset_from_mob(
+                caller,
+                str(mob_label),
+                str(asset_label),
+            )
         ),
     }
 
@@ -1211,6 +1293,93 @@ def _project_asset_container_actions(
             )
 
 
+def _project_mob_asset_actions(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    mob: SandboxMob,
+    player_assets: HasAssets,
+) -> None:
+    mob_label = mob.get_label()
+    if not mob_label:
+        return
+    mob_name = mob.name or mob_label
+    for asset_label, asset in sorted(player_assets.assets.items()):
+        asset_name = _asset_name(asset)
+        Action(
+            registry=graph,
+            label=f"sandbox_give_{location.get_label()}_{asset_label}_to_{mob_label}",
+            predecessor_id=location.uid,
+            successor_id=location.uid,
+            text=f"Give {asset_name} to {mob_name}",
+            availability=[
+                Predicate(
+                    expr=(
+                        "sandbox_mob_can_receive_asset("
+                        f"{mob_label!r}, {asset_label!r})"
+                    )
+                )
+            ],
+            effects=[
+                Effect(
+                    expr=(
+                        f"sandbox_give_asset_to_mob({mob_label!r}, "
+                        f"{asset_label!r})"
+                    )
+                )
+            ],
+            journal_text="Done.",
+            tags={"dynamic", "sandbox", "mob", "asset", "give"},
+            ui_hints=_sandbox_contribution_hints(
+                location,
+                source="sandbox_mob",
+                contribution="give_to_mob",
+                source_label=mob_label,
+                source_kind="mob",
+                mob=mob_label,
+                asset=asset_label,
+                target=mob_label,
+            ),
+        )
+    for asset_label, asset in sorted(mob.assets.items()):
+        asset_name = _asset_name(asset)
+        Action(
+            registry=graph,
+            label=f"sandbox_take_{location.get_label()}_{asset_label}_from_{mob_label}",
+            predecessor_id=location.uid,
+            successor_id=location.uid,
+            text=f"Take {asset_name} from {mob_name}",
+            availability=[
+                Predicate(
+                    expr=(
+                        "sandbox_mob_can_give_asset("
+                        f"{mob_label!r}, {asset_label!r})"
+                    )
+                )
+            ],
+            effects=[
+                Effect(
+                    expr=(
+                        f"sandbox_take_asset_from_mob({mob_label!r}, "
+                        f"{asset_label!r})"
+                    )
+                )
+            ],
+            journal_text=_asset_take_text(asset),
+            tags={"dynamic", "sandbox", "mob", "asset", "take"},
+            ui_hints=_sandbox_contribution_hints(
+                location,
+                source="sandbox_mob",
+                contribution="take_from_mob",
+                source_label=mob_label,
+                source_kind="mob",
+                mob=mob_label,
+                asset=asset_label,
+                target=mob_label,
+            ),
+        )
+
+
 @on_provision(
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
@@ -1403,7 +1572,15 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
     if _projection_state(caller, ctx).suppress_location_description:
         return None
 
+    player_assets = _player_asset_holder(caller)
     for mob in _present_mobs(caller):
+        if player_assets is not None:
+            _project_mob_asset_actions(
+                caller,
+                graph=graph,
+                mob=mob,
+                player_assets=player_assets,
+            )
         mob_label = mob.get_label()
         for affordance in mob.affordances:
             affordance_tag = _mob_affordance_tag(affordance.label)

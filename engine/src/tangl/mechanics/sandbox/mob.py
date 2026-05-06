@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from tangl.story.concepts import Actor
+from tangl.story.concepts.asset import HasAssets
 
 from .schedule import Schedule
 from .time import WorldTime
@@ -21,7 +22,7 @@ class SandboxMobAffordance(BaseModel):
     state_effects: dict[str, Any] = Field(default_factory=dict)
 
 
-class SandboxMob(Actor):
+class SandboxMob(HasAssets, Actor):
     """Stable actor-like concept that can be parked in a sandbox location."""
 
     kind: str = ""
