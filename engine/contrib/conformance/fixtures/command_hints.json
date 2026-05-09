@@ -1,0 +1,76 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000006",
+  "step": 52,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000601",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000602",
+        "00000000-0000-4000-8000-000000000603",
+        "00000000-0000-4000-8000-000000000606",
+        "00000000-0000-4000-8000-000000000607"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000602",
+      "fragment_type": "content",
+      "content": "You are in a small stone chamber. A brass lamp rests beside a closed iron door.",
+      "content_format": "md"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000603",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "field",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000604",
+        "00000000-0000-4000-8000-000000000605"
+      ],
+      "hints": {"label_text": "Visible things"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000604",
+      "fragment_type": "token",
+      "token_id": "lamp",
+      "kind": "item",
+      "content": "brass lamp",
+      "display_state": "available",
+      "zone_ref": "00000000-0000-4000-8000-000000000603"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000605",
+      "fragment_type": "token",
+      "token_id": "iron-door",
+      "kind": "exit",
+      "content": "iron door",
+      "display_state": "closed",
+      "zone_ref": "00000000-0000-4000-8000-000000000603"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000606",
+      "fragment_type": "interpretation",
+      "content": "You can't eat the mailbox.",
+      "outcome": "impossible",
+      "command_text": "eat mailbox"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000607",
+      "fragment_type": "choice",
+      "edge_id": "interpret_command",
+      "text": "Try a command.",
+      "available": true,
+      "accepts": {"kind": "raw_command"},
+      "ui_hints": {"hotkey": ">"}
+    }
+  ],
+  "metadata": {
+    "fixture": "command_hints",
+    "grammar": {
+      "examples": ["take lamp", "open door", "look around"],
+      "verbs": ["take", "open", "look"],
+      "nouns": ["lamp", "door"]
+    }
+  }
+}

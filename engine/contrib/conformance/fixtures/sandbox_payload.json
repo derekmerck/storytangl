@@ -1,0 +1,117 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000005",
+  "step": 51,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000501",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000502",
+        "00000000-0000-4000-8000-000000000503",
+        "00000000-0000-4000-8000-000000000506",
+        "00000000-0000-4000-8000-000000000507",
+        "00000000-0000-4000-8000-000000000508",
+        "00000000-0000-4000-8000-000000000509"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000502",
+      "fragment_type": "content",
+      "content": "The bedroom smells of rain. A brass lamp sits on the desk.",
+      "content_format": "md"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000503",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "field",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000504",
+        "00000000-0000-4000-8000-000000000505"
+      ],
+      "hints": {"label_text": "Here"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000504",
+      "fragment_type": "token",
+      "token_id": "lamp",
+      "kind": "item",
+      "content": "brass lamp",
+      "display_state": "available",
+      "zone_ref": "00000000-0000-4000-8000-000000000503",
+      "hints": {"label_text": "brass lamp"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000505",
+      "fragment_type": "token",
+      "token_id": "mailbox",
+      "kind": "item",
+      "content": "small mailbox",
+      "display_state": "closed",
+      "zone_ref": "00000000-0000-4000-8000-000000000503",
+      "hints": {"label_text": "small mailbox"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000506",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001506",
+      "text": "Look around.",
+      "available": true,
+      "accepts": {"kind": "pick"},
+      "ui_hints": {"hotkey": "1"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000507",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001507",
+      "text": "Take something.",
+      "available": true,
+      "accepts": {
+        "kind": "tokens",
+        "min": 1,
+        "max": 1,
+        "constraints": {
+          "target_zone_ref": "00000000-0000-4000-8000-000000000503"
+        }
+      },
+      "ui_hints": {"hotkey": "2"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000508",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001508",
+      "text": "Name your sword.",
+      "available": true,
+      "accepts": {
+        "kind": "text",
+        "placeholder": "e.g. Hopebreaker",
+        "validators": [
+          {"kind": "length", "min": 2, "max": 24},
+          {
+            "kind": "regex",
+            "pattern": "^[A-Za-z][A-Za-z '-]*$",
+            "message": "Letters, spaces, ' and - only."
+          }
+        ]
+      },
+      "ui_hints": {"hotkey": "3"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000509",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001509",
+      "text": "Offer coins.",
+      "available": true,
+      "accepts": {
+        "kind": "quantity",
+        "min": 1,
+        "max": 7,
+        "step": 1,
+        "unit": "coin"
+      },
+      "ui_hints": {"hotkey": "4"}
+    }
+  ],
+  "metadata": {"fixture": "sandbox_payload"}
+}

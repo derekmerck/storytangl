@@ -3,12 +3,18 @@
 > Status: Directional contract for fragment-era interactivity
 > Authority: Story owns interaction meaning; service transports fragments;
 > clients render affordances and gracefully degrade unsupported widgets.
+> Current render-contract authority: `STORYTANGL_WIDGET_VOCAB.md`, with
+> repo-current status tracked in `WIDGET_CONTRACT_RECONCILIATION.md`.
 
 StoryTangl is not trying to turn every client into a general game engine. The
 engine and handlers own legality, state transitions, scoring, and hidden state.
 The client-facing vocabulary should instead describe what kind of player action
 is being requested, what state is legible, and how a renderer may collect a
 payload.
+
+This note remains useful as interaction-design rationale. The unified widget
+vocabulary supersedes it for portable fragment widgets, `ProjectedState`
+section values, tier tags, and conformance fixture planning.
 
 The current `choice` fragment is the minimal form of this contract. The broader
 vocabulary below describes the features we are building toward as fixtures and
@@ -195,6 +201,19 @@ Grammar hints are optional and must be treated as denormalized convenience
 metadata derived from the visible turn surface. They must not contain hidden
 verbs, nouns, aliases, or targets.
 
+The first web-client hint shape is deliberately advisory:
+
+```text
+metadata:
+  grammar:
+    examples: ["take lamp", "open door"]
+    verbs: ["take", "open"]
+    nouns: ["lamp", "door"]
+```
+
+Clients can use this for placeholders or autocomplete. A CLI or minimal client
+can ignore it and submit raw text to `interpret_command`.
+
 When a raw command does not advance the story, the backend should return a
 renderable feedback fragment. A future `interpretation` fragment can cover:
 
@@ -308,9 +327,8 @@ The next web/client work should stay small and contract-driven:
 2. Add `ChoiceInputView` for `pick`, `text`, `quantity`, and `tokens`.
 3. Add canonical fixtures for a quantity interaction and a small sandbox-like
    turn with visible room/inventory zones.
-4. Add raw command input only after the payload widgets are tested. It should
-   submit to a reserved `raw_command` choice and fall back to backend
-   interpretation when no local hint is available.
+4. Keep raw command input as a reserved `raw_command` choice that submits
+   `{text}` to the backend; grammar hints are optional presentation metadata.
 5. Add `interpretation` rendering after the backend shape exists; fallback to
    content is acceptable before then.
 6. Add `compose` after the simple payload widgets are stable.

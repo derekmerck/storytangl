@@ -222,7 +222,7 @@ accepts: {
 }
 payload: { token_ids: ['rust-map-card'] }
 
-// raw command fallback (deferred; submit to a reserved interpretation choice)
+// raw command fallback
 accepts: { kind: 'raw_command' }
 payload: { text: 'take lamp' }
 ```
@@ -230,6 +230,16 @@ payload: { text: 'take lamp' }
 Command bars are backend-authoritative. Use grammar hints only for optional
 preview/autocomplete; when in doubt, submit raw text to the reserved
 `interpret_command` choice and render the returned envelope.
+
+```typescript
+metadata: {
+  grammar: {
+    examples: ['take lamp', 'open door'],
+    verbs: ['take', 'open'],
+    nouns: ['lamp', 'door']
+  }
+}
+```
 
 ## 🌐 API Endpoints
 

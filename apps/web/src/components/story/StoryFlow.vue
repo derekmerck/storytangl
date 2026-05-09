@@ -75,6 +75,7 @@ const applyControlFragment = (
 const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]): StorySceneModel[] => {
   const sceneGroups = renderFragments.filter(isSceneGroup)
   const groups = sceneGroups.length > 0 ? sceneGroups : []
+  const metadata = envelope.metadata ?? {}
 
   if (groups.length > 0) {
     return groups.map((group) => {
@@ -83,6 +84,7 @@ const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]
         key: `${group.uid}-${sceneCounter.value}`,
         uid: group.uid,
         memberIds: [...group.member_ids],
+        metadata,
       }
     })
   }
@@ -98,6 +100,7 @@ const buildScenes = (envelope: RuntimeEnvelope, renderFragments: StoryFragment[]
       key: `scene-${envelope.step ?? sceneCounter.value}-${sceneCounter.value}`,
       uid: `scene-${envelope.step ?? sceneCounter.value}`,
       memberIds,
+      metadata,
     },
   ]
 }
@@ -222,6 +225,7 @@ const doAction = async (actionUid: string, payload?: unknown) => {
       ref="sceneRefs"
       :scene="scene"
       :fragments="fragmentRegistry"
+      :metadata="scene.metadata"
       :disabled="loading"
       @doAction="doAction"
     />

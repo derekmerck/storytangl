@@ -1,0 +1,96 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000001",
+  "step": 47,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000101",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000102",
+        "00000000-0000-4000-8000-000000000103",
+        "00000000-0000-4000-8000-000000000104",
+        "00000000-0000-4000-8000-000000000107",
+        "00000000-0000-4000-8000-000000000108",
+        "00000000-0000-4000-8000-000000000109"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000102",
+      "fragment_type": "content",
+      "content": "Rain drums on the thatch. Inside the Crossroads Inn the air is smoke and peat.",
+      "content_format": "md",
+      "hints": {"style_tags": ["narrative", "establishing"]}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000103",
+      "fragment_type": "media",
+      "content": "/media/world/tangl_world/crossroads.svg",
+      "content_format": "url",
+      "media_role": "cover_im",
+      "staging_hints": {"media_shape": "banner"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000104",
+      "fragment_type": "group",
+      "group_type": "dialog",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000105",
+        "00000000-0000-4000-8000-000000000106"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000105",
+      "fragment_type": "attributed",
+      "who": "Stranger",
+      "how": "low, confidential",
+      "media": "speech",
+      "content": "They say you're headed north."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000106",
+      "fragment_type": "media",
+      "content": "/media/world/tangl_world/stranger_avatar.svg",
+      "content_format": "url",
+      "media_role": "avatar_im",
+      "staging_hints": {"media_shape": "avatar"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000107",
+      "fragment_type": "kv",
+      "content": [
+        ["time", "late evening"],
+        ["coin", "63 s"],
+        ["weather", "rain"]
+      ],
+      "hints": {"style_tags": ["status-inline"]}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000108",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001108",
+      "text": "Pay the forty silver.",
+      "available": true,
+      "ui_hints": {"hotkey": "1", "icon": "cash"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000109",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001109",
+      "text": "Lift the map while he drinks.",
+      "available": false,
+      "unavailable_reason": "Requires Sleight of Hand >= 2",
+      "blockers": [
+        {"kind": "skill", "key": "sleight_of_hand", "need": 2, "have": 1}
+      ],
+      "ui_hints": {"hotkey": "2", "icon": "hand"}
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000110",
+      "fragment_type": "user_event",
+      "event_type": "achievement_progress",
+      "content": {"id": "met_10_strangers", "progress": "7/10"}
+    }
+  ],
+  "metadata": {"fixture": "crossroads_inn"}
+}

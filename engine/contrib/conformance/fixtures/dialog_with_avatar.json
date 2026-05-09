@@ -1,0 +1,45 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000002",
+  "step": 48,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000201",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": ["00000000-0000-4000-8000-000000000202"]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000202",
+      "fragment_type": "group",
+      "group_type": "dialog",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000203",
+        "00000000-0000-4000-8000-000000000204",
+        "00000000-0000-4000-8000-000000000205"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000203",
+      "fragment_type": "attributed",
+      "who": "Guard",
+      "how": "stern",
+      "media": "speech",
+      "content": "Who goes there?"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000204",
+      "fragment_type": "media",
+      "content": "/media/world/tangl_world/guard_avatar.svg",
+      "content_format": "url",
+      "media_role": "avatar_im"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000205",
+      "fragment_type": "media",
+      "content": "/media/world/tangl_world/gatehouse.svg",
+      "content_format": "url",
+      "media_role": "dialog_im"
+    }
+  ],
+  "metadata": {"fixture": "dialog_with_avatar"}
+}

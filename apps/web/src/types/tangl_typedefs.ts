@@ -376,4 +376,5 @@ export interface StorySceneModel {
   key: string
   uid: FragmentId
   memberIds: FragmentId[]
+  metadata?: Record<string, unknown>
 }

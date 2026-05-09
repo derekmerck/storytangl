@@ -1,0 +1,25 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000007",
+  "step": 53,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000701",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": ["00000000-0000-4000-8000-000000000702"]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000702",
+      "fragment_type": "content",
+      "content": "This line is removed before rendering.",
+      "content_format": "md"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000703",
+      "fragment_type": "delete",
+      "ref_type": "content",
+      "ref_id": "00000000-0000-4000-8000-000000000702"
+    }
+  ],
+  "metadata": {"fixture": "control_delete"}
+}

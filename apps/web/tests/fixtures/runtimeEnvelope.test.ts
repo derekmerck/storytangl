@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buyQuantityRuntimeEnvelope,
+  commandHintRuntimeEnvelope,
   crossroadsRuntimeEnvelope,
   sandboxPayloadRuntimeEnvelope,
 } from '.'
@@ -78,6 +79,7 @@ describe('runtime envelope fixtures', () => {
       crossroadsRuntimeEnvelope,
       buyQuantityRuntimeEnvelope,
       sandboxPayloadRuntimeEnvelope,
+      commandHintRuntimeEnvelope,
     ]
     const referencedChoices: Array<{ choice: ChoiceStoryFragment; refs: string[] }> = []
 
@@ -109,9 +111,9 @@ describe('runtime envelope fixtures', () => {
     expect(referencedChoices).not.toHaveLength(0)
   })
 
-  it('covers text, quantity, and token payload accepts', () => {
+  it('covers text, quantity, token, and raw command payload accepts', () => {
     const kinds = new Set(
-      sandboxPayloadRuntimeEnvelope.fragments
+      [...sandboxPayloadRuntimeEnvelope.fragments, ...commandHintRuntimeEnvelope.fragments]
         .filter((fragment): fragment is ChoiceStoryFragment => fragment.fragment_type === 'choice')
         .map((choice) => choice.accepts?.kind)
         .filter((kind): kind is string => typeof kind === 'string'),
@@ -120,5 +122,17 @@ describe('runtime envelope fixtures', () => {
     expect(kinds.has('text')).toBe(true)
     expect(kinds.has('quantity')).toBe(true)
     expect(kinds.has('tokens')).toBe(true)
+    expect(kinds.has('raw_command')).toBe(true)
+  })
+
+  it('keeps command grammar hints advisory metadata', () => {
+    const grammar = commandHintRuntimeEnvelope.metadata?.grammar
+
+    expect(isRecord(grammar)).toBe(true)
+    if (!isRecord(grammar)) {
+      throw new Error('command grammar fixture must be an object')
+    }
+    expect(Array.isArray(grammar.examples)).toBe(true)
+    expect(grammar.examples).toContain('take lamp')
   })
 })

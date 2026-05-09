@@ -8,6 +8,7 @@ import { isRecord } from './fragmentUtils'
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
+  metadata?: Record<string, unknown>
   disabled?: boolean
 }>()
 
@@ -37,7 +38,10 @@ const hasPayloadInput = computed(() => {
     return false
   }
   const kind = props.choice.accepts.kind
-  if (typeof kind === 'string' && ['text', 'quantity', 'tokens'].includes(kind)) {
+  if (
+    typeof kind === 'string' &&
+    ['text', 'quantity', 'tokens', 'raw_command'].includes(kind)
+  ) {
     return true
   }
   return typeof props.choice.accepts.input === 'string'
@@ -102,6 +106,7 @@ const handleClick = () => {
         v-if="hasPayloadInput"
         :choice="choice"
         :fragments="fragments ?? {}"
+        :metadata="metadata"
         :disabled="!available || busy"
         @payload-change="handlePayloadChange"
         @commit="handleClick"

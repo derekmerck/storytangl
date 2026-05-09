@@ -30,9 +30,15 @@ type PreparedValidator = Validator & {
   regex?: RegExp
 }
 
+type CommandGrammar = {
+  examples?: unknown
+  placeholder?: unknown
+}
+
 const props = defineProps<{
   choice: ChoiceStoryFragment
   fragments: Record<string, StoryFragment>
+  metadata?: Record<string, unknown>
   disabled?: boolean
 }>()
 
@@ -65,9 +71,33 @@ const acceptsKind = computed(() => {
 })
 const hasExplicitKind = computed(() => typeof accepts.value.kind === 'string')
 
-const rendersInput = computed(() => ['text', 'quantity', 'tokens'].includes(acceptsKind.value))
+const rendersInput = computed(() =>
+  ['text', 'quantity', 'tokens', 'raw_command'].includes(acceptsKind.value),
+)
 const inputLabel = computed(() => props.choice.text)
-const placeholder = computed(() => stringValue(accepts.value.placeholder) ?? '')
+const commandGrammar = computed<CommandGrammar>(() => {
+  const grammar = props.metadata?.grammar
+  return isRecord(grammar) ? grammar : {}
+})
+const commandExamples = computed(() =>
+  Array.isArray(commandGrammar.value.examples)
+    ? commandGrammar.value.examples.filter(
+        (example): example is string => typeof example === 'string' && example.length > 0,
+      )
+    : [],
+)
+const commandPlaceholder = computed(() => {
+  if (acceptsKind.value !== 'raw_command') {
+    return undefined
+  }
+  return (
+    stringValue(commandGrammar.value.placeholder) ??
+    (commandExamples.value.length > 0 ? `e.g. ${commandExamples.value[0]}` : 'Type a command')
+  )
+})
+const placeholder = computed(() =>
+  stringValue(accepts.value.placeholder) ?? commandPlaceholder.value ?? '',
+)
 const minValue = computed(() => numericValue(accepts.value.min))
 const maxValue = computed(() => numericValue(accepts.value.max))
 const stepValue = computed(() => numericValue(accepts.value.step) ?? 1)
@@ -247,7 +277,7 @@ const tokenPayload = (): PayloadState => {
 }
 
 const payloadState = computed<PayloadState>(() => {
-  if (acceptsKind.value === 'text') {
+  if (acceptsKind.value === 'text' || acceptsKind.value === 'raw_command') {
     return textPayload()
   }
   if (acceptsKind.value === 'quantity') {
@@ -308,9 +338,10 @@ watch(
 <template>
   <div v-if="rendersInput" class="choice-input-view" data-testid="choice-input-view">
     <v-text-field
-      v-if="acceptsKind === 'text'"
+      v-if="acceptsKind === 'text' || acceptsKind === 'raw_command'"
       v-model="inputValue"
       class="choice-input"
+      :class="{ 'choice-input--command': acceptsKind === 'raw_command' }"
       density="compact"
       hide-details
       variant="outlined"
@@ -386,6 +417,10 @@ watch(
 
 .choice-input {
   max-width: 280px;
+}
+
+.choice-input--command {
+  max-width: min(100%, 520px);
 }
 
 .choice-input--quantity {

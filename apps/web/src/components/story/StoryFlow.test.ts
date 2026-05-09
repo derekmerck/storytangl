@@ -7,6 +7,7 @@ import * as directives from 'vuetify/directives'
 
 import { HttpResponse, http, server } from '@tests/setup'
 import {
+  commandHintRuntimeEnvelope,
   crossroadsNextRuntimeEnvelope,
   crossroadsRuntimeEnvelope,
 } from '@tests/fixtures'
@@ -174,6 +175,39 @@ describe('StoryFlow', () => {
 
     const scenes = wrapper.findAllComponents(StoryBlock)
     expect(scenes.length).toBeGreaterThan(initialCount)
+    expect(wrapper.text()).toContain('The stranger slides the folded vellum')
+  })
+
+  it('submits command text through the reserved raw command choice', async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/story/update`, () =>
+        HttpResponse.json(commandHintRuntimeEnvelope),
+      ),
+      http.post(`${DEFAULT_API_URL}/story/do`, async ({ request }) => {
+        const body = await request.json()
+        expect(body).toEqual({
+          choice_id: 'interpret_command',
+          payload: { text: 'take lamp' },
+        })
+        return HttpResponse.json(crossroadsNextRuntimeEnvelope)
+      }),
+    )
+
+    const wrapper = mountFlow()
+    await flushPromises()
+
+    const input = wrapper.find('input')
+    expect(input.attributes('placeholder')).toBe('e.g. take lamp')
+
+    await input.setValue('take lamp')
+    const commandButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Try a command'))
+
+    expect(commandButton).toBeDefined()
+    await commandButton!.trigger('click')
+    await flushPromises()
+
     expect(wrapper.text()).toContain('The stranger slides the folded vellum')
   })
 

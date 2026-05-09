@@ -244,14 +244,14 @@ User clicks action button:
         │
         └─► Browser auto-scrolls to new content
 
-Payload-bearing choices follow the same path. `accepts.kind="text"` submits
-`{text}`, `quantity` submits `{quantity}`, and `tokens` submits `{token_ids}`.
-The backend validates every payload.
+Payload-bearing choices follow the same path. `accepts.kind="text"` and
+`raw_command` submit `{text}`, `quantity` submits `{quantity}`, and `tokens`
+submits `{token_ids}`. The backend validates every payload.
 
-Command bars are a later affordance over this same path. A command bar submits
-raw text to a reserved `raw_command` choice such as `interpret_command` unless
-the backend has already provided a safe resolved choice. Advisory grammar hints
-may improve preview/autocomplete, but they do not replace backend resolution.
+Command bars are an affordance over this same path. A command bar submits raw
+text to a reserved `raw_command` choice such as `interpret_command`. Advisory
+grammar hints from `RuntimeEnvelope.metadata.grammar` may improve placeholder,
+preview, or autocomplete behavior, but they do not replace backend resolution.
 
 ═══════════════════════════════════════════════════════════════════
                     KEY DESIGN DECISIONS

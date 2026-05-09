@@ -20,6 +20,7 @@ import {
 const props = defineProps<{
   scene: StorySceneModel
   fragments: Record<string, StoryFragment>
+  metadata?: Record<string, unknown>
   disabled?: boolean
 }>()
 
@@ -84,6 +85,7 @@ const handleAction = (uid: string, payload?: unknown) => {
             :key="choice.uid"
             :choice="choice"
             :fragments="fragments"
+            :metadata="metadata"
             :disabled="disabled"
             @doAction="handleAction"
           />

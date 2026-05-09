@@ -1,0 +1,46 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000000004",
+  "step": 50,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000000401",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000000402",
+        "00000000-0000-4000-8000-000000000403",
+        "00000000-0000-4000-8000-000000000404"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000402",
+      "fragment_type": "content",
+      "content": "The quartermaster taps the crate. Rations are two coin each.",
+      "content_format": "md"
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000403",
+      "fragment_type": "kv",
+      "content": [
+        ["wallet", "7 coin"],
+        ["rations", 0]
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000000404",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000001404",
+      "text": "Buy rations.",
+      "available": true,
+      "accepts": {
+        "kind": "quantity",
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "unit": "ration"
+      },
+      "ui_hints": {"hotkey": "1"}
+    }
+  ],
+  "metadata": {"fixture": "quantity_payload"}
+}

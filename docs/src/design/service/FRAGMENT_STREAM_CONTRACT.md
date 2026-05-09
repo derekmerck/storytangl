@@ -4,6 +4,8 @@
 > Authority: `tangl.service.response.RuntimeEnvelope`,
 > `tangl.journal.fragments`, `ServiceManager`, and the web fixtures under
 > `apps/web/tests/fixtures/`.
+> Renderer vocabulary: `../story/STORYTANGL_WIDGET_VOCAB.md`; repo-current
+> implementation status: `../story/WIDGET_CONTRACT_RECONCILIATION.md`.
 
 Story session methods return `RuntimeEnvelope`. The envelope carries ordered
 journal fragments plus cursor metadata. Clients render those fragments directly;
@@ -185,6 +187,19 @@ hints should travel under `metadata.grammar`. If promoted to a top-level
 `RuntimeEnvelope.grammar` field later, the semantics should stay the same:
 grammar is a visible-surface projection and never a security boundary.
 
+The first supported hint shape is intentionally small:
+
+```text
+metadata:
+  grammar:
+    examples: ["take lamp", "open door"]
+    verbs: ["take", "open"]
+    nouns: ["lamp", "door"]
+```
+
+Clients may ignore these hints and still submit `{text}` to
+`interpret_command`.
+
 ## Decision Legibility
 
 If an open choice references a token, zone, blocker, state fragment, or other
@@ -215,7 +230,7 @@ Required fixture behaviors:
 - a realistic `ProjectedState`
 - locked choices with blockers
 - freeform, quantity, and token payload contracts
-- raw-command payload contracts once interpretation choices land
+- raw-command payload contracts through reserved interpretation choices
 - group flattening and dialog grouping
 - unknown fragment fallback
 - pending media placeholders

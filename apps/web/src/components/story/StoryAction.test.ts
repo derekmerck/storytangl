@@ -12,6 +12,7 @@ const vuetify = createVuetify({ components, directives })
 const mountWithVuetify = (props: {
   choice: ChoiceStoryFragment
   fragments?: Record<string, StoryFragment>
+  metadata?: Record<string, unknown>
   disabled?: boolean
 }) =>
   mount(StoryAction, {
@@ -236,6 +237,67 @@ describe('StoryAction', () => {
     await wrapper.find('input').setValue('Hope')
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')![0]).toEqual(['action_text', { text: 'Hope' }])
+  })
+
+  it('emits raw command payloads through the reserved interpretation edge', async () => {
+    const commandChoice: ChoiceStoryFragment = {
+      uid: 'action_command',
+      fragment_type: 'choice',
+      edge_id: 'interpret_command',
+      text: 'Try a command.',
+      accepts: { kind: 'raw_command' },
+    }
+
+    const wrapper = mountWithVuetify({
+      choice: commandChoice,
+      metadata: {
+        grammar: {
+          examples: ['take lamp', 'open door'],
+        },
+      },
+    })
+
+    const input = wrapper.find('input')
+    expect(input.attributes('placeholder')).toBe('e.g. take lamp')
+
+    await input.setValue('take lamp')
+    await wrapper.find('button').trigger('click')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'interpret_command',
+      { text: 'take lamp' },
+    ])
+  })
+
+  it('submits raw commands when grammar hints are missing or malformed', async () => {
+    const commandChoice: ChoiceStoryFragment = {
+      uid: 'action_command',
+      fragment_type: 'choice',
+      edge_id: 'interpret_command',
+      text: 'Try a command.',
+      accepts: { kind: 'raw_command' },
+    }
+
+    const wrapper = mountWithVuetify({
+      choice: commandChoice,
+      metadata: {
+        grammar: {
+          examples: [12, null],
+          verbs: 'take',
+        },
+      },
+    })
+
+    const input = wrapper.find('input')
+    expect(input.attributes('placeholder')).toBe('Type a command')
+
+    await input.setValue('xyzzy')
+    await input.trigger('keydown.enter')
+
+    expect(wrapper.emitted('doAction')![0]).toEqual([
+      'interpret_command',
+      { text: 'xyzzy' },
+    ])
   })
 
   it('emits quantity accepts payloads after min/max validation passes', async () => {
