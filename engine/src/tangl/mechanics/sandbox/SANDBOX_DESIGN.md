@@ -67,6 +67,12 @@ geography before choosing what to reduce to prose. How intentionality, telos,
 and authorial direction constrain that choice remains a later design question,
 but the cursor-projection vocabulary gives us a place to ask it.
 
+The broader philosophy note names this as a superposition of possible stories:
+the observed journal collapses part of the design space, while still-unobserved
+soft truth can be re-solved around later choices. Sandbox geography is one
+useful projection for that future solver because it makes nearby opportunities,
+recent paths, blocked routes, and offscreen actors explicit.
+
 ---
 
 ## Relationship To Existing Architecture

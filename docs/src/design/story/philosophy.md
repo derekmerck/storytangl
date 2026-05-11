@@ -187,6 +187,72 @@ any point in the traversal.
 
 ---
 
+## Superposition of Possible Stories
+
+StoryTangl can also be understood as maintaining a **superposition of possible
+stories**.  A linear narrative fixes beginning, middle, and end before the
+reader begins.  A traditional branching story pre-considers many deterministic
+paths.  A more dynamic story can instead begin with a field of compatible
+latent truths: possible motives, identities, relationships, role assignments,
+symbolic meanings, future beats, and story arcs.
+
+Traversal collapses that field gradually.  Each journaled disclosure removes
+some possibilities and strengthens others.  What has been disclosed to the
+reader becomes hard to revise; what has only been assumed by planners,
+handlers, or hidden state can remain soft.  If an unexpected choice or event
+occurs, the engine may retcon any still-unobserved soft truth so the new beat
+fits the evidence already fixed in the syuzhet.
+
+This suggests a useful distinction:
+
+- **Observed truth**: fixed because it has appeared in the journal or has been
+  explicitly committed by the runtime ledger.
+- **Committed hidden truth**: fixed internally, but not yet disclosed.
+- **Soft truth**: provisional assumptions used by planners or authorities, but
+  still revisable if the story can re-solve coherently.
+- **Potential truth**: candidate explanations, identities, motives, roles, and
+  payoffs still available in the design space.
+- **Contradicted truth**: no longer available unless reframed as dream, lie,
+  rumor, hallucination, mistaken identity, fiction-within-fiction, or another
+  explicit interpretive move.
+
+Under this model, retcon is not cheating.  It is a controlled narrative
+operation over soft truth, constrained by the observed ledger.  The design goal
+is not to make every possible hidden fact mutable forever.  It is to know which
+facts have become accountable to the reader and which facts remain negotiable.
+
+### Latent Hooks and Foreshadowing
+
+Foreshadowing is retrospective.  A disclosed element becomes foreshadowing only
+when a later payoff makes the earlier disclosure matter in hindsight.  Until
+then, the same element may be ordinary world-building, atmosphere, a motif, a
+red herring, or unused texture.
+
+The old sword on the mantelpiece is therefore not inherently Chekhov's sword.
+At first it is a **latent hook**: a disclosed story element with possible
+affordances and meanings.  If Act III needs a duel, inheritance clue, threat,
+family memory, or ironic accident, the sword can be promoted into payoff.  If
+no compatible future beat calls for it, the sword remains world-building.  If
+too much salience was spent on it, the story may need to pay it off, deflate it,
+or intentionally reclassify it as misdirection.
+
+This gives future planning systems a concrete question to ask:
+
+- Which disclosed hooks remain latent?
+- Which hooks are compatible with the current telos and emerging story arc?
+- Which hooks have accumulated enough salience that they should pay off,
+  invert, or be deliberately retired?
+- Which proposed twist can be supported by earlier disclosures without
+  violating the observed syuzhet?
+
+The implementation implied by this section is not present yet.  It points
+toward a future constraint authority over the fact ledger: hard disclosures,
+soft assumptions, latent hooks, morphology/genre constraints, and authorial
+telos would be solved together before the next beat is reduced to journal
+prose.
+
+---
+
 ## Landmarks in Story Space
 
 The graph's nodes are **landmarks** — fixed points of authored narrative
