@@ -57,6 +57,16 @@ links do not need intrinsic plot semantics. They are transitions from one menu
 of opportunities to a neighboring menu of opportunities, while the normal graph
 and story overlays continue to supply narrative meaning.
 
+This also points toward a useful separation between truth, disclosure, and
+rendering. The story graph and world state can hold what is true; the syuzhet
+projection can hold what has been disclosed to this reader; the journal renderer
+can decide what the current narrator is allowed to say now. A future generative
+beat can walk backward through story truth, backward through reader disclosure,
+up through character-arc or morphology space, and outward through sandbox
+geography before choosing what to reduce to prose. How intentionality, telos,
+and authorial direction constrain that choice remains a later design question,
+but the cursor-projection vocabulary gives us a place to ask it.
+
 ---
 
 ## Relationship To Existing Architecture
