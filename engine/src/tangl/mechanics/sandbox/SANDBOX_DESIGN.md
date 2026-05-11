@@ -418,6 +418,17 @@ than by creating a dialogue or encounter subsystem.
    pattern. Once-only interactions should use the existing visit-history
    suppression already used by scheduled events.
 
+   The core shape is not sandbox-specific. An interaction answers three VM
+   questions: where does this edge go, when does it fire, and should it return?
+   The `where` answer is a resolvable target reference; the `when` answer is
+   ordinary action selection or `activation`/`trigger_phase` (`first`/PREREQS,
+   `last`/POSTREQS); the `return` answer is `return_phase` on the edge.
+   Authoring syntaxes may expose this as `target`, `target_with_return`,
+   arrows such as `-->` / `-->&`, or sandbox's `return_to_location`, but those
+   are compiler conveniences over the same edge fields. Current sandbox
+   `return_to_location` should be unified with the general story compiler's
+   call/return action syntax when that exposure gap is addressed.
+
 3. **Keep conditions in the existing availability/effect vocabulary.** First
    pass conditions should be simple state predicates or runtime operations
    evaluated in the normal sandbox namespace. Avoid mob-specific condition
