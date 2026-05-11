@@ -108,6 +108,21 @@ These fixtures intentionally use `piece` and `piece_ids` only. There are no
 legacy clients outside this repository, so any remaining UI `token` vocabulary
 should be fixed in place when found rather than supported through adapters.
 
+## Multi-Envelope Sequence Suite
+
+Sequence fixtures live under `engine/contrib/conformance/sequences/`. They
+exercise the fragment registry over time rather than a single turn snapshot.
+
+- `garage_buy_mount.json`: starts with a pending media placeholder, a catalog
+  offer, an empty inventory zone, an empty slot zone, and an unknown fallback
+  fragment; then updates media to a ready URL, deletes the stale offer, adds a
+  realized piece, moves that piece into the slot, and deletes the fallback.
+
+The sequence harness asserts the same invariants a thin client needs: update
+fragments preserve UID identity, delete fragments remove stale registry entries,
+piece movement updates both zone membership and piece state, and every open
+choice references state renderable in the current scene shell.
+
 ## Webapp Remediation Backlog
 
 These are the concrete migrations implied by the unified vocabulary:
@@ -127,7 +142,9 @@ These are the concrete migrations implied by the unified vocabulary:
    outcome emits it.
 7. Implement `overlay` and `status_sidecar` only when the engine emits worked
    examples.
-8. Build or update the CLI reference port before graduating any P1/P2 widget
+8. Add more sequence fixtures as soon as a feature depends on cross-envelope
+   registry behavior rather than single-turn rendering.
+9. Build or update the CLI reference port before graduating any P1/P2 widget
    into Tier S.
 
 ## Wireframe Guidance

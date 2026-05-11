@@ -1,0 +1,285 @@
+{
+  "sequence_id": "garage_buy_mount",
+  "description": "Buy an offer, mint a realized piece, then move it into a slot while media and fallback fragments update across envelopes.",
+  "envelopes": [
+    {
+      "cursor_id": "00000000-0000-4000-8000-000000020001",
+      "step": 201,
+      "fragments": [
+        {
+          "uid": "00000000-0000-4000-8000-000000021001",
+          "fragment_type": "group",
+          "group_type": "scene",
+          "member_ids": [
+            "00000000-0000-4000-8000-000000021002",
+            "00000000-0000-4000-8000-000000021003",
+            "00000000-0000-4000-8000-000000021004",
+            "00000000-0000-4000-8000-000000021006",
+            "00000000-0000-4000-8000-000000021007",
+            "00000000-0000-4000-8000-000000021008",
+            "00000000-0000-4000-8000-000000021009"
+          ]
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021002",
+          "fragment_type": "content",
+          "content_format": "md",
+          "content": "Murph slides a fresh placard onto the counter."
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021003",
+          "fragment_type": "media",
+          "media_role": "info_im",
+          "content_format": "rit",
+          "content": "gen:garage-card",
+          "generation_status": "pending"
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021004",
+          "fragment_type": "group",
+          "group_type": "zone",
+          "zone_role": "catalog",
+          "member_ids": ["00000000-0000-4000-8000-000000021005"],
+          "hints": {
+            "label_text": "Murph's wares"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021005",
+          "fragment_type": "piece",
+          "piece_id": "flamethrower",
+          "kind": "weapon",
+          "realized": false,
+          "available": true,
+          "zone_ref": "00000000-0000-4000-8000-000000021004",
+          "properties": {
+            "name": "Flamethrower",
+            "weight": 3
+          },
+          "cost": [
+            {
+              "ledger_key": "wallet",
+              "delta": -400,
+              "unit": "cr"
+            }
+          ],
+          "hints": {
+            "label_text": "Flamethrower"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021006",
+          "fragment_type": "group",
+          "group_type": "zone",
+          "zone_role": "inventory",
+          "member_ids": [],
+          "hints": {
+            "label_text": "parts on hand"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021007",
+          "fragment_type": "group",
+          "group_type": "zone",
+          "zone_role": "slot",
+          "member_ids": [],
+          "hints": {
+            "label_text": "front mount"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021008",
+          "fragment_type": "choice",
+          "edge_id": "00000000-0000-4000-8000-000000020101",
+          "text": "Buy from Murph's.",
+          "available": true,
+          "accepts": {
+            "kind": "pieces",
+            "min": 1,
+            "max": 1,
+            "constraints": {
+              "target_zone_ref": "00000000-0000-4000-8000-000000021004"
+            }
+          },
+          "ui_hints": {
+            "hotkey": "1"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021009",
+          "fragment_type": "custom_probe",
+          "label": "debug marker"
+        }
+      ],
+      "metadata": {
+        "fixture": "garage_buy_mount_step_1"
+      }
+    },
+    {
+      "cursor_id": "00000000-0000-4000-8000-000000020002",
+      "step": 202,
+      "fragments": [
+        {
+          "uid": "00000000-0000-4000-8000-000000021010",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021003",
+          "payload": {
+            "content_format": "url",
+            "content": "/media/world/carwars/garage-card.svg",
+            "generation_status": "ready"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021011",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021004",
+          "payload": {
+            "member_ids": []
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021012",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021006",
+          "payload": {
+            "member_ids": ["00000000-0000-4000-8000-000000021013"]
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021013",
+          "fragment_type": "piece",
+          "piece_id": "flamethrower-1",
+          "kind": "weapon",
+          "realized": true,
+          "zone_ref": "00000000-0000-4000-8000-000000021006",
+          "properties": {
+            "name": "Flamethrower",
+            "weight": 3
+          },
+          "hints": {
+            "label_text": "Flamethrower"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021014",
+          "fragment_type": "delete",
+          "ref_id": "00000000-0000-4000-8000-000000021008"
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021015",
+          "fragment_type": "delete",
+          "ref_id": "00000000-0000-4000-8000-000000021005"
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021016",
+          "fragment_type": "choice",
+          "edge_id": "00000000-0000-4000-8000-000000020102",
+          "text": "Mount the flamethrower.",
+          "available": true,
+          "accepts": {
+            "kind": "place",
+            "source_zone_ref": "00000000-0000-4000-8000-000000021006",
+            "target_zone_ref": "00000000-0000-4000-8000-000000021007",
+            "constraints": {
+              "target_kind": ["weapon"]
+            }
+          },
+          "ui_hints": {
+            "hotkey": "1"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021017",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021001",
+          "payload": {
+            "member_ids": [
+              "00000000-0000-4000-8000-000000021002",
+              "00000000-0000-4000-8000-000000021003",
+              "00000000-0000-4000-8000-000000021004",
+              "00000000-0000-4000-8000-000000021006",
+              "00000000-0000-4000-8000-000000021007",
+              "00000000-0000-4000-8000-000000021016",
+              "00000000-0000-4000-8000-000000021009"
+            ]
+          }
+        }
+      ],
+      "metadata": {
+        "fixture": "garage_buy_mount_step_2"
+      }
+    },
+    {
+      "cursor_id": "00000000-0000-4000-8000-000000020003",
+      "step": 203,
+      "fragments": [
+        {
+          "uid": "00000000-0000-4000-8000-000000021018",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021006",
+          "payload": {
+            "member_ids": []
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021019",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021007",
+          "payload": {
+            "member_ids": ["00000000-0000-4000-8000-000000021013"]
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021020",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021013",
+          "payload": {
+            "zone_ref": "00000000-0000-4000-8000-000000021007",
+            "display_state": "mounted"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021021",
+          "fragment_type": "delete",
+          "ref_id": "00000000-0000-4000-8000-000000021016"
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021022",
+          "fragment_type": "delete",
+          "ref_id": "00000000-0000-4000-8000-000000021009"
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021023",
+          "fragment_type": "choice",
+          "edge_id": "00000000-0000-4000-8000-000000020103",
+          "text": "Hit the road.",
+          "available": true,
+          "accepts": {
+            "kind": "pick"
+          },
+          "ui_hints": {
+            "hotkey": "1"
+          }
+        },
+        {
+          "uid": "00000000-0000-4000-8000-000000021024",
+          "fragment_type": "update",
+          "ref_id": "00000000-0000-4000-8000-000000021001",
+          "payload": {
+            "member_ids": [
+              "00000000-0000-4000-8000-000000021002",
+              "00000000-0000-4000-8000-000000021003",
+              "00000000-0000-4000-8000-000000021004",
+              "00000000-0000-4000-8000-000000021006",
+              "00000000-0000-4000-8000-000000021007",
+              "00000000-0000-4000-8000-000000021023"
+            ]
+          }
+        }
+      ],
+      "metadata": {
+        "fixture": "garage_buy_mount_step_3"
+      }
+    }
+  ]
+}

@@ -22,6 +22,11 @@ the compact CarWars garage turn. Proposal fixtures should stay JSON-loadable
 and reference-port-renderable, but they are not conformance requirements until
 `docs/src/design/story/WIDGET_CONTRACT_RECONCILIATION.md` promotes them.
 
+`sequences/` contains multi-envelope fixtures. These exercise the client-side
+fragment registry: media placeholders update in place, pieces move between
+zones, stale offers or fallback fragments can be deleted, and open choices keep
+their referenced state renderable after each envelope.
+
 `reference_port.py` is the smallest current proof of that portability. It
 renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without
 importing engine models or calling the service layer. `cli_reference_port.py`

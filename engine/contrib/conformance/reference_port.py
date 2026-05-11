@@ -68,6 +68,20 @@ class RenderDocument:
         return tuple(item.choice for item in self.items if item.choice is not None)
 
 
+@dataclass(frozen=True)
+class SequenceRenderStep:
+    """One rendered step from a multi-envelope fixture sequence."""
+
+    index: int
+    envelope: JsonObject
+    registry: FragmentRegistry
+    document: RenderDocument
+
+    @property
+    def lines(self) -> list[str]:
+        return format_document(self.document)
+
+
 def load_fixture(path: Path) -> JsonObject:
     """Load a fixture JSON object."""
 
@@ -95,6 +109,39 @@ def render_fixture(payload: JsonObject) -> list[str]:
     return format_document(render_fixture_document(payload))
 
 
+def render_sequence_steps(sequence: JsonObject) -> tuple[SequenceRenderStep, ...]:
+    """Apply a sequence of RuntimeEnvelope-like payloads through one registry."""
+
+    registry: FragmentRegistry = {}
+    steps: list[SequenceRenderStep] = []
+    for index, envelope in enumerate(_object_list(sequence.get("envelopes")), start=1):
+        registry = apply_runtime_envelope(registry, envelope)
+        snapshot = dict(registry)
+        steps.append(
+            SequenceRenderStep(
+                index=index,
+                envelope=envelope,
+                registry=snapshot,
+                document=_render_runtime_document(envelope, snapshot),
+            )
+        )
+    return tuple(steps)
+
+
+def render_sequence(sequence: JsonObject) -> list[list[str]]:
+    """Render every step of a multi-envelope sequence to plain text lines."""
+
+    return [step.lines for step in render_sequence_steps(sequence)]
+
+
+def apply_runtime_envelope(registry: FragmentRegistry, envelope: JsonObject) -> FragmentRegistry:
+    """Return the registry state after applying one RuntimeEnvelope-like payload."""
+
+    next_registry = dict(registry)
+    _apply_fragments(next_registry, _object_list(envelope.get("fragments")))
+    return next_registry
+
+
 def format_document(document: RenderDocument) -> list[str]:
     """Format a rendered document as terminal-friendly text lines."""
 
@@ -105,7 +152,14 @@ def render_runtime_envelope_document(envelope: JsonObject) -> RenderDocument:
     """Render a RuntimeEnvelope-like JSON object to a generic view model."""
 
     fragments = _object_list(envelope.get("fragments"))
-    registry = _registry_after_controls(fragments)
+    registry: FragmentRegistry = {}
+    _apply_fragments(registry, fragments)
+    return _render_runtime_document(envelope, registry)
+
+
+def _render_runtime_document(envelope: JsonObject, registry: FragmentRegistry) -> RenderDocument:
+    """Render a RuntimeEnvelope-like registry snapshot to a generic view model."""
+
     scenes = [
         fragment
         for fragment in registry.values()
@@ -168,8 +222,7 @@ def _runtime_title(envelope: JsonObject) -> str:
     return " | ".join(bits)
 
 
-def _registry_after_controls(fragments: Sequence[JsonObject]) -> FragmentRegistry:
-    registry: FragmentRegistry = {}
+def _apply_fragments(registry: FragmentRegistry, fragments: Sequence[JsonObject]) -> None:
     for fragment in fragments:
         fragment_type = _text(fragment, "fragment_type")
         if fragment_type == "delete":
@@ -187,7 +240,6 @@ def _registry_after_controls(fragments: Sequence[JsonObject]) -> FragmentRegistr
         uid = _text(fragment, "uid")
         if uid:
             registry[uid] = fragment
-    return registry
 
 
 def _render_fragment(
