@@ -111,7 +111,7 @@ describe('runtime envelope fixtures', () => {
     expect(referencedChoices).not.toHaveLength(0)
   })
 
-  it('covers text, quantity, token, and raw command payload accepts', () => {
+  it('covers text, quantity, piece, and raw command payload accepts', () => {
     const kinds = new Set(
       [...sandboxPayloadRuntimeEnvelope.fragments, ...commandHintRuntimeEnvelope.fragments]
         .filter((fragment): fragment is ChoiceStoryFragment => fragment.fragment_type === 'choice')
@@ -121,7 +121,7 @@ describe('runtime envelope fixtures', () => {
 
     expect(kinds.has('text')).toBe(true)
     expect(kinds.has('quantity')).toBe(true)
-    expect(kinds.has('tokens')).toBe(true)
+    expect(kinds.has('pieces')).toBe(true)
     expect(kinds.has('raw_command')).toBe(true)
   })
 

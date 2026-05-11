@@ -46,7 +46,7 @@ The CLI floor is:
 
 - render prose and visible state as readable text
 - render choices in order, including locked choices and reasons
-- collect `text`, `quantity`, and visible `token` selections through prompts
+- collect `text`, `quantity`, and visible `piece` selections through prompts
 - submit the same `choice_id` plus payload that a rich widget submits
 - optionally submit raw command text to a reserved interpretation choice
 
@@ -59,7 +59,7 @@ client-side rules runtime.
 ### Surface
 
 A surface is a renderable interaction area: a choice list, hand, board, document
-packet, token pool, shop, map, status panel, or resource economy.
+packet, piece pool, shop, map, status panel, or resource economy.
 
 In the fragment stream, surfaces are usually represented by `group` fragments
 plus member fragments. `group_type="scene"` is the current top-level shell;
@@ -68,12 +68,12 @@ same id-reference pattern.
 
 ### Entity
 
-An entity is a renderable or targetable object: card, token, document, die,
+An entity is a renderable or targetable object: card, piece, document, die,
 credential, clue, actor, location, board cell, generator, or inventory item.
 
 At the client boundary, entities should appear as fragments or group members
 with small capability fields rather than as deep class hierarchies. A card-like
-token might carry `kind`, `display_state`, `zone_ref`, labels, and hints. The
+piece might carry `kind`, `display_state`, `zone_ref`, labels, and hints. The
 handler still owns the live graph object.
 
 ### Zone
@@ -85,7 +85,7 @@ Zones matter because many interactions are target-constrained:
 
 ```text
 accepts:
-  kind: tokens
+  kind: pieces
   min: 1
   max: 1
   constraints:
@@ -113,7 +113,7 @@ future interaction endpoint receives after the renderer collects any payload.
 Keep the distinction sharp:
 
 - Affordance: "Show a card from your hand."
-- Payload: `{token_ids: ["rust-map-card"]}`
+- Payload: `{piece_ids: ["rust-map-card"]}`
 - Move: handler-valid committed action derived from choice id plus payload
 
 ### Procedure
@@ -123,12 +123,12 @@ push-your-luck, inspection loop, drafting, bidding, trick, combat round, shop
 transaction, resource tick, puzzle attempt, or timed challenge.
 
 Procedures are handler/runtime concepts. Clients should see their state through
-fragments: status, zones, tokens, choices, blockers, outcomes, and events.
+fragments: status, zones, pieces, choices, blockers, outcomes, and events.
 
 ### Resource And Transaction
 
 Resources are typed quantities: coin, health, time, action points, suspicion,
-influence, generator output, token reserves, or production inputs.
+influence, generator output, piece reserves, or production inputs.
 
 Resource-loop interactions should expose ledgers and transactions as renderable
 state rather than burying them in prose. The handler owns arithmetic; the client
@@ -148,7 +148,7 @@ Near-term accepted shapes:
 | `pick` or absent | `{}` or no payload | numbered choice |
 | `text` | `{text: string}` | line prompt with optional validators |
 | `quantity` | `{quantity: int}` | integer prompt with min/max and reason text |
-| `tokens` | `{token_ids: string[]}` | numbered entries from a visible target zone |
+| `pieces` | `{piece_ids: string[]}` | numbered entries from a visible target zone |
 | `raw_command` | `{text: string}` | command prompt submitted to interpretation edge |
 
 Later, `compose` can combine those simple parts:
@@ -161,7 +161,7 @@ accepts:
       accepts: {kind: quantity, min: 1, max: 7, unit: coin}
     - role: target
       accepts:
-        kind: tokens
+        kind: pieces
         min: 1
         max: 1
         constraints: {target_zone_ref: z-room}
@@ -173,7 +173,7 @@ The corresponding payload should remain explicit:
 {
   parts: {
     amount: {quantity: 2},
-    target: {token_ids: ["guard"]}
+    target: {piece_ids: ["guard"]}
   }
 }
 ```
@@ -193,7 +193,7 @@ The preferred model is backend-authoritative:
    such as `edge_id="interpret_command"` with `accepts.kind="raw_command"`.
 3. A client may render that choice as a command bar or as a CLI prompt.
 4. A capable client may use advisory grammar hints for autocomplete, preview,
-   and token highlighting.
+   and piece highlighting.
 5. On submit, the backend resolves or rejects the command and returns a normal
    `RuntimeEnvelope`.
 
@@ -256,7 +256,7 @@ These classes describe effect and rendering expectations:
 | query | Ask for explanation, hint, rule, or status. |
 
 Plain story choices are `commit` or `confirm` affordances with no additional
-payload. Card, token, credential, and resource interactions add target and
+payload. Card, piece, credential, and resource interactions add target and
 constraint metadata.
 
 ## Visibility
@@ -285,8 +285,8 @@ Every rich interaction should degrade to choices plus readable state.
 
 Examples:
 
-- A web card UI may render hand zones and selectable tokens.
-- A CLI may render the same zone as a numbered list and collect a token id.
+- A web card UI may render hand zones and selectable pieces.
+- A CLI may render the same zone as a numbered list and collect a piece id.
 - A CLI command prompt may submit raw text to `interpret_command` without local
   grammar support.
 - A Ren'Py view may show a menu plus a small status panel.
@@ -307,7 +307,7 @@ client-side rules runtime:
   relation, round result, best-of-N scoring.
 - Blackjack/21/22: deck, hand zones, hidden dealer state, hit/stand, threshold
   and bust result.
-- Nim and token games: shared pools, take/put quantity constraints, shrinking
+- Nim and piece games: shared pools, take/put quantity constraints, shrinking
   legal moves, terminal policy.
 - Bag RPS and bidding: commit a typed quantity bundle from a reserve.
 - Credentials/Papers-Please-like scenes: inspect documents, reveal mismatches,
@@ -322,9 +322,9 @@ to the client.
 
 The next web/client work should stay small and contract-driven:
 
-1. Keep `zone` and `token` widgets small and generic; do not add game-specific
+1. Keep `zone` and `piece` widgets small and generic; do not add game-specific
    board logic to the client.
-2. Add `ChoiceInputView` for `pick`, `text`, `quantity`, and `tokens`.
+2. Add `ChoiceInputView` for `pick`, `text`, `quantity`, and `pieces`.
 3. Add canonical fixtures for a quantity interaction and a small sandbox-like
    turn with visible room/inventory zones.
 4. Keep raw command input as a reserved `raw_command` choice that submits

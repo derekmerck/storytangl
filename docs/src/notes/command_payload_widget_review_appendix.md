@@ -24,7 +24,7 @@ button, menu, CLI prompt, or Ren'Py menu would submit.
   - `{}` for pick/button choices
   - `{text: "..."}`
   - `{quantity: 3}`
-  - `{token_ids: ["..."]}`
+  - `{piece_ids: ["..."]}`
   - `{parts: {role: subpayload}}` later for composed forms
 - Backend failures should return renderable interpretation feedback such as
   ambiguous, unknown noun, blocked, impossible, or validation failed.
@@ -34,7 +34,7 @@ button, menu, CLI prompt, or Ren'Py menu would submit.
 - Keep `ProjectedState` as the durable sidecar for ledgers and status; do not
   introduce `projected_value` as an in-stream fragment until the backend has a
   real need for it.
-- Keep `zone` and `token` references id-based and renderable. If an open choice
+- Keep `zone` and `piece` references id-based and renderable. If an open choice
   references a target zone, that zone must be visible or reachable in the current
   client shell.
 - Treat grammar as advisory metadata. It must be derived from the visible turn
@@ -53,8 +53,8 @@ and read input. It should still be able to provide every interaction:
 - Render choices as numbered rows with locked reasons.
 - For `accepts.kind="text"`, prompt for a line and submit `{text}`.
 - For `accepts.kind="quantity"`, prompt for an integer and submit `{quantity}`.
-- For `accepts.kind="tokens"`, number the visible target-zone entries and submit
-  `{token_ids}`.
+- For `accepts.kind="pieces"`, number the visible target-zone entries and submit
+  `{piece_ids}`.
 - For `accepts.kind="raw_command"`, prompt for a command line and submit
   `{text}` to the reserved interpretation edge.
 - For `compose`, ask the parts sequentially once that payload shape is adopted.
@@ -66,8 +66,8 @@ client-side rules to make the turn playable.
 
 The next implementation should stay narrow:
 
-1. Make `ChoiceInputView` support `pick`, `text`, `quantity`, and `tokens`.
-2. Add canonical fixtures for quantity and sandbox-ish token/text interactions.
+1. Make `ChoiceInputView` support `pick`, `text`, `quantity`, and `pieces`.
+2. Add canonical fixtures for quantity and sandbox-ish piece/text interactions.
 3. Add `raw_command`, grammar preview, and `interpretation` rendering in a later
    slice.
 4. Add `compose` after the simple payload shapes are tested.

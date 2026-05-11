@@ -156,20 +156,20 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('63')
   })
 
-  it('renders zone groups with token labels and state', () => {
+  it('renders zone groups with piece labels and state', () => {
     const fragments: Record<string, StoryFragment> = {
       zone: {
         uid: 'zone',
         fragment_type: 'group',
         group_type: 'zone',
         zone_role: 'player_hand',
-        member_ids: ['token'],
+        member_ids: ['piece'],
         hints: { label_text: 'Traveler hand' },
       },
-      token: {
-        uid: 'token',
-        fragment_type: 'token',
-        token_id: 'rust-map-card',
+      piece: {
+        uid: 'piece',
+        fragment_type: 'piece',
+        piece_id: 'rust-map-card',
         content: 'Rust map card',
         display_state: 'face_up',
       },
@@ -178,7 +178,7 @@ describe('StoryBlock', () => {
     const wrapper = mountBlock(fragments, ['zone'])
 
     expect(wrapper.find('[data-testid="zone-fragment"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Traveler hand')
     expect(wrapper.text()).toContain('Rust map card')
     expect(wrapper.text()).toContain('face up')
@@ -229,21 +229,21 @@ describe('StoryBlock', () => {
     expect(wrapper.text()).toContain('three ticks')
   })
 
-  it('renders standalone token fragments', () => {
+  it('renders standalone piece fragments', () => {
     const fragments: Record<string, StoryFragment> = {
-      token: {
-        uid: 'token',
-        fragment_type: 'token',
-        token_id: 'lantern-token',
+      piece: {
+        uid: 'piece',
+        fragment_type: 'piece',
+        piece_id: 'lantern-piece',
         kind: 'tool',
         label: 'Brass lantern',
         display_state: 'ready',
       },
     }
 
-    const wrapper = mountBlock(fragments, ['token'])
+    const wrapper = mountBlock(fragments, ['piece'])
 
-    expect(wrapper.find('[data-testid="token-fragment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="piece-fragment"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Brass lantern')
     expect(wrapper.text()).toContain('ready')
   })

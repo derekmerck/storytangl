@@ -50,6 +50,7 @@ class RenderItem:
     indent: int = 0
     ref_id: str | None = None
     choice: ChoiceControl | None = None
+    data: JsonObject | None = None
 
     def as_text(self) -> str:
         return f"{'  ' * self.indent}{self.text}"
@@ -215,8 +216,16 @@ def _render_fragment(
         return _render_kv(fragment, indent)
     if fragment_type == "choice":
         return [_render_choice(fragment, registry, envelope, indent)]
-    if fragment_type == "token":
-        return [_item("token", _render_token(fragment), indent=indent, ref_id=uid)]
+    if fragment_type == "piece":
+        return [
+            _item(
+                "piece",
+                _render_piece(fragment),
+                indent=indent,
+                ref_id=uid,
+                data=_piece_data(fragment),
+            )
+        ]
     if fragment_type == "interpretation":
         text = _render_interpretation(fragment)
         return [_item("interpretation", text, indent=indent, ref_id=uid)]
@@ -380,23 +389,37 @@ def _accepts_prompt(
         unit_text = f" {unit}" if unit else ""
         return f" <quantity {bounds}{unit_text}>"
 
-    if kind == "tokens":
+    if kind == "pieces":
         minimum = accepts.get("min")
         maximum = accepts.get("max")
         constraints = _object(accepts.get("constraints"))
         zone_ref = _text(constraints, "target_zone_ref") if constraints is not None else None
         zone = registry.get(zone_ref) if zone_ref else None
         zone_label = _fragment_label(zone, zone_ref or "zone") if zone is not None else "zone"
-        count = _selection_count(minimum, maximum, "token")
+        count = _selection_count(minimum, maximum, "piece")
         return f" <select {count} from {zone_label}>"
 
     return f" <{kind}>"
 
 
-def _render_token(fragment: JsonObject) -> str:
-    label = _fragment_label(fragment, "token")
+def _render_piece(fragment: JsonObject) -> str:
+    label = _fragment_label(fragment, "piece")
     state = _text(fragment, "display_state")
     return f"- {label} [{state}]" if state else f"- {label}"
+
+
+def _piece_data(fragment: JsonObject) -> JsonObject:
+    data: JsonObject = {}
+    piece_id = _text(fragment, "piece_id")
+    zone_ref = _text(fragment, "zone_ref")
+    label = _fragment_label(fragment, "piece")
+    if piece_id:
+        data["piece_id"] = piece_id
+    if zone_ref:
+        data["zone_ref"] = zone_ref
+    if label:
+        data["label"] = label
+    return data
 
 
 def _render_interpretation(fragment: JsonObject) -> str:
@@ -468,7 +491,7 @@ def _fragment_label(fragment: JsonObject | None, fallback: str) -> str:
     hints = _object(fragment.get("hints"))
     return (
         (_text(hints, "label_text") if hints is not None else None)
-        or _text(fragment, "label", "content", "text", "token_id")
+        or _text(fragment, "label", "content", "text", "piece_id")
         or fallback
     )
 
@@ -504,8 +527,16 @@ def _item(
     indent: int = 0,
     ref_id: str | None = None,
     choice: ChoiceControl | None = None,
+    data: JsonObject | None = None,
 ) -> RenderItem:
-    return RenderItem(role=role, text=text, indent=indent, ref_id=ref_id, choice=choice)
+    return RenderItem(
+        role=role,
+        text=text,
+        indent=indent,
+        ref_id=ref_id,
+        choice=choice,
+        data=data,
+    )
 
 
 def _text(record: JsonObject | None, *keys: str) -> str | None:

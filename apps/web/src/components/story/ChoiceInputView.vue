@@ -5,9 +5,9 @@ import type {
   ChoiceStoryFragment,
   GroupStoryFragment,
   StoryFragment,
-  TokenStoryFragment,
+  PieceStoryFragment,
 } from '@/types'
-import { fragmentText, isGroupFragment, isRecord, isTokenFragment } from './fragmentUtils'
+import { fragmentText, isGroupFragment, isRecord, isPieceFragment } from './fragmentUtils'
 
 type PayloadState = {
   valid: boolean
@@ -48,7 +48,7 @@ const emit = defineEmits<{
 }>()
 
 const inputValue = ref('')
-const selectedTokenIds = ref<string[]>([])
+const selectedPieceIds = ref<string[]>([])
 
 const stringValue = (value: unknown): string | undefined =>
   typeof value === 'string' && value ? value : undefined
@@ -72,7 +72,7 @@ const acceptsKind = computed(() => {
 const hasExplicitKind = computed(() => typeof accepts.value.kind === 'string')
 
 const rendersInput = computed(() =>
-  ['text', 'quantity', 'tokens', 'raw_command'].includes(acceptsKind.value),
+  ['text', 'quantity', 'pieces', 'raw_command'].includes(acceptsKind.value),
 )
 const inputLabel = computed(() => props.choice.text)
 const commandGrammar = computed<CommandGrammar>(() => {
@@ -143,44 +143,44 @@ const targetZone = computed<GroupStoryFragment | undefined>(() => {
   return fragment && isGroupFragment(fragment) ? fragment : undefined
 })
 
-const tokensByTokenId = computed(() => {
-  const tokens = new Map<string, TokenStoryFragment>()
+const piecesByPieceId = computed(() => {
+  const pieces = new Map<string, PieceStoryFragment>()
   for (const fragment of Object.values(props.fragments)) {
-    if (isTokenFragment(fragment) && fragment.token_id) {
-      tokens.set(fragment.token_id, fragment)
+    if (isPieceFragment(fragment) && fragment.piece_id) {
+      pieces.set(fragment.piece_id, fragment)
     }
   }
-  return tokens
+  return pieces
 })
 
-const tokenByMemberId = (memberId: string): TokenStoryFragment | undefined => {
+const pieceByMemberId = (memberId: string): PieceStoryFragment | undefined => {
   const fragment = props.fragments[memberId]
-  if (fragment && isTokenFragment(fragment)) {
+  if (fragment && isPieceFragment(fragment)) {
     return fragment
   }
-  return tokensByTokenId.value.get(memberId)
+  return piecesByPieceId.value.get(memberId)
 }
 
-const candidateTokens = computed<TokenStoryFragment[]>(() =>
+const candidatePieces = computed<PieceStoryFragment[]>(() =>
   targetZone.value?.member_ids
-    .map(tokenByMemberId)
-    .filter((fragment): fragment is TokenStoryFragment => Boolean(fragment)) ?? [],
+    .map(pieceByMemberId)
+    .filter((fragment): fragment is PieceStoryFragment => Boolean(fragment)) ?? [],
 )
 
-const tokenLabel = (token: TokenStoryFragment): string => {
-  const hints = token.hints ?? token.presentation_hints
-  const content = fragmentText(token.content)
+const pieceLabel = (piece: PieceStoryFragment): string => {
+  const hints = piece.hints ?? piece.presentation_hints
+  const content = fragmentText(piece.content)
   return (
     stringValue(hints?.label_text) ??
-    stringValue(token.label) ??
+    stringValue(piece.label) ??
     (content ? content : undefined) ??
-    stringValue(token.token_id) ??
-    token.uid
+    stringValue(piece.piece_id) ??
+    piece.uid
   )
 }
 
-const tokenPayloadId = (token: TokenStoryFragment): string => token.token_id ?? token.uid
-const candidateTokenPayloadIds = computed(() => candidateTokens.value.map(tokenPayloadId))
+const piecePayloadId = (piece: PieceStoryFragment): string => piece.piece_id ?? piece.uid
+const candidatePiecePayloadIds = computed(() => candidatePieces.value.map(piecePayloadId))
 
 const validateText = (value: string): string | undefined => {
   if (required.value && value.trim() === '') {
@@ -261,19 +261,19 @@ const quantityPayload = (): PayloadState => {
   return { valid: true, payload: wrapPayload(quantity) }
 }
 
-const tokenPayload = (): PayloadState => {
+const piecePayload = (): PayloadState => {
   const min = minValue.value ?? 1
   const max = maxValue.value ?? 1
-  if (candidateTokens.value.length === 0) {
+  if (candidatePieces.value.length === 0) {
     return { valid: false, message: 'No valid targets' }
   }
-  if (selectedTokenIds.value.length < min) {
+  if (selectedPieceIds.value.length < min) {
     return { valid: false, message: min === max ? `Select ${min}` : `Select ${min}-${max}` }
   }
-  if (selectedTokenIds.value.length > max) {
+  if (selectedPieceIds.value.length > max) {
     return { valid: false, message: `Select at most ${max}` }
   }
-  return { valid: true, payload: { token_ids: [...selectedTokenIds.value] } }
+  return { valid: true, payload: { piece_ids: [...selectedPieceIds.value] } }
 }
 
 const payloadState = computed<PayloadState>(() => {
@@ -283,40 +283,40 @@ const payloadState = computed<PayloadState>(() => {
   if (acceptsKind.value === 'quantity') {
     return quantityPayload()
   }
-  if (acceptsKind.value === 'tokens') {
-    return tokenPayload()
+  if (acceptsKind.value === 'pieces') {
+    return piecePayload()
   }
   return { valid: true, payload: props.choice.payload }
 })
 
-const toggleToken = (token: TokenStoryFragment) => {
+const togglePiece = (piece: PieceStoryFragment) => {
   if (props.disabled) {
     return
   }
-  const id = tokenPayloadId(token)
-  if (selectedTokenIds.value.includes(id)) {
-    selectedTokenIds.value = selectedTokenIds.value.filter((selected) => selected !== id)
+  const id = piecePayloadId(piece)
+  if (selectedPieceIds.value.includes(id)) {
+    selectedPieceIds.value = selectedPieceIds.value.filter((selected) => selected !== id)
     return
   }
 
   const max = maxValue.value ?? 1
   if (max <= 1) {
-    selectedTokenIds.value = [id]
+    selectedPieceIds.value = [id]
     return
   }
-  if (selectedTokenIds.value.length >= max) {
+  if (selectedPieceIds.value.length >= max) {
     return
   }
-  selectedTokenIds.value = [...selectedTokenIds.value, id]
+  selectedPieceIds.value = [...selectedPieceIds.value, id]
 }
 
-const handleTokenKeydown = (event: KeyboardEvent, token: TokenStoryFragment) => {
+const handlePieceKeydown = (event: KeyboardEvent, piece: PieceStoryFragment) => {
   if (props.disabled) {
     return
   }
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    toggleToken(token)
+    togglePiece(piece)
   }
 }
 
@@ -327,10 +327,10 @@ watch(
 )
 
 watch(
-  [acceptsKind, targetZoneRef, candidateTokenPayloadIds],
+  [acceptsKind, targetZoneRef, candidatePiecePayloadIds],
   () => {
     inputValue.value = ''
-    selectedTokenIds.value = []
+    selectedPieceIds.value = []
   },
 )
 </script>
@@ -372,27 +372,27 @@ watch(
       </template>
     </v-text-field>
 
-    <div v-else-if="acceptsKind === 'tokens'" class="choice-token-input">
+    <div v-else-if="acceptsKind === 'pieces'" class="choice-piece-input">
       <div
-        v-if="candidateTokens.length > 0"
-        class="choice-token-list"
+        v-if="candidatePieces.length > 0"
+        class="choice-piece-list"
         role="listbox"
         :aria-label="inputLabel"
       >
         <div
-          v-for="token in candidateTokens"
-          :key="token.uid"
-          class="choice-token-option"
-          :class="{ 'choice-token-option--selected': selectedTokenIds.includes(tokenPayloadId(token)) }"
+          v-for="piece in candidatePieces"
+          :key="piece.uid"
+          class="choice-piece-option"
+          :class="{ 'choice-piece-option--selected': selectedPieceIds.includes(piecePayloadId(piece)) }"
           role="option"
-          :aria-selected="selectedTokenIds.includes(tokenPayloadId(token))"
+          :aria-selected="selectedPieceIds.includes(piecePayloadId(piece))"
           :aria-disabled="disabled ? 'true' : undefined"
-          :data-token-id="tokenPayloadId(token)"
+          :data-piece-id="piecePayloadId(piece)"
           :tabindex="disabled ? undefined : 0"
-          @click="toggleToken(token)"
-          @keydown="handleTokenKeydown($event, token)"
+          @click="togglePiece(piece)"
+          @keydown="handlePieceKeydown($event, piece)"
         >
-          {{ tokenLabel(token) }}
+          {{ pieceLabel(piece) }}
         </div>
       </div>
       <div v-else class="choice-input-message">No valid targets</div>
@@ -432,17 +432,17 @@ watch(
   font-size: 0.78rem;
 }
 
-.choice-token-input {
+.choice-piece-input {
   min-width: 0;
 }
 
-.choice-token-list {
+.choice-piece-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.choice-token-option {
+.choice-piece-option {
   background: rgba(var(--v-theme-surface), 0.86);
   border: 1px solid rgba(var(--v-theme-primary), 0.34);
   border-radius: 6px;
@@ -453,12 +453,12 @@ watch(
   padding: 6px 9px;
 }
 
-.choice-token-option[aria-disabled='true'] {
+.choice-piece-option[aria-disabled='true'] {
   cursor: default;
   opacity: 0.6;
 }
 
-.choice-token-option--selected {
+.choice-piece-option--selected {
   background: rgba(var(--v-theme-primary), 0.16);
   border-color: rgb(var(--v-theme-primary));
 }

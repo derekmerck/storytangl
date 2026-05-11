@@ -21,10 +21,11 @@ itself is not.
 > they each realize the same widget contract in their own medium.
 
 Repository note: this document intentionally uses the settled vocabulary target
-(`piece`, record-shaped `KvRow`, `interpretation.result/text`) even where the
-current engine/webapp still carry migration names (`token`, tuple-style kv rows,
-or fallback-only interpretation rendering). See the reconciliation document
-before generating conformance fixtures or filing implementation drift.
+(`piece`, record-shaped `KvRow`, `interpretation.result/text`). The webapp and
+conformance fixtures have retired the older UI `token` term; tuple-style kv
+rows and fallback-only interpretation rendering remain current implementation
+gaps. See the reconciliation document before generating conformance fixtures or
+filing implementation drift.
 
 ---
 
@@ -89,11 +90,11 @@ the repo-current schedule in `WIDGET_CONTRACT_RECONCILIATION.md`.
 
 | v0.x | v1.0 | Reason |
 |---|---|---|
-| `token` (UI piece) | `piece` | Collides with `tangl.core.token.Token` (singleton wrapper). |
+| `token` (retired UI term) | `piece` | Collides with `tangl.core.token.Token` (singleton wrapper). |
 | `ledger` (UI section type) | *removed* | Subsumed by annotated `kv_list` rows (§2.5). The engine's `tangl.vm.runtime.ledger.Ledger` keeps the name. |
 | `choice_id` (HTTP body) | `edge_id` | Reconciles with `ChoiceFragment.edge_id`. |
 | `interpretation.outcome` / `command_text` | `interpretation.result` / `text` | Spec-final names; webapp drift is recent enough to fix cheaply. |
-| `token_ids` (commit payload) | `piece_ids` | Follows `piece` rename. |
+| `token_ids` (retired commit payload) | `piece_ids` | Follows `piece` rename. |
 
 ---
 
@@ -255,7 +256,7 @@ class MediaFragment(ContentFragment):
 | **A11y** | Images need `content` labeled via `hints` or sibling text. Audio/video must expose native controls or keyboard toggle. `prefers-reduced-motion` disables `media_transition`. |
 | **Fallback** | Unknown `media_role` → render inline. `content_format="rit"` unresolved → pending placeholder. |
 
-**Port sketches.** Web: `<img>` / `<video>` / `<audio>` / placeholder; role maps to CSS class. CLI: `[img: <url>]` / `[♪ <url>]` single-line tokens. tkinter: `Label(image=…)` or placeholder `Frame`; audio/video out-of-band. Ren'Py: `scene <bg>` / `show <sprite>` / `play music` / `play sound`. Godot: `TextureRect` / `VideoStreamPlayer` / `AudioStreamPlayer`.
+**Port sketches.** Web: `<img>` / `<video>` / `<audio>` / placeholder; role maps to CSS class. CLI: `[img: <url>]` / `[♪ <url>]` single-line markers. tkinter: `Label(image=…)` or placeholder `Frame`; audio/video out-of-band. Ren'Py: `scene <bg>` / `show <sprite>` / `play music` / `play sound`. Godot: `TextureRect` / `VideoStreamPlayer` / `AudioStreamPlayer`.
 
 ### 2.4 `group` — Container
 
@@ -397,7 +398,7 @@ on `ChoiceFragment` accepts both forms during deprecation.
 | **Required** | `uid`, `text` |
 | **Optional** | `edge_id` (omitted for `interpret_command` reserved choices); `available` (default `true`); `unavailable_reason`; `blockers[]`; `accepts`; `ui_hints`; `activation_payload` |
 | **Container rule** | Always emitted within the active `scene` group. Order is presented order; `ui_hints.hotkey` is advisory. |
-| **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, tokens, compose, raw_command}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
+| **States** | **available** → active. **locked** (`available=false`) → disabled but present; show `unavailable_reason`; `blockers[]` is author-facing detail. **freeform** (`accepts.kind ∈ {text, quantity, pieces, compose, raw_command}`) → inline input; commit sends typed payload. **loading** → disable group during dispatch. **error** → re-enable; mark failed attempt. |
 | **A11y** | Group is `role="group" aria-label="choices"`. Hotkeys from `ui_hints.hotkey`; ↑/↓ cycles; Enter commits; Esc cancels freeform. Focus returns to primary choice of new turn after dispatch. Hit target ≥ 44×44 on touch. Locked choices remain focusable for screen reader stability. |
 | **Fallback** | Unknown `accepts.kind` → plain button posting empty payload, with warning. Unknown `ui_hints.widget` → default widget for `accepts.kind`. |
 
@@ -582,7 +583,7 @@ A port that implements a strict subset of profiles is still a conforming
 StoryTangl client for any bundle whose `profiles` are a subset of the
 port's supported profiles. The minimum conforming card-game client
 implements `card`, `hand`, `field`, `pile`, `score_pile`, `discard`,
-`accepts.kind ∈ {pick, tokens}`, plus the §3 value types it uses. This is
+`accepts.kind ∈ {pick, pieces}`, plus the §3 value types it uses. This is
 the path by which (e.g.) a hana-smuta tkinter board ships without
 implementing the full §6 vocabulary.
 
@@ -646,8 +647,8 @@ class CostPreview(BaseModel):
     delta: int
     unit: str | None = None
 
-class TokenConstraints(BaseModel):
-    """Constraints on a kind='tokens' selection."""
+class PieceConstraints(BaseModel):
+    """Constraints on a kind='pieces' selection."""
     same_property: list[str] | None = None
     different_property: list[str] | None = None
     target_zone_ref: str | None = None    # uid of group with group_type=zone
@@ -698,11 +699,11 @@ class QuantityAccepts(BaseModel):
     ledger_ref: str | None = None     # show "you have N" from this section
     cost_preview: CostPreview | None = None
 
-class TokensAccepts(BaseModel):
-    kind: Literal["tokens"] = "tokens"   # selects pieces; not the engine "Token"
+class PiecesAccepts(BaseModel):
+    kind: Literal["pieces"] = "pieces"
     min: int = 1
     max: int = 1
-    constraints: TokenConstraints | None = None
+    constraints: PieceConstraints | None = None
 
 class ComposePart(BaseModel):
     role: str                            # stable string the backend keys on
@@ -716,12 +717,12 @@ class RawCommandAccepts(BaseModel):
     kind: Literal["raw_command"] = "raw_command"
 
 NonComposeAccepts: TypeAlias = Annotated[
-    PickAccepts | TextAccepts | QuantityAccepts | TokensAccepts | RawCommandAccepts,
+    PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts | RawCommandAccepts,
     Field(discriminator="kind"),
 ]
 
 Accepts: TypeAlias = Annotated[
-    PickAccepts | TextAccepts | QuantityAccepts | TokensAccepts
+    PickAccepts | TextAccepts | QuantityAccepts | PiecesAccepts
     | ComposeAccepts | RawCommandAccepts,
     Field(discriminator="kind"),
 ]
@@ -740,7 +741,7 @@ and matches existing webapp behavior.
 | `pick` | `{}` (empty object) | The `edge_id` is the answer. |
 | `text` | `{ "text": str }` | |
 | `quantity` | `{ "quantity": int }` | |
-| `tokens` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max` |
+| `pieces` | `{ "piece_ids": [str, ...] }` | `min ≤ len ≤ max` |
 | `compose` | `{ "parts": { role: subpayload, ... } }` | Each subpayload follows its part's `accepts.kind`. |
 | `raw_command` | `{ "text": str }` | Reserved for `interpret_command`-shaped choices. |
 
@@ -934,10 +935,9 @@ Three changes from the current `openapi.json`:
 
 ## 7 · Tier P2 — interactive surface vocabulary (proposed, larger)
 
-This section depends on settling the §6 ontology rename (`token` → `piece`)
-and the predicate registration protocol (§7.4). It is sketch-level until
-those land. Implementations MAY consume this as a roadmap; it is not yet
-contract.
+This section depends on typed engine support for the settled `piece` surface
+and the predicate registration protocol (§7.4). It is sketch-level until those
+land. Implementations MAY consume this as a roadmap; it is not yet contract.
 
 ### 7.1 `PieceFragment` — Identified surface element with state
 
@@ -1029,7 +1029,7 @@ Genre layers add domain-specific widgets on top of Tier P2:
 - **Carwars-gamebook** (in design): `slot` zone_role, `place` accepts.kind,
   `piece_offer`, `dice_roll` content fragment, `ui_hints.stat_check`.
 - **Hana-smuta board** (sketched in v0.x): card profile + `hand` / `field` /
-  `pile` / `score_pile` zones, plus matching `accepts(tokens, same_property)`.
+  `pile` / `score_pile` zones, plus matching `accepts(pieces, same_property)`.
 
 These remain in design conversations. They do not enter Tier P2 until
 their underlying primitives have stabilized and a CLI rendering exists.
@@ -1052,7 +1052,7 @@ their underlying primitives have stabilized and a CLI rendering exists.
 | kv (fragment) | inline chips | `[status] k=v k=v` | label pairs | `HBoxContainer` |
 | choice (pick, available) | button | `1) …` | `Button` | `menu:` / `Button` |
 | choice (locked) | disabled + reason | `(locked) reason` | disabled + reason | `if` gated |
-| choice (text/quantity/tokens) | inline form | `> ` prompt | `Entry` / `Spinbox` | `renpy.input` / `LineEdit` |
+| choice (text/quantity/pieces) | inline form | `> ` prompt | `Entry` / `Spinbox` | `renpy.input` / `LineEdit` |
 | choice (compose) | grouped form | sequenced prompts | nested `Frames` | menu of menus |
 | choice (raw_command) | command bar | `> ` prompt (default) | `Entry` | `renpy.input` |
 | control (update/delete) | re-render target | re-print with marker | re-render cell | re-run statement |
@@ -1078,7 +1078,7 @@ engine/contrib/conformance/
   fixtures/
     crossroads_inn.json           # canonical narrative turn
     projected_state_all_values.json # all current ProjectedState value types
-    sandbox_payload.json          # text/quantity/tokens accepts variants
+    sandbox_payload.json          # text/quantity/pieces accepts variants
     quantity_payload.json         # quantity accepts with min/max/unit
     command_hints.json            # raw_command + grammar + interpretation
     dialog_with_avatar.json       # attributed group + avatar_im binding

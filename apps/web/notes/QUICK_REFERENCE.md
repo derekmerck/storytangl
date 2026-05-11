@@ -162,9 +162,9 @@ GroupStoryFragment {
   zone_role?: string | null
 }
 
-TokenStoryFragment {
-  fragment_type: 'token'
-  token_id?: string | null
+PieceStoryFragment {
+  fragment_type: 'piece'
+  piece_id?: string | null
   kind?: string | null
   display_state?: string | null
   zone_ref?: string | null
@@ -213,14 +213,14 @@ accepts: {
 }
 payload: { quantity: 3 }
 
-// visible token selection
+// visible piece selection
 accepts: {
-  kind: 'tokens',
+  kind: 'pieces',
   min: 1,
   max: 1,
   constraints: { target_zone_ref: 'f-zone-player-hand' }
 }
-payload: { token_ids: ['rust-map-card'] }
+payload: { piece_ids: ['rust-map-card'] }
 
 // raw command fallback
 accepts: { kind: 'raw_command' }

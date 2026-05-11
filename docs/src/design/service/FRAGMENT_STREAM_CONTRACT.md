@@ -74,7 +74,7 @@ extension types preserve the same `BaseFragment` shape.
 | `media` | Media reference or placeholder; service may dereference RITs. |
 | `choice` | Player-facing interaction offer backed by an `Action` edge. |
 | `group` | Relational overlay tying peer fragments together by id. |
-| `token` | Targetable piece or object rendered inside a zone. |
+| `piece` | Targetable piece or object rendered inside a zone. |
 | `kv` | Ordered key-value content for compact state/status surfaces. |
 | `update` / `delete` | Control fragments mutating an earlier registry entry. |
 | `user_event` | User-facing notification or client hint. |
@@ -119,13 +119,13 @@ Canonical near-term variants:
 | absent or `pick` | `{}` or omitted | The edge id is the whole answer. |
 | `text` | `{text: string}` | Freeform line such as a name, password, note, or command. |
 | `quantity` | `{quantity: int}` | Integer amount with optional min/max/unit/cost hints. |
-| `tokens` | `{token_ids: string[]}` | Selection from a visible target zone. |
+| `pieces` | `{piece_ids: string[]}` | Selection from a visible target zone. |
 | `raw_command` | `{text: string}` | Text submitted to a reserved interpretation edge. |
 
 `compose` may combine these later using role-keyed subpayloads. It should not be
 the first implementation target.
 
-A rich client may render sliders, steppers, token chips, autocomplete, or form
+A rich client may render sliders, steppers, piece chips, autocomplete, or form
 groups. A CLI should be able to ask the same values as sequential prompts and
 submit the same payload.
 
@@ -155,7 +155,7 @@ placeholder. Clients should show that placeholder when no final URL/data exists.
 Groups may reference other groups. Clients may flatten those references for
 presentation, but the registry remains id-based.
 
-`group_type="zone"` is the current generic container for targetable token
+`group_type="zone"` is the current generic container for targetable piece
 surfaces such as a hand, room contents, inventory, field, packet, or map. If a
 choice references `constraints.target_zone_ref`, that zone must be rendered or
 reachable in the current shell.
@@ -182,7 +182,7 @@ returns the same cursor with a renderable explanation, such as an
 `interpretation` fragment.
 
 Advisory grammar hints may help capable clients preview a command, highlight
-tokens, or show completions. Until there is a dedicated envelope field, such
+pieces, or show completions. Until there is a dedicated envelope field, such
 hints should travel under `metadata.grammar`. If promoted to a top-level
 `RuntimeEnvelope.grammar` field later, the semantics should stay the same:
 grammar is a visible-surface projection and never a security boundary.
@@ -202,7 +202,7 @@ Clients may ignore these hints and still submit `{text}` to
 
 ## Decision Legibility
 
-If an open choice references a token, zone, blocker, state fragment, or other
+If an open choice references a piece, zone, blocker, state fragment, or other
 renderable object, the referenced state must be visible in the current shell or
 otherwise reachable through a supported client affordance.
 
@@ -229,7 +229,7 @@ Required fixture behaviors:
 - a realistic whole-turn `RuntimeEnvelope`
 - a realistic `ProjectedState`
 - locked choices with blockers
-- freeform, quantity, and token payload contracts
+- freeform, quantity, and piece payload contracts
 - raw-command payload contracts through reserved interpretation choices
 - group flattening and dialog grouping
 - unknown fragment fallback

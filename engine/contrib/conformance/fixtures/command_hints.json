@@ -32,8 +32,8 @@
     },
     {
       "uid": "00000000-0000-4000-8000-000000000604",
-      "fragment_type": "token",
-      "token_id": "lamp",
+      "fragment_type": "piece",
+      "piece_id": "lamp",
       "kind": "item",
       "content": "brass lamp",
       "display_state": "available",
@@ -41,8 +41,8 @@
     },
     {
       "uid": "00000000-0000-4000-8000-000000000605",
-      "fragment_type": "token",
-      "token_id": "iron-door",
+      "fragment_type": "piece",
+      "piece_id": "iron-door",
       "kind": "exit",
       "content": "iron door",
       "display_state": "closed",

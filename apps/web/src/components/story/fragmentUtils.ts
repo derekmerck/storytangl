@@ -7,7 +7,7 @@ import type {
   MediaStoryFragment,
   RuntimeEnvelope,
   StoryFragment,
-  TokenStoryFragment,
+  PieceStoryFragment,
 } from '@/types'
 
 export type UnknownRecord = Record<string, unknown>
@@ -41,8 +41,8 @@ export const isChoiceFragment = (fragment: StoryFragment): fragment is ChoiceSto
 export const isMediaFragment = (fragment: StoryFragment): fragment is MediaStoryFragment =>
   fragment.fragment_type === 'media'
 
-export const isTokenFragment = (fragment: StoryFragment): fragment is TokenStoryFragment =>
-  fragment.fragment_type === 'token'
+export const isPieceFragment = (fragment: StoryFragment): fragment is PieceStoryFragment =>
+  fragment.fragment_type === 'piece'
 
 export const isControlFragment = (fragment: StoryFragment): fragment is ControlStoryFragment =>
   fragment.fragment_type === 'update' || fragment.fragment_type === 'delete'

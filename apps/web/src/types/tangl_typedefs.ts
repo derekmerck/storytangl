@@ -307,9 +307,9 @@ export interface GroupStoryFragment extends BaseStoryFragment {
   zone_role?: string | null
 }
 
-export interface TokenStoryFragment extends BaseStoryFragment {
-  fragment_type: 'token'
-  token_id?: FragmentId | null
+export interface PieceStoryFragment extends BaseStoryFragment {
+  fragment_type: 'piece'
+  piece_id?: FragmentId | null
   kind?: string | null
   display_state?: string | null
   zone_ref?: FragmentId | null
@@ -356,7 +356,7 @@ export type StoryFragment =
   | AttributedStoryFragment
   | MediaStoryFragment
   | GroupStoryFragment
-  | TokenStoryFragment
+  | PieceStoryFragment
   | KvStoryFragment
   | ChoiceStoryFragment
   | ControlStoryFragment

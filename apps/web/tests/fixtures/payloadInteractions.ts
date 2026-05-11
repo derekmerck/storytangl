@@ -88,8 +88,8 @@ export const sandboxPayloadRuntimeEnvelope: RuntimeEnvelope = {
     },
     {
       uid: 'tok-lamp',
-      fragment_type: 'token',
-      token_id: 'lamp',
+      fragment_type: 'piece',
+      piece_id: 'lamp',
       kind: 'item',
       content: 'brass lamp',
       display_state: 'available',
@@ -98,8 +98,8 @@ export const sandboxPayloadRuntimeEnvelope: RuntimeEnvelope = {
     },
     {
       uid: 'tok-mailbox',
-      fragment_type: 'token',
-      token_id: 'mailbox',
+      fragment_type: 'piece',
+      piece_id: 'mailbox',
       kind: 'item',
       content: 'small mailbox',
       display_state: 'closed',
@@ -116,8 +116,8 @@ export const sandboxPayloadRuntimeEnvelope: RuntimeEnvelope = {
     },
     {
       uid: 'tok-coin-purse',
-      fragment_type: 'token',
-      token_id: 'coin-purse',
+      fragment_type: 'piece',
+      piece_id: 'coin-purse',
       kind: 'counter',
       content: 'coin purse',
       display_state: 'ready',
@@ -140,7 +140,7 @@ export const sandboxPayloadRuntimeEnvelope: RuntimeEnvelope = {
       text: 'Take something.',
       available: true,
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'z-room' },
@@ -220,8 +220,8 @@ export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
     },
     {
       uid: 'tok-command-lamp',
-      fragment_type: 'token',
-      token_id: 'lamp',
+      fragment_type: 'piece',
+      piece_id: 'lamp',
       kind: 'item',
       content: 'brass lamp',
       display_state: 'available',
@@ -230,8 +230,8 @@ export const commandHintRuntimeEnvelope: RuntimeEnvelope = {
     },
     {
       uid: 'tok-command-door',
-      fragment_type: 'token',
-      token_id: 'iron-door',
+      fragment_type: 'piece',
+      piece_id: 'iron-door',
       kind: 'exit',
       content: 'iron door',
       display_state: 'closed',

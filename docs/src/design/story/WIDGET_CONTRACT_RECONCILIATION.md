@@ -18,13 +18,13 @@ from the vocabulary tier labels alone.
 
 | Surface | Current branch | Unified target | Decision |
 | --- | --- | --- | --- |
-| UI token / selectable item | Web fixtures and payloads use `token`, `token_id`, `token_ids`. Engine has no dedicated `TokenFragment` decoder. | `piece`, `piece_id`, `piece_ids`. | Adopt `piece` as the contract target. Keep current `token` fixtures until the engine grows the typed fragment and migration/coercion path. |
+| UI piece / selectable item | Web fixtures and conformance fixtures use `piece`, `piece_id`, `piece_ids`. Engine typed decode support is still pending. | `piece`, `piece_id`, `piece_ids`. | `piece` is now the only UI target terminology. Do not add new `token` UI fixtures or payloads. |
 | Engine singleton token | `tangl.core.token.Token` names a local instance of a reference singleton. | Unchanged. | This is the reason to avoid `token` for UI pieces. |
 | Ordered kv rows | Engine `KvFragment.content` is still `OrderedTupleDict`; web fixtures use tuple-like arrays. | Record-shaped `KvRow` with optional semantic fields. | Treat record-shaped `KvRow` as a migration target, not current Tier S. |
 | Choice HTTP id | Web posts `choice_id` containing `ChoiceFragment.edge_id`; docs increasingly say `edge_id`. | `edge_id` in contract language. | Keep transport compatibility for now; prefer `edge_id` in new docs and fixtures where possible. |
 | Command feedback | Current fixture uses unknown `interpretation` fallback fields `outcome` and `command_text`. | Typed `interpretation` with `result` and `text`. | Do not make typed interpretation a Tier-S conformance requirement yet. |
 
-`piece` is better than `token` because it avoids the engine singleton conflict
+`piece` replaced the older UI `token` term because it avoids the engine singleton conflict
 while staying general enough for cards, counters, documents, dice, actors, and
 board cells. `chip` is a viable renderer word, but it is too visual and too
 small-object-specific for the portable contract.
@@ -46,7 +46,7 @@ small-object-specific for the portable contract.
 | `choice` available/locked | Current `ChoiceFragment`. | Rendered, disabled semantics covered. | Tier S. | Include. |
 | `accepts.kind="text"` | Current as dict payload metadata. | Rendered by `ChoiceInputView`. | Tier S/P1 typed target. | Include. |
 | `accepts.kind="quantity"` | Current as dict payload metadata. | Rendered by `ChoiceInputView`. | Tier S/P1 typed target. | Include. |
-| `accepts.kind="tokens"` | Current web pressure fixture; engine type is untyped dict and no token fragment decoder exists. | Rendered with `group_type="zone"` and `fragment_type="token"`. | `piece_ids` target. | Keep web fixture; do not make engine conformance-gating yet. |
+| `accepts.kind="pieces"` | Current web/conformance pressure fixture; engine type is untyped dict and no dedicated piece fragment decoder exists. | Rendered with `group_type="zone"` and `fragment_type="piece"`. | `piece_ids`. | Include as the targetable-state pressure surface. |
 | `accepts.kind="raw_command"` | Current as reserved choice shape; backend resolution remains authoritative. | Rendered by `ChoiceInputView`; `metadata.grammar` is scene-local and advisory. | Tier P1/Tier S candidate. | Include web fixture; backend interpretation fixture can mature later. |
 | `control(update/delete)` | Current `ControlFragment`. | Applied to registry. | Tier S. | Include. |
 | `user_event` | Current `UserEventFragment`. | Rendered as status alert. | Tier S. | Include. |
@@ -54,7 +54,7 @@ small-object-specific for the portable contract.
 | `compose` | Not current. | Not rendered. | Tier P1. | Defer. |
 | `cost_preview` | Not current. | Not rendered. | Tier P1. | Defer. |
 | `predicate_ref` | Not current. | Not rendered. | Tier P2. | Defer. |
-| `piece` / `zone` typed surface | Not current in engine. | Web has `token`/`zone` pressure widgets. | Tier P2 naming target. | Defer engine conformance; keep web pressure tests. |
+| `piece` / `zone` typed surface | Not current in engine. | Web has `piece`/`zone` pressure widgets. | Tier P2 typed target. | Keep pressure fixtures and reference-port tests until engine models catch up. |
 
 ## First Fixture Suite
 
@@ -68,7 +68,7 @@ The first conformance pass added JSON fixtures under
 - `projected_state_all_values.json`: one `ProjectedState` with scalar,
   `kv_list`, `item_list`, `table`, and `badges`.
 - `quantity_payload.json`: `accepts.kind="quantity"` with min/max/unit.
-- `sandbox_payload.json`: text, quantity, current `tokens`/zone pressure
+- `sandbox_payload.json`: text, quantity, current `pieces`/zone pressure
   surface, and decision-legibility references.
 - `command_hints.json`: reserved `interpret_command`,
   `accepts.kind="raw_command"`, and advisory `metadata.grammar`.
@@ -83,8 +83,9 @@ belong in proposal or migration fixtures until the engine emits them.
 
 These are the concrete migrations implied by the unified vocabulary:
 
-1. Add typed engine fragments or decode support for the `piece`/zone surface,
-   then migrate web `token` fixtures and payloads to `piece`/`piece_ids`.
+1. Add typed engine fragments or decode support for the `piece`/zone surface.
+   UI fixtures and payloads already use `piece`/`piece_ids`; backend model
+   support should follow that vocabulary directly.
 2. Replace tuple-like kv payloads with record-shaped `KvRow` in engine
    `KvFragment`, projected state, fixtures, and web rendering.
 3. Add a typed `InterpretationFragment` with `result` and `text`, while keeping

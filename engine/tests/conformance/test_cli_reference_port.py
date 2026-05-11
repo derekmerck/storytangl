@@ -52,17 +52,17 @@ def test_generic_reference_model_exposes_roles_and_choice_controls() -> None:
     document = PORT.render_fixture_document(payload)
 
     zone = next(item for item in document.items if item.role == "zone_label")
-    tokens = [item for item in document.items if item.role == "token"]
+    pieces = [item for item in document.items if item.role == "piece"]
     choices = {choice.label: choice for choice in document.choices}
 
     assert document.kind == "runtime_envelope"
     assert zone.text == "Here:"
-    assert [token.text for token in tokens] == [
+    assert [piece.text for piece in pieces] == [
         "- brass lamp [available]",
         "- small mailbox [closed]",
     ]
-    assert choices["Take something."].accepts_kind == "tokens"
-    assert choices["Take something."].prompt == " <select 1 token from Here>"
+    assert choices["Take something."].accepts_kind == "pieces"
+    assert choices["Take something."].prompt == " <select 1 piece from Here>"
     assert choices["Name your sword."].accepts_kind == "text"
     assert choices["Offer coins."].accepts_kind == "quantity"
 
@@ -77,13 +77,13 @@ def test_cli_reference_renders_story_flow_choices_and_events() -> None:
     assert '[event:achievement_progress] {"id": "met_10_strangers", "progress": "7/10"}' in output
 
 
-def test_cli_reference_renders_token_zone_and_payload_prompts() -> None:
+def test_cli_reference_renders_piece_zone_and_payload_prompts() -> None:
     output = _render("sandbox_payload.json")
 
     assert "Here:" in output
     assert "- brass lamp [available]" in output
     assert "- small mailbox [closed]" in output
-    assert "2) Take something. <select 1 token from Here>" in output
+    assert "2) Take something. <select 1 piece from Here>" in output
     assert "3) Name your sword. <text: e.g. Hopebreaker>" in output
     assert "4) Offer coins. <quantity 1-7 coin>" in output
 

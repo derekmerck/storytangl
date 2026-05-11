@@ -156,13 +156,13 @@ describe('StoryAction', () => {
     ])
   })
 
-  it('renders structured token accepts as token options', () => {
-    const tokenChoice: ChoiceStoryFragment = {
-      uid: 'action_tokens',
+  it('renders structured piece accepts as piece options', () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
       fragment_type: 'choice',
       text: 'Play a card',
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'zone-hand' },
@@ -177,16 +177,16 @@ describe('StoryAction', () => {
       },
       card: {
         uid: 'card',
-        fragment_type: 'token',
-        token_id: 'rust-map-card',
+        fragment_type: 'piece',
+        piece_id: 'rust-map-card',
         content: 'Rust map card',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
 
     expect(wrapper.find('[data-testid="choice-input-view"]').exists()).toBe(true)
-    expect(wrapper.find('.choice-token-option').exists()).toBe(true)
+    expect(wrapper.find('.choice-piece-option').exists()).toBe(true)
     expect(wrapper.text()).toContain('Rust map card')
   })
 
@@ -346,14 +346,14 @@ describe('StoryAction', () => {
     expect(wrapper.emitted('doAction')![0]).toEqual(['action_quantity', undefined])
   })
 
-  it('emits token accepts payloads from visible target-zone tokens', async () => {
-    const tokenChoice: ChoiceStoryFragment = {
-      uid: 'action_tokens',
+  it('emits piece accepts payloads from visible target-zone pieces', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
       fragment_type: 'choice',
-      edge_id: 'edge_tokens',
+      edge_id: 'edge_pieces',
       text: 'Take something',
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'zone-room' },
@@ -368,33 +368,33 @@ describe('StoryAction', () => {
       },
       'lamp-fragment': {
         uid: 'lamp-fragment',
-        fragment_type: 'token',
-        token_id: 'lamp',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
         content: 'brass lamp',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
 
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')).toBeUndefined()
 
-    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('.choice-piece-option').trigger('click')
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')![0]).toEqual([
-      'edge_tokens',
-      { token_ids: ['lamp'] },
+      'edge_pieces',
+      { piece_ids: ['lamp'] },
     ])
   })
 
-  it('clears stale token payload when a same-uid choice points at a new zone', async () => {
-    const tokenChoice: ChoiceStoryFragment = {
-      uid: 'action_tokens',
+  it('clears stale piece payload when a same-uid choice points at a new zone', async () => {
+    const pieceChoice: ChoiceStoryFragment = {
+      uid: 'action_pieces',
       fragment_type: 'choice',
-      edge_id: 'edge_tokens',
+      edge_id: 'edge_pieces',
       text: 'Take something',
       accepts: {
-        kind: 'tokens',
+        kind: 'pieces',
         min: 1,
         max: 1,
         constraints: { target_zone_ref: 'zone-room' },
@@ -409,26 +409,26 @@ describe('StoryAction', () => {
       },
       'lamp-fragment': {
         uid: 'lamp-fragment',
-        fragment_type: 'token',
-        token_id: 'lamp',
+        fragment_type: 'piece',
+        piece_id: 'lamp',
         content: 'brass lamp',
       },
     }
 
-    const wrapper = mountWithVuetify({ choice: tokenChoice, fragments })
+    const wrapper = mountWithVuetify({ choice: pieceChoice, fragments })
 
-    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('.choice-piece-option').trigger('click')
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')![0]).toEqual([
-      'edge_tokens',
-      { token_ids: ['lamp'] },
+      'edge_pieces',
+      { piece_ids: ['lamp'] },
     ])
 
     await wrapper.setProps({
       choice: {
-        ...tokenChoice,
+        ...pieceChoice,
         accepts: {
-          kind: 'tokens',
+          kind: 'pieces',
           min: 1,
           max: 1,
           constraints: { target_zone_ref: 'zone-bag' },
@@ -443,8 +443,8 @@ describe('StoryAction', () => {
         },
         'coin-fragment': {
           uid: 'coin-fragment',
-          fragment_type: 'token',
-          token_id: 'coin',
+          fragment_type: 'piece',
+          piece_id: 'coin',
           content: 'silver coin',
         },
       },
@@ -458,12 +458,12 @@ describe('StoryAction', () => {
     await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('doAction')!.length).toBe(1)
 
-    await wrapper.find('.choice-token-option').trigger('click')
+    await wrapper.find('.choice-piece-option').trigger('click')
     await wrapper.find('button').trigger('click')
     const events = wrapper.emitted('doAction')!
     expect(events[events.length - 1]).toEqual([
-      'edge_tokens',
-      { token_ids: ['coin'] },
+      'edge_pieces',
+      { piece_ids: ['coin'] },
     ])
   })
 })

@@ -166,8 +166,8 @@ def _assert_fragment_shape(fragment: dict[str, Any]) -> None:
             assert isinstance(fragment.get("payload"), dict)
     elif fragment_type == "user_event":
         assert "content" in fragment
-    elif fragment_type == "token":
-        assert isinstance(fragment.get("token_id"), str)
+    elif fragment_type == "piece":
+        assert isinstance(fragment.get("piece_id"), str)
     elif fragment_type == "interpretation":
         assert isinstance(fragment.get("content"), str)
     else:
