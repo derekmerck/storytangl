@@ -164,8 +164,8 @@ even though the engine has already committed to her as the villain.
 
 Conversely, when the journal introduces a concept before it becomes
 structurally necessary, the story holds **narrative credit**.  Mentioning the
-old sword on the mantelpiece in Act I creates credit that Act III's sword
-fight will draw down.  (Chekhov knew this, but didn't have a dependency
+gun on the wall in Act I creates credit that Act III's crisis may draw down.
+(Chekhov knew this, but didn't have a dependency
 graph.)
 
 This maps directly to the provisioning system:
@@ -228,11 +228,11 @@ when a later payoff makes the earlier disclosure matter in hindsight.  Until
 then, the same element may be ordinary world-building, atmosphere, a motif, a
 red herring, or unused texture.
 
-The old sword on the mantelpiece is therefore not inherently Chekhov's sword.
+The gun on the wall is therefore not inherently Chekhov's gun.
 At first it is a **latent hook**: a disclosed story element with possible
-affordances and meanings.  If Act III needs a duel, inheritance clue, threat,
-family memory, or ironic accident, the sword can be promoted into payoff.  If
-no compatible future beat calls for it, the sword remains world-building.  If
+affordances and meanings.  If Act III needs a threat, crime, clue, inheritance
+dispute, family memory, or ironic accident, the gun can be promoted into payoff.
+If no compatible future beat calls for it, the gun remains world-building.  If
 too much salience was spent on it, the story may need to pay it off, deflate it,
 or intentionally reclassify it as misdirection.
 
