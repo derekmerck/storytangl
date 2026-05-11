@@ -1,0 +1,99 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000010003",
+  "step": 103,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000013001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000013002",
+        "00000000-0000-4000-8000-000000013003",
+        "00000000-0000-4000-8000-000000013005",
+        "00000000-0000-4000-8000-000000013006"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000013002",
+      "fragment_type": "content",
+      "content": "The empty turret mount waits above the driver's cage."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000013003",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "inventory",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000013004"
+      ],
+      "hints": {
+        "label_text": "parts on hand"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000013004",
+      "fragment_type": "piece",
+      "piece_id": "vulcan-1",
+      "kind": "weapon",
+      "realized": true,
+      "zone_ref": "00000000-0000-4000-8000-000000013003",
+      "properties": {
+        "name": "Vulcan Gun",
+        "weight": 2
+      },
+      "hints": {
+        "label_text": "Vulcan Gun"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000013005",
+      "fragment_type": "group",
+      "group_type": "zone",
+      "zone_role": "slot",
+      "member_ids": [],
+      "constraints": {
+        "accepts_kind": ["weapon"],
+        "capacity": [
+          {
+            "kind": "count",
+            "max": 1,
+            "unit": "weapon"
+          },
+          {
+            "kind": "weight",
+            "max": 4,
+            "unit": "stone",
+            "sum_property": "weight",
+            "ledger_key": "vehicle.turret.weight"
+          }
+        ]
+      },
+      "hints": {
+        "label_text": "turret"
+      }
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000013006",
+      "fragment_type": "choice",
+      "edge_id": "00000000-0000-4000-8000-000000013106",
+      "text": "Mount a weapon.",
+      "available": true,
+      "accepts": {
+        "kind": "place",
+        "source_zone_ref": "00000000-0000-4000-8000-000000013003",
+        "target_zone_ref": "00000000-0000-4000-8000-000000013005",
+        "constraints": {
+          "target_kind": ["weapon"]
+        }
+      },
+      "ui_hints": {
+        "hotkey": "1"
+      }
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_place_accepts",
+    "proposal": true,
+    "vocab_version": "1.1"
+  }
+}

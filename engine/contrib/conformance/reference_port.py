@@ -229,6 +229,8 @@ def _render_fragment(
     if fragment_type == "interpretation":
         text = _render_interpretation(fragment)
         return [_item("interpretation", text, indent=indent, ref_id=uid)]
+    if fragment_type == "roll":
+        return [_item("roll", _render_roll(fragment), indent=indent, ref_id=uid)]
     if fragment_type == "user_event":
         return [_item("user_event", _render_user_event(fragment), indent=indent, ref_id=uid)]
 
@@ -310,7 +312,7 @@ def _render_kv(fragment: JsonObject, indent: int) -> list[RenderItem]:
             value = row[1]
             items.append(_item("fact", f"{label}: {value}", indent=indent, ref_id=uid))
         elif isinstance(row, dict):
-            label = row.get("key") or row.get("label")
+            label = row.get("label") or row.get("key")
             value = row.get("value")
             if label is not None:
                 items.append(_item("fact", f"{label}: {value}", indent=indent, ref_id=uid))
@@ -399,13 +401,37 @@ def _accepts_prompt(
         count = _selection_count(minimum, maximum, "piece")
         return f" <select {count} from {zone_label}>"
 
+    if kind == "place":
+        source_ref = _text(accepts, "source_zone_ref")
+        target_ref = _text(accepts, "target_zone_ref")
+        source = registry.get(source_ref) if source_ref else None
+        target = registry.get(target_ref) if target_ref else None
+        source_label = (
+            _fragment_label(source, source_ref or "source") if source_ref else "source"
+        )
+        target_label = (
+            _fragment_label(target, target_ref or "target") if target_ref else "target"
+        )
+        return f" <place from {source_label} to {target_label}>"
+
     return f" <{kind}>"
 
 
 def _render_piece(fragment: JsonObject) -> str:
     label = _fragment_label(fragment, "piece")
     state = _text(fragment, "display_state")
-    return f"- {label} [{state}]" if state else f"- {label}"
+    realized = fragment.get("realized")
+    available = fragment.get("available")
+    unavailable_reason = _text(fragment, "unavailable_reason")
+    tags: list[str] = []
+    if state:
+        tags.append(state)
+    if realized is False:
+        tags.append("offer")
+    if available is False:
+        tags.append(f"locked: {unavailable_reason}" if unavailable_reason else "locked")
+    suffix = f" [{', '.join(tags)}]" if tags else ""
+    return f"- {label}{suffix}"
 
 
 def _piece_data(fragment: JsonObject) -> JsonObject:
@@ -430,6 +456,34 @@ def _render_interpretation(fragment: JsonObject) -> str:
     if command_text:
         prefix = f'{prefix} "{command_text}"'
     return f"{prefix} {content}"
+
+
+def _render_roll(fragment: JsonObject) -> str:
+    label = _text(fragment, "label") or "Roll"
+    kind = _text(fragment, "kind") or "roll"
+    outcome = _text(fragment, "outcome") or "unknown"
+    inputs = _object(fragment.get("inputs"))
+    narrative = _text(fragment, "narrative")
+    summary = _roll_input_summary(inputs)
+    details = f" {summary}" if summary else ""
+    suffix = f" {narrative}" if narrative else ""
+    return f"[roll:{kind}] {label}:{details} outcome={outcome}.{suffix}"
+
+
+def _roll_input_summary(inputs: JsonObject | None) -> str:
+    if inputs is None:
+        return ""
+    dice = _text(inputs, "dice")
+    rolled = _list(inputs.get("rolled"))
+    modifier = inputs.get("modifier")
+    total = inputs.get("total")
+    target = inputs.get("target")
+    if dice and rolled and isinstance(total, int):
+        rolled_text = " + ".join(str(value) for value in rolled)
+        modifier_text = f" {modifier:+d}" if isinstance(modifier, int) and modifier else ""
+        target_text = f" vs {target}" if isinstance(target, int) else ""
+        return f"{dice} rolled {rolled_text}{modifier_text} = {total}{target_text}"
+    return json.dumps(inputs, sort_keys=True)
 
 
 def _render_user_event(fragment: JsonObject) -> str:

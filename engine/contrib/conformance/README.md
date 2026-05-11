@@ -16,6 +16,12 @@ target in `STORYTANGL_WIDGET_VOCAB.md`. In particular:
 Every future port should be able to load these JSON files and assert observable
 output in its own medium.
 
+`proposals/` contains non-gating fixtures for v1.1 target surfaces such as
+record-shaped `KvRow`, `piece.realized`, `place` accepts, `roll` fragments, and
+the compact CarWars garage turn. Proposal fixtures should stay JSON-loadable
+and reference-port-renderable, but they are not conformance requirements until
+`docs/src/design/story/WIDGET_CONTRACT_RECONCILIATION.md` promotes them.
+
 `reference_port.py` is the smallest current proof of that portability. It
 renders the fixtures into a UI-neutral `RenderDocument` from JSON only, without
 importing engine models or calling the service layer. `cli_reference_port.py`

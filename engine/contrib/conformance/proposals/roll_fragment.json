@@ -1,0 +1,49 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000010004",
+  "step": 104,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000014001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000014002",
+        "00000000-0000-4000-8000-000000014003"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000014002",
+      "fragment_type": "content",
+      "content": "You wrench the Beast toward the gap between burning wrecks."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000014003",
+      "fragment_type": "roll",
+      "label": "Driving check",
+      "kind": "dice",
+      "inputs": {
+        "dice": "2d6",
+        "rolled": [4, 5],
+        "modifier": 0,
+        "total": 9,
+        "target": 12
+      },
+      "outcome": "fail",
+      "narrative": "The wheel jerks under you. The Beast clips the divider and showers sparks.",
+      "against": {
+        "piece_id": "driver",
+        "property": "driving"
+      },
+      "ritual_hints": {
+        "skip_label": "Skip the roll",
+        "allow_replay": true,
+        "duration_ms": 1800
+      }
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_roll_fragment",
+    "proposal": true,
+    "vocab_version": "1.1"
+  }
+}

@@ -275,7 +275,7 @@ describe('StoryBlock', () => {
     const fragments: Record<string, StoryFragment> = {
       weird: {
         uid: 'weird',
-        fragment_type: 'dice_roll',
+        fragment_type: 'roll',
         content: { value: 6 },
       },
     }
@@ -283,6 +283,6 @@ describe('StoryBlock', () => {
     const wrapper = mountBlock(fragments, ['weird'])
 
     expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('dice_roll')
+    expect(wrapper.text()).toContain('roll')
   })
 })

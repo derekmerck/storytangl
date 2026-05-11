@@ -1,6 +1,6 @@
 # StoryTangl Widget Vocabulary
 
-**Version:** v1.0 (draft) · supersedes v0.3 + interactive-surfaces v0.4 + command-resolution v0.1
+**Version:** v1.1 (draft) · supersedes v1.0 + carwars-extensions v0.1
 **Status of this document:** adopted unified vocabulary target. Repo-current
 conformance status is tracked in
 `docs/src/design/story/WIDGET_CONTRACT_RECONCILIATION.md`; do not treat every
@@ -26,6 +26,12 @@ conformance fixtures have retired the older UI `token` term; tuple-style kv
 rows and fallback-only interpretation rendering remain current implementation
 gaps. See the reconciliation document before generating conformance fixtures or
 filing implementation drift.
+
+**v1.1 reconciliation summary.** The current repo has proposal fixtures for
+record-shaped `KvRow`, `piece.realized`, `place` accepts, `roll`, and a compact
+CarWars garage turn. Those fixtures are review scaffolding, not Tier-S gating
+requirements. `piece`/`piece_ids` is the only UI target vocabulary; the engine's
+`tangl.core.token.Token` keeps its existing name.
 
 ---
 
@@ -555,7 +561,7 @@ bundle = {
 
     # Custom fragment types the story invents — must include text fallback
     "handlers": {
-        "dice_roll": "renderDiceRoll",      # function reference
+        "roll": "renderRoll",              # function reference
     },
 }
 ```
@@ -681,7 +687,7 @@ Validator: TypeAlias = Annotated[
 
 class PickAccepts(BaseModel):
     kind: Literal["pick"] = "pick"
-    cost_preview: CostPreview | None = None
+    cost_previews: list[CostPreview] = Field(default_factory=list)
 
 class TextAccepts(BaseModel):
     kind: Literal["text"] = "text"
@@ -697,7 +703,7 @@ class QuantityAccepts(BaseModel):
     step: int = 1
     unit: str | None = None
     ledger_ref: str | None = None     # show "you have N" from this section
-    cost_preview: CostPreview | None = None
+    cost_previews: list[CostPreview] = Field(default_factory=list)
 
 class PiecesAccepts(BaseModel):
     kind: Literal["pieces"] = "pieces"
@@ -775,7 +781,7 @@ class UIHints(BaseModel, extra="allow"):
     icon: str | None = None
     emphasis: Literal["primary", "subtle", "warning", "danger"] | None = None
     widget: str | None = None             # variant override id from bundle.widgets
-    cost_preview: CostPreview | None = None
+    cost_previews: list[CostPreview] = Field(default_factory=list)
 ```
 
 `UIHints` is deliberately open (`extra="allow"`) — it's a hint surface, not
@@ -1027,7 +1033,7 @@ typing lands.
 Genre layers add domain-specific widgets on top of Tier P2:
 
 - **Carwars-gamebook** (in design): `slot` zone_role, `place` accepts.kind,
-  `piece_offer`, `dice_roll` content fragment, `ui_hints.stat_check`.
+  `piece.realized=false` offers, `RollFragment`, `ui_hints.stat_check`.
 - **Hana-smuta board** (sketched in v0.x): card profile + `hand` / `field` /
   `pile` / `score_pile` zones, plus matching `accepts(pieces, same_property)`.
 

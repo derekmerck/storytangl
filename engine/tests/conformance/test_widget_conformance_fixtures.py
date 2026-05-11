@@ -17,6 +17,7 @@ from tangl.service.response import ProjectedState, RuntimeEnvelope
 
 
 FIXTURE_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "fixtures"
+PROPOSAL_DIR = Path(__file__).parents[2] / "contrib" / "conformance" / "proposals"
 PROJECTED_STATE_FIXTURE = "projected_state_all_values.json"
 EXPECTED_FIXTURES = {
     "command_hints.json",
@@ -27,6 +28,13 @@ EXPECTED_FIXTURES = {
     "projected_state_all_values.json",
     "quantity_payload.json",
     "sandbox_payload.json",
+}
+EXPECTED_PROPOSALS = {
+    "carwars_garage_turn.json",
+    "piece_realization.json",
+    "place_accepts.json",
+    "record_kvrow.json",
+    "roll_fragment.json",
 }
 
 
@@ -43,6 +51,10 @@ def _runtime_fixture_paths() -> list[Path]:
         for path in FIXTURE_DIR.glob("*.json")
         if path.name != PROJECTED_STATE_FIXTURE
     )
+
+
+def _proposal_fixture_paths() -> list[Path]:
+    return sorted(PROPOSAL_DIR.glob("*.json"))
 
 
 def _is_record(value: object) -> bool:
@@ -178,10 +190,23 @@ def test_expected_fixture_suite_is_present() -> None:
     assert {path.name for path in FIXTURE_DIR.glob("*.json")} == EXPECTED_FIXTURES
 
 
+def test_expected_proposal_fixture_suite_is_present_but_not_gating() -> None:
+    assert {path.name for path in _proposal_fixture_paths()} == EXPECTED_PROPOSALS
+    assert not (EXPECTED_FIXTURES & EXPECTED_PROPOSALS)
+
+
 @pytest.mark.parametrize("path", _runtime_fixture_paths(), ids=lambda path: path.name)
 def test_runtime_fixtures_validate_as_runtime_envelopes(path: Path) -> None:
     payload = _load_fixture(path)
 
+    RuntimeEnvelope.model_validate(payload)
+
+
+@pytest.mark.parametrize("path", _proposal_fixture_paths(), ids=lambda path: path.name)
+def test_proposal_fixtures_are_loadable_runtime_envelopes(path: Path) -> None:
+    payload = _load_fixture(path)
+
+    assert payload.get("metadata", {}).get("proposal") is True
     RuntimeEnvelope.model_validate(payload)
 
 

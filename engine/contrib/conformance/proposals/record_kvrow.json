@@ -1,0 +1,56 @@
+{
+  "cursor_id": "00000000-0000-4000-8000-000000010001",
+  "step": 101,
+  "fragments": [
+    {
+      "uid": "00000000-0000-4000-8000-000000011001",
+      "fragment_type": "group",
+      "group_type": "scene",
+      "member_ids": [
+        "00000000-0000-4000-8000-000000011002",
+        "00000000-0000-4000-8000-000000011003"
+      ]
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000011002",
+      "fragment_type": "content",
+      "content_format": "md",
+      "content": "The dashboard needles settle into a nervous rhythm."
+    },
+    {
+      "uid": "00000000-0000-4000-8000-000000011003",
+      "fragment_type": "kv",
+      "content": [
+        {
+          "key": "fuel",
+          "label": "Fuel",
+          "value": 6,
+          "max": 10,
+          "unit": "tank",
+          "hint": "bar"
+        },
+        {
+          "key": "armor",
+          "label": "Armor",
+          "value": 3,
+          "max": 8,
+          "unit": "plate",
+          "hint": "bar",
+          "emphasis": "warn"
+        },
+        {
+          "key": "cash_delta",
+          "label": "Wallet",
+          "value": -400,
+          "unit": "cr",
+          "hint": "delta"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "fixture": "proposal_record_kvrow",
+    "proposal": true,
+    "vocab_version": "1.1"
+  }
+}

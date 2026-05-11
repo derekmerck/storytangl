@@ -10,6 +10,7 @@ from types import ModuleType
 
 ROOT = Path(__file__).parents[3]
 FIXTURE_DIR = ROOT / "engine" / "contrib" / "conformance" / "fixtures"
+PROPOSAL_DIR = ROOT / "engine" / "contrib" / "conformance" / "proposals"
 REFERENCE_PATH = ROOT / "engine" / "contrib" / "conformance" / "reference_port.py"
 CLI_PATH = ROOT / "engine" / "contrib" / "conformance" / "cli_reference_port.py"
 
@@ -29,6 +30,11 @@ PORT = _load_port()
 
 def _render(name: str) -> str:
     payload = PORT.load_fixture(FIXTURE_DIR / name)
+    return "\n".join(PORT.render_fixture(payload))
+
+
+def _render_proposal(name: str) -> str:
+    payload = PORT.load_fixture(PROPOSAL_DIR / name)
     return "\n".join(PORT.render_fixture(payload))
 
 
@@ -139,3 +145,16 @@ def test_cli_reference_keeps_unknown_fragment_fallback_observable() -> None:
     output = "\n".join(PORT.render_fixture(payload))
 
     assert "[unsupported mystery] Future widget" in output
+
+
+def test_cli_reference_can_inspect_proposal_fixtures_without_promoting_them() -> None:
+    garage_output = _render_proposal("carwars_garage_turn.json")
+    roll_output = _render_proposal("roll_fragment.json")
+    kv_output = _render_proposal("record_kvrow.json")
+
+    assert "1) Mount a weapon. <place from parts on hand to turret>" in garage_output
+    assert "2) Buy from Murph's. <select 0-2 pieces from Murph's wares>" in garage_output
+    assert "- Flamethrower [offer]" in garage_output
+    assert "- Rocket Launcher Mk II [offer, locked: Out of stock until next session.]" in garage_output
+    assert "[roll:dice] Driving check: 2d6 rolled 4 + 5 = 9 vs 12 outcome=fail." in roll_output
+    assert "Fuel: 6" in kv_output
