@@ -28,6 +28,35 @@ legacy IF extraction remain research or follow-up work.
 Parser UI is optional. It does not create actions. It only maps user text to
 the closest current choice, diagnostic choice, or no match.
 
+### Cursor Projections
+
+The sandbox location axis is one projection of the StoryTangl cursor, not a
+new cursor model.
+
+A single runtime cursor can be understood as projecting onto several story
+manifolds at once:
+
+- a morphology or story-arc overlay: courtship, loss, recovery, betrayal,
+  Propp-like function, or other high-level template position;
+- the actual traversed story graph: this concrete scene, action, edge, or
+  dynamic hub;
+- the current syuzhet chain: the ordered disclosure path that has carried the
+  reader to the present moment;
+- the sandbox geography: the current place in a linked field of adjacent
+  opportunity menus.
+
+Most of this is still implicit in v38, but it is useful vocabulary for later
+work on story scale-space and higher-level templates. The same cursor may be
+"in" a romance beat, "at" a tavern scene, "after" an overheard conversation in
+the syuzhet, and "north of" a locked grate in the sandbox projection.
+
+Sandbox simply makes one of those projections explicit. It treats the active
+node as a location-like hub and projects movement choices to adjacent hubs:
+north, east, south, west, in, out, up, down, or any other authored link. Those
+links do not need intrinsic plot semantics. They are transitions from one menu
+of opportunities to a neighboring menu of opportunities, while the normal graph
+and story overlays continue to supply narrative meaning.
+
 ---
 
 ## Relationship To Existing Architecture
