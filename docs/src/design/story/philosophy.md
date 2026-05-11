@@ -412,8 +412,8 @@ discourse layer should change how a story *reads* without changing what
 satellite nodes should leave the story structurally complete.  These are
 testable claims, and the engine provides the apparatus to test them.
 
-For a detailed survey, see the *StoryTangl Literature Review (2025)* and
-the research agenda.
+For implementation-specific follow-up, see the subpackage design notes and the
+research-direction summary in the root README.
 
 ---
 
@@ -423,6 +423,7 @@ the research agenda.
 - **How** the graph primitives work → see `engine/src/tangl/core/CORE_DESIGN.md`
 - **How** story concepts are modeled → see `engine/src/tangl/story/`
 - **How** the service layer transforms fragments → see `engine/src/tangl/service/`
-- **What** research directions follow from this → see `storytangl-research-agenda.md`
+- **What** research directions follow from this → see the root `README.md`
+  and package-level design notes
 
 This document is the **why**.  The subpackage design docs are the **how**.
