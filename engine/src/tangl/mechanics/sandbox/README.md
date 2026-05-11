@@ -115,6 +115,16 @@ Scheduled mobs also count as present actors for scheduled-event gates. This
 establishes a runtime home for offscreen actors without adding pathing, fleeing,
 combat, trade negotiation, or lazy dialog scene generation yet.
 
+The next interaction slice treats mobs as sponsors for ordinary traversable
+content. This is a sandbox instance of a broader StoryTangl pattern: a concept
+that is in scope can sponsor a choice without owning a separate runtime.
+Actor-owned, place-owned, asset-owned, fixture-owned, and plot-owned content
+should all lower to normal `Action` edges with ordinary availability, effects,
+journal fragments, traversal, optional call/return, and ledger history. Sandbox
+should prove this first with present mobs, then reuse the same shape for local
+events, carried assets, and reachable fixtures before promoting any helper into
+general story vocabulary.
+
 The Adventure import goal is semantic compression, not faithful emulation. A
 compact world schema should declare locations, exits, assets, fixtures, mobs,
 world concepts, traits, and initial state; reusable sandbox handlers and narrow

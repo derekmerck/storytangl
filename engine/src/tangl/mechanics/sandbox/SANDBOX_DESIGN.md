@@ -293,6 +293,125 @@ scheduled events. This proves the "pirate has a runtime home" shape without
 adding movement AI, pathfinding, fleeing, combat, trade negotiation, or lazy
 dialog scene generation yet.
 
+### Sponsored Traversal And Concept-Owned Content
+
+Sandbox has exposed a broader StoryTangl pattern: traversable content does not
+have to be organized only by acts, chapters, and scenes. Those remain the
+canonical plot spine, but any concept that participates in scope can sponsor
+ordinary traversal when it is present, active, carried, or otherwise relevant.
+
+The authoring owner and runtime sponsor can be different:
+
+- plot-owned content is offered by the current scene or story spine;
+- place-owned content is offered when a location is active;
+- actor-owned content is offered when the actor is present;
+- asset-owned content is offered when the asset is present, carried, worn, or
+  otherwise in scope;
+- fixture-owned content is offered when the fixture is reachable;
+- scope/system-owned content is offered by the enclosing sandbox scope or
+  world authority.
+
+This is a way to organize authored material, not a second runtime path. A mob
+can carry "talk to Aria about the monster" because that beat belongs to Aria's
+arc; a location can carry "listen at the locked door" because that beat belongs
+to the place; a plot spine can carry "continue the investigation" because that
+beat belongs to the current narrative sequence. All of them should project the
+same kind of thing: a normal `Action` choice with ordinary availability,
+effects, journal output, traversal, and optional call/return behavior.
+
+This gives us three distinct axes:
+
+- **Structural scope**: where an authored template lives for organization,
+  naming, and materialization policy.
+- **Runtime sponsor**: which concept is allowed to project the affordance into
+  the current choice surface.
+- **Activation conditions**: whether the projected affordance is currently
+  usable, visible, once-only, safe to offer, or gated by state.
+
+Keeping those axes separate avoids the global-event-table trap. "Chat with
+Aria about the monster" does not need to be a global event with conditions
+that mention every possible location. It can be structurally owned by Aria,
+sponsored when Aria is present, and activated only when the story has met the
+monster and the current scope is safe enough to pause for conversation.
+
+The same idea applies to locations and assets. A barn dance location can
+sponsor a welcome beat no matter which entrance the player used. A carried
+instrument can sponsor "play a song" in any scope that permits music. A locked
+door can sponsor "unlock the door" while using ordinary edge availability to
+explain that the player lacks the key.
+
+The sandbox-specific pieces implemented so far are early instances of this
+pattern:
+
+- sandbox locations sponsor movement exits and local fixtures;
+- sandbox scopes sponsor wait, schedules, and player inventory;
+- present mobs sponsor description, simple self-loop actions, and asset
+  transfers;
+- assets and fixtures sponsor take/drop/read/open/close/unlock/container
+  actions through typed facets and the asset transaction manager.
+
+The likely promotion path is a general StoryTangl helper for sponsored
+traversal or concept-owned affordances once at least mobs, locations, assets,
+and fixtures are using the same shape. Until then sandbox should keep the
+implementation local and prove that the projection compiles down to ordinary
+StoryTangl actions.
+
+### Strategy: Sponsored Interactions
+
+Build this as a sequence of small slices over the current sandbox work rather
+than by creating a dialogue or encounter subsystem.
+
+1. **Stabilize present mobs as sponsors.** `SandboxMob` already has schedule
+   and presence projection, mutable state, and `HasAssets`. Add one narrow
+   interaction declaration to the mob surface, such as `interactions`, whose
+   entries name a label, target traversable, optional selected-action journal
+   text, `once`, and `return_to_location`.
+
+2. **Project mob interactions as ordinary actions.** When a mob is present,
+   the mob projector should lower each active interaction into an `Action`
+   edge. Jump-and-return should use the existing `return_phase=PLANNING`
+   pattern. Once-only interactions should use the existing visit-history
+   suppression already used by scheduled events.
+
+3. **Keep conditions in the existing availability/effect vocabulary.** First
+   pass conditions should be simple state predicates or runtime operations
+   evaluated in the normal sandbox namespace. Avoid mob-specific condition
+   engines. Conditions such as "safe to talk", "met the monster", or
+   "relationship trust high enough" should decide whether an ordinary action is
+   offered or activatable.
+
+4. **Share the declaration with locations next.** Once mob-owned interactions
+   work, reuse the same interaction shape for location-owned local events.
+   This tests whether sponsor-owned content is really independent of actor
+   presence and not just a mob feature.
+
+5. **Extend to assets and fixtures only after the shape holds.** Carried or
+   present assets and reachable fixtures should be able to sponsor the same
+   interaction declarations. This is where instruments, books, doors, altars,
+   and other object-bound storylets become first-class without new traversal
+   machinery.
+
+6. **Delay lazy materialization.** The first implementation should target
+   existing traversable nodes. Later, an interaction can name a template that is
+   materialized only when invoked, using the existing template/provisioning path
+   rather than a sandbox-specific scene factory. This keeps stable sandbox
+   simulation and lazy encounter content compatible without blending them.
+
+7. **Promote only after duplication appears.** If the same sponsor interaction
+   logic is cleanly shared by mobs, locations, fixtures, and assets, extract
+   the generic pieces into story-level vocabulary. Until then, sandbox remains
+   the pressure test and the runtime contract remains ordinary actions,
+   journal fragments, effects, and ledger history.
+
+Acceptance tests for the next slice should prove the architectural shape:
+
+- a present mob offers an interaction that traverses to a target and returns;
+- an absent scheduled mob does not offer that interaction;
+- a once-only interaction is suppressed after its target has been visited;
+- a location-owned interaction is offered only at that location;
+- the projected actions are ordinary `Action` edges with journal fragments, not
+  a parallel interaction ledger.
+
 ### Visibility Projection
 
 Darkness is not primarily a movement constraint. It is a projection rule over
