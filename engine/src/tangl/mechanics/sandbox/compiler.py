@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tangl.core import Token
+from tangl.core.runtime_op import Effect, Predicate
 from tangl.story import StoryGraph
 from tangl.story.concepts.asset import AssetType
 
@@ -18,11 +19,14 @@ from .facets import (
     OpenableFacet,
     SwitchableFacet,
 )
+from .interaction import SandboxInteraction
 from .location import SandboxExit, SandboxFixture, SandboxLocation
 from .mob import SandboxMob, SandboxMobAffordance
 from .schedule import Schedule
 from .scope import SandboxScope
 from .visibility import SandboxVisibilityRule
+
+RuntimeOpT = TypeVar("RuntimeOpT", Predicate, Effect)
 
 
 class SandboxCompiledAssetType(AssetType):
@@ -148,6 +152,66 @@ class SandboxExitSpec(BaseModel):
         )
 
 
+def _normalize_runtime_ops(value: Any, op_kind: type[RuntimeOpT]) -> list[RuntimeOpT]:
+    if value is None:
+        return []
+    out: list[Any] = []
+    for item in value:
+        if isinstance(item, op_kind):
+            out.append(item)
+        elif isinstance(item, str):
+            out.append(op_kind(expr=item))
+        elif isinstance(item, dict):
+            out.append(op_kind.model_validate(item))
+        else:
+            raise TypeError(f"Expected {op_kind.__name__} expression, got {type(item)!r}")
+    return out
+
+
+class SandboxInteractionSpec(BaseModel):
+    """Authored compact interaction sponsored by a scoped concept."""
+
+    text: str
+    target: str
+    journal: str | None = None
+    journal_text: str | None = None
+    activation: str | None = None
+    once: bool = False
+    return_to_location: bool = False
+    availability: list[Predicate] = Field(default_factory=list)
+    effects: list[Effect] = Field(default_factory=list)
+
+    @field_validator("availability", mode="before")
+    @classmethod
+    def _normalize_availability(cls, value: Any) -> list[Predicate]:
+        return _normalize_runtime_ops(value, Predicate)
+
+    @field_validator("effects", mode="before")
+    @classmethod
+    def _normalize_effects(cls, value: Any) -> list[Effect]:
+        return _normalize_runtime_ops(value, Effect)
+
+    def as_interaction(self, label: str) -> SandboxInteraction:
+        """Return the runtime sponsored interaction."""
+        return SandboxInteraction(
+            label=label,
+            text=self.text,
+            target=self.target,
+            journal_text=self.journal_text or self.journal or "",
+            activation=self.activation,
+            once=self.once,
+            return_to_location=self.return_to_location,
+            availability=list(self.availability),
+            effects=list(self.effects),
+        )
+
+
+class SandboxLocationContributionsSpec(BaseModel):
+    """Authored contribution tables for one compact location."""
+
+    interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
+
+
 class SandboxLocationSpec(BaseModel):
     """Authored compact sandbox location."""
 
@@ -158,6 +222,9 @@ class SandboxLocationSpec(BaseModel):
     traits: list[str] = Field(default_factory=list)
     descriptions: SandboxDescriptionSpec = Field(default_factory=SandboxDescriptionSpec)
     exits: dict[str, str | SandboxExitSpec] = Field(default_factory=dict)
+    contributes: SandboxLocationContributionsSpec = Field(
+        default_factory=SandboxLocationContributionsSpec
+    )
     runtime_identity: SandboxRuntimeIdentitySpec = Field(
         default_factory=SandboxRuntimeIdentitySpec
     )
@@ -248,6 +315,7 @@ class SandboxMobContributionsSpec(BaseModel):
     """Authored contribution tables for one compact mob."""
 
     affordances: dict[str, SandboxMobActionSpec] = Field(default_factory=dict)
+    interactions: dict[str, SandboxInteractionSpec] = Field(default_factory=dict)
 
 
 class SandboxMobSpec(BaseModel):
@@ -388,6 +456,11 @@ class SandboxSliceCompiler:
                 light="light" in traits,
                 content=descriptions.lit or descriptions.look or descriptions.first or "",
                 dark_text=descriptions.dark,
+                interactions=[
+                    interaction_spec.as_interaction(interaction_label)
+                    for interaction_label, interaction_spec
+                    in location_spec.contributes.interactions.items()
+                ],
             )
             links: dict[str, str | SandboxExit] = {}
             for direction, exit_spec in location_spec.exits.items():
@@ -649,6 +722,11 @@ class SandboxSliceCompiler:
                     action_spec.as_affordance(action_label)
                     for action_label, action_spec
                     in mob_spec.contributes.affordances.items()
+                ],
+                interactions=[
+                    interaction_spec.as_interaction(interaction_label)
+                    for interaction_label, interaction_spec
+                    in mob_spec.contributes.interactions.items()
                 ],
             )
             graph.add(mob)

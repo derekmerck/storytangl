@@ -15,6 +15,7 @@ from tangl.vm import ResolutionPhase, TraversableNode, VmPhaseCtx, on_provision,
 from tangl.vm.dispatch import on_compose_journal, on_gather_ns
 
 from .facets import ContainerFacet, LightSourceFacet, SwitchableFacet
+from .interaction import SandboxInteraction
 from .location import (
     SandboxExit,
     SandboxFixture,
@@ -383,6 +384,70 @@ def _mob_affordance_tag(label: str) -> str | None:
     if not normalized:
         return None
     return f"affordance:{normalized}"
+
+
+def _interaction_tag(label: str) -> str | None:
+    normalized = label.strip().replace(" ", "_")
+    if not normalized:
+        return None
+    return f"interaction:{normalized}"
+
+
+def _interaction_target(
+    location: SandboxLocation,
+    interaction: SandboxInteraction,
+) -> TraversableNode | None:
+    if interaction.target == "current":
+        return location
+    return _resolve_traversable_ref(location, interaction.target)
+
+
+def _project_sandbox_interaction(
+    location: SandboxLocation,
+    *,
+    graph: Graph,
+    interaction: SandboxInteraction,
+    source: str,
+    sponsor_label: str,
+    sponsor_kind: str,
+    tags: set[str],
+    **hints: Any,
+) -> Action | None:
+    tag = _interaction_tag(interaction.label)
+    if tag is None:
+        return None
+    target = _interaction_target(location, interaction)
+    if target is None:
+        return None
+    if interaction.once and _target_visited(target):
+        return None
+    return Action(
+        registry=graph,
+        label=(
+            f"sandbox_{source}_{location.get_label()}_"
+            f"{sponsor_label}_{interaction.label}"
+        ),
+        predecessor_id=location.uid,
+        successor_id=target.uid,
+        text=interaction.text,
+        trigger_phase=Action.trigger_phase_from_activation(interaction.activation),
+        return_phase=ResolutionPhase.PLANNING if interaction.return_to_location else None,
+        availability=list(interaction.availability),
+        effects=list(interaction.effects),
+        journal_text=interaction.journal_text,
+        tags={"dynamic", "sandbox", "interaction", tag, *tags},
+        ui_hints=_sandbox_contribution_hints(
+            location,
+            source=source,
+            contribution="interaction",
+            source_label=sponsor_label,
+            source_kind=sponsor_kind,
+            interaction=interaction.label,
+            target=target.get_label(),
+            return_to_location=interaction.return_to_location,
+            **hints,
+        ),
+    )
 
 
 def _time_owner(location: SandboxLocation) -> Any:
@@ -1617,6 +1682,45 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
                     action=affordance.label,
                 ),
             )
+        for interaction in mob.interactions:
+            _project_sandbox_interaction(
+                caller,
+                graph=graph,
+                interaction=interaction,
+                source="sandbox_mob",
+                sponsor_label=mob_label,
+                sponsor_kind="mob",
+                tags={"mob"},
+                mob=mob_label,
+            )
+    return None
+
+
+@on_provision(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+)
+def project_sandbox_location_interactions(*, caller, ctx, **_kw):
+    """Project active location-sponsored interactions into ordinary actions."""
+    if not isinstance(caller, SandboxLocation):
+        return None
+    if not caller.auto_provision:
+        return None
+    graph = getattr(caller, "graph", None)
+    if graph is None or bool(getattr(graph, "frozen_shape", False)):
+        return None
+
+    _clear_dynamic_sandbox_actions(caller, action_kind="location", ctx=ctx)
+    for interaction in caller.interactions:
+        _project_sandbox_interaction(
+            caller,
+            graph=graph,
+            interaction=interaction,
+            source="sandbox_location",
+            sponsor_label=caller.get_label(),
+            sponsor_kind="location",
+            tags={"location"},
+        )
     return None
 
 

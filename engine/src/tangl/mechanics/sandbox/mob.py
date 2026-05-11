@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from tangl.story.concepts import Actor
 from tangl.story.concepts.asset import HasAssets
 
+from .interaction import SandboxInteraction
 from .schedule import Schedule
 from .time import WorldTime
 
@@ -33,6 +34,7 @@ class SandboxMob(HasAssets, Actor):
     nearby_text: str | None = None
     schedule: Schedule = Field(default_factory=Schedule)
     affordances: list[SandboxMobAffordance] = Field(default_factory=list)
+    interactions: list[SandboxInteraction] = Field(default_factory=list)
 
     def scheduled_location(self, world_time: WorldTime | None = None) -> str:
         """Return the mob location implied by its current schedule."""

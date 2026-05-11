@@ -392,6 +392,9 @@ pattern:
 - sandbox scopes sponsor wait, schedules, and player inventory;
 - present mobs sponsor description, simple self-loop actions, and asset
   transfers;
+- present mobs and active locations sponsor `SandboxInteraction` declarations
+  that lower to ordinary actions, optional call/return edges, and self-loop
+  effect/journal actions;
 - assets and fixtures sponsor take/drop/read/open/close/unlock/container
   actions through typed facets and the asset transaction manager.
 
@@ -406,17 +409,17 @@ StoryTangl actions.
 Build this as a sequence of small slices over the current sandbox work rather
 than by creating a dialogue or encounter subsystem.
 
-1. **Stabilize present mobs as sponsors.** `SandboxMob` already has schedule
-   and presence projection, mutable state, and `HasAssets`. Add one narrow
-   interaction declaration to the mob surface, such as `interactions`, whose
+1. **Stabilize present mobs and active locations as sponsors.** `SandboxMob`
+   already has schedule and presence projection, mutable state, and `HasAssets`;
+   `SandboxLocation` is the active hub. Both now carry `interactions`, whose
    entries name a label, target traversable, optional selected-action journal
-   text, `once`, and `return_to_location`.
+   text, `once`, availability, effects, activation, and `return_to_location`.
 
-2. **Project mob interactions as ordinary actions.** When a mob is present,
-   the mob projector should lower each active interaction into an `Action`
-   edge. Jump-and-return should use the existing `return_phase=PLANNING`
-   pattern. Once-only interactions should use the existing visit-history
-   suppression already used by scheduled events.
+2. **Project sponsored interactions as ordinary actions.** When a mob is
+   present or a location is active, the projector lowers each active interaction
+   into an `Action` edge. Jump-and-return uses the existing
+   `return_phase=PLANNING` pattern. Once-only interactions use the existing
+   visit-history suppression already used by scheduled events.
 
    The core shape is not sandbox-specific. An interaction answers three VM
    questions: where does this edge go, when does it fire, and should it return?
@@ -436,24 +439,19 @@ than by creating a dialogue or encounter subsystem.
    "relationship trust high enough" should decide whether an ordinary action is
    offered or activatable.
 
-4. **Share the declaration with locations next.** Once mob-owned interactions
-   work, reuse the same interaction shape for location-owned local events.
-   This tests whether sponsor-owned content is really independent of actor
-   presence and not just a mob feature.
-
-5. **Extend to assets and fixtures only after the shape holds.** Carried or
+4. **Extend to assets and fixtures only after the shape holds.** Carried or
    present assets and reachable fixtures should be able to sponsor the same
    interaction declarations. This is where instruments, books, doors, altars,
    and other object-bound storylets become first-class without new traversal
    machinery.
 
-6. **Delay lazy materialization.** The first implementation should target
+5. **Delay lazy materialization.** The first implementation should target
    existing traversable nodes. Later, an interaction can name a template that is
    materialized only when invoked, using the existing template/provisioning path
    rather than a sandbox-specific scene factory. This keeps stable sandbox
    simulation and lazy encounter content compatible without blending them.
 
-7. **Promote only after duplication appears.** If the same sponsor interaction
+6. **Promote only after duplication appears.** If the same sponsor interaction
    logic is cleanly shared by mobs, locations, fixtures, and assets, extract
    the generic pieces into story-level vocabulary. Until then, sandbox remains
    the pressure test and the runtime contract remains ordinary actions,

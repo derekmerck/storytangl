@@ -13,6 +13,8 @@ from .compiler import (
     SandboxInitialAssetSpec,
     SandboxInitialFixtureSpec,
     SandboxInitialMobSpec,
+    SandboxInteractionSpec,
+    SandboxLocationContributionsSpec,
     SandboxLocationSpec,
     SandboxMaterializationSpec,
     SandboxMobActionSpec,
@@ -39,12 +41,14 @@ from .handlers import (
     contribute_sandbox_inventory_helpers,
     project_sandbox_asset_actions,
     project_sandbox_fixture_actions,
+    project_sandbox_location_interactions,
     project_sandbox_location_links,
     project_sandbox_mob_actions,
     project_sandbox_scheduled_events,
     project_sandbox_unlocks,
     project_sandbox_wait,
 )
+from .interaction import SandboxInteraction
 from .mob import SandboxMob, SandboxMobAffordance
 from .location import (
     SandboxExit,
@@ -71,6 +75,9 @@ __all__ = [
     "SandboxInitialAssetSpec",
     "SandboxInitialFixtureSpec",
     "SandboxInitialMobSpec",
+    "SandboxInteraction",
+    "SandboxInteractionSpec",
+    "SandboxLocationContributionsSpec",
     "SandboxLocation",
     "SandboxLocationSpec",
     "ContainerFacet",
@@ -108,6 +115,7 @@ __all__ = [
     "normalize_sandbox_direction",
     "project_sandbox_asset_actions",
     "project_sandbox_fixture_actions",
+    "project_sandbox_location_interactions",
     "project_sandbox_location_links",
     "project_sandbox_mob_actions",
     "project_sandbox_scheduled_events",
