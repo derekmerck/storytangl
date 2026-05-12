@@ -246,7 +246,7 @@
           "dice": "2d6",
           "target": 12,
           "modifier": 0,
-          "success_text": "15/36 chance"
+          "success_text": "1/36 chance"
         }
       }
     }

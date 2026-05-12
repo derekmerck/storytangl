@@ -8,7 +8,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import Sequence, cast
+from typing import Sequence
 
 
 def _load_reference_port() -> ModuleType:
@@ -16,7 +16,9 @@ def _load_reference_port() -> ModuleType:
         import reference_port
 
         return reference_port
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as error:
+        if error.name != "reference_port":
+            raise
         module_path = Path(__file__).with_name("reference_port.py")
         spec = importlib.util.spec_from_file_location("reference_port", module_path)
         if spec is None or spec.loader is None:
@@ -40,7 +42,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("fixture", type=Path, help="Path to a conformance fixture JSON file")
     args = parser.parse_args(argv)
 
-    for line in cast(list[str], render_fixture(load_fixture(args.fixture))):
+    for line in render_fixture(load_fixture(args.fixture)):
         print(line)
     return 0
 

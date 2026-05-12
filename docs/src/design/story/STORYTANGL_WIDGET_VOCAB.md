@@ -1,7 +1,7 @@
-# StoryTangl Widget Vocabulary
+# StoryTangl Widget Vocabulary Target
 
 **Version:** v1.1 (draft) · supersedes v1.0 + carwars-extensions v0.1
-**Status of this document:** adopted unified vocabulary target. Repo-current
+**Status of this document:** proposed unified vocabulary target. Repo-current
 conformance status is tracked in
 `docs/src/design/story/WIDGET_CONTRACT_RECONCILIATION.md`; do not treat every
 Tier S label below as CI-enforced until that table marks the surface current.
@@ -46,7 +46,7 @@ direction.
 
 | Tag | Meaning |
 |---|---|
-| **Tier S** (Stable) | Implemented in engine v3.7+ as documented; clients MAY rely on it. |
+| **Tier S** (Stable target) | Intended portable baseline. Clients MAY rely on the subset marked current in `WIDGET_CONTRACT_RECONCILIATION.md`; unreconciled entries remain target language. |
 | **Tier P1** (Proposed, next engine epoch) | Concrete proposal with typed Pydantic models below. Additive. Backwards-compatible coercion path planned. |
 | **Tier P2** (Proposed, larger) | Architectural direction with sketch-level types. Pending settlement of §6 ontology. |
 | **Tier P3** (Genre extensions) | Domain-specific layers (carwars, hana-smuta, etc.). Defer until P1+P2 stabilize. |
@@ -84,7 +84,7 @@ render and route events.
 
 All ordered key/value structures in this document are arrays of records, not
 arrays of tuples. This applies to `KvRow` (§2.5), `compose.parts` payloads
-(§5.1), and any future ordered-pair surface. Records are extensible, narrow
+(§6.1), and any future ordered-pair surface. Records are extensible, narrow
 cleanly in TypeScript and Pydantic, and survive schema evolution. Tuples are
 not used at any wire boundary.
 
@@ -389,15 +389,15 @@ class ChoiceFragment(BaseFragment, extra="allow"):
     text: str = ""
     available: bool = True
     unavailable_reason: str | None = None
-    blockers: list["Blocker"] | None = None         # Tier P1 type, see §5.3
-    accepts: "Accepts | None" = None                # Tier P1 type, see §5.1
-    ui_hints: "UIHints | None" = None               # Tier P1 type, see §5.2
+    blockers: list[dict[str, Any]] | None = None    # Tier P1 typed target, see §6.3
+    accepts: dict[str, Any] | None = None           # Tier P1 typed target, see §6.1
+    ui_hints: dict[str, Any] | None = None          # Tier P1 typed target, see §6.2
     activation_payload: Any = Field(None, alias="payload")
 ```
 
 The current engine emits `accepts`, `ui_hints`, and `blockers` as
-`dict[str, Any]`. Tier P1 (§5) introduces typed shapes; the migration shim
-on `ChoiceFragment` accepts both forms during deprecation.
+plain dict/list values. Tier P1 (§6) introduces typed shapes; that migration
+should accept both forms during deprecation.
 
 | | |
 |---|---|
@@ -1178,24 +1178,25 @@ updating `cli_reference_port.py` fail CI.
 | Predicate (Tier P2) | An author-registered, backend-evaluated boolean function referenced by `predicate_ref`. |
 | Tier S/P1/P2/P3 | This document's stratification of stable vs. proposed vocabulary. |
 
-## Appendix B — Open questions (working list)
+## Appendix B — Implementation questions and decisions
 
-1. **`payload_type` wrapper** in webapp `ChoiceInputView`. Kill, formalize,
-   or fold into a specific `Accepts` variant? Default-kill unless an author
-   case appears.
-2. **`render_profile` query parameter** on `/story/do` (currently
-   defaults to `"raw"`). What other profiles exist? Document or remove.
-3. **Sunset clock for legacy `JournalStoryUpdate[]`** in
-   `apps/web/src/components/story/fragmentUtils.ts`. Are any backends
-   still emitting that shape? If not, the adapters can go.
-4. **Predicate registration protocol** (§7.4). Awaiting an MVP author.
-5. **Conformance fixture format** — JSON wins for cross-language portability;
-   confirmed unless YAML's commentability becomes load-bearing.
-6. **Group fragment `dialog` vs DialogFragment** — current engine has both.
-   Spec says ports MAY treat them identically. If there's a use case for
-   DialogFragment carrying additional fields, it should be promoted. Else,
-   plan retirement of the legacy shape.
+1. **`payload_type` wrapper** in webapp `ChoiceInputView`: default decision is
+   kill or fold into a concrete `Accepts` variant; do not standardize a second
+   wrapper unless an author case appears.
+2. **`render_profile` query parameter** on `/story/do`: document concrete
+   profiles or remove it. The vocabulary does not define render profiles as a
+   parallel contract.
+3. **Legacy `JournalStoryUpdate[]` adapters** in
+   `apps/web/src/components/story/fragmentUtils.ts`: keep only as a sunset
+   compatibility path while fragment-stream rendering takes over.
+4. **Predicate registration protocol** (§7.4): blocked pending an author MVP;
+   keep dependencies in the blocked list rather than Tier S fixtures.
+5. **Conformance fixture format**: JSON is the committed cross-language format.
+   YAML is documentation-only unless commentability becomes load-bearing.
+6. **Group fragment `dialog` vs DialogFragment**: ports MAY treat them
+   identically. Promote extra fields to `DialogFragment` if needed; otherwise
+   plan retirement of the duplicate legacy shape.
 
 ---
 
-*End of v1.0.*
+*End of v1.1 draft.*

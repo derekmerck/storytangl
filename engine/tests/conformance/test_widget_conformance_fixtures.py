@@ -57,10 +57,6 @@ def _proposal_fixture_paths() -> list[Path]:
     return sorted(PROPOSAL_DIR.glob("*.json"))
 
 
-def _is_record(value: object) -> bool:
-    return isinstance(value, dict)
-
-
 def _fragment_uid(fragment: dict[str, Any]) -> str:
     uid = fragment.get("uid")
     assert isinstance(uid, str) and uid, "fragment uid must be a non-empty string"

@@ -69,8 +69,8 @@
     "fixture": "command_hints",
     "grammar": {
       "examples": ["take lamp", "open door", "look around"],
-      "verbs": ["take", "open", "look"],
-      "nouns": ["lamp", "door"]
+      "verbs": ["take", "open", "look", "eat"],
+      "nouns": ["lamp", "door", "around", "mailbox"]
     }
   }
 }
